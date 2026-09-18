@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  native:
+    name: native (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Linux winit dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libxkbcommon-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.1
+          components: rustfmt, clippy
+      - name: Check native viewer
+        shell: bash
+        run: cargo check --locked --manifest-path iterations/001-car-viewer/Cargo.toml --workspace --bin porsche-viewer
+      - name: Test workspace
+        shell: bash
+        run: cargo test --locked --manifest-path iterations/001-car-viewer/Cargo.toml --workspace
+      - name: Run tests with synthetic resources
+        shell: bash
+        run: python scripts/test_iterations.py
+
+  wasm:
+    name: wasm check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.1
+          targets: wasm32-unknown-unknown
+      - name: Check wasm viewer
+        run: cargo check --locked --manifest-path iterations/001-car-viewer/Cargo.toml --target wasm32-unknown-unknown --workspace
