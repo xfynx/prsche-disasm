@@ -117,7 +117,11 @@ pub fn run_cli(args: impl IntoIterator<Item = String>) -> Result<(), String> {
                     &path,
                 ))
             } else {
-                run_window(scene, &title)
+                let center = match (center_x, center_y, center_z) {
+                    (Some(x), Some(y), Some(z)) => Some([x, y, z]),
+                    _ => None,
+                };
+                run_window(scene, &title, yaw, pitch, distance, center)
             }
         }
         _ => unreachable!(),
@@ -498,9 +502,16 @@ fn read_track_dir_recursive(
     Ok(())
 }
 
-fn run_window(scene: Scene, car: &str) -> Result<(), String> {
+fn run_window(
+    scene: Scene,
+    title: &str,
+    yaw: Option<f32>,
+    pitch: Option<f32>,
+    distance: Option<f32>,
+    center: Option<[f32; 3]>,
+) -> Result<(), String> {
     let event_loop = EventLoop::new().map_err(|e| format!("Event loop unavailable: {e}"))?;
-    let mut app = App::new(scene, car);
+    let mut app = App::new(scene, title, yaw, pitch, distance, center);
     event_loop
         .run_app(&mut app)
         .map_err(|e| format!("Window loop failed: {e}"))
@@ -513,21 +524,40 @@ struct App {
     surface: Option<wgpu::Surface<'static>>,
     config: Option<wgpu::SurfaceConfiguration>,
     renderer: Option<Renderer>,
-    dragging: bool,
+    dragging_orbit: bool,
+    dragging_pan: bool,
     cursor: Option<(f64, f64)>,
+    shift_pressed: bool,
+    initial_yaw: Option<f32>,
+    initial_pitch: Option<f32>,
+    initial_distance: Option<f32>,
+    initial_center: Option<[f32; 3]>,
 }
 
 impl App {
-    fn new(scene: Scene, car: &str) -> Self {
+    fn new(
+        scene: Scene,
+        title: &str,
+        yaw: Option<f32>,
+        pitch: Option<f32>,
+        distance: Option<f32>,
+        center: Option<[f32; 3]>,
+    ) -> Self {
         Self {
             scene: Some(scene),
-            title: format!("Porsche Unleashed car viewer - {car}"),
+            title: title.to_string(),
             window: None,
             surface: None,
             config: None,
             renderer: None,
-            dragging: false,
+            dragging_orbit: false,
+            dragging_pan: false,
             cursor: None,
+            shift_pressed: false,
+            initial_yaw: yaw,
+            initial_pitch: pitch,
+            initial_distance: distance,
+            initial_center: center,
         }
     }
 
@@ -574,7 +604,7 @@ impl App {
             desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
-        let renderer = Renderer::new(
+        let mut renderer = Renderer::new(
             device,
             queue,
             format,
@@ -582,6 +612,20 @@ impl App {
             config.height,
             self.scene.as_ref().ok_or("Scene missing")?,
         )?;
+        if let Some(yaw) = self.initial_yaw {
+            renderer.camera.yaw = yaw;
+        }
+        if let Some(pitch) = self.initial_pitch {
+            renderer.camera.pitch = pitch.clamp(-1.45, 1.45);
+        }
+        if let Some(distance) = self.initial_distance {
+            renderer.camera.distance = distance;
+            renderer.camera.initial_distance = distance;
+        }
+        if let Some(center) = self.initial_center {
+            renderer.camera.center = glam::Vec3::from(center);
+            renderer.camera.initial_center = renderer.camera.center;
+        }
 
         self.window = Some(window);
         self.surface = Some(surface);
@@ -661,25 +705,50 @@ impl ApplicationHandler for App {
                     event_loop.exit();
                 }
             }
-            WindowEvent::MouseInput {
-                state,
-                button: MouseButton::Left,
-                ..
-            } => {
-                self.dragging = state == ElementState::Pressed;
-                if !self.dragging {
+            WindowEvent::ModifiersChanged(modifiers) => {
+                self.shift_pressed = modifiers.state().shift_key();
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                let pressed = state == ElementState::Pressed;
+                match button {
+                    MouseButton::Left => {
+                        if self.shift_pressed {
+                            self.dragging_pan = pressed;
+                            self.dragging_orbit = false;
+                        } else {
+                            self.dragging_orbit = pressed;
+                            self.dragging_pan = false;
+                        }
+                    }
+                    MouseButton::Right | MouseButton::Middle => {
+                        self.dragging_pan = pressed;
+                        self.dragging_orbit = false;
+                    }
+                    _ => {}
+                }
+                if !self.dragging_orbit && !self.dragging_pan {
+                    self.cursor = None;
+                }
+            }
+            WindowEvent::CursorLeft { .. } => {
+                if !self.dragging_orbit && !self.dragging_pan {
                     self.cursor = None;
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                if self.dragging {
-                    if let (Some((x, y)), Some(renderer)) = (self.cursor, &mut self.renderer) {
-                        renderer
-                            .camera
-                            .orbit((position.x - x) as f32, (position.y - y) as f32);
-                    }
-                    if let Some(window) = &self.window {
-                        window.request_redraw();
+                if let (Some((x, y)), Some(renderer)) = (self.cursor, &mut self.renderer) {
+                    let dx = (position.x - x) as f32;
+                    let dy = (position.y - y) as f32;
+                    if self.dragging_orbit {
+                        renderer.camera.orbit(dx, dy);
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    } else if self.dragging_pan {
+                        renderer.camera.pan(dx, dy);
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
                     }
                 }
                 self.cursor = Some((position.x, position.y));
@@ -696,26 +765,78 @@ impl ApplicationHandler for App {
                     window.request_redraw();
                 }
             }
-            WindowEvent::KeyboardInput { event, .. }
-                if event.state == ElementState::Pressed
-                    && matches!(event.physical_key, PhysicalKey::Code(KeyCode::KeyR)) =>
-            {
-                if let Some(renderer) = &mut self.renderer {
-                    renderer.camera.reset();
-                }
-                if let Some(window) = &self.window {
-                    window.request_redraw();
-                }
-            }
-            WindowEvent::KeyboardInput { event, .. }
-                if event.state == ElementState::Pressed
-                    && matches!(event.physical_key, PhysicalKey::Code(KeyCode::KeyC)) =>
-            {
-                if let Some(renderer) = &mut self.renderer {
-                    renderer.cycle_paint_color();
-                }
-                if let Some(window) = &self.window {
-                    window.request_redraw();
+            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
+                let speed_mult = if self.shift_pressed { 3.0 } else { 1.0 };
+                match event.physical_key {
+                    PhysicalKey::Code(KeyCode::KeyR) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            renderer.camera.reset();
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::KeyC) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            renderer.cycle_paint_color();
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::KeyW) | PhysicalKey::Code(KeyCode::ArrowUp) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            renderer.camera.move_ground(speed_mult, 0.0);
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::KeyS) | PhysicalKey::Code(KeyCode::ArrowDown) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            renderer.camera.move_ground(-speed_mult, 0.0);
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::KeyA) | PhysicalKey::Code(KeyCode::ArrowLeft) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            renderer.camera.move_ground(0.0, -speed_mult);
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::KeyD) | PhysicalKey::Code(KeyCode::ArrowRight) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            renderer.camera.move_ground(0.0, speed_mult);
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::KeyQ)
+                    | PhysicalKey::Code(KeyCode::Minus)
+                    | PhysicalKey::Code(KeyCode::NumpadSubtract) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            renderer.camera.zoom(120.0 * speed_mult);
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::KeyE)
+                    | PhysicalKey::Code(KeyCode::Equal)
+                    | PhysicalKey::Code(KeyCode::NumpadAdd) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            renderer.camera.zoom(-120.0 * speed_mult);
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    _ => {}
                 }
             }
             _ => {}

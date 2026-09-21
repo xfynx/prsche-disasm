@@ -58,6 +58,8 @@ pub struct Camera {
     pub pitch: f32,
     pub distance: f32,
     pub center: Vec3,
+    pub initial_center: Vec3,
+    pub initial_distance: f32,
     pub radius: f32,
 }
 
@@ -66,8 +68,12 @@ impl Camera {
         let min = Vec3::from(bounds[0]);
         let max = Vec3::from(bounds[1]);
         let radius = ((max - min).length() * 0.5).max(0.1);
+        let center = (max + min) * 0.5;
+        let distance = radius * 2.8;
         let mut camera = Self {
-            center: (max + min) * 0.5,
+            center,
+            initial_center: center,
+            initial_distance: distance,
             radius,
             yaw: 0.0,
             pitch: 0.0,
@@ -77,19 +83,40 @@ impl Camera {
         camera
     }
     pub fn reset(&mut self) {
+        self.center = self.initial_center;
         self.yaw = 0.75;
         self.pitch = 0.27;
-        self.distance = self.radius * 2.8;
+        self.distance = self.initial_distance;
     }
     pub fn orbit(&mut self, x: f32, y: f32) {
         self.yaw -= x * 0.006;
         self.pitch = (self.pitch + y * 0.006).clamp(-1.45, 1.45);
     }
-    pub fn zoom(&mut self, delta: f32) {
-        self.distance =
-            (self.distance * (delta * 0.001).exp()).clamp(self.radius * 1.1, self.radius * 16.0);
+    pub fn pan(&mut self, x: f32, y: f32) {
+        let eye = self.eye();
+        let forward = (self.center - eye).normalize_or_zero();
+        let right = forward.cross(Vec3::Y).normalize_or_zero();
+        let up = right.cross(forward).normalize_or_zero();
+        let speed = (self.distance * 0.0015).max(0.01);
+        self.center += (-right * x + up * y) * speed;
     }
-    fn eye(&self) -> Vec3 {
+    pub fn move_ground(&mut self, forward_amount: f32, right_amount: f32) {
+        let eye = self.eye();
+        let forward = (self.center - eye).normalize_or_zero();
+        let mut forward_h = Vec3::new(forward.x, 0.0, forward.z).normalize_or_zero();
+        if forward_h.length_squared() < 0.001 {
+            forward_h = Vec3::new(-self.yaw.sin(), 0.0, -self.yaw.cos());
+        }
+        let right_h = forward_h.cross(Vec3::Y).normalize_or_zero();
+        let speed = (self.distance * 0.05).clamp(0.5, 50.0);
+        self.center += (forward_h * forward_amount + right_h * right_amount) * speed;
+    }
+    pub fn zoom(&mut self, delta: f32) {
+        let min_distance = (self.radius * 0.001).clamp(0.2, 1.0);
+        let max_distance = (self.radius * 20.0).max(5000.0);
+        self.distance = (self.distance * (delta * 0.001).exp()).clamp(min_distance, max_distance);
+    }
+    pub fn eye(&self) -> Vec3 {
         self.center
             + self.distance
                 * Vec3::new(
@@ -99,11 +126,13 @@ impl Camera {
                 )
     }
     fn uniform(&self, width: u32, height: u32) -> CameraUniform {
+        let near = (self.distance * 0.05).clamp(0.05, 1.0);
+        let far = (self.radius * 20.0).max(10_000.0);
         let projection = Mat4::perspective_rh(
             45.0_f32.to_radians(),
             width as f32 / height.max(1) as f32,
-            self.radius * 0.01,
-            self.radius * 100.0,
+            near,
+            far,
         );
         let eye = self.eye();
         CameraUniform {

@@ -23,14 +23,14 @@
 .\local\builds\002-track-viewer\windows\porsche-viewer.exe view `
   --game-dir local/game --track skidpad `
   --screenshot iterations/002-track-viewer/runs/001-track-baseline/skidpad-road-joint.png `
-  --center-x 105.8 --center-y 0.2 --center-z -195.3 --distance 45.0 --pitch 0.4 --yaw 2.3 `
+  --center-x 105.8 --center-y 0.2 --center-z -195.3 --distance 12.0 --pitch 0.35 --yaw 2.3 `
   --width 1280 --height 720
 
 # 4. Детальный вид объектов окружения (шинные отбойники TIREWALL01, каменная стена, деревья)
 .\local\builds\002-track-viewer\windows\porsche-viewer.exe view `
   --game-dir local/game --track skidpad `
   --screenshot iterations/002-track-viewer/runs/001-track-baseline/skidpad-tirewall.png `
-  --center-x -97.4 --center-y 0.8 --center-z 181.1 --distance 30.0 --pitch 0.2 --yaw 1.2 `
+  --center-x -97.4 --center-y 0.8 --center-z 181.1 --distance 12.0 --pitch 0.15 --yaw 1.2 `
   --width 1280 --height 720
 ```
 

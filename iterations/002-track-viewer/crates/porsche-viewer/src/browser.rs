@@ -108,6 +108,18 @@ impl BrowserViewer {
         }
     }
 
+    pub fn pan(&mut self, dx: f32, dy: f32) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.camera.pan(dx, dy);
+        }
+    }
+
+    pub fn move_ground(&mut self, forward: f32, right: f32) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.camera.move_ground(forward, right);
+        }
+    }
+
     pub fn zoom(&mut self, delta: f32) {
         if let Some(renderer) = &mut self.renderer {
             renderer.camera.zoom(delta);

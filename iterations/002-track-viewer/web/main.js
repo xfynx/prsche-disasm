@@ -138,6 +138,12 @@ loadButton.addEventListener("click", async () => {
   }
 });
 
+let panMode = false;
+
+canvas.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+});
+
 resetButton.addEventListener("click", () => {
   if (viewer) {
     viewer.reset_camera();
@@ -147,18 +153,21 @@ resetButton.addEventListener("click", () => {
 
 canvas.addEventListener("pointerdown", (event) => {
   dragging = true;
+  panMode = event.button === 2 || event.button === 1 || event.shiftKey;
   lastPointer = { x: event.clientX, y: event.clientY };
   canvas.setPointerCapture(event.pointerId);
 });
 
 canvas.addEventListener("pointerup", (event) => {
   dragging = false;
+  panMode = false;
   lastPointer = null;
   canvas.releasePointerCapture(event.pointerId);
 });
 
 canvas.addEventListener("pointercancel", () => {
   dragging = false;
+  panMode = false;
   lastPointer = null;
 });
 
@@ -169,7 +178,11 @@ canvas.addEventListener("pointermove", (event) => {
   const dx = event.clientX - lastPointer.x;
   const dy = event.clientY - lastPointer.y;
   lastPointer = { x: event.clientX, y: event.clientY };
-  viewer.orbit(dx, dy);
+  if (panMode) {
+    viewer.pan(dx, dy);
+  } else {
+    viewer.orbit(dx, dy);
+  }
   queueFrame();
 });
 
@@ -188,12 +201,31 @@ canvas.addEventListener(
 
 window.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
-  if (event.code === "KeyR" && viewer) {
+  if (!viewer) return;
+  const speedMult = event.shiftKey ? 3.0 : 1.0;
+  if (event.code === "KeyR") {
     viewer.reset_camera();
     queueFrame();
-  }
-  if (event.code === "KeyC" && viewer) {
+  } else if (event.code === "KeyC") {
     viewer.cycle_paint_color();
+    queueFrame();
+  } else if (event.code === "KeyW" || event.code === "ArrowUp") {
+    viewer.move_ground(speedMult, 0);
+    queueFrame();
+  } else if (event.code === "KeyS" || event.code === "ArrowDown") {
+    viewer.move_ground(-speedMult, 0);
+    queueFrame();
+  } else if (event.code === "KeyA" || event.code === "ArrowLeft") {
+    viewer.move_ground(0, -speedMult);
+    queueFrame();
+  } else if (event.code === "KeyD" || event.code === "ArrowRight") {
+    viewer.move_ground(0, speedMult);
+    queueFrame();
+  } else if (event.code === "KeyQ" || event.code === "Minus" || event.code === "NumpadSubtract") {
+    viewer.zoom(120 * speedMult);
+    queueFrame();
+  } else if (event.code === "KeyE" || event.code === "Equal" || event.code === "NumpadAdd") {
+    viewer.zoom(-120 * speedMult);
     queueFrame();
   }
 });
