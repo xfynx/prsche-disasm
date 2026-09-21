@@ -131,9 +131,7 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         };
 
         let texture = tex_map.get(&tex_name).copied();
-        let alpha_mode = if render_method == "Opaque" {
-            AlphaMode::Opaque
-        } else if let Some(t_idx) = texture {
+        let alpha_mode = if let Some(t_idx) = texture {
             let has_transparency = scene.textures[t_idx]
                 .rgba
                 .as_chunks::<4>()
@@ -141,7 +139,11 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                 .iter()
                 .any(|p| p[3] < 255);
             if has_transparency {
-                AlphaMode::Mask
+                if render_method == "Transparency" {
+                    AlphaMode::Blend
+                } else {
+                    AlphaMode::Mask
+                }
             } else {
                 AlphaMode::Opaque
             }
@@ -169,6 +171,7 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         });
     }
 
+    let mut raw_meshes = Vec::new();
     let mut total_tris = 0;
     for (ai, a) in crp.articles.iter().enumerate() {
         let article_name = a
@@ -253,10 +256,27 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                         scene.bounds[1][k] = scene.bounds[1][k].max(v.position[k]);
                     }
                 }
-                scene.meshes.push(m);
+                raw_meshes.push(m);
             }
         }
     }
+
+    // Combine meshes sharing the same material to drastically reduce GPU buffer count and draw calls
+    let mut combined: BTreeMap<usize, Mesh> = BTreeMap::new();
+    for m in raw_meshes {
+        let entry = combined.entry(m.material).or_insert_with(|| Mesh {
+            name: format!("mat_{}", m.material),
+            vertices: Vec::new(),
+            indices: Vec::new(),
+            material: m.material,
+        });
+        let base_idx = entry.vertices.len() as u32;
+        entry.vertices.extend(m.vertices);
+        entry
+            .indices
+            .extend(m.indices.into_iter().map(|idx| idx + base_idx));
+    }
+    scene.meshes = combined.into_values().collect();
 
     if scene.meshes.is_empty() {
         return Err("no drawable meshes in track".into());
@@ -454,21 +474,13 @@ mod tests {
         files.insert("skidpad.fsh".into(), std::fs::read(&fsh_path).unwrap());
 
         let scene = load(&files, "skidpad").unwrap();
-        assert_eq!(scene.meshes.len(), 385);
+        assert_eq!(scene.meshes.len(), 46);
         assert_eq!(scene.textures.len(), 98);
         assert_eq!(scene.materials.len(), 107);
+        let total_triangles: usize = scene.meshes.iter().map(|m| m.indices.len() / 3).sum();
+        assert_eq!(total_triangles, 6848);
         assert!(scene.bounds[0][0] < -200.0);
         assert!(scene.bounds[1][0] > 200.0);
-
-        // Check for road meshes
-        assert!(scene.meshes.iter().any(|m| m.name.starts_with("RD0040C")));
-        assert!(scene.meshes.iter().any(|m| m.name.starts_with("RD0048C")));
-
-        // Check for environmental objects
-        assert!(scene
-            .meshes
-            .iter()
-            .any(|m| m.name.starts_with("TIREWALL01")));
     }
 
     #[test]
@@ -476,5 +488,47 @@ mod tests {
         let files = AssetFiles::new();
         let err = load(&files, "skidpad").unwrap_err();
         assert!(err.contains("missing resource skidpad.crp"));
+    }
+
+    #[test]
+    fn audit_all_tracks_magenta() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData/Track");
+        if !root.exists() {
+            return;
+        }
+        for track_name in &["farmland", "skidpad"] {
+            let path = root.join(format!("{track_name}.crp"));
+            let fsh_path = root.join(format!("{track_name}.fsh"));
+            let mut files = AssetFiles::new();
+            files.insert(format!("{track_name}.crp"), std::fs::read(&path).unwrap());
+            files.insert(
+                format!("{track_name}.fsh"),
+                std::fs::read(&fsh_path).unwrap(),
+            );
+            let scene = match load(&files, track_name) {
+                Ok(s) => s,
+                Err(e) => {
+                    println!("TRACK FAIL: {track_name}: {e}");
+                    continue;
+                }
+            };
+            println!(
+                "=== Track {track_name} (textures: {}) ===",
+                scene.textures.len()
+            );
+            let fsh_bytes = files.get(&format!("{track_name}.fsh")).unwrap();
+            let fsh = nfs_formats::parse_fsh(fsh_bytes).unwrap();
+            for img in &fsh {
+                if ["fi03", "eur1", "wall", "hs09"].contains(&img.name.as_str()) {
+                    let _n = img.width as usize * img.height as usize;
+                    let p0 = &img.rgba[..16];
+                    println!(
+                        "  FSH image '{}' ({}x{}): sample={:?}",
+                        img.name, img.width, img.height, p0
+                    );
+                }
+            }
+        }
     }
 }

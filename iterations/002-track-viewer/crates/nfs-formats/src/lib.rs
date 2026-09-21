@@ -310,25 +310,7 @@ pub fn parse_fsh(input: &[u8]) -> Result<Vec<Image>> {
                     rgba.extend_from_slice(&pixel);
                 }
             }
-            0x7e => {
-                for p in bytes(
-                    d,
-                    o + 16,
-                    count
-                        .checked_mul(2)
-                        .ok_or("FSH 16bpp byte count overflow")?,
-                )?
-                .as_chunks::<2>()
-                .0
-                {
-                    let v = u16::from_le_bytes([p[0], p[1]]);
-                    let r = (((v >> 11) & 31) * 255 / 31) as u8;
-                    let g = (((v >> 5) & 63) * 255 / 63) as u8;
-                    let b = ((v & 31) * 255 / 31) as u8;
-                    rgba.extend_from_slice(&[r, g, b, 255]);
-                }
-            }
-            0x78 => {
+            0x78 | 0x7e => {
                 for p in bytes(
                     d,
                     o + 16,

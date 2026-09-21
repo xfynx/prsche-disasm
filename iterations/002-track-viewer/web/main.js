@@ -67,7 +67,7 @@ function rememberFiles(files) {
     .sort();
 
   availableTracks = [...basenames]
-    .filter(name => name.endsWith(".crp") && !basenames.has(name.slice(0, -4) + ".tpg"))
+    .filter(name => name.endsWith(".crp") && basenames.has(name.slice(0, -4) + ".fsh"))
     .map(name => name.slice(0, -4))
     .sort();
 
