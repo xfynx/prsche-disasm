@@ -18,8 +18,12 @@ class SnapshotTests(unittest.TestCase):
             (source/'src/main.rs').write_text('original', encoding='utf-8')
             (source/'target').mkdir()
             (source/'target/build').write_text('cache', encoding='utf-8')
+            (source/'runs/001-old').mkdir(parents=True)
+            (source/'runs/001-old/snap.png').write_bytes(b'png')
             target = iteration.create_iteration(root, source.name, '001-viewer')
             self.assertFalse((target/'target').exists())
+            self.assertFalse((target/'runs/001-old').exists())
+            self.assertTrue((target/'runs/README.md').exists())
             (target/'src/main.rs').write_text('changed', encoding='utf-8')
             self.assertEqual((source/'src/main.rs').read_text(), 'original')
             with self.assertRaises(FileExistsError):

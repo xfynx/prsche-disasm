@@ -4,7 +4,7 @@ import re
 import shutil
 from pathlib import Path
 
-SKIP = {'target', '__pycache__', '.git', 'local', '.venv', 'node_modules'}
+SKIP = {'target', '__pycache__', '.git', 'local', '.venv', 'node_modules', 'runs'}
 
 
 def create_iteration(root, source_name, name):
@@ -27,6 +27,14 @@ def create_iteration(root, source_name, name):
         f'# {name}\n\nСтатус: в работе.\n\nПолный снимок `{source.name}`.\n'
         f'Планируемый тег: `iteration-{name[:3]}`.\n\n'
         'Цель, команды и критерии готовности необходимо актуализировать перед работой.\n',
+        encoding='utf-8')
+    runs_dir = destination / 'runs'
+    runs_dir.mkdir(exist_ok=True)
+    (runs_dir / 'README.md').write_text(
+        '# Viewer runs\n\n'
+        'Здесь хранятся воспроизводимые визуальные запуски текущей итерации. '
+        'Предыдущие запуски остаются в своих завершённых снимках.\n\n'
+        'Каждый запуск получает отдельную папку `NNN-краткое-описание/` с `README.md` и снимками.\n',
         encoding='utf-8')
     print(destination)
     return destination
