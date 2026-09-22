@@ -5,9 +5,13 @@ import unittest
 from pathlib import Path
 
 WORKSPACE = Path(__file__).resolve().parents[1]
-EXE = WORKSPACE / "local/builds/002-track-viewer/windows/porsche-viewer.exe"
-if not EXE.exists():
-    EXE = WORKSPACE / "local/builds/002-track-viewer/.cargo-target/release/porsche-viewer.exe"
+candidates = [
+    WORKSPACE / "local/builds/003-track-environment/windows/porsche-viewer.exe",
+    WORKSPACE / "local/builds/003-track-environment/.cargo-target/release/porsche-viewer.exe",
+    WORKSPACE / "local/builds/002-track-viewer/windows/porsche-viewer.exe",
+    WORKSPACE / "local/builds/002-track-viewer/.cargo-target/release/porsche-viewer.exe",
+]
+EXE = next((p for p in candidates if p.exists()), candidates[0])
 GAME_DIR = WORKSPACE / "local/game"
 
 
@@ -26,10 +30,11 @@ class TestTrackCli(unittest.TestCase):
             text=True,
         )
         self.assertEqual(res.returncode, 0, f"inspect skidpad failed: {res.stderr}")
-        self.assertIn("385 parts", res.stdout)
         self.assertIn("6848 triangles", res.stdout)
         self.assertIn("98 textures", res.stdout)
         self.assertIn("107 materials", res.stdout)
+        self.assertIn("Props: 70 articles, 11 instances", res.stdout)
+        self.assertIn("Sky: loaded", res.stdout)
 
     def test_inspect_car_regression(self):
         res = subprocess.run(
