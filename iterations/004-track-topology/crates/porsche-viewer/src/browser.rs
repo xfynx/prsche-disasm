@@ -116,8 +116,22 @@ impl BrowserViewer {
 
     pub fn move_ground(&mut self, forward: f32, right: f32) {
         if let Some(renderer) = &mut self.renderer {
-            renderer.camera.move_ground(forward, right);
+            renderer.move_ground(forward, right);
         }
+    }
+
+    pub fn toggle_camera_mode(&mut self) -> bool {
+        self.renderer
+            .as_mut()
+            .map(|r| r.toggle_camera_mode())
+            .unwrap_or(false)
+    }
+
+    pub fn is_drive_mode(&self) -> bool {
+        self.renderer
+            .as_ref()
+            .map(|r| r.is_drive_mode())
+            .unwrap_or(false)
     }
 
     pub fn zoom(&mut self, delta: f32) {
@@ -136,6 +150,84 @@ impl BrowserViewer {
         if let Some(renderer) = &mut self.renderer {
             renderer.cycle_paint_color();
         }
+    }
+
+    pub fn set_show_topology(&mut self, show: bool) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.set_show_topology(show);
+        }
+    }
+
+    pub fn toggle_topology(&mut self) -> bool {
+        self.renderer
+            .as_mut()
+            .map(|r| r.toggle_topology())
+            .unwrap_or(false)
+    }
+
+    pub fn has_topology(&self) -> bool {
+        self.renderer
+            .as_ref()
+            .and_then(|r| r.topology.as_ref())
+            .map(|t| t.vertex_count > 0)
+            .unwrap_or(false)
+    }
+
+    pub fn update_car(&mut self, dt: f32, throttle: f32, steer: f32, handbrake: bool) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.update_car(dt, throttle, steer, handbrake);
+        }
+    }
+
+    pub fn reset_car(&mut self) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.reset_car();
+        }
+    }
+
+    pub fn cycle_car_view(&mut self) -> u32 {
+        if let Some(renderer) = &mut self.renderer {
+            match renderer.cycle_car_view() {
+                crate::arcade::DriveViewMode::Chase => 0,
+                crate::arcade::DriveViewMode::Bumper => 1,
+                crate::arcade::DriveViewMode::Free => 2,
+            }
+        } else {
+            0
+        }
+    }
+
+    pub fn cycle_car_paint(&mut self) -> usize {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.cycle_car_paint()
+        } else {
+            0
+        }
+    }
+
+    pub fn get_car_speed(&self) -> f32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_car_speed_kmh())
+            .unwrap_or(0.0)
+    }
+
+    pub fn get_car_gear(&self) -> i32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_car_gear())
+            .unwrap_or(0)
+    }
+
+    pub fn get_car_rpm(&self) -> f32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_car_rpm())
+            .unwrap_or(0.0)
+    }
+
+    pub fn has_car(&self) -> bool {
+        self.renderer.as_ref().map(|r| r.has_car()).unwrap_or(false)
     }
 
     pub fn render(&mut self) -> Result<(), JsValue> {

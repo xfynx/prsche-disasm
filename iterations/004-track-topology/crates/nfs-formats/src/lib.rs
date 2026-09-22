@@ -205,6 +205,12 @@ pub use track::{parse_track_crp, TrackCrp, TRACK_CRP_MAGIC};
 pub mod scn;
 pub use scn::{parse_scn, GeomElement, ScnFile};
 
+pub mod topology;
+pub use topology::{
+    parse_edg, parse_jnc, parse_map, EdgeSegment, JunctionRecord, Junctions, MapHeader, MapSection,
+    RoadEdges, TrackMap,
+};
+
 #[derive(Debug, Clone)]
 pub struct Image {
     pub name: String,

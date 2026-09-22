@@ -72,6 +72,34 @@ pub struct SkyTexture {
     pub rgba: Vec<u8>,
 }
 
+/// A 3D edge segment in scene coordinates.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TopologyEdge {
+    pub flags: u8,
+    pub p1: [f32; 3],
+    pub p2: [f32; 3],
+}
+
+/// A 3D polyline representing road boundaries or splines in scene coordinates.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TopologyLine {
+    pub points: Vec<[f32; 3]>,
+    pub color: [f32; 4],
+}
+
+/// Track topology representation including road boundaries, junctions, and slice mapping.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct TrackTopology {
+    /// 3D edge segments in scene coordinates `[x, y, -z]`.
+    pub edges: Vec<TopologyEdge>,
+    /// Continuous boundary polylines assembled from connected edges.
+    pub boundary_lines: Vec<TopologyLine>,
+    /// Junction connection nodes (from `.jnc`).
+    pub junctions: Vec<nfs_formats::JunctionRecord>,
+    /// Track map metadata (from `.map`, if present).
+    pub map: Option<nfs_formats::TrackMap>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Scene {
     pub meshes: Vec<Mesh>,
@@ -85,6 +113,8 @@ pub struct Scene {
     pub prop_instances: Vec<PropInstance>,
     /// Sky horizon panorama texture, if available.
     pub sky_texture: Option<SkyTexture>,
+    /// Track topology (boundaries, junctions, map), if available.
+    pub topology: Option<TrackTopology>,
 }
 
 impl Default for Scene {
@@ -98,6 +128,7 @@ impl Default for Scene {
             prop_articles: Vec::new(),
             prop_instances: Vec::new(),
             sky_texture: None,
+            topology: None,
         }
     }
 }

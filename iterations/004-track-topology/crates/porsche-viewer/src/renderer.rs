@@ -53,7 +53,14 @@ pub async fn request_gpu(
     Ok((adapter, device, queue))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CameraMode {
+    Orbit,
+    Drive,
+}
+
 pub struct Camera {
+    pub mode: CameraMode,
     pub yaw: f32,
     pub pitch: f32,
     pub distance: f32,
@@ -61,6 +68,10 @@ pub struct Camera {
     pub initial_center: Vec3,
     pub initial_distance: f32,
     pub radius: f32,
+    pub drive_pos: Vec3,
+    pub drive_target: Vec3,
+    pub drive_height: f32,
+    pub drive_fov: f32,
 }
 
 impl Camera {
@@ -71,6 +82,7 @@ impl Camera {
         let center = (max + min) * 0.5;
         let distance = radius * 2.8;
         let mut camera = Self {
+            mode: CameraMode::Orbit,
             center,
             initial_center: center,
             initial_distance: distance,
@@ -78,64 +90,127 @@ impl Camera {
             yaw: 0.0,
             pitch: 0.0,
             distance: 0.0,
+            drive_pos: center,
+            drive_target: center + Vec3::new(0.0, 0.0, -10.0),
+            drive_height: 1.6,
+            drive_fov: 58.0,
         };
         camera.reset();
         camera
     }
     pub fn reset(&mut self) {
+        self.mode = CameraMode::Orbit;
         self.center = self.initial_center;
         self.yaw = 0.75;
         self.pitch = 0.27;
         self.distance = self.initial_distance;
+        self.drive_pos = self.initial_center;
+        self.drive_target = self.initial_center + Vec3::new(0.0, 0.0, -10.0);
+        self.drive_height = 1.6;
+        self.drive_fov = 58.0;
     }
     pub fn orbit(&mut self, x: f32, y: f32) {
-        self.yaw -= x * 0.006;
-        self.pitch = (self.pitch + y * 0.006).clamp(-1.45, 1.45);
+        match self.mode {
+            CameraMode::Orbit => {
+                self.yaw -= x * 0.006;
+                self.pitch = (self.pitch + y * 0.006).clamp(-1.45, 1.45);
+            }
+            CameraMode::Drive => {
+                self.yaw -= x * 0.004;
+                self.pitch = (self.pitch - y * 0.004).clamp(-1.35, 1.35);
+            }
+        }
     }
     pub fn pan(&mut self, x: f32, y: f32) {
-        let eye = self.eye();
-        let forward = (self.center - eye).normalize_or_zero();
-        let right = forward.cross(Vec3::Y).normalize_or_zero();
-        let up = right.cross(forward).normalize_or_zero();
-        let speed = (self.distance * 0.0015).max(0.01);
-        self.center += (-right * x + up * y) * speed;
+        match self.mode {
+            CameraMode::Orbit => {
+                let eye = self.eye();
+                let forward = (self.center - eye).normalize_or_zero();
+                let right = forward.cross(Vec3::Y).normalize_or_zero();
+                let up = right.cross(forward).normalize_or_zero();
+                let speed = (self.distance * 0.0015).max(0.01);
+                self.center += (-right * x + up * y) * speed;
+            }
+            CameraMode::Drive => {
+                let forward_h =
+                    Vec3::new(-self.yaw.sin(), 0.0, -self.yaw.cos()).normalize_or_zero();
+                let right_h = forward_h.cross(Vec3::Y).normalize_or_zero();
+                self.drive_pos += -right_h * x * 0.05 + forward_h * y * 0.05;
+            }
+        }
     }
     pub fn move_ground(&mut self, forward_amount: f32, right_amount: f32) {
-        let eye = self.eye();
-        let forward = (self.center - eye).normalize_or_zero();
-        let mut forward_h = Vec3::new(forward.x, 0.0, forward.z).normalize_or_zero();
-        if forward_h.length_squared() < 0.001 {
-            forward_h = Vec3::new(-self.yaw.sin(), 0.0, -self.yaw.cos());
+        match self.mode {
+            CameraMode::Orbit => {
+                let eye = self.eye();
+                let forward = (self.center - eye).normalize_or_zero();
+                let mut forward_h = Vec3::new(forward.x, 0.0, forward.z).normalize_or_zero();
+                if forward_h.length_squared() < 0.001 {
+                    forward_h = Vec3::new(-self.yaw.sin(), 0.0, -self.yaw.cos());
+                }
+                let right_h = forward_h.cross(Vec3::Y).normalize_or_zero();
+                let speed = (self.distance * 0.05).clamp(0.5, 50.0);
+                self.center += (forward_h * forward_amount + right_h * right_amount) * speed;
+            }
+            CameraMode::Drive => {
+                let forward_h =
+                    Vec3::new(-self.yaw.sin(), 0.0, -self.yaw.cos()).normalize_or_zero();
+                let right_h = forward_h.cross(Vec3::Y).normalize_or_zero();
+                let speed = 25.0;
+                self.drive_pos += (forward_h * forward_amount + right_h * right_amount) * speed;
+            }
         }
-        let right_h = forward_h.cross(Vec3::Y).normalize_or_zero();
-        let speed = (self.distance * 0.05).clamp(0.5, 50.0);
-        self.center += (forward_h * forward_amount + right_h * right_amount) * speed;
     }
     pub fn zoom(&mut self, delta: f32) {
-        let min_distance = (self.radius * 0.001).clamp(0.2, 1.0);
-        let max_distance = (self.radius * 20.0).max(5000.0);
-        self.distance = (self.distance * (delta * 0.001).exp()).clamp(min_distance, max_distance);
+        match self.mode {
+            CameraMode::Orbit => {
+                let min_distance = (self.radius * 0.001).clamp(0.2, 1.0);
+                let max_distance = (self.radius * 20.0).max(5000.0);
+                self.distance =
+                    (self.distance * (delta * 0.001).exp()).clamp(min_distance, max_distance);
+            }
+            CameraMode::Drive => {
+                self.drive_height = (self.drive_height + delta * 0.005).clamp(0.5, 30.0);
+            }
+        }
     }
     pub fn eye(&self) -> Vec3 {
-        self.center
-            + self.distance
-                * Vec3::new(
-                    self.yaw.sin() * self.pitch.cos(),
-                    self.pitch.sin(),
-                    self.yaw.cos() * self.pitch.cos(),
-                )
+        match self.mode {
+            CameraMode::Orbit => {
+                self.center
+                    + self.distance
+                        * Vec3::new(
+                            self.yaw.sin() * self.pitch.cos(),
+                            self.pitch.sin(),
+                            self.yaw.cos() * self.pitch.cos(),
+                        )
+            }
+            CameraMode::Drive => self.drive_pos,
+        }
+    }
+    pub fn target(&self) -> Vec3 {
+        match self.mode {
+            CameraMode::Orbit => self.center,
+            CameraMode::Drive => self.drive_target,
+        }
     }
     fn view_projection(&self, width: u32, height: u32) -> Mat4 {
-        let near = (self.distance * 0.05).clamp(0.05, 1.0);
-        let far = (self.radius * 20.0).max(10_000.0);
-        let projection = Mat4::perspective_rh(
-            45.0_f32.to_radians(),
-            width as f32 / height.max(1) as f32,
-            near,
-            far,
-        );
+        let (fov, near, far) = match self.mode {
+            CameraMode::Orbit => (
+                45.0_f32.to_radians(),
+                (self.distance * 0.05).clamp(0.05, 1.0),
+                (self.radius * 20.0).max(10_000.0),
+            ),
+            CameraMode::Drive => (
+                self.drive_fov.to_radians(),
+                0.1_f32,
+                (self.radius * 20.0).max(10_000.0),
+            ),
+        };
+        let projection = Mat4::perspective_rh(fov, width as f32 / height.max(1) as f32, near, far);
         let eye = self.eye();
-        projection * Mat4::look_at_rh(eye, self.center, Vec3::Y)
+        let target = self.target();
+        projection * Mat4::look_at_rh(eye, target, Vec3::Y)
     }
     fn uniform(&self, width: u32, height: u32) -> CameraUniform {
         let eye = self.eye();
@@ -195,6 +270,24 @@ struct SkyState {
     texture_group: wgpu::BindGroup,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct LineVertex {
+    position: [f32; 3],
+    color: [f32; 4],
+}
+
+pub struct TopologyRenderer {
+    pipeline: wgpu::RenderPipeline,
+    vertex_buffer: wgpu::Buffer,
+    pub vertex_count: u32,
+}
+
+struct CarRenderState {
+    meshes: Vec<GpuMesh>,
+    materials: Vec<GpuMaterial>,
+}
+
 pub struct Renderer {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -211,6 +304,11 @@ pub struct Renderer {
     depth: wgpu::TextureView,
     prop_draws: Vec<PropDraw>,
     sky: Option<SkyState>,
+    pub topology: Option<TopologyRenderer>,
+    pub show_topology: bool,
+    pub road_edges: Vec<nfs_assets::TopologyEdge>,
+    pub car: Option<crate::arcade::ArcadeCar>,
+    car_render: Option<CarRenderState>,
 }
 
 impl Renderer {
@@ -372,22 +470,30 @@ impl Renderer {
             immediate_size: 0,
         });
         let mut pipelines = BTreeMap::new();
-        for material in &scene.materials {
-            let blend = material.alpha_mode == AlphaMode::Blend;
-            let double_sided = material.double_sided;
-            let key = (blend, double_sided, material.depth_bias);
-            if pipelines.contains_key(&key) {
-                continue;
-            }
-            pipelines.insert(key, device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let make_pipeline = |blend: bool, double_sided: bool, depth_bias: i32| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("car"), layout: Some(&layout),
                 vertex: wgpu::VertexState { module: &shader, entry_point: Some("vs_main"), compilation_options: Default::default(), buffers: &[Some(wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<GpuVertex>() as u64, step_mode: wgpu::VertexStepMode::Vertex, attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x2] })] },
                 fragment: Some(wgpu::FragmentState { module: &shader, entry_point: Some("fs_main"), compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format, blend: if blend { Some(wgpu::BlendState::ALPHA_BLENDING) } else { None }, write_mask: wgpu::ColorWrites::ALL })] }),
                 primitive: wgpu::PrimitiveState { cull_mode: if double_sided { None } else { Some(wgpu::Face::Back) }, ..Default::default() },
-                depth_stencil: Some(wgpu::DepthStencilState { format: wgpu::TextureFormat::Depth32Float, depth_write_enabled: Some(!blend), depth_compare: Some(wgpu::CompareFunction::LessEqual), stencil: Default::default(), bias: wgpu::DepthBiasState { constant: material.depth_bias, ..Default::default() } }),
+                depth_stencil: Some(wgpu::DepthStencilState { format: wgpu::TextureFormat::Depth32Float, depth_write_enabled: Some(!blend), depth_compare: Some(wgpu::CompareFunction::LessEqual), stencil: Default::default(), bias: wgpu::DepthBiasState { constant: depth_bias, ..Default::default() } }),
                 multisample: Default::default(), multiview_mask: None, cache: None,
-            }));
+            })
+        };
+        for material in &scene.materials {
+            let blend = material.alpha_mode == AlphaMode::Blend;
+            let double_sided = material.double_sided;
+            let key = (blend, double_sided, material.depth_bias);
+            pipelines
+                .entry(key)
+                .or_insert_with(|| make_pipeline(blend, double_sided, material.depth_bias));
         }
+        pipelines
+            .entry((false, false, 0))
+            .or_insert_with(|| make_pipeline(false, false, 0));
+        pipelines
+            .entry((true, false, 0))
+            .or_insert_with(|| make_pipeline(true, false, 0));
         let mut meshes = Vec::new();
         for mesh in &scene.meshes {
             if mesh.vertices.is_empty() || mesh.indices.is_empty() {
@@ -486,6 +592,257 @@ impl Renderer {
             )
         });
 
+        // Build topology line overlay
+        let mut topology_renderer = None;
+        if let Some(top) = &scene.topology {
+            let mut line_vertices = Vec::new();
+            for line in &top.boundary_lines {
+                if line.points.len() >= 2 {
+                    for i in 0..line.points.len() - 1 {
+                        line_vertices.push(LineVertex {
+                            position: line.points[i],
+                            color: line.color,
+                        });
+                        line_vertices.push(LineVertex {
+                            position: line.points[i + 1],
+                            color: line.color,
+                        });
+                    }
+                }
+            }
+            if !line_vertices.is_empty() {
+                let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("topology line vertices"),
+                    contents: bytemuck::cast_slice(&line_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+                let line_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("topology line shader"),
+                    source: wgpu::ShaderSource::Wgsl(
+                        r#"
+struct Camera {
+    matrix: mat4x4<f32>,
+    eye: vec4<f32>,
+    model: mat4x4<f32>,
+};
+@group(0) @binding(0) var<uniform> camera: Camera;
+
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+    @location(1) color: vec4<f32>,
+};
+
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec4<f32>,
+};
+
+@vertex
+fn vs_main(in: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    var world_pos = camera.model * vec4<f32>(in.position, 1.0);
+    var clip_pos = camera.matrix * world_pos;
+    clip_pos.z = clip_pos.z - 0.0004 * clip_pos.w;
+    out.clip_position = clip_pos;
+    out.color = in.color;
+    return out;
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    return in.color;
+}
+"#
+                        .into(),
+                    ),
+                });
+                let line_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("topology line layout"),
+                    bind_group_layouts: &[Some(&camera_layout)],
+                    immediate_size: 0,
+                });
+                let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("topology line pipeline"),
+                    layout: Some(&line_layout),
+                    vertex: wgpu::VertexState {
+                        module: &line_shader,
+                        entry_point: Some("vs_main"),
+                        compilation_options: Default::default(),
+                        buffers: &[Some(wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<LineVertex>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x4],
+                        })],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &line_shader,
+                        entry_point: Some("fs_main"),
+                        compilation_options: Default::default(),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format,
+                            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::LineList,
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: wgpu::TextureFormat::Depth32Float,
+                        depth_write_enabled: Some(false),
+                        depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                        stencil: Default::default(),
+                        bias: Default::default(),
+                    }),
+                    multisample: Default::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
+                topology_renderer = Some(TopologyRenderer {
+                    pipeline,
+                    vertex_buffer,
+                    vertex_count: line_vertices.len() as u32,
+                });
+            }
+        }
+
+        // Arcade car spawn and procedural GPU geometry (for track scenes)
+        let mut car = None;
+        let mut car_render = None;
+        let road_edges: Vec<nfs_assets::TopologyEdge> = scene
+            .topology
+            .as_ref()
+            .map(|t| t.edges.clone())
+            .unwrap_or_default();
+
+        if !road_edges.is_empty() {
+            let mut spawn_pos = camera.center;
+            let mut spawn_yaw = 0.0_f32;
+
+            if let Some(first_edge) = road_edges.first() {
+                let p1 = Vec3::from(first_edge.p1);
+                let p2 = Vec3::from(first_edge.p2);
+                let mid = (p1 + p2) * 0.5;
+                let dir = (p2 - p1).normalize_or_zero();
+                let perp = Vec3::new(-dir.z, 0.0, dir.x).normalize_or_zero();
+                let to_center = camera.center - mid;
+                let inward = if perp.dot(to_center) >= 0.0 {
+                    perp
+                } else {
+                    -perp
+                };
+                spawn_pos = mid + inward * 6.5;
+                spawn_pos.y = p1.y;
+                if dir.length_squared() > 0.01 {
+                    spawn_yaw = (-dir.x).atan2(-dir.z);
+                }
+            }
+
+            let mut arcade_car = crate::arcade::ArcadeCar::new(spawn_pos, spawn_yaw);
+            arcade_car.reset_to_road(&road_edges);
+            car = Some(arcade_car);
+
+            let geom = crate::car_mesh::generate_procedural_car();
+            let mut car_materials = Vec::new();
+            for part in &geom.parts {
+                let color_idx = part.material;
+                let base_color = match color_idx {
+                    crate::car_mesh::MAT_BODY => crate::car_mesh::CAR_COLORS[0],
+                    crate::car_mesh::MAT_GLASS => [0.10, 0.14, 0.20, 0.90],
+                    crate::car_mesh::MAT_BLACK => [0.08, 0.08, 0.09, 1.0],
+                    crate::car_mesh::MAT_RIMS => [0.82, 0.84, 0.86, 1.0],
+                    crate::car_mesh::MAT_LIGHTS_FRONT => [1.0, 0.98, 0.85, 1.0],
+                    crate::car_mesh::MAT_LIGHTS_REAR => [0.95, 0.06, 0.06, 1.0],
+                    _ => [0.8, 0.8, 0.8, 1.0],
+                };
+                let alpha_mode = if color_idx == crate::car_mesh::MAT_GLASS {
+                    AlphaMode::Blend
+                } else {
+                    AlphaMode::Opaque
+                };
+                let material_uniform = [
+                    base_color[0],
+                    base_color[1],
+                    base_color[2],
+                    base_color[3],
+                    alpha_mode_code(alpha_mode),
+                    0.0,
+                    0.0,
+                    0.0,
+                ];
+                let color_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("procedural car color"),
+                    contents: bytemuck::cast_slice(&material_uniform),
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                });
+                let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("procedural car material"),
+                    layout: &material_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&white),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&sampler),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: color_buf.as_entire_binding(),
+                        },
+                    ],
+                });
+                car_materials.push(GpuMaterial {
+                    group,
+                    color_buffer: color_buf,
+                    paintable: color_idx == crate::car_mesh::MAT_BODY,
+                    alpha_mode,
+                    alpha_cutoff: 0.0,
+                    double_sided: false,
+                    depth_bias: 0,
+                });
+            }
+
+            let mut car_meshes = Vec::new();
+            for (idx, part) in geom.parts.iter().enumerate() {
+                let vertices: Vec<GpuVertex> = part
+                    .vertices
+                    .iter()
+                    .map(|v| GpuVertex {
+                        position: v.pos,
+                        normal: v.normal,
+                        uv: v.uv,
+                    })
+                    .collect();
+                let center = vertices
+                    .iter()
+                    .map(|v| Vec3::from(v.position))
+                    .sum::<Vec3>()
+                    / vertices.len() as f32;
+                car_meshes.push(GpuMesh {
+                    vertex: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("procedural car vertex"),
+                        contents: bytemuck::cast_slice(&vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    }),
+                    index: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("procedural car index"),
+                        contents: bytemuck::cast_slice(&part.indices),
+                        usage: wgpu::BufferUsages::INDEX,
+                    }),
+                    count: part.indices.len() as u32,
+                    material: idx,
+                    center,
+                });
+            }
+            car_render = Some(CarRenderState {
+                meshes: car_meshes,
+                materials: car_materials,
+            });
+        }
+
         let depth = depth_view(&device, width, height);
         Ok(Self {
             device,
@@ -503,6 +860,11 @@ impl Renderer {
             depth,
             prop_draws,
             sky,
+            topology: topology_renderer,
+            show_topology: true,
+            road_edges,
+            car,
+            car_render,
         })
     }
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -713,6 +1075,352 @@ impl Renderer {
                 bytemuck::bytes_of(&self.camera.uniform(self.width, self.height)),
             );
         }
+
+        // 3.5. Draw arcade car on track (if present)
+        if let (Some(car), Some(car_render)) = (&self.car, &self.car_render) {
+            let mut uniform = self.camera.uniform(self.width, self.height);
+            uniform.model = car.model_matrix().to_cols_array_2d();
+            self.queue
+                .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&uniform));
+
+            let mut encoder = self.device.create_command_encoder(&Default::default());
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("arcade car"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: target,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &self.depth,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
+                    }),
+                    ..Default::default()
+                });
+                pass.set_bind_group(0, &self.camera_group, &[]);
+                for mesh in &car_render.meshes {
+                    if mesh.material >= car_render.materials.len() {
+                        continue;
+                    }
+                    let material = &car_render.materials[mesh.material];
+                    let pipeline_key = (
+                        material.alpha_mode == AlphaMode::Blend,
+                        material.double_sided,
+                        material.depth_bias,
+                    );
+                    if let Some(pipeline) = self.pipelines.get(&pipeline_key) {
+                        pass.set_pipeline(pipeline);
+                        pass.set_bind_group(1, &material.group, &[]);
+                        pass.set_vertex_buffer(0, mesh.vertex.slice(..));
+                        pass.set_index_buffer(mesh.index.slice(..), wgpu::IndexFormat::Uint32);
+                        pass.draw_indexed(0..mesh.count, 0, 0..1);
+                    }
+                }
+            }
+            self.queue.submit([encoder.finish()]);
+
+            // Restore identity model for remaining passes
+            self.queue.write_buffer(
+                &self.camera_buffer,
+                0,
+                bytemuck::bytes_of(&self.camera.uniform(self.width, self.height)),
+            );
+        }
+
+        // 4. Draw topology lines (if enabled and present)
+        if let Some(top) = self
+            .topology
+            .as_ref()
+            .filter(|t| self.show_topology && t.vertex_count > 0)
+        {
+            let mut encoder = self.device.create_command_encoder(&Default::default());
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("topology lines"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: target,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &self.depth,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
+                    }),
+                    ..Default::default()
+                });
+                pass.set_pipeline(&top.pipeline);
+                pass.set_bind_group(0, &self.camera_group, &[]);
+                pass.set_vertex_buffer(0, top.vertex_buffer.slice(..));
+                pass.draw(0..top.vertex_count, 0..1);
+            }
+            self.queue.submit([encoder.finish()]);
+        }
+    }
+
+    pub fn set_show_topology(&mut self, show: bool) {
+        self.show_topology = show;
+    }
+
+    pub fn toggle_topology(&mut self) -> bool {
+        self.show_topology = !self.show_topology;
+        self.show_topology
+    }
+
+    pub fn sample_road_elevation(&self, x: f32, z: f32) -> Option<f32> {
+        sample_road_elevation_from_edges(&self.road_edges, x, z)
+    }
+
+    pub fn move_ground(&mut self, forward_amount: f32, right_amount: f32) {
+        if self.camera.mode == CameraMode::Drive && self.car.is_some() {
+            self.update_car(0.016, forward_amount * 0.05, right_amount * 0.05, false);
+            return;
+        }
+        self.camera.move_ground(forward_amount, right_amount);
+        if let Some(road_y) = (self.camera.mode == CameraMode::Drive)
+            .then(|| self.sample_road_elevation(self.camera.drive_pos.x, self.camera.drive_pos.z))
+            .flatten()
+        {
+            let target_y = road_y + self.camera.drive_height;
+            self.camera.drive_pos.y += (target_y - self.camera.drive_pos.y) * 0.35;
+        }
+    }
+
+    pub fn toggle_camera_mode(&mut self) -> bool {
+        match self.camera.mode {
+            CameraMode::Orbit => {
+                self.camera.mode = CameraMode::Drive;
+                if let Some(car) = &mut self.car {
+                    if car.pos.length_squared() < 0.01 {
+                        car.reset_to_road(&self.road_edges);
+                    }
+                    self.camera.drive_pos = car.camera_eye;
+                    self.camera.drive_target = car.camera_target;
+                    self.camera.drive_fov = 58.0;
+                } else {
+                    let mut start_pos = self.camera.center;
+                    if let Some(road_y) = self.sample_road_elevation(start_pos.x, start_pos.z) {
+                        start_pos.y = road_y + self.camera.drive_height;
+                    } else if let Some(first_edge) = self.road_edges.first() {
+                        start_pos = Vec3::new(
+                            first_edge.p1[0],
+                            first_edge.p1[1] + self.camera.drive_height,
+                            first_edge.p1[2],
+                        );
+                        let dir = (Vec3::from(first_edge.p2) - Vec3::from(first_edge.p1))
+                            .normalize_or_zero();
+                        if dir.length_squared() > 0.01 {
+                            self.camera.yaw = (-dir.x).atan2(-dir.z);
+                        }
+                    }
+                    self.camera.drive_pos = start_pos;
+                    self.camera.drive_target = start_pos + Vec3::new(0.0, 0.0, -10.0);
+                }
+                self.camera.pitch = 0.0;
+                true
+            }
+            CameraMode::Drive => {
+                self.camera.mode = CameraMode::Orbit;
+                if let Some(car) = &self.car {
+                    self.camera.center = car.pos;
+                } else {
+                    let forward = Vec3::new(-self.camera.yaw.sin(), 0.0, -self.camera.yaw.cos());
+                    self.camera.center = self.camera.drive_pos + forward * 20.0;
+                }
+                self.camera.distance = 40.0;
+                self.camera.pitch = 0.35;
+                false
+            }
+        }
+    }
+
+    pub fn is_drive_mode(&self) -> bool {
+        self.camera.mode == CameraMode::Drive
+    }
+
+    pub fn update_car(&mut self, dt: f32, throttle: f32, steer: f32, handbrake: bool) {
+        let edges = &self.road_edges;
+        if let Some(car) = &mut self.car {
+            car.update(dt, throttle, steer, handbrake, edges, |x, z| {
+                sample_road_elevation_from_edges(edges, x, z)
+            });
+            if self.camera.mode == CameraMode::Drive {
+                self.camera.drive_pos = car.camera_eye;
+                self.camera.drive_target = car.camera_target;
+                self.camera.drive_fov = match car.view_mode {
+                    crate::arcade::DriveViewMode::Chase => {
+                        58.0 + (car.speed.abs() / 50.0).clamp(0.0, 1.0) * 10.0
+                    }
+                    crate::arcade::DriveViewMode::Bumper => {
+                        68.0 + (car.speed.abs() / 50.0).clamp(0.0, 1.0) * 12.0
+                    }
+                    crate::arcade::DriveViewMode::Free => 55.0,
+                };
+            }
+        }
+    }
+
+    pub fn reset_car(&mut self) {
+        if let Some(car) = &mut self.car {
+            car.reset_to_road(&self.road_edges);
+            if self.camera.mode == CameraMode::Drive {
+                self.camera.drive_pos = car.camera_eye;
+                self.camera.drive_target = car.camera_target;
+            }
+        }
+    }
+
+    pub fn cycle_car_view(&mut self) -> crate::arcade::DriveViewMode {
+        if let Some(car) = &mut self.car {
+            let mode = car.cycle_view_mode();
+            if self.camera.mode == CameraMode::Drive {
+                self.camera.drive_pos = car.camera_eye;
+                self.camera.drive_target = car.camera_target;
+            }
+            mode
+        } else {
+            crate::arcade::DriveViewMode::Chase
+        }
+    }
+
+    pub fn cycle_car_paint(&mut self) -> usize {
+        if let (Some(car), Some(car_render)) = (&mut self.car, &mut self.car_render) {
+            let color_idx = car.cycle_paint();
+            let color = crate::car_mesh::CAR_COLORS[color_idx];
+            let material_uniform = [
+                color[0],
+                color[1],
+                color[2],
+                color[3],
+                alpha_mode_code(AlphaMode::Opaque),
+                0.0,
+                0.0,
+                0.0,
+            ];
+            self.queue.write_buffer(
+                &car_render.materials[crate::car_mesh::MAT_BODY].color_buffer,
+                0,
+                bytemuck::cast_slice(&material_uniform),
+            );
+            color_idx
+        } else {
+            0
+        }
+    }
+
+    pub fn get_car_speed_kmh(&self) -> f32 {
+        self.car.as_ref().map(|c| c.speed_kmh()).unwrap_or(0.0)
+    }
+
+    pub fn get_car_gear(&self) -> i32 {
+        self.car.as_ref().map(|c| c.gear).unwrap_or(0)
+    }
+
+    pub fn get_car_rpm(&self) -> f32 {
+        self.car.as_ref().map(|c| c.rpm).unwrap_or(0.0)
+    }
+
+    pub fn has_car(&self) -> bool {
+        self.car.is_some()
+    }
+}
+
+pub fn sample_road_elevation_from_edges(
+    road_edges: &[nfs_assets::TopologyEdge],
+    x: f32,
+    z: f32,
+) -> Option<f32> {
+    if road_edges.is_empty() {
+        return None;
+    }
+    let mut best_dist_sq = 1e9_f32;
+    let mut best_y = 0.0_f32;
+
+    for edge in road_edges {
+        let x1 = edge.p1[0];
+        let z1 = edge.p1[2];
+        let x2 = edge.p2[0];
+        let z2 = edge.p2[2];
+
+        if (x - x1).abs() > 45.0 && (x - x2).abs() > 45.0 {
+            continue;
+        }
+        if (z - z1).abs() > 45.0 && (z - z2).abs() > 45.0 {
+            continue;
+        }
+
+        let dx = x2 - x1;
+        let dz = z2 - z1;
+        let seg_len_sq = dx * dx + dz * dz;
+        let t = if seg_len_sq < 1e-6 {
+            0.0
+        } else {
+            (((x - x1) * dx + (z - z1) * dz) / seg_len_sq).clamp(0.0, 1.0)
+        };
+
+        let proj_x = x1 + t * dx;
+        let proj_z = z1 + t * dz;
+        let dist_sq = (x - proj_x) * (x - proj_x) + (z - proj_z) * (z - proj_z);
+        if dist_sq < best_dist_sq {
+            best_dist_sq = dist_sq;
+            let y1 = edge.p1[1];
+            let y2 = edge.p2[1];
+            best_y = y1 + t * (y2 - y1);
+        }
+    }
+
+    if best_dist_sq < 625.0 {
+        return Some(best_y);
+    }
+
+    if best_dist_sq > 1e8 {
+        for edge in road_edges {
+            let x1 = edge.p1[0];
+            let z1 = edge.p1[2];
+            let x2 = edge.p2[0];
+            let z2 = edge.p2[2];
+
+            let dx = x2 - x1;
+            let dz = z2 - z1;
+            let seg_len_sq = dx * dx + dz * dz;
+            let t = if seg_len_sq < 1e-6 {
+                0.0
+            } else {
+                (((x - x1) * dx + (z - z1) * dz) / seg_len_sq).clamp(0.0, 1.0)
+            };
+
+            let proj_x = x1 + t * dx;
+            let proj_z = z1 + t * dz;
+            let dist_sq = (x - proj_x) * (x - proj_x) + (z - proj_z) * (z - proj_z);
+            if dist_sq < best_dist_sq {
+                best_dist_sq = dist_sq;
+                let y1 = edge.p1[1];
+                let y2 = edge.p2[1];
+                best_y = y1 + t * (y2 - y1);
+            }
+        }
+    }
+
+    if best_dist_sq < 6400.0 {
+        Some(best_y)
+    } else {
+        None
     }
 }
 

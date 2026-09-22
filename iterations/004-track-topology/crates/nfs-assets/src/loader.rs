@@ -322,7 +322,23 @@ pub fn load(files: &AssetFiles, car: &str) -> Result<Scene, String> {
         .filter(|&level| level != 0)
         .min()
         .unwrap_or(0);
-    let mut scene=Scene{meshes:Vec::new(),textures:Vec::new(),materials:Vec::new(),bounds:[[f32::INFINITY;3],[f32::NEG_INFINITY;3]],diagnostics:vec![format!("{} CRP articles, {} misc entries, {} decoded bytes; {}, scene level {scene_lod}, undamaged, no driver",crp.articles.len(),crp.misc.len(),crp.decoded_size,style.name)],prop_articles:Vec::new(),prop_instances:Vec::new(),sky_texture:None};
+    let mut scene = Scene {
+        meshes: Vec::new(),
+        textures: Vec::new(),
+        materials: Vec::new(),
+        bounds: [[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]],
+        diagnostics: vec![format!(
+            "{} CRP articles, {} misc entries, {} decoded bytes; {}, scene level {scene_lod}, undamaged, no driver",
+            crp.articles.len(),
+            crp.misc.len(),
+            crp.decoded_size,
+            style.name
+        )],
+        prop_articles: Vec::new(),
+        prop_instances: Vec::new(),
+        sky_texture: None,
+        topology: None,
+    };
     let mut skipped = Vec::new();
     let mut selected = Vec::new();
     let pages = num(&ini, "header", "numtpages", 0)?;

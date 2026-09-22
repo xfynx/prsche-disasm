@@ -1,8 +1,65 @@
 use std::collections::BTreeMap;
 
-use nfs_formats::{bytes, f32le, parse_fsh, parse_scn, parse_track_crp, u16le, u32le, Entry};
+use nfs_formats::{
+    bytes, f32le, parse_edg, parse_fsh, parse_jnc, parse_map, parse_scn, parse_track_crp, u16le,
+    u32le, Entry,
+};
 
 use super::*;
+
+fn edge_color(flags: u8) -> [f32; 4] {
+    if flags == 0 {
+        [0.0, 0.8, 1.0, 1.0] // Cyan for normal road boundaries
+    } else if flags & 0x10 != 0 {
+        [1.0, 0.6, 0.0, 1.0] // Orange for barriers/walls
+    } else if flags & 0x20 != 0 {
+        [0.2, 1.0, 0.2, 1.0] // Bright green for curbs/grass
+    } else {
+        [1.0, 0.2, 0.8, 1.0] // Magenta for other flags
+    }
+}
+
+fn dist_sq(a: [f32; 3], b: [f32; 3]) -> f32 {
+    let dx = a[0] - b[0];
+    let dy = a[1] - b[1];
+    let dz = a[2] - b[2];
+    dx * dx + dy * dy + dz * dz
+}
+
+fn assemble_boundary_lines(edges: &[TopologyEdge]) -> Vec<TopologyLine> {
+    let mut lines = Vec::new();
+    let mut current_points: Vec<[f32; 3]> = Vec::new();
+    let mut current_color = [0.0; 4];
+
+    for edge in edges {
+        let color = edge_color(edge.flags);
+        if current_points.is_empty() {
+            current_points.push(edge.p1);
+            current_points.push(edge.p2);
+            current_color = color;
+        } else if color == current_color && dist_sq(*current_points.last().unwrap(), edge.p1) < 1e-4
+        {
+            current_points.push(edge.p2);
+        } else {
+            lines.push(TopologyLine {
+                points: std::mem::take(&mut current_points),
+                color: current_color,
+            });
+            current_points.push(edge.p1);
+            current_points.push(edge.p2);
+            current_color = color;
+        }
+    }
+
+    if !current_points.is_empty() {
+        lines.push(TopologyLine {
+            points: current_points,
+            color: current_color,
+        });
+    }
+
+    lines
+}
 
 fn find<'a>(files: &'a AssetFiles, name: &str) -> Result<&'a [u8], String> {
     let name = name.to_ascii_lowercase();
@@ -99,6 +156,7 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         prop_articles: Vec::new(),
         prop_instances: Vec::new(),
         sky_texture: None,
+        topology: None,
     };
 
     let mut tex_map = BTreeMap::new();
@@ -429,14 +487,14 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                 && !low.contains("sky new")
                 && low.ends_with(".fsh")
                 && {
-                let stem = low
-                    .rsplit('/')
-                    .next()
-                    .unwrap_or("")
-                    .strip_suffix(".fsh")
-                    .unwrap_or("");
-                stem.eq_ignore_ascii_case(track)
-            }
+                    let stem = low
+                        .rsplit('/')
+                        .next()
+                        .unwrap_or("")
+                        .strip_suffix(".fsh")
+                        .unwrap_or("");
+                    stem.eq_ignore_ascii_case(track)
+                }
         })
         .cloned();
 
@@ -471,8 +529,82 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         }
     }
 
+    // --- Track topology loading (.edg, .jnc, .map) ---
+    let edg_key = format!("{track}.edg");
+    let jnc_key = format!("{track}.jnc");
+    let map_key = format!("{track}.map");
+
+    let edg_data = find(files, &edg_key).ok();
+    let jnc_data = find(files, &jnc_key).ok();
+    let map_data = find(files, &map_key).ok();
+
+    if edg_data.is_some() || jnc_data.is_some() || map_data.is_some() {
+        let mut topology = TrackTopology::default();
+
+        if let Some(data) = edg_data {
+            match parse_edg(data) {
+                Ok(edg) => {
+                    for seg in &edg.segments {
+                        topology.edges.push(TopologyEdge {
+                            flags: seg.flags,
+                            p1: to_scene_coordinates(seg.p1),
+                            p2: to_scene_coordinates(seg.p2),
+                        });
+                    }
+                    topology.boundary_lines = assemble_boundary_lines(&topology.edges);
+                    scene.diagnostics.push(format!(
+                        "EDG {edg_key}: {} segments, {} boundary lines",
+                        topology.edges.len(),
+                        topology.boundary_lines.len()
+                    ));
+                }
+                Err(e) => {
+                    scene
+                        .diagnostics
+                        .push(format!("EDG {edg_key}: parse error: {e}"));
+                }
+            }
+        }
+
+        if let Some(data) = jnc_data {
+            match parse_jnc(data) {
+                Ok(jnc) => {
+                    topology.junctions = jnc.records;
+                    scene.diagnostics.push(format!(
+                        "JNC {jnc_key}: {} junction records",
+                        topology.junctions.len()
+                    ));
+                }
+                Err(e) => {
+                    scene
+                        .diagnostics
+                        .push(format!("JNC {jnc_key}: parse error: {e}"));
+                }
+            }
+        }
+
+        if let Some(data) = map_data {
+            match parse_map(data) {
+                Ok(map) => {
+                    let sec_count = map.sections.len();
+                    topology.map = Some(map);
+                    scene
+                        .diagnostics
+                        .push(format!("MAP {map_key}: {sec_count} sections"));
+                }
+                Err(e) => {
+                    scene
+                        .diagnostics
+                        .push(format!("MAP {map_key}: parse error: {e}"));
+                }
+            }
+        }
+
+        scene.topology = Some(topology);
+    }
+
     scene.diagnostics.push(format!(
-        "Props: {} articles, {} instances; Sky: {}",
+        "Props: {} articles, {} instances; Sky: {}; Topology: {}",
         scene.prop_articles.len(),
         scene.prop_instances.len(),
         if scene.sky_texture.is_some() {
@@ -480,6 +612,15 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         } else {
             "none"
         },
+        if let Some(top) = &scene.topology {
+            format!(
+                "{} edges, {} lines",
+                top.edges.len(),
+                top.boundary_lines.len()
+            )
+        } else {
+            "none".to_string()
+        }
     ));
 
     Ok(scene)
@@ -670,9 +811,16 @@ mod tests {
         assert_eq!(scene.prop_articles.len(), 70);
         assert_eq!(scene.textures.len(), 98);
         assert_eq!(scene.materials.len(), 107);
-        let static_end = scene.prop_articles.first().map(|p| p.mesh_range.start).unwrap_or(scene.meshes.len());
+        let static_end = scene
+            .prop_articles
+            .first()
+            .map(|p| p.mesh_range.start)
+            .unwrap_or(scene.meshes.len());
         assert_eq!(static_end, 46);
-        let static_triangles: usize = scene.meshes[..static_end].iter().map(|m| m.indices.len() / 3).sum();
+        let static_triangles: usize = scene.meshes[..static_end]
+            .iter()
+            .map(|m| m.indices.len() / 3)
+            .sum();
         assert_eq!(static_triangles, 6848);
         assert!(scene.bounds[0][0] < -200.0);
         assert!(scene.bounds[1][0] > 200.0);
@@ -752,5 +900,35 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn local_skidpad_loads_with_topology() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData/Track");
+        let crp_path = root.join("skidpad.crp");
+        let fsh_path = root.join("skidpad.fsh");
+        let edg_path = root.join("skidpad.edg");
+        let jnc_path = root.join("skidpad.jnc");
+        let map_path = root.join("skidpad.map");
+
+        if !crp_path.exists() || !fsh_path.exists() || !edg_path.exists() {
+            return;
+        }
+
+        let mut files = AssetFiles::new();
+        files.insert("skidpad.crp".into(), std::fs::read(&crp_path).unwrap());
+        files.insert("skidpad.fsh".into(), std::fs::read(&fsh_path).unwrap());
+        files.insert("skidpad.edg".into(), std::fs::read(&edg_path).unwrap());
+        files.insert("skidpad.jnc".into(), std::fs::read(&jnc_path).unwrap());
+        files.insert("skidpad.map".into(), std::fs::read(&map_path).unwrap());
+
+        let scene = load(&files, "skidpad").unwrap();
+        assert!(scene.topology.is_some());
+        let top = scene.topology.as_ref().unwrap();
+        assert_eq!(top.edges.len(), 167);
+        assert!(!top.boundary_lines.is_empty());
+        assert_eq!(top.junctions.len(), 1);
+        assert!(top.map.is_some());
     }
 }

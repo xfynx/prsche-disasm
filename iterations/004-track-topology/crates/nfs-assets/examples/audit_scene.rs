@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Numeric geometry audit independent of GPU visibility and camera placement.
 use nfs_assets::{load_car, AssetFiles, Mesh, Scene, Texture};
 use std::{env, fs, path::Path};

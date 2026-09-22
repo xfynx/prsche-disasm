@@ -1,86 +1,156 @@
-# Porsche Unleashed: текущая реализация
+# Need for Speed: Porsche Unleashed — открытый движок и просмотрщик
 
-Актуальный согласованный проект: Rust + wgpu + winit, Windows/Linux/macOS
-и браузерный WebAssembly/WebGPU-просмотрщик. [План](PLAN.md), [статус](STATUS.md),
-[сборка](docs/building.md), [агенты и модели](docs/agents.md).
+Современная независимая реализация игрового движка **Need for Speed: Porsche Unleashed** (NFS 5, 2000) на **Rust + wgpu + winit** для Windows, Linux, macOS и браузера (WebAssembly / WebGPU).
 
-Полные снимки исходников находятся в `iterations/`. Все они читают одну общую
-папку ресурсов `local/game`; ресурсы не копируются в итерации или сайт.
-Дополнительные копии допускаются для изменяющих файлы экспериментов.
-
-Текущий просмотрщик: [001-car-viewer](iterations/001-car-viewer/README.md).
-Воспроизводимые визуальные проверки: [runs](iterations/001-car-viewer/runs/README.md).
-Run010: проверены 44 модели с двух сторон; фары не перекрашиваются.
-001 принята 2026-09-19 после ручной проверки браузера; тег `iteration-001`.
-Далее — [002-track-viewer](docs/next-iteration.md).
-
-Ниже сохранены ранее появившиеся заметки. Перечисленные в них адреса, названия
-функций, версии и структура C++-проекта не подтверждены текущим исследованием;
-при расхождениях следует пользоваться PLAN.md и STATUS.md.
+Текущая активная итерация: **[`004-track-topology`](iterations/004-track-topology/README.md)** (тег `iteration-004`).  
+Документация проекта: [План работ](PLAN.md) &bull; [Текущее состояние](STATUS.md) &bull; [Сборка](docs/building.md) &bull; [Форматы топологии](docs/track-topology-formats.md) &bull; [Роли агентов](docs/agents.md).
 
 ---
 
-# Need for Speed: Porsche Unleashed (NFS 5) Reverse Engineering Project
+## 🚀 Быстрый запуск
 
-Reverse engineering and disassembly project for **Need for Speed: Porsche Unleashed** (PC, released 2000).
+Ресурсы оригинальной игры читаются исключительно из локального каталога `local/game` в корне проекта (в Git не добавляются).
+
+### Вариант 1. Веб-версия (Web / WebGPU в браузере)
+
+Веб-версия работает локально через WebAssembly и WebGPU. Ресурсы игры по умолчанию автоматически подгружаются сервером из папки `local/game` в режиме read-only:
+
+1. **Собрать проект** (при необходимости):
+   ```powershell
+   . .\scripts\tool-env.ps1
+   .\scripts\build.ps1 -Iteration 004-track-topology -Config release -Target web
+   ```
+2. **Запустить локальный веб-сервер**:
+   ```powershell
+   py -3 scripts/serve-web.py --iteration 004-track-topology --port 8000
+   ```
+3. **Открыть в браузере**:
+   Перейдите по адресу [http://127.0.0.1:8000/](http://127.0.0.1:8000/) в браузере с поддержкой WebGPU (Google Chrome или Microsoft Edge).
+   - Все 15 трасс и 24 автомобиля доступны сразу в выпадающем списке.
+   - По умолчанию мгновенно загружается трасса `Skidpad` со спорткаром на стартовой позиции.
+   - Нажмите клавишу **`F`** или кнопку **«Заезд (F)»** для включения режима аркадного заезда с гоночным HUD (спидометр, тахометр, передача).
+   - Для загрузки внешних файлов используйте кнопки «Папка игры» / «Файлы».
 
 ---
 
-## 🎯 Objectives
-- **Static Analysis**: Disassemble and decompile `Porsche.exe` (v3.5 / v3.52) using Ghidra / IDA Pro.
-- **Dynamic Analysis**: Map runtime memory addresses, data structures, and function calls using x32dbg & Cheat Engine.
-- **File Format Specification**: Document internal file structures (`.viv`, `.crp`, `.fsh`, `.carp`, `.tri`, `.pne`).
-- **Decompilation / Reconstruction**: Reconstruct clean C/C++ header definitions, game logic, physics engine, and render pipeline.
+### Вариант 2. Десктоп-версия (Desktop / Windows Native)
+
+Нативное окно Windows с аппаратным рендерингом через Vulkan / DirectX:
+
+1. **Собрать нативный исполняемый файл**:
+   ```powershell
+   . .\scripts\tool-env.ps1
+   .\scripts\build.ps1 -Iteration 004-track-topology -Config release -Target native
+   ```
+2. **Запуск интерактивного просмотра трассы**:
+   ```powershell
+   # Запуск кругового полигона Skidpad
+   .\local\builds\004-track-topology\windows\porsche-viewer.exe view --game-dir .\local\game --track skidpad
+
+   # Запуск любой другой трассы (alps, autobahn, canyon, castle, monaco1...5 и др.)
+   .\local\builds\004-track-topology\windows\porsche-viewer.exe view --game-dir .\local\game --track alps
+   ```
+3. **Запуск просмотра автомобиля**:
+   ```powershell
+   # Запуск просмотра модели 356a (или 911, 930, 993, 996, boxster и др.)
+   .\local\builds\004-track-topology\windows\porsche-viewer.exe view --game-dir .\local\game --car 356a
+   ```
+4. **Консольная инспекция ресурсов**:
+   ```powershell
+   .\local\builds\004-track-topology\windows\porsche-viewer.exe inspect --game-dir .\local\game --track skidpad
+   ```
 
 ---
 
-## 📁 Repository Structure
+## 🎮 Управление и горячие клавиши
+
+| Клавиша | Режим заезда на авто (`F`) | Режим свободной камеры / орбиты |
+|---|---|---|
+| **`F`** | Выход в орбитальную камеру | **Вход в режим заезда на авто** |
+| **`W` / `▲`** | Газ (ускорение) | Движение камеры вперёд |
+| **`S` / `▼`** | Тормоз / Задний ход | Движение камеры назад |
+| **`A` / `D` (или `◄`/`►`)** | Руление влево / вправо | Смещение камеры влево / вправо |
+| **`Space`** | **Ручной тормоз с заносом (дрифт)** | — |
+| **`C`** | Смена вида: Сзади / Капот / Свободный | Смена цвета кузова (в режиме авто) |
+| **`P`** | Смена цвета кузова спорткара | — |
+| **`R`** | Сброс машины на дорожное полотно | Сброс камеры к исходной позиции |
+| **`T`** | Вкл / выкл 3D линий границ полотна (`.edg`) | Вкл / выкл 3D линий границ |
+| **`Shift`** (удержание) | — | Ускорение перемещения камеры (x2.5) |
+| **`ЛКМ` + движение мыши** | Вращение камеры вокруг автомобиля | Вращение камеры вокруг центра сцены |
+| **`ПКМ` + движение мыши** | Панорамирование | Панорамирование |
+| **`Колёсико мыши`** | Дистанция камеры | Приближение / удаление |
+
+---
+
+## 📁 Структура репозитория
 
 ```
 porsche disasm/
-├── bin/                 # Target executables & clean binaries (Porsche.exe v3.52)
-├── docs/                # Reverse engineering notes & documentation
-│   ├── file_formats.md  # Detailed specs for .viv, .crp, .carp, .fsh, etc.
-│   └── memory_map.md    # Function entry points, global variables, and memory offsets
-├── src/                 # Reconstructed C/C++ source code & data structure headers
-│   └── nfs_types.h      # Core C data types and structures
-├── tools/               # Helper scripts, Ghidra scripts, and conversion utilities
-└── CMakeLists.txt       # Build system configuration for decompiled code / hooks
+├── docs/                 # Архитектурная документация, окружение и форматы
+│   ├── track-topology-formats.md # Спецификация форматов .jnc, .edg, .map
+│   ├── crp-format.md     # Спецификация формата архивов моделей и треков CRP
+│   ├── building.md       # Подробные инструкции по сборке
+│   └── agents.md         # Роли и правила автономной разработки
+├── iterations/           # Завершённые и активные снимки разработки (snapshots)
+│   ├── 001-car-viewer/   # Итерация 001: просмотрщик моделей CarModel (тег iteration-001)
+│   ├── 002-track-viewer/ # Итерация 002: геометрия 15 трасс игры (тег iteration-002)
+│   ├── 003-track-environment/ # Итерация 003: пропы .scn и скайбокс неба (тег iteration-003)
+│   └── 004-track-topology/    # Итерация 004: топология, границы полотна, заезд на авто (тег iteration-004)
+├── scripts/              # Автоматизация и инструменты
+│   ├── build.ps1         # Универсальный скрипт сборки Windows native и WASM
+│   ├── serve-web.py      # Локальный HTTP-сервер для WebGPU с доступом к local/game
+│   ├── tool-env.ps1      # Инициализация окружения Rust и инструментов
+│   └── research/         # Утилиты реверса и зонды (.edg, .jnc, .crp, disasm)
+└── local/                # Локальные данные вне Git (игнорируются)
+    ├── game/             # Оригинальные файлы игры (только чтение!)
+    └── builds/           # Скомпилированные бинарники и веб-сайты
 ```
 
 ---
 
-## 🛠 Recommended Tooling
+## 🏆 Пройденные вехи проекта
 
-| Category | Tool | Description |
-|---|---|---|
-| **Disassembler / Decompiler** | [Ghidra](https://ghidra-sre.org/) | Recommended for x86 32-bit decompilation and data structure analysis |
-| **Alternative Disassembler** | IDA Pro / Binary Ninja | Alternative static analysis tools |
-| **Debugger** | [x32dbg](https://x32dbg.com/) | 32-bit Windows debugger for dynamic analysis |
-| **Memory Scanner** | [Cheat Engine](https://www.cheatengine.org/) | Runtime variable searching and pointer map generation |
-| **PE Inspector** | PEview / CFF Explorer | Inspect PE headers, imports, sections, and DRM wrappers |
+1. **`001-car-viewer`** (сентябрь 2026, тег `iteration-001`):
+   - Восстановлены распаковщик CRP, иерархия деталей, геометрия и LOD-уровни.
+   - Декодер FSH (BGR, BGRA, 8bpp палитровый) и альфа-маски окраски кузова.
+   - Подтверждена корректная загрузка всех **44 моделей CarModel** игры с колесами и фарами.
+2. **`002-track-viewer`** (сентябрь 2026, тег `iteration-002`):
+   - Декодирование `karT` треков из CRP, триангуляция типов примитивов 1, 3, 4.
+   - Поддержка 16-битных текстур FSH `0x7e` (ARGB 1555), батчинг мешей по материалам (-97% буферов).
+   - 100% текстурирование и загрузка всех **15 трасс** игры без швов между блоками.
+3. **`003-track-environment`** (сентябрь 2026, тег `iteration-003`):
+   - Парсинг сценариев расстановки `.scn` и инстанцирование динамических библиотечных объектов (конусы, стрелки, указатели).
+   - Рендеринг 360-градусной цилиндрической панорамы горизонта `horz` из `Sky/<track>.fsh`.
+4. **`004-track-topology`** (сентябрь 2026, тег `iteration-004`, **активная**):
+   - Реверс и парсеры топологии: развилки `.jnc`, кромки полотна `.edg`, секции `.map`.
+   - Рендерер 3D-линий границ дорожного полотна (`TopologyRenderer`) с защитой от z-fighting.
+   - Аркадное вождение спорткара Porsche (`ArcadeCar`): динамика, руление с учётом скорости, дрифт, автоматическая КПП, обороты двигателя, привязка к высоте и уклону дороги.
+   - Веб-версия с гоночным стеклянным HUD и дефолтной автоподгрузкой ресурсов `local/game`.
 
 ---
 
-## ⚙ Executable Prerequisites
+## 📚 Справочные открытые проекты (References & Acknowledgements)
 
-1. **Target Version**: `Porsche.exe` patched to **v3.5** or **v3.52** (English / Multi version).
-2. **Unpacked Executable**: Ensure SafeDisc DRM wrapper is stripped (Executable base address: `0x00400000`).
-3. **Compiler Target**: Microsoft Visual C++ 6.0 (MSVC 6.0 x86 32-bit, `cdecl` / `thiscall` calling conventions).
+В ходе исследования ранних бинарных форматов игры (CRP, FSH) в качестве отправных точек и сверки структур использовались следующие открытые наработки сообщества:
+
+- **[CrpLib](https://auroux.free.fr/)** (Дени Ору / Denis Auroux, 2002):  
+  Исторически первая реализация разбора контейнеров `.crp` и текстур для NFS: Porsche Unleashed на языке C. Описала базовые заголовки статей и блоки вершин/нормалей.
+- **[OpenNFS / LibOpenNFS](https://github.com/OpenNFS/LibOpenNFS)**:  
+  Мульти-движковый проект загрузки ресурсов игр серии NFS (NFS 1–6). Содержит общие описания заголовков FSH-текстур (`FshTypes.h`) и адаптацию оригинальной библиотеки `CrpLib`.
+- **[dima424658 / LibOpenNFS](https://github.com/dima424658/LibOpenNFS)** (форк Дмитрия Панкова):  
+  **Чем отличается от upstream LibOpenNFS**: в основном репозитории OpenNFS поддержка NFS5 опиралась на устаревший C-код `CrpLib`. В форке `dima424658` была предпринята модернизация парсера NFS5: написаны типизированные C++ структуры (`include/NFS5/CRP/Types.hpp`, `BasicTypes.hpp`, `CRPFile.cpp`), уточнены битовые поля заголовков статей (`HeaderInfo`), смещения и распаковка VIV-архивов. Использовался для верификации выравнивания байт и масок статей.
+- **[FSHTool](https://auroux.free.fr/)**:  
+  Утилита Дени Ору для анализа формата QFS/RefPack сжатия и блоков изображений FSH.
+
+> **Важно**: Все загрузчики, парсеры и движок в этом проекте написаны **с нуля на чистом safe Rust** без использования C/C++ runtime или чужого кода. Форматы топологии трасс (`.jnc`, `.edg`, `.map`) и сценарии расстановки (`.scn`) отсутствовали в указанных проектах и были реверсированы напрямую из исполняемого файла `nfs5.exe` через Capstone и Ghidra (спецификация: [`docs/track-topology-formats.md`](docs/track-topology-formats.md)).
 
 ---
 
-## 🚀 Quick Start Guide
+## ⚙ Требования к окружению
 
-### 1. Preparing `Porsche.exe` in Ghidra
-1. Open Ghidra and create a new project.
-2. Import `bin/Porsche.exe`.
-3. Set Language to **x86:LE:32:Visual Studio:default** (32-bit Little Endian x86).
-4. Run auto-analysis with standard options enabled.
-5. Apply Visual Studio 6.0 Function ID (FID) signatures to auto-label CRT library routines.
-
-### 2. Key Target Areas
-- **Main Entry Point**: `WinMain` at startup.
-- **File System**: Archives loading `.viv` files (`GIM_ReadFile`, `VIV_ExtractFile`).
-- **Physics Engine**: Vehicle dynamics tick (`VehiclePhysics_Update`), `.carp` parsing.
-- **Graphics Pipeline**: D3D7 / Glide rendering pipeline (`Render3D_DrawMesh`).
+- **ОС**: Windows 10/11 x64 (также поддерживаются Linux и macOS).
+- **Rust**: версия 1.98.1+ (MSVC toolchain на Windows, target `wasm32-unknown-unknown`).
+- **Python**: 3.10+ (для локального веб-сервера и исследовательских скриптов).
+- **Графика**:
+  - Для Desktop: видеокарта с поддержкой Vulkan 1.2+ или DirectX 12.
+  - Для Web: браузер с поддержкой WebGPU (Chrome 113+, Edge 113+).

@@ -1,3 +1,5 @@
+#![allow(clippy::items_after_test_module)]
+
 use std::{
     collections::BTreeMap,
     fs,
@@ -789,7 +791,11 @@ impl ApplicationHandler for App {
                 match event.physical_key {
                     PhysicalKey::Code(KeyCode::KeyR) => {
                         if let Some(renderer) = &mut self.renderer {
-                            renderer.camera.reset();
+                            if renderer.is_drive_mode() && renderer.has_car() {
+                                renderer.reset_car();
+                            } else {
+                                renderer.camera.reset();
+                            }
                         }
                         if let Some(window) = &self.window {
                             window.request_redraw();
@@ -797,7 +803,64 @@ impl ApplicationHandler for App {
                     }
                     PhysicalKey::Code(KeyCode::KeyC) => {
                         if let Some(renderer) = &mut self.renderer {
-                            renderer.cycle_paint_color();
+                            if renderer.is_drive_mode() && renderer.has_car() {
+                                let view = renderer.cycle_car_view();
+                                println!("Car view mode: {:?}", view);
+                            } else {
+                                renderer.cycle_paint_color();
+                            }
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::KeyP) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            if renderer.has_car() {
+                                renderer.cycle_car_paint();
+                            } else {
+                                renderer.cycle_paint_color();
+                            }
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::Space) => {
+                        if let Some(renderer) = &mut self.renderer
+                            && renderer.is_drive_mode()
+                            && renderer.has_car()
+                        {
+                            renderer.update_car(0.04, 0.0, 0.0, true);
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::KeyT) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            let on = renderer.toggle_topology();
+                            println!("Topology overlay: {}", if on { "on" } else { "off" });
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                    PhysicalKey::Code(KeyCode::KeyF) => {
+                        if let Some(renderer) = &mut self.renderer {
+                            let drive = renderer.toggle_camera_mode();
+                            println!(
+                                "Mode: {}",
+                                if drive {
+                                    if renderer.has_car() {
+                                        "Arcade Car Drive"
+                                    } else {
+                                        "Drive (fly-through)"
+                                    }
+                                } else {
+                                    "Orbit"
+                                }
+                            );
                         }
                         if let Some(window) = &self.window {
                             window.request_redraw();
@@ -805,23 +868,65 @@ impl ApplicationHandler for App {
                     }
                     PhysicalKey::Code(KeyCode::KeyW) | PhysicalKey::Code(KeyCode::ArrowUp) => {
                         if let Some(renderer) = &mut self.renderer {
-                            renderer.camera.move_ground(speed_mult, 0.0);
+                            if renderer.is_drive_mode() && renderer.has_car() {
+                                renderer.update_car(0.04, speed_mult, 0.0, false);
+                            } else {
+                                renderer.move_ground(speed_mult, 0.0);
+                            }
                         }
-                        if let Some(window) = &self.window {
+                        if let (Some(window), Some(renderer)) = (&self.window, &self.renderer) {
+                            if renderer.is_drive_mode() && renderer.has_car() {
+                                let speed = renderer.get_car_speed_kmh();
+                                let gear = renderer.get_car_gear();
+                                let g_str = if gear < 0 {
+                                    "R".into()
+                                } else if gear == 0 {
+                                    "N".into()
+                                } else {
+                                    format!("{gear}")
+                                };
+                                window.set_title(&format!(
+                                    "{} | {:.0} км/ч [{}]",
+                                    self.title, speed, g_str
+                                ));
+                            }
                             window.request_redraw();
                         }
                     }
                     PhysicalKey::Code(KeyCode::KeyS) | PhysicalKey::Code(KeyCode::ArrowDown) => {
                         if let Some(renderer) = &mut self.renderer {
-                            renderer.camera.move_ground(-speed_mult, 0.0);
+                            if renderer.is_drive_mode() && renderer.has_car() {
+                                renderer.update_car(0.04, -speed_mult, 0.0, false);
+                            } else {
+                                renderer.move_ground(-speed_mult, 0.0);
+                            }
                         }
-                        if let Some(window) = &self.window {
+                        if let (Some(window), Some(renderer)) = (&self.window, &self.renderer) {
+                            if renderer.is_drive_mode() && renderer.has_car() {
+                                let speed = renderer.get_car_speed_kmh();
+                                let gear = renderer.get_car_gear();
+                                let g_str = if gear < 0 {
+                                    "R".into()
+                                } else if gear == 0 {
+                                    "N".into()
+                                } else {
+                                    format!("{gear}")
+                                };
+                                window.set_title(&format!(
+                                    "{} | {:.0} км/ч [{}]",
+                                    self.title, speed, g_str
+                                ));
+                            }
                             window.request_redraw();
                         }
                     }
                     PhysicalKey::Code(KeyCode::KeyA) | PhysicalKey::Code(KeyCode::ArrowLeft) => {
                         if let Some(renderer) = &mut self.renderer {
-                            renderer.camera.move_ground(0.0, -speed_mult);
+                            if renderer.is_drive_mode() && renderer.has_car() {
+                                renderer.update_car(0.04, 0.0, -1.0, false);
+                            } else {
+                                renderer.move_ground(0.0, -speed_mult);
+                            }
                         }
                         if let Some(window) = &self.window {
                             window.request_redraw();
@@ -829,7 +934,11 @@ impl ApplicationHandler for App {
                     }
                     PhysicalKey::Code(KeyCode::KeyD) | PhysicalKey::Code(KeyCode::ArrowRight) => {
                         if let Some(renderer) = &mut self.renderer {
-                            renderer.camera.move_ground(0.0, speed_mult);
+                            if renderer.is_drive_mode() && renderer.has_car() {
+                                renderer.update_car(0.04, 0.0, 1.0, false);
+                            } else {
+                                renderer.move_ground(0.0, speed_mult);
+                            }
                         }
                         if let Some(window) = &self.window {
                             window.request_redraw();

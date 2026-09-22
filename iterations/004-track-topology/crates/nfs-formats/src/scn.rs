@@ -132,7 +132,7 @@ Geometry Element
         assert_eq!(g.fourcc, 1162760003); // 'CONE'
         assert_eq!(g.flags, 0);
         assert!((g.position[0] - -16.174486).abs() < 1e-4);
-        assert!((g.position[2] - 144.580231).abs() < 1e-4);
+        assert!((g.position[2] - 144.580_23).abs() < 1e-4);
         assert!((g.rotation[0][0] - 0.999937).abs() < 1e-4);
         assert_eq!(g.name, "Geometry Element");
     }

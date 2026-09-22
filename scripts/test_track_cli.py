@@ -6,6 +6,8 @@ from pathlib import Path
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 candidates = [
+    WORKSPACE / "local/builds/004-track-topology/windows/porsche-viewer.exe",
+    WORKSPACE / "local/builds/004-track-topology/.cargo-target/release/porsche-viewer.exe",
     WORKSPACE / "local/builds/003-track-environment/windows/porsche-viewer.exe",
     WORKSPACE / "local/builds/003-track-environment/.cargo-target/release/porsche-viewer.exe",
     WORKSPACE / "local/builds/002-track-viewer/windows/porsche-viewer.exe",

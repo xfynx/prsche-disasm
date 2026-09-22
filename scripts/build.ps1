@@ -6,7 +6,7 @@ param(
     [ValidateSet('debug', 'release')]
     [string]$Config = 'release',
 
-    [ValidateSet('all', 'native', 'web')]
+    [ValidateSet('all', 'native', 'windows', 'web')]
     [string]$Target = 'all',
 
     [string]$GameDir = 'local/game'
@@ -58,7 +58,7 @@ function Invoke-Cargo([string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "cargo build failed (exit code $LASTEXITCODE)" }
 }
 
-if ($Target -in @('all', 'native')) {
+if ($Target -in @('all', 'native', 'windows')) {
     Invoke-Cargo (@('--bin', 'porsche-viewer') + $profileArgs)
     $nativeBinary = Join-Path $CargoTarget (Join-Path $profileDir 'porsche-viewer.exe')
     if (-not (Test-Path -LiteralPath $nativeBinary -PathType Leaf)) { throw "Native executable was not produced: $nativeBinary" }
