@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Porsche Unleashed — просмотр моделей и трасс</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="viewer">
+      <section class="toolbar" aria-label="Управление просмотром">
+        <label class="field">
+          <span>Папка игры</span>
+          <input id="folderInput" type="file" webkitdirectory multiple />
+        </label>
+        <label class="field">
+          <span>Файлы</span>
+          <input id="fileInput" type="file" multiple />
+        </label>
+        <label class="field">
+          <span>Режим</span>
+          <select id="modeSelect">
+            <option value="track" selected>Трасса</option>
+            <option value="car">Авто</option>
+          </select>
+        </label>
+        <label class="target">
+          <span id="targetLabel">Трасса</span>
+          <input id="targetInput" value="skidpad" autocomplete="off" list="targetOptions" />
+          <datalist id="targetOptions"></datalist>
+        </label>
+        <button id="loadButton" type="button">Загрузить</button>
+        <button id="resetButton" type="button" title="Сброс камеры (R)">R</button>
+        <span id="status" role="status">Выберите папку игры или файлы трассы/авто.</span>
+        <span class="hint" title="Управление камерой">ЛКМ: вращение &bull; ПКМ / Shift+ЛКМ / WASD: перемещение &bull; Колёсико / Q,E: зум</span>
+      </section>
+      <canvas id="viewport"></canvas>
+      <pre id="summary" aria-live="polite"></pre>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
