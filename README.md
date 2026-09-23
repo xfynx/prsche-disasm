@@ -2,7 +2,7 @@
 
 Современная независимая реализация игрового движка **Need for Speed: Porsche Unleashed** (NFS 5, 2000) на **Rust + wgpu + winit** для Windows, Linux, macOS и браузера (WebAssembly / WebGPU).
 
-Последняя завершённая итерация: **[`005-unified-driving`](iterations/005-unified-driving/README.md)** (тег `iteration-005`). Следующий этап: [006](docs/next-iteration.md).
+Текущая активная итерация: **[`006-game-systems`](iterations/006-game-systems/README.md)** (завершена, тег `iteration-006`). Завершена: [`005-unified-driving`](iterations/005-unified-driving/README.md) (тег `iteration-005`).
 Полный перенос, включая Evolution и Factory Driver: [дорожная карта 006–014](docs/roadmap.md).
 Документация проекта: [План работ](PLAN.md) &bull; [Текущее состояние](STATUS.md) &bull; [Сборка](docs/building.md) &bull; [Форматы топологии](docs/track-topology-formats.md) &bull; [Роли агентов](docs/agents.md).
 
@@ -10,13 +10,14 @@
 
 ## 🚀 Быстрый запуск
 
-Для активной 005:
+Для 006-game-systems:
 
 ```powershell
 . .\scripts\tool-env.ps1
-.\scripts\build.ps1 -Iteration 005-unified-driving -Config release -Target all
+.\scripts\build.ps1 -Iteration 006-game-systems -Config release -Target all
 .\scripts\launch-viewer.ps1 -Mode desktop
 ```
+
 
 `desktop` открывает общий web/WASM интерфейс в отдельном окне Edge/Chrome.
 `-Mode web` открывает его в браузере, `-Mode native` — самостоятельное Rust-окно.
@@ -142,11 +143,22 @@ porsche disasm/
 3. **`003-track-environment`** (сентябрь 2026, тег `iteration-003`):
    - Парсинг сценариев расстановки `.scn` и инстанцирование динамических библиотечных объектов (конусы, стрелки, указатели).
    - Рендеринг 360-градусной цилиндрической панорамы горизонта `horz` из `Sky/<track>.fsh`.
-4. **`004-track-topology`** (сентябрь 2026, тег `iteration-004`, **активная**):
+4. **`004-track-topology`** (сентябрь 2026, тег `iteration-004`):
    - Реверс и парсеры топологии: развилки `.jnc`, кромки полотна `.edg`, секции `.map`.
    - Рендерер 3D-линий границ дорожного полотна (`TopologyRenderer`) с защитой от z-fighting.
    - Аркадное вождение спорткара Porsche (`ArcadeCar`): динамика, руление с учётом скорости, дрифт, автоматическая КПП, обороты двигателя, привязка к высоте и уклону дороги.
    - Веб-версия с гоночным стеклянным HUD и дефолтной автоподгрузкой ресурсов `local/game`.
+5. **`005-unified-driving`** (сентябрь 2026, тег `iteration-005`):
+   - Унифицированные desktop/web лаунчеры (`launch-viewer.ps1`, `Launch-*.cmd`).
+   - Spatial grid статической дорожной геометрии (`surface.rs`): аудит всех 15 трасс (109 707 полигонов, ошибка < 0.0002 м).
+   - Скрываемый интерфейс, плавное руление и стабильная физика прототипа.
+6. **`006-game-systems`** (сентябрь 2026, тег `iteration-006`):
+   - Доказательная база реверса `nfs5.exe` (SHA-256 `c318af393d4c2b7071a820ca3d69e956bbd94769b6e5c2e3e49f498ecbc94906`).
+   - Парсеры `SimCar` (88/88 `.sim`) и `AisCar` (22/22 `.ais`) в `nfs-formats/src/sim.rs`.
+   - Архитектура сохранений `.sav`, каталоги `nfs5.car`, `nfs5.trk`, миссии `nfs5.fac` в `nfs-formats/src/career.rs`.
+   - Детерминированные реплеи `replay.rpl` (8 суб-сэмплов/тик, RLE-поток) в `nfs-formats/src/replay.rs`.
+   - 500-RPM сетка крутящего момента, воспроизводимый baseline стенд в `local/experiments/bench/sim_baseline.json`.
+
 
 ---
 

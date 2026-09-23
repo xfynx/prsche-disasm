@@ -160,8 +160,23 @@ run002 — исправление формата 16bpp FSH `0x7e` (ARGB 1555), �
 0.000164 м); 72 unit tests, fmt/clippy, native/WASM release и 44 авто проверены.
 Playwright Chromium подтвердил web UI/заезд/focus, native offscreen снимки осмотрены.
 Интерактивный запуск native-окна и desktop-лаунчера проверен и подтверждён пользователем.
-Максимум прототипа 240 км/ч; исправлены подшаги коллизий и фильтр по высоте.
 Принятый снимок: `iteration-005`.
+
+## 006-game-systems (готова к приёмке, 2026-09-23)
+
+План: [iterations/006-game-systems/PLAN.md](iterations/006-game-systems/PLAN.md).
+Цель: доказательная карта поведения оригинальной игры (NFS 5) и разработка парсеров
+её ключевых форматов данных (`Simulation`, `FEData`, `savedata`). Подготовка доказательного
+фундамента для симуляции физики (007) и режима заезда/карьеры (008–010).
+
+- Снимок создан из `iteration-005` (скрипт `scripts/new-iteration.py`).
+- T01: PE-карта `nfs5.exe`, функции загрузки `.sim` (`0x0049c750`), `.ais` (`0x0049ca30`), масштабирующие коэффициенты. См. [`simulation-evidence.md`](iterations/006-game-systems/research/simulation-evidence.md).
+- T02: парсеры `SimCar` (328 байт) и `AisCar` (304 байта) в `nfs-formats/src/sim.rs`. Валидация 88/88 `.sim` и 22/22 `.ais` файлов.
+- T03: архитектура сохранений `.sav` (голова связного списка `0x0065b634`), парсеры каталогов `nfs5.car` (109 авто), `nfs5.trk` (15 трасс), `nfs5.fac` (34 миссии Factory Driver) в `nfs-formats/src/career.rs`. См. [`career-evidence.md`](iterations/006-game-systems/research/career-evidence.md).
+- T04: реверс детерминированных реплеев `replay.rpl` (8 суб-сэмплов на тик, RLE-поток ввода, заголовок 15 908 байт на 8 авто), парсер `ReplayFile` в `nfs-formats/src/replay.rs`, открытие 500-RPM сетки крутящего момента, baseline стенд в `local/experiments/bench/sim_baseline.json`. См. [`telemetry-evidence.md`](iterations/006-game-systems/research/telemetry-evidence.md).
+- T05: интеграция, 83 unit-теста, `fmt` и `clippy` (`-D warnings`) чистые, полная сборка `build.ps1 -Target all` (native + WASM), артефакты Run 001 (`runs/001-game-systems/`).
+- Следующий этап: `007-physics-simulation` (подробности в docs/next-iteration.md).
+
 
 ## Проверки и продолжение
 

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d{3}-[A-Za-z0-9._-]+$')]
-    [string]$Iteration = '005-unified-driving',
+    [string]$Iteration = '006-game-systems',
 
     [ValidateSet('debug', 'release')]
     [string]$Config = 'release',

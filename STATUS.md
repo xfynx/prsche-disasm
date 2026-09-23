@@ -1,8 +1,20 @@
 # Состояние проекта
 
-Обновлено 2026-09-23. **005-unified-driving завершена (тег `iteration-005`)**; 004-track-topology завершена.
-Текущий план: [006](docs/next-iteration.md).
+Обновлено 2026-09-23. **006-game-systems в работе**; 005-unified-driving завершена (тег `iteration-005`).
+Текущий план: [006](iterations/006-game-systems/PLAN.md).
 Полный перенос с обеими карьерами: [дорожная карта 006–014](docs/roadmap.md).
+
+## Активная итерация: 006-game-systems (готова к приёмке)
+- Снимок: `iterations/006-game-systems`.
+- Рабочий план: [PLAN.md](iterations/006-game-systems/PLAN.md).
+- [Run 001](iterations/006-game-systems/runs/001-game-systems/README.md):
+  - T01: PE-карта `nfs5.exe`, функции загрузки `.sim` (`0x0049c750`), `.ais` (`0x0049ca30`), масштабирующие коэффициенты. См. [`simulation-evidence.md`](iterations/006-game-systems/research/simulation-evidence.md).
+  - T02: парсеры `SimCar` (328 байт) и `AisCar` (304 байта) в `nfs-formats/src/sim.rs`. Валидация 88/88 `.sim` и 22/22 `.ais` файлов.
+  - T03: архитектура сохранений `.sav` (связный список секций `0x0065b634`), парсеры каталогов `nfs5.car` (109 авто), `nfs5.trk` (15 трасс), `nfs5.fac` (34 миссии Factory Driver) в `nfs-formats/src/career.rs`. См. [`career-evidence.md`](iterations/006-game-systems/research/career-evidence.md).
+  - T04: реверс детерминированных реплеев `replay.rpl` (8 суб-сэмплов на тик, RLE-поток ввода, заголовок 15 908 байт на 8 авто), парсер `ReplayFile` в `nfs-formats/src/replay.rs`, открытие 500-RPM сетки крутящего момента, baseline стенд в `local/experiments/bench/sim_baseline.json`. См. [`telemetry-evidence.md`](iterations/006-game-systems/research/telemetry-evidence.md).
+  - T05: интеграция, 83 unit-теста passed, `fmt` и `clippy` (`-D warnings`) чистые, полная сборка `build.ps1 -Target all` (native + WASM) выполнена без ошибок.
+- Итерация завершена, ожидает подтверждения пользователя для тегирования `iteration-006`.
+
 
 ## Проверенный результат
 

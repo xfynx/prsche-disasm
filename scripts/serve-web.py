@@ -73,7 +73,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--iteration', default='005-unified-driving')
+    parser.add_argument('--iteration', default='006-game-systems')
     parser.add_argument('--port', type=int, default=8000)
     parser.add_argument('--game-dir', default='local/game')
     parser.add_argument('--ready-file', type=Path)
