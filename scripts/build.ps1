@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d{3}-[A-Za-z0-9._-]+$')]
-    [string]$Iteration = '006-game-systems',
+    [string]$Iteration = '007-physics-simulation',
 
     [ValidateSet('debug', 'release')]
     [string]$Config = 'release',
