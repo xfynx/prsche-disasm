@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Porsche Unleashed — просмотр моделей и трасс</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="viewer">
+      <section id="menu" class="toolbar" aria-label="Управление просмотром">
+        <div class="menu-heading"><span>PORSCHE UNLEASHED</span><small>Игровая оболочка и карьеры · 009</small></div>
+        <div class="shell-profile-bar">
+          <div class="profile-chip">
+            <span class="profile-label">ПРОФИЛЬ:</span>
+            <b id="profileNameDisplay">Driver</b>
+            <span class="credits-badge"><b id="profileCreditsDisplay">11 000</b> CR</span>
+            <span id="profileRankDisplay" class="rank-badge">Applicant</span>
+          </div>
+          <div class="shell-actions">
+            <button id="careerEvolutionBtn" type="button" class="btn-career evo-btn" title="Турниры Evolution (Classic / Golden / Modern)">🏆 Evolution</button>
+            <button id="dealershipBtn" type="button" class="btn-career deal-btn" title="Автосалон новых и подержанных Porsche">🏪 Автосалон</button>
+            <button id="partsShopBtn" type="button" class="btn-career parts-btn" title="Магазин тюнинга и ремонт узлов">🔧 Тюнинг</button>
+            <button id="careerFactoryBtn" type="button" class="btn-career fac-btn" title="Первое задание Factory Driver: 0M01">🏭 Factory</button>
+            <button id="profileBtn" type="button" class="btn-subtle" title="Профиль и гараж">Гараж</button>
+            <button id="soundBtn" type="button" class="btn-subtle" title="Вкл/Выкл звук">🔊 Звук</button>
+          </div>
+        </div>
+        <label class="field" title="Выбрать локальную папку игры (переопределить)">
+          <span>Папка игры</span>
+          <input id="folderInput" type="file" webkitdirectory multiple />
+        </label>
+        <label class="field" title="Выбрать отдельные файлы игры">
+          <span>Файлы</span>
+          <input id="fileInput" type="file" multiple />
+        </label>
+        <span id="sourceBadge" class="source-badge" title="Текущий источник ресурсов игры">local/game</span>
+        <button id="resetSourceButton" type="button" class="btn-subtle" style="display:none" title="Вернуться к файлам local/game">К local/game</button>
+        <label class="field">
+          <span>Режим</span>
+          <select id="modeSelect">
+            <option value="track" selected>Трасса</option>
+            <option value="car">Авто</option>
+          </select>
+        </label>
+        <label class="field">
+          <span id="targetLabel">Трасса</span>
+          <select id="targetSelect"></select>
+        </label>
+        <label class="checkbox-field" id="topologyField" title="Показать/скрыть 3D границы трассы (T)">
+          <input id="topologyCheckbox" type="checkbox" />
+          <span>3D Границы</span>
+        </label>
+        <button id="tourButton" type="button" title="Режим аркадного заезда на авто / прогона (F)">Заезд (F)</button>
+        <button id="cameraButton" type="button" title="Сменить вид камеры: Сзади / Капот / Свободный (C)">Вид (C)</button>
+        <button id="paintButton" type="button" title="Сменить цвет кузова авто (P)">Цвет (P)</button>
+        <button id="loadButton" type="button">Загрузить</button>
+        <button id="resetButton" type="button" title="Сброс камеры / возврат на трассу (R)">R</button>
+        <button id="hudButton" type="button" aria-pressed="true">Приборы (H)</button>
+        <button id="detailsButton" type="button" aria-expanded="false" aria-controls="summary">Диагностика</button>
+        <button id="hideMenuButton" type="button">Скрыть меню (Esc)</button>
+        <span id="status" role="status">Выберите папку игры или файлы трассы/авто.</span>
+        <span class="hint">F: заезд · WASD: газ/руль · Space: ручник · C: камера · R: сброс · H: приборы</span>
+        <span class="prototype-note">Карьеры 009: Evolution (356 Challenge) и Factory Driver (0M01) с сохранением профиля.</span>
+      </section>
+      <div class="viewport-wrapper">
+        <canvas id="viewport" tabindex="0" aria-label="Трёхмерная сцена"></canvas>
+        <button id="menuButton" type="button" aria-expanded="true" aria-controls="menu">Меню · Esc</button>
+        <div id="raceHudTop" class="race-hud-top" hidden>
+          <div class="race-badge pos-badge">
+            <span class="badge-label">ПОЗИЦИЯ</span>
+            <span class="badge-val"><b id="racePos">1</b><small id="raceTotalPos">/4</small></span>
+          </div>
+          <div class="race-badge lap-badge">
+            <span class="badge-label">КРУГ</span>
+            <span class="badge-val"><b id="raceLap">1</b><small id="raceTotalLaps">/3</small></span>
+          </div>
+          <div class="race-badge time-badge">
+            <span class="badge-label">ВРЕМЯ КРУГА</span>
+            <span id="raceLapTime" class="badge-val timer-val">00:00.0</span>
+            <span id="raceBestLap" class="badge-sub">ЛУЧШИЙ --:--.-</span>
+          </div>
+        </div>
+        <div id="countdownBanner" class="countdown-banner" hidden>
+          <span id="countdownText" class="countdown-text">3</span>
+        </div>
+        <div id="wrongWayBanner" class="wrong-way-banner" hidden>
+          <span>⚠️ НЕ В ТУ СТОРОНУ!</span>
+        </div>
+        <!-- Event Briefing Modal -->
+        <div id="eventBriefingModal" class="race-results-modal" hidden>
+          <div class="results-card briefing-card">
+            <h2 id="briefingTitle" class="results-title">СОБЫТИЕ</h2>
+            <div id="briefingDesc" class="briefing-desc">Описание события...</div>
+            <div class="briefing-details">
+              <div class="stat-item">
+                <span class="stat-label">Трасса / Авто</span>
+                <span id="briefingTrackCar" class="stat-val briefing-val">Canyon / 356 Ferdinand</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Условие / Цель</span>
+                <span id="briefingGoal" class="stat-val briefing-val">1-е место (2 круга)</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Награда</span>
+                <span id="briefingReward" class="stat-val briefing-val">4 500 CR</span>
+              </div>
+            </div>
+            <div class="modal-buttons">
+              <button id="briefingStartBtn" type="button" class="btn-primary">Старт события</button>
+              <button id="briefingCancelBtn" type="button" class="btn-subtle">Отмена</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Profile Management Modal -->
+        <div id="profileModal" class="race-results-modal" hidden>
+          <div class="results-card profile-card">
+            <h2 class="results-title">ПРОФИЛЬ И СОХРАНЕНИЯ</h2>
+            <div class="profile-edit-row">
+              <label class="field">
+                <span>Имя водителя:</span>
+                <input id="profileNameInput" type="text" value="Driver" style="width: 60%; background:#252622; color:#eee; border:1px solid #666; padding:4px 8px;" />
+              </label>
+            </div>
+            <div class="profile-stats-grid">
+              <div>Баланс: <b id="modalCreditsDisplay" style="color:#d3bd83">11 000 CR</b></div>
+              <div>Ранг Фабрики: <b id="modalRankDisplay" style="color:#22c55e">Applicant</b></div>
+            </div>
+            <div class="garage-section">
+              <div class="garage-title">ГАРАЖ ИГРОКА</div>
+              <div id="profileGarageList" class="garage-list">
+                <div class="garage-empty">Гараж пуст. Нажмите кнопку покупки ниже.</div>
+              </div>
+            </div>
+            <div class="modal-buttons vertical">
+              <button id="profileBuyCarBtn" type="button" class="btn-primary">Купить '50 356 Coupé Ferdinand (11 000 CR)</button>
+              <div style="display:flex; gap:8px; justify-content:center; width:100%; margin-top:8px;">
+                <button id="profileExportBtn" type="button" class="btn-subtle">Экспорт .json</button>
+                <label class="btn-subtle" style="display:inline-flex; align-items:center; cursor:pointer;">
+                  Импорт .json
+                  <input id="profileImportInput" type="file" accept=".json" style="display:none;" />
+                </label>
+                <button id="profileResetBtn" type="button" class="btn-subtle" style="color:#e69279">Сбросить</button>
+              </div>
+              <button id="profileModalCloseBtn" type="button" class="btn-subtle" style="margin-top:12px;">Закрыть</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dealership Modal (010) -->
+        <div id="dealershipModal" class="race-results-modal" hidden>
+          <div class="results-card market-card">
+            <h2 class="results-title">АВТОСАЛОН PORSCHE</h2>
+            <div class="market-nav">
+              <div class="market-tabs">
+                <button id="dealershipNewTab" type="button" class="tab-btn active">Новые автомобили</button>
+                <button id="dealershipUsedTab" type="button" class="tab-btn">Подержанные авто (Б/У)</button>
+              </div>
+              <div class="era-filters">
+                <button type="button" class="era-chip active" data-era="all">Все эпохи</button>
+                <button type="button" class="era-chip" data-era="Classic">Classic</button>
+                <button type="button" class="era-chip" data-era="Golden">Golden</button>
+                <button type="button" class="era-chip" data-era="Modern">Modern</button>
+              </div>
+            </div>
+            <div id="dealershipGrid" class="market-grid"></div>
+            <div class="modal-buttons">
+              <button id="dealershipCloseBtn" type="button" class="btn-subtle">Закрыть</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parts & Tuning Shop Modal (010) -->
+        <div id="partsShopModal" class="race-results-modal" hidden>
+          <div class="results-card market-card">
+            <h2 class="results-title">МАСТЕРСКАЯ ТЮНИНГА И РЕМОНТА</h2>
+            <div class="car-tuning-header">
+              <div class="tuning-car-info">
+                <span class="tuning-label">Текущее авто:</span>
+                <b id="tuningCarName">Porsche</b> &bull;
+                <span>Пробег: <b id="tuningCarMileage">0 км</b></span> &bull;
+                <span>Состояние: <b id="tuningCarCondition">100%</b></span>
+              </div>
+              <button id="tuningRepairAllBtn" type="button" class="btn-primary" style="margin:0;">Ремонт узлов (0 CR)</button>
+            </div>
+            <div class="tuning-categories">
+              <button type="button" class="cat-chip active" data-cat="all">Все узлы</button>
+              <button type="button" class="cat-chip" data-cat="Engine">Двигатель</button>
+              <button type="button" class="cat-chip" data-cat="Exhaust">Выхлоп</button>
+              <button type="button" class="cat-chip" data-cat="Brakes">Тормоза</button>
+              <button type="button" class="cat-chip" data-cat="Springs">Подвеска</button>
+              <button type="button" class="cat-chip" data-cat="Tires">Шины</button>
+              <button type="button" class="cat-chip" data-cat="WeightReduction">Кузов</button>
+            </div>
+            <div id="tuningPartsGrid" class="market-grid parts-grid"></div>
+            <div class="modal-buttons">
+              <button id="partsShopCloseBtn" type="button" class="btn-subtle">Закрыть</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Evolution Tournaments Modal (010) -->
+        <div id="evolutionTournamentsModal" class="race-results-modal" hidden>
+          <div class="results-card market-card">
+            <h2 class="results-title">КАРЬЕРА EVOLUTION: КУБКИ И ТУРНИРЫ</h2>
+            <div class="era-filters">
+              <button type="button" class="evo-era-chip active" data-era="classic">Классическая эпоха (1950–1969)</button>
+              <button type="button" class="evo-era-chip" data-era="golden">Золотая эпоха (1970–1988)</button>
+              <button type="button" class="evo-era-chip" data-era="modern">Современная эпоха (1989–2000)</button>
+            </div>
+            <div id="evolutionCupsGrid" class="cups-grid"></div>
+            <div class="modal-buttons">
+              <button id="evolutionCloseBtn" type="button" class="btn-subtle">Закрыть</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Race Results Modal -->
+        <div id="raceResultsModal" class="race-results-modal" hidden>
+          <div class="results-card">
+            <h2 id="resultsTitle" class="results-title">ФИНИШ ЗАЕЗДА</h2>
+            <div id="resultsSubtitle" class="results-subtitle">Позиция P1 из 4</div>
+            <div id="resultsSpeech" class="results-speech" style="display:none;"></div>
+            <div class="results-stats">
+              <div class="stat-item">
+                <span class="stat-label">Текущий круг</span>
+                <span id="resultsLapTime" class="stat-val">--:--.-</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Лучший круг</span>
+                <span id="resultsBestTime" class="stat-val">--:--.-</span>
+              </div>
+            </div>
+            <div id="resultsRewardBadge" class="results-reward-badge" style="margin-bottom:18px; font-weight:bold; color:#22c55e;"></div>
+            <div style="display:flex; gap:12px; justify-content:center;">
+              <button id="raceContinueBtn" type="button" class="btn-primary">Продолжить</button>
+              <button id="raceRestartBtn" type="button" class="btn-subtle">Заехать снова (R)</button>
+            </div>
+          </div>
+        </div>
+        <div id="hud" class="hud" hidden>
+          <div class="hud-main">
+            <div class="hud-speed-gauge">
+              <span id="speedValue" class="speed-val">0</span>
+              <span class="speed-unit">КМ/Ч</span>
+            </div>
+            <div class="hud-gear-container">
+              <span class="gear-title">ПЕРЕДАЧА</span>
+              <span id="gearValue" class="gear-val">N</span>
+            </div>
+          </div>
+          <div class="hud-rpm-wrapper" title="Тахометр">
+            <div id="rpmBar" class="hud-rpm-fill"></div>
+          </div>
+          <div class="hud-hint">
+            <span><b>W/▲</b> Газ</span> &bull;
+            <span><b>S/▼</b> Тормоз/Назад</span> &bull;
+            <span><b>A/D</b> Руль</span> &bull;
+            <span><b>Space</b> Ручник</span> &bull;
+            <span><b id="physicsModeBadge">M: 6 DOF Физика</b></span> &bull;
+            <span><b>C</b> Камера</span> &bull;
+            <span><b>R</b> На трассу</span>
+          </div>
+        </div>
+      </div>
+      <pre id="summary" hidden></pre>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

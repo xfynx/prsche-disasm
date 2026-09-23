@@ -6,6 +6,18 @@ foreach ($pattern in @('cmake-*/bin', 'ninja', 'jdk-*/bin', 'wasm-bindgen-*-x86_
     $PorscheToolPaths += Get-Item (Join-Path $PorscheTools $pattern) -ErrorAction SilentlyContinue | ForEach-Object FullName
 }
 $env:PATH = ($PorscheToolPaths -join ';') + ';' + $env:PATH
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    $nodeCandidates = @(
+        (Join-Path $env:LOCALAPPDATA 'ms-playwright-go/1.57.0'),
+        'C:\Program Files\nodejs'
+    )
+    foreach ($nc in $nodeCandidates) {
+        if (Test-Path (Join-Path $nc 'node.exe')) {
+            $env:PATH = "$nc;$env:PATH"
+            break
+        }
+    }
+}
 $PorscheJdk = Get-ChildItem $PorscheTools -Directory -Filter 'jdk-*' -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($PorscheJdk) { $env:JAVA_HOME = $PorscheJdk.FullName }
 $PorscheGhidra = Get-ChildItem $PorscheTools -Directory -Filter 'ghidra_*_PUBLIC' -ErrorAction SilentlyContinue | Select-Object -First 1
