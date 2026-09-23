@@ -6,7 +6,19 @@
 ./scripts/build.ps1
 ```
 
-По умолчанию собирается `001-car-viewer` в конфигурации `release`. Windows executable записывается в `local/builds/001-car-viewer/windows/porsche-viewer.exe`. Web-пакет содержит статические файлы из `iterations/001-car-viewer/web` и файлы wasm-bindgen в `local/builds/001-car-viewer/web/package` (`viewer_impl.js`, `viewer_impl_bg.wasm` и сопутствующий `.d.ts`).
+По умолчанию собирается активная `005-unified-driving` в конфигурации `release`.
+Windows executable: `local/builds/005-unified-driving/windows/porsche-viewer.exe`.
+Web-пакет: `local/builds/005-unified-driving/web`, статический UI плюс wasm-bindgen
+в `package` (`viewer_impl.js`, `viewer_impl_bg.wasm` и сопутствующий `.d.ts`).
+
+Запуск: `./scripts/launch-viewer.ps1 -Mode desktop|web|native` (выбрать одно значение).
+Дополнительный desktop использует тот же web-пакет в отдельном окне Edge/Chrome;
+нужны установленный браузер и Python для локального read-only сервера.
+Helper слушает свободный loopback-порт, PID проверяется, логи каждого запуска
+сохраняются в `local/builds/<iteration>/launcher/<id>`. Остановка сервера — Ctrl+C
+в консоли launcher; закрытие окна браузера пока не останавливает сервер автоматически.
+Native работает самостоятельно: без аргументов — каталог; `catalog --game-dir <path>`
+выбирает другой источник; прежние `inspect/view` сохранены.
 
 Параметры `-Iteration`, `-Config debug|release` и `-Target all|native|web` позволяют выбрать снимок, конфигурацию или часть сборки. Скрипт требует Rust `1.98.1` из `rust-toolchain.toml`, проверенный `Cargo.lock` в корне итерации и `wasm-bindgen-cli 0.2.128` на `PATH`; для нового снимка сначала создайте lock-файл командой `cargo generate-lockfile --manifest-path iterations/<iteration>/Cargo.toml`. Окружение можно подготовить через `./scripts/tool-env.ps1`.
 

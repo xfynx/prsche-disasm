@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d{3}-[A-Za-z0-9._-]+$')]
-    [string]$Iteration = '001-car-viewer',
+    [string]$Iteration = '005-unified-driving',
 
     [ValidateSet('debug', 'release')]
     [string]$Config = 'release',
@@ -84,4 +84,9 @@ if ($Target -in @('all', 'web')) {
     if ($LASTEXITCODE -ne 0) { throw "wasm-bindgen failed (exit code $LASTEXITCODE)" }
 }
 
+foreach ($mode in @('desktop', 'web', 'native')) {
+    $launcher = Join-Path $OutputRoot ("Launch-{0}.cmd" -f $mode)
+    $content = '@echo off' + "`r`n" + 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\..\..\scripts\launch-viewer.ps1" -Iteration ' + $Iteration + ' -Mode ' + $mode + "`r`n"
+    [IO.File]::WriteAllText($launcher, $content, [Text.Encoding]::ASCII)
+}
 Write-Host "Build complete: $OutputRoot (config=$Config, target=$Target, game-dir=$GameDir)"

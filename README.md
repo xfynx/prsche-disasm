@@ -2,12 +2,33 @@
 
 Современная независимая реализация игрового движка **Need for Speed: Porsche Unleashed** (NFS 5, 2000) на **Rust + wgpu + winit** для Windows, Linux, macOS и браузера (WebAssembly / WebGPU).
 
-Текущая активная итерация: **[`004-track-topology`](iterations/004-track-topology/README.md)** (тег `iteration-004`).  
+Последняя завершённая итерация: **[`005-unified-driving`](iterations/005-unified-driving/README.md)** (тег `iteration-005`). Следующий этап: [006](docs/next-iteration.md).
+Полный перенос, включая Evolution и Factory Driver: [дорожная карта 006–014](docs/roadmap.md).
 Документация проекта: [План работ](PLAN.md) &bull; [Текущее состояние](STATUS.md) &bull; [Сборка](docs/building.md) &bull; [Форматы топологии](docs/track-topology-formats.md) &bull; [Роли агентов](docs/agents.md).
 
 ---
 
 ## 🚀 Быстрый запуск
+
+Для активной 005:
+
+```powershell
+. .\scripts\tool-env.ps1
+.\scripts\build.ps1 -Iteration 005-unified-driving -Config release -Target all
+.\scripts\launch-viewer.ps1 -Mode desktop
+```
+
+`desktop` открывает общий web/WASM интерфейс в отдельном окне Edge/Chrome.
+`-Mode web` открывает его в браузере, `-Mode native` — самостоятельное Rust-окно.
+После сборки те же режимы доступны через `local/builds/005-unified-driving/Launch-*.cmd`.
+Для desktop/web консоль launcher должна оставаться открытой; Ctrl+C останавливает
+его локальный сервер, окно браузера закрывается отдельно. Это переходная оболочка,
+не новая реализация движка. Native сохраняет `inspect/view` и без аргументов
+открывает каталог (Tab — авто/трассы, PgUp/PgDn — выбор).
+
+Web/desktop: Esc — меню, H — приборы, F — заезд; диагностическая панель открывается
+отдельно. В заезде всё ещё тестовая машина; каталог авто служит просмотру моделей.
+Проверки и ограничения 005 — в её README. Ниже сохранены команды принятой 004.
 
 Ресурсы оригинальной игры читаются исключительно из локального каталога `local/game` в корне проекта (в Git не добавляются).
 

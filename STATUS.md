@@ -1,11 +1,24 @@
 # Состояние проекта
 
-Обновлено 2026-09-23. **004-track-topology завершена**.
-Предыдущие снимки: `001-car-viewer`, `002-track-viewer`, `003-track-environment`.
-[План 004](iterations/004-track-topology/PLAN.md). [Следующий этап](docs/next-iteration.md).
-Задачи T01–T06 завершены: реверс `.jnc`/`.edg`/`.map`, парсеры, интеграция в Scene, рендеринг линий границ, Web UI (select + 3D checkbox) и визуальная приёмка в `runs/001-topology-verification`.
+Обновлено 2026-09-23. **005-unified-driving завершена (тег `iteration-005`)**; 004-track-topology завершена.
+Текущий план: [006](docs/next-iteration.md).
+Полный перенос с обеими карьерами: [дорожная карта 006–014](docs/roadmap.md).
 
 ## Проверенный результат
+
+### 005-unified-driving
+- [Run 001](iterations/005-unified-driving/runs/001-unified-driving/README.md):
+  - Общий desktop/web запуск (`scripts/launch-viewer.ps1`), три `Launch-*.cmd`; desktop — web/WASM в отдельном окне Edge/Chrome. Native CLI сохранён, добавлен каталог без аргументов и непрерывный ввод по кадрам. Пользователь подтвердил интерактивную работу.
+  - Web UI: Esc скрывает/возвращает меню, H выключает приборы, диагностика отдельно.
+  - Прототип: плавный руль, ограничение угла по скорости, максимум 240 км/ч, подшаги ≤1/120 с и фильтр кромок по высоте. Это не оригинальная физика.
+  - CPU spatial grid по статическим RD* треугольникам до batching: высота/нормаль, выбор ближайшего допустимого уровня и исходный article/primitive/triangle ID. Все 15 трасс прошли centroid audit (109 707 треугольников), худшая ошибка 0.000164 м.
+  - 72 unit tests passed, 3 специальных GPU tests ignored; fmt/clippy чистые; release native/WASM собраны; 44/44 модели загружаются.
+  - Playwright 1.57 + обычное окно Chromium: меню/заезд/HUD/каталог/focus проверены, ошибок страницы нет. Native offscreen Vulkan — skidpad и 356a осмотрены.
+  - Реверс: воспроизводимый аудит PE/EDG/JNC, оговорки о семантике флагов, инвентарь FEData/Simulation/savedata для карьер.
+- Предыдущие снимки: `001-car-viewer`, `002-track-viewer`, `003-track-environment`, `004-track-topology`.
+- [План 005](iterations/005-unified-driving/PLAN.md). [Следующий этап](docs/next-iteration.md).
+- Задачи T01–T06 завершены, код закоммичен, тег `iteration-005`.
+
 
 ### 004-track-topology
 - [Run 001](iterations/004-track-topology/runs/001-topology-verification/README.md): offscreen Vulkan-снимки треков и автомобиля:
@@ -64,17 +77,16 @@
 
 ## Приёмка и ограничения
 
-Итерация `004-track-topology` полностью принята (тег `iteration-004`).
-Следующий этап: `005-track-physics-surfaces` (подробный план в `docs/next-iteration.md`):
-- Точный рейкаст высоты и нормали по дорожным полигонам CRP (BVH / spatial grid).
-- Физическая классификация покрытий (асфальт, обочина, поребрики, трава) и сцепление шин.
-- Динамический крен кузова, баланс сцепления, занос и следы торможения (skid marks).
-- Засечка времени круга по узлам развилок `.jnc`.
+Итерация `005-unified-driving` полностью принята (тег `iteration-005`).
+Следующий этап — `006: карта поведения оригинала и форматы игровых систем`. Не раздувать аркадную машину: сначала
+геометрическая опора и доказательства оригинальных игровых систем. Поверхности,
+сцепление, подвеска и правила гонки — после проверки данных и поведения оригинала.
+См. `docs/next-iteration.md` и полную дорожную карту `docs/roadmap.md`.
 
 ## Основание проекта
 
 Rust/wgpu/winit, shared native/WASM Scene, три crate в workspace.
 local/game: 1742 файла / 599126359 байт, SHA-256 манифест в docs/game-manifest.json.
 Среда и версии: docs/environment.md и docs/building.md; формат: docs/crp-format.md.
-Git main, локальные снимки iteration-001, iteration-002, iteration-003; remote не настроен.
+Git main, локальные снимки iteration-001, iteration-002, iteration-003, iteration-004, iteration-005; remote не настроен.
 Пустой 000-bootstrap убран; восстановимая копия local/archive/000-bootstrap.
