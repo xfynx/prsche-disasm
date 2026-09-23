@@ -2,7 +2,7 @@
 
 Современная независимая реализация игрового движка **Need for Speed: Porsche Unleashed** (NFS 5, 2000) на **Rust + wgpu + winit** для Windows, Linux, macOS и браузера (WebAssembly / WebGPU).
 
-Текущая активная итерация: **[`006-game-systems`](iterations/006-game-systems/README.md)** (завершена, тег `iteration-006`). Завершена: [`005-unified-driving`](iterations/005-unified-driving/README.md) (тег `iteration-005`).
+Активная итерация: **[009-game-shell](iterations/009-game-shell/README.md)**. Последний завершённый снимок: [008-race-loop](iterations/008-race-loop/README.md), тег `iteration-008`. Завершённые снимки неизменны.
 Полный перенос, включая Evolution и Factory Driver: [дорожная карта 006–014](docs/roadmap.md).
 Документация проекта: [План работ](PLAN.md) &bull; [Текущее состояние](STATUS.md) &bull; [Сборка](docs/building.md) &bull; [Форматы топологии](docs/track-topology-formats.md) &bull; [Роли агентов](docs/agents.md).
 
@@ -10,18 +10,18 @@
 
 ## 🚀 Быстрый запуск
 
-Для 006-game-systems:
+Для активной 009-game-shell:
 
 ```powershell
 . .\scripts\tool-env.ps1
-.\scripts\build.ps1 -Iteration 006-game-systems -Config release -Target all
+.\scripts\build.ps1 -Iteration 009-game-shell -Config release -Target all
 .\scripts\launch-viewer.ps1 -Mode desktop
 ```
 
 
 `desktop` открывает общий web/WASM интерфейс в отдельном окне Edge/Chrome.
 `-Mode web` открывает его в браузере, `-Mode native` — самостоятельное Rust-окно.
-После сборки те же режимы доступны через `local/builds/005-unified-driving/Launch-*.cmd`.
+После сборки те же режимы доступны через `local/builds/009-game-shell/Launch-*.cmd`.
 Для desktop/web консоль launcher должна оставаться открытой; Ctrl+C останавливает
 его локальный сервер, окно браузера закрывается отдельно. Это переходная оболочка,
 не новая реализация движка. Native сохраняет `inspect/view` и без аргументов

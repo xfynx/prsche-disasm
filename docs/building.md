@@ -6,9 +6,9 @@
 ./scripts/build.ps1
 ```
 
-По умолчанию собирается активная `005-unified-driving` в конфигурации `release`.
-Windows executable: `local/builds/005-unified-driving/windows/porsche-viewer.exe`.
-Web-пакет: `local/builds/005-unified-driving/web`, статический UI плюс wasm-bindgen
+По умолчанию собирается активная `009-game-shell` в конфигурации `release`.
+Windows executable: `local/builds/009-game-shell/windows/porsche-viewer.exe`.
+Web-пакет: `local/builds/009-game-shell/web`, статический UI плюс wasm-bindgen
 в `package` (`viewer_impl.js`, `viewer_impl_bg.wasm` и сопутствующий `.d.ts`).
 
 Запуск: `./scripts/launch-viewer.ps1 -Mode desktop|web|native` (выбрать одно значение).

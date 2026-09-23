@@ -4,7 +4,7 @@ param(
     [string]$Mode = 'desktop',
 
     [ValidatePattern('^\d{3}-[A-Za-z0-9._-]+$')]
-    [string]$Iteration = '007-physics-simulation',
+    [string]$Iteration = '009-game-shell',
 
     [string]$GameDir = 'local/game'
 )

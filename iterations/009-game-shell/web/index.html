@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Porsche Unleashed — просмотр моделей и трасс</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="viewer">
+      <section id="menu" class="toolbar" aria-label="Управление просмотром">
+        <div class="menu-heading"><span>PORSCHE UNLEASHED</span><small>Исследовательский заезд · 005</small></div>
+        <label class="field" title="Выбрать локальную папку игры (переопределить)">
+          <span>Папка игры</span>
+          <input id="folderInput" type="file" webkitdirectory multiple />
+        </label>
+        <label class="field" title="Выбрать отдельные файлы игры">
+          <span>Файлы</span>
+          <input id="fileInput" type="file" multiple />
+        </label>
+        <span id="sourceBadge" class="source-badge" title="Текущий источник ресурсов игры">local/game</span>
+        <button id="resetSourceButton" type="button" class="btn-subtle" style="display:none" title="Вернуться к файлам local/game">К local/game</button>
+        <label class="field">
+          <span>Режим</span>
+          <select id="modeSelect">
+            <option value="track" selected>Трасса</option>
+            <option value="car">Авто</option>
+          </select>
+        </label>
+        <label class="field">
+          <span id="targetLabel">Трасса</span>
+          <select id="targetSelect"></select>
+        </label>
+        <label class="checkbox-field" id="topologyField" title="Показать/скрыть 3D границы трассы (T)">
+          <input id="topologyCheckbox" type="checkbox" />
+          <span>3D Границы</span>
+        </label>
+        <button id="tourButton" type="button" title="Режим аркадного заезда на авто / прогона (F)">Заезд (F)</button>
+        <button id="cameraButton" type="button" title="Сменить вид камеры: Сзади / Капот / Свободный (C)">Вид (C)</button>
+        <button id="paintButton" type="button" title="Сменить цвет кузова авто (P)">Цвет (P)</button>
+        <button id="loadButton" type="button">Загрузить</button>
+        <button id="resetButton" type="button" title="Сброс камеры / возврат на трассу (R)">R</button>
+        <button id="hudButton" type="button" aria-pressed="true">Приборы (H)</button>
+        <button id="detailsButton" type="button" aria-expanded="false" aria-controls="summary">Диагностика</button>
+        <button id="hideMenuButton" type="button">Скрыть меню (Esc)</button>
+        <span id="status" role="status">Выберите папку игры или файлы трассы/авто.</span>
+        <span class="hint">F: заезд · WASD: газ/руль · Space: ручник · C: камера · R: сброс · H: приборы</span>
+        <span class="prototype-note">Пока в заезде используется тестовый автомобиль. Каталог «Авто» — просмотр оригинальных моделей.</span>
+      </section>
+      <div class="viewport-wrapper">
+        <canvas id="viewport" tabindex="0" aria-label="Трёхмерная сцена"></canvas>
+        <button id="menuButton" type="button" aria-expanded="true" aria-controls="menu">Меню · Esc</button>
+        <div id="raceHudTop" class="race-hud-top" hidden>
+          <div class="race-badge pos-badge">
+            <span class="badge-label">ПОЗИЦИЯ</span>
+            <span class="badge-val"><b id="racePos">1</b><small id="raceTotalPos">/4</small></span>
+          </div>
+          <div class="race-badge lap-badge">
+            <span class="badge-label">КРУГ</span>
+            <span class="badge-val"><b id="raceLap">1</b><small id="raceTotalLaps">/3</small></span>
+          </div>
+          <div class="race-badge time-badge">
+            <span class="badge-label">ВРЕМЯ КРУГА</span>
+            <span id="raceLapTime" class="badge-val timer-val">00:00.0</span>
+            <span id="raceBestLap" class="badge-sub">ЛУЧШИЙ --:--.-</span>
+          </div>
+        </div>
+        <div id="countdownBanner" class="countdown-banner" hidden>
+          <span id="countdownText" class="countdown-text">3</span>
+        </div>
+        <div id="wrongWayBanner" class="wrong-way-banner" hidden>
+          <span>⚠️ НЕ В ТУ СТОРОНУ!</span>
+        </div>
+        <div id="raceResultsModal" class="race-results-modal" hidden>
+          <div class="results-card">
+            <h2 class="results-title">ФИНИШ ЗАЕЗДА</h2>
+            <div id="resultsSubtitle" class="results-subtitle">Позиция P1 из 4</div>
+            <div class="results-stats">
+              <div class="stat-item">
+                <span class="stat-label">Текущий круг</span>
+                <span id="resultsLapTime" class="stat-val">--:--.-</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Лучший круг</span>
+                <span id="resultsBestTime" class="stat-val">--:--.-</span>
+              </div>
+            </div>
+            <button id="raceRestartBtn" type="button" class="btn-primary">Заехать снова (R)</button>
+          </div>
+        </div>
+        <div id="hud" class="hud" hidden>
+          <div class="hud-main">
+            <div class="hud-speed-gauge">
+              <span id="speedValue" class="speed-val">0</span>
+              <span class="speed-unit">КМ/Ч</span>
+            </div>
+            <div class="hud-gear-container">
+              <span class="gear-title">ПЕРЕДАЧА</span>
+              <span id="gearValue" class="gear-val">N</span>
+            </div>
+          </div>
+          <div class="hud-rpm-wrapper" title="Тахометр">
+            <div id="rpmBar" class="hud-rpm-fill"></div>
+          </div>
+          <div class="hud-hint">
+            <span><b>W/▲</b> Газ</span> &bull;
+            <span><b>S/▼</b> Тормоз/Назад</span> &bull;
+            <span><b>A/D</b> Руль</span> &bull;
+            <span><b>Space</b> Ручник</span> &bull;
+            <span><b id="physicsModeBadge">M: 6 DOF Физика</b></span> &bull;
+            <span><b>C</b> Камера</span> &bull;
+            <span><b>R</b> На трассу</span>
+          </div>
+        </div>
+      </div>
+      <pre id="summary" hidden></pre>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
