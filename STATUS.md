@@ -1,8 +1,17 @@
 # Состояние проекта
 
-Обновлено 2026-09-24. **010-evolution-career завершена** (готовится тег `iteration-010`); следующая `011-factory-driver`.
-Текущий план: [iterations/010-evolution-career/PLAN.md](iterations/010-evolution-career/PLAN.md).
+Обновлено 2026-09-24. **011-factory-driver завершена** (тег `iteration-011`); следующая `012-audio-cockpit`.
+Текущий план: [iterations/011-factory-driver/PLAN.md](iterations/011-factory-driver/PLAN.md).
 Полный перенос с обеими карьерами: [дорожная карта 006–014](docs/roadmap.md).
+
+## Завершённая итерация: 011-factory-driver
+- [Run 001](iterations/011-factory-driver/runs/001-factory-driver/README.md):
+  - T01: бинарный реверс всех 34 миссий `nfs5.fac` и языковой базы `festrings.csv`.
+  - T02: движок испытаний `factory_driver.rs` в `crates/nfs-game`: детекторы трюков `StuntDetector` (180° slide, 360° spin, reverse J-turn, слаломные штрафы, контроль повреждений кузова).
+  - T03: система карьерного роста пилота (Applicant -> Junior Test Driver -> Test Driver -> Senior Test Driver -> Chief Test Driver -> Master Ace) и наградные автомобили ('78 911 Turbo 3.3, '73 Carrera RS 2.7, '99 911 GT3 Factory Edition).
+  - T04: модальное окно `#factoryMissionsModal` с фильтрами уровней сложности Tier 1–3, репликами шеф-инструктора Рольфа, статусами и лучшими временами.
+  - T05: 142 теста Rust passed across workspace, Clippy `-D warnings` чист, Rustfmt чист, Playwright Chromium E2E (0 errors), сборка native и WASM.
+- Задачи T01–T05 завершены, тег `iteration-011`.
 
 ## Завершённая итерация: 010-evolution-career
 - [Run 001](iterations/010-evolution-career/runs/001-evolution-career/README.md):
