@@ -10,7 +10,21 @@
   <body>
     <main class="viewer">
       <section id="menu" class="toolbar" aria-label="Управление просмотром">
-        <div class="menu-heading"><span>PORSCHE UNLEASHED</span><small>Исследовательский заезд · 005</small></div>
+        <div class="menu-heading"><span>PORSCHE UNLEASHED</span><small>Игровая оболочка и карьеры · 009</small></div>
+        <div class="shell-profile-bar">
+          <div class="profile-chip">
+            <span class="profile-label">ПРОФИЛЬ:</span>
+            <b id="profileNameDisplay">Driver</b>
+            <span class="credits-badge"><b id="profileCreditsDisplay">11 000</b> CR</span>
+            <span id="profileRankDisplay" class="rank-badge">Applicant</span>
+          </div>
+          <div class="shell-actions">
+            <button id="careerEvolutionBtn" type="button" class="btn-career evo-btn" title="Первый турнир Evolution: 356 Challenge">🏆 Evolution</button>
+            <button id="careerFactoryBtn" type="button" class="btn-career fac-btn" title="Первое задание Factory Driver: 0M01">🏭 Factory</button>
+            <button id="profileBtn" type="button" class="btn-subtle" title="Профиль и сохранения">Профиль</button>
+            <button id="soundBtn" type="button" class="btn-subtle" title="Вкл/Выкл звук">🔊 Звук</button>
+          </div>
+        </div>
         <label class="field" title="Выбрать локальную папку игры (переопределить)">
           <span>Папка игры</span>
           <input id="folderInput" type="file" webkitdirectory multiple />
@@ -46,7 +60,7 @@
         <button id="hideMenuButton" type="button">Скрыть меню (Esc)</button>
         <span id="status" role="status">Выберите папку игры или файлы трассы/авто.</span>
         <span class="hint">F: заезд · WASD: газ/руль · Space: ручник · C: камера · R: сброс · H: приборы</span>
-        <span class="prototype-note">Пока в заезде используется тестовый автомобиль. Каталог «Авто» — просмотр оригинальных моделей.</span>
+        <span class="prototype-note">Карьеры 009: Evolution (356 Challenge) и Factory Driver (0M01) с сохранением профиля.</span>
       </section>
       <div class="viewport-wrapper">
         <canvas id="viewport" tabindex="0" aria-label="Трёхмерная сцена"></canvas>
@@ -72,10 +86,73 @@
         <div id="wrongWayBanner" class="wrong-way-banner" hidden>
           <span>⚠️ НЕ В ТУ СТОРОНУ!</span>
         </div>
+        <!-- Event Briefing Modal -->
+        <div id="eventBriefingModal" class="race-results-modal" hidden>
+          <div class="results-card briefing-card">
+            <h2 id="briefingTitle" class="results-title">СОБЫТИЕ</h2>
+            <div id="briefingDesc" class="briefing-desc">Описание события...</div>
+            <div class="briefing-details">
+              <div class="stat-item">
+                <span class="stat-label">Трасса / Авто</span>
+                <span id="briefingTrackCar" class="stat-val briefing-val">Canyon / 356 Ferdinand</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Условие / Цель</span>
+                <span id="briefingGoal" class="stat-val briefing-val">1-е место (2 круга)</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Награда</span>
+                <span id="briefingReward" class="stat-val briefing-val">4 500 CR</span>
+              </div>
+            </div>
+            <div class="modal-buttons">
+              <button id="briefingStartBtn" type="button" class="btn-primary">Старт события</button>
+              <button id="briefingCancelBtn" type="button" class="btn-subtle">Отмена</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Profile Management Modal -->
+        <div id="profileModal" class="race-results-modal" hidden>
+          <div class="results-card profile-card">
+            <h2 class="results-title">ПРОФИЛЬ И СОХРАНЕНИЯ</h2>
+            <div class="profile-edit-row">
+              <label class="field">
+                <span>Имя водителя:</span>
+                <input id="profileNameInput" type="text" value="Driver" style="width: 60%; background:#252622; color:#eee; border:1px solid #666; padding:4px 8px;" />
+              </label>
+            </div>
+            <div class="profile-stats-grid">
+              <div>Баланс: <b id="modalCreditsDisplay" style="color:#d3bd83">11 000 CR</b></div>
+              <div>Ранг Фабрики: <b id="modalRankDisplay" style="color:#22c55e">Applicant</b></div>
+            </div>
+            <div class="garage-section">
+              <div class="garage-title">ГАРАЖ ИГРОКА</div>
+              <div id="profileGarageList" class="garage-list">
+                <div class="garage-empty">Гараж пуст. Нажмите кнопку покупки ниже.</div>
+              </div>
+            </div>
+            <div class="modal-buttons vertical">
+              <button id="profileBuyCarBtn" type="button" class="btn-primary">Купить '50 356 Coupé Ferdinand (11 000 CR)</button>
+              <div style="display:flex; gap:8px; justify-content:center; width:100%; margin-top:8px;">
+                <button id="profileExportBtn" type="button" class="btn-subtle">Экспорт .json</button>
+                <label class="btn-subtle" style="display:inline-flex; align-items:center; cursor:pointer;">
+                  Импорт .json
+                  <input id="profileImportInput" type="file" accept=".json" style="display:none;" />
+                </label>
+                <button id="profileResetBtn" type="button" class="btn-subtle" style="color:#e69279">Сбросить</button>
+              </div>
+              <button id="profileModalCloseBtn" type="button" class="btn-subtle" style="margin-top:12px;">Закрыть</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Race Results Modal -->
         <div id="raceResultsModal" class="race-results-modal" hidden>
           <div class="results-card">
-            <h2 class="results-title">ФИНИШ ЗАЕЗДА</h2>
+            <h2 id="resultsTitle" class="results-title">ФИНИШ ЗАЕЗДА</h2>
             <div id="resultsSubtitle" class="results-subtitle">Позиция P1 из 4</div>
+            <div id="resultsSpeech" class="results-speech" style="display:none;"></div>
             <div class="results-stats">
               <div class="stat-item">
                 <span class="stat-label">Текущий круг</span>
@@ -86,7 +163,11 @@
                 <span id="resultsBestTime" class="stat-val">--:--.-</span>
               </div>
             </div>
-            <button id="raceRestartBtn" type="button" class="btn-primary">Заехать снова (R)</button>
+            <div id="resultsRewardBadge" class="results-reward-badge" style="margin-bottom:18px; font-weight:bold; color:#22c55e;"></div>
+            <div style="display:flex; gap:12px; justify-content:center;">
+              <button id="raceContinueBtn" type="button" class="btn-primary">Продолжить</button>
+              <button id="raceRestartBtn" type="button" class="btn-subtle">Заехать снова (R)</button>
+            </div>
           </div>
         </div>
         <div id="hud" class="hud" hidden>

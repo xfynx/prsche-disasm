@@ -114,4 +114,31 @@ element("#tourButton").dispatch("click");
 assert.equal(driving, false);
 assert.equal(document.body.classes.has("menu-hidden"), false);
 assert.equal(element("#hud").hidden, true);
-console.log("UI state: drive/menu/HUD/focus/selector/diagnostics checks passed");
+
+// 009 Shell UI & Modals regression checks
+element("#soundBtn").dispatch("click");
+assert.equal(element("#soundBtn").classes.has("active"), true, "Sound button toggles active");
+element("#soundBtn").dispatch("click");
+assert.equal(element("#soundBtn").classes.has("active"), false, "Sound button toggles off");
+
+element("#careerEvolutionBtn").dispatch("click");
+assert.equal(element("#eventBriefingModal").hidden, false, "Evolution briefing opens");
+element("#briefingCancelBtn").dispatch("click");
+assert.equal(element("#eventBriefingModal").hidden, true, "Evolution briefing cancels");
+
+element("#careerFactoryBtn").dispatch("click");
+assert.equal(element("#eventBriefingModal").hidden, false, "Factory briefing opens");
+element("#briefingCancelBtn").dispatch("click");
+assert.equal(element("#eventBriefingModal").hidden, true, "Factory briefing cancels");
+
+element("#profileBtn").dispatch("click");
+assert.equal(element("#profileModal").hidden, false, "Profile modal opens");
+element("#profileModalCloseBtn").dispatch("click");
+assert.equal(element("#profileModal").hidden, true, "Profile modal closes");
+
+// Input field typing isolation
+window.dispatch("keydown", { code: "KeyW", target: new Input(), repeat: false });
+assert.equal(context.testApi.activeKeys.size, 0, "Inputs must not capture drive keys");
+
+console.log("UI state: drive/menu/HUD/focus/selector/diagnostics/shell/modals checks passed");
+

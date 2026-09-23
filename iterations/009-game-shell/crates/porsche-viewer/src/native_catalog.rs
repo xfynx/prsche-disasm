@@ -108,6 +108,16 @@ impl NativeCatalog {
         }
     }
 
+    pub fn select_track_by_name(&mut self, track_name: &str) -> bool {
+        if let Some(pos) = self.tracks.iter().position(|t| t == track_name) {
+            self.kind = NativeTargetKind::Track;
+            self.track_index = pos;
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn current_kind_label(&self) -> &'static str {
         match self.kind {
             NativeTargetKind::Car => "Car",

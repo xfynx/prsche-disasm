@@ -1,18 +1,23 @@
 # Состояние проекта
 
-Обновлено 2026-09-24. **008-race-loop завершена** (тег `iteration-008`); активна `009-game-shell`.
+Обновлено 2026-09-24. **009-game-shell завершена** (тег `iteration-009`); планируется `010-evolution-career`.
 Текущий план: [docs/next-iteration.md](docs/next-iteration.md).
 Полный перенос с обеими карьерами: [дорожная карта 006–014](docs/roadmap.md).
 
-## Активная итерация: 009-game-shell
-- Снимок создан из 008 без прежних runs. Завершённые 001–008 не меняются.
-- Рабочий план: [iterations/009-game-shell/PLAN.md](iterations/009-game-shell/PLAN.md).
-- T00 выполнено: исправлен знак поворота колёс 6 DOF; регресс воспроизвёл ошибку до исправления. 118 Rust-тестов passed (3 GPU ignored), web input regression, fmt/clippy, native/WASM release — успешно.
-- [Run 001](iterations/009-game-shell/runs/001-controls-regression/README.md): Chromium проверил A/вправо через реальный ввод и телеметрию WASM в 6 DOF и аркаде; знаки правильные, ошибок страницы нет. Отдельный интерактивный native-запуск в этом run не проверялся.
-- Далее T01/T03: модель экранов и подтверждение карьерных правил. Оболочка/профиль/карьеры 009 ещё не реализованы; итерация открыта.
-- Цель: главное меню, профиль игрока, сохранение/загрузка прогресса, запуск первых событий карьер Evolution и Factory Driver.
-
 ## Проверенный результат
+
+### 009-game-shell
+- [Run 001](iterations/009-game-shell/runs/001-controls-regression/README.md):
+  - T00: исправление инверсии руля в 6 DOF физике (`vehicle.rs`), отрицательный угол для правого поворота колёс при направлении -Z.
+  - Регрессионный стенд: воспроизведение бага до исправления, 21 тест `porsche-viewer` зелёный, web input checks, Playwright тест знака курса.
+- [Run 002](iterations/009-game-shell/runs/002-game-shell/README.md):
+  - T01: независимый крейт `crates/nfs-game`, архитектурная машина экранов `Screen`, идемпотентная обработка результатов и защита от гонок загрузки.
+  - T02: профиль игрока `PlayerProfile` (11 000 CR, гараж, ранги), атомарное сохранение `.tmp` -> rename на диске, `localStorage` и JSON импорт/экспорт в Web.
+  - T03: бинарное исследование `nfs5.trn` и `nfs5.fac`, парсеры турниров и миссий в `nfs-formats/src/career.rs`, отчёт [`research/first-events-evidence.md`](iterations/009-game-shell/research/first-events-evidence.md).
+  - T04: сквозной запуск первых карьерных событий: Evolution 356 Challenge (Canyon, Monaco 1; взнос 2 000 CR, приз 4 500 CR) и Factory Driver 0M01 (Skidpad, Boxster, лимит 32.0 с).
+  - T05: базовый звук: WebAudio синтезатор (RPM, визг шин, сигналы отсчёта/финиша) и WinMM beeper для native; модальные окна брифинга, профиля и результатов.
+  - 129 Rust-тестов passed, clippy `-D warnings` и fmt чистые, release native/WASM собраны, 10 проверок Chromium WebGPU пройдены.
+- Задачи T00–T05 завершены, код закоммичен, тег `iteration-009`.
 
 ### 008-race-loop
 - [Run 001](iterations/008-race-loop/runs/001-race-loop/README.md):
@@ -56,7 +61,6 @@
 - [План 005](iterations/005-unified-driving/PLAN.md). [Следующий этап](docs/next-iteration.md).
 - Задачи T01–T06 завершены, код закоммичен, тег `iteration-005`.
 
-
 ### 004-track-topology
 - [Run 001](iterations/004-track-topology/runs/001-topology-verification/README.md): offscreen Vulkan-снимки треков и автомобиля:
   - `skidpad_topology.png`: отображение 167 кромок дорожного полотна skidpad (121 непрерывная линия) поверх геометрии без z-fighting.
@@ -70,7 +74,7 @@
 - **Аркадная навигация по трассе (Arcade Car Navigation)**:
   - Стилизованный спорткар Porsche (`car_mesh.rs`) со сменой цветов палитры (горячая клавиша `P`).
   - Аркадная физика автомобиля (`arcade.rs`): разгон, торможение, руление с учётом скорости, ручной тормоз с заносом (Space), расчёт передачи (1..5, R, N) и оборотов двигателя (RPM).
-  - Привязка к дорожному полотну: адаптация высоты ($Y$) и наклона кузова по уклону и виражам дороги (`sample_road_elevation_from_edges`), отскок от границ `.edg`.
+  - Привязка к дорожному полотну: адаптация высоты ($Y$) и наклона кузова по уклону и виражам дороги (`sample_road_elevation_fromEdges`), отскок от границ `.edg`.
   - Динамическая камера от 3-го лица с плавной интерполяцией и переключением видов (Chase / Bumper / Free, клавиша `C`).
   - Гоночный HUD в веб-версии: полупрозрачный стеклянный спидометр (км/ч), индикатор передачи, шкала тахометра (RPM) и подсказка клавиш. В нативном окне статус отображается в заголовке окна.
 - Исследовательские скрипты реверса сохранены в версионируемой папке `scripts/research/`.
@@ -114,16 +118,13 @@
 
 ## Приёмка и ограничения
 
-Итерация `005-unified-driving` полностью принята (тег `iteration-005`).
-Следующий этап — `006: карта поведения оригинала и форматы игровых систем`. Не раздувать аркадную машину: сначала
-геометрическая опора и доказательства оригинальных игровых систем. Поверхности,
-сцепление, подвеска и правила гонки — после проверки данных и поведения оригинала.
+Итерация `009-game-shell` полностью принята (тег `iteration-009`).
+Следующий этап — `010-evolution-career`: полный цикл эпохи Classic, турнирное древо `nfs5.trn`, покупка/продажа подержанных авто и рынок запчастей.
 См. `docs/next-iteration.md` и полную дорожную карту `docs/roadmap.md`.
 
 ## Основание проекта
 
-Rust/wgpu/winit, shared native/WASM Scene, три crate в workspace.
+Rust/wgpu/winit, shared native/WASM Scene, четыре crate в workspace (`nfs-formats`, `nfs-assets`, `nfs-game`, `porsche-viewer`).
 local/game: 1742 файла / 599126359 байт, SHA-256 манифест в docs/game-manifest.json.
 Среда и версии: docs/environment.md и docs/building.md; формат: docs/crp-format.md.
-Git main, локальные снимки iteration-001, iteration-002, iteration-003, iteration-004, iteration-005; remote не настроен.
-Пустой 000-bootstrap убран; восстановимая копия local/archive/000-bootstrap.
+Git main, локальные снимки iteration-001..iteration-009; remote не настроен.

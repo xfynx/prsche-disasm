@@ -1,4 +1,4 @@
-import init, { create_viewer } from "./package/viewer_impl.js";
+import init, { create_viewer, shell_profile_new, shell_profile_buy_356, shell_apply_event_result, shell_get_first_evolution_event, shell_get_first_factory_event } from "./package/viewer_impl.js";
 
 const KNOWN_TRACKS = [
   { id: "skidpad", name: "Skidpad (Полигон)" },
@@ -101,9 +101,483 @@ if (raceRestartBtn) {
     if (viewer) {
       viewer.restart_race();
       if (raceResultsModal) raceResultsModal.hidden = true;
+      eventFinishedHandled = false;
       setStatus("Гонка перезапущена / старт на решётке.");
       queueFrame();
     }
+  });
+}
+
+// --- WebAudio Synthesizer (009 Sound) ---
+class SoundManager {
+  constructor() {
+    this.ctx = null;
+    this.enabled = false;
+    this.engineOsc = null;
+    this.engineFilter = null;
+    this.engineGain = null;
+    this.skidNoise = null;
+    this.skidFilter = null;
+    this.skidGain = null;
+  }
+
+  toggle() {
+    this.enabled = !this.enabled;
+    if (this.enabled) {
+      this.init();
+    } else {
+      this.stop();
+    }
+    return this.enabled;
+  }
+
+  init() {
+    if (!this.ctx && typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext)) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioCtx();
+      } catch {}
+    }
+    if (this.ctx && this.ctx.state === "suspended") {
+      this.ctx.resume().catch(() => {});
+    }
+    if (this.ctx && !this.engineOsc) {
+      try {
+        this.engineOsc = this.ctx.createOscillator();
+        this.engineOsc.type = "sawtooth";
+        this.engineOsc.frequency.setValueAtTime(65, this.ctx.currentTime);
+
+        this.engineFilter = this.ctx.createBiquadFilter();
+        this.engineFilter.type = "lowpass";
+        this.engineFilter.frequency.setValueAtTime(450, this.ctx.currentTime);
+
+        this.engineGain = this.ctx.createGain();
+        this.engineGain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+
+        this.engineOsc.connect(this.engineFilter);
+        this.engineFilter.connect(this.engineGain);
+        this.engineGain.connect(this.ctx.destination);
+        this.engineOsc.start();
+
+        const bufferSize = this.ctx.sampleRate * 2;
+        const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+        this.skidNoise = this.ctx.createBufferSource();
+        this.skidNoise.buffer = noiseBuffer;
+        this.skidNoise.loop = true;
+
+        this.skidFilter = this.ctx.createBiquadFilter();
+        this.skidFilter.type = "bandpass";
+        this.skidFilter.frequency.setValueAtTime(900, this.ctx.currentTime);
+        this.skidFilter.Q.setValueAtTime(1.5, this.ctx.currentTime);
+
+        this.skidGain = this.ctx.createGain();
+        this.skidGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+
+        this.skidNoise.connect(this.skidFilter);
+        this.skidFilter.connect(this.skidGain);
+        this.skidGain.connect(this.ctx.destination);
+        this.skidNoise.start();
+      } catch {}
+    }
+  }
+
+  stop() {
+    if (this.engineGain && this.ctx) {
+      try { this.engineGain.gain.setValueAtTime(0.0, this.ctx.currentTime); } catch {}
+    }
+    if (this.skidGain && this.ctx) {
+      try { this.skidGain.gain.setValueAtTime(0.0, this.ctx.currentTime); } catch {}
+    }
+  }
+
+  update(rpm, speed, handbrake) {
+    if (!this.enabled || !this.ctx || !this.engineOsc) return;
+    try {
+      const targetFreq = 55 + rpm * 225;
+      this.engineOsc.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.05);
+      if (this.engineGain) {
+        const gainVal = 0.02 + rpm * 0.05;
+        this.engineGain.gain.setTargetAtTime(gainVal, this.ctx.currentTime, 0.05);
+      }
+      if (this.skidGain) {
+        const isSkidding = handbrake || (Math.abs(speed) > 20 && rpm > 0.85);
+        this.skidGain.gain.setTargetAtTime(isSkidding ? 0.08 : 0.0, this.ctx.currentTime, 0.05);
+      }
+    } catch {}
+  }
+
+  playCue(freq, durationMs) {
+    if (!this.enabled || !this.ctx) return;
+    try {
+      if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + durationMs / 1000);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + durationMs / 1000);
+    } catch {}
+  }
+
+  playPass() {
+    this.playCue(523.25, 120);
+    setTimeout(() => this.playCue(659.25, 120), 100);
+    setTimeout(() => this.playCue(783.99, 250), 200);
+  }
+
+  playFail() {
+    this.playCue(240, 150);
+    setTimeout(() => this.playCue(180, 300), 120);
+  }
+}
+
+const soundManager = new SoundManager();
+
+// --- Profile Persistence and State ---
+const storage = typeof localStorage !== "undefined" ? localStorage : {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
+const PROFILE_KEY = "porsche_profile_009";
+let currentProfile = null;
+const RANK_NAMES = ["Applicant", "Junior Test Driver", "Test Driver", "Senior Test Driver", "Chief Test Driver"];
+
+function loadStoredProfile() {
+  try {
+    const raw = storage.getItem(PROFILE_KEY);
+    if (raw) {
+      currentProfile = JSON.parse(raw);
+    }
+  } catch {}
+  if (!currentProfile) {
+    if (typeof shell_profile_new === "function") {
+      try {
+        const json = shell_profile_new("Driver");
+        currentProfile = JSON.parse(json);
+      } catch {}
+    }
+    if (!currentProfile) {
+      currentProfile = {
+        name: "Driver",
+        credits: 11000,
+        factory_rank: 0,
+        garage: [],
+        selected_car_index: 0,
+        evolution_unlocked_epochs: [1],
+        factory_completed_missions: [],
+      };
+    }
+    saveProfile();
+  }
+  updateProfileUI();
+}
+
+function saveProfile() {
+  if (currentProfile) {
+    try {
+      storage.setItem(PROFILE_KEY, JSON.stringify(currentProfile));
+    } catch {}
+  }
+  updateProfileUI();
+}
+
+function updateProfileUI() {
+  if (!currentProfile) return;
+  const nameEl = document.querySelector("#profileNameDisplay");
+  const credEl = document.querySelector("#profileCreditsDisplay");
+  const rankEl = document.querySelector("#profileRankDisplay");
+  const mName = document.querySelector("#profileNameInput");
+  const mCred = document.querySelector("#modalCreditsDisplay");
+  const mRank = document.querySelector("#modalRankDisplay");
+  const gList = document.querySelector("#profileGarageList");
+  const buyBtn = document.querySelector("#profileBuyCarBtn");
+
+  const rankStr = RANK_NAMES[currentProfile.factory_rank] || `Rank ${currentProfile.factory_rank}`;
+  const credStr = `${currentProfile.credits.toLocaleString()} CR`;
+
+  if (nameEl) nameEl.textContent = currentProfile.name;
+  if (credEl) credEl.textContent = currentProfile.credits.toLocaleString();
+  if (rankEl) rankEl.textContent = rankStr;
+
+  if (mName && typeof document.activeElement !== "undefined" && document.activeElement !== mName) {
+    mName.value = currentProfile.name;
+  }
+  if (mCred) mCred.textContent = credStr;
+  if (mRank) mRank.textContent = rankStr;
+
+  const has356 = currentProfile.garage && currentProfile.garage.some(c => c.model_name && c.model_name.startsWith("356"));
+  if (buyBtn) {
+    if (has356) {
+      buyBtn.disabled = true;
+      buyBtn.textContent = "Куплено: '50 356 Ferdinand";
+    } else {
+      buyBtn.disabled = currentProfile.credits < 11000;
+      buyBtn.textContent = "Купить '50 356 Coupé Ferdinand (11 000 CR)";
+    }
+  }
+
+  if (gList) {
+    if (!currentProfile.garage || currentProfile.garage.length === 0) {
+      gList.replaceChildren();
+      const emptyDiv = document.createElement("div");
+      emptyDiv.className = "garage-empty";
+      emptyDiv.textContent = "Гараж пуст. Нажмите кнопку покупки ниже.";
+      gList.appendChild(emptyDiv);
+    } else {
+      gList.replaceChildren();
+      currentProfile.garage.forEach((c, i) => {
+        const item = document.createElement("div");
+        item.className = "garage-item" + (i === currentProfile.selected_car_index ? " selected" : "");
+        item.textContent = `${c.model_name} (${c.sim_name}) — ${c.price_paid.toLocaleString()} CR`;
+        gList.appendChild(item);
+      });
+    }
+  }
+}
+
+// --- Career Events & Briefing State ---
+let activeCareerEvent = null;
+let eventFinishedHandled = false;
+
+function showBriefing(eventData) {
+  activeCareerEvent = eventData;
+  eventFinishedHandled = false;
+  const modal = document.querySelector("#eventBriefingModal");
+  if (!modal) return;
+  const bTitle = document.querySelector("#briefingTitle");
+  const bDesc = document.querySelector("#briefingDesc");
+  const bTrackCar = document.querySelector("#briefingTrackCar");
+  const bGoal = document.querySelector("#briefingGoal");
+  const bReward = document.querySelector("#briefingReward");
+
+  if (bTitle) bTitle.textContent = eventData.title;
+  if (bDesc) bDesc.textContent = eventData.description;
+  if (bTrackCar) bTrackCar.textContent = `${eventData.track} / ${eventData.car}`;
+  if (bGoal) bGoal.textContent = eventData.goal;
+  if (bReward) bReward.textContent = eventData.reward;
+  modal.hidden = false;
+}
+
+// Wire up Toolbar & Career Buttons
+const soundBtn = document.querySelector("#soundBtn");
+if (soundBtn) {
+  soundBtn.addEventListener("click", () => {
+    const enabled = soundManager.toggle();
+    soundBtn.classList.toggle("active", enabled);
+    soundBtn.textContent = enabled ? "🔊 Звук: ВКЛ" : "🔇 Звук: ВЫКЛ";
+  });
+}
+
+const profileBtn = document.querySelector("#profileBtn");
+const profileModal = document.querySelector("#profileModal");
+const profileModalCloseBtn = document.querySelector("#profileModalCloseBtn");
+const profileNameInput = document.querySelector("#profileNameInput");
+const profileBuyCarBtn = document.querySelector("#profileBuyCarBtn");
+const profileExportBtn = document.querySelector("#profileExportBtn");
+const profileImportInput = document.querySelector("#profileImportInput");
+const profileResetBtn = document.querySelector("#profileResetBtn");
+
+if (profileBtn && profileModal) {
+  profileBtn.addEventListener("click", () => {
+    updateProfileUI();
+    profileModal.hidden = false;
+  });
+}
+if (profileModalCloseBtn && profileModal) {
+  profileModalCloseBtn.addEventListener("click", () => {
+    profileModal.hidden = true;
+  });
+}
+if (profileNameInput) {
+  profileNameInput.addEventListener("input", (e) => {
+    if (currentProfile) {
+      currentProfile.name = e.target.value.trim() || "Driver";
+      saveProfile();
+    }
+  });
+}
+if (profileBuyCarBtn) {
+  profileBuyCarBtn.addEventListener("click", () => {
+    if (!currentProfile) return;
+    if (typeof shell_profile_buy_356 === "function") {
+      try {
+        const res = shell_profile_buy_356(JSON.stringify(currentProfile));
+        currentProfile = JSON.parse(res);
+        saveProfile();
+        soundManager.playPass();
+      } catch (err) {
+        if (typeof alert === "function") alert(err);
+      }
+    } else {
+      if (currentProfile.credits >= 11000) {
+        currentProfile.credits -= 11000;
+        currentProfile.garage.push({
+          model_name: "356_1",
+          sim_name: "356coupe11",
+          color_index: 0,
+          price_paid: 11000,
+        });
+        currentProfile.selected_car_index = currentProfile.garage.length - 1;
+        saveProfile();
+        soundManager.playPass();
+      }
+    }
+    updateProfileUI();
+  });
+}
+if (profileExportBtn) {
+  profileExportBtn.addEventListener("click", () => {
+    if (!currentProfile) return;
+    if (typeof Blob !== "undefined" && typeof URL !== "undefined" && typeof URL.createObjectURL === "function") {
+      const blob = new Blob([JSON.stringify(currentProfile, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `porsche_profile_${currentProfile.name.toLowerCase().replace(/[^a-z0-9]/g, "_")}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  });
+}
+if (profileImportInput) {
+  profileImportInput.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed.name === "string" && typeof parsed.credits === "number") {
+        currentProfile = parsed;
+        saveProfile();
+        soundManager.playPass();
+        setStatus(`Профиль "${currentProfile.name}" успешно импортирован.`);
+      }
+    } catch (err) {
+      if (typeof alert === "function") alert("Ошибка при импорте: " + err.message);
+    }
+  });
+}
+if (profileResetBtn) {
+  profileResetBtn.addEventListener("click", () => {
+    storage.removeItem(PROFILE_KEY);
+    currentProfile = null;
+    loadStoredProfile();
+    setStatus("Профиль сброшен к начальному состоянию.");
+  });
+}
+
+const careerEvolutionBtn = document.querySelector("#careerEvolutionBtn");
+if (careerEvolutionBtn) {
+  careerEvolutionBtn.addEventListener("click", () => {
+    const evoInfo = {
+      id: "356_CHALLENGE",
+      title: "Evolution: 356 Challenge (Эра Classic)",
+      description: "Первый турнир эры Classic. 2 этапа (Canyon и Monaco 1). Одержите победу над соперниками на классическом 356!",
+      track: "Canyon",
+      car: "356 Coupé (1950)",
+      goal: "1-е место на этапе (4 участника)",
+      reward: "4 500 CR",
+      is_factory: false,
+      trackId: "canyon",
+    };
+    if (typeof shell_get_first_evolution_event === "function") {
+      try {
+        const parsed = JSON.parse(shell_get_first_evolution_event());
+        evoInfo.title = parsed.title;
+        evoInfo.description = parsed.description;
+        evoInfo.reward = `${parsed.first_prize.toLocaleString()} CR`;
+        evoInfo.trackId = parsed.track_name.toLowerCase();
+        evoInfo.track = parsed.track_name;
+      } catch {}
+    }
+    showBriefing(evoInfo);
+  });
+}
+
+const careerFactoryBtn = document.querySelector("#careerFactoryBtn");
+if (careerFactoryBtn) {
+  careerFactoryBtn.addEventListener("click", () => {
+    const facInfo = {
+      id: "0M01",
+      title: "Factory Driver: 0M01 Applying Test",
+      description: "Начальный отборочный тест на должность водителя-испытателя Porsche. Пройдите круг по полигону Skidpad на Porsche Boxster быстрее 32.0 секунд!",
+      track: "Skidpad",
+      car: "Boxster (986)",
+      goal: "Время круга ≤ 32.0 сек",
+      reward: "Приём в штат (Junior Test Driver)",
+      is_factory: true,
+      time_limit: 32.0,
+      trackId: "skidpad",
+      pass_msg: "Отличный заезд! Вы приняты водителем-испытателем Porsche!",
+      fail_msg: "Время превышено. Вы не уложились в 32.0 секунды. Попробуйте снова!",
+    };
+    if (typeof shell_get_first_factory_event === "function") {
+      try {
+        const parsed = JSON.parse(shell_get_first_factory_event());
+        facInfo.id = parsed.id;
+        facInfo.title = parsed.title;
+        facInfo.description = parsed.description;
+        facInfo.time_limit = parsed.time_limit;
+        facInfo.trackId = parsed.track_name.toLowerCase();
+        facInfo.pass_msg = parsed.pass_message;
+        facInfo.fail_msg = parsed.fail_message;
+      } catch {}
+    }
+    showBriefing(facInfo);
+  });
+}
+
+const briefingStartBtn = document.querySelector("#briefingStartBtn");
+if (briefingStartBtn) {
+  briefingStartBtn.addEventListener("click", async () => {
+    const modal = document.querySelector("#eventBriefingModal");
+    if (modal) modal.hidden = true;
+    if (!activeCareerEvent) return;
+
+    modeSelect.value = "track";
+    updateOptions();
+    targetSelect.value = activeCareerEvent.trackId;
+    await loadTarget();
+
+    if (viewer) {
+      if (!viewer.is_drive_mode()) {
+        viewer.toggle_camera_mode();
+        setMenuVisible(false);
+        syncTourButton();
+      }
+      viewer.restart_race();
+      eventFinishedHandled = false;
+      soundManager.playCue(880, 100);
+      setStatus(`Карьерный заезд начат: ${activeCareerEvent.title}`);
+    }
+  });
+}
+
+const briefingCancelBtn = document.querySelector("#briefingCancelBtn");
+if (briefingCancelBtn) {
+  briefingCancelBtn.addEventListener("click", () => {
+    const modal = document.querySelector("#eventBriefingModal");
+    if (modal) modal.hidden = true;
+    activeCareerEvent = null;
+  });
+}
+
+const raceContinueBtn = document.querySelector("#raceContinueBtn");
+if (raceContinueBtn) {
+  raceContinueBtn.addEventListener("click", () => {
+    if (raceResultsModal) raceResultsModal.hidden = true;
+    activeCareerEvent = null;
+    setMenuVisible(true);
   });
 }
 
@@ -883,6 +1357,8 @@ function updateNavigation(dt) {
     const gear = viewer.get_car_gear();
     const rpm = Math.max(0, Math.min(1, viewer.get_car_rpm()));
 
+    soundManager.update(rpm, speed, handbrake);
+
     if (speedValue) speedValue.textContent = String(speed);
     if (gearValue) {
       gearValue.textContent = gear < 0 ? "R" : gear === 0 ? "N" : String(gear);
@@ -921,6 +1397,7 @@ function updateNavigation(dt) {
     // Countdown Banner
     if (countdownBanner) {
       if (phase === 1) {
+        if (lastPhase !== 1) soundManager.playCue(440, 80);
         countdownBanner.hidden = false;
         const remaining = viewer.get_countdown_remaining();
         if (countdownText) {
@@ -930,6 +1407,7 @@ function updateNavigation(dt) {
           else countdownText.textContent = "1";
         }
       } else if (phase === 2 && lastPhase === 1) {
+        soundManager.playCue(880, 150);
         countdownBanner.hidden = false;
         if (countdownText) {
           countdownText.classList.add("go");
@@ -955,9 +1433,76 @@ function updateNavigation(dt) {
         raceResultsModal.hidden = false;
         const pos = viewer.get_player_position();
         const total = viewer.get_total_participants();
+        const lapTime = viewer.get_current_lap_time();
+        const bestTime = viewer.get_best_lap_time();
         if (resultsSubtitle) resultsSubtitle.textContent = `Позиция: P${pos} из ${total}`;
-        if (resultsLapTime) resultsLapTime.textContent = formatRaceTime(viewer.get_current_lap_time());
-        if (resultsBestTime) resultsBestTime.textContent = formatRaceTime(viewer.get_best_lap_time());
+        if (resultsLapTime) resultsLapTime.textContent = formatRaceTime(lapTime);
+        if (resultsBestTime) resultsBestTime.textContent = formatRaceTime(bestTime);
+
+        if (activeCareerEvent && !eventFinishedHandled) {
+          eventFinishedHandled = true;
+          let passed = false;
+          if (activeCareerEvent.is_factory) {
+            passed = lapTime > 0 && lapTime <= (activeCareerEvent.time_limit || 32.0);
+          } else {
+            passed = pos === 1;
+          }
+
+          if (passed) {
+            soundManager.playPass();
+          } else {
+            soundManager.playFail();
+          }
+
+          const speechEl = document.querySelector("#resultsSpeech");
+          const rewardBadge = document.querySelector("#resultsRewardBadge");
+
+          if (activeCareerEvent.is_factory) {
+            if (speechEl) {
+              speechEl.style.display = "block";
+              speechEl.textContent = passed ? activeCareerEvent.pass_msg : activeCareerEvent.fail_msg;
+            }
+            if (rewardBadge) {
+              rewardBadge.textContent = passed ? "✓ ТЕСТ ПРОЙДЕН — ПОВЫШЕНИЕ ДО JUNIOR TEST DRIVER" : "✗ ТЕСТ НЕ ПРОЙДЕН — ВРЕМЯ ПРЕВЫШЕНО";
+              rewardBadge.style.color = passed ? "#22c55e" : "#ef4444";
+            }
+          } else {
+            if (speechEl) speechEl.style.display = "none";
+            if (rewardBadge) {
+              rewardBadge.textContent = passed ? "✓ 1-Е МЕСТО — НАГРАДА: +4 500 CR" : `ПОЗИЦИЯ P${pos} — ЗАЕЗД ЗАВЕРШЁН`;
+              rewardBadge.style.color = passed ? "#22c55e" : "#d3bd83";
+            }
+          }
+
+          if (typeof shell_apply_event_result === "function" && currentProfile) {
+            try {
+              const resJson = shell_apply_event_result(
+                JSON.stringify(currentProfile),
+                activeCareerEvent.id,
+                lapTime,
+                pos
+              );
+              currentProfile = JSON.parse(resJson);
+              saveProfile();
+            } catch (e) {
+              console.error("WASM event result apply error:", e);
+            }
+          } else if (currentProfile) {
+            if (activeCareerEvent.is_factory && passed) {
+              if (currentProfile.factory_rank === 0) currentProfile.factory_rank = 1;
+              if (!currentProfile.factory_completed_missions.includes("0M01")) {
+                currentProfile.factory_completed_missions.push("0M01");
+              }
+            } else if (!activeCareerEvent.is_factory && passed) {
+              currentProfile.credits += 4500;
+            }
+            saveProfile();
+          }
+        } else if (!activeCareerEvent && !eventFinishedHandled) {
+          eventFinishedHandled = true;
+          if (pos === 1) soundManager.playPass();
+          else soundManager.playFail();
+        }
       }
     }
 
@@ -1049,6 +1594,7 @@ function animate(now = 0) {
 }
 
 async function boot() {
+  loadStoredProfile();
   updateOptions();
   if (!navigator.gpu) {
     setStatus("WebGPU недоступен. Нужен браузер с поддержкой WebGPU.");

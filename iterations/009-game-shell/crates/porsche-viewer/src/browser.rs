@@ -397,3 +397,95 @@ fn has_webgpu() -> bool {
             .and_then(|navigator| js_sys::Reflect::get(&navigator, &JsValue::from_str("gpu")).ok())
             .is_some()
 }
+
+#[wasm_bindgen]
+pub fn shell_profile_new(name: String) -> String {
+    let mut profile = nfs_game::profile::PlayerProfile::new(&name);
+    let _ = profile.buy_initial_356();
+    profile.to_json_string()
+}
+
+#[wasm_bindgen]
+pub fn shell_profile_buy_356(profile_json: String) -> Result<String, JsValue> {
+    let mut profile = nfs_game::profile::PlayerProfile::from_json_string(&profile_json)
+        .map_err(|e| JsValue::from_str(&e))?;
+    profile
+        .buy_initial_356()
+        .map_err(|e| JsValue::from_str(&e))?;
+    Ok(profile.to_json_string())
+}
+
+#[wasm_bindgen]
+pub fn shell_apply_event_result(
+    profile_json: String,
+    event_id: String,
+    player_time_sec: f32,
+    position: usize,
+) -> Result<String, JsValue> {
+    let profile = nfs_game::profile::PlayerProfile::from_json_string(&profile_json)
+        .map_err(|e| JsValue::from_str(&e))?;
+
+    let event = if event_id == "0M01" {
+        nfs_game::events::get_factory_driver_first_event()
+    } else {
+        let car_model = profile
+            .garage
+            .get(profile.selected_car_index)
+            .map(|c| c.model_name.as_str())
+            .unwrap_or("356_1");
+        let car_sim = profile
+            .garage
+            .get(profile.selected_car_index)
+            .map(|c| c.sim_name.as_str())
+            .unwrap_or("356coupe11");
+        nfs_game::events::get_evolution_first_event(car_model, car_sim)
+    };
+
+    let mut shell = nfs_game::shell::GameShell::with_profile(profile);
+    shell.screen = nfs_game::shell::Screen::Racing {
+        event,
+        paused: false,
+    };
+    shell.finish_race(player_time_sec, position);
+
+    let updated_profile = shell
+        .profile
+        .ok_or_else(|| JsValue::from_str("Missing profile"))?;
+    Ok(updated_profile.to_json_string())
+}
+
+#[wasm_bindgen]
+pub fn shell_get_first_evolution_event() -> String {
+    let event = nfs_game::events::get_evolution_first_event("356_1", "356coupe11");
+    format!(
+        r#"{{"id":"{}","title":"{}","description":"{}","track_name":"{}","laps":{},"opponents":{},"entry_fee":{},"first_prize":{}}}"#,
+        event.id,
+        event.title,
+        event.description,
+        event.track_name,
+        event.laps,
+        event.opponents_count,
+        event.entry_fee,
+        event.first_prize
+    )
+}
+
+#[wasm_bindgen]
+pub fn shell_get_first_factory_event() -> String {
+    let event = nfs_game::events::get_factory_driver_first_event();
+    let max_sec = match event.goal {
+        nfs_game::events::EventGoal::TimeLimit { max_seconds } => max_seconds,
+        _ => 32.0,
+    };
+    format!(
+        r#"{{"id":"{}","title":"{}","description":"{}","track_name":"{}","laps":{},"time_limit":{:.1},"pass_message":"{}","fail_message":"{}"}}"#,
+        event.id,
+        event.title,
+        event.description,
+        event.track_name,
+        event.laps,
+        max_sec,
+        event.pass_message,
+        event.fail_message
+    )
+}

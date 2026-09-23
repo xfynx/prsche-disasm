@@ -733,6 +733,41 @@ struct RaceDriveTelemetry {
     countdown: f32,
 }
 
+#[cfg(target_os = "windows")]
+mod native_audio {
+    unsafe extern "system" {
+        fn Beep(dwFreq: u32, dwDuration: u32) -> i32;
+    }
+
+    pub fn play_cue_async(freq: u32, duration_ms: u32) {
+        std::thread::spawn(move || unsafe {
+            let _ = Beep(freq, duration_ms);
+        });
+    }
+
+    pub fn cue_pass() {
+        std::thread::spawn(move || unsafe {
+            let _ = Beep(880, 100);
+            let _ = Beep(1175, 150);
+            let _ = Beep(1760, 200);
+        });
+    }
+
+    pub fn cue_fail() {
+        std::thread::spawn(move || unsafe {
+            let _ = Beep(440, 150);
+            let _ = Beep(330, 250);
+        });
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+mod native_audio {
+    pub fn play_cue_async(_freq: u32, _duration_ms: u32) {}
+    pub fn cue_pass() {}
+    pub fn cue_fail() {}
+}
+
 struct App {
     scene: Option<Scene>,
     title: String,
@@ -753,6 +788,9 @@ struct App {
     initial_pitch: Option<f32>,
     initial_distance: Option<f32>,
     initial_center: Option<[f32; 3]>,
+    shell: nfs_game::shell::GameShell,
+    profile_path: PathBuf,
+    race_finished_handled: bool,
 }
 
 impl App {
@@ -764,6 +802,19 @@ impl App {
         distance: Option<f32>,
         center: Option<[f32; 3]>,
     ) -> Self {
+        let profile_dir = PathBuf::from("local/profiles");
+        let profile_path = profile_dir.join("default.json");
+        let profile = match nfs_game::profile::PlayerProfile::load_from_path(&profile_path) {
+            Ok(p) => p,
+            Err(_) => {
+                let mut p = nfs_game::profile::PlayerProfile::new("Player");
+                let _ = p.buy_initial_356();
+                let _ = p.save_atomic(&profile_path);
+                p
+            }
+        };
+        let shell = nfs_game::shell::GameShell::with_profile(profile);
+
         Self {
             scene: Some(scene),
             title: title.to_string(),
@@ -784,6 +835,9 @@ impl App {
             initial_pitch: pitch,
             initial_distance: distance,
             initial_center: center,
+            shell,
+            profile_path,
+            race_finished_handled: false,
         }
     }
 
@@ -920,16 +974,35 @@ impl App {
     }
 
     fn window_title(&self) -> String {
+        let prof_info = self
+            .shell
+            .profile
+            .as_ref()
+            .map(|p| {
+                format!(
+                    " | Профиль: {} ({} CR | Турнир 356: {} | Фабрика: {})",
+                    p.name,
+                    p.credits,
+                    if p.evolution.completed_tournaments.contains(&0) {
+                        "Пройден"
+                    } else {
+                        "Открыт"
+                    },
+                    p.factory_driver.current_mission_code
+                )
+            })
+            .unwrap_or_default();
         let mut title = if let Some(catalog) = &self.catalog {
             format!(
-                "Porsche Viewer | {} {}/{}: {} | Tab group, [/]/PgUp/PgDn switch, F drive, T topology",
+                "Porsche Viewer | {} {}/{}: {}{} | Tab группа, [/] выбор, F заезд, F2 Evolution, F3 Factory, T топология",
                 catalog.current_kind_label(),
                 catalog.current_index() + 1,
                 catalog.current_len(),
-                self.title
+                self.title,
+                prof_info
             )
         } else {
-            self.title.clone()
+            format!("{}{}", self.title, prof_info)
         };
         if let Some(error) = &self.load_error {
             title.push_str(" | Load error: ");
@@ -1002,6 +1075,22 @@ impl App {
             ));
         }
         if let Some((speed, gear, race_info)) = status {
+            if let Some(r) = race_info
+                && (r.phase == 4 || r.phase == 5)
+                && !self.race_finished_handled
+            {
+                self.race_finished_handled = true;
+                self.shell.finish_race(r.lap_time, r.pos);
+                if let Some(prof) = &self.shell.profile {
+                    let _ = prof.save_atomic(&self.profile_path);
+                }
+                if r.pos == 1 {
+                    native_audio::cue_pass();
+                } else {
+                    native_audio::cue_fail();
+                }
+                self.update_window_title();
+            }
             self.update_drive_title(speed, gear, race_info);
         }
     }
@@ -1235,7 +1324,38 @@ impl ApplicationHandler for App {
                     KeyCode::BracketRight | KeyCode::PageDown if !event.repeat => {
                         self.advance_catalog(1);
                     }
+                    KeyCode::F2 if !event.repeat => {
+                        if let Some(catalog) = &mut self.catalog
+                            && catalog.select_track_by_name("canyon")
+                        {
+                            self.reload_catalog_scene();
+                            if let Some(renderer) = &mut self.renderer {
+                                if !renderer.is_drive_mode() {
+                                    renderer.toggle_camera_mode();
+                                }
+                                renderer.restart_race();
+                            }
+                            self.race_finished_handled = false;
+                            native_audio::play_cue_async(880, 80);
+                        }
+                    }
+                    KeyCode::F3 if !event.repeat => {
+                        if let Some(catalog) = &mut self.catalog
+                            && catalog.select_track_by_name("skidpad")
+                        {
+                            self.reload_catalog_scene();
+                            if let Some(renderer) = &mut self.renderer {
+                                if !renderer.is_drive_mode() {
+                                    renderer.toggle_camera_mode();
+                                }
+                                renderer.restart_race();
+                            }
+                            self.race_finished_handled = false;
+                            native_audio::play_cue_async(990, 80);
+                        }
+                    }
                     KeyCode::KeyR if !event.repeat => {
+                        self.race_finished_handled = false;
                         if let Some(renderer) = &mut self.renderer {
                             if renderer.is_drive_mode() && renderer.has_car() {
                                 renderer.reset_car();

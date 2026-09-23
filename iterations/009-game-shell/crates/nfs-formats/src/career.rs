@@ -7,6 +7,8 @@ pub const FACTORY_MISSION_COUNT: usize = 34;
 pub const CAR_CATALOG_REC_SIZE: usize = 1648;
 pub const TRACK_CATALOG_REC_SIZE: usize = 1192;
 pub const TRACK_CATALOG_COUNT: usize = 15;
+pub const TOURNAMENT_REC_SIZE: usize = 3392;
+pub const TOURNAMENT_COUNT: usize = 35;
 
 /// Known top-level section in a profile save file (.sav).
 #[derive(Debug, Clone, PartialEq)]
@@ -261,6 +263,12 @@ pub struct FactoryMissionTemplate {
     pub code: String,
     /// Numerical mission ID.
     pub id: u32,
+    /// Briefing string ID from festrings.csv.
+    pub brief_string_id: u32,
+    /// Time limit in seconds.
+    pub time_limit_sec: u32,
+    /// Track catalog index (e.g. 13 for skidpad).
+    pub track_id: u32,
 }
 
 /// Parse factory driver mission templates (`nfs5.fac`).
@@ -278,6 +286,13 @@ pub fn parse_factory_missions(data: &[u8]) -> Result<Vec<FactoryMissionTemplate>
     for i in 0..count {
         let rec = bytes(data, i * FACTORY_MISSION_REC_SIZE, FACTORY_MISSION_REC_SIZE)?;
         let id = u32le(rec, 0)?;
+        let brief_string_id = u32le(rec, 0x00)?;
+        let time_limit_sec = u32le(rec, 0x20)?;
+        let track_id = if rec.len() > 0x73 {
+            rec[0x72] as u32 | ((rec[0x73] as u32) << 8)
+        } else {
+            0
+        };
 
         let mut code = String::new();
         for w in rec.windows(4) {
@@ -293,10 +308,84 @@ pub fn parse_factory_missions(data: &[u8]) -> Result<Vec<FactoryMissionTemplate>
             }
         }
 
-        missions.push(FactoryMissionTemplate { code, id });
+        missions.push(FactoryMissionTemplate {
+            code,
+            id,
+            brief_string_id,
+            time_limit_sec,
+            track_id,
+        });
     }
 
     Ok(missions)
+}
+
+/// A stage / race in an Evolution tournament.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TournamentStage {
+    pub track_id: u32,
+    pub prizes: [u32; 8],
+    pub entry_fee: u32,
+}
+
+/// Evolution tournament record from `nfs5.trn`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TournamentRecord {
+    pub title_string_id: u32,
+    pub desc_string_id: u32,
+    pub num_stages: u32,
+    pub entry_fee: u32,
+    pub stages: Vec<TournamentStage>,
+}
+
+/// Parse tournaments from `nfs5.trn`.
+pub fn parse_tournaments(data: &[u8]) -> Result<Vec<TournamentRecord>> {
+    if !data.len().is_multiple_of(TOURNAMENT_REC_SIZE) {
+        return Err(format!(
+            "invalid nfs5.trn size: {} is not a multiple of {TOURNAMENT_REC_SIZE}",
+            data.len()
+        ));
+    }
+
+    let count = data.len() / TOURNAMENT_REC_SIZE;
+    let mut tournaments = Vec::with_capacity(count);
+
+    for i in 0..count {
+        let rec = bytes(data, i * TOURNAMENT_REC_SIZE, TOURNAMENT_REC_SIZE)?;
+        let title_string_id = u32le(rec, 0x24)?;
+        let desc_string_id = u32le(rec, 0x28)?;
+        let num_stages = u32le(rec, 0x39c)?;
+        let entry_fee = u32le(rec, 0x3c8)?;
+
+        let mut stages = Vec::new();
+        let stage_count = (num_stages as usize).min(8);
+        for s in 0..stage_count {
+            let offset = 0x3a0 + s * 0xa4;
+            if offset + 0x30 <= rec.len() {
+                let track_id = u32le(rec, offset)?;
+                let mut prizes = [0u32; 8];
+                for (p, prize) in prizes.iter_mut().enumerate() {
+                    *prize = u32le(rec, offset + 8 + p * 4)?;
+                }
+                let s_fee = u32le(rec, offset + 0x28)?;
+                stages.push(TournamentStage {
+                    track_id,
+                    prizes,
+                    entry_fee: s_fee,
+                });
+            }
+        }
+
+        tournaments.push(TournamentRecord {
+            title_string_id,
+            desc_string_id,
+            num_stages,
+            entry_fee,
+            stages,
+        });
+    }
+
+    Ok(tournaments)
 }
 
 #[cfg(test)]
@@ -373,6 +462,33 @@ mod tests {
         let missions = parse_factory_missions(&data).unwrap();
         assert_eq!(missions.len(), FACTORY_MISSION_COUNT);
         assert_eq!(missions[0].code, "0M01");
+        assert_eq!(missions[0].time_limit_sec, 32);
+        assert_eq!(missions[0].track_id, 13); // skidpad
         assert_eq!(missions[1].code, "1m01");
+    }
+
+    #[test]
+    fn parse_local_tournaments() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../..")
+            .join("local/game/FEData/Data/nfs5.trn");
+        if !path.exists() {
+            return;
+        }
+
+        let data = std::fs::read(&path).unwrap();
+        let tournaments = parse_tournaments(&data).unwrap();
+        assert_eq!(tournaments.len(), TOURNAMENT_COUNT);
+        // Classic Tournament 1: 356 Challenge
+        let t0 = &tournaments[0];
+        assert_eq!(t0.title_string_id, 2018); // "356 Challenge"
+        assert_eq!(t0.desc_string_id, 2036);
+        assert_eq!(t0.num_stages, 2);
+        assert_eq!(t0.entry_fee, 750);
+        assert_eq!(t0.stages.len(), 2);
+        assert_eq!(t0.stages[0].track_id, 14); // canyon
+        assert_eq!(t0.stages[0].prizes[0], 4500); // 1st place prize
+        assert_eq!(t0.stages[1].track_id, 8); // monaco1
+        assert_eq!(t0.stages[1].prizes[0], 4500);
     }
 }
