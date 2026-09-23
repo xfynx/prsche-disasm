@@ -162,9 +162,9 @@ Playwright Chromium подтвердил web UI/заезд/focus, native offscre
 Интерактивный запуск native-окна и desktop-лаунчера проверен и подтверждён пользователем.
 Принятый снимок: `iteration-005`.
 
-## 006-game-systems (готова к приёмке, 2026-09-23)
+## 006-game-systems (завершена и проверена)
 
-План: [iterations/006-game-systems/PLAN.md](iterations/006-game-systems/PLAN.md).
+План: [iterations/006-game-systems/PLAN.md](iterations/006-game-systems/PLAN.md). Тег: `iteration-006`.
 Цель: доказательная карта поведения оригинальной игры (NFS 5) и разработка парсеров
 её ключевых форматов данных (`Simulation`, `FEData`, `savedata`). Подготовка доказательного
 фундамента для симуляции физики (007) и режима заезда/карьеры (008–010).
@@ -175,7 +175,21 @@ Playwright Chromium подтвердил web UI/заезд/focus, native offscre
 - T03: архитектура сохранений `.sav` (голова связного списка `0x0065b634`), парсеры каталогов `nfs5.car` (109 авто), `nfs5.trk` (15 трасс), `nfs5.fac` (34 миссии Factory Driver) в `nfs-formats/src/career.rs`. См. [`career-evidence.md`](iterations/006-game-systems/research/career-evidence.md).
 - T04: реверс детерминированных реплеев `replay.rpl` (8 суб-сэмплов на тик, RLE-поток ввода, заголовок 15 908 байт на 8 авто), парсер `ReplayFile` в `nfs-formats/src/replay.rs`, открытие 500-RPM сетки крутящего момента, baseline стенд в `local/experiments/bench/sim_baseline.json`. См. [`telemetry-evidence.md`](iterations/006-game-systems/research/telemetry-evidence.md).
 - T05: интеграция, 83 unit-теста, `fmt` и `clippy` (`-D warnings`) чистые, полная сборка `build.ps1 -Target all` (native + WASM), артефакты Run 001 (`runs/001-game-systems/`).
-- Следующий этап: `007-physics-simulation` (подробности в docs/next-iteration.md).
+- Принятый снимок: `iteration-006`.
+
+## 007-physics-simulation (завершена и проверена)
+
+План: [iterations/007-physics-simulation/PLAN.md](iterations/007-physics-simulation/PLAN.md). Тег: `iteration-007`.
+Цель: детерминированный 6 DOF физический движок автомобиля на основе доказанных параметров `.sim` и контакт со spatial grid дороги `surface.rs`.
+
+- Снимок создан из `iteration-006` (скрипт `scripts/new-iteration.py`).
+- T01: кинематика и динамика 6 DOF твёрдого тела (`rigid_body.rs`): масса, моменты инерции, кватернион ориентации, локальные $\leftrightarrow$ мировые координаты, фиксированный шаг с подшагами $\le 1/240$ с.
+- T02: силовая установка (`powertrain.rs`): 21-точечная сетка крутящего момента 500-RPM из `SimCar`, динамика маховика (холостой ход, отсечка, внутреннее сопротивление), трансмиссия с передаточными числами и главной парой.
+- T03: 4-колёсная независимая подвеска (`suspension.rs`): опрос высоты и нормали через spatial grid `surface.rs`, раздельные коэффициенты сжатия (bump) и отбоя (rebound), стабилизаторы поперечной устойчивости, динамический перенос веса.
+- T04: шинная модель (`tire.rs`): продольный и поперечный увод (slip ratio, slip angle), эллипс трения Кулона, коэффициенты `front_grip`/`rear_grip` из `.sim`, статический замок тормозов при остановке.
+- T05: калибровочный стенд (`calibration_bench.rs`): 102 unit/integration тестов; битовый детерминизм; разгон/торможение 356A и Boxster 2.5L; проигрывание управления из `replay.rpl`.
+- T06: интеграция в просмотрщик: переключение режима физики клавишей `M` / кнопкой UI; телеметрический HUD со спидометром, тахометром, передачей, перегрузкой $g$ и реакцией 4 колёс; чистые `fmt` и `clippy -- -D warnings`; полные релизные сборки native и WASM.
+- Следующий этап: `008-race-loop` (подробности в [docs/next-iteration.md](docs/next-iteration.md)).
 
 
 ## Проверки и продолжение

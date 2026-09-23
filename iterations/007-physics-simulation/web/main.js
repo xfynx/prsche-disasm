@@ -737,6 +737,22 @@ window.addEventListener("keydown", (event) => {
     }
     return;
   }
+  if (event.code === "KeyM" && !event.repeat) {
+    if (viewer) {
+      const isSim = viewer.toggle_sim_mode();
+      const badge = document.getElementById("physicsModeBadge");
+      if (badge) {
+        badge.textContent = isSim ? "M: 6 DOF Физика" : "M: Аркада";
+      }
+      setStatus(
+        isSim
+          ? "Физика: 6 DOF Реалистичная симуляция (.sim, 4 независимых колеса, подвеска)"
+          : "Физика: Прототип Аркадной модели"
+      );
+      queueFrame();
+    }
+    return;
+  }
   if (event.code === "KeyC" && !event.repeat) {
     if (viewer) {
       if (viewer.is_drive_mode() && viewer.has_car()) {

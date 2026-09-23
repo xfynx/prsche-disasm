@@ -15,7 +15,7 @@ const { spawn, spawnSync } = require('node:child_process');
     const python = spawnSync('py', ['-3', '-c', 'import sys; print(sys.executable)'], { encoding: 'utf8', windowsHide: true });
     if (python.status !== 0) throw new Error(python.stderr || 'Python discovery failed');
     const ready = path.join(output, `server-ready-${Date.now()}.json`);
-    server = spawn(python.stdout.trim(), [path.join(root, 'scripts/serve-web.py'), '--iteration', '005-unified-driving', '--port', '0', '--ready-file', ready], { cwd: root, windowsHide: true, stdio: 'ignore' });
+    server = spawn(python.stdout.trim(), [path.join(root, 'scripts/serve-web.py'), '--iteration', '007-physics-simulation', '--port', '0', '--ready-file', ready], { cwd: root, windowsHide: true, stdio: 'ignore' });
     try {
       for (let attempt = 0; !fs.existsSync(ready); attempt++) {
         if (server.exitCode !== null || attempt > 100) throw new Error('Owned test server failed');

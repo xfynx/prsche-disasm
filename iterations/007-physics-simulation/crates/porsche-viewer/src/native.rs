@@ -1192,6 +1192,22 @@ impl ApplicationHandler for App {
                             window.request_redraw();
                         }
                     }
+                    KeyCode::KeyM if !event.repeat => {
+                        if let Some(renderer) = &mut self.renderer {
+                            let sim = renderer.toggle_sim_mode();
+                            println!(
+                                "Physics mode: {}",
+                                if sim {
+                                    "6 DOF Realistic Simulation (.sim curves, 4-wheel independent suspension)"
+                                } else {
+                                    "Prototype Arcade Car"
+                                }
+                            );
+                        }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
                     KeyCode::KeyT if !event.repeat => {
                         if let Some(renderer) = &mut self.renderer {
                             let on = renderer.toggle_topology();

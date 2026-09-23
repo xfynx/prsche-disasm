@@ -1,0 +1,587 @@
+//! Full 6 DOF Vehicle Simulation Engine.
+//!
+//! Orchestrates `RigidBody`, `Powertrain`, `SuspensionSystem`, and 4-wheel tire friction
+//! models with aerodynamic drag and ground surface collision.
+
+use glam::{Mat4, Quat, Vec3};
+use nfs_formats::SimCar;
+
+use super::powertrain::Powertrain;
+use super::rigid_body::RigidBody;
+use super::suspension::{SuspensionSystem, WHEEL_FL, WHEEL_FR, WHEEL_RL, WHEEL_RR};
+use crate::surface::RoadSurface;
+
+const AIR_DENSITY: f32 = 1.225; // kg / m^3
+const MAX_SUB_STEP_DT: f32 = 1.0 / 240.0; // 240 Hz max sub-step
+const GRAVITY: f32 = 9.80665;
+
+/// Driver input controls for vehicle simulation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VehicleControls {
+    /// Throttle pedal input [0.0, 1.0].
+    pub throttle: f32,
+    /// Brake pedal input [0.0, 1.0].
+    pub brake: f32,
+    /// Steering command [-1.0, 1.0], positive is right steer.
+    pub steer: f32,
+    /// Emergency / handbrake engaged.
+    pub handbrake: bool,
+    /// Manual gear selection request:
+    /// - `Some(0)`: Neutral
+    /// - `Some(-1)`: Reverse
+    /// - `Some(1..=8)`: Forward gears
+    /// - `None`: Keep automatic shifting
+    pub manual_gear: Option<i32>,
+    /// Enable automatic gear transmission logic.
+    pub auto_gear: bool,
+}
+
+impl Default for VehicleControls {
+    fn default() -> Self {
+        Self {
+            throttle: 0.0,
+            brake: 0.0,
+            steer: 0.0,
+            handbrake: false,
+            manual_gear: None,
+            auto_gear: true,
+        }
+    }
+}
+
+/// Instantaneous simulation state and telemetry output.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VehicleTelemetry {
+    /// Vehicle forward ground speed (m/s).
+    pub speed_mps: f32,
+    /// Vehicle forward speed (km/h).
+    pub speed_kmh: f32,
+    /// Engine rotational speed in RPM.
+    pub engine_rpm: f32,
+    /// Current transmission gear (-1: R, 0: N, 1..=6: Forward).
+    pub current_gear: i32,
+    /// Throttle input applied.
+    pub throttle: f32,
+    /// Brake input applied.
+    pub brake: f32,
+    /// Steering angle of front road wheels (radians).
+    pub steer_angle_rad: f32,
+    /// Lateral acceleration in units of g (9.81 m/s^2).
+    pub lateral_accel_g: f32,
+    /// Longitudinal acceleration in units of g.
+    pub longitudinal_accel_g: f32,
+    /// Yaw rate in rad/s.
+    pub yaw_rate_rad_s: f32,
+    /// Angular rotation speed of each wheel (rad/s) [FL, FR, RL, RR].
+    pub wheel_omegas: [f32; 4],
+    /// Suspension compression (m) [FL, FR, RL, RR].
+    pub wheel_compressions: [f32; 4],
+    /// Longitudinal slip ratio of tires [FL, FR, RL, RR].
+    pub wheel_slip_ratios: [f32; 4],
+    /// Lateral slip angle of tires in radians [FL, FR, RL, RR].
+    pub wheel_slip_angles: [f32; 4],
+    /// Ground contact flag for each wheel [FL, FR, RL, RR].
+    pub wheels_in_contact: [bool; 4],
+    /// 4x4 chassis transformation matrix in world coordinates.
+    pub chassis_transform: Mat4,
+    /// 4x4 transformation matrices for each of the 4 wheels [FL, FR, RL, RR].
+    pub wheel_transforms: [Mat4; 4],
+}
+
+/// Complete vehicle dynamics simulation instance.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VehicleSimulation {
+    /// 6 DOF rigid chassis body.
+    pub body: RigidBody,
+    /// Engine, clutch, and transmission.
+    pub powertrain: Powertrain,
+    /// 4-wheel independent suspension system.
+    pub suspension: SuspensionSystem,
+    /// Front/rear brake force distribution factor (e.g. 0.60 = 60% front).
+    pub brake_bias: f32,
+    /// Total peak braking torque (N*m).
+    pub max_brake_torque: f32,
+    /// Aerodynamic drag coefficient (Cd).
+    pub drag_coeff: f32,
+    /// Frontal cross-section area in m^2 (typically 1.8 - 2.1 m^2).
+    pub frontal_area: f32,
+    /// Aerodynamic downforce factor (Cl).
+    pub downforce_coeff: f32,
+    /// Maximum front wheel steer angle (radians, ~32 degrees = 0.558 rad).
+    pub max_steer_angle: f32,
+    /// Current smoothed steer angle (radians).
+    pub current_steer_angle: f32,
+    /// Steering response smoothing rate (rad/s).
+    pub steer_speed: f32,
+    /// Visual accumulated rotation angle of each wheel for rendering [FL, FR, RL, RR].
+    pub wheel_visual_angles: [f32; 4],
+    /// Previous linear velocity (used to compute instantaneous g-forces).
+    pub prev_linear_velocity: Vec3,
+    /// Filtered lateral acceleration (m/s^2).
+    pub lateral_accel: f32,
+    /// Filtered longitudinal acceleration (m/s^2).
+    pub longitudinal_accel: f32,
+    /// Stored vehicle specification.
+    pub spec_name: String,
+}
+
+impl VehicleSimulation {
+    /// Construct a vehicle simulation from reverse-engineered NFS 5 `SimCar` specs.
+    pub fn from_sim(sim: &SimCar) -> Self {
+        let mass = sim.mass_kg.clamp(400.0, 3000.0);
+        let width = (sim.front_track_m.max(sim.rear_track_m) + 0.35).clamp(1.4, 2.3);
+        let length = (sim.wheelbase_m + 1.2).clamp(3.0, 5.5);
+        let height = 1.30;
+
+        let cg_offset = Vec3::from_array(sim.cg_offset_m);
+
+        let mut body = RigidBody::new(mass, width, height, length, cg_offset);
+        // Start resting upright slightly above ground
+        body.position = Vec3::new(0.0, 0.40, 0.0);
+
+        let powertrain = Powertrain::from_sim(sim);
+        let suspension = SuspensionSystem::from_sim(sim);
+
+        let drag_coeff = if sim.drag_coeff > 0.1 && sim.drag_coeff < 1.0 {
+            sim.drag_coeff
+        } else {
+            0.32
+        };
+
+        let brake_bias = if sim.brake_bias > 0.2 && sim.brake_bias < 0.9 {
+            sim.brake_bias
+        } else {
+            0.62
+        };
+
+        Self {
+            body,
+            powertrain,
+            suspension,
+            brake_bias,
+            max_brake_torque: mass * 12.0, // Enough to generate ~1.2g deceleration
+            drag_coeff,
+            frontal_area: 1.95,
+            downforce_coeff: 0.15,
+            max_steer_angle: 32.0f32.to_radians(),
+            current_steer_angle: 0.0,
+            steer_speed: 6.0, // Fast steering response
+            wheel_visual_angles: [0.0; 4],
+            prev_linear_velocity: Vec3::ZERO,
+            lateral_accel: 0.0,
+            longitudinal_accel: 0.0,
+            spec_name: sim.name.clone(),
+        }
+    }
+
+    /// Reset vehicle position, orientation, and zero out all velocities.
+    pub fn reset(&mut self, position: Vec3, yaw: f32) {
+        self.body.position = position;
+        self.body.orientation = Quat::from_rotation_y(yaw);
+        self.body.linear_velocity = Vec3::ZERO;
+        self.body.angular_velocity = Vec3::ZERO;
+        self.current_steer_angle = 0.0;
+        self.powertrain.current_rpm = self.powertrain.idle_rpm;
+        self.powertrain.current_gear = 1;
+        self.prev_linear_velocity = Vec3::ZERO;
+        for w in &mut self.suspension.wheels {
+            w.tire.omega = 0.0;
+            w.compression = 0.0;
+        }
+        self.wheel_visual_angles = [0.0; 4];
+    }
+
+    /// Advance the vehicle simulation by `dt` seconds with given driver controls and road geometry.
+    pub fn step(
+        &mut self,
+        surface: Option<&RoadSurface>,
+        controls: &VehicleControls,
+        dt: f32,
+    ) -> VehicleTelemetry {
+        let safe_dt = dt.clamp(1e-4, 0.1);
+
+        // Determine number of sub-steps for numerical stability of springs/tire friction
+        let num_sub_steps = (safe_dt / MAX_SUB_STEP_DT).ceil().max(1.0) as usize;
+        let sub_dt = safe_dt / (num_sub_steps as f32);
+
+        // Process gear shift requests
+        if let Some(target_gear) = controls.manual_gear {
+            self.powertrain.shift_to(target_gear);
+        } else if controls.auto_gear {
+            self.update_automatic_transmission();
+        }
+
+        // Speed-sensitive steering angle limit to prevent violent spinouts at high velocity
+        let speed_mps = self.body.forward_speed();
+        let speed_factor = (1.0 / (1.0 + speed_mps * 0.025)).clamp(0.20, 1.0);
+        let target_steer = controls.steer.clamp(-1.0, 1.0) * self.max_steer_angle * speed_factor;
+
+        for _ in 0..num_sub_steps {
+            // Smooth steer input towards target
+            let steer_delta = target_steer - self.current_steer_angle;
+            let max_change = self.steer_speed * sub_dt;
+            self.current_steer_angle += steer_delta.clamp(-max_change, max_change);
+            self.suspension.set_steer_angle(self.current_steer_angle);
+
+            self.sub_step(surface, controls, sub_dt);
+        }
+
+        // Compute instantaneous accelerations in body coordinates
+        let accel_world = (self.body.linear_velocity - self.prev_linear_velocity) / safe_dt;
+        self.prev_linear_velocity = self.body.linear_velocity;
+
+        let right_dir = self.body.right();
+        let forward_dir = self.body.forward();
+
+        let raw_lat = accel_world.dot(right_dir) / GRAVITY;
+        let raw_lon = accel_world.dot(forward_dir) / GRAVITY;
+
+        // Low-pass filter for smooth telemetry readouts
+        self.lateral_accel = self.lateral_accel * 0.85 + raw_lat * 0.15;
+        self.longitudinal_accel = self.longitudinal_accel * 0.85 + raw_lon * 0.15;
+
+        // Build telemetry and rendering matrices
+        self.build_telemetry(controls)
+    }
+
+    /// Single fixed-delta physics sub-step.
+    fn sub_step(&mut self, surface: Option<&RoadSurface>, controls: &VehicleControls, dt: f32) {
+        // Clear force and torque accumulators
+        self.body.clear_accumulators();
+
+        // 1. Suspension contact raycast and spring/damper forces
+        self.suspension
+            .update_surface_contact(&mut self.body, surface, dt);
+
+        // 2. Powertrain torque delivery
+        let throttle = controls.throttle.clamp(0.0, 1.0);
+        let avg_wheel_omega = {
+            let mut sum = 0.0;
+            let mut count = 0.0;
+            for w in &self.suspension.wheels {
+                if w.is_driven {
+                    sum += w.tire.omega;
+                    count += 1.0;
+                }
+            }
+            if count > 0.0 {
+                sum / count
+            } else {
+                0.0
+            }
+        };
+        let drive_torque = self.powertrain.step(throttle, avg_wheel_omega, dt);
+
+        // Driven wheels count
+        let driven_count = self
+            .suspension
+            .wheels
+            .iter()
+            .filter(|w| w.is_driven)
+            .count()
+            .max(1) as f32;
+        let per_wheel_drive_torque = drive_torque / driven_count;
+
+        // 3. Braking distribution
+        let brake_in = controls.brake.clamp(0.0, 1.0);
+        let front_brake_torque = brake_in * self.max_brake_torque * self.brake_bias * 0.5;
+        let rear_brake_torque = brake_in * self.max_brake_torque * (1.0 - self.brake_bias) * 0.5;
+
+        // 4. Update each tire contact and forces
+        for (idx, wheel) in self.suspension.wheels.iter_mut().enumerate() {
+            let is_front = idx == WHEEL_FL || idx == WHEEL_FR;
+
+            let wheel_drive = if wheel.is_driven {
+                per_wheel_drive_torque
+            } else {
+                0.0
+            };
+
+            let mut wheel_brake = if is_front {
+                front_brake_torque
+            } else {
+                rear_brake_torque
+            };
+
+            // Handbrake locks rear wheels
+            if controls.handbrake && !is_front {
+                wheel_brake += self.max_brake_torque * 0.6;
+            }
+
+            if wheel.in_contact {
+                // Calculate wheel contact velocity in world space
+                let contact_vel = self.body.point_velocity(wheel.contact_point_world);
+
+                // Compute wheel orientation heading (steered direction)
+                let wheel_rot = Quat::from_axis_angle(self.body.up(), wheel.steer_angle);
+                let wheel_fwd = wheel_rot * self.body.forward();
+                let wheel_right = wheel_rot * self.body.right();
+
+                let forward_vel = contact_vel.dot(wheel_fwd);
+                let lateral_vel = contact_vel.dot(wheel_right);
+
+                // Normal force on this wheel
+                let normal_load = wheel.tire.normal_load;
+
+                // Step tire friction
+                let forces = wheel.tire.step(
+                    normal_load,
+                    forward_vel,
+                    lateral_vel,
+                    wheel_drive,
+                    wheel_brake,
+                    dt,
+                );
+                let f_long = forces.x;
+                let f_lat = forces.y;
+
+                // Combine friction forces into world vector
+                let tire_force_world = wheel_fwd * f_long + wheel_right * f_lat;
+
+                // Apply tire force to rigid body at contact point
+                self.body
+                    .apply_force_at_world_pos(tire_force_world, wheel.contact_point_world);
+            } else {
+                // Wheel is airborne: spin down freely or accelerate from drive torque
+                wheel.tire.step(0.0, 0.0, 0.0, wheel_drive, wheel_brake, dt);
+            }
+
+            // Visual wheel rotation integration
+            self.wheel_visual_angles[idx] += wheel.tire.omega * dt;
+        }
+
+        // 5. Aerodynamic drag and downforce
+        let v_world = self.body.linear_velocity;
+        let speed_sq = v_world.length_squared();
+        if speed_sq > 0.01 {
+            let drag_mag = 0.5 * AIR_DENSITY * self.drag_coeff * self.frontal_area * speed_sq;
+            let drag_force = -v_world.normalize() * drag_mag;
+            self.body.apply_central_force(drag_force);
+
+            // Aerodynamic downforce acting through chassis
+            let downforce_mag =
+                0.5 * AIR_DENSITY * self.downforce_coeff * self.frontal_area * speed_sq;
+            let downforce = -self.body.up() * downforce_mag;
+            self.body.apply_central_force(downforce);
+        }
+
+        // 6. Integrate 6 DOF equations of motion
+        self.body.integrate(dt, Vec3::new(0.0, -GRAVITY, 0.0));
+
+        // When vehicle is near standstill and brakes are applied, halt motion to prevent creep
+        if controls.brake > 0.3
+            && controls.throttle < 0.05
+            && self.body.linear_velocity.length_squared() < 0.16
+        {
+            self.body.linear_velocity = Vec3::ZERO;
+            self.body.angular_velocity = Vec3::ZERO;
+            for w in &mut self.suspension.wheels {
+                w.tire.omega = 0.0;
+            }
+        }
+    }
+
+    /// Automatic transmission shift schedule logic.
+    fn update_automatic_transmission(&mut self) {
+        if self.powertrain.current_gear <= 0 {
+            return;
+        }
+
+        let rpm = self.powertrain.current_rpm;
+        let gear = self.powertrain.current_gear as u32;
+
+        // Upshift near redline (92% of redline)
+        if rpm > self.powertrain.redline_rpm * 0.92 && gear < self.powertrain.forward_gears {
+            self.powertrain.shift_up();
+        }
+        // Downshift when bogged down (below 2400 RPM for higher gears)
+        else if rpm < 2400.0 && gear > 1 {
+            self.powertrain.shift_down();
+        }
+    }
+
+    /// Generate complete telemetry package and visual transform matrices.
+    fn build_telemetry(&self, controls: &VehicleControls) -> VehicleTelemetry {
+        let speed_mps = self.body.forward_speed();
+        let speed_kmh = speed_mps * 3.6;
+
+        let chassis_transform = self.body.transform_matrix();
+
+        // Compute 4 individual wheel transform matrices
+        let mut wheel_transforms = [Mat4::IDENTITY; 4];
+        for (i, wheel) in self.suspension.wheels.iter().enumerate() {
+            // Wheel position relative to body: hardpoint + (uncompressed_len - compression) along -Y
+            let uncompressed_len = wheel.rest_length + wheel.tire.radius;
+            let current_len = uncompressed_len - wheel.compression;
+            let rel_wheel_pos = wheel.hardpoint_body - Vec3::Y * current_len;
+
+            // Wheel rotation: steer angle (Y) * visual roll angle (X)
+            let steer_quat = if wheel.is_steered {
+                Quat::from_rotation_y(wheel.steer_angle)
+            } else {
+                Quat::IDENTITY
+            };
+            let roll_quat = Quat::from_rotation_x(self.wheel_visual_angles[i]);
+
+            let local_wheel_mat =
+                Mat4::from_translation(rel_wheel_pos) * Mat4::from_quat(steer_quat * roll_quat);
+
+            wheel_transforms[i] = chassis_transform * local_wheel_mat;
+        }
+
+        VehicleTelemetry {
+            speed_mps,
+            speed_kmh,
+            engine_rpm: self.powertrain.current_rpm,
+            current_gear: self.powertrain.current_gear,
+            throttle: controls.throttle,
+            brake: controls.brake,
+            steer_angle_rad: self.current_steer_angle,
+            lateral_accel_g: self.lateral_accel,
+            longitudinal_accel_g: self.longitudinal_accel,
+            yaw_rate_rad_s: self.body.angular_velocity.y,
+            wheel_omegas: [
+                self.suspension.wheels[WHEEL_FL].tire.omega,
+                self.suspension.wheels[WHEEL_FR].tire.omega,
+                self.suspension.wheels[WHEEL_RL].tire.omega,
+                self.suspension.wheels[WHEEL_RR].tire.omega,
+            ],
+            wheel_compressions: [
+                self.suspension.wheels[WHEEL_FL].compression,
+                self.suspension.wheels[WHEEL_FR].compression,
+                self.suspension.wheels[WHEEL_RL].compression,
+                self.suspension.wheels[WHEEL_RR].compression,
+            ],
+            wheel_slip_ratios: [
+                self.suspension.wheels[WHEEL_FL].tire.slip_ratio,
+                self.suspension.wheels[WHEEL_FR].tire.slip_ratio,
+                self.suspension.wheels[WHEEL_RL].tire.slip_ratio,
+                self.suspension.wheels[WHEEL_RR].tire.slip_ratio,
+            ],
+            wheel_slip_angles: [
+                self.suspension.wheels[WHEEL_FL].tire.slip_angle,
+                self.suspension.wheels[WHEEL_FR].tire.slip_angle,
+                self.suspension.wheels[WHEEL_RL].tire.slip_angle,
+                self.suspension.wheels[WHEEL_RR].tire.slip_angle,
+            ],
+            wheels_in_contact: [
+                self.suspension.wheels[WHEEL_FL].in_contact,
+                self.suspension.wheels[WHEEL_FR].in_contact,
+                self.suspension.wheels[WHEEL_RL].in_contact,
+                self.suspension.wheels[WHEEL_RR].in_contact,
+            ],
+            chassis_transform,
+            wheel_transforms,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_boxster_sim() -> SimCar {
+        SimCar {
+            name: "Test Boxster".to_string(),
+            mass_kg: 1252.0,
+            wheelbase_m: 2.415,
+            gear_count: 5,
+            drive_flags: 2,
+            reverse_gear: -3.44,
+            forward_gears: vec![3.50, 2.12, 1.43, 1.03, 0.79],
+            final_drive: 3.89,
+            redline_rpm: 6700.0,
+            idle_or_step_rpm: 800.0,
+            torque_curve: [
+                98.0, 102.0, 130.0, 138.0, 157.0, 157.0, 169.0, 169.0, 173.0, 181.0, 181.0, 173.0,
+                146.0, 110.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            ],
+            brake_bias: 0.62,
+            drag_coeff: 0.31,
+            swaybar_stiffness: 12000.0,
+            suspension_stiffness: 28.0,
+            front_track_m: 1.465,
+            rear_track_m: 1.500,
+            damping_compression: 2.5,
+            damping_rebound: 3.2,
+            tire_grip: 100.0,
+            cg_offset_m: [0.0, 0.35, -0.1],
+            raw: [0u8; 328],
+        }
+    }
+
+    #[test]
+    fn vehicle_initialization_from_sim() {
+        let sim = test_boxster_sim();
+        let vehicle = VehicleSimulation::from_sim(&sim);
+
+        assert_eq!(vehicle.body.mass, 1252.0);
+        assert_eq!(vehicle.powertrain.forward_gears, 5);
+        assert_eq!(vehicle.suspension.wheels.len(), 4);
+    }
+
+    #[test]
+    fn vehicle_accelerates_on_throttle() {
+        let sim = test_boxster_sim();
+        let mut vehicle = VehicleSimulation::from_sim(&sim);
+
+        // Put vehicle on flat ground
+        vehicle.reset(Vec3::new(0.0, 0.35, 0.0), 0.0);
+
+        let controls = VehicleControls {
+            throttle: 1.0,
+            brake: 0.0,
+            steer: 0.0,
+            handbrake: false,
+            manual_gear: Some(1),
+            auto_gear: false,
+        };
+
+        // Simulate 1 second of full throttle in 1st gear
+        for _ in 0..60 {
+            vehicle.step(None, &controls, 1.0 / 60.0);
+        }
+
+        // Vehicle should have accelerated forward (negative Z is forward)
+        assert!(
+            vehicle.body.linear_velocity.z < -1.0,
+            "Car should move forward (-Z)"
+        );
+        assert!(
+            vehicle.body.forward_speed() > 1.0,
+            "Forward speed should be positive"
+        );
+    }
+
+    #[test]
+    fn vehicle_brakes_and_decelerates() {
+        let sim = test_boxster_sim();
+        let mut vehicle = VehicleSimulation::from_sim(&sim);
+
+        vehicle.reset(Vec3::new(0.0, 0.35, 0.0), 0.0);
+        // Give vehicle initial forward speed of 20 m/s (~72 km/h)
+        vehicle.body.linear_velocity = Vec3::new(0.0, 0.0, -20.0);
+        for w in &mut vehicle.suspension.wheels {
+            w.tire.omega = 20.0 / w.tire.radius;
+        }
+
+        let brake_controls = VehicleControls {
+            throttle: 0.0,
+            brake: 1.0,
+            steer: 0.0,
+            handbrake: false,
+            manual_gear: None,
+            auto_gear: true,
+        };
+
+        // Simulate 0.5s of hard braking
+        for _ in 0..30 {
+            vehicle.step(None, &brake_controls, 1.0 / 60.0);
+        }
+
+        assert!(
+            vehicle.body.forward_speed() < 18.0,
+            "Speed should drop significantly under braking"
+        );
+    }
+}

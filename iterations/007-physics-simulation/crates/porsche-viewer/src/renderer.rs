@@ -309,6 +309,9 @@ pub struct Renderer {
     pub road_edges: Vec<nfs_assets::TopologyEdge>,
     pub road_surface: Option<nfs_assets::RoadSurface>,
     pub car: Option<crate::arcade::ArcadeCar>,
+    pub sim_car: Option<nfs_assets::physics::VehicleSimulation>,
+    pub sim_telemetry: Option<nfs_assets::physics::VehicleTelemetry>,
+    pub sim_mode: bool,
     car_render: Option<CarRenderState>,
 }
 
@@ -708,8 +711,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             }
         }
 
-        // Arcade car spawn and procedural GPU geometry (for track scenes)
+        // Arcade & 6 DOF Simulation car spawn and procedural GPU geometry (for track scenes)
         let mut car = None;
+        let mut sim_car = None;
         let mut car_render = None;
         let road_edges: Vec<nfs_assets::TopologyEdge> = scene
             .topology
@@ -754,6 +758,38 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 arcade_car.pos.y = hit.height;
             }
             car = Some(arcade_car);
+
+            // Realistic 6 DOF Vehicle Simulation specification
+            let sim_spec = nfs_formats::sim::SimCar {
+                name: "1997 Boxster 2.5L".to_string(),
+                mass_kg: 1252.0,
+                wheelbase_m: 2.415,
+                gear_count: 5,
+                drive_flags: 2,
+                reverse_gear: -3.44,
+                forward_gears: vec![3.50, 2.12, 1.43, 1.03, 0.79],
+                final_drive: 3.89,
+                redline_rpm: 6700.0,
+                idle_or_step_rpm: 800.0,
+                torque_curve: [
+                    98.0, 102.0, 130.0, 138.0, 157.0, 157.0, 169.0, 169.0, 173.0, 181.0, 181.0,
+                    173.0, 146.0, 110.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                ],
+                brake_bias: 0.62,
+                drag_coeff: 0.31,
+                swaybar_stiffness: 12000.0,
+                suspension_stiffness: 28.0,
+                front_track_m: 1.465,
+                rear_track_m: 1.500,
+                damping_compression: 2.5,
+                damping_rebound: 3.2,
+                tire_grip: 0.90,
+                cg_offset_m: [0.0, 0.35, -0.1],
+                raw: [0u8; 328],
+            };
+            let mut vehicle_sim = nfs_assets::physics::VehicleSimulation::from_sim(&sim_spec);
+            vehicle_sim.reset(spawn_pos, spawn_yaw);
+            sim_car = Some(vehicle_sim);
 
             let geom = crate::car_mesh::generate_procedural_car();
             let mut car_materials = Vec::new();
@@ -877,6 +913,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             road_surface: scene.road_surface.clone(),
             road_edges,
             car,
+            sim_car,
+            sim_telemetry: None,
+            sim_mode: true,
             car_render,
         })
     }
@@ -1089,10 +1128,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             );
         }
 
-        // 3.5. Draw arcade car on track (if present)
+        // 3.5. Draw car on track (if present)
         if let (Some(car), Some(car_render)) = (&self.car, &self.car_render) {
+            let model_matrix = match (&self.sim_car, self.sim_mode) {
+                (Some(sim), true) => sim.body.transform_matrix(),
+                _ => car.model_matrix(),
+            };
             let mut uniform = self.camera.uniform(self.width, self.height);
-            uniform.model = car.model_matrix().to_cols_array_2d();
+            uniform.model = model_matrix.to_cols_array_2d();
             self.queue
                 .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&uniform));
 
@@ -1269,6 +1312,29 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     pub fn update_car(&mut self, dt: f32, throttle: f32, steer: f32, handbrake: bool) {
         let edges = &self.road_edges;
+
+        if let (true, Some(sim)) = (self.sim_mode, &mut self.sim_car) {
+            let controls = nfs_assets::physics::VehicleControls {
+                throttle: throttle.max(0.0),
+                brake: (-throttle).max(0.0),
+                steer,
+                handbrake,
+                manual_gear: None,
+                auto_gear: true,
+            };
+            let tel = sim.step(self.road_surface.as_ref(), &controls, dt);
+            if self.camera.mode == CameraMode::Drive {
+                let forward = sim.body.forward();
+                let eye = sim.body.position + Vec3::new(0.0, 2.0, 0.0) - forward * 5.8;
+                let target = sim.body.position + Vec3::new(0.0, 0.9, 0.0) + forward * 1.5;
+                self.camera.drive_pos = eye;
+                self.camera.drive_target = target;
+                self.camera.drive_fov = 58.0 + (tel.speed_mps / 50.0).clamp(0.0, 1.0) * 10.0;
+            }
+            self.sim_telemetry = Some(tel);
+            return;
+        }
+
         if let Some(car) = &mut self.car {
             let reference_y = car.pos.y;
             let surface = self.road_surface.as_ref();
@@ -1307,6 +1373,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 .and_then(|surface| surface.query(car.pos.x, car.pos.z, car.pos.y, 2.0, 4.0))
             {
                 car.pos.y = hit.height;
+            }
+            if let Some(sim) = &mut self.sim_car {
+                sim.reset(car.pos, car.yaw);
             }
             if self.camera.mode == CameraMode::Drive {
                 self.camera.drive_pos = car.camera_eye;
@@ -1354,15 +1423,33 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     pub fn get_car_speed_kmh(&self) -> f32 {
+        if let (true, Some(tel)) = (self.sim_mode, &self.sim_telemetry) {
+            return tel.speed_kmh;
+        }
         self.car.as_ref().map(|c| c.speed_kmh()).unwrap_or(0.0)
     }
 
     pub fn get_car_gear(&self) -> i32 {
+        if let (true, Some(tel)) = (self.sim_mode, &self.sim_telemetry) {
+            return tel.current_gear;
+        }
         self.car.as_ref().map(|c| c.gear).unwrap_or(0)
     }
 
     pub fn get_car_rpm(&self) -> f32 {
+        if let (true, Some(tel)) = (self.sim_mode, &self.sim_telemetry) {
+            return (tel.engine_rpm / 7000.0).clamp(0.0, 1.0);
+        }
         self.car.as_ref().map(|c| c.rpm).unwrap_or(0.0)
+    }
+
+    pub fn toggle_sim_mode(&mut self) -> bool {
+        self.sim_mode = !self.sim_mode;
+        self.sim_mode
+    }
+
+    pub fn is_sim_mode(&self) -> bool {
+        self.sim_mode
     }
 
     pub fn has_car(&self) -> bool {

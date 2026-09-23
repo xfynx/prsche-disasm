@@ -230,6 +230,20 @@ impl BrowserViewer {
         self.renderer.as_ref().map(|r| r.has_car()).unwrap_or(false)
     }
 
+    pub fn toggle_sim_mode(&mut self) -> bool {
+        self.renderer
+            .as_mut()
+            .map(|r| r.toggle_sim_mode())
+            .unwrap_or(false)
+    }
+
+    pub fn is_sim_mode(&self) -> bool {
+        self.renderer
+            .as_ref()
+            .map(|r| r.is_sim_mode())
+            .unwrap_or(false)
+    }
+
     pub fn render(&mut self) -> Result<(), JsValue> {
         let Some(renderer) = &mut self.renderer else {
             return Ok(());

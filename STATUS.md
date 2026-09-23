@@ -1,22 +1,29 @@
 # Состояние проекта
 
-Обновлено 2026-09-23. **006-game-systems в работе**; 005-unified-driving завершена (тег `iteration-005`).
-Текущий план: [006](iterations/006-game-systems/PLAN.md).
+Обновлено 2026-09-23. **007-physics-simulation завершена** (тег `iteration-007`); 006-game-systems завершена (тег `iteration-006`).
+Следующий этап: [008-race-loop](docs/next-iteration.md).
 Полный перенос с обеими карьерами: [дорожная карта 006–014](docs/roadmap.md).
 
-## Активная итерация: 006-game-systems (готова к приёмке)
-- Снимок: `iterations/006-game-systems`.
-- Рабочий план: [PLAN.md](iterations/006-game-systems/PLAN.md).
+## Проверенный результат
+
+### 007-physics-simulation
+- [Run 001](iterations/007-physics-simulation/runs/001-physics-simulation/README.md):
+  - T01: 6 DOF Rigid Body динамика (`rigid_body.rs`): масса, моменты инерции, кватернион ориентации, локальные/мировые преобразования, численный интегратор с подшагами $\le 1/240$ с.
+  - T02: силовая установка и КПП (`powertrain.rs`): 21-точечная сетка крутящего момента с шагом 500 RPM из `.sim`, динамика оборотов маховика (холостой ход, отсечка, сопротивление вращению), передаточные числа и главная передача.
+  - T03: 4-колёсная независимая подвеска (`suspension.rs`): лучевые запросы к spatial grid `surface.rs`, силы пружин, амортизаторы сжатия и отбоя (bump/rebound), стабилизаторы поперечной устойчивости, динамический перенос веса кузова.
+  - T04: шинная модель и тормоза (`tire.rs`): продольный (slip ratio) и поперечный (slip angle) увод шин, эллипс трения Кулона, коэффициенты `front_grip`/`rear_grip` из `.sim`, статический замок тормозов при остановке.
+  - T05: калибровочный стенд (`calibration_bench.rs`): 102/102 unit/integration тестов passed; битовый детерминизм подтверждён; воспроизведение потока управления из `replay.rpl`; разгон и торможение 356A (0-100 за 14.37 с, 100-0 за 43.9 м) и Boxster 2.5L (0-100 за 7.83 с, 100-0 за 41.5 м).
+  - T06: интеграция в просмотрщик (desktop/web): переключение на лету клавишей `M` / кнопкой UI между 6 DOF симуляцией и аркадным прототипом; телеметрический HUD со спидометром, тахометром, передачей, перегрузкой $g$ и реакцией колёс; чистые `fmt` и `clippy -- -D warnings`; полная сборка native и WASM.
+- Задачи T01–T06 завершены, код закоммичен, тег `iteration-007`.
+
+### 006-game-systems
 - [Run 001](iterations/006-game-systems/runs/001-game-systems/README.md):
   - T01: PE-карта `nfs5.exe`, функции загрузки `.sim` (`0x0049c750`), `.ais` (`0x0049ca30`), масштабирующие коэффициенты. См. [`simulation-evidence.md`](iterations/006-game-systems/research/simulation-evidence.md).
   - T02: парсеры `SimCar` (328 байт) и `AisCar` (304 байта) в `nfs-formats/src/sim.rs`. Валидация 88/88 `.sim` и 22/22 `.ais` файлов.
   - T03: архитектура сохранений `.sav` (связный список секций `0x0065b634`), парсеры каталогов `nfs5.car` (109 авто), `nfs5.trk` (15 трасс), `nfs5.fac` (34 миссии Factory Driver) в `nfs-formats/src/career.rs`. См. [`career-evidence.md`](iterations/006-game-systems/research/career-evidence.md).
   - T04: реверс детерминированных реплеев `replay.rpl` (8 суб-сэмплов на тик, RLE-поток ввода, заголовок 15 908 байт на 8 авто), парсер `ReplayFile` в `nfs-formats/src/replay.rs`, открытие 500-RPM сетки крутящего момента, baseline стенд в `local/experiments/bench/sim_baseline.json`. См. [`telemetry-evidence.md`](iterations/006-game-systems/research/telemetry-evidence.md).
   - T05: интеграция, 83 unit-теста passed, `fmt` и `clippy` (`-D warnings`) чистые, полная сборка `build.ps1 -Target all` (native + WASM) выполнена без ошибок.
-- Итерация завершена, ожидает подтверждения пользователя для тегирования `iteration-006`.
-
-
-## Проверенный результат
+- Итерация завершена, закоммичена, тег `iteration-006`.
 
 ### 005-unified-driving
 - [Run 001](iterations/005-unified-driving/runs/001-unified-driving/README.md):

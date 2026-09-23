@@ -1,7 +1,9 @@
 //! GPU-independent scene contract shared by native and browser frontends.
 use std::collections::BTreeMap;
 
+pub mod physics;
 pub mod surface;
+pub use physics::{VehicleControls, VehicleSimulation, VehicleTelemetry};
 pub use surface::{RoadSurface, RoadSurfaceReport, RoadTriangle, RoadTriangleIdentity, SurfaceHit};
 
 #[derive(Debug, Clone)]

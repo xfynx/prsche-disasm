@@ -1,9 +1,9 @@
 # 007-physics-simulation
 
-Статус: в работе.  
+Статус: завершена и проверена (Run 001).  
 Снимок создан из `006-game-systems` (скрипт `scripts/new-iteration.py`).  
-Планируемый тег: `iteration-007`.  
-Собственная история runs начинается с 001. `local/game` read-only.  
+Тег: `iteration-007`.  
+Собственная история runs: `runs/001-physics-simulation/`. `local/game` read-only.  
 
 Цель: восстановить аутентичную детерминированную симуляцию физики автомобиля и взаимодействия с дорожным полотном на основе доказанных параметров `.sim`, открытых в итерации 006.
 
@@ -53,6 +53,14 @@ cargo clippy --locked --manifest-path iterations/007-physics-simulation/Cargo.to
 cargo test --locked --manifest-path iterations/007-physics-simulation/Cargo.toml --target-dir local/builds/007-physics-simulation/.cargo-target --workspace
 .\scripts\build.ps1 -Iteration 007-physics-simulation -Config release -Target all
 ```
+
+## Результаты Run 001 (2026-09-23)
+
+- **Отчёт и журналы**: [`runs/001-physics-simulation/README.md`](runs/001-physics-simulation/README.md).
+- **Тесты**: 102/102 unit и integration тестов passed (включая калибровочные тесты динамики 356A, Boxster 2.5L, битовый детерминизм и проигрывание управления из `replay.rpl`).
+- **Качество кода**: `cargo fmt --check` (0 расхождений), `cargo clippy -- -D warnings` (0 предупреждений).
+- **Сборка**: релизные бинарники собраны для Windows (`local/builds/007-physics-simulation/release/porsche-viewer.exe`) и WebAssembly/WebGPU (`local/builds/007-physics-simulation/web/`).
+- **Интерактивность**: клавиша `M` и переключатель в веб-интерфейсе позволяют на лету переключаться между 6 DOF симуляцией и аркадным прототипом. Телеметрический HUD выводит скорость, передачу, обороты двигателя, вертикальную перегрузку $g$ и нормальные реакции 4 колёс.
 
 Детальный рабочий план: [PLAN.md](PLAN.md).  
 Общая дорожная карта: [docs/roadmap.md](../../docs/roadmap.md).
