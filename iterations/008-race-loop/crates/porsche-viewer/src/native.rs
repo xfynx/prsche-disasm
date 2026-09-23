@@ -627,6 +627,8 @@ fn read_track_dir_recursive(
                 // .scn files use <track>_st<N>.scn naming — match by prefix
                 stem.to_ascii_lowercase()
                     .starts_with(&track.to_ascii_lowercase())
+            } else if extension.as_deref() == Some("lsp") {
+                stem.eq_ignore_ascii_case(track) || stem.eq_ignore_ascii_case(&format!("{track}0"))
             } else {
                 // Original: crp, fsh, env, edg, map, jnc with exact stem match
                 matches!(
@@ -695,6 +697,18 @@ fn load_catalog_scene(catalog: &NativeCatalog) -> Result<(Scene, String), String
             ))
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RaceDriveTelemetry {
+    phase: u32,
+    pos: usize,
+    total_pos: usize,
+    lap: u32,
+    total_laps: u32,
+    lap_time: f32,
+    wrong_way: bool,
+    countdown: f32,
 }
 
 struct App {
@@ -945,29 +959,73 @@ impl App {
             && renderer.has_car()
         {
             renderer.update_car(dt, throttle, steering, handbrake);
-            status = Some((renderer.get_car_speed_kmh(), renderer.get_car_gear()));
+            let race_info = if renderer.race_session.is_some() {
+                Some(RaceDriveTelemetry {
+                    phase: renderer.get_race_phase(),
+                    pos: renderer.get_player_position(),
+                    total_pos: renderer.get_total_participants(),
+                    lap: renderer.get_current_lap(),
+                    total_laps: renderer.get_total_laps(),
+                    lap_time: renderer.get_current_lap_time(),
+                    wrong_way: renderer.is_wrong_way(),
+                    countdown: renderer.get_countdown_remaining(),
+                })
+            } else {
+                None
+            };
+            status = Some((
+                renderer.get_car_speed_kmh(),
+                renderer.get_car_gear(),
+                race_info,
+            ));
         }
-        if let Some((speed, gear)) = status {
-            self.update_drive_title(speed, gear);
+        if let Some((speed, gear, race_info)) = status {
+            self.update_drive_title(speed, gear, race_info);
         }
     }
 
-    fn update_drive_title(&self, speed: f32, gear: i32) {
+    fn update_drive_title(&self, speed: f32, gear: i32, race_info: Option<RaceDriveTelemetry>) {
         let Some(window) = &self.window else {
             return;
         };
-        let gear = if gear < 0 {
+        let gear_str = if gear < 0 {
             "R".into()
         } else if gear == 0 {
             "N".into()
         } else {
             format!("{gear}")
         };
+
+        let mut race_str = String::new();
+        if let Some(r) = race_info {
+            if r.wrong_way {
+                race_str.push_str(" | ⚠️ WRONG WAY!");
+            }
+            match r.phase {
+                1 => {
+                    race_str.push_str(&format!(" | СТАРТ ЧЕРЕЗ {:.1}c", r.countdown));
+                }
+                2 => {
+                    let mins = (r.lap_time / 60.0).floor() as u32;
+                    let secs = r.lap_time % 60.0;
+                    race_str.push_str(&format!(
+                        " | P{}/{} | Круг {}/{} | {:02}:{:04.1}",
+                        r.pos, r.total_pos, r.lap, r.total_laps, mins, secs
+                    ));
+                }
+                4 | 5 => {
+                    race_str.push_str(&format!(" | ФИНИШ! P{}/{}", r.pos, r.total_pos));
+                }
+                _ => {}
+            }
+        }
+
         window.set_title(&format!(
-            "{} | {:.0} км/ч [{}]",
+            "{} | {:.0} км/ч [{}]{}",
             self.window_title(),
             speed,
-            gear
+            gear_str,
+            race_str
         ));
     }
 

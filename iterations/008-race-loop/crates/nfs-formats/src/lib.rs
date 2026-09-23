@@ -207,8 +207,8 @@ pub use scn::{parse_scn, GeomElement, ScnFile};
 
 pub mod topology;
 pub use topology::{
-    parse_edg, parse_jnc, parse_map, EdgeSegment, JunctionRecord, Junctions, MapHeader, MapSection,
-    RoadEdges, TrackMap,
+    parse_edg, parse_jnc, parse_lsp, parse_map, EdgeSegment, JunctionRecord, Junctions,
+    LineSplinePath, MapHeader, MapSection, RoadEdges, SplinePoint, TrackMap,
 };
 
 pub mod sim;

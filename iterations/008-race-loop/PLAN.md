@@ -32,12 +32,12 @@
 
 ## Задачи и статус выполнения
 
-- [ ] **T01: race state machine & timing** — конечный автомат гонки (`RaceStateMachine`): состояния `Countdown`, `Racing`, `Paused`, `Finished`, `Results`, таймеры кругов и дельт.
-- [ ] **T02: track course & checkpoints** — построение маршрута трассы (`TrackCourse`): осевая линия из `.jnc`/`.map`, чекпоинт-створы поперек полотна, фиксация кругов, направление (Forward/Reverse), детекция Wrong Way.
-- [ ] **T03: barrier collision** — физика отскока от кромок полотна `.edg`: вычисление точки контакта, нормали барьера и импульса отскока шасси.
-- [ ] **T04: AI opponents & grid** — соперники ИИ (`AiController`): профили `AisCar`, следование по траектории с контролем скорости в поворотах, стартовая решётка, расчёт позиций.
-- [ ] **T05: race HUD & results UI** — гоночный HUD (позиция, круг, секундомер, предупреждения) и экран результатов в Web и Native окнах.
-- [ ] **T06: integration, verification & run 001** — headless integration тест полного цикла заезда, проверка сборки native/WASM, оформление Run 001.
+- [x] **T01: race state machine & timing** — конечный автомат гонки (`RaceSession`): состояния `Countdown(3..2..1..GO)`, `Racing`, `Paused`, `Finished`, `Results`, таймеры кругов, дельт и лучшего круга (`nfs-assets/src/race/state.rs`).
+- [x] **T02: track course & checkpoints** — реверс-инжиниринг формата `.lsp` (Line Spline Path), парсер 30 файлов трасс, построение маршрута трассы (`TrackCourse`), автоматическая классификация круговая/спринт (gap < 60м), чекпоинт-створы, фиксация кругов, детекция Wrong Way (`nfs-assets/src/race/course.rs`, `nfs-formats/src/topology.rs`).
+- [x] **T03: barrier collision** — физика отскока от кромок полотна `.edg`: вычисление точки контакта, нормали барьера и упруго-пластического импульса отскока с трением (`nfs-assets/src/race/collision.rs`).
+- [x] **T04: AI opponents & grid** — соперники ИИ (`AiOpponent`): профили `AisCar` из `.ais`, следование по траектории с чистым преследованием (pure pursuit) и контролем скорости по кривизне $v = \sqrt{a_{lat}/\kappa}$, стартовая решётка до 8 машин (`calculate_grid_slot`), расчёт позиций (`nfs-assets/src/race/ai.rs`).
+- [x] **T05: race HUD & results UI** — гоночный HUD (позиция P1/4, круг, секундомер, таймер лучшего круга, пульсирующий баннер отсчёта, предупреждение Wrong Way) и модальное окно финиша в Web и Native окнах (`porsche-viewer`, `web/main.js`, `web/style.css`, `web/index.html`).
+- [x] **T06: integration, verification & run 001** — headless integration тест полного цикла заезда (`tests/race_integration.rs`), проверка сборки release native/WASM, оформление Run 001 (`runs/001-race-loop/README.md`).
 
 ## Проверки
 

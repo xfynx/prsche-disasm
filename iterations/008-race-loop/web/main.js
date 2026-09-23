@@ -69,8 +69,43 @@ const summary = document.querySelector("#summary");
 const menuButton = document.querySelector("#menuButton");
 const hudButton = document.querySelector("#hudButton");
 const detailsButton = document.querySelector("#detailsButton");
+const raceHudTop = document.querySelector("#raceHudTop");
+const racePos = document.querySelector("#racePos");
+const raceTotalPos = document.querySelector("#raceTotalPos");
+const raceLap = document.querySelector("#raceLap");
+const raceTotalLaps = document.querySelector("#raceTotalLaps");
+const raceLapTime = document.querySelector("#raceLapTime");
+const raceBestLap = document.querySelector("#raceBestLap");
+const countdownBanner = document.querySelector("#countdownBanner");
+const countdownText = document.querySelector("#countdownText");
+const wrongWayBanner = document.querySelector("#wrongWayBanner");
+const raceResultsModal = document.querySelector("#raceResultsModal");
+const resultsSubtitle = document.querySelector("#resultsSubtitle");
+const resultsLapTime = document.querySelector("#resultsLapTime");
+const resultsBestTime = document.querySelector("#resultsBestTime");
+const raceRestartBtn = document.querySelector("#raceRestartBtn");
+
 let menuVisible = true;
 let hudVisible = true;
+let lastPhase = 0;
+
+function formatRaceTime(secs) {
+  if (!Number.isFinite(secs) || secs <= 0) return "--:--.-";
+  const mins = Math.floor(secs / 60);
+  const remainingSecs = (secs % 60).toFixed(1);
+  return `${String(mins).padStart(2, "0")}:${remainingSecs.padStart(4, "0")}`;
+}
+
+if (raceRestartBtn) {
+  raceRestartBtn.addEventListener("click", () => {
+    if (viewer) {
+      viewer.restart_race();
+      if (raceResultsModal) raceResultsModal.hidden = true;
+      setStatus("Гонка перезапущена / старт на решётке.");
+      queueFrame();
+    }
+  });
+}
 
 function setMenuVisible(visible) {
   menuVisible = visible;
@@ -347,6 +382,8 @@ function findTrackFilesFromCatalog(target) {
         `${targetLower}.edg`,
         `${targetLower}.map`,
         `${targetLower}.jnc`,
+        `${targetLower}0.lsp`,
+        `${targetLower}.lsp`,
       ].includes(basename)
     ) {
       matching.push(relPath);
@@ -558,8 +595,18 @@ function syncTourButton() {
   tourButton.classList.toggle("active", isDrive);
   tourButton.textContent = isDrive ? "Орбита (F)" : (hasCar ? "Заезд (F)" : "Прогон (F)");
 
+  const isDriveAndCar = isDrive && hasCar;
   if (hud) {
-    hud.hidden = !(isDrive && hasCar && hudVisible);
+    hud.hidden = !(isDriveAndCar && hudVisible);
+  }
+  const isRacingActive = isDriveAndCar && viewer && viewer.get_race_phase && viewer.get_race_phase() > 0;
+  if (raceHudTop) {
+    raceHudTop.hidden = !(isRacingActive && hudVisible);
+  }
+  if (!isDriveAndCar) {
+    if (countdownBanner) countdownBanner.hidden = true;
+    if (wrongWayBanner) wrongWayBanner.hidden = true;
+    if (raceResultsModal) raceResultsModal.hidden = true;
   }
 }
 
@@ -610,7 +657,14 @@ canvas.addEventListener("contextmenu", (event) => {
 
 resetButton.addEventListener("click", () => {
   if (viewer) {
-    viewer.reset_camera();
+    if (viewer.is_drive_mode() && viewer.has_car()) {
+      viewer.restart_race();
+      if (raceResultsModal) raceResultsModal.hidden = true;
+      setStatus("Гонка перезапущена / старт на решётке.");
+    } else {
+      viewer.reset_camera();
+      setStatus("Камера сброшена.");
+    }
     velForward = 0;
     velRight = 0;
     velZoom = 0;
@@ -699,8 +753,9 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "KeyR" && !event.repeat) {
     if (viewer) {
       if (viewer.is_drive_mode() && viewer.has_car()) {
-        viewer.reset_car();
-        setStatus("Авто возвращено на трассу.");
+        viewer.restart_race();
+        if (raceResultsModal) raceResultsModal.hidden = true;
+        setStatus("Гонка перезапущена / старт на решётке.");
       } else {
         viewer.reset_camera();
         setStatus("Камера сброшена.");
@@ -708,6 +763,7 @@ window.addEventListener("keydown", (event) => {
       velForward = 0;
       velRight = 0;
       velZoom = 0;
+      syncTourButton();
       queueFrame();
     }
     return;
@@ -843,7 +899,69 @@ function updateNavigation(dt) {
       }
     }
 
-    if (Math.abs(speed) > 0.1 || throttle !== 0 || steer !== 0 || handbrake) {
+    // Update Race HUD
+    const phase = viewer.get_race_phase ? viewer.get_race_phase() : 0;
+    const isRacingActive = phase > 0;
+
+    if (raceHudTop) {
+      raceHudTop.hidden = !(hudVisible && isRacingActive);
+      if (isRacingActive) {
+        if (racePos) racePos.textContent = String(viewer.get_player_position());
+        if (raceTotalPos) raceTotalPos.textContent = `/${viewer.get_total_participants()}`;
+        if (raceLap) raceLap.textContent = String(viewer.get_current_lap());
+        if (raceTotalLaps) raceTotalLaps.textContent = `/${viewer.get_total_laps()}`;
+        if (raceLapTime) raceLapTime.textContent = formatRaceTime(viewer.get_current_lap_time());
+        if (raceBestLap) {
+          const best = viewer.get_best_lap_time();
+          raceBestLap.textContent = `ЛУЧШИЙ ${formatRaceTime(best)}`;
+        }
+      }
+    }
+
+    // Countdown Banner
+    if (countdownBanner) {
+      if (phase === 1) {
+        countdownBanner.hidden = false;
+        const remaining = viewer.get_countdown_remaining();
+        if (countdownText) {
+          countdownText.classList.remove("go");
+          if (remaining > 2.0) countdownText.textContent = "3";
+          else if (remaining > 1.0) countdownText.textContent = "2";
+          else countdownText.textContent = "1";
+        }
+      } else if (phase === 2 && lastPhase === 1) {
+        countdownBanner.hidden = false;
+        if (countdownText) {
+          countdownText.classList.add("go");
+          countdownText.textContent = "СТАРТ!";
+        }
+        setTimeout(() => {
+          if (countdownBanner) countdownBanner.hidden = true;
+        }, 1200);
+      } else if (phase !== 1 && (lastPhase !== 1 || phase > 2)) {
+        countdownBanner.hidden = true;
+      }
+    }
+    lastPhase = phase;
+
+    // Wrong Way Alert
+    if (wrongWayBanner) {
+      wrongWayBanner.hidden = !(phase === 2 && viewer.is_wrong_way());
+    }
+
+    // Race Finished / Results Modal
+    if (raceResultsModal) {
+      if ((phase === 4 || phase === 5) && raceResultsModal.hidden) {
+        raceResultsModal.hidden = false;
+        const pos = viewer.get_player_position();
+        const total = viewer.get_total_participants();
+        if (resultsSubtitle) resultsSubtitle.textContent = `Позиция: P${pos} из ${total}`;
+        if (resultsLapTime) resultsLapTime.textContent = formatRaceTime(viewer.get_current_lap_time());
+        if (resultsBestTime) resultsBestTime.textContent = formatRaceTime(viewer.get_best_lap_time());
+      }
+    }
+
+    if (isRacingActive || Math.abs(speed) > 0.1 || throttle !== 0 || steer !== 0 || handbrake) {
       queueFrame();
     }
     return;

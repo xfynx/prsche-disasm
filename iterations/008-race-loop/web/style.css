@@ -39,4 +39,37 @@ input[type="checkbox"] { accent-color: #c6ad72; }
 .hud-rpm-wrapper { width: 100%; height: 3px; margin-top: 12px; background: #56574c; }
 .hud-rpm-fill { height: 100%; width: 15%; background: #d3bd83; }
 .hud-hint { display: none; }
-@media (max-width: 760px) { .toolbar { padding: 16px; } .hud { bottom: 16px; right: 16px; } }
+
+/* Race Loop Top HUD */
+.race-hud-top { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; gap: 16px; background: rgba(22, 24, 21, 0.92); border-top: 2px solid #c6ad72; padding: 7px 18px; pointer-events: none; user-select: none; z-index: 15; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
+.race-badge { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 60px; }
+.badge-label { font-size: 8px; letter-spacing: 0.12em; color: #a9a69a; text-transform: uppercase; margin-bottom: 2px; }
+.badge-val { font: 20px/1.1 Consolas, monospace; color: #eee9de; }
+.badge-val b { color: #d3bd83; font-weight: bold; }
+.badge-val small { font-size: 13px; color: #8e8b80; }
+.badge-sub { font-size: 9px; color: #9c998f; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.timer-val { font-variant-numeric: tabular-nums; }
+
+/* Big Countdown Cue Banner */
+.countdown-banner { position: absolute; top: 36%; left: 50%; transform: translate(-50%, -50%); z-index: 30; pointer-events: none; user-select: none; }
+.countdown-text { font: 96px/1 "Impact", "Segoe UI Black", Arial Black, sans-serif; color: #f59e0b; text-shadow: 0 0 35px rgba(245, 158, 11, 0.8), 0 4px 14px #000; animation: pulse-cue 0.8s infinite alternate; }
+.countdown-text.go { color: #22c55e; text-shadow: 0 0 40px rgba(34, 197, 94, 0.9), 0 4px 14px #000; }
+@keyframes pulse-cue { from { transform: scale(0.92); opacity: 0.85; } to { transform: scale(1.08); opacity: 1.0; } }
+
+/* Wrong Way Alert */
+.wrong-way-banner { position: absolute; top: 16%; left: 50%; transform: translateX(-50%); z-index: 30; background: rgba(220, 38, 38, 0.9); color: #fff; font: bold 18px/1 "Segoe UI", Arial, sans-serif; padding: 10px 24px; border: 2px solid #f87171; border-radius: 3px; box-shadow: 0 0 30px rgba(239, 68, 68, 0.8); pointer-events: none; user-select: none; animation: flash-red 0.4s infinite alternate; }
+@keyframes flash-red { from { opacity: 0.4; } to { opacity: 1.0; } }
+
+/* Race Results Modal */
+.race-results-modal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(10, 12, 10, 0.85); z-index: 40; backdrop-filter: blur(4px); }
+.results-card { background: #1a1c18; border: 1px solid #555348; border-top: 4px solid #c6ad72; padding: 32px 40px; text-align: center; max-width: 420px; width: 90%; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8); }
+.results-title { margin: 0 0 8px; font-size: 24px; letter-spacing: 0.12em; color: #d3bd83; }
+.results-subtitle { font-size: 18px; color: #eee9de; margin-bottom: 24px; }
+.results-stats { display: flex; justify-content: space-around; margin-bottom: 28px; padding: 14px 0; border-top: 1px solid #333; border-bottom: 1px solid #333; }
+.stat-item { display: flex; flex-direction: column; gap: 4px; }
+.stat-label { font-size: 10px; color: #999; letter-spacing: 0.05em; text-transform: uppercase; }
+.stat-val { font: 20px Consolas, monospace; color: #f59e0b; font-variant-numeric: tabular-nums; }
+.btn-primary { background: #c6ad72; color: #151612; font-weight: bold; padding: 10px 24px; border: none; cursor: pointer; border-radius: 2px; font-size: 14px; }
+.btn-primary:hover { background: #dfcfaa; }
+
+@media (max-width: 760px) { .toolbar { padding: 16px; } .hud { bottom: 16px; right: 16px; } .race-hud-top { top: 10px; gap: 10px; padding: 6px 12px; } .badge-val { font-size: 16px; } }

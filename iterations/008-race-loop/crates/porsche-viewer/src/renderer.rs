@@ -312,6 +312,12 @@ pub struct Renderer {
     pub sim_car: Option<nfs_assets::physics::VehicleSimulation>,
     pub sim_telemetry: Option<nfs_assets::physics::VehicleTelemetry>,
     pub sim_mode: bool,
+    pub race_session: Option<nfs_assets::RaceSession>,
+    pub track_course: Option<nfs_assets::TrackCourse>,
+    pub course_tracker: Option<nfs_assets::CourseProgressTracker>,
+    pub ai_opponents: Vec<nfs_assets::AiOpponent>,
+    pub barrier_config: nfs_assets::BarrierCollisionConfig,
+    pub is_wrong_way: bool,
     car_render: Option<CarRenderState>,
 }
 
@@ -327,7 +333,7 @@ impl Renderer {
         if scene.meshes.is_empty() || scene.materials.is_empty() {
             return Err("Scene has no geometry or materials".into());
         }
-        let camera = Camera::new(scene.bounds);
+        let mut camera = Camera::new(scene.bounds);
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("camera"),
             contents: bytemuck::bytes_of(&camera.uniform(width, height)),
@@ -744,6 +750,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 }
             }
 
+            if let Some(course) = &scene.course {
+                let (grid_pos, _, grid_yaw) = nfs_assets::calculate_grid_slot(0, course);
+                spawn_pos = Vec3::from(grid_pos);
+                spawn_yaw = grid_yaw;
+            }
+
             let mut arcade_car = crate::arcade::ArcadeCar::new(spawn_pos, spawn_yaw);
             arcade_car.reset_to_road(&road_edges);
             if let Some(hit) = scene.road_surface.as_ref().and_then(|surface| {
@@ -892,6 +904,54 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
 
         let depth = depth_view(&device, width, height);
+
+        let track_course = scene.course.clone();
+        let mut race_session = None;
+        let mut course_tracker = None;
+        let mut ai_opponents = Vec::new();
+
+        if let Some(course) = &track_course {
+            let total_laps = if course.is_circuit { 3 } else { 1 };
+            let mut session =
+                nfs_assets::RaceSession::new("track0", total_laps, !course.is_circuit);
+            session.add_participant(0, "Player", true, "Porsche 911 Carrera");
+
+            let (p0_pos, _, p0_yaw) = nfs_assets::calculate_grid_slot(0, course);
+            course_tracker = Some(nfs_assets::CourseProgressTracker::new(p0_pos));
+
+            if let Some(car) = &mut car {
+                car.pos = glam::Vec3::from(p0_pos);
+                car.yaw = p0_yaw;
+            }
+            if let Some(sim) = &mut sim_car {
+                sim.reset(glam::Vec3::from(p0_pos), p0_yaw);
+            }
+            if let (CameraMode::Drive, Some(car)) = (camera.mode, &car) {
+                camera.drive_pos = car.camera_eye;
+                camera.drive_target = car.camera_target;
+            }
+
+            let ai_profiles = [
+                nfs_assets::AiProfile::pro(),
+                nfs_assets::AiProfile::veteran(),
+                nfs_assets::AiProfile::novice(),
+            ];
+            for (i, profile) in ai_profiles.into_iter().enumerate() {
+                let slot = i + 1;
+                let ai = nfs_assets::AiOpponent::new(
+                    slot,
+                    profile.name.clone(),
+                    "Porsche 911 Carrera",
+                    profile,
+                    slot,
+                    course,
+                );
+                session.add_participant(slot, ai.name.clone(), false, "Porsche 911 Carrera");
+                ai_opponents.push(ai);
+            }
+            race_session = Some(session);
+        }
+
         Ok(Self {
             device,
             queue,
@@ -916,6 +976,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             sim_car,
             sim_telemetry: None,
             sim_mode: true,
+            race_session,
+            track_course,
+            course_tracker,
+            ai_opponents,
+            barrier_config: nfs_assets::BarrierCollisionConfig::default(),
+            is_wrong_way: false,
             car_render,
         })
     }
@@ -1184,6 +1250,61 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             }
             self.queue.submit([encoder.finish()]);
 
+            // Draw AI opponent vehicles on track
+            for ai in &self.ai_opponents {
+                let model_matrix =
+                    Mat4::from_translation(Vec3::from(ai.position)) * Mat4::from_rotation_y(ai.yaw);
+                let mut uniform = self.camera.uniform(self.width, self.height);
+                uniform.model = model_matrix.to_cols_array_2d();
+                self.queue
+                    .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&uniform));
+
+                let mut encoder = self.device.create_command_encoder(&Default::default());
+                {
+                    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("ai car"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: target,
+                            depth_slice: None,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: &self.depth,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            }),
+                            stencil_ops: None,
+                        }),
+                        ..Default::default()
+                    });
+                    pass.set_bind_group(0, &self.camera_group, &[]);
+                    for mesh in &car_render.meshes {
+                        if mesh.material >= car_render.materials.len() {
+                            continue;
+                        }
+                        let material = &car_render.materials[mesh.material];
+                        let pipeline_key = (
+                            material.alpha_mode == AlphaMode::Blend,
+                            material.double_sided,
+                            material.depth_bias,
+                        );
+                        if let Some(pipeline) = self.pipelines.get(&pipeline_key) {
+                            pass.set_pipeline(pipeline);
+                            pass.set_bind_group(1, &material.group, &[]);
+                            pass.set_vertex_buffer(0, mesh.vertex.slice(..));
+                            pass.set_index_buffer(mesh.index.slice(..), wgpu::IndexFormat::Uint32);
+                            pass.draw_indexed(0..mesh.count, 0, 0..1);
+                        }
+                    }
+                }
+                self.queue.submit([encoder.finish()]);
+            }
+
             // Restore identity model for remaining passes
             self.queue.write_buffer(
                 &self.camera_buffer,
@@ -1310,8 +1431,19 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         self.camera.mode == CameraMode::Drive
     }
 
-    pub fn update_car(&mut self, dt: f32, throttle: f32, steer: f32, handbrake: bool) {
+    pub fn update_car(&mut self, dt: f32, mut throttle: f32, steer: f32, handbrake: bool) {
         let edges = &self.road_edges;
+
+        // Check race session state and restrict inputs during countdown
+        if let Some(session) = &mut self.race_session {
+            if !session.phase.allows_driving_input() {
+                throttle = 0.0;
+            }
+            session.step(dt);
+        }
+
+        let mut player_pos = [0.0; 3];
+        let mut player_fwd = [0.0, 0.0, -1.0];
 
         if let (true, Some(sim)) = (self.sim_mode, &mut self.sim_car) {
             let controls = nfs_assets::physics::VehicleControls {
@@ -1323,6 +1455,23 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 auto_gear: true,
             };
             let tel = sim.step(self.road_surface.as_ref(), &controls, dt);
+
+            // Barrier collision resolution for 6 DOF simulation
+            let mut pos = sim.body.position.to_array();
+            let mut vel = sim.body.linear_velocity.to_array();
+            if nfs_assets::BarrierCollider::resolve_collision(
+                &mut pos,
+                &mut vel,
+                edges,
+                &self.barrier_config,
+            ) {
+                sim.body.position = Vec3::from(pos);
+                sim.body.linear_velocity = Vec3::from(vel);
+            }
+
+            player_pos = sim.body.position.to_array();
+            player_fwd = sim.body.forward().to_array();
+
             if self.camera.mode == CameraMode::Drive {
                 let forward = sim.body.forward();
                 let eye = sim.body.position + Vec3::new(0.0, 2.0, 0.0) - forward * 5.8;
@@ -1332,10 +1481,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 self.camera.drive_fov = 58.0 + (tel.speed_mps / 50.0).clamp(0.0, 1.0) * 10.0;
             }
             self.sim_telemetry = Some(tel);
-            return;
-        }
-
-        if let Some(car) = &mut self.car {
+        } else if let Some(car) = &mut self.car {
             let reference_y = car.pos.y;
             let surface = self.road_surface.as_ref();
             car.update(dt, throttle, steer, handbrake, edges, |x, z| {
@@ -1348,6 +1494,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                     None => sample_road_elevation_from_edges(edges, x, z),
                 }
             });
+            player_pos = car.pos.to_array();
+            player_fwd = car.forward().to_array();
+
             if self.camera.mode == CameraMode::Drive {
                 self.camera.drive_pos = car.camera_eye;
                 self.camera.drive_target = car.camera_target;
@@ -1362,9 +1511,79 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 };
             }
         }
+
+        // Progress tracking along course
+        if let (Some(course), Some(tracker), Some(session)) = (
+            &self.track_course,
+            &mut self.course_tracker,
+            &mut self.race_session,
+        ) {
+            let lap_res = tracker.update(player_pos, player_fwd, course, dt);
+            self.is_wrong_way = tracker.is_wrong_way;
+
+            if let Some(true) = lap_res {
+                session.on_player_lap_completed();
+            }
+
+            let dist = course.distance_along_course(player_pos);
+            if let Some(p) = session.participants.iter_mut().find(|p| p.is_player) {
+                p.distance_along_track = dist;
+            }
+
+            // Update AI opponents
+            if session.phase.is_racing() {
+                let surface = self.road_surface.as_ref();
+                for ai in &mut self.ai_opponents {
+                    ai.step_kinematics(dt, course, |x, z| {
+                        surface
+                            .and_then(|s| s.query(x, z, 0.0, 500.0, 500.0))
+                            .map(|h| h.height)
+                            .unwrap_or(0.0)
+                    });
+                    if let Some(p) = session.participants.iter_mut().find(|p| p.id == ai.id) {
+                        p.distance_along_track = ai.distance_along_course;
+                        p.laps_completed = ai.laps_completed;
+                    }
+                }
+            }
+
+            session.update_standings();
+        }
     }
 
     pub fn reset_car(&mut self) {
+        if let Some(course) = &self.track_course {
+            let (pos, _, yaw) = nfs_assets::calculate_grid_slot(0, course);
+            if let Some(car) = &mut self.car {
+                car.pos = Vec3::from(pos);
+                car.yaw = yaw;
+                car.speed = 0.0;
+            }
+            if let Some(sim) = &mut self.sim_car {
+                sim.reset(Vec3::from(pos), yaw);
+            }
+            self.course_tracker = Some(nfs_assets::CourseProgressTracker::new(pos));
+            if let Some(session) = &mut self.race_session {
+                session.restart(3.0);
+            }
+            for (i, ai) in self.ai_opponents.iter_mut().enumerate() {
+                let slot = i + 1;
+                let (ai_pos, ai_fwd, ai_yaw) = nfs_assets::calculate_grid_slot(slot, course);
+                ai.position = ai_pos;
+                ai.forward = ai_fwd;
+                ai.yaw = ai_yaw;
+                ai.current_speed = 0.0;
+                ai.tracker = nfs_assets::CourseProgressTracker::new(ai_pos);
+                ai.distance_along_course = 0.0;
+                ai.laps_completed = 0;
+            }
+            if let (CameraMode::Drive, Some(car)) = (self.camera.mode, &self.car) {
+                self.camera.drive_pos = car.camera_eye;
+                self.camera.drive_target = car.camera_target;
+            }
+            return;
+        }
+
         if let Some(car) = &mut self.car {
             car.reset_to_road(&self.road_edges);
             if let Some(hit) = self
@@ -1382,6 +1601,74 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 self.camera.drive_target = car.camera_target;
             }
         }
+    }
+
+    pub fn get_race_phase(&self) -> u32 {
+        match self.race_session.as_ref().map(|s| &s.phase) {
+            None | Some(nfs_assets::RacePhase::Loading) => 0,
+            Some(nfs_assets::RacePhase::Countdown { .. }) => 1,
+            Some(nfs_assets::RacePhase::Racing { .. }) => 2,
+            Some(nfs_assets::RacePhase::Paused { .. }) => 3,
+            Some(nfs_assets::RacePhase::Finished { .. }) => 4,
+            Some(nfs_assets::RacePhase::Results) => 5,
+        }
+    }
+
+    pub fn get_countdown_remaining(&self) -> f32 {
+        match self.race_session.as_ref().map(|s| &s.phase) {
+            Some(nfs_assets::RacePhase::Countdown { remaining_secs, .. }) => *remaining_secs,
+            _ => 0.0,
+        }
+    }
+
+    pub fn get_player_position(&self) -> usize {
+        self.race_session
+            .as_ref()
+            .map(|s| s.player_position())
+            .unwrap_or(1)
+    }
+
+    pub fn get_total_participants(&self) -> usize {
+        self.race_session
+            .as_ref()
+            .map(|s| s.participants.len())
+            .unwrap_or(1)
+    }
+
+    pub fn get_current_lap(&self) -> u32 {
+        self.race_session
+            .as_ref()
+            .map(|s| s.lap_tracker.current_lap)
+            .unwrap_or(1)
+    }
+
+    pub fn get_total_laps(&self) -> u32 {
+        self.race_session
+            .as_ref()
+            .map(|s| s.lap_tracker.total_laps)
+            .unwrap_or(1)
+    }
+
+    pub fn get_current_lap_time(&self) -> f32 {
+        self.race_session
+            .as_ref()
+            .map(|s| s.lap_tracker.current_lap_time)
+            .unwrap_or(0.0)
+    }
+
+    pub fn get_best_lap_time(&self) -> f32 {
+        self.race_session
+            .as_ref()
+            .and_then(|s| s.lap_tracker.best_lap_time)
+            .unwrap_or(0.0)
+    }
+
+    pub fn is_wrong_way(&self) -> bool {
+        self.is_wrong_way
+    }
+
+    pub fn restart_race(&mut self) {
+        self.reset_car();
     }
 
     pub fn cycle_car_view(&mut self) -> crate::arcade::DriveViewMode {

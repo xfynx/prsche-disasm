@@ -244,6 +244,75 @@ impl BrowserViewer {
             .unwrap_or(false)
     }
 
+    pub fn get_race_phase(&self) -> u32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_race_phase())
+            .unwrap_or(0)
+    }
+
+    pub fn get_countdown_remaining(&self) -> f32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_countdown_remaining())
+            .unwrap_or(0.0)
+    }
+
+    pub fn get_player_position(&self) -> usize {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_player_position())
+            .unwrap_or(1)
+    }
+
+    pub fn get_total_participants(&self) -> usize {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_total_participants())
+            .unwrap_or(1)
+    }
+
+    pub fn get_current_lap(&self) -> u32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_current_lap())
+            .unwrap_or(1)
+    }
+
+    pub fn get_total_laps(&self) -> u32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_total_laps())
+            .unwrap_or(1)
+    }
+
+    pub fn get_current_lap_time(&self) -> f32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_current_lap_time())
+            .unwrap_or(0.0)
+    }
+
+    pub fn get_best_lap_time(&self) -> f32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_best_lap_time())
+            .unwrap_or(0.0)
+    }
+
+    pub fn is_wrong_way(&self) -> bool {
+        self.renderer
+            .as_ref()
+            .map(|r| r.is_wrong_way())
+            .unwrap_or(false)
+    }
+
+    pub fn restart_race(&mut self) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.restart_race();
+        }
+    }
+
     pub fn render(&mut self) -> Result<(), JsValue> {
         let Some(renderer) = &mut self.renderer else {
             return Ok(());

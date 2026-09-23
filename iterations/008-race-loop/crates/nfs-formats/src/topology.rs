@@ -207,6 +207,47 @@ pub fn parse_map(input: &[u8]) -> Result<TrackMap> {
     Ok(TrackMap { header, sections })
 }
 
+/// A 2D waypoint point from an EA `.lsp` line spline path file.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SplinePoint {
+    pub x: f32,
+    pub z: f32,
+}
+
+/// A parsed `.lsp` line spline path containing a sequence of waypoints along the track.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineSplinePath {
+    pub version: u32,
+    pub points: Vec<SplinePoint>,
+}
+
+/// Parse a `.lsp` line spline path file (4-byte version header + 8-byte (x, z) waypoint records).
+pub fn parse_lsp(input: &[u8]) -> Result<LineSplinePath> {
+    if input.len() < 4 {
+        return Err(format!(
+            "invalid .lsp size {}: minimum size is 4 bytes",
+            input.len()
+        ));
+    }
+    let data_len = input.len() - 4;
+    if !data_len.is_multiple_of(8) {
+        return Err(format!(
+            "invalid .lsp payload size {}: must be a multiple of 8 bytes",
+            data_len
+        ));
+    }
+    let version = u32le(input, 0)?;
+    let count = data_len / 8;
+    let mut points = Vec::with_capacity(count);
+    for i in 0..count {
+        let off = 4 + i * 8;
+        let x = f32le(input, off)?;
+        let z = f32le(input, off + 4)?;
+        points.push(SplinePoint { x, z });
+    }
+    Ok(LineSplinePath { version, points })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -326,5 +367,46 @@ mod tests {
                 assert!(!map.sections.is_empty(), "Track {t} .map has no sections");
             }
         }
+
+        // Validate all available .lsp files in racer/work
+        let lsp_dir = root.join("racer").join("work");
+        if lsp_dir.exists() {
+            let mut validated_count = 0;
+            for entry in std::fs::read_dir(&lsp_dir).unwrap().flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("lsp") {
+                    let data = std::fs::read(&path).unwrap();
+                    let lsp = parse_lsp(&data).unwrap();
+                    assert_eq!(lsp.version, 1);
+                    assert!(!lsp.points.is_empty());
+                    validated_count += 1;
+                }
+            }
+            assert!(
+                validated_count >= 30,
+                "Expected at least 30 .lsp files, got {validated_count}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_lsp_synthetic() {
+        assert!(parse_lsp(&[0; 3]).is_err());
+        assert!(parse_lsp(&[0; 11]).is_err());
+
+        let mut data = vec![0u8; 20];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // version = 1
+        data[4..8].copy_from_slice(&100.5f32.to_le_bytes()); // pt0.x
+        data[8..12].copy_from_slice(&(-50.25f32).to_le_bytes()); // pt0.z
+        data[12..16].copy_from_slice(&200.0f32.to_le_bytes()); // pt1.x
+        data[16..20].copy_from_slice(&(-75.0f32).to_le_bytes()); // pt1.z
+
+        let lsp = parse_lsp(&data).unwrap();
+        assert_eq!(lsp.version, 1);
+        assert_eq!(lsp.points.len(), 2);
+        assert_eq!(lsp.points[0].x, 100.5);
+        assert_eq!(lsp.points[0].z, -50.25);
+        assert_eq!(lsp.points[1].x, 200.0);
+        assert_eq!(lsp.points[1].z, -75.0);
     }
 }

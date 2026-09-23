@@ -2,8 +2,14 @@
 use std::collections::BTreeMap;
 
 pub mod physics;
+pub mod race;
 pub mod surface;
 pub use physics::{VehicleControls, VehicleSimulation, VehicleTelemetry};
+pub use race::{
+    calculate_grid_slot, AiOpponent, AiProfile, BarrierCollider, BarrierCollisionConfig,
+    BarrierHit, CheckpointGate, CountdownCue, CourseProgressTracker, CourseWaypoint, LapTracker,
+    RaceParticipant, RacePhase, RaceSession, TrackCourse,
+};
 pub use surface::{RoadSurface, RoadSurfaceReport, RoadTriangle, RoadTriangleIdentity, SurfaceHit};
 
 #[derive(Debug, Clone)]
@@ -103,6 +109,8 @@ pub struct TrackTopology {
     pub junctions: Vec<nfs_formats::JunctionRecord>,
     /// Track map metadata (from `.map`, if present).
     pub map: Option<nfs_formats::TrackMap>,
+    /// Line spline path waypoints (from `.lsp`, if present).
+    pub spline: Option<nfs_formats::LineSplinePath>,
 }
 
 #[derive(Debug, Clone)]
@@ -124,6 +132,8 @@ pub struct Scene {
     ///
     /// This is a geometric road-surface hypothesis, not a proven original collision contract.
     pub road_surface: Option<RoadSurface>,
+    /// Track course (checkpoints, waypoints, racing line), if available.
+    pub course: Option<TrackCourse>,
 }
 
 impl Default for Scene {
@@ -139,6 +149,7 @@ impl Default for Scene {
             sky_texture: None,
             topology: None,
             road_surface: None,
+            course: None,
         }
     }
 }

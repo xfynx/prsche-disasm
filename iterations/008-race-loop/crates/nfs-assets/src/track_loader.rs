@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use nfs_formats::{
-    bytes, f32le, parse_edg, parse_fsh, parse_jnc, parse_map, parse_scn, parse_track_crp, u16le,
-    u32le, Entry,
+    bytes, f32le, parse_edg, parse_fsh, parse_jnc, parse_lsp, parse_map, parse_scn,
+    parse_track_crp, u16le, u32le, Entry,
 };
 
 use super::*;
@@ -158,6 +158,7 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         sky_texture: None,
         topology: None,
         road_surface: None,
+        course: None,
     };
 
     let mut tex_map = BTreeMap::new();
@@ -557,16 +558,21 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         }
     }
 
-    // --- Track topology loading (.edg, .jnc, .map) ---
+    // --- Track topology loading (.edg, .jnc, .map, .lsp) ---
     let edg_key = format!("{track}.edg");
     let jnc_key = format!("{track}.jnc");
     let map_key = format!("{track}.map");
+    let lsp0_key = format!("{track}0.lsp");
+    let lsp_key = format!("{track}.lsp");
 
     let edg_data = find(files, &edg_key).ok();
     let jnc_data = find(files, &jnc_key).ok();
     let map_data = find(files, &map_key).ok();
+    let lsp_data = find(files, &lsp0_key)
+        .or_else(|_| find(files, &lsp_key))
+        .ok();
 
-    if edg_data.is_some() || jnc_data.is_some() || map_data.is_some() {
+    if edg_data.is_some() || jnc_data.is_some() || map_data.is_some() || lsp_data.is_some() {
         let mut topology = TrackTopology::default();
 
         if let Some(data) = edg_data {
@@ -624,6 +630,47 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                     scene
                         .diagnostics
                         .push(format!("MAP {map_key}: parse error: {e}"));
+                }
+            }
+        }
+
+        if let Some(data) = lsp_data {
+            match parse_lsp(data) {
+                Ok(lsp) => {
+                    let pts_count = lsp.points.len();
+                    if pts_count >= 3 {
+                        let p_first = &lsp.points[0];
+                        let p_last = &lsp.points[pts_count - 1];
+                        let gap = ((p_first.x - p_last.x).powi(2) + (p_first.z - p_last.z).powi(2))
+                            .sqrt();
+                        let is_circuit = gap < 60.0;
+                        if let Ok(course) =
+                            TrackCourse::from_spline_points(&lsp.points, is_circuit, |x, z| {
+                                scene
+                                    .road_surface
+                                    .as_ref()
+                                    .and_then(|s| s.query(x, z, 0.0, 500.0, 500.0))
+                                    .map(|h| h.height)
+                                    .unwrap_or(0.0)
+                            })
+                        {
+                            scene.diagnostics.push(format!(
+                                "Course: {} waypoints, {} checkpoints, len {:.1}m ({})",
+                                course.waypoints.len(),
+                                course.checkpoints.len(),
+                                course.total_length,
+                                if is_circuit { "Circuit" } else { "Sprint" }
+                            ));
+                            scene.course = Some(course);
+                        }
+                    }
+                    topology.spline = Some(lsp);
+                    scene
+                        .diagnostics
+                        .push(format!("LSP: {pts_count} waypoints"));
+                }
+                Err(e) => {
+                    scene.diagnostics.push(format!("LSP parse error: {e}"));
                 }
             }
         }
@@ -945,6 +992,7 @@ mod tests {
         let edg_path = root.join("skidpad.edg");
         let jnc_path = root.join("skidpad.jnc");
         let map_path = root.join("skidpad.map");
+        let lsp_path = root.join("racer/work/skidpad0.lsp");
 
         if !crp_path.exists() || !fsh_path.exists() || !edg_path.exists() {
             return;
@@ -956,6 +1004,9 @@ mod tests {
         files.insert("skidpad.edg".into(), std::fs::read(&edg_path).unwrap());
         files.insert("skidpad.jnc".into(), std::fs::read(&jnc_path).unwrap());
         files.insert("skidpad.map".into(), std::fs::read(&map_path).unwrap());
+        if lsp_path.exists() {
+            files.insert("skidpad0.lsp".into(), std::fs::read(&lsp_path).unwrap());
+        }
 
         let scene = load(&files, "skidpad").unwrap();
         assert!(scene.topology.is_some());
@@ -964,5 +1015,13 @@ mod tests {
         assert!(!top.boundary_lines.is_empty());
         assert_eq!(top.junctions.len(), 1);
         assert!(top.map.is_some());
+        if lsp_path.exists() {
+            assert!(top.spline.is_some());
+            assert!(scene.course.is_some());
+            let course = scene.course.as_ref().unwrap();
+            assert_eq!(course.waypoints.len(), 234);
+            assert!(course.is_circuit);
+            assert!(!course.checkpoints.is_empty());
+        }
     }
 }
