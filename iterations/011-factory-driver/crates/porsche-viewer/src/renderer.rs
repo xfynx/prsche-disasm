@@ -763,12 +763,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                     arcade_car.pos.x,
                     arcade_car.pos.z,
                     arcade_car.pos.y,
-                    2.0,
-                    4.0,
+                    25.0,
+                    50.0,
                 )
             }) {
                 arcade_car.pos.y = hit.height;
             }
+            arcade_car.set_pose(arcade_car.pos, spawn_yaw);
+            camera.drive_pos = arcade_car.camera_eye;
+            camera.drive_target = arcade_car.camera_target;
             car = Some(arcade_car);
 
             // Realistic 6 DOF Vehicle Simulation specification
@@ -917,19 +920,24 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             session.add_participant(0, "Player", true, "Porsche 911 Carrera");
 
             let (p0_pos, _, p0_yaw) = nfs_assets::calculate_grid_slot(0, course);
-            course_tracker = Some(nfs_assets::CourseProgressTracker::new(p0_pos));
+            let mut car_pos = glam::Vec3::from(p0_pos);
+            if let Some(hit) = scene
+                .road_surface
+                .as_ref()
+                .and_then(|s| s.query(car_pos.x, car_pos.z, car_pos.y, 25.0, 50.0))
+            {
+                car_pos.y = hit.height;
+            }
 
             if let Some(car) = &mut car {
-                car.pos = glam::Vec3::from(p0_pos);
-                car.yaw = p0_yaw;
-            }
-            if let Some(sim) = &mut sim_car {
-                sim.reset(glam::Vec3::from(p0_pos), p0_yaw);
-            }
-            if let (CameraMode::Drive, Some(car)) = (camera.mode, &car) {
+                car.set_pose(car_pos, p0_yaw);
                 camera.drive_pos = car.camera_eye;
                 camera.drive_target = car.camera_target;
             }
+            if let Some(sim) = &mut sim_car {
+                sim.reset(car_pos, p0_yaw);
+            }
+            course_tracker = Some(nfs_assets::CourseProgressTracker::new(car_pos.to_array()));
 
             let ai_profiles = [
                 nfs_assets::AiProfile::pro(),
@@ -1239,7 +1247,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                         material.double_sided,
                         material.depth_bias,
                     );
-                    if let Some(pipeline) = self.pipelines.get(&pipeline_key) {
+                    let pipeline = self
+                        .pipelines
+                        .get(&pipeline_key)
+                        .or_else(|| self.pipelines.get(&(pipeline_key.0, false, 0)))
+                        .or_else(|| self.pipelines.get(&(false, false, 0)));
+                    if let Some(pipeline) = pipeline {
                         pass.set_pipeline(pipeline);
                         pass.set_bind_group(1, &material.group, &[]);
                         pass.set_vertex_buffer(0, mesh.vertex.slice(..));
@@ -1387,6 +1400,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                     if car.pos.length_squared() < 0.01 {
                         car.reset_to_road(&self.road_edges);
                     }
+                    let fwd = car.forward();
+                    car.camera_eye = car.pos + Vec3::new(0.0, 2.0, 0.0) - fwd * 5.8;
+                    car.camera_target = car.pos + Vec3::new(0.0, 0.9, 0.0) + fwd * 1.5;
                     self.camera.drive_pos = car.camera_eye;
                     self.camera.drive_target = car.camera_target;
                     self.camera.drive_fov = 58.0;
@@ -1554,32 +1570,44 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     pub fn reset_car(&mut self) {
         if let Some(course) = &self.track_course {
             let (pos, _, yaw) = nfs_assets::calculate_grid_slot(0, course);
+            let mut car_pos = Vec3::from(pos);
+            if let Some(hit) = self
+                .road_surface
+                .as_ref()
+                .and_then(|surface| surface.query(car_pos.x, car_pos.z, car_pos.y, 25.0, 50.0))
+            {
+                car_pos.y = hit.height;
+            }
             if let Some(car) = &mut self.car {
-                car.pos = Vec3::from(pos);
-                car.yaw = yaw;
-                car.speed = 0.0;
+                car.set_pose(car_pos, yaw);
+                self.camera.drive_pos = car.camera_eye;
+                self.camera.drive_target = car.camera_target;
             }
             if let Some(sim) = &mut self.sim_car {
-                sim.reset(Vec3::from(pos), yaw);
+                sim.reset(car_pos, yaw);
             }
-            self.course_tracker = Some(nfs_assets::CourseProgressTracker::new(pos));
+            self.course_tracker = Some(nfs_assets::CourseProgressTracker::new(car_pos.to_array()));
             if let Some(session) = &mut self.race_session {
                 session.restart(3.0);
             }
             for (i, ai) in self.ai_opponents.iter_mut().enumerate() {
                 let slot = i + 1;
                 let (ai_pos, ai_fwd, ai_yaw) = nfs_assets::calculate_grid_slot(slot, course);
-                ai.position = ai_pos;
+                let mut p = ai_pos;
+                if let Some(hit) = self
+                    .road_surface
+                    .as_ref()
+                    .and_then(|surface| surface.query(p[0], p[2], p[1], 25.0, 50.0))
+                {
+                    p[1] = hit.height;
+                }
+                ai.position = p;
                 ai.forward = ai_fwd;
                 ai.yaw = ai_yaw;
                 ai.current_speed = 0.0;
-                ai.tracker = nfs_assets::CourseProgressTracker::new(ai_pos);
+                ai.tracker = nfs_assets::CourseProgressTracker::new(p);
                 ai.distance_along_course = 0.0;
                 ai.laps_completed = 0;
-            }
-            if let (CameraMode::Drive, Some(car)) = (self.camera.mode, &self.car) {
-                self.camera.drive_pos = car.camera_eye;
-                self.camera.drive_target = car.camera_target;
             }
             return;
         }
@@ -1741,6 +1769,282 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     pub fn has_car(&self) -> bool {
         self.car.is_some()
+    }
+
+    /// Load genuine Porsche car model geometry, textures, and simulation profile onto the track.
+    pub fn set_car_model(&mut self, scene: &Scene, car_name: &str) -> Result<(), String> {
+        if scene.meshes.is_empty() {
+            return Err("Car scene has no geometry".into());
+        }
+
+        let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("car texture sampler"),
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
+        let material_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("car material layout"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let white = upload_texture(&self.device, &self.queue, 1, 1, &[255; 4]);
+        let mut texture_views = Vec::new();
+        for texture in &scene.textures {
+            texture_views.push(upload_texture(
+                &self.device,
+                &self.queue,
+                texture.width,
+                texture.height,
+                &texture.rgba,
+            ));
+        }
+
+        let mut car_materials = Vec::new();
+        for (i, material) in scene.materials.iter().enumerate() {
+            let view = match material.texture {
+                Some(idx) => texture_views.get(idx).unwrap_or(&white),
+                None => &white,
+            };
+            let material_uniform = [
+                material.base_color[0],
+                material.base_color[1],
+                material.base_color[2],
+                material.base_color[3],
+                alpha_mode_code(material.alpha_mode),
+                material.alpha_cutoff,
+                if material.paintable { 1.0 } else { 0.0 },
+                0.0,
+            ];
+            let color = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(&format!("car mat {i}")),
+                    contents: bytemuck::cast_slice(&material_uniform),
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                });
+            let group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(&format!("car mat group {i}")),
+                layout: &material_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: color.as_entire_binding(),
+                    },
+                ],
+            });
+            car_materials.push(GpuMaterial {
+                group,
+                color_buffer: color,
+                paintable: material.paintable,
+                alpha_mode: material.alpha_mode,
+                alpha_cutoff: material.alpha_cutoff,
+                double_sided: material.double_sided,
+                depth_bias: material.depth_bias,
+            });
+        }
+
+        let mut car_meshes = Vec::new();
+        for mesh in &scene.meshes {
+            if mesh.vertices.is_empty() || mesh.indices.is_empty() {
+                continue;
+            }
+            let vertices: Vec<GpuVertex> = mesh
+                .vertices
+                .iter()
+                .map(|v| GpuVertex {
+                    position: v.position,
+                    normal: v.normal,
+                    uv: v.uv,
+                })
+                .collect();
+            let center = mesh
+                .vertices
+                .iter()
+                .map(|v| Vec3::from(v.position))
+                .sum::<Vec3>()
+                / mesh.vertices.len() as f32;
+            car_meshes.push(GpuMesh {
+                vertex: self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some(&mesh.name),
+                        contents: bytemuck::cast_slice(&vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    }),
+                index: self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some(&mesh.name),
+                        contents: bytemuck::cast_slice(&mesh.indices),
+                        usage: wgpu::BufferUsages::INDEX,
+                    }),
+                count: mesh.indices.len() as u32,
+                material: mesh.material,
+                center,
+            });
+        }
+
+        self.car_render = Some(CarRenderState {
+            meshes: car_meshes,
+            materials: car_materials,
+        });
+
+        self.configure_sim_for_model(car_name);
+        Ok(())
+    }
+
+    /// Configure realistic vehicle simulation parameters for specified model.
+    pub fn configure_sim_for_model(&mut self, model_name: &str) {
+        let name_lower = model_name.to_lowercase();
+        let (name, mass, gears, ratios, final_drive, redline, torque_max, cg_offset) =
+            if name_lower.contains("356") {
+                (
+                    "1950 Porsche 356 Ferdinand",
+                    810.0,
+                    4,
+                    vec![3.18, 1.76, 1.13, 0.81],
+                    4.375,
+                    4500.0,
+                    80.0,
+                    [0.0, 0.28, -0.2],
+                )
+            } else if name_lower.contains("911")
+                || name_lower.contains("901")
+                || name_lower.contains("rs")
+            {
+                (
+                    "1973 Porsche 911 Carrera RS 2.7",
+                    960.0,
+                    5,
+                    vec![3.18, 1.83, 1.26, 0.96, 0.76],
+                    3.875,
+                    7300.0,
+                    255.0,
+                    [0.0, 0.32, -0.3],
+                )
+            } else if name_lower.contains("930") || name_lower.contains("turbo") {
+                (
+                    "1978 Porsche 911 Turbo 3.3",
+                    1300.0,
+                    4,
+                    vec![2.25, 1.30, 0.89, 0.65],
+                    4.22,
+                    6800.0,
+                    412.0,
+                    [0.0, 0.34, -0.35],
+                )
+            } else if name_lower.contains("996") || name_lower.contains("gt3") {
+                (
+                    "1999 Porsche 911 GT3 (996)",
+                    1350.0,
+                    6,
+                    vec![3.82, 2.15, 1.56, 1.21, 0.97, 0.83],
+                    3.44,
+                    7900.0,
+                    370.0,
+                    [0.0, 0.33, -0.25],
+                )
+            } else if name_lower.contains("993") {
+                (
+                    "1995 Porsche 911 Carrera (993)",
+                    1370.0,
+                    6,
+                    vec![3.82, 2.05, 1.41, 1.12, 0.92, 0.77],
+                    3.44,
+                    6800.0,
+                    330.0,
+                    [0.0, 0.33, -0.28],
+                )
+            } else {
+                (
+                    "1997 Porsche Boxster 2.5L",
+                    1252.0,
+                    5,
+                    vec![3.50, 2.12, 1.43, 1.03, 0.79],
+                    3.89,
+                    6700.0,
+                    245.0,
+                    [0.0, 0.35, -0.1],
+                )
+            };
+
+        let mut torque_curve = [0.0f32; 21];
+        for (i, val) in torque_curve.iter_mut().enumerate().take(14) {
+            let t = i as f32 / 13.0;
+            *val = torque_max * (0.6 + 0.4 * (1.0 - (t - 0.7).powi(2) * 2.0).clamp(0.0, 1.0));
+        }
+
+        let sim_spec = nfs_formats::sim::SimCar {
+            name: name.to_string(),
+            mass_kg: mass,
+            wheelbase_m: 2.40,
+            gear_count: gears,
+            drive_flags: 2,
+            reverse_gear: -3.5,
+            forward_gears: ratios,
+            final_drive,
+            redline_rpm: redline,
+            idle_or_step_rpm: 800.0,
+            torque_curve,
+            brake_bias: 0.62,
+            drag_coeff: 0.31,
+            swaybar_stiffness: 14000.0,
+            suspension_stiffness: 30.0,
+            front_track_m: 1.45,
+            rear_track_m: 1.48,
+            damping_compression: 2.5,
+            damping_rebound: 3.2,
+            tire_grip: 0.95,
+            cg_offset_m: cg_offset,
+            raw: [0u8; 328],
+        };
+
+        let spawn_pos = self.car.as_ref().map(|c| c.pos).unwrap_or(glam::Vec3::ZERO);
+        let spawn_yaw = self.car.as_ref().map(|c| c.yaw).unwrap_or(0.0);
+        let mut sim = nfs_assets::physics::VehicleSimulation::from_sim(&sim_spec);
+        sim.reset(spawn_pos, spawn_yaw);
+        self.sim_car = Some(sim);
     }
 }
 

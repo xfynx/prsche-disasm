@@ -138,6 +138,26 @@ impl ArcadeCar {
         self.camera_target = self.pos + Vec3::new(0.0, 0.9, 0.0) + fwd * 1.5;
     }
 
+    /// Set vehicle world pose directly and update camera targets immediately.
+    pub fn set_pose(&mut self, pos: Vec3, yaw: f32) {
+        self.pos = pos;
+        self.yaw = yaw;
+        self.pitch = 0.0;
+        self.roll = 0.0;
+        self.speed = 0.0;
+        self.steer_angle = 0.0;
+        self.is_braking = false;
+        self.is_handbraking = false;
+        self.is_reversing = false;
+        self.gear = 1;
+        self.rpm = 0.15;
+        self.pedal_command = 0.0;
+
+        let fwd = self.forward();
+        self.camera_eye = self.pos + Vec3::new(0.0, 2.0, 0.0) - fwd * 5.8;
+        self.camera_target = self.pos + Vec3::new(0.0, 0.9, 0.0) + fwd * 1.5;
+    }
+
     fn max_steer_angle_for_speed(speed: f32) -> f32 {
         let speed_sq = speed.abs().max(0.1).powi(2);
         let grip_limited_angle = (MAX_LATERAL_ACCEL * WHEELBASE / speed_sq).atan();

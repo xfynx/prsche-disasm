@@ -248,7 +248,7 @@ const storage = typeof localStorage !== "undefined" ? localStorage : {
   removeItem: () => {},
 };
 
-const PROFILE_KEY = "porsche_profile_009";
+const PROFILE_KEY = "porsche_profile_011_v2";
 let currentProfile = null;
 const RANK_NAMES = ["Applicant", "Junior Test Driver", "Test Driver", "Senior Test Driver", "Chief Test Driver"];
 
@@ -259,6 +259,9 @@ function loadStoredProfile() {
       currentProfile = JSON.parse(raw);
     }
   } catch {}
+  if (currentProfile && typeof currentProfile.version !== "number") {
+    currentProfile.version = 1;
+  }
   if (!currentProfile) {
     if (typeof shell_profile_new === "function") {
       try {
@@ -268,13 +271,41 @@ function loadStoredProfile() {
     }
     if (!currentProfile) {
       currentProfile = {
+        version: 1,
         name: "Driver",
         credits: 11000,
         factory_rank: 0,
-        garage: [],
+        garage: [
+          {
+            model_name: "356_1",
+            display_name: "356 'No. 1' Roadster (1948)",
+            sim_name: "356road11",
+            era: "Classic",
+            year: 1948,
+            color_index: 0,
+            price_paid: 11000,
+            condition: 1.0,
+            mileage_km: 0.0,
+            installed_parts: [],
+          },
+        ],
         selected_car_index: 0,
-        evolution_unlocked_epochs: [1],
-        factory_completed_missions: [],
+        evolution_career: {
+          current_era: "Classic",
+          completed_tournaments: [],
+          unlocked_eras: ["Classic"],
+          trophies: [],
+          total_winnings: 0,
+        },
+        factory_driver: {
+          driver_rank: "Applicant",
+          current_tier: 1,
+          current_mission_code: "0M01",
+          completed_missions: [],
+          best_times: {},
+          passed_count: 0,
+        },
+        race_history: [],
       };
     }
     saveProfile();
@@ -817,22 +848,108 @@ function renderFactoryMissions() {
 let activeCareerEvent = null;
 let eventFinishedHandled = false;
 
+const CAR_SPECS = {
+  "356_1": { name: "Porsche 356 'No. 1' Roadster (1948)", power: "40 л.с. (30 кВт)", weight: "585 кг", drive: "RR (Заднемоторный)" },
+  "356": { name: "Porsche 356 Coupé Ferdinand (1950)", power: "44 л.с. (32 кВт)", weight: "820 кг", drive: "RR (Заднемоторный)" },
+  "356a": { name: "Porsche 356 A 1600 Coupé (1956)", power: "60 л.с. (44 кВт)", weight: "850 кг", drive: "RR (Заднемоторный)" },
+  "356b": { name: "Porsche 356 B 2000 GS Carrera 2 (1960)", power: "130 л.с. (96 кВт)", weight: "1 010 кг", drive: "RR (Заднемоторный)" },
+  "550": { name: "Porsche 550 A Spyder (1956)", power: "135 л.с. (99 кВт)", weight: "550 кг", drive: "MR (Среднемоторный)" },
+  "901": { name: "Porsche 911 Coupé (901) (1964)", power: "130 л.с. (96 кВт)", weight: "1 080 кг", drive: "RR (Заднемоторный)" },
+  "914": { name: "Porsche 914/4 (1970)", power: "80 л.с. (59 кВт)", weight: "940 кг", drive: "MR (Среднемоторный)" },
+  "911_rs": { name: "Porsche 911 Carrera RS 2.7 (1973)", power: "210 л.с. (154 кВт)", weight: "960 кг", drive: "RR (Заднемоторный)" },
+  "911rs": { name: "Porsche 911 Carrera RS 2.7 (1973)", power: "210 л.с. (154 кВт)", weight: "960 кг", drive: "RR (Заднемоторный)" },
+  "928": { name: "Porsche 928 (1978)", power: "240 л.с. (177 кВт)", weight: "1 450 кг", drive: "FR (Передний двигатель)" },
+  "930": { name: "Porsche 911 Turbo 3.3 (930) (1978)", power: "300 л.с. (221 кВт)", weight: "1 300 кг", drive: "RR (Заднемоторный турбо)" },
+  "935": { name: "Porsche 935/78 'Moby Dick' (1978)", power: "845 л.с. (621 кВт)", weight: "1 025 кг", drive: "RR (Заднемоторный гоночный)" },
+  "944": { name: "Porsche 944 (1982)", power: "163 л.с. (120 кВт)", weight: "1 180 кг", drive: "FR (Трансэксл)" },
+  "959": { name: "Porsche 959 (1987)", power: "450 л.с. (331 кВт)", weight: "1 450 кг", drive: "AWD (Полный привод)" },
+  "964": { name: "Porsche 911 Carrera 2 (964) (1989)", power: "250 л.с. (184 кВт)", weight: "1 350 кг", drive: "RR (Заднемоторный)" },
+  "993": { name: "Porsche 911 Carrera (993) (1995)", power: "272 л.с. (200 кВт)", weight: "1 370 кг", drive: "RR (Заднемоторный)" },
+  "996": { name: "Porsche 911 Carrera (996) (1998)", power: "300 л.с. (221 кВт)", weight: "1 320 кг", drive: "RR (Заднемоторный)" },
+  "boxster": { name: "Porsche Boxster (986) (1997)", power: "204 л.с. (150 кВт)", weight: "1 252 кг", drive: "MR (Среднемоторный)" },
+  "gt1": { name: "Porsche 911 GT1 Straßenversion (1998)", power: "544 л.с. (400 кВт)", weight: "1 150 кг", drive: "MR (Среднемоторный битурбо)" },
+  "gt2": { name: "Porsche 911 GT2 (993) (1996)", power: "430 л.с. (316 кВт)", weight: "1 290 кг", drive: "RR (Заднемоторный турбо)" },
+  "gt3": { name: "Porsche 911 GT3 (996) (1999)", power: "360 л.с. (265 кВт)", weight: "1 350 кг", drive: "RR (Заднемоторный атмосферный)" },
+};
+
 function showBriefing(eventData) {
   activeCareerEvent = eventData;
   eventFinishedHandled = false;
   const modal = document.querySelector("#eventBriefingModal");
   if (!modal) return;
+
+  const bCategory = document.querySelector("#briefingCategoryBadge");
   const bTitle = document.querySelector("#briefingTitle");
+  const bInstructorName = document.querySelector("#briefingInstructorName");
   const bDesc = document.querySelector("#briefingDesc");
   const bTrackCar = document.querySelector("#briefingTrackCar");
+  const bCarTitle = document.querySelector("#briefingCarTitle");
+  const bCarPower = document.querySelector("#briefingCarPower");
+  const bCarWeight = document.querySelector("#briefingCarWeight");
+  const bCarDrive = document.querySelector("#briefingCarDrive");
+  const bTrackName = document.querySelector("#briefingTrackName");
   const bGoal = document.querySelector("#briefingGoal");
+  const bTimeLimit = document.querySelector("#briefingTimeLimit");
+  const bRules = document.querySelector("#briefingRules");
   const bReward = document.querySelector("#briefingReward");
 
+  const isFactory = Boolean(eventData.is_factory);
+  if (bCategory) {
+    bCategory.textContent = isFactory ? "PORSCHE FACTORY DRIVER" : "PORSCHE EVOLUTION";
+    bCategory.className = isFactory ? "briefing-category-badge factory" : "briefing-category-badge evolution";
+  }
+
   if (bTitle) bTitle.textContent = eventData.title;
+  if (bInstructorName) {
+    bInstructorName.textContent = isFactory ? "Инструктор Рольф (Rolf · Porsche Test Team Lead)" : "Дирекция турниров Porsche Evolution";
+  }
   if (bDesc) bDesc.textContent = eventData.description;
-  if (bTrackCar) bTrackCar.textContent = `${eventData.track} / ${eventData.car}`;
-  if (bGoal) bGoal.textContent = eventData.goal;
+
+  let carKey = "356_1";
+  if (isFactory) {
+    carKey = eventData.mission_obj?.car_model || eventData.car_sim || "boxster";
+  } else {
+    const selIdx = currentProfile?.selected_car_index || 0;
+    carKey = currentProfile?.garage?.[selIdx]?.model_name || "356_1";
+  }
+  carKey = carKey.toLowerCase();
+  const spec = CAR_SPECS[carKey] || {
+    name: eventData.car || `Porsche ${carKey.toUpperCase()}`,
+    power: "204 л.с. (150 кВт)",
+    weight: "1 250 кг",
+    drive: "Задний привод (RWD)",
+  };
+
+  if (bCarTitle) bCarTitle.textContent = spec.name;
+  if (bCarPower) bCarPower.textContent = spec.power;
+  if (bCarWeight) bCarWeight.textContent = spec.weight;
+  if (bCarDrive) bCarDrive.textContent = spec.drive;
+
+  const trackDisplay = eventData.track_display || eventData.track || eventData.track_name || eventData.trackId;
+  if (bTrackName) bTrackName.textContent = trackDisplay;
+  if (bTrackCar) bTrackCar.textContent = `${trackDisplay} / ${spec.name}`;
+  if (bGoal) bGoal.textContent = eventData.goal || eventData.goal_text || "1-е место";
+
+  if (bTimeLimit) {
+    if (eventData.time_limit && eventData.time_limit > 0) {
+      bTimeLimit.textContent = `${eventData.time_limit.toFixed(1)} сек`;
+    } else if (eventData.laps) {
+      bTimeLimit.textContent = `${eventData.laps} круга (без лимита)`;
+    } else {
+      bTimeLimit.textContent = "Без лимита времени";
+    }
+  }
+
+  if (bRules) {
+    if (isFactory) {
+      bRules.textContent = "Точное соблюдение траектории; сбитые конусы +2.0 сек к времени.";
+    } else {
+      bRules.textContent = "Контактная борьба с соперниками; срезка углов штрафуется.";
+    }
+  }
+
   if (bReward) bReward.textContent = eventData.reward;
+
   modal.hidden = false;
 }
 
@@ -1091,6 +1208,47 @@ if (briefingStartBtn) {
     updateOptions();
     targetSelect.value = activeCareerEvent.trackId;
     await loadTarget();
+
+    // Load authentic car model for this career event
+    let targetCar = "boxster";
+    if (activeCareerEvent.is_factory) {
+      targetCar = activeCareerEvent.mission_obj?.car_model || activeCareerEvent.car_sim || "boxster";
+    } else {
+      const selectedIdx = currentProfile?.selected_car_index || 0;
+      targetCar = currentProfile?.garage?.[selectedIdx]?.model_name || "356_1";
+    }
+    targetCar = targetCar.toLowerCase();
+
+    if (viewer && typeof viewer.set_car_model === "function") {
+      try {
+        let carNames = [];
+        let carBytes = [];
+        const isCustom = useCustomFiles && selectedFiles.length > 0;
+        if (isCustom) {
+          for (const file of selectedFiles) {
+            const basename = selectedName(file).split(/[\\/]/).pop().toLowerCase();
+            if (![`${targetCar}.crp`, `${targetCar}.tpg`, `${targetCar}.clr`].includes(basename) && !basename.endsWith(".fsh")) {
+              continue;
+            }
+            carNames.push(selectedName(file));
+            carBytes.push(new Uint8Array(await file.arrayBuffer()));
+          }
+        } else {
+          const carPaths = findCarFilesFromCatalog(targetCar);
+          if (carPaths.length > 0) {
+            const fetched = await fetchGameFiles(carPaths);
+            carNames = fetched.names;
+            carBytes = fetched.bytes;
+          }
+        }
+        if (carNames.length > 0) {
+          const modelLog = viewer.set_car_model(carNames, carBytes, targetCar);
+          console.log("Loaded authentic car for event:", modelLog);
+        }
+      } catch (carErr) {
+        console.warn("Could not load car model for event:", carErr);
+      }
+    }
 
     if (viewer) {
       if (!viewer.is_drive_mode()) {
@@ -1379,6 +1537,7 @@ function findTrackFilesFromCatalog(target) {
       continue;
     }
     if (fullPath.includes("/sky/") || fullPath.includes("/sky new/")) continue;
+    if (fullPath.includes("/fedata/") || fullPath.includes("/trackart/") || fullPath.includes("/cardata/")) continue;
 
     if (
       ext === "scn" &&
@@ -1513,6 +1672,7 @@ async function loadTarget() {
             continue;
           }
           if (fullPath.includes("/sky/") || fullPath.includes("/sky new/")) continue;
+          if (fullPath.includes("/fedata/") || fullPath.includes("/trackart/") || fullPath.includes("/cardata/")) continue;
 
           if (
             ext === "scn" &&
@@ -1534,6 +1694,8 @@ async function loadTarget() {
               `${target}.edg`,
               `${target}.map`,
               `${target}.jnc`,
+              `${target}0.lsp`,
+              `${target}.lsp`,
             ].includes(basename)
           ) {
             names.push(selectedName(file));
@@ -1579,6 +1741,37 @@ async function loadTarget() {
       summary.textContent = text;
       const hasTopo = viewer.has_topology();
       setStatus(`Трасса "${target}" загружена из ${sourceText}.${hasTopo ? " F — начать заезд. T — границы." : " Границы не найдены."}`);
+
+      if (typeof viewer.set_car_model === "function") {
+        try {
+          const selIdx = currentProfile?.selected_car_index || 0;
+          const carModel = (currentProfile?.garage?.[selIdx]?.model_name || "356_1").toLowerCase();
+          let carNames = [];
+          let carBytes = [];
+          if (isCustom) {
+            for (const file of customFiles) {
+              const basename = selectedName(file).split(/[\\/]/).pop().toLowerCase();
+              if (![`${carModel}.crp`, `${carModel}.tpg`, `${carModel}.clr`].includes(basename) && !basename.endsWith(".fsh")) {
+                continue;
+              }
+              carNames.push(selectedName(file));
+              carBytes.push(new Uint8Array(await file.arrayBuffer()));
+            }
+          } else {
+            const carPaths = findCarFilesFromCatalog(carModel);
+            if (carPaths.length > 0) {
+              const fetchedCar = await fetchGameFiles(carPaths);
+              carNames = fetchedCar.names;
+              carBytes = fetchedCar.bytes;
+            }
+          }
+          if (carNames.length > 0) {
+            viewer.set_car_model(carNames, carBytes, carModel);
+          }
+        } catch (carErr) {
+          console.warn("Auto-load car model onto track failed:", carErr);
+        }
+      }
     } else {
       const text = viewer.load(names, bytes, target);
       summary.textContent = text;

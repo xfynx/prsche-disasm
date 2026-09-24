@@ -134,8 +134,53 @@ const { spawn, spawnSync } = require('node:child_process');
     assert.ok(after <= before + 1, `focus release coast ${before} -> ${after}`);
     checks.push(`focus release ${before} -> ${after}`);
     await other.close();
+
+    // Verify Dealership (Point 2: car purchase no error)
+    await page.keyboard.press('Escape');
+    await page.locator('#dealershipBtn').click();
+    assert.equal(await page.locator('#dealershipModal').isVisible(), true);
+    await page.waitForTimeout(400);
+    await page.locator('#dealershipUsedTab').click();
+    await page.waitForTimeout(400);
+    await screenshot('web-dealership.png');
+    await page.locator('#dealershipNewTab').click();
+    await page.waitForTimeout(300);
+    await page.locator('#dealershipCloseBtn').click();
+    checks.push('dealership catalog and used market verified without errors');
+
+    // Verify Canyon track loading (Point 4: Canyon track not broken)
+    await page.locator('#targetSelect').selectOption('canyon');
+    await loaded('canyon');
+    await page.locator('#tourButton').click();
+    await waitForStart();
+    await page.waitForTimeout(1000);
+    const canyonPose = await page.evaluate(() => readDriveTestState().pose);
+    assert.ok(Number.isFinite(canyonPose[1]), 'canyon altitude ' + canyonPose[1]);
+    await screenshot('web-canyon.png');
+    await page.keyboard.press('Escape');
+    checks.push('canyon loaded and car grounded at y=' + canyonPose[1].toFixed(1));
+
+    // Verify Factory Driver campaign (Points 1 & 3: authentic briefing & genuine car model)
+    await page.locator('#careerFactoryBtn').click();
+    assert.equal(await page.locator('#factoryMissionsModal').isVisible(), true);
+    await page.waitForTimeout(400);
+    await screenshot('web-factory-ladder.png');
+    const firstMissionBtn = page.locator('#factoryMissionsGrid .cup-card:first-child button');
+    await firstMissionBtn.click();
+    assert.equal(await page.locator('#eventBriefingModal').isVisible(), true);
+    assert.equal(await page.locator('#briefingCategoryBadge').textContent(), 'PORSCHE FACTORY DRIVER');
+    const briefingCar = await page.locator('#briefingCarTitle').textContent();
+    assert.ok(briefingCar.toUpperCase().includes('PORSCHE'), 'authentic car title ' + briefingCar);
+    await screenshot('web-factory-briefing.png');
+    await page.locator('#briefingStartBtn').click();
+    await page.waitForFunction(() => [0, 2].includes(readDriveTestState().phase), null, { timeout: 15000 });
+    await page.waitForTimeout(1000);
+    await screenshot('web-factory-mission-drive.png');
+    await page.keyboard.press('Escape');
+    checks.push('factory driver mission 0M01 briefing and authentic car model verified');
+
     assert.deepEqual(errors, []);
-    fs.writeFileSync(path.join(output, 'browser-check.json'), JSON.stringify({ browser: browser.version(), iteration: '009-game-shell', checks, errors }, null, 2));
+    fs.writeFileSync(path.join(output, 'browser-check.json'), JSON.stringify({ browser: browser.version(), iteration: '011-factory-driver', checks, errors }, null, 2));
     console.log(JSON.stringify({ checks, errors }));
   } catch (error) {
     await screenshot('web-failure.png').catch(() => {});

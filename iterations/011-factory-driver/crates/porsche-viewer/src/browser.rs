@@ -91,6 +91,25 @@ impl BrowserViewer {
         self.set_scene(scene)
     }
 
+    pub fn set_car_model(
+        &mut self,
+        names: Array,
+        bytes: Array,
+        car_name: String,
+    ) -> Result<String, JsValue> {
+        let scene = files_from_js(names, bytes)
+            .and_then(|files| load_car(&files, &car_name))
+            .map_err(|e| JsValue::from_str(&e))?;
+        if let Some(renderer) = &mut self.renderer {
+            renderer
+                .set_car_model(&scene, &car_name)
+                .map_err(|e| JsValue::from_str(&e))?;
+            Ok(format!("Car model '{car_name}' loaded successfully"))
+        } else {
+            Err(JsValue::from_str("Renderer not initialized"))
+        }
+    }
+
     pub fn resize(&mut self, width: u32, height: u32) {
         let width = width.max(1);
         let height = height.max(1);
@@ -496,7 +515,7 @@ pub fn shell_get_dealership_catalog() -> String {
 #[wasm_bindgen]
 pub fn shell_get_used_cars() -> String {
     let used_cars =
-        nfs_game::economy::generate_used_car_market(nfs_game::tournament::TournamentEra::Classic);
+        nfs_game::economy::generate_used_car_market(nfs_game::tournament::TournamentEra::Modern);
     let json_items: Vec<String> = used_cars
         .iter()
         .map(|c| {
@@ -604,7 +623,7 @@ pub fn shell_buy_car(
 
     let market_car = if is_used {
         let used = nfs_game::economy::generate_used_car_market(
-            nfs_game::tournament::TournamentEra::Classic,
+            nfs_game::tournament::TournamentEra::Modern,
         );
         used.into_iter()
             .find(|c| c.id == car_id)

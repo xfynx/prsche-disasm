@@ -849,10 +849,10 @@ impl PlayerProfile {
         let version = val
             .get("version")
             .and_then(|v| v.as_u32())
-            .ok_or("missing or invalid 'version'")?;
-        if version != Self::CURRENT_VERSION {
+            .unwrap_or(Self::CURRENT_VERSION);
+        if version > Self::CURRENT_VERSION {
             return Err(format!(
-                "unsupported profile version {version}, expected {}",
+                "unsupported profile version {version}, expected <= {}",
                 Self::CURRENT_VERSION
             ));
         }
