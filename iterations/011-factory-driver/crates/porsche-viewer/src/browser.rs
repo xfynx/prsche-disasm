@@ -349,6 +349,54 @@ impl BrowserViewer {
         }
     }
 
+    pub fn configure_mission(&mut self, is_factory: bool, time_limit: f32, has_opponent: bool) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.configure_mission(is_factory, time_limit, has_opponent);
+        }
+    }
+
+    pub fn get_mission_elapsed_time(&self) -> f32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_mission_elapsed_time())
+            .unwrap_or(0.0)
+    }
+
+    pub fn get_cone_hits(&self) -> u32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_cone_hits())
+            .unwrap_or(0)
+    }
+
+    pub fn get_stunt_180(&self) -> bool {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_stunt_180())
+            .unwrap_or(false)
+    }
+
+    pub fn get_stunt_360(&self) -> bool {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_stunt_360())
+            .unwrap_or(false)
+    }
+
+    pub fn get_stunt_jturn(&self) -> bool {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_stunt_jturn())
+            .unwrap_or(false)
+    }
+
+    pub fn is_mission_mode(&self) -> bool {
+        self.renderer
+            .as_ref()
+            .map(|r| r.is_mission_mode())
+            .unwrap_or(false)
+    }
+
     pub fn render(&mut self) -> Result<(), JsValue> {
         let Some(renderer) = &mut self.renderer else {
             return Ok(());

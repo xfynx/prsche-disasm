@@ -319,6 +319,12 @@ pub struct Renderer {
     pub barrier_config: nfs_assets::BarrierCollisionConfig,
     pub is_wrong_way: bool,
     car_render: Option<CarRenderState>,
+    pub prop_positions: Vec<[f32; 3]>,
+    pub prop_hit: Vec<bool>,
+    pub is_mission_mode: bool,
+    pub mission_time_limit: f32,
+    pub mission_elapsed_time: f32,
+    pub stunt_detector: Option<nfs_game::factory_driver::StuntDetector>,
 }
 
 impl Renderer {
@@ -754,6 +760,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 let (grid_pos, _, grid_yaw) = nfs_assets::calculate_grid_slot(0, course);
                 spawn_pos = Vec3::from(grid_pos);
                 spawn_yaw = grid_yaw;
+                if let Some(surface) = scene.road_surface.as_ref().filter(|s| {
+                    s.query(spawn_pos.x, spawn_pos.z, spawn_pos.y, 25.0, 50.0)
+                        .is_none()
+                }) {
+                    let gate0 = &course.checkpoints[0];
+                    let fwd_pos = Vec3::new(
+                        gate0.center[0] + gate0.forward[0] * 5.0,
+                        gate0.center[1],
+                        gate0.center[2] + gate0.forward[2] * 5.0,
+                    );
+                    if let Some(hit) = surface.query(fwd_pos.x, fwd_pos.z, fwd_pos.y, 50.0, 100.0) {
+                        spawn_pos = Vec3::new(fwd_pos.x, hit.height, fwd_pos.z);
+                    }
+                }
             }
 
             let mut arcade_car = crate::arcade::ArcadeCar::new(spawn_pos, spawn_yaw);
@@ -769,6 +789,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             }) {
                 arcade_car.pos.y = hit.height;
             }
+            spawn_pos = arcade_car.pos;
             arcade_car.set_pose(arcade_car.pos, spawn_yaw);
             camera.drive_pos = arcade_car.camera_eye;
             camera.drive_target = arcade_car.camera_target;
@@ -921,11 +942,42 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
             let (p0_pos, _, p0_yaw) = nfs_assets::calculate_grid_slot(0, course);
             let mut car_pos = glam::Vec3::from(p0_pos);
-            if let Some(hit) = scene
+            let hit = scene
                 .road_surface
                 .as_ref()
                 .and_then(|s| s.query(car_pos.x, car_pos.z, car_pos.y, 25.0, 50.0))
-            {
+                .or_else(|| {
+                    let gate0 = &course.checkpoints[0];
+                    let fwd_pos = [
+                        gate0.center[0] + gate0.forward[0] * 5.0,
+                        gate0.center[1],
+                        gate0.center[2] + gate0.forward[2] * 5.0,
+                    ];
+                    if let Some(h) = scene
+                        .road_surface
+                        .as_ref()
+                        .and_then(|s| s.query(fwd_pos[0], fwd_pos[2], fwd_pos[1], 50.0, 100.0))
+                    {
+                        car_pos.x = fwd_pos[0];
+                        car_pos.z = fwd_pos[2];
+                        return Some(h);
+                    }
+                    let h = scene.road_surface.as_ref().and_then(|s| {
+                        s.query(
+                            gate0.center[0],
+                            gate0.center[2],
+                            gate0.center[1],
+                            50.0,
+                            100.0,
+                        )
+                    });
+                    if h.is_some() {
+                        car_pos.x = gate0.center[0];
+                        car_pos.z = gate0.center[2];
+                    }
+                    h
+                });
+            if let Some(hit) = hit {
                 car_pos.y = hit.height;
             }
 
@@ -991,6 +1043,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             barrier_config: nfs_assets::BarrierCollisionConfig::default(),
             is_wrong_way: false,
             car_render,
+            prop_positions: scene.prop_instances.iter().map(|p| p.position).collect(),
+            prop_hit: vec![false; scene.prop_instances.len()],
+            is_mission_mode: false,
+            mission_time_limit: 0.0,
+            mission_elapsed_time: 0.0,
+            stunt_detector: None,
         })
     }
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -1565,17 +1623,104 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
             session.update_standings();
         }
+
+        // Mission mode tracking and prop cone collisions
+        if self.is_mission_mode {
+            let is_racing = self
+                .race_session
+                .as_ref()
+                .map(|s| s.phase.is_racing())
+                .unwrap_or(true);
+            if is_racing {
+                self.mission_elapsed_time += dt;
+
+                // Check prop (cone) collision detection
+                for i in 0..self.prop_positions.len() {
+                    if !self.prop_hit[i] {
+                        let p = self.prop_positions[i];
+                        let dx = player_pos[0] - p[0];
+                        let dy = player_pos[1] - p[1];
+                        let dz = player_pos[2] - p[2];
+                        if dx * dx + dy * dy + dz * dz < 2.2 * 2.2 {
+                            self.prop_hit[i] = true;
+                            if let Some(detector) = &mut self.stunt_detector {
+                                detector.cone_hits += 1;
+                            }
+                        }
+                    }
+                }
+
+                // Update stunt detector
+                if let Some(detector) = &mut self.stunt_detector {
+                    let speed_mps = if self.sim_mode {
+                        self.sim_telemetry
+                            .as_ref()
+                            .map(|t| t.speed_mps)
+                            .unwrap_or(0.0)
+                    } else {
+                        self.car.as_ref().map(|c| c.speed).unwrap_or(0.0)
+                    };
+                    let heading = if let (true, Some(sim)) = (self.sim_mode, &self.sim_car) {
+                        let fwd = sim.body.forward();
+                        (-fwd.x).atan2(-fwd.z)
+                    } else if let Some(car) = &self.car {
+                        car.yaw
+                    } else {
+                        0.0
+                    };
+                    let is_rev = if let (true, Some(tel)) = (self.sim_mode, &self.sim_telemetry) {
+                        tel.current_gear < 0
+                    } else if let Some(car) = &self.car {
+                        car.is_reversing
+                    } else {
+                        false
+                    };
+                    detector.update(dt, speed_mps, heading, is_rev, handbrake, 0.0);
+                }
+            }
+        }
     }
 
     pub fn reset_car(&mut self) {
         if let Some(course) = &self.track_course {
             let (pos, _, yaw) = nfs_assets::calculate_grid_slot(0, course);
             let mut car_pos = Vec3::from(pos);
-            if let Some(hit) = self
+            let hit = self
                 .road_surface
                 .as_ref()
                 .and_then(|surface| surface.query(car_pos.x, car_pos.z, car_pos.y, 25.0, 50.0))
-            {
+                .or_else(|| {
+                    let gate0 = &course.checkpoints[0];
+                    let fwd_pos = [
+                        gate0.center[0] + gate0.forward[0] * 5.0,
+                        gate0.center[1],
+                        gate0.center[2] + gate0.forward[2] * 5.0,
+                    ];
+                    if let Some(h) = self
+                        .road_surface
+                        .as_ref()
+                        .and_then(|s| s.query(fwd_pos[0], fwd_pos[2], fwd_pos[1], 50.0, 100.0))
+                    {
+                        car_pos.x = fwd_pos[0];
+                        car_pos.z = fwd_pos[2];
+                        return Some(h);
+                    }
+                    let h = self.road_surface.as_ref().and_then(|s| {
+                        s.query(
+                            gate0.center[0],
+                            gate0.center[2],
+                            gate0.center[1],
+                            50.0,
+                            100.0,
+                        )
+                    });
+                    if h.is_some() {
+                        car_pos.x = gate0.center[0];
+                        car_pos.z = gate0.center[2];
+                    }
+                    h
+                });
+            if let Some(hit) = hit {
                 car_pos.y = hit.height;
             }
             if let Some(car) = &mut self.car {
@@ -1697,6 +1842,78 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     pub fn restart_race(&mut self) {
         self.reset_car();
+        if self.is_mission_mode {
+            self.mission_elapsed_time = 0.0;
+            self.prop_hit.fill(false);
+            if let Some(detector) = &mut self.stunt_detector {
+                let initial_yaw = if let Some(c) = &self.car { c.yaw } else { 0.0 };
+                detector.reset(initial_yaw);
+            }
+        }
+    }
+
+    pub fn configure_mission(&mut self, is_factory: bool, time_limit: f32, has_opponent: bool) {
+        self.is_mission_mode = is_factory;
+        self.mission_time_limit = time_limit;
+        self.mission_elapsed_time = 0.0;
+        self.prop_hit.fill(false);
+        if is_factory {
+            let mut det = nfs_game::factory_driver::StuntDetector::new();
+            let initial_yaw = if let Some(c) = &self.car { c.yaw } else { 0.0 };
+            det.reset(initial_yaw);
+            self.stunt_detector = Some(det);
+            if !has_opponent {
+                self.ai_opponents.clear();
+                if let Some(session) = &mut self.race_session {
+                    session.participants.retain(|p| p.is_player);
+                    session.lap_tracker.total_laps = 1;
+                }
+            } else {
+                self.ai_opponents.truncate(1);
+                if let Some(session) = &mut self.race_session {
+                    session.participants.truncate(2);
+                    session.lap_tracker.total_laps = 1;
+                }
+            }
+        } else {
+            self.stunt_detector = None;
+        }
+    }
+
+    pub fn get_mission_elapsed_time(&self) -> f32 {
+        self.mission_elapsed_time
+    }
+
+    pub fn get_cone_hits(&self) -> u32 {
+        self.stunt_detector
+            .as_ref()
+            .map(|d| d.cone_hits)
+            .unwrap_or(0)
+    }
+
+    pub fn get_stunt_180(&self) -> bool {
+        self.stunt_detector
+            .as_ref()
+            .map(|d| d.has_done_180)
+            .unwrap_or(false)
+    }
+
+    pub fn get_stunt_360(&self) -> bool {
+        self.stunt_detector
+            .as_ref()
+            .map(|d| d.has_done_360)
+            .unwrap_or(false)
+    }
+
+    pub fn get_stunt_jturn(&self) -> bool {
+        self.stunt_detector
+            .as_ref()
+            .map(|d| d.has_done_jturn)
+            .unwrap_or(false)
+    }
+
+    pub fn is_mission_mode(&self) -> bool {
+        self.is_mission_mode
     }
 
     pub fn cycle_car_view(&mut self) -> crate::arcade::DriveViewMode {
@@ -1889,19 +2106,30 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             if mesh.vertices.is_empty() || mesh.indices.is_empty() {
                 continue;
             }
+            const CAR_SCALE: f32 = 5.0;
             let vertices: Vec<GpuVertex> = mesh
                 .vertices
                 .iter()
                 .map(|v| GpuVertex {
-                    position: v.position,
-                    normal: v.normal,
+                    position: [
+                        -v.position[0] * CAR_SCALE,
+                        v.position[1] * CAR_SCALE,
+                        -v.position[2] * CAR_SCALE,
+                    ],
+                    normal: [-v.normal[0], v.normal[1], -v.normal[2]],
                     uv: v.uv,
                 })
                 .collect();
             let center = mesh
                 .vertices
                 .iter()
-                .map(|v| Vec3::from(v.position))
+                .map(|v| {
+                    Vec3::new(
+                        -v.position[0] * CAR_SCALE,
+                        v.position[1] * CAR_SCALE,
+                        -v.position[2] * CAR_SCALE,
+                    )
+                })
                 .sum::<Vec3>()
                 / mesh.vertices.len() as f32;
             car_meshes.push(GpuMesh {

@@ -236,6 +236,85 @@ pub struct Image {
     pub y: u32,
     pub rgba: Vec<u8>,
 }
+fn decode_dxt1(width: usize, height: usize, data: &[u8]) -> Result<Vec<u8>> {
+    let mut rgba = vec![0u8; width * height * 4];
+    let blocks_x = width.div_ceil(4);
+    let blocks_y = height.div_ceil(4);
+    let expected_len = blocks_x * blocks_y * 8;
+    if data.len() < expected_len {
+        return Err("DXT1 data truncated".into());
+    }
+    for by in 0..blocks_y {
+        for bx in 0..blocks_x {
+            let offset = (by * blocks_x + bx) * 8;
+            let c0_raw = u16::from_le_bytes([data[offset], data[offset + 1]]);
+            let c1_raw = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
+            let bits = u32::from_le_bytes([
+                data[offset + 4],
+                data[offset + 5],
+                data[offset + 6],
+                data[offset + 7],
+            ]);
+
+            let unpack565 = |v: u16| -> [u8; 4] {
+                let r = (((v >> 11) & 31) * 255 / 31) as u8;
+                let g = (((v >> 5) & 63) * 255 / 63) as u8;
+                let b = ((v & 31) * 255 / 31) as u8;
+                [r, g, b, 255]
+            };
+
+            let col0 = unpack565(c0_raw);
+            let col1 = unpack565(c1_raw);
+            let (col2, col3) = if c0_raw > c1_raw {
+                (
+                    [
+                        ((2 * col0[0] as u16 + col1[0] as u16) / 3) as u8,
+                        ((2 * col0[1] as u16 + col1[1] as u16) / 3) as u8,
+                        ((2 * col0[2] as u16 + col1[2] as u16) / 3) as u8,
+                        255,
+                    ],
+                    [
+                        ((col0[0] as u16 + 2 * col1[0] as u16) / 3) as u8,
+                        ((col0[1] as u16 + 2 * col1[1] as u16) / 3) as u8,
+                        ((col0[2] as u16 + 2 * col1[2] as u16) / 3) as u8,
+                        255,
+                    ],
+                )
+            } else {
+                (
+                    [
+                        ((col0[0] as u16 + col1[0] as u16) / 2) as u8,
+                        ((col0[1] as u16 + col1[1] as u16) / 2) as u8,
+                        ((col0[2] as u16 + col1[2] as u16) / 2) as u8,
+                        255,
+                    ],
+                    [0, 0, 0, 0],
+                )
+            };
+            let palette = [col0, col1, col2, col3];
+
+            for py in 0..4 {
+                let y = by * 4 + py;
+                if y >= height {
+                    continue;
+                }
+                for px in 0..4 {
+                    let x = bx * 4 + px;
+                    if x >= width {
+                        continue;
+                    }
+                    let code_idx = (py * 4 + px) * 2;
+                    let code = ((bits >> code_idx) & 3) as usize;
+                    let p = palette[code];
+                    let dst = (y * width + x) * 4;
+                    rgba[dst..dst + 4].copy_from_slice(&p);
+                }
+            }
+        }
+    }
+    Ok(rgba)
+}
+
 pub fn parse_fsh(input: &[u8]) -> Result<Vec<Image>> {
     let decoded = decompress(input)?;
     if bytes(&decoded, 0, 4)? != b"SHPI" {
@@ -353,6 +432,10 @@ pub fn parse_fsh(input: &[u8]) -> Result<Vec<Image>> {
                     let a = if v & 0x8000 != 0 { 255 } else { 0 };
                     rgba.extend_from_slice(&[r, g, b, a]);
                 }
+            }
+            0x6d | 0xed => {
+                let raw_data = bytes(d, o + 16, d.len() - (o + 16))?;
+                rgba = decode_dxt1(width as usize, height as usize, raw_data)?;
             }
             f => {
                 return Err(format!(

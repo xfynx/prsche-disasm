@@ -192,7 +192,9 @@ impl SuspensionSystem {
 
             // Query surface elevation and normal
             let (ground_y, ground_normal) = if let Some(surf) = surface {
-                if let Some(hit) = surf.query(mount_world.x, mount_world.z, mount_world.y, 2.0, 2.0)
+                if let Some(hit) = surf
+                    .query(mount_world.x, mount_world.z, mount_world.y, 2.5, 3.5)
+                    .or_else(|| surf.query(mount_world.x, mount_world.z, mount_world.y, 6.0, 8.0))
                 {
                     (hit.height, Vec3::from_array(hit.normal))
                 } else {

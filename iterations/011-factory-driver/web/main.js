@@ -76,6 +76,12 @@ const raceLap = document.querySelector("#raceLap");
 const raceTotalLaps = document.querySelector("#raceTotalLaps");
 const raceLapTime = document.querySelector("#raceLapTime");
 const raceBestLap = document.querySelector("#raceBestLap");
+const racePosBadge = document.querySelector("#racePosBadge");
+const raceLapBadge = document.querySelector("#raceLapBadge");
+const raceTimeLabel = document.querySelector("#raceTimeLabel");
+const facStatusBadge = document.querySelector("#facStatusBadge");
+const facStatusVal = document.querySelector("#facStatusVal");
+const facStatusSub = document.querySelector("#facStatusSub");
 const countdownBanner = document.querySelector("#countdownBanner");
 const countdownText = document.querySelector("#countdownText");
 const wrongWayBanner = document.querySelector("#wrongWayBanner");
@@ -950,6 +956,25 @@ function showBriefing(eventData) {
 
   if (bReward) bReward.textContent = eventData.reward;
 
+  const bMapImg = document.querySelector("#briefingMapImg");
+  const bInstructorImg = document.querySelector("#briefingInstructorImg");
+
+  if (bInstructorImg) {
+    bInstructorImg.src = "./assets/people_rolp.png";
+  }
+
+  if (bMapImg) {
+    let mapFile = "map_0m01.png";
+    if (isFactory && eventData.mission_obj?.code) {
+      const code = String(eventData.mission_obj.code).toLowerCase();
+      mapFile = `map_${code}.png`;
+    }
+    bMapImg.src = `./assets/${mapFile}`;
+    bMapImg.onerror = () => {
+      bMapImg.src = "./assets/map_0m01.png";
+    };
+  }
+
   modal.hidden = false;
 }
 
@@ -1204,10 +1229,23 @@ if (briefingStartBtn) {
     if (modal) modal.hidden = true;
     if (!activeCareerEvent) return;
 
+    let specificScn = null;
+    if (activeCareerEvent.is_factory && activeCareerEvent.mission_obj) {
+      const code = String(activeCareerEvent.mission_obj.code || "");
+      const tier = activeCareerEvent.mission_obj.tier || 1;
+      const trackId = (activeCareerEvent.trackId || "").toLowerCase();
+      if (code.toUpperCase() === "0M01") {
+        specificScn = `${trackId}_st1.scn`;
+      } else if (code.match(/^\d+m\d+$/i)) {
+        const num = parseInt(code.slice(2), 10);
+        specificScn = `${trackId}_st${tier}${num}.scn`;
+      }
+    }
+
     modeSelect.value = "track";
     updateOptions();
     targetSelect.value = activeCareerEvent.trackId;
-    await loadTarget();
+    await loadTarget(specificScn);
 
     // Load authentic car model for this career event
     let targetCar = "boxster";
@@ -1251,12 +1289,27 @@ if (briefingStartBtn) {
     }
 
     if (viewer) {
+      const isDuel = activeCareerEvent.mission_obj?.type === "duel" || (activeCareerEvent.mission_obj?.title || "").toLowerCase().includes("duel");
+      if (typeof viewer.configure_mission === "function") {
+        viewer.configure_mission(
+          Boolean(activeCareerEvent.is_factory),
+          activeCareerEvent.time_limit || 0.0,
+          Boolean(isDuel)
+        );
+      }
       if (!viewer.is_drive_mode()) {
         viewer.toggle_camera_mode();
         setMenuVisible(false);
         syncTourButton();
       }
       viewer.restart_race();
+      if (typeof viewer.configure_mission === "function") {
+        viewer.configure_mission(
+          Boolean(activeCareerEvent.is_factory),
+          activeCareerEvent.time_limit || 0.0,
+          Boolean(isDuel)
+        );
+      }
       eventFinishedHandled = false;
       soundManager.playCue(880, 100);
       setStatus(`Карьерный заезд начат: ${activeCareerEvent.title}`);
@@ -1523,9 +1576,11 @@ if (resetSourceButton) {
   });
 }
 
-function findTrackFilesFromCatalog(target) {
+function findTrackFilesFromCatalog(target, specificScn = null) {
   const matching = [];
   const targetLower = target.toLowerCase();
+  const scnTarget = specificScn ? specificScn.toLowerCase() : null;
+
   for (const relPath of localGameFiles) {
     const fullPath = relPath.replace(/\\/g, "/").toLowerCase();
     const basename = fullPath.split("/").pop();
@@ -1539,14 +1594,19 @@ function findTrackFilesFromCatalog(target) {
     if (fullPath.includes("/sky/") || fullPath.includes("/sky new/")) continue;
     if (fullPath.includes("/fedata/") || fullPath.includes("/trackart/") || fullPath.includes("/cardata/")) continue;
 
-    if (
-      ext === "scn" &&
-      stem.startsWith(targetLower) &&
-      !basename.includes("audio") &&
-      !basename.includes("camera") &&
-      !basename.includes("start")
-    ) {
-      matching.push(relPath);
+    if (ext === "scn") {
+      if (basename.includes("audio") || basename.includes("camera") || basename.includes("start")) {
+        continue;
+      }
+      if (scnTarget) {
+        if (basename === scnTarget) {
+          matching.push(relPath);
+        }
+      } else {
+        if (stem.startsWith(targetLower) && !stem.match(/_st\d+$/i)) {
+          matching.push(relPath);
+        }
+      }
       continue;
     }
 
@@ -1632,7 +1692,7 @@ async function fetchGameFiles(paths) {
   return { names, bytes };
 }
 
-async function loadTarget() {
+async function loadTarget(specificScn = null) {
   if (!viewer) {
     setStatus("WebGPU еще не готов.");
     return;
@@ -1674,15 +1734,21 @@ async function loadTarget() {
           if (fullPath.includes("/sky/") || fullPath.includes("/sky new/")) continue;
           if (fullPath.includes("/fedata/") || fullPath.includes("/trackart/") || fullPath.includes("/cardata/")) continue;
 
-          if (
-            ext === "scn" &&
-            stem.startsWith(target) &&
-            !basename.includes("audio") &&
-            !basename.includes("camera") &&
-            !basename.includes("start")
-          ) {
-            names.push(selectedName(file));
-            bytes.push(new Uint8Array(await file.arrayBuffer()));
+          if (ext === "scn") {
+            if (basename.includes("audio") || basename.includes("camera") || basename.includes("start")) {
+              continue;
+            }
+            if (specificScn) {
+              if (basename === specificScn.toLowerCase()) {
+                names.push(selectedName(file));
+                bytes.push(new Uint8Array(await file.arrayBuffer()));
+              }
+            } else {
+              if (stem.startsWith(target) && !stem.match(/_st\d+$/i)) {
+                names.push(selectedName(file));
+                bytes.push(new Uint8Array(await file.arrayBuffer()));
+              }
+            }
             continue;
           }
 
@@ -1717,7 +1783,7 @@ async function loadTarget() {
       }
     } else {
       const paths = isTrack
-        ? findTrackFilesFromCatalog(target)
+        ? findTrackFilesFromCatalog(target, specificScn)
         : findCarFilesFromCatalog(target);
 
       if (paths.length === 0) {
@@ -2110,6 +2176,11 @@ function updateNavigation(dt) {
         rpmBar.style.background = "#d3bd83";
       }
     }
+    const gaugeNeedle = document.querySelector("#gaugeNeedle");
+    if (gaugeNeedle) {
+      const angle = -125 + rpm * 250;
+      gaugeNeedle.style.transform = `translate(-50%, -90%) rotate(${angle}deg)`;
+    }
 
     // Update Race HUD
     const phase = viewer.get_race_phase ? viewer.get_race_phase() : 0;
@@ -2118,14 +2189,64 @@ function updateNavigation(dt) {
     if (raceHudTop) {
       raceHudTop.hidden = !(hudVisible && isRacingActive);
       if (isRacingActive) {
-        if (racePos) racePos.textContent = String(viewer.get_player_position());
-        if (raceTotalPos) raceTotalPos.textContent = `/${viewer.get_total_participants()}`;
-        if (raceLap) raceLap.textContent = String(viewer.get_current_lap());
-        if (raceTotalLaps) raceTotalLaps.textContent = `/${viewer.get_total_laps()}`;
-        if (raceLapTime) raceLapTime.textContent = formatRaceTime(viewer.get_current_lap_time());
-        if (raceBestLap) {
-          const best = viewer.get_best_lap_time();
-          raceBestLap.textContent = `ЛУЧШИЙ ${formatRaceTime(best)}`;
+        const isFactory = Boolean(activeCareerEvent?.is_factory);
+        const isDuel = activeCareerEvent?.mission_obj?.type === "duel" || (activeCareerEvent?.mission_obj?.title || "").toLowerCase().includes("duel");
+
+        if (isFactory) {
+          if (racePosBadge) racePosBadge.style.display = isDuel ? "flex" : "none";
+          if (raceLapBadge) raceLapBadge.style.display = isDuel ? "flex" : "none";
+          if (facStatusBadge) facStatusBadge.style.display = "flex";
+
+          if (raceTimeLabel) raceTimeLabel.textContent = "ВРЕМЯ ЗАДАНИЯ";
+          const elapsed = (typeof viewer.get_mission_elapsed_time === "function")
+            ? viewer.get_mission_elapsed_time()
+            : viewer.get_current_lap_time();
+          if (raceLapTime) raceLapTime.textContent = formatRaceTime(elapsed);
+          
+          const timeLimit = activeCareerEvent.time_limit || 0;
+          if (raceBestLap) {
+            if (timeLimit > 0) {
+              const remaining = Math.max(0, timeLimit - elapsed);
+              raceBestLap.textContent = `ЛИМИТ: ${timeLimit.toFixed(1)}с (ОСТ: ${remaining.toFixed(1)}с)`;
+            } else {
+              raceBestLap.textContent = "ЦЕЛЬ: ПОБЕДА";
+            }
+          }
+
+          if (facStatusVal && typeof viewer.get_cone_hits === "function") {
+            const hits = viewer.get_cone_hits();
+            facStatusVal.textContent = `КОНУСЫ: ${hits}`;
+            facStatusVal.style.color = hits > 0 ? "#ef4444" : "#22c55e";
+          }
+          if (facStatusSub && typeof viewer.get_stunt_180 === "function") {
+            const h180 = viewer.get_stunt_180();
+            const h360 = viewer.get_stunt_360();
+            const hj = viewer.get_stunt_jturn();
+            let statusText = "ТЕСТ В ПРОЦЕССЕ";
+            if (activeCareerEvent.mission_obj?.type === "spin360") {
+              statusText = h360 ? "360°: ВЫПОЛНЕНО ✓" : "360°: ТРЕБУЕТСЯ";
+            } else if (activeCareerEvent.mission_obj?.type === "slide180") {
+              statusText = h180 ? "180°: ВЫПОЛНЕНО ✓" : "180°: ТРЕБУЕТСЯ";
+            } else if (h360 || h180 || hj) {
+              statusText = `СТАНТ: ${h360 ? "360° " : ""}${h180 ? "180° " : ""}${hj ? "J-TURN " : ""}✓`;
+            }
+            facStatusSub.textContent = statusText;
+          }
+        } else {
+          if (racePosBadge) racePosBadge.style.display = "flex";
+          if (raceLapBadge) raceLapBadge.style.display = "flex";
+          if (facStatusBadge) facStatusBadge.style.display = "none";
+          if (raceTimeLabel) raceTimeLabel.textContent = "ВРЕМЯ КРУГА";
+
+          if (racePos) racePos.textContent = String(viewer.get_player_position());
+          if (raceTotalPos) raceTotalPos.textContent = `/${viewer.get_total_participants()}`;
+          if (raceLap) raceLap.textContent = String(viewer.get_current_lap());
+          if (raceTotalLaps) raceTotalLaps.textContent = `/${viewer.get_total_laps()}`;
+          if (raceLapTime) raceLapTime.textContent = formatRaceTime(viewer.get_current_lap_time());
+          if (raceBestLap) {
+            const best = viewer.get_best_lap_time();
+            raceBestLap.textContent = `ЛУЧШИЙ ${formatRaceTime(best)}`;
+          }
         }
       }
     }
@@ -2171,15 +2292,23 @@ function updateNavigation(dt) {
         const total = viewer.get_total_participants();
         const lapTime = viewer.get_current_lap_time();
         const bestTime = viewer.get_best_lap_time();
-        if (resultsSubtitle) resultsSubtitle.textContent = `Позиция: P${pos} из ${total}`;
-        if (resultsLapTime) resultsLapTime.textContent = formatRaceTime(lapTime);
+        const elapsed = (typeof viewer.get_mission_elapsed_time === "function" && activeCareerEvent?.is_factory)
+          ? viewer.get_mission_elapsed_time()
+          : lapTime;
+
+        if (resultsSubtitle) {
+          resultsSubtitle.textContent = activeCareerEvent?.is_factory
+            ? `Миссия: ${activeCareerEvent.title}`
+            : `Позиция: P${pos} из ${total}`;
+        }
+        if (resultsLapTime) resultsLapTime.textContent = formatRaceTime(elapsed);
         if (resultsBestTime) resultsBestTime.textContent = formatRaceTime(bestTime);
 
         if (activeCareerEvent && !eventFinishedHandled) {
           eventFinishedHandled = true;
           let passed = false;
           if (activeCareerEvent.is_factory) {
-            passed = lapTime > 0 && lapTime <= (activeCareerEvent.time_limit || 32.0);
+            passed = elapsed > 0 && elapsed <= (activeCareerEvent.time_limit || 32.0);
           } else {
             passed = pos === 1;
           }
@@ -2212,14 +2341,19 @@ function updateNavigation(dt) {
 
           if (activeCareerEvent.is_factory && activeCareerEvent.mission_index && typeof shell_complete_factory_mission === "function" && currentProfile) {
             try {
+              const has180 = typeof viewer.get_stunt_180 === "function" ? viewer.get_stunt_180() : true;
+              const has360 = typeof viewer.get_stunt_360 === "function" ? viewer.get_stunt_360() : true;
+              const hasJturn = typeof viewer.get_stunt_jturn === "function" ? viewer.get_stunt_jturn() : true;
+              const coneHits = typeof viewer.get_cone_hits === "function" ? viewer.get_cone_hits() : 0;
+
               const resJson = shell_complete_factory_mission(
                 JSON.stringify(currentProfile),
                 activeCareerEvent.mission_index,
-                lapTime,
-                true, // 180 slide
-                true, // 360 spin
-                true, // jturn
-                0,    // cone hits
+                elapsed,
+                has180,
+                has360,
+                hasJturn,
+                coneHits,
                 0.0,  // damage
                 pos === 1
               );

@@ -9,77 +9,177 @@
   </head>
   <body>
     <main class="viewer">
-      <section id="menu" class="toolbar" aria-label="Управление просмотром">
-        <div class="menu-heading"><span>PORSCHE UNLEASHED</span><small>Игровая оболочка и карьеры · 011</small></div>
-        <div class="shell-profile-bar">
-          <div class="profile-chip">
-            <span class="profile-label">ПРОФИЛЬ:</span>
-            <b id="profileNameDisplay">Driver</b>
-            <span class="credits-badge"><b id="profileCreditsDisplay">11 000</b> CR</span>
-            <span id="profileRankDisplay" class="rank-badge">Applicant</span>
+      <section id="menu" class="porsche-shell" aria-label="Игровая оболочка Porsche Unleashed">
+        <!-- Authentic Top Brand & Profile Bar -->
+        <header class="shell-top-bar">
+          <div class="shell-brand-left">
+            <span class="shell-series-tag">NEED FOR SPEED</span>
+            <span class="shell-series-sub">PORSCHE UNLEASHED</span>
           </div>
-          <div class="shell-actions">
-            <button id="careerEvolutionBtn" type="button" class="btn-career evo-btn" title="Турниры Evolution (Classic / Golden / Modern)">🏆 Evolution</button>
-            <button id="dealershipBtn" type="button" class="btn-career deal-btn" title="Автосалон новых и подержанных Porsche">🏪 Автосалон</button>
-            <button id="partsShopBtn" type="button" class="btn-career parts-btn" title="Магазин тюнинга и ремонт узлов">🔧 Тюнинг</button>
-            <button id="careerFactoryBtn" type="button" class="btn-career fac-btn" title="Лестница испытаний Factory Driver (34 миссии)">🏭 Factory</button>
-            <button id="profileBtn" type="button" class="btn-subtle" title="Профиль и гараж">Гараж</button>
-            <button id="soundBtn" type="button" class="btn-subtle" title="Вкл/Выкл звук">🔊 Звук</button>
+          <div class="shell-brand-center">
+            <img src="./assets/porsche_0000.png" class="porsche-brand-logo" alt="PORSCHE" />
+            <div class="brand-red-divider"></div>
+          </div>
+          <div class="shell-profile-box">
+            <div class="profile-meta">
+              <span class="profile-label">ВОДИТЕЛЬ:</span>
+              <b id="profileNameDisplay">Driver</b>
+              <span id="profileRankDisplay" class="rank-badge">Applicant</span>
+            </div>
+            <div class="profile-cash">
+              <span class="cash-label">CASH:</span>
+              <b id="profileCreditsDisplay">11 000</b> <span class="cash-cr">CR</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- Main Screen Body: Left Pillar Buttons + Central Showcase Deck -->
+        <div class="shell-main-stage">
+          <!-- Left Navigation Pillar: Authentic NFS5 Crimson Pill Buttons (singleplayer.lay / factorydriver.lay) -->
+          <nav class="shell-nav-pillar" aria-label="Основные режимы игры">
+            <button id="careerFactoryBtn" type="button" class="nfs-pill-btn fac-btn" title="Лестница испытаний Factory Driver (34 миссии)">
+              <span class="pill-stem"></span>
+              <span class="pill-icon">🏭</span>
+              <span class="pill-body">
+                <span class="pill-title">FACTORY DRIVER</span>
+                <span class="pill-desc">34 миссии Рольфа на полигоне Weissach</span>
+              </span>
+            </button>
+            <button id="careerEvolutionBtn" type="button" class="nfs-pill-btn evo-btn" title="Турниры Evolution (Classic / Golden / Modern)">
+              <span class="pill-stem"></span>
+              <span class="pill-icon">🏆</span>
+              <span class="pill-body">
+                <span class="pill-title">EVOLUTION</span>
+                <span class="pill-desc">Кубки 3 эпох: 1950, 1970, 1990</span>
+              </span>
+            </button>
+            <button id="dealershipBtn" type="button" class="nfs-pill-btn deal-btn" title="Автосалон новых и подержанных Porsche">
+              <span class="pill-stem"></span>
+              <span class="pill-icon">🏪</span>
+              <span class="pill-body">
+                <span class="pill-title">АВТОСАЛОН</span>
+                <span class="pill-desc">Новые и подержанные Porsche</span>
+              </span>
+            </button>
+            <button id="partsShopBtn" type="button" class="nfs-pill-btn parts-btn" title="Магазин тюнинга и ремонт узлов">
+              <span class="pill-stem"></span>
+              <span class="pill-icon">🔧</span>
+              <span class="pill-body">
+                <span class="pill-title">ТЮНИНГ И РЕМОНТ</span>
+                <span class="pill-desc">Запчасти, узлы и ремонт ходовой</span>
+              </span>
+            </button>
+            <button id="profileBtn" type="button" class="nfs-pill-btn profile-btn" title="Профиль, сохранения и гараж">
+              <span class="pill-stem"></span>
+              <span class="pill-icon">🚘</span>
+              <span class="pill-body">
+                <span class="pill-title">ГАРАЖ ИГРОКА</span>
+                <span class="pill-desc">Коллекция авто и сохранения</span>
+              </span>
+            </button>
+          </nav>
+
+          <!-- Center-Right Showcase Deck & Quick Setup -->
+          <div class="shell-showcase-deck">
+            <div class="deck-frame">
+              <div class="deck-header">
+                <span class="deck-tag">SHOWROOM & TRACK SELECTION</span>
+                <span id="sourceBadge" class="source-badge" title="Текущий источник ресурсов игры">local/game</span>
+                <button id="resetSourceButton" type="button" class="btn-subtle" style="display:none" title="Вернуться к файлам local/game">К local/game</button>
+              </div>
+
+              <!-- Mode and Target Pickers -->
+              <div class="deck-selectors-row">
+                <label class="deck-field">
+                  <span class="field-label">РЕЖИМ ПРОСМОТРА:</span>
+                  <select id="modeSelect">
+                    <option value="track" selected>Трасса (Track)</option>
+                    <option value="car">Автосалон (Car Showcase)</option>
+                  </select>
+                </label>
+                <label class="deck-field">
+                  <span id="targetLabel" class="field-label">ТРАССА:</span>
+                  <select id="targetSelect"></select>
+                </label>
+              </div>
+
+              <!-- Quick Vehicle Actions -->
+              <div class="deck-actions-row">
+                <button id="paintButton" type="button" class="btn-action" title="Сменить цвет кузова авто (P)">🎨 Цвет (P)</button>
+                <button id="cameraButton" type="button" class="btn-action" title="Сменить вид камеры: Сзади / Капот / Свободный (C)">🎥 Вид (C)</button>
+                <button id="resetButton" type="button" class="btn-action" title="Сброс камеры / возврат на трассу (R)">🔄 Сброс (R)</button>
+                <label class="checkbox-field" id="topologyField" title="Показать/скрыть 3D границы трассы (T)">
+                  <input id="topologyCheckbox" type="checkbox" />
+                  <span>3D Границы</span>
+                </label>
+              </div>
+
+              <!-- Secondary Dev / Resource Bar -->
+              <div class="deck-dev-bar">
+                <label class="field-compact" title="Выбрать локальную папку игры (переопределить)">
+                  <span>Папка игры:</span>
+                  <input id="folderInput" type="file" webkitdirectory multiple />
+                </label>
+                <label class="field-compact" title="Выбрать отдельные файлы игры">
+                  <span>Файлы:</span>
+                  <input id="fileInput" type="file" multiple />
+                </label>
+                <button id="loadButton" type="button" class="btn-subtle">Загрузить</button>
+                <button id="hudButton" type="button" class="btn-subtle" aria-pressed="true">Приборы (H)</button>
+                <button id="detailsButton" type="button" class="btn-subtle" aria-expanded="false" aria-controls="summary">Диагностика</button>
+              </div>
+
+              <!-- Status Banner -->
+              <div class="deck-status-box">
+                <span id="status" role="status">Выберите папку игры или файлы трассы/авто.</span>
+                <span class="hint">F: заезд · WASD: газ/руль · Space: ручник · C: камера · R: сброс · H: приборы · Esc: меню</span>
+              </div>
+            </div>
           </div>
         </div>
-        <label class="field" title="Выбрать локальную папку игры (переопределить)">
-          <span>Папка игры</span>
-          <input id="folderInput" type="file" webkitdirectory multiple />
-        </label>
-        <label class="field" title="Выбрать отдельные файлы игры">
-          <span>Файлы</span>
-          <input id="fileInput" type="file" multiple />
-        </label>
-        <span id="sourceBadge" class="source-badge" title="Текущий источник ресурсов игры">local/game</span>
-        <button id="resetSourceButton" type="button" class="btn-subtle" style="display:none" title="Вернуться к файлам local/game">К local/game</button>
-        <label class="field">
-          <span>Режим</span>
-          <select id="modeSelect">
-            <option value="track" selected>Трасса</option>
-            <option value="car">Авто</option>
-          </select>
-        </label>
-        <label class="field">
-          <span id="targetLabel">Трасса</span>
-          <select id="targetSelect"></select>
-        </label>
-        <label class="checkbox-field" id="topologyField" title="Показать/скрыть 3D границы трассы (T)">
-          <input id="topologyCheckbox" type="checkbox" />
-          <span>3D Границы</span>
-        </label>
-        <button id="tourButton" type="button" title="Режим аркадного заезда на авто / прогона (F)">Заезд (F)</button>
-        <button id="cameraButton" type="button" title="Сменить вид камеры: Сзади / Капот / Свободный (C)">Вид (C)</button>
-        <button id="paintButton" type="button" title="Сменить цвет кузова авто (P)">Цвет (P)</button>
-        <button id="loadButton" type="button">Загрузить</button>
-        <button id="resetButton" type="button" title="Сброс камеры / возврат на трассу (R)">R</button>
-        <button id="hudButton" type="button" aria-pressed="true">Приборы (H)</button>
-        <button id="detailsButton" type="button" aria-expanded="false" aria-controls="summary">Диагностика</button>
-        <button id="hideMenuButton" type="button">Скрыть меню (Esc)</button>
-        <span id="status" role="status">Выберите папку игры или файлы трассы/авто.</span>
-        <span class="hint">F: заезд · WASD: газ/руль · Space: ручник · C: камера · R: сброс · H: приборы</span>
-        <span class="prototype-note">Карьеры 011: Evolution (Кубки и турниры), Factory Driver (34 миссии) и профиль игрока.</span>
+
+        <!-- Bottom Navigation Bar (bottombar.lay) -->
+        <footer class="shell-bottom-bar">
+          <div class="bottom-left">
+            <button id="hideMenuButton" type="button" class="bottom-back-pill" title="Закрыть меню и перейти к сцене (Esc)">
+              ◀ СВЕРНУТЬ МЕНЮ (ESC)
+            </button>
+            <button id="soundBtn" type="button" class="bottom-sound-pill" title="Вкл/Выкл звук">🔊 ЗВУК</button>
+          </div>
+          <div class="bottom-center">
+            <div class="bottom-brand-watermark">NEED FOR SPEED · PORSCHE UNLEASHED · 2000 EA CANADA</div>
+          </div>
+          <div class="bottom-right">
+            <!-- The Authentic Glowing Oval RACE Button (ID_PLAYGAMEBUTTON) -->
+            <button id="tourButton" type="button" class="race-play-btn" title="Начать заезд на выбранном Porsche (F)">
+              <span class="race-stem-top"></span>
+              <span class="race-label">СТАРТ ЗАЕЗДА · RACE (F)</span>
+              <span class="race-stem-bottom"></span>
+            </button>
+          </div>
+        </footer>
       </section>
       <div class="viewport-wrapper">
         <canvas id="viewport" tabindex="0" aria-label="Трёхмерная сцена"></canvas>
         <button id="menuButton" type="button" aria-expanded="true" aria-controls="menu">Меню · Esc</button>
         <div id="raceHudTop" class="race-hud-top" hidden>
-          <div class="race-badge pos-badge">
+          <div id="racePosBadge" class="race-badge pos-badge">
             <span class="badge-label">ПОЗИЦИЯ</span>
             <span class="badge-val"><b id="racePos">1</b><small id="raceTotalPos">/4</small></span>
           </div>
-          <div class="race-badge lap-badge">
+          <div id="raceLapBadge" class="race-badge lap-badge">
             <span class="badge-label">КРУГ</span>
             <span class="badge-val"><b id="raceLap">1</b><small id="raceTotalLaps">/3</small></span>
           </div>
           <div class="race-badge time-badge">
-            <span class="badge-label">ВРЕМЯ КРУГА</span>
+            <span id="raceTimeLabel" class="badge-label">ВРЕМЯ КРУГА</span>
             <span id="raceLapTime" class="badge-val timer-val">00:00.0</span>
             <span id="raceBestLap" class="badge-sub">ЛУЧШИЙ --:--.-</span>
+          </div>
+          <div id="facStatusBadge" class="race-badge fac-badge" style="display: none;">
+            <span class="badge-label">ИСПЫТАНИЕ</span>
+            <span id="facStatusVal" class="badge-val" style="font-size: 15px; color: #d3bd83;">КОНУСЫ: 0</span>
+            <span id="facStatusSub" class="badge-sub" style="color: #999;">В ПРОЦЕССЕ</span>
           </div>
         </div>
         <div id="countdownBanner" class="countdown-banner" hidden>
@@ -88,61 +188,76 @@
         <div id="wrongWayBanner" class="wrong-way-banner" hidden>
           <span>⚠️ НЕ В ТУ СТОРОНУ!</span>
         </div>
-        <!-- Event Briefing Modal (Authentic NFS: Porsche Unleashed) -->
+        <!-- Event Briefing Modal (Authentic NFS: Porsche Unleashed missionbrief.lay) -->
         <div id="eventBriefingModal" class="race-results-modal" hidden>
           <div class="results-card briefing-card authentic-porsche-briefing">
             <div class="briefing-header-bar">
-              <span id="briefingCategoryBadge" class="briefing-category-badge">PORSCHE FACTORY DRIVER</span>
-              <span class="briefing-brand-badge">WEISSACH TEST TRACK</span>
+              <div class="briefing-brand-group">
+                <img src="./assets/porsche_0000.png" class="briefing-porsche-logo" alt="Porsche" />
+                <span id="briefingCategoryBadge" class="briefing-category-badge">PORSCHE FACTORY DRIVER</span>
+              </div>
+              <span id="briefingTrackFacility" class="briefing-brand-badge">WEISSACH TEST CENTER</span>
             </div>
             <h2 id="briefingTitle" class="briefing-headline">0M01: APPLYING TEST</h2>
             
-            <div class="briefing-instructor-box">
-              <div class="instructor-avatar-wrap">
-                <div class="instructor-badge">ROLF</div>
+            <div class="briefing-layout-grid">
+              <!-- Left Visual Column with Authentic Rolf Photo and Mission Blueprint Diagram -->
+              <div class="briefing-visual-col">
+                <div class="instructor-photo-frame">
+                  <img id="briefingInstructorImg" src="./assets/people_rolp.png" alt="Rolf" class="instructor-photo-img" />
+                  <div id="briefingInstructorName" class="instructor-nameplate">ROLF · CHIEF TEST PILOT</div>
+                </div>
+                <div class="mission-schematic-frame">
+                  <img id="briefingMapImg" src="./assets/map_0m01.png" alt="Mission Schematic" class="mission-schematic-img" />
+                  <div class="schematic-caption">СХЕМА ЗАДАНИЯ И РАССТАНОВКА КОНУСОВ</div>
+                </div>
               </div>
-              <div class="instructor-speech">
-                <div id="briefingInstructorName" class="instructor-name">Инструктор Рольф (Rolf · Test Team)</div>
-                <div id="briefingDesc" class="briefing-desc">Описание события...</div>
-              </div>
-            </div>
 
-            <div class="briefing-car-card">
-              <div class="car-card-header">
-                <span class="car-badge-icon">🏎️</span>
-                <span id="briefingCarTitle" class="car-card-name">PORSCHE BOXSTER (986)</span>
-                <span id="briefingTrackCar" style="display:none;"></span>
-              </div>
-              <div class="car-specs-grid">
-                <div class="spec-cell"><span class="spec-label">МОЩНОСТЬ</span><span id="briefingCarPower" class="spec-val">204 л.с.</span></div>
-                <div class="spec-cell"><span class="spec-label">МАССА</span><span id="briefingCarWeight" class="spec-val">1 252 кг</span></div>
-                <div class="spec-cell"><span class="spec-label">ПРИВОД</span><span id="briefingCarDrive" class="spec-val">MR (Задний)</span></div>
-                <div class="spec-cell"><span class="spec-label">ТРАССА</span><span id="briefingTrackName" class="spec-val">Weissach Skid Pad</span></div>
-              </div>
-            </div>
+              <!-- Right Directives Column -->
+              <div class="briefing-content-col">
+                <div class="instructor-speech-box">
+                  <div class="speech-quote-mark">“</div>
+                  <div id="briefingDesc" class="briefing-desc">Вы хотите стать частью команды испытателей Porsche? Покажите свое мастерство на автодроме Weissach Skid Pad: объезжайте конусы по стрелкам, не сбивая их.</div>
+                </div>
 
-            <div class="briefing-rules-grid">
-              <div class="rule-box">
-                <span class="rule-label">ЦЕЛЬ</span>
-                <span id="briefingGoal" class="rule-val">1-е место</span>
-              </div>
-              <div class="rule-box">
-                <span class="rule-label">ЛИМИТ ВРЕМЕНИ</span>
-                <span id="briefingTimeLimit" class="rule-val">32.0 сек</span>
-              </div>
-              <div class="rule-box">
-                <span class="rule-label">ИНСТРУКЦИЯ</span>
-                <span id="briefingRules" class="rule-val">Соблюдайте чистоту траектории</span>
-              </div>
-              <div class="rule-box">
-                <span class="rule-label">НАГРАДА</span>
-                <span id="briefingReward" class="rule-val">4 500 CR</span>
-              </div>
-            </div>
+                <div class="briefing-car-card">
+                  <div class="car-card-header">
+                    <img src="./assets/logos_911.png" class="car-card-badge-img" alt="Badge" onerror="this.style.display='none'" />
+                    <span id="briefingCarTitle" class="car-card-name">PORSCHE BOXSTER (986)</span>
+                    <span id="briefingTrackCar" style="display:none;"></span>
+                  </div>
+                  <div class="car-specs-grid">
+                    <div class="spec-cell"><span class="spec-label">МОЩНОСТЬ</span><span id="briefingCarPower" class="spec-val">204 л.с.</span></div>
+                    <div class="spec-cell"><span class="spec-label">МАССА</span><span id="briefingCarWeight" class="spec-val">1 252 кг</span></div>
+                    <div class="spec-cell"><span class="spec-label">ПРИВОД</span><span id="briefingCarDrive" class="spec-val">MR (Задний)</span></div>
+                    <div class="spec-cell"><span class="spec-label">ТРАССА</span><span id="briefingTrackName" class="spec-val">Weissach Skid Pad</span></div>
+                  </div>
+                </div>
 
-            <div class="modal-buttons briefing-buttons">
-              <button id="briefingStartBtn" type="button" class="btn-primary start-test-btn">СТАРТ ЗАЕЗДА</button>
-              <button id="briefingCancelBtn" type="button" class="btn-subtle">ОТМЕНА</button>
+                <div class="briefing-rules-grid">
+                  <div class="rule-box">
+                    <span class="rule-label">ЦЕЛЬ</span>
+                    <span id="briefingGoal" class="rule-val">Завершить без штрафов</span>
+                  </div>
+                  <div class="rule-box">
+                    <span class="rule-label">ЛИМИТ ВРЕМЕНИ</span>
+                    <span id="briefingTimeLimit" class="rule-val">32.0 сек</span>
+                  </div>
+                  <div class="rule-box">
+                    <span class="rule-label">ШТРАФЫ</span>
+                    <span id="briefingRules" class="rule-val">+2.0 сек за каждый сбитый конус</span>
+                  </div>
+                  <div class="rule-box">
+                    <span class="rule-label">НАГРАДА</span>
+                    <span id="briefingReward" class="rule-val">Квалификация пилота</span>
+                  </div>
+                </div>
+
+                <div class="modal-buttons briefing-buttons">
+                  <button id="briefingCancelBtn" type="button" class="btn-subtle briefing-back-btn">◀ НАЗАД</button>
+                  <button id="briefingStartBtn" type="button" class="nfs-pill-btn briefing-start-btn">СТАРТ ЗАЕЗДА (RACE) ▶</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -295,28 +410,57 @@
             </div>
           </div>
         </div>
-        <div id="hud" class="hud" hidden>
-          <div class="hud-main">
-            <div class="hud-speed-gauge">
-              <span id="speedValue" class="speed-val">0</span>
-              <span class="speed-unit">КМ/Ч</span>
+        <!-- Authentic Porsche In-Race Gauge Pod (hud.fsh / instrument cluster) -->
+        <div id="hud" class="hud porsche-hud" hidden>
+          <div class="porsche-cluster-pod">
+            <!-- Analog Tachometer Dial Ring with Numbers 0-8 and Redline -->
+            <svg class="cluster-dial-svg" viewBox="0 0 200 200">
+              <circle cx="100" cy="100" r="92" class="dial-outer-ring" />
+              <circle cx="100" cy="100" r="86" class="dial-inner-ring" />
+              <!-- Redline sector (6.5k to 8k RPM) -->
+              <path d="M 143 47 A 86 86 0 0 1 174 135" class="dial-redline-arc" />
+              <!-- Ticks and Numbers -->
+              <g class="dial-ticks">
+                <text x="44" y="148" class="dial-num">0</text>
+                <text x="32" y="112" class="dial-num">1</text>
+                <text x="38" y="76" class="dial-num">2</text>
+                <text x="62" y="48" class="dial-num">3</text>
+                <text x="96" y="38" class="dial-num">4</text>
+                <text x="132" y="48" class="dial-num">5</text>
+                <text x="156" y="76" class="dial-num">6</text>
+                <text x="162" y="112" class="dial-num redline-num">7</text>
+                <text x="150" y="148" class="dial-num redline-num">8</text>
+              </g>
+              <text x="100" y="66" class="dial-sub">x1000 r/min</text>
+            </svg>
+            <!-- Dynamic Sweeping Red Needle -->
+            <div id="gaugeNeedle" class="cluster-needle"></div>
+            <div class="cluster-center-cap"></div>
+            <!-- Center Digital Speedometer & Gear display -->
+            <div class="cluster-digital-box">
+              <div class="hud-speed-gauge">
+                <span id="speedValue" class="speed-val">0</span>
+                <span class="speed-unit">КМ/Ч</span>
+              </div>
+              <div class="hud-gear-container">
+                <span class="gear-title">GEAR</span>
+                <span id="gearValue" class="gear-val">N</span>
+              </div>
             </div>
-            <div class="hud-gear-container">
-              <span class="gear-title">ПЕРЕДАЧА</span>
-              <span id="gearValue" class="gear-val">N</span>
+            <!-- Tachometer bar (compatibility & additional visual feedback) -->
+            <div class="hud-rpm-wrapper" title="Тахометр">
+              <div id="rpmBar" class="hud-rpm-fill"></div>
             </div>
-          </div>
-          <div class="hud-rpm-wrapper" title="Тахометр">
-            <div id="rpmBar" class="hud-rpm-fill"></div>
           </div>
           <div class="hud-hint">
             <span><b>W/▲</b> Газ</span> &bull;
-            <span><b>S/▼</b> Тормоз/Назад</span> &bull;
+            <span><b>S/▼</b> Тормоз</span> &bull;
             <span><b>A/D</b> Руль</span> &bull;
             <span><b>Space</b> Ручник</span> &bull;
-            <span><b id="physicsModeBadge">M: 6 DOF Физика</b></span> &bull;
+            <span><b id="physicsModeBadge">M: 6 DOF</b></span> &bull;
             <span><b>C</b> Камера</span> &bull;
-            <span><b>R</b> На трассу</span>
+            <span><b>R</b> Сброс</span> &bull;
+            <span><b>Esc</b> Меню</span>
           </div>
         </div>
       </div>

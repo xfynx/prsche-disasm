@@ -1047,6 +1047,12 @@ mod tests {
                     .indices
                     .iter()
                     .all(|&index| (index as usize) < mesh.vertices.len())));
+            println!("{car} bounds: {:?}", scene.bounds);
+            for m in scene.meshes.iter().take(15) {
+                let z =
+                    m.vertices.iter().map(|v| v.position[2]).sum::<f32>() / m.vertices.len() as f32;
+                println!("mesh {} center z: {:.3}", m.name, z);
+            }
             assert!(scene.bounds.into_iter().flatten().all(f32::is_finite));
         }
     }
