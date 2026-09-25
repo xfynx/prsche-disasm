@@ -1,4 +1,4 @@
-# Сборка viewer
+# Сборка активной итерации
 
 Из корня репозитория выполните одну команду:
 
@@ -6,10 +6,22 @@
 ./scripts/build.ps1
 ```
 
-По умолчанию собирается активная `009-game-shell` в конфигурации `release`.
-Windows executable: `local/builds/009-game-shell/windows/porsche-viewer.exe`.
-Web-пакет: `local/builds/009-game-shell/web`, статический UI плюс wasm-bindgen
+По умолчанию собирается активная `012-campaign-fidelity` в конфигурации `release`.
+Windows executable: `local/builds/012-campaign-fidelity/windows/porsche-viewer.exe`.
+Web-пакет: `local/builds/012-campaign-fidelity/web`, статический UI плюс wasm-bindgen
 в `package` (`viewer_impl.js`, `viewer_impl_bg.wasm` и сопутствующий `.d.ts`).
+
+Для оригинальных картинок интерфейса один раз выполните `./scripts/extract-fe-ui.ps1`.
+Скрипт читает `local/game/FEData` и создаёт 119 PNG в `local/derived/fe-ui`;
+локальный сервер активной 012 отдаёт их по `/assets/`. Кэш и игровые ресурсы не входят
+в Git или web-пакет. Повторяющиеся ID внутри FSH сохраняют прежнее правило последнего
+элемента, выбор записывается в выводе извлечения. Это ещё не восстановление оригинальных
+шрифтов, комнат и всех слоёв интерфейса.
+
+Точные результаты и незакрытые проверки активной итерации описаны в корневых
+[PLAN.md](../PLAN.md), [STATUS.md](../STATUS.md) и её [checkpoint run](../iterations/012-campaign-fidelity/runs/001-fidelity-repair/README.md).
+Снимки 001–011 заморожены; отчёты и проверки прошлых итераций не доказывают
+полного соответствия оригиналу 1:1.
 
 Запуск: `./scripts/launch-viewer.ps1 -Mode desktop|web|native` (выбрать одно значение).
 Дополнительный desktop использует тот же web-пакет в отдельном окне Edge/Chrome;

@@ -21,6 +21,7 @@ class Handler(SimpleHTTPRequestHandler):
     }
 
     game_dir = None
+    ui_assets_dir = None
     game_files_cache = None
 
     def end_headers(self):
@@ -57,6 +58,11 @@ class Handler(SimpleHTTPRequestHandler):
 
     def translate_path(self, path):
         clean_path = path.split('?', 1)[0].split('#', 1)[0]
+        if self.ui_assets_dir and clean_path.startswith('/assets/'):
+            target = (self.ui_assets_dir / clean_path[len('/assets/'):]).resolve()
+            if self.ui_assets_dir in target.parents and target.is_file():
+                return str(target)
+            return ''
         if self.game_dir and (clean_path.startswith('/game/') or clean_path.startswith('/local/game/')):
             prefix = '/game/' if clean_path.startswith('/game/') else '/local/game/'
             rel_path = clean_path[len(prefix):]
@@ -73,7 +79,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--iteration', default='009-game-shell')
+    parser.add_argument('--iteration', default='012-campaign-fidelity')
     parser.add_argument('--port', type=int, default=8000)
     parser.add_argument('--game-dir', default='local/game')
     parser.add_argument('--ready-file', type=Path)
@@ -87,6 +93,9 @@ def main():
         raise SystemExit('Built site not found. Run scripts/build.ps1 first.')
 
     Handler.game_dir = game_path if game_path.is_dir() else None
+    # Derived original UI images are a local read-only cache, not snapshot sources.
+    ui_cache = (root / 'local/derived/fe-ui').resolve()
+    Handler.ui_assets_dir = ui_cache if args.iteration == '012-campaign-fidelity' and ui_cache.is_dir() else None
     if Handler.game_dir:
         print(f'Game resources: {Handler.game_dir} (read-only)', flush=True)
 

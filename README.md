@@ -2,26 +2,26 @@
 
 Современная независимая реализация игрового движка **Need for Speed: Porsche Unleashed** (NFS 5, 2000) на **Rust + wgpu + winit** для Windows, Linux, macOS и браузера (WebAssembly / WebGPU).
 
-Активная итерация: **[009-game-shell](iterations/009-game-shell/README.md)**. Последний завершённый снимок: [008-race-loop](iterations/008-race-loop/README.md), тег `iteration-008`. Завершённые снимки неизменны.
-Полный перенос, включая Evolution и Factory Driver: [дорожная карта 006–014](docs/roadmap.md).
+Активная итерация: **[012-campaign-fidelity](iterations/012-campaign-fidelity/README.md)**. Последний завершённый снимок: [011-factory-driver](iterations/011-factory-driver/README.md), тег `iteration-011`. Снимки 001–011 заморожены; прежние отчёты не подтверждают полного совпадения с оригиналом 1:1.
+Полный перенос, включая Evolution, Factory Driver и остальные режимы: [дорожная карта](docs/roadmap.md).
 Документация проекта: [План работ](PLAN.md) &bull; [Текущее состояние](STATUS.md) &bull; [Сборка](docs/building.md) &bull; [Форматы топологии](docs/track-topology-formats.md) &bull; [Роли агентов](docs/agents.md).
 
 ---
 
 ## 🚀 Быстрый запуск
 
-Для активной 009-game-shell:
+Для активной 012-campaign-fidelity:
 
 ```powershell
 . .\scripts\tool-env.ps1
-.\scripts\build.ps1 -Iteration 009-game-shell -Config release -Target all
+.\scripts\build.ps1 -Iteration 012-campaign-fidelity -Config release -Target all
 .\scripts\launch-viewer.ps1 -Mode desktop
 ```
 
 
 `desktop` открывает общий web/WASM интерфейс в отдельном окне Edge/Chrome.
 `-Mode web` открывает его в браузере, `-Mode native` — самостоятельное Rust-окно.
-После сборки те же режимы доступны через `local/builds/009-game-shell/Launch-*.cmd`.
+После сборки те же режимы доступны через `local/builds/012-campaign-fidelity/Launch-*.cmd`.
 Для desktop/web консоль launcher должна оставаться открытой; Ctrl+C останавливает
 его локальный сервер, окно браузера закрывается отдельно. Это переходная оболочка,
 не новая реализация движка. Native сохраняет `inspect/view` и без аргументов
