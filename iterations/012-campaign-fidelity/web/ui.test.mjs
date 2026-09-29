@@ -50,7 +50,7 @@ const source = readFileSync(new URL("main.js", import.meta.url), "utf8")
   .replace(/\bboot\(\);\s*$/, "");
 vm.runInContext(source + `\n globalThis.testApi = {
   setViewer: value => viewer = value,
-  activeKeys, syncTourButton, updateNavigation, showBriefing, factoryGoalSatisfied,
+  activeKeys, syncTourButton, updateNavigation, showBriefing, factoryGoalSatisfied, findSimResource,
   primeMotion: () => { velForward = 3; velRight = 2; velZoom = 1; },
   motion: () => [velForward, velRight, velZoom],
 };`, context);
@@ -190,4 +190,13 @@ assert.equal(goal(missionDriver(true, true), 32.01, 32), false, "late goal fails
 assert.equal(goal(missionDriver(true, true), 0, 32), false, "reset is not a finish");
 assert.equal(goal(missionDriver(true, true), NaN, 32), false);
 assert.equal(goal(missionDriver(true, true), 12, 32), true);
-console.log("UI state: drive/menu/HUD/focus/selector/diagnostics/shell/modals/mission goal checks passed");
+const findSim = context.testApi.findSimResource;
+const simFiles = ["GameData/Simulation/CarData/boxster25.sim", "GameData/Simulation/CarData/356Acoupe16.sim"];
+assert.equal(findSim(simFiles, "BOXSTER25.SIM"), simFiles[0]);
+assert.equal(findSim(simFiles, "356Acoupe16"), simFiles[1]);
+assert.throws(() => findSim(simFiles, "boxster"), /boxster\.sim/);
+assert.throws(() => findSim(simFiles, ""), /Не указан/);
+assert.throws(() => findSim([...simFiles, "other/boxster25.sim"], "boxster25"), /несколько/);
+const customSim = { path: "Chosen\\GameData\\boxster25.sim" };
+assert.equal(findSim([customSim], "boxster25", file => file.path), customSim);
+console.log("UI state: drive/menu/HUD/focus/selector/diagnostics/shell/modals/mission goal/SIM selection checks passed");

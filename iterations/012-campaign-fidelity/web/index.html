@@ -37,6 +37,11 @@
         <div class="shell-main-stage">
           <!-- Left Navigation Pillar: Authentic NFS5 Crimson Pill Buttons (singleplayer.lay / factorydriver.lay) -->
           <nav class="shell-nav-pillar" aria-label="Основные режимы игры">
+            <button id="quickRaceBtn" type="button" class="nfs-pill-btn" title="Отдельная гонка на выбранной трассе">
+              <span class="pill-stem"></span><span class="pill-icon">🏁</span>
+              <span class="pill-body"><span class="pill-title">QUICK RACE</span>
+                <span class="pill-desc">Трасса, автомобиль и соперники</span></span>
+            </button>
             <button id="careerFactoryBtn" type="button" class="nfs-pill-btn fac-btn" title="Лестница испытаний Factory Driver (34 миссии)">
               <span class="pill-stem"></span>
               <span class="pill-icon">🏭</span>
@@ -189,6 +194,23 @@
           <span>⚠️ НЕ В ТУ СТОРОНУ!</span>
         </div>
         <!-- Shared event briefing; factory-only mission imagery is hidden for Evolution. -->
+        <div id="quickRaceModal" class="race-results-modal" role="dialog" aria-modal="true" aria-labelledby="quickRaceTitle" hidden>
+          <div class="results-card profile-card">
+            <h2 id="quickRaceTitle" class="results-title">QUICK RACE</h2>
+            <div class="quick-race-fields">
+              <label class="deck-field"><span class="field-label">ТРАССА</span><select id="quickRaceTrack"></select></label>
+              <label class="deck-field"><span class="field-label">АВТОМОБИЛЬ</span><select id="quickRaceCar"></select></label>
+              <label class="deck-field"><span class="field-label">КРУГИ</span><select id="quickRaceLaps"><option value="1">1</option><option value="3" selected>3</option><option value="5">5</option></select></label>
+              <label class="deck-field"><span class="field-label">СОПЕРНИКИ</span><select id="quickRaceOpponents"><option value="0">Без соперников</option><option value="3" selected>3</option></select></label>
+            </div>
+            <p>На трассе от точки до точки — один заезд. Результат не меняет карьеру.</p>
+            <p id="quickRaceStatus" role="status"></p>
+            <div class="results-actions">
+              <button id="quickRaceStartBtn" type="button" class="btn-primary">Начать гонку</button>
+              <button id="quickRaceCancelBtn" type="button" class="btn-subtle">Назад</button>
+            </div>
+          </div>
+        </div>
         <div id="eventBriefingModal" class="race-results-modal" hidden>
           <div class="results-card briefing-card authentic-porsche-briefing">
             <div class="fe-briefing-panel fe-briefing-panel-main" aria-hidden="true"></div>

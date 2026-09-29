@@ -642,7 +642,11 @@ fn read_track_dir_recursive(
                 .map(|n| n.eq_ignore_ascii_case("sky"))
                 .unwrap_or(false);
 
-            let selected = if in_sky_dir {
+            let selected = if stem.eq_ignore_ascii_case("animdefs")
+                && extension.as_deref() == Some("txt")
+            {
+                true
+            } else if in_sky_dir {
                 // Inside Sky/: load .fsh files matching track name
                 extension.as_deref() == Some("fsh") && stem.eq_ignore_ascii_case(track)
             } else if extension.as_deref() == Some("scn") {

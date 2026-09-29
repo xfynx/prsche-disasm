@@ -297,8 +297,8 @@ fn test_all_15_tracks_complete_physics_and_collision_audit() {
                 &barrier_config,
             );
 
-            let (_, dist_along) = course.find_closest_waypoint(ai_car.position);
-            ai_car.distance_along_course = dist_along;
+            // find_closest_waypoint().1 is distance OFF the course, not progress.
+            ai_car.distance_along_course = course.distance_along_course(ai_car.position);
             ai_car
                 .tracker
                 .update(ai_car.position, ai_car.forward, course, dt);

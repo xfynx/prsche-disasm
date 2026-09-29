@@ -73,6 +73,8 @@ pub struct PropInstance {
     pub position: [f32; 3],
     /// 3×3 orientation matrix (row-major) from the `.scn` file.
     pub rotation: [[f32; 3]; 3],
+    /// animdefs.txt property; separate from the SCN geometry category.
+    pub triggerable: bool,
 }
 
 /// Sky panorama texture loaded from `Sky/<track>.fsh`.
@@ -171,10 +173,11 @@ impl Default for Scene {
 pub struct ScenarioStart {
     pub position: [f32; 3],
     pub forward: [f32; 3],
+    pub linked_prop: Option<scenario::PropTarget>,
 }
 
-/// Source footprint with forward direction inferred from ordered centers.
-/// Treating these as mission progression gates is a reconstruction hypothesis.
+/// Source trigger conditions. Shape-1 geometry/constraints follow the EXE;
+/// the vehicle input adapter and complete mission result flow remain under audit.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScenarioGate {
     pub sequence: u32,
@@ -182,7 +185,11 @@ pub struct ScenarioGate {
     pub segment: [[f32; 3]; 2],
     pub width: f32,
     pub forward: [f32; 3],
+    pub velocity_direction: [f32; 3],
+    pub shape: u32,
+    pub speed_range: [f32; 2],
     pub is_end: bool,
+    pub linked_prop: Option<scenario::PropTarget>,
 }
 
 pub mod scenario;

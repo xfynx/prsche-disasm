@@ -359,10 +359,14 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                 format!("{article_name}#{ai}/{}", pr.index),
             )?;
             if !m.indices.is_empty() {
-                // Skidpad's st1 Start sits on the flat MESH04 article, outside all
-                // RD* triangles. Its four source triangles include the trigger center.
+                // Skidpad CRP mt53 is the complete segmented flat pad; mt54 is
+                // its sloped outer rim. These source material IDs select geometry,
+                // not tyre properties. MESH04 alone covers only Start and is also
+                // a reused building name. See Run 006's source inventory.
                 let skidpad_pad = track.eq_ignore_ascii_case("skidpad")
-                    && article_name.eq_ignore_ascii_case("MESH04");
+                    && [53, 54]
+                        .iter()
+                        .any(|id| matmap.get(id) == Some(&m.material));
                 if skidpad_pad
                     || article_name
                         .get(..2)
@@ -390,7 +394,7 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
     let road_surface = RoadSurface::from_triangles(road_triangles);
     let road_report = road_surface.report();
     scene.diagnostics.push(format!(
-        "Road-surface hypothesis (static RD* and sourced Skidpad MESH04 geometry before batching): {} accepted; rejected degenerate={}, vertical={}, non-finite={}, out-of-bounds={}, giant={}",
+        "Road-surface hypothesis (static RD* and sourced Skidpad mt53/mt54 geometry before batching): {} accepted; rejected degenerate={}, vertical={}, non-finite={}, out-of-bounds={}, giant={}",
         road_report.accepted,
         road_report.rejected_degenerate,
         road_report.rejected_vertical,
@@ -484,6 +488,22 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
             let scn_text = String::from_utf8_lossy(scn_data);
             match parse_scn(&scn_text) {
                 Ok(scn) => {
+                    let definitions = find(files, "animdefs.txt").and_then(|data| {
+                        nfs_formats::animdefs::parse_animdefs(&String::from_utf8_lossy(data))
+                    });
+                    if let Err(error) = &definitions {
+                        scene
+                            .diagnostics
+                            .push(format!("Scenario object metadata unavailable: {error}"));
+                    }
+                    let linked_prop = |trigger: &nfs_formats::scn::ScenarioTrigger| {
+                        scn.linked_geom(trigger)
+                            .filter(|geom| geom.flags as i16 == 1)
+                            .map(|geom| crate::scenario::PropTarget {
+                                fourcc: geom.fourcc,
+                                position: to_scene_coordinates(geom.position),
+                            })
+                    };
                     scene.scenario_name = Some(
                         scn_key
                             .rsplit('/')
@@ -491,52 +511,48 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                             .unwrap_or(&scn_key)
                             .to_ascii_lowercase(),
                     );
-                    if let Some(start) = scn
-                        .triggers
-                        .iter()
-                        .find(|t| t.name.eq_ignore_ascii_case("Start"))
-                    {
+                    if let Some(start) = scn.triggers.iter().find(|t| t.trigger_type == Some(2)) {
                         let forward = to_scene_coordinates(start.direction);
                         if forward[0].hypot(forward[2]) > 0.5 {
                             scene.scenario_start = Some(crate::ScenarioStart {
                                 position: to_scene_coordinates(start.position),
                                 forward,
+                                linked_prop: linked_prop(start),
                             });
                         }
                     }
                     scene.scenario_end = scn
                         .triggers
                         .iter()
-                        .find(|t| t.name.eq_ignore_ascii_case("End"))
+                        .find(|t| t.trigger_type == Some(1))
                         .map(|t| to_scene_coordinates(t.position));
-                    if let Some(start) = scene.scenario_start {
-                        let mut previous = start.position;
+                    if scene.scenario_start.is_some() {
                         let mut triggers: Vec<_> = scn
                             .triggers
                             .iter()
-                            .filter(|t| {
-                                t.sequence > 0
-                                    && (t.name.eq_ignore_ascii_case("Waypoint Tigger")
-                                        || t.name.eq_ignore_ascii_case("End"))
-                            })
+                            .filter(|t| t.sequence > 0 && matches!(t.trigger_type, Some(0 | 1)))
                             .collect();
                         triggers.sort_by_key(|t| t.sequence);
                         for trigger in triggers {
                             let center = to_scene_coordinates(trigger.position);
-                            let dx = center[0] - previous[0];
-                            let dz = center[2] - previous[2];
-                            let length = dx.hypot(dz);
-                            if length > 0.0 && trigger.width > 0.0 {
+                            if let (Some(shape), Some(speed_range)) =
+                                (trigger.shape, trigger.speed_range)
+                            {
                                 scene.scenario_gates.push(crate::ScenarioGate {
                                     sequence: trigger.sequence as u32,
                                     center,
                                     segment: trigger.segment.map(to_scene_coordinates),
                                     width: trigger.width,
-                                    forward: [dx / length, 0.0, dz / length],
-                                    is_end: trigger.name.eq_ignore_ascii_case("End"),
+                                    forward: to_scene_coordinates(trigger.direction),
+                                    velocity_direction: to_scene_coordinates(
+                                        trigger.velocity_direction,
+                                    ),
+                                    shape,
+                                    speed_range,
+                                    is_end: trigger.trigger_type == Some(1),
+                                    linked_prop: linked_prop(trigger),
                                 });
                             }
-                            previous = center;
                         }
                     }
                     let mut matched = 0;
@@ -549,8 +565,21 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                         {
                             scene.prop_instances.push(PropInstance {
                                 article_index: idx,
+                                triggerable: definitions
+                                    .as_ref()
+                                    .ok()
+                                    .and_then(|defs| defs.find_tag_or_first(ge.fourcc))
+                                    .is_some_and(|definition| definition.triggerable),
                                 position: to_scene_coordinates(ge.position),
-                                rotation: ge.rotation,
+                                // GEOM v4 consumer multiplies the basis by the
+                                // signed short percentage (EXE 0x46a644..0x46a7e9).
+                                rotation: ge.rotation.map(|row| {
+                                    row.map(|value| {
+                                        value
+                                            * ge.uniform_scale_percent
+                                                .map_or(1.0, |p| p as f32 * 0.01)
+                                    })
+                                }),
                             });
                             matched += 1;
                         } else {
@@ -987,12 +1016,77 @@ mod tests {
         files.insert("skidpad.crp".into(), std::fs::read(&crp_path).unwrap());
         files.insert("skidpad.fsh".into(), std::fs::read(&fsh_path).unwrap());
         files.insert("skidpad_st1.scn".into(), std::fs::read(&scn_path).unwrap());
+        files.insert(
+            "animdefs.txt".into(),
+            std::fs::read(root.join("animdefs.txt")).unwrap(),
+        );
         files.insert("sky/skidpad.fsh".into(), std::fs::read(&sky_path).unwrap());
 
         let scene = load(&files, "skidpad").unwrap();
         assert_eq!(scene.prop_articles.len(), 70);
         assert_eq!(scene.prop_instances.len(), 11);
+        assert_eq!(
+            scene
+                .prop_instances
+                .iter()
+                .filter(|p| p.triggerable)
+                .count(),
+            5
+        );
+        // Original v4 arrows use percentages; the final L A stays at 100%.
+        // Check the full basis and translation against the source SCN so scale
+        // cannot accidentally affect placement or only one rotation axis.
+        let source =
+            nfs_formats::scn::parse_scn(&std::fs::read_to_string(&scn_path).unwrap()).unwrap();
+        let arrows: Vec<_> = source
+            .geom_elements
+            .iter()
+            .filter(|g| g.flags == 1)
+            .collect();
+        assert_eq!(
+            arrows
+                .iter()
+                .map(|g| g.uniform_scale_percent.unwrap())
+                .collect::<Vec<_>>(),
+            [41, 49, 55, 42, 100]
+        );
+        for arrow in arrows {
+            let position = to_scene_coordinates(arrow.position);
+            let instance = scene
+                .prop_instances
+                .iter()
+                .find(|p| p.position == position)
+                .unwrap();
+            let scale = arrow.uniform_scale_percent.unwrap() as f32 * 0.01;
+            for row in 0..3 {
+                for col in 0..3 {
+                    assert!(
+                        (instance.rotation[row][col] - arrow.rotation[row][col] * scale).abs()
+                            < 1e-6
+                    );
+                }
+            }
+        }
         let start = scene.scenario_start.expect("Skidpad st1 Start trigger");
+        assert_eq!(
+            start.linked_prop.unwrap().position,
+            [-3.916403, 4.161158, -110.107_32]
+        );
+        assert_eq!(
+            scene
+                .scenario_gates
+                .iter()
+                .map(|gate| gate.linked_prop.map(|p| p.position[2]))
+                .collect::<Vec<_>>(),
+            [
+                Some(-59.33183),
+                Some(-4.083225),
+                Some(79.31392),
+                None,
+                Some(-150.21165),
+                None
+            ]
+        );
         assert_eq!(start.position, [-6.844955, 0.0, -147.240_66]);
         assert_eq!(start.forward, [0.0, 0.0, 1.0]);
         assert_eq!(scene.scenario_end, Some([-6.805335, 0.0, -144.493_32]));
@@ -1010,7 +1104,15 @@ mod tests {
         let mut route =
             crate::scenario::ScenarioProgress::new(scene.scenario_gates.clone(), start.position)
                 .expect("0M01 has an ordered source route ending at End");
-        route.observe(scene.scenario_end.unwrap());
+        route.observe(&crate::scenario::TriggerVehicle {
+            position: glam::Vec3::from(scene.scenario_end.unwrap()),
+            forward: glam::Vec3::Z,
+            right: glam::Vec3::X,
+            up: glam::Vec3::Y,
+            half_extents: glam::Vec3::new(0.9, 0.6, 2.2),
+            velocity: glam::Vec3::ZERO,
+            expanded: false,
+        });
         assert!(
             !route.complete(),
             "End reached before waypoints must not pass"
@@ -1023,6 +1125,43 @@ mod tests {
             .expect("SCN Start has static MESH04 support");
         assert_eq!(support.identity.article_name, "MESH04");
         assert_eq!(support.height, 0.0);
+        // Continuous support along every source gate center, including both
+        // sides of sector boundaries. The old MESH04-only selection fell through
+        // immediately after gate 1 in a real keyboard playthrough.
+        let surface = scene.road_surface.as_ref().unwrap();
+        let mut previous = start.position;
+        for gate in &scene.scenario_gates {
+            for step in 0..=100 {
+                let t = step as f32 / 100.0;
+                let x = previous[0] + (gate.center[0] - previous[0]) * t;
+                let z = previous[2] + (gate.center[2] - previous[2]) * t;
+                for dx in [-1.0, 0.0, 1.0] {
+                    let hit = surface.query(x + dx, z, 0.0, 0.1, 0.1).unwrap_or_else(|| {
+                        panic!("missing pad before gate {} at {x}, {z}", gate.sequence)
+                    });
+                    assert!(hit.height.abs() < 0.001);
+                }
+            }
+            previous = gate.center;
+        }
+        assert_eq!(
+            surface
+                .query(1.45, -102.99, 0.0, 0.1, 0.1)
+                .expect("attempt-1 fall location must have source support")
+                .identity
+                .article_name,
+            "MESH18"
+        );
+        assert!(
+            !surface
+                .triangles()
+                .any(|(id, _, _)| id.article_name == "MESH04" && id.article_index == 52),
+            "same-named building must not become road support"
+        );
+        assert!(
+            surface.query(180.0, 180.0, 0.0, 0.1, 0.1).is_none(),
+            "pad bounds must not become a rectangular phantom floor"
+        );
         assert!(scene.sky_texture.is_some());
         let sky = scene.sky_texture.as_ref().unwrap();
         assert_eq!(sky.width, 256);

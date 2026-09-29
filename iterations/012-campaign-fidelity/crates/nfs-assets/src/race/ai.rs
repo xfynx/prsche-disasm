@@ -141,7 +141,14 @@ impl AiOpponent {
         let mut accum_dist = 0.0f32;
 
         for step in 1..n {
-            let next_idx = (curr_wp_idx + step) % n;
+            let next_idx = if course.is_circuit {
+                (curr_wp_idx + step) % n
+            } else {
+                (curr_wp_idx + step).min(n - 1)
+            };
+            if next_idx == target_idx {
+                break;
+            }
             let d = distance_sq(
                 course.waypoints[target_idx].position,
                 course.waypoints[next_idx].position,
@@ -233,7 +240,8 @@ impl AiOpponent {
         let wheel_angle = controls.steer * max_steer;
         let wheelbase = 2.45;
         let angular_vel = (self.current_speed / wheelbase) * wheel_angle.tan();
-        self.yaw -= angular_vel * dt;
+        // The controller's positive heading error requires increasing yaw.
+        self.yaw += angular_vel * dt;
 
         // Position update
         let fwd_x = -self.yaw.sin();
@@ -341,6 +349,64 @@ mod tests {
         assert!(
             ai.distance_along_course > 20.0,
             "AI should make progress along course"
+        );
+    }
+
+    #[test]
+    fn ai_converges_to_course_on_either_side() {
+        for side in [-1.0, 1.0] {
+            let course_x = side * 8.0;
+            let points: Vec<_> = (0..25)
+                .map(|i| SplinePoint {
+                    x: course_x,
+                    z: i as f32 * 10.0,
+                })
+                .collect();
+            let course = TrackCourse::from_spline_points(&points, false, |_, _| 0.0).unwrap();
+            let mut ai = AiOpponent::new(1, "Rival", "boxster", AiProfile::default(), 0, &course);
+            ai.position = [0.0; 3];
+            ai.forward = [0.0, 0.0, -1.0];
+            ai.yaw = 0.0;
+            ai.current_speed = 8.0;
+            for _ in 0..180 {
+                ai.step_kinematics(1.0 / 60.0, &course, |_, _| 0.0);
+            }
+            let lateral_error = (ai.position[0] - course_x).abs();
+            assert!(
+                lateral_error < 2.0,
+                "AI did not converge to course x={course_x}: position={:?}, error={lateral_error}",
+                ai.position
+            );
+            assert!(ai.position[2] < -20.0, "AI must progress while converging");
+        }
+    }
+
+    #[test]
+    fn sprint_end_lookahead_keeps_driving_towards_endpoint() {
+        let points: Vec<_> = (0..25)
+            .map(|i| SplinePoint {
+                x: 0.0,
+                z: i as f32 * 10.0,
+            })
+            .collect();
+        let course = TrackCourse::from_spline_points(&points, false, |_, _| 0.0).unwrap();
+        let mut ai = AiOpponent::new(1, "Rival", "boxster", AiProfile::default(), 0, &course);
+        ai.position = [0.0, 0.0, -232.0];
+        ai.forward = [0.0, 0.0, -1.0];
+        ai.yaw = 0.0;
+        ai.current_speed = 20.0;
+        for _ in 0..10 {
+            ai.step_kinematics(1.0 / 60.0, &course, |_, _| 0.0);
+        }
+        assert!(
+            ai.position[2] < -235.0,
+            "AI must approach the sprint endpoint"
+        );
+        assert!(
+            ai.position[0].abs() < 0.2 && ai.forward[2] < -0.95,
+            "AI turned back towards start before finish: position={:?}, heading={:?}",
+            ai.position,
+            ai.forward
         );
     }
 }

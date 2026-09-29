@@ -202,6 +202,7 @@ pub fn parse_crp(input: &[u8]) -> Result<Crp> {
 pub mod track;
 pub use track::{parse_track_crp, TrackCrp, TRACK_CRP_MAGIC};
 
+pub mod animdefs;
 pub mod scn;
 pub use scn::{parse_scn, GeomElement, ScnFile};
 

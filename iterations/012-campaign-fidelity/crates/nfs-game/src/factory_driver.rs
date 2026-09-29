@@ -218,7 +218,8 @@ pub fn get_factory_missions_catalog() -> Vec<FactoryMission> {
             briefing: "Вы хотите стать частью команды испытателей Porsche? Покажите свое мастерство на автодроме Weissach Skid Pad: объезжайте конусы по стрелкам, не сбивая их.".into(),
             tip: "Используйте мягкое руление на Porsche Boxster. Сбитые конусы добавляют штрафные секунды.".into(),
             car_model: "boxster".into(),
-            car_sim: "boxster".into(),
+            // Standard Boxster 2.5 profile from nfs5.car record 60.
+            car_sim: "boxster25".into(),
             track_id: "skidpad".into(),
             track_name: "Weissach Skid Pad".into(),
             mission_type: MissionType::SlalomCourse { time_limit_sec: 32.0, cone_penalty_sec: 2.0 },

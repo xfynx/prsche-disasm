@@ -319,7 +319,10 @@ pub struct Renderer {
     pub barrier_config: nfs_assets::BarrierCollisionConfig,
     pub is_wrong_way: bool,
     car_render: Option<CarRenderState>,
-    pub prop_positions: Vec<[f32; 3]>,
+    /// Rendered source-model bounds adapter; original selected bounds getter
+    /// and body/model origin equivalence still require comparison.
+    trigger_half_extents: Option<Vec3>,
+    scenario_props: Vec<nfs_assets::scenario::ScenarioProp>,
     pub prop_hit: Vec<bool>,
     scenario_start: Option<nfs_assets::ScenarioStart>,
     scenario_name: Option<String>,
@@ -336,6 +339,37 @@ fn scenario_start_pose(start: nfs_assets::ScenarioStart) -> (Vec3, f32) {
     let forward = Vec3::from(start.forward).normalize_or_zero();
     let yaw = (-forward.x).atan2(-forward.z);
     (Vec3::from(start.position), yaw)
+}
+
+fn quick_race_grid(
+    course: &nfs_assets::TrackCourse,
+    laps: u32,
+    opponents: u32,
+) -> (nfs_assets::RaceSession, Vec<nfs_assets::AiOpponent>) {
+    let effective_laps = if course.is_circuit { laps } else { 1 };
+    let mut session =
+        nfs_assets::RaceSession::new("quick_race", effective_laps, !course.is_circuit);
+    session.add_participant(0, "Player", true, "Porsche 911 Carrera");
+    let mut ai = Vec::with_capacity(opponents as usize);
+    let profiles = [
+        nfs_assets::AiProfile::pro(),
+        nfs_assets::AiProfile::veteran(),
+        nfs_assets::AiProfile::novice(),
+    ];
+    for (i, profile) in profiles.into_iter().take(opponents as usize).enumerate() {
+        let slot = i + 1;
+        let opponent = nfs_assets::AiOpponent::new(
+            slot,
+            profile.name.clone(),
+            "Porsche 911 Carrera",
+            profile,
+            slot,
+            course,
+        );
+        session.add_participant(slot, opponent.name.clone(), false, "Porsche 911 Carrera");
+        ai.push(opponent);
+    }
+    (session, ai)
 }
 
 impl Renderer {
@@ -572,7 +606,7 @@ impl Renderer {
             .unwrap_or(scene.meshes.len());
 
         // Build prop instance draw calls
-        let prop_draws: Vec<PropDraw> = scene
+        let mut prop_draws: Vec<PropDraw> = scene
             .prop_instances
             .iter()
             .map(|inst| {
@@ -603,6 +637,22 @@ impl Renderer {
                 }
             })
             .collect();
+
+        let mut scenario_props: Vec<_> = scene
+            .prop_instances
+            .iter()
+            .map(|inst| nfs_assets::scenario::ScenarioProp {
+                target: nfs_assets::scenario::PropTarget {
+                    position: inst.position,
+                    fourcc: scene.prop_articles[inst.article_index].fourcc,
+                },
+                triggerable: inst.triggerable,
+            })
+            .collect();
+        nfs_assets::scenario::hide_triggerable_props(&mut scenario_props);
+        for (draw, prop) in prop_draws.iter_mut().zip(&scenario_props) {
+            draw.model.w_axis.y = prop.target.position[1];
+        }
 
         // Build sky dome
         let sky = scene.sky_texture.as_ref().map(|sky_tex| {
@@ -1057,7 +1107,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             barrier_config: nfs_assets::BarrierCollisionConfig::default(),
             is_wrong_way: false,
             car_render,
-            prop_positions: scene.prop_instances.iter().map(|p| p.position).collect(),
+            trigger_half_extents: None,
+            scenario_props,
             prop_hit: vec![false; scene.prop_instances.len()],
             scenario_start: scene.scenario_start,
             scenario_name: scene.scenario_name.clone(),
@@ -1647,15 +1698,23 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                     && self.mission_elapsed_time > self.mission_time_limit
                 {
                     self.mission_timed_out = true;
-                } else if let Some(progress) = &mut self.mission_progress {
-                    progress.observe(player_pos);
+                } else if let Some(vehicle) = self.trigger_vehicle()
+                    && let Some(progress) = &mut self.mission_progress
+                {
+                    let previous = progress.passed_gates();
+                    progress.observe(&vehicle);
+                    if progress.passed_gates() != previous
+                        && let Some(target) = progress.last_linked_prop()
+                    {
+                        self.activate_scenario_prop(target);
+                    }
                 }
             }
             if !self.mission_timed_out {
                 // Check prop (cone) collision detection
-                for i in 0..self.prop_positions.len() {
+                for i in 0..self.scenario_props.len() {
                     if !self.prop_hit[i] {
-                        let p = self.prop_positions[i];
+                        let p = self.scenario_props[i].target.position;
                         let dx = player_pos[0] - p[0];
                         let dy = player_pos[1] - p[1];
                         let dz = player_pos[2] - p[2];
@@ -1700,6 +1759,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     pub fn reset_car(&mut self) {
+        self.reset_scenario_props();
         if let Some(course) = &self.track_course {
             let (pos, _, yaw) = nfs_assets::calculate_grid_slot(0, course);
             let mut car_pos = Vec3::from(pos);
@@ -1782,6 +1842,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 ai.forward = ai_fwd;
                 ai.yaw = ai_yaw;
                 ai.current_speed = 0.0;
+                ai.velocity = [0.0; 3];
+                ai.current_controls = Default::default();
+                ai.lookahead_wp_idx = 1;
                 ai.tracker = nfs_assets::CourseProgressTracker::new(p);
                 ai.distance_along_course = 0.0;
                 ai.laps_completed = 0;
@@ -1901,6 +1964,36 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
     }
 
+    /// Start a standalone race on the loaded course with the selected grid size.
+    pub fn configure_quick_race(&mut self, laps: u32, opponents: u32) -> Result<(), String> {
+        if !matches!(laps, 1 | 3 | 5) {
+            return Err("Quick Race laps must be 1, 3, or 5".into());
+        }
+        if !matches!(opponents, 0 | 3) {
+            return Err("Quick Race opponents must be 0 or 3".into());
+        }
+        let course = self
+            .track_course
+            .as_ref()
+            .ok_or("Quick Race requires a track course")?;
+        if course.checkpoints.is_empty() {
+            return Err("Quick Race track course has no starting grid".into());
+        }
+        let (session, ai) = quick_race_grid(course, laps, opponents);
+        self.race_session = Some(session);
+        self.ai_opponents = ai;
+        self.is_mission_mode = false;
+        self.mission_progress = None;
+        self.mission_timed_out = false;
+        self.mission_time_limit = 0.0;
+        self.mission_elapsed_time = 0.0;
+        self.stunt_detector = None;
+        self.prop_hit.fill(false);
+        self.is_wrong_way = false;
+        self.reset_car();
+        Ok(())
+    }
+
     pub fn configure_mission(&mut self, is_factory: bool, time_limit: f32, has_opponent: bool) {
         self.is_mission_mode = is_factory;
         self.mission_progress = None;
@@ -1938,6 +2031,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         self.mission_timed_out = false;
         if self.is_mission_mode
             && code.eq_ignore_ascii_case("0M01")
+            && self.trigger_half_extents.is_some()
             && self.scenario_name.as_deref() == Some("skidpad_st1.scn")
         {
             let start = self
@@ -1948,10 +2042,79 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             self.mission_progress =
                 nfs_assets::scenario::ScenarioProgress::new(self.scenario_gates.clone(), start);
         }
+        self.reset_scenario_props();
+    }
+
+    fn activate_scenario_prop(&mut self, target: nfs_assets::scenario::PropTarget) {
+        nfs_assets::scenario::select_triggerable_prop(&mut self.scenario_props, target);
+        self.sync_scenario_prop_transforms();
+    }
+
+    fn trigger_vehicle(&self) -> Option<nfs_assets::scenario::TriggerVehicle> {
+        let half_extents = self.trigger_half_extents?;
+        let (position, forward, right, up, velocity) = if self.sim_mode {
+            let body = &self.sim_car.as_ref()?.body;
+            (
+                body.position,
+                body.forward(),
+                body.right(),
+                body.up(),
+                body.linear_velocity,
+            )
+        } else {
+            let car = self.car.as_ref()?;
+            (
+                car.pos + Vec3::Y * half_extents.y,
+                car.forward(),
+                car.right(),
+                Vec3::Y,
+                car.forward() * car.speed,
+            )
+        };
+        Some(nfs_assets::scenario::TriggerVehicle {
+            position,
+            forward,
+            right,
+            up,
+            velocity,
+            half_extents,
+            expanded: false,
+        })
+    }
+
+    fn sync_scenario_prop_transforms(&mut self) {
+        for (draw, prop) in self.prop_draws.iter_mut().zip(&self.scenario_props) {
+            draw.model.w_axis.y = prop.target.position[1];
+        }
+    }
+
+    fn reset_scenario_props(&mut self) {
+        nfs_assets::scenario::hide_triggerable_props(&mut self.scenario_props);
+        if self.is_mission_mode
+            && self.mission_progress.is_some()
+            && let Some(target) = self.scenario_start.and_then(|start| start.linked_prop)
+        {
+            nfs_assets::scenario::select_triggerable_prop(&mut self.scenario_props, target);
+        }
+        self.sync_scenario_prop_transforms();
     }
 
     pub fn get_mission_goal_supported(&self) -> bool {
         self.mission_progress.is_some()
+    }
+
+    pub fn get_mission_passed_gates(&self) -> u32 {
+        self.mission_progress
+            .as_ref()
+            .map_or(0, |p| p.passed_gates() as u32)
+    }
+
+    pub fn get_scenario_prop_positions(&self) -> Vec<f32> {
+        self.scenario_props
+            .iter()
+            .filter(|p| p.triggerable)
+            .flat_map(|p| p.target.position)
+            .collect()
     }
 
     pub fn get_mission_goal_reached(&self) -> bool {
@@ -2070,8 +2233,22 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         self.car.is_some()
     }
 
+    /// Replace the active physics profile with a parsed original .sim file.
+    /// Parse and validate first so malformed input cannot discard the current car.
+    pub fn set_car_sim(&mut self, bytes: &[u8]) -> Result<(), String> {
+        let car = self.car.as_ref().ok_or("No car on the current track")?;
+        let sim = simulation_from_bytes_at_pose(bytes, car.pos, car.yaw)?;
+        self.sim_car = Some(sim);
+        Ok(())
+    }
+
     /// Load genuine Porsche car model geometry, textures, and simulation profile onto the track.
     pub fn set_car_model(&mut self, scene: &Scene, car_name: &str) -> Result<(), String> {
+        // The car loader divides raw geometry by five; driving rendering below
+        // restores it. This adapter uses that same visible body's dimensions.
+        let extents = (Vec3::from(scene.bounds[1]) - Vec3::from(scene.bounds[0])) * 2.5;
+        self.trigger_half_extents =
+            (extents.is_finite() && extents.min_element() > 0.0).then_some(extents);
         if scene.meshes.is_empty() {
             return Err("Car scene has no geometry".into());
         }
@@ -2356,6 +2533,50 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         sim.reset(spawn_pos + Vec3::Y * sim.resting_height(), spawn_yaw);
         self.sim_car = Some(sim);
     }
+}
+
+fn simulation_from_bytes_at_pose(
+    bytes: &[u8],
+    road_position: Vec3,
+    yaw: f32,
+) -> Result<nfs_assets::physics::VehicleSimulation, String> {
+    let spec = nfs_formats::parse_sim(bytes).map_err(|e| format!("Invalid car SIM: {e}"))?;
+    // The format parser checks structure and length. Guard the fields used by
+    // physics as well: a correctly sized damaged file can contain NaN or zeroes.
+    if !spec.mass_kg.is_finite()
+        || spec.mass_kg <= 0.0
+        || !spec.wheelbase_m.is_finite()
+        || spec.wheelbase_m <= 0.0
+        || !(1..=6).contains(&spec.gear_count)
+        || spec
+            .forward_gears
+            .iter()
+            .any(|ratio| !ratio.is_finite() || *ratio <= 0.0)
+        || !spec.reverse_gear.is_finite()
+        || !spec.final_drive.is_finite()
+        || spec.final_drive <= 0.0
+        || !spec.redline_rpm.is_finite()
+        || spec.redline_rpm <= 0.0
+        || !spec.idle_or_step_rpm.is_finite()
+        || !spec.torque_curve.iter().all(|torque| torque.is_finite())
+        || !spec.brake_bias.is_finite()
+        || !spec.drag_coeff.is_finite()
+        || !spec.swaybar_stiffness.is_finite()
+        || !spec.suspension_stiffness.is_finite()
+        || !spec.front_track_m.is_finite()
+        || spec.front_track_m <= 0.0
+        || !spec.rear_track_m.is_finite()
+        || spec.rear_track_m <= 0.0
+        || !spec.damping_compression.is_finite()
+        || !spec.damping_rebound.is_finite()
+        || !spec.tire_grip.is_finite()
+        || !spec.cg_offset_m.iter().all(|offset| offset.is_finite())
+    {
+        return Err("Invalid car SIM: nonphysical or nonfinite parameters".into());
+    }
+    let mut sim = nfs_assets::physics::VehicleSimulation::from_sim(&spec);
+    sim.reset(road_position + Vec3::Y * sim.resting_height(), yaw);
+    Ok(sim)
 }
 
 pub fn sample_road_elevation_from_edges(
@@ -2715,5 +2936,60 @@ fn create_sky_state(
         camera_buffer,
         camera_group,
         texture_group,
+    }
+}
+
+#[cfg(test)]
+mod sim_loading_tests {
+    use super::*;
+
+    fn put_f32(data: &mut [u8], offset: usize, value: f32) {
+        data[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    #[test]
+    fn original_sim_preserves_road_pose_and_rejects_damage() {
+        let mut data = [0u8; nfs_formats::SIM_FILE_SIZE];
+        data[..4].copy_from_slice(b"Test");
+        put_f32(&mut data, 0x40, 1100.0);
+        put_f32(&mut data, 0x44, 2400.0);
+        data[0x50..0x54].copy_from_slice(&1i32.to_le_bytes());
+        put_f32(&mut data, 0x68, 3.2);
+        put_f32(&mut data, 0x80, 3.9);
+        put_f32(&mut data, 0x94, 6000.0);
+        put_f32(&mut data, 0x10c, 1450.0);
+        put_f32(&mut data, 0x110, 1450.0);
+
+        let position = Vec3::new(30.0, 4.0, -12.0);
+        let sim = simulation_from_bytes_at_pose(&data, position, 1.2).unwrap();
+        assert_eq!(sim.body.mass, 1100.0);
+        assert_eq!(sim.body.position.x, position.x);
+        assert_eq!(sim.body.position.z, position.z);
+        assert!((sim.body.position.y - position.y - sim.resting_height()).abs() < 1e-5);
+        assert_eq!(sim.body.orientation, glam::Quat::from_rotation_y(1.2));
+        assert!(simulation_from_bytes_at_pose(&data[..100], position, 1.2).is_err());
+        put_f32(&mut data, 0x40, f32::NAN);
+        assert!(simulation_from_bytes_at_pose(&data, position, 1.2).is_err());
+    }
+
+    #[test]
+    fn quick_race_grid_respects_laps_sprint_and_opponents() {
+        let mut course = nfs_assets::TrackCourse {
+            waypoints: Vec::new(),
+            checkpoints: Vec::new(),
+            total_length: 0.0,
+            is_circuit: true,
+        };
+        let (session, ai) = quick_race_grid(&course, 5, 3);
+        assert_eq!(session.lap_tracker.total_laps, 5);
+        assert_eq!(session.participants.len(), 4);
+        assert_eq!(ai.len(), 3);
+        let (session, ai) = quick_race_grid(&course, 3, 0);
+        assert_eq!(session.lap_tracker.total_laps, 3);
+        assert_eq!(session.participants.len(), 1);
+        assert!(ai.is_empty());
+        course.is_circuit = false;
+        let (session, _) = quick_race_grid(&course, 5, 0);
+        assert_eq!(session.lap_tracker.total_laps, 1);
     }
 }

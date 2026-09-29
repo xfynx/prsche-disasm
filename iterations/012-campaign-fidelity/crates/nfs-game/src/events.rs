@@ -67,7 +67,8 @@ pub fn get_factory_driver_first_event() -> EventDefinition {
         track_id: 13,
         track_name: "skidpad".to_string(),
         car_model: "boxster".to_string(),
-        car_sim: "boxster".to_string(),
+        // Standard Boxster 2.5 profile from nfs5.car record 60.
+        car_sim: "boxster25".to_string(),
         laps: 1,
         opponents_count: 0,
         entry_fee: 0,

@@ -278,6 +278,15 @@ function loadStoredProfile() {
   if (currentProfile && typeof currentProfile.version !== "number") {
     currentProfile.version = 1;
   }
+  // Older JS starter profiles used a nonexistent SIM name for the same starter model.
+  for (const car of currentProfile?.garage || []) {
+    if (car.model_name === "356_1" && car.sim_name === "356road11") {
+      car.sim_name = "356coupe11";
+    }
+    if (String(car.model_name || '').toLowerCase() === "boxster" && car.sim_name === "boxster") {
+      car.sim_name = "boxster25";
+    }
+  }
   if (!currentProfile) {
     if (typeof shell_profile_new === "function") {
       try {
@@ -295,7 +304,7 @@ function loadStoredProfile() {
           {
             model_name: "356_1",
             display_name: "356 'No. 1' Roadster (1948)",
-            sim_name: "356road11",
+            sim_name: "356coupe11",
             era: "Classic",
             year: 1948,
             color_index: 0,
@@ -1241,7 +1250,10 @@ if (briefingStartBtn) {
     modeSelect.value = "track";
     updateOptions();
     targetSelect.value = activeCareerEvent.trackId;
-    await loadTarget(specificScn);
+    if (!await loadTarget(specificScn)) {
+      if (modal) modal.hidden = false;
+      return;
+    }
 
     // Load authentic car model for this career event
     let targetCar = "boxster";
@@ -1253,38 +1265,20 @@ if (briefingStartBtn) {
     }
     targetCar = targetCar.toLowerCase();
 
-    if (viewer && typeof viewer.set_car_model === "function") {
-      try {
-        let carNames = [];
-        let carBytes = [];
-        const isCustom = useCustomFiles && selectedFiles.length > 0;
-        if (isCustom) {
-          for (const file of selectedFiles) {
-            const basename = selectedName(file).split(/[\\/]/).pop().toLowerCase();
-            if (![`${targetCar}.crp`, `${targetCar}.tpg`, `${targetCar}.clr`].includes(basename) && !basename.endsWith(".fsh")) {
-              continue;
-            }
-            carNames.push(selectedName(file));
-            carBytes.push(new Uint8Array(await file.arrayBuffer()));
-          }
-        } else {
-          const carPaths = findCarFilesFromCatalog(targetCar);
-          if (carPaths.length > 0) {
-            const fetched = await fetchGameFiles(carPaths);
-            carNames = fetched.names;
-            carBytes = fetched.bytes;
-          }
-        }
-        if (carNames.length > 0) {
-          const modelLog = viewer.set_car_model(carNames, carBytes, targetCar);
-          console.log("Loaded authentic car for event:", modelLog);
-        }
-      } catch (carErr) {
-        console.warn("Could not load car model for event:", carErr);
-      }
+    try {
+      const selectedIdx = currentProfile?.selected_car_index || 0;
+      const simName = activeCareerEvent.is_factory
+        ? activeCareerEvent.mission_obj?.car_sim || activeCareerEvent.car_sim
+        : currentProfile?.garage?.[selectedIdx]?.sim_name;
+      await loadRaceCar(targetCar, simName);
+    } catch (error) {
+      setStatus(`Заезд не начат: ${error instanceof Error ? error.message : String(error)}`);
+      if (modal) modal.hidden = false;
+      return;
     }
 
     if (viewer) {
+      if (!viewer.is_sim_mode()) viewer.toggle_sim_mode();
       const isDuel = activeCareerEvent.mission_obj?.type === "duel" || (activeCareerEvent.mission_obj?.title || "").toLowerCase().includes("duel");
       if (typeof viewer.configure_mission === "function") {
         viewer.configure_mission(
@@ -1622,6 +1616,7 @@ function findTrackFilesFromCatalog(target, specificScn = null) {
         `${targetLower}.edg`,
         `${targetLower}.map`,
         `${targetLower}.jnc`,
+        "animdefs.txt",
         `${targetLower}0.lsp`,
         `${targetLower}.lsp`,
       ].includes(basename)
@@ -1696,15 +1691,137 @@ async function fetchGameFiles(paths) {
   return { names, bytes };
 }
 
+// Model names and simulation names are different identifiers (e.g. boxster / boxster25).
+// Resolve only the requested SIM; ambiguous or missing resources must not choose another car.
+function findSimResource(resources, simName, nameOf = value => value) {
+  if (typeof simName !== "string" || !simName.trim()) {
+    throw new Error("Не указан файл физики автомобиля.");
+  }
+  const basename = simName.trim().split(/[\\/]/).pop().replace(/\.sim$/i, "").toLowerCase() + ".sim";
+  const matches = resources.filter(value => nameOf(value).split(/[\\/]/).pop().toLowerCase() === basename);
+  if (matches.length !== 1) {
+    throw new Error(matches.length ? `Найдено несколько файлов ${basename}.` : `Не найден файл ${basename}.`);
+  }
+  return matches[0];
+}
+
+async function loadCarSim(simName) {
+  let data;
+  if (useCustomFiles && selectedFiles.length > 0) {
+    const file = findSimResource(selectedFiles, simName, selectedName);
+    data = new Uint8Array(await file.arrayBuffer());
+  } else {
+    const path = findSimResource(localGameFiles, simName);
+    data = (await fetchGameFiles([path])).bytes[0];
+  }
+  viewer.set_car_sim(data);
+}
+
+async function loadRaceCar(model, simName) {
+  const target = model.toLowerCase();
+  let files;
+  if (useCustomFiles && selectedFiles.length > 0) {
+    const selected = selectedFiles.filter(file => {
+      const basename = selectedName(file).split(/[\\/]/).pop().toLowerCase();
+      return [`${target}.crp`, `${target}.tpg`, `${target}.clr`].includes(basename) || basename.endsWith('.fsh');
+    });
+    files = { names: selected.map(selectedName), bytes: await Promise.all(selected.map(async file => new Uint8Array(await file.arrayBuffer()))) };
+  } else {
+    files = await fetchGameFiles(findCarFilesFromCatalog(target));
+  }
+  if (!files.names.some(name => name.split(/[\\/]/).pop().toLowerCase() === `${target}.crp`)) {
+    throw new Error(`Не найдена модель ${target}.crp.`);
+  }
+  viewer.set_car_model(files.names, files.bytes, target);
+  await loadCarSim(simName);
+}
+
+const quickRaceModal = document.querySelector('#quickRaceModal');
+const quickRaceTrack = document.querySelector('#quickRaceTrack');
+const quickRaceCar = document.querySelector('#quickRaceCar');
+const quickRaceStartBtn = document.querySelector('#quickRaceStartBtn');
+const quickRaceCancelBtn = document.querySelector('#quickRaceCancelBtn');
+const quickRaceStatus = document.querySelector('#quickRaceStatus');
+let quickRaceCars = [];
+function openQuickRace() {
+  quickRaceModal.hidden = false;
+  quickRaceStatus.textContent = '';
+  const populate = (select, options) => {
+    const previous = select.value;
+    select.replaceChildren();
+    for (const [value, label] of options) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      select.appendChild(option);
+    }
+    if (options.some(([value]) => value === previous)) select.value = previous;
+  };
+  populate(quickRaceTrack, availableTracks.map(id => [id, KNOWN_TRACKS.find(track => track.id === id)?.name || id]));
+  try {
+    const resources = useCustomFiles ? selectedFiles.map(selectedName) : localGameFiles;
+    quickRaceCars = JSON.parse(shell_get_dealership_catalog()).filter(car => {
+      if (!availableCars.includes(car.model_name.toLowerCase())) return false;
+      try { findSimResource(resources, car.sim_name); return true; } catch { return false; }
+    });
+    populate(quickRaceCar, quickRaceCars.map(car => [car.id, car.display_name]));
+    quickRaceStartBtn.disabled = !quickRaceCars.length || !availableTracks.length;
+    if (quickRaceStartBtn.disabled) quickRaceStatus.textContent = 'Выберите папку игры с трассами, моделями и файлами физики автомобилей.';
+  } catch (error) {
+    quickRaceStartBtn.disabled = true;
+    quickRaceStatus.textContent = String(error);
+  }
+  quickRaceTrack.focus();
+}
+document.querySelector('#quickRaceBtn').addEventListener('click', openQuickRace);
+quickRaceCancelBtn.addEventListener('click', () => {
+  if (!quickRaceCancelBtn.disabled) quickRaceModal.hidden = true;
+});
+quickRaceStartBtn.addEventListener('click', async () => {
+  if (quickRaceStartBtn.disabled) return;
+  const car = quickRaceCars.find(car => car.id === quickRaceCar.value);
+  if (!car) return;
+  const track = quickRaceTrack.value;
+  const laps = Number(document.querySelector('#quickRaceLaps').value);
+  const opponents = Number(document.querySelector('#quickRaceOpponents').value);
+  quickRaceStartBtn.disabled = true;
+  quickRaceCancelBtn.disabled = true;
+  quickRaceStatus.textContent = 'Загрузка заезда…';
+  clearNavigation();
+  // Clear career identity before loading or restarting any race; no rewards are possible.
+  activeCareerEvent = null;
+  eventFinishedHandled = false;
+  if (raceResultsModal) raceResultsModal.hidden = true;
+  try {
+    modeSelect.value = 'track';
+    updateOptions();
+    targetSelect.value = track;
+    if (!await loadTarget()) throw new Error(statusLine.textContent);
+    await loadRaceCar(car.model_name, car.sim_name);
+    if (!viewer.is_sim_mode()) viewer.toggle_sim_mode();
+    viewer.configure_quick_race(laps, opponents);
+    if (!viewer.is_drive_mode()) viewer.toggle_camera_mode();
+    quickRaceModal.hidden = true;
+    setMenuVisible(false);
+    syncTourButton();
+    setStatus(`Quick Race: ${car.display_name} · ${track}`);
+  } catch (error) {
+    quickRaceStatus.textContent = error instanceof Error ? error.message : String(error);
+  } finally {
+    quickRaceStartBtn.disabled = false;
+    quickRaceCancelBtn.disabled = false;
+  }
+});
+
 async function loadTarget(specificScn = null) {
   if (!viewer) {
     setStatus("WebGPU еще не готов.");
-    return;
+    return false;
   }
   const isCustom = useCustomFiles && selectedFiles.length > 0;
   if (!isCustom && !localGameAvailable) {
     setStatus("Выберите папку игры или файлы.");
-    return;
+    return false;
   }
 
   const isTrack = modeSelect.value === "track";
@@ -1764,6 +1881,7 @@ async function loadTarget(specificScn = null) {
               `${target}.edg`,
               `${target}.map`,
               `${target}.jnc`,
+              "animdefs.txt",
               `${target}0.lsp`,
               `${target}.lsp`,
             ].includes(basename)
@@ -1800,7 +1918,7 @@ async function loadTarget(specificScn = null) {
       bytes = fetched.bytes;
     }
 
-    if (generation !== loadGeneration) return;
+    if (generation !== loadGeneration) return false;
     if (names.length === 0) {
       throw new Error(`Файлы для ${isTrack ? "трассы" : "авто"} "${target}" не найдены.`);
     }
@@ -1837,6 +1955,8 @@ async function loadTarget(specificScn = null) {
           }
           if (carNames.length > 0) {
             viewer.set_car_model(carNames, carBytes, carModel);
+            // Free driving uses the selected garage car's SIM as well.
+            await loadCarSim(currentProfile?.garage?.[selIdx]?.sim_name || "356coupe11");
           }
         } catch (carErr) {
           console.warn("Auto-load car model onto track failed:", carErr);
@@ -1850,9 +1970,11 @@ async function loadTarget(specificScn = null) {
 
     syncTourButton();
     queueFrame();
+    return true;
   } catch (error) {
-    if (generation !== loadGeneration) return;
+    if (generation !== loadGeneration) return false;
     setStatus(error instanceof Error ? error.message : String(error));
+    return false;
   } finally {
     if (generation === loadGeneration) {
       loadButton.disabled = false;
@@ -2019,9 +2141,14 @@ function isTyping(event) {
 window.addEventListener("keydown", (event) => {
   if (event.code === "Escape" && !event.repeat) {
     event.preventDefault();
+    if (!quickRaceModal.hidden) {
+      if (!quickRaceCancelBtn.disabled) quickRaceModal.hidden = true;
+      return;
+    }
     setMenuVisible(!menuVisible);
     return;
   }
+  if (!quickRaceModal.hidden) return;
   if (isTyping(event)) return;
   if (event.ctrlKey || event.altKey || event.metaKey) return;
   if (event.code === "KeyH" && !event.repeat) {

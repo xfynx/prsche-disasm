@@ -26,7 +26,11 @@
 - Поле `0x58`: String ID `3005` (Pass HUD / Поздравление: «Hey there, welcome to the team. I’m Rolf and I'm the Test Driving Supervisor for the Porsche Test Team...»).
 - Поле `0x64`: String ID `3010` (Fail HUD / Отказ: «I’m sorry, my young friend, but you just don’t have the skills we require. Come and see me again when you’ve got a bit more experience...»).
 - Поле `0x72`: ID трассы: `13` (0x000d), соответствует `skidpad` в `nfs5.trk`.
-- Автомобиль: `Porsche Boxster` (модель `boxster`, sim `boxster`, 2.5L).
+- Автомобиль: `Porsche Boxster` (модель `boxster`, sim `boxster25`, 2.5L).
+  Уточнение 2026-09-26: `nfs5.car` record 60 содержит
+  `1997Boxster25 / Boxster / Boxster25` (spec/model/SIM, offsets 0x48/0x7c/0xb0,
+  размер записи 1648). `boxster.sim` отсутствует; `boxster25.sim` — 328 байт, 1252 кг.
+  Это подтверждает связь модели и SIM; правила миссии и её полный сценарий ещё открыты.
 
 ### 2.2. Правила миссии
 - **Условие победы (Pass)**: Финиш за время $\le 32.0$ с.

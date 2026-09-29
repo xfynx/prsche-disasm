@@ -192,7 +192,8 @@ pub fn get_dealership_catalog() -> Vec<MarketCar> {
         MarketCar {
             id: "boxster_986".into(),
             model_name: "boxster".into(),
-            sim_name: "boxster".into(),
+            // nfs5.car record 60: 1997Boxster25 / Boxster / Boxster25.
+            sim_name: "boxster25".into(),
             display_name: "'97 Boxster (986)".into(),
             year: 1997,
             era: TournamentEra::Modern,

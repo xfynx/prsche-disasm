@@ -29,21 +29,27 @@ const { spawn, spawnSync } = require('node:child_process');
   }
   let browser;
   try {
-  // Full Chromium: headless shell exposes no adapter here.
-  browser = await chromium.launch({ channel: 'chromium', headless: false });
+  // Use full Chromium's headless mode, not headless-shell, to avoid OS focus theft during driving.
+  browser = await chromium.launch({ channel: 'chromium', headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   // Harness-only access to read-only telemetry; no test global in shipped main.js.
   await page.route('**/main.js', async route => {
     const response = await route.fetch();
-    await route.fulfill({ response, body: (await response.text()) + '\n globalThis.readDriveTestState = () => ({ pose: Array.from(viewer.get_car_pose()), sim: viewer.is_sim_mode(), phase: viewer.get_race_phase(), speed: viewer.get_car_speed(), gear: viewer.get_car_gear(), goalSupported: viewer.get_mission_goal_supported(), goalReached: viewer.get_mission_goal_reached(), timedOut: viewer.get_mission_timed_out() });' });
+    await route.fulfill({ response, body: (await response.text()) + '\n globalThis.readDriveTestState = () => ({ pose: Array.from(viewer.get_car_pose()), props: Array.from(viewer.get_scenario_prop_positions()), sim: viewer.is_sim_mode(), mass: viewer.get_car_sim_mass(), simName: viewer.get_car_sim_name(), participants: viewer.get_total_participants(), laps: viewer.get_total_laps(), career: activeCareerEvent, profile: JSON.stringify(currentProfile), phase: viewer.get_race_phase(), speed: viewer.get_car_speed(), gear: viewer.get_car_gear(), gates: viewer.get_mission_passed_gates(), goalSupported: viewer.get_mission_goal_supported(), goalReached: viewer.get_mission_goal_reached(), timedOut: viewer.get_mission_timed_out() });' });
   });
   const errors = [];
   const checks = [];
+  const knownFailures = [];
   page.on('pageerror', error => errors.push(String(error)));
   page.on('console', message => {
     if (message.type() === 'error') errors.push(message.text());
+    if (message.type() === 'warning') console.log('browser warning:', message.text());
   });
   const screenshot = name => page.screenshot({ path: path.join(output, name), fullPage: true });
+  const sourceMass = name => fs.readFileSync(path.resolve(__dirname,
+    '../../../local/game/GameData/Simulation/CarData', `${name}.sim`)).readFloatLE(0x40);
+  const sourceName = name => fs.readFileSync(path.resolve(__dirname,
+    '../../../local/game/GameData/Simulation/CarData', `${name}.sim`)).subarray(0, 64).toString('utf8').split('\0')[0].trim();
   const loaded = name => page.waitForFunction(name => {
     const status = document.querySelector('#status').textContent;
     return status.includes(`"${name}" загружен`) && !document.querySelector('#targetSelect').disabled;
@@ -53,6 +59,8 @@ const { spawn, spawnSync } = require('node:child_process');
     console.log('page loaded; waiting for skidpad');
     await loaded('skidpad');
     checks.push('skidpad boot');
+    assert.equal((await page.evaluate(() => readDriveTestState())).mass, sourceMass('356coupe11'));
+    checks.push('garage 356 runtime mass matches original 356coupe11.sim');
     console.log('skidpad loaded');
     assert.equal(await page.locator('#hud').isVisible(), false);
     assert.equal(await page.locator('#summary').isVisible(), false);
@@ -193,8 +201,20 @@ const { spawn, spawnSync } = require('node:child_process');
     assert.equal(await page.locator('.briefing-visual-col').isVisible(), false);
     assert.equal(await page.locator('#briefingTrackFacility').textContent(), 'EVOLUTION TOURNAMENT');
     await screenshot('web-evolution-briefing.png');
-    await page.locator('#briefingCancelBtn').click();
     checks.push('Evolution cup selection and briefing contain no Factory portrait or mission map');
+
+    // A damaged required SIM must keep the briefing open, never start on model-table physics.
+    await page.route('**/356coupe11.sim', route => route.fulfill({ status: 200, body: Buffer.from([0, 1, 2]) }));
+    await page.locator('#briefingStartBtn').click();
+    await page.waitForFunction(() => document.querySelector('#status').textContent.includes('Заезд не начат:'));
+    assert.equal(await page.locator('#eventBriefingModal').isVisible(), true);
+    await page.unroute('**/356coupe11.sim');
+    await page.locator('#briefingStartBtn').click();
+    await page.waitForFunction(() => document.querySelector('#status').textContent.includes('Карьерный заезд начат:'));
+    assert.equal((await page.evaluate(() => readDriveTestState())).mass, sourceMass('356coupe11'));
+    assert.equal((await page.evaluate(() => readDriveTestState())).sim, true);
+    await page.keyboard.press('Escape');
+    checks.push('Evolution rejects damaged SIM; retry applies original 356coupe11.sim');
 
     // Verify Factory Driver campaign (Points 1 & 3: authentic briefing & genuine car model)
     await page.locator('#careerFactoryBtn').click();
@@ -223,6 +243,10 @@ const { spawn, spawnSync } = require('node:child_process');
     await page.waitForFunction(() => readDriveTestState().goalSupported, null, { timeout: 30000 });
     await page.waitForTimeout(1000);
     const missionState = await page.evaluate(() => readDriveTestState());
+    assert.equal(missionState.mass, sourceMass('boxster25'));
+    assert.equal(missionState.simName, sourceName('boxster25'));
+    assert.equal(missionState.sim, true);
+    checks.push('Factory 0M01 runtime mass matches original boxster25.sim');
     assert.equal(missionState.phase, 2);
     assert.equal(missionState.goalReached, false);
     assert.equal(missionState.timedOut, false);
@@ -230,15 +254,115 @@ const { spawn, spawnSync } = require('node:child_process');
     assert.ok(Math.abs(missionState.pose[2] + 147.240662) < 0.5, 'SCN Start Z');
     assert.ok(missionState.pose[1] > 0.1 && missionState.pose[1] < 1.0, 'car rests on the mission pad');
     await screenshot('web-factory-mission-drive.png');
+    const activeArrows = props => {
+      assert.equal(props.length, 15, 'all five source triggerable arrows loaded');
+      return [0, 1, 2, 3, 4].filter(i => props[i * 3 + 1] < 8000);
+    };
+    assert.deepEqual(activeArrows(missionState.props), [0], 'Start link selects Arrow 1; L A hidden');
+    assert.equal(missionState.gates, 0, 'nearby End cannot finish before waypoints');
+    await page.keyboard.down('w');
+    try {
+      await page.waitForFunction(() => {
+        const props = readDriveTestState().props;
+        return props.length === 15 && props[4] < 8000 && props[1] > 8000;
+      }, null, { timeout: 12000 });
+    } finally { await page.keyboard.up('w'); }
+    assert.deepEqual(activeArrows((await page.evaluate(() => readDriveTestState())).props), [1]);
+    const firstGate = await page.evaluate(() => readDriveTestState());
+    assert.equal(firstGate.gates, 1);
+    assert.ok(firstGate.pose[2] < -115.951881, 'body diagonal triggers before center crosses the source segment');
+    await screenshot('web-factory-arrow-waypoint.png');
+    await page.keyboard.press('r');
+    await page.waitForTimeout(200);
+    assert.deepEqual(activeArrows((await page.evaluate(() => readDriveTestState())).props), [0], 'restart restores Start arrow');
+    assert.equal((await page.evaluate(() => readDriveTestState())).gates, 0, 'restart clears trigger progression');
+    checks.push('0M01 source triggerable metadata: Start Arrow 1, driven waypoint Arrow 2, restart Arrow 1; L A hidden');
+    // Separate diagnostic for the known 0M01 surface/start regression. Quick Race
+    // below must still be exercised even when this mission-specific probe fails.
+    try {
+      await page.keyboard.down('w');
+      await page.waitForFunction(() => readDriveTestState().speed > 15, null, { timeout: 12000 });
+      await page.keyboard.up('w');
+      await page.keyboard.down('s');
+      await page.waitForFunction(() => readDriveTestState().gear < 0 && readDriveTestState().speed < -3, null, { timeout: 12000 });
+      await page.keyboard.up('s');
+      await page.keyboard.down('w');
+      await page.waitForFunction(() => readDriveTestState().gear > 0 && readDriveTestState().speed > 3, null, { timeout: 12000 });
+      checks.push('0M01 Boxster held S/W direction changes');
+    } catch (error) {
+      const diagnostic = { error: String(error), state: await page.evaluate(() => readDriveTestState()) };
+      fs.writeFileSync(path.join(output, 'factory-controls.json'), JSON.stringify(diagnostic, null, 2));
+      await screenshot('web-factory-controls.png');
+      knownFailures.push('0M01 held S/W direction change: see factory-controls.json');
+    } finally {
+      await page.keyboard.up('w');
+      await page.keyboard.up('s');
+    }
     await page.keyboard.press('Escape');
     checks.push('0M01 source briefing placement and SCN start/support; no instant goal (original offset/mission rules not verified)');
 
+    // Quick Race must remove the previous Factory state and leave the profile untouched.
+    const profileBeforeQuickRace = (await page.evaluate(() => readDriveTestState())).profile;
+    await page.locator('#quickRaceBtn').click();
+    await page.locator('#quickRaceTrack').selectOption('skidpad');
+    await page.locator('#quickRaceCar').selectOption('356a_coupe');
+    await page.locator('#quickRaceLaps').selectOption('5');
+    await page.locator('#quickRaceOpponents').selectOption('0');
+    await screenshot('web-quick-race-setup.png');
+    await page.locator('#quickRaceStartBtn').click();
+    await page.waitForFunction(() => document.querySelector('#quickRaceModal').hidden && document.querySelector('#status').textContent.startsWith('Quick Race:'));
+    await waitForStart();
+    const soloRace = await page.evaluate(() => readDriveTestState());
+    assert.equal(soloRace.career, null);
+    assert.equal(soloRace.goalSupported, false);
+    assert.equal(soloRace.participants, 1);
+    assert.equal(soloRace.laps, 5);
+    assert.equal(soloRace.mass, sourceMass('356Acoupe16'));
+    assert.equal(soloRace.simName, sourceName('356Acoupe16'));
+    await page.keyboard.down('w');
+    await page.waitForFunction(() => readDriveTestState().speed > 10, null, { timeout: 12000 });
+    await page.keyboard.up('w');
+    await screenshot('web-quick-race-solo.png');
+    await page.keyboard.press('r');
+    await waitForStart();
+    const restarted = await page.evaluate(() => readDriveTestState());
+    assert.equal(restarted.participants, 1);
+    assert.equal(restarted.laps, 5);
+    assert.equal(restarted.mass, sourceMass('356Acoupe16'));
+    await page.keyboard.press('Escape');
+    await page.locator('#quickRaceBtn').click();
+    await page.locator('#quickRaceCar').selectOption('boxster_986');
+    await page.locator('#quickRaceLaps').selectOption('1');
+    await page.locator('#quickRaceOpponents').selectOption('3');
+    await page.locator('#quickRaceStartBtn').click();
+    await page.waitForFunction(() => document.querySelector('#quickRaceModal').hidden && document.querySelector('#status').textContent.startsWith('Quick Race:'));
+    await waitForStart();
+    const gridRace = await page.evaluate(() => readDriveTestState());
+    assert.equal(gridRace.participants, 4);
+    assert.equal(gridRace.laps, 1);
+    assert.equal(gridRace.simName, sourceName('boxster25'));
+    assert.equal(gridRace.profile, profileBeforeQuickRace);
+    await screenshot('web-quick-race-grid.png');
+    checks.push('Quick Race after Factory: original 356 A/Boxster SIM, 5/1 laps, solo/3 AI, restart and unchanged profile');
+
+    await page.keyboard.down('w');
+    await page.waitForFunction(() => readDriveTestState().speed > 15, null, { timeout: 12000 });
+    await page.keyboard.up('w');
+    await page.keyboard.down('s');
+    await page.waitForFunction(() => readDriveTestState().gear < 0 && readDriveTestState().speed < -3, null, { timeout: 12000 });
+    await page.keyboard.up('s');
+    await page.keyboard.down('w');
+    await page.waitForFunction(() => readDriveTestState().gear > 0 && readDriveTestState().speed > 3, null, { timeout: 12000 });
+    await page.keyboard.up('w');
+    checks.push('original Boxster SIM held S to reverse and W back to forward in Quick Race');
+
     assert.deepEqual(errors, []);
-    fs.writeFileSync(path.join(output, 'browser-check.json'), JSON.stringify({ browser: browser.version(), iteration: '012-campaign-fidelity', checks, errors }, null, 2));
-    console.log(JSON.stringify({ checks, errors }));
+    fs.writeFileSync(path.join(output, 'browser-check.json'), JSON.stringify({ browser: browser.version(), iteration: '012-campaign-fidelity', checks, errors, knownFailures }, null, 2));
+    console.log(JSON.stringify({ checks, errors, knownFailures }));
+    if (knownFailures.length) process.exitCode = 1;
   } catch (error) {
     await screenshot('web-failure.png').catch(() => {});
-    fs.writeFileSync(path.join(output, 'browser-failure.json'), JSON.stringify({ checks, errors, error: String(error), status: await page.locator('#status').textContent().catch(() => '') }, null, 2));
+    fs.writeFileSync(path.join(output, 'browser-failure.json'), JSON.stringify({ checks, errors, error: String(error), state: await page.evaluate(() => readDriveTestState()).catch(() => null), status: await page.locator('#status').textContent().catch(() => '') }, null, 2));
     throw error;
   } finally {
     await browser.close();

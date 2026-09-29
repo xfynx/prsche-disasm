@@ -196,20 +196,14 @@ impl SuspensionSystem {
             let ground = if let Some(surf) = surface {
                 // Search only the suspension's reach. A missing road triangle is
                 // not a hidden plane at y=0, nor permission to attach to another deck.
-                surf.query(
-                    mount_world.x,
-                    mount_world.z,
-                    mount_world.y,
-                    0.49,
-                    uncompressed_len,
-                )
-                .map(|hit| (hit.height, Vec3::from_array(hit.normal)))
+                surf.suspension_ray(mount_world, up, uncompressed_len, 0.49)
+                    .map(|(distance, hit)| (distance, Vec3::from_array(hit.normal)))
             } else {
                 // Explicit flat-ground fixture used by CPU calibration benches.
-                Some((0.0, Vec3::Y))
+                (up.y > 0.01).then(|| (mount_world.y / up.y, Vec3::Y))
             };
 
-            let Some((ground_y, ground_normal)) = ground else {
+            let Some((dist_to_ground, ground_normal)) = ground else {
                 wheel.in_contact = false;
                 wheel.compression = 0.0;
                 wheel.compression_velocity = 0.0;
@@ -218,8 +212,7 @@ impl SuspensionSystem {
                 continue;
             };
 
-            let ground_pt = Vec3::new(mount_world.x, ground_y, mount_world.z);
-            let dist_to_ground = (mount_world - ground_pt).dot(up);
+            let ground_pt = mount_world - up * dist_to_ground;
 
             let compression = (uncompressed_len - dist_to_ground).clamp(0.0, wheel.max_compression);
 
@@ -259,10 +252,12 @@ impl SuspensionSystem {
             }
 
             let arb_diff = match i {
-                WHEEL_FL => -arb_front_force,
-                WHEEL_FR => arb_front_force,
-                WHEEL_RL => -arb_rear_force,
-                WHEEL_RR => arb_rear_force,
+                // More compression on the left must add upward support there
+                // and remove it on the right, opposing rather than amplifying roll.
+                WHEEL_FL => arb_front_force,
+                WHEEL_FR => -arb_front_force,
+                WHEEL_RL => arb_rear_force,
+                WHEEL_RR => -arb_rear_force,
                 _ => 0.0,
             };
 
@@ -337,6 +332,69 @@ mod tests {
             "rear-biased mass needs a longer front axle arm"
         );
         assert!(((front_arm / (front_arm + rear_arm)) - 0.58).abs() < 1e-5);
+    }
+
+    #[test]
+    fn tilted_suspension_uses_ray_distance_and_rejects_inverted_contact() {
+        let sim = test_sim_356();
+        let mut susp = SuspensionSystem::from_sim(&sim);
+        for wheel in &mut susp.wheels {
+            wheel.hardpoint_body = Vec3::ZERO;
+        }
+        let mut body = RigidBody::new(sim.mass_kg, 1.6, 1.3, 4.0, Vec3::ZERO);
+        body.position = Vec3::new(0.0, 0.4, 0.0);
+        body.orientation = glam::Quat::from_rotation_z(std::f32::consts::FRAC_PI_4);
+        susp.update_surface_contact(&mut body, None, 1.0 / 240.0);
+        for wheel in &susp.wheels {
+            let reach = wheel.rest_length + wheel.tire.radius;
+            let expected_length = 0.4 / body.up().y;
+            assert!(wheel.in_contact);
+            assert!(
+                (wheel.compression - (reach - expected_length)).abs() < 1e-5,
+                "compression must use ray/plane distance, not projection"
+            );
+            assert!(
+                (wheel.contact_point_world - (body.position - body.up() * expected_length))
+                    .length()
+                    < 1e-5
+            );
+        }
+        body.orientation = glam::Quat::from_rotation_z(std::f32::consts::PI);
+        susp.update_surface_contact(&mut body, None, 1.0 / 240.0);
+        assert!(susp
+            .wheels
+            .iter()
+            .all(|w| !w.in_contact && w.tire.normal_load == 0.0));
+    }
+
+    #[test]
+    fn anti_roll_bar_opposes_body_roll_without_adding_heave() {
+        let sim = test_sim_356();
+        for roll in [-0.035, 0.035] {
+            let mut body = RigidBody::new(sim.mass_kg, 1.6, 1.3, 4.0, Vec3::ZERO);
+            body.position = Vec3::new(0.0, 0.45, 0.0);
+            body.orientation = glam::Quat::from_rotation_z(roll);
+            let mut baseline = body.clone();
+            let mut springs = SuspensionSystem::from_sim(&sim);
+            springs.anti_roll_front = 0.0;
+            springs.anti_roll_rear = 0.0;
+            springs.update_surface_contact(&mut baseline, None, 1.0 / 240.0);
+            let mut with_bar = SuspensionSystem::from_sim(&sim);
+            with_bar.update_surface_contact(&mut body, None, 1.0 / 240.0);
+            assert!(with_bar
+                .wheels
+                .iter()
+                .all(|w| w.in_contact && w.tire.normal_load > 0.0));
+            let bar_torque = body.accum_torque.z - baseline.accum_torque.z;
+            assert!(
+                bar_torque * roll < 0.0,
+                "bar must restore roll {roll}, but adds torque {bar_torque}"
+            );
+            assert!(
+                (body.accum_force.y - baseline.accum_force.y).abs() < 0.01,
+                "bar transfers load between wheels, not total axle support"
+            );
+        }
     }
 
     #[test]

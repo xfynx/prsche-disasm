@@ -55,6 +55,14 @@ impl Tire {
         self.omega * self.radius
     }
 
+    fn integrate_rotation(&mut self, external_torque: f32, brake_torque: f32, dt: f32) {
+        let unbraked_omega = self.omega + external_torque * dt / self.inertia;
+        let brake_delta = brake_torque.max(0.0) * dt / self.inertia;
+        // A brake can dissipate angular momentum up to standstill, never drive
+        // the wheel through zero into opposite rotation during this step.
+        self.omega = unbraked_omega.signum() * (unbraked_omega.abs() - brake_delta).max(0.0);
+    }
+
     /// Compute contact forces and update wheel rotational velocity.
     ///
     /// - `normal_load`: vertical force from suspension (N)
@@ -82,9 +90,7 @@ impl Tire {
             self.lateral_force = 0.0;
 
             // Free wheel rotation under drive/brake torque
-            let net_torque =
-                drive_torque - self.omega.signum() * brake_torque.min(drive_torque.abs());
-            self.omega += (net_torque / self.inertia) * dt;
+            self.integrate_rotation(drive_torque, brake_torque, dt);
             return Vec2::ZERO;
         }
 
@@ -128,18 +134,7 @@ impl Tire {
         let tire_torque = self.longitudinal_force * self.radius;
         let ext_torque = drive_torque - tire_torque;
 
-        if self.omega.abs() < 0.2 && ext_torque.abs() <= brake_torque {
-            // Static brake lock: brake torque exceeds external torque holding wheel stationary
-            self.omega = 0.0;
-        } else {
-            let brake_oppose = if self.omega.abs() >= 0.2 {
-                self.omega.signum() * brake_torque
-            } else {
-                ext_torque.signum() * brake_torque
-            };
-            let net_wheel_torque = ext_torque - brake_oppose;
-            self.omega += (net_wheel_torque / self.inertia) * dt;
-        }
+        self.integrate_rotation(ext_torque, brake_torque, dt);
 
         // Prevent micro-oscillations near zero speed
         if v_long.abs() < 0.2 && drive_torque.abs() < 1.0 && brake_torque > 10.0 {
@@ -162,6 +157,72 @@ mod tests {
         assert_eq!(forces, Vec2::ZERO);
         assert_eq!(tire.longitudinal_force, 0.0);
         assert_eq!(tire.lateral_force, 0.0);
+    }
+
+    #[test]
+    fn strong_braking_stops_grounded_wheel_without_reversing_it() {
+        for initial_omega in [-2.0, 2.0] {
+            for dt in [1.0 / 240.0, 1.0 / 480.0, 1.0 / 960.0] {
+                let mut tire = Tire::new(0.31, 1.0);
+                tire.omega = initial_omega;
+                // Start with zero slip, isolating the brake's angular impulse.
+                tire.step(4000.0, initial_omega * tire.radius, 0.0, 0.0, 10000.0, dt);
+                assert_eq!(
+                    tire.omega, 0.0,
+                    "braking alone must stop, not reverse a wheel: start={initial_omega}, dt={dt}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn airborne_braking_stops_wheel_without_drive_torque() {
+        for initial_omega in [-2.0, 2.0] {
+            let mut tire = Tire::new(0.31, 1.0);
+            tire.omega = initial_omega;
+            assert_eq!(
+                tire.step(0.0, 0.0, 0.0, 0.0, 10000.0, 1.0 / 240.0),
+                Vec2::ZERO
+            );
+            assert_eq!(
+                tire.omega, 0.0,
+                "brakes must act even without road contact or drive torque"
+            );
+        }
+    }
+
+    #[test]
+    fn modest_brake_slows_rotation_without_instant_lock() {
+        for load in [0.0, 4000.0] {
+            for direction in [-1.0, 1.0] {
+                let mut tire = Tire::new(0.31, 1.0);
+                tire.omega = direction * 20.0;
+                tire.step(load, tire.surface_speed(), 0.0, 0.0, 120.0, 1.0 / 240.0);
+                assert!(
+                    tire.omega * direction > 19.0 && tire.omega * direction < 20.0,
+                    "modest brake must dissipate energy without an instant stop: {}",
+                    tire.omega
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn external_torque_can_overpower_brake_from_rest() {
+        for load in [0.0, 4000.0] {
+            for direction in [-1.0, 1.0] {
+                let mut tire = Tire::new(0.31, 1.0);
+                tire.step(load, 0.0, 0.0, direction * 2400.0, 1200.0, 1.0 / 240.0);
+                assert!(
+                    tire.omega * direction > 0.0,
+                    "drive torque exceeding brake must release stationary wheel"
+                );
+                assert!(
+                    tire.omega.abs() < 2400.0 / tire.inertia / 240.0,
+                    "brake must still oppose the applied torque"
+                );
+            }
+        }
     }
 
     #[test]

@@ -230,7 +230,11 @@ impl VehicleSimulation {
         }
         let desired = if pedal < 0.0 { -1 } else { 1 };
         let current = self.powertrain.current_gear.signum();
-        let speed = self.body.forward_speed();
+        // Suspension settling on a pitched chassis is not ground travel. Using
+        // the full 3D forward speed here can keep braking after XZ has stopped.
+        let forward = self.body.forward();
+        let speed =
+            self.body.linear_velocity.x * forward.x + self.body.linear_velocity.z * forward.z;
         let ground_speed = self
             .body
             .linear_velocity
@@ -762,6 +766,93 @@ mod tests {
         assert_eq!(forward.throttle, 0.0);
         assert_eq!(forward.brake, 1.0, "W must first stop reverse motion");
         assert_eq!(forward.manual_gear, None);
+    }
+
+    #[test]
+    fn original_boxster_held_pedals_reverse_then_forward() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData/Simulation/CarData/boxster25.sim");
+        let bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!("SKIP optional original SIM regression: {}", path.display());
+                return;
+            }
+            Err(error) => panic!("cannot read {}: {error}", path.display()),
+        };
+        let spec = nfs_formats::parse_sim(&bytes).expect("installed Boxster SIM must parse");
+        eprintln!("Original SIM regression: {}", path.display());
+        let surface = flat_test_surface();
+        for hz in [30, 60, 120] {
+            let mut vehicle = VehicleSimulation::from_sim(&spec);
+            vehicle.reset(Vec3::Y * vehicle.resting_height(), 0.0);
+            for _ in 0..hz * 12 {
+                let controls = vehicle.controls_from_signed_pedal(-1.0, 0.0, false);
+                vehicle.step(Some(&surface), &controls, 1.0 / hz as f32);
+                if vehicle.body.forward_speed() < -1.0 {
+                    break;
+                }
+            }
+            assert_eq!(vehicle.powertrain.current_gear, -1);
+            assert!(
+                vehicle.body.forward_speed() < -1.0,
+                "S must establish reverse"
+            );
+            for _ in 0..hz * 12 {
+                let controls = vehicle.controls_from_signed_pedal(1.0, 0.0, false);
+                if controls.manual_gear == Some(1) {
+                    assert!(
+                        vehicle
+                            .body
+                            .linear_velocity
+                            .x
+                            .hypot(vehicle.body.linear_velocity.z)
+                            <= 0.001,
+                        "held W must stop ground motion before selecting forward"
+                    );
+                }
+                vehicle.step(Some(&surface), &controls, 1.0 / hz as f32);
+                if vehicle.body.forward_speed() > 1.0 {
+                    break;
+                }
+            }
+            assert!(
+                vehicle.powertrain.current_gear > 0 && vehicle.body.forward_speed() > 1.0,
+                "held W failed at {hz} Hz: gear={} velocity={:?}, forward={:?}, wheels={:?}",
+                vehicle.powertrain.current_gear,
+                vehicle.body.linear_velocity,
+                vehicle.body.forward(),
+                vehicle
+                    .suspension
+                    .wheels
+                    .iter()
+                    .map(|w| (w.in_contact, w.tire.omega))
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+
+    #[test]
+    fn direction_change_ignores_vertical_settling_after_ground_stop() {
+        let mut vehicle = VehicleSimulation::from_sim(&test_boxster_sim());
+        vehicle.powertrain.current_gear = -1;
+        vehicle.body.orientation = Quat::from_rotation_x(0.1);
+        vehicle.body.linear_velocity = Vec3::new(0.0, -0.25, 0.0);
+        assert!(vehicle.body.forward_speed() < -0.001);
+        let controls = vehicle.controls_from_signed_pedal(1.0, 0.0, false);
+        assert_eq!(
+            controls.manual_gear,
+            Some(1),
+            "ground motion has already stopped"
+        );
+        assert_eq!(controls.throttle, 1.0);
+        vehicle.body.linear_velocity.z = 1.0;
+        let moving = vehicle.controls_from_signed_pedal(1.0, 0.0, false);
+        assert_eq!(
+            moving.manual_gear, None,
+            "must still brake reverse ground motion"
+        );
+        assert_eq!(moving.brake, 1.0);
     }
 
     #[test]

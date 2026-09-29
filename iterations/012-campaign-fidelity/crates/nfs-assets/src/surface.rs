@@ -140,6 +140,82 @@ impl RoadSurface {
         })
     }
 
+    /// Cast along a suspension's local down axis against finite source triangles.
+    /// The signed distance permits a small existing ground penetration to recover.
+    /// Upward/back-face rays cannot attach inverted wheels to the road.
+    pub fn suspension_ray(
+        &self,
+        origin: glam::Vec3,
+        up: glam::Vec3,
+        reach: f32,
+        penetration: f32,
+    ) -> Option<(f32, SurfaceHit)> {
+        if !origin.is_finite()
+            || !up.is_finite()
+            || !reach.is_finite()
+            || !penetration.is_finite()
+            || reach < 0.0
+            || penetration < 0.0
+            || (up.length_squared() - 1.0).abs() > 0.001
+        {
+            return None;
+        }
+        let a = origin + up * penetration;
+        let b = origin - up * reach;
+        let min = a.min(b);
+        let max = a.max(b);
+        let (min_x, min_z) = cell_for(min.x, min.z)?;
+        let (max_x, max_z) = cell_for(max.x, max.z)?;
+        let cells =
+            (i64::from(max_x) - i64::from(min_x) + 1) * (i64::from(max_z) - i64::from(min_z) + 1);
+        if cells > MAX_CELLS_PER_TRIANGLE {
+            return None;
+        }
+        let mut best: Option<(f32, &IndexedTriangle, f32)> = None;
+        for x in min_x..=max_x {
+            for z in min_z..=max_z {
+                let Some(indices) = self.grid.get(&(x, z)) else {
+                    continue;
+                };
+                for &index in indices {
+                    let triangle = &self.triangles[index];
+                    let normal = glam::Vec3::from_array(triangle.normal);
+                    let denominator = up.dot(normal);
+                    if denominator <= 0.01 {
+                        continue;
+                    }
+                    let distance = (origin - glam::Vec3::from_array(triangle.source.positions[0]))
+                        .dot(normal)
+                        / denominator;
+                    if distance < -penetration || distance > reach {
+                        continue;
+                    }
+                    let point = origin - up * distance;
+                    let Some(height) = height_at(&triangle.source.positions, point.x, point.z)
+                    else {
+                        continue;
+                    };
+                    if best
+                        .as_ref()
+                        .is_none_or(|(old, _, _)| distance.abs() < old.abs())
+                    {
+                        best = Some((distance, triangle, height));
+                    }
+                }
+            }
+        }
+        best.map(|(distance, triangle, height)| {
+            (
+                distance,
+                SurfaceHit {
+                    height,
+                    normal: triangle.normal,
+                    identity: triangle.source.identity.clone(),
+                },
+            )
+        })
+    }
+
     fn insert(&mut self, triangle: RoadTriangle) {
         if triangle
             .positions
@@ -443,6 +519,39 @@ mod tests {
                 rejected_giant: 1,
             }
         );
+    }
+
+    #[test]
+    fn suspension_ray_crosses_cells_and_uses_finite_sloped_triangles() {
+        let up = glam::Vec3::new(-0.6, 0.8, 0.0);
+        let flat = RoadSurface::from_triangles([triangle(
+            "pad",
+            [[16.0, 0.0, -1.0], [18.0, 0.0, -1.0], [16.0, 0.0, 1.0]],
+        )]);
+        let origin = glam::Vec3::new(15.8, 0.4, 0.0);
+        assert!(flat.query(origin.x, origin.z, origin.y, 0.0, 1.0).is_none());
+        let (distance, hit) = flat
+            .suspension_ray(origin, up, 0.6, 0.49)
+            .expect("tilted ray enters the neighboring grid cell and pad triangle");
+        assert!((distance - 0.5).abs() < 1e-5);
+        assert_eq!(hit.identity.article_name, "pad");
+        assert!(flat.suspension_ray(origin, up, 0.4, 0.49).is_none());
+        assert!(flat.suspension_ray(origin, -up, 0.6, 0.49).is_none());
+        assert!(flat
+            .suspension_ray(origin + glam::Vec3::Z * 2.0, up, 0.6, 0.49)
+            .is_none());
+        let slope = RoadSurface::from_triangles([triangle(
+            "ramp",
+            [[16.0, 0.0, -1.0], [18.0, 2.0, -1.0], [16.0, 0.0, 1.0]],
+        )]);
+        let origin = glam::Vec3::new(16.3, 1.0, 0.0);
+        let (distance, hit) = slope.suspension_ray(origin, up, 0.6, 0.49).unwrap();
+        assert!((distance - 0.5).abs() < 1e-5);
+        assert!((hit.height - 0.6).abs() < 1e-5);
+        let (_, recovered) = flat
+            .suspension_ray(glam::Vec3::new(16.2, -0.05, 0.0), glam::Vec3::Y, 0.6, 0.1)
+            .unwrap();
+        assert_eq!(recovered.height, 0.0);
     }
 
     #[test]

@@ -9,6 +9,17 @@
 
 ## Current implementation and limits
 
+Updated by Run 005 (2026-09-28): the former swept-point rectangular/forward-entry
+model below is historical. Runtime now uses the recovered shape-1 two-diagonal
+predicate, source optional heading/velocity constraints, source speed bounds
+and type/sequence dispatch. See [predicate evidence](trigger-car-diagonals.md).
+The rendered-model bounds/sim-pose adapter remains unverified against the
+original selected bounds object and contact solver. The Start center/second
+direction vector are proven setup inputs, see [start evidence](0m01-start-pose.md).
+Exact final spawn, complete penalties/results and original playthrough remain open.
+
+### Historical Run 001 implementation
+
 - The selected SCN's `Start` center and direction are carried through the scene loader. Factory mission reset places the car there, projects onto static support, and raises the simulation body by its computed resting height. This is a source-backed course anchor, **not a proven exact original car staging position or offset**. Other modes retain their prior start selection.
 - The SCN records waypoint trigger indexes 1–5, then `End` index 6. Each record supplies a center, two segment endpoints, and an additional numeric field (1.0 for waypoints; 8.5 for End) interpreted here as the short side of a rectangle. The implementation requires forward entry through these rectangles in source order. Forward direction is inferred from successive trigger centers. This is a **reconstruction hypothesis** for mission progress, not a recovered EXE contract for trigger volume or vehicle shape.
 - Factory mission simulation now ignores generic LSP lap completion. `0M01` is the only supported scenario route, and only when `skidpad_st1.scn` was selected. The route reaches success after ordered waypoint→End traversal within 32 s; exceeding the time limit ends it as a failure. Other missions expose goal support as false and cannot receive a fabricated generic-lap victory. Browser glue must call `configure_mission_code(code)` after `configure_mission(...)`, then `restart_race()`, and must award only when `get_mission_goal_supported()` and `get_mission_goal_reached()` are true.

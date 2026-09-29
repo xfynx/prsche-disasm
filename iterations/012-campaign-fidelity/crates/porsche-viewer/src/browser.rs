@@ -110,6 +110,33 @@ impl BrowserViewer {
         }
     }
 
+    /// Install the selected car's original 328-byte physics profile.
+    pub fn set_car_sim(&mut self, bytes: Uint8Array) -> Result<(), JsValue> {
+        let renderer = self
+            .renderer
+            .as_mut()
+            .ok_or_else(|| JsValue::from_str("Renderer not initialized"))?;
+        renderer
+            .set_car_sim(&bytes.to_vec())
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    pub fn get_car_sim_mass(&self) -> f32 {
+        self.renderer
+            .as_ref()
+            .and_then(|renderer| renderer.sim_car.as_ref())
+            .map(|sim| sim.body.mass)
+            .unwrap_or(0.0)
+    }
+
+    pub fn get_car_sim_name(&self) -> String {
+        self.renderer
+            .as_ref()
+            .and_then(|renderer| renderer.sim_car.as_ref())
+            .map(|sim| sim.spec_name.clone())
+            .unwrap_or_default()
+    }
+
     pub fn resize(&mut self, width: u32, height: u32) {
         let width = width.max(1);
         let height = height.max(1);
@@ -255,6 +282,30 @@ impl BrowserViewer {
             .unwrap_or(0)
     }
 
+    /// Read-only diagnostics: linear xyz, angular xyz, then for each wheel
+    /// contact (0/1), angular speed, compression, normal load, longitudinal force;
+    /// followed by body up xyz and actual steering angle.
+    pub fn get_car_physics_state(&self) -> Vec<f32> {
+        let Some(sim) = self.renderer.as_ref().and_then(|r| r.sim_car.as_ref()) else {
+            return Vec::new();
+        };
+        let mut state = Vec::with_capacity(30);
+        state.extend_from_slice(&sim.body.linear_velocity.to_array());
+        state.extend_from_slice(&sim.body.angular_velocity.to_array());
+        for wheel in &sim.suspension.wheels {
+            state.extend_from_slice(&[
+                if wheel.in_contact { 1.0 } else { 0.0 },
+                wheel.tire.omega,
+                wheel.compression,
+                wheel.tire.normal_load,
+                wheel.tire.longitudinal_force,
+            ]);
+        }
+        state.extend_from_slice(&sim.body.up().to_array());
+        state.push(sim.current_steer_angle);
+        state
+    }
+
     pub fn get_car_rpm(&self) -> f32 {
         self.renderer
             .as_ref()
@@ -349,6 +400,16 @@ impl BrowserViewer {
         }
     }
 
+    pub fn configure_quick_race(&mut self, laps: u32, opponents: u32) -> Result<(), JsValue> {
+        let renderer = self
+            .renderer
+            .as_mut()
+            .ok_or_else(|| JsValue::from_str("Renderer not initialized"))?;
+        renderer
+            .configure_quick_race(laps, opponents)
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
     pub fn configure_mission(&mut self, is_factory: bool, time_limit: f32, has_opponent: bool) {
         if let Some(renderer) = &mut self.renderer {
             renderer.configure_mission(is_factory, time_limit, has_opponent);
@@ -365,6 +426,20 @@ impl BrowserViewer {
         self.renderer
             .as_ref()
             .is_some_and(|r| r.get_mission_goal_supported())
+    }
+
+    pub fn get_mission_passed_gates(&self) -> u32 {
+        self.renderer
+            .as_ref()
+            .map_or(0, |r| r.get_mission_passed_gates())
+    }
+
+    /// Read-only positions of source-triggerable props, in SCN placement order.
+    pub fn get_scenario_prop_positions(&self) -> Vec<f32> {
+        self.renderer
+            .as_ref()
+            .map(|r| r.get_scenario_prop_positions())
+            .unwrap_or_default()
     }
 
     pub fn get_mission_goal_reached(&self) -> bool {
