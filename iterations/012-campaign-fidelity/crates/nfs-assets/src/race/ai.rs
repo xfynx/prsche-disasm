@@ -85,6 +85,9 @@ pub struct AiOpponent {
     pub forward: [f32; 3],
     pub yaw: f32,
     pub current_speed: f32,
+    pub wheel_distance: f32,
+    /// Velocity from a vehicle impact that the path controller must not erase.
+    collision_velocity: [f32; 3],
     pub tracker: CourseProgressTracker,
     pub distance_along_course: f32,
     pub laps_completed: u32,
@@ -114,6 +117,8 @@ impl AiOpponent {
             forward,
             yaw,
             current_speed: 0.0,
+            wheel_distance: 0.0,
+            collision_velocity: [0.0; 3],
             tracker: CourseProgressTracker::new(pos),
             distance_along_course: 0.0,
             laps_completed: 0,
@@ -220,6 +225,11 @@ impl AiOpponent {
     ) {
         let controls = self.update_controls(course, dt);
 
+        // Impact motion persists across controller steps, then dissipates through tires.
+        let impact_decay = (-2.5 * dt.max(0.0)).exp();
+        self.collision_velocity[0] *= impact_decay;
+        self.collision_velocity[2] *= impact_decay;
+
         // Acceleration and braking
         let accel_rate = 8.5; // m/s^2
         let brake_rate = 18.0;
@@ -248,11 +258,27 @@ impl AiOpponent {
         let fwd_z = -self.yaw.cos();
         self.forward = [fwd_x, 0.0, fwd_z];
 
-        self.position[0] += fwd_x * self.current_speed * dt;
-        self.position[2] += fwd_z * self.current_speed * dt;
+        self.velocity = [
+            fwd_x * self.current_speed + self.collision_velocity[0],
+            0.0,
+            fwd_z * self.current_speed + self.collision_velocity[2],
+        ];
+        self.position[0] += self.velocity[0] * dt;
+        self.position[2] += self.velocity[2] * dt;
+        self.wheel_distance += (self.velocity[0] * fwd_x + self.velocity[2] * fwd_z) * dt;
         self.position[1] = elevation_fn(self.position[0], self.position[2]);
+    }
 
-        self.velocity = [fwd_x * self.current_speed, 0.0, fwd_z * self.current_speed];
+    /// Applies the world-space velocity returned by vehicle contact resolution.
+    pub fn apply_collision_velocity(&mut self, velocity: [f32; 3]) {
+        let forward_speed = velocity[0] * self.forward[0] + velocity[2] * self.forward[2];
+        self.current_speed = forward_speed.max(0.0);
+        self.collision_velocity = [
+            velocity[0] - self.forward[0] * self.current_speed,
+            0.0,
+            velocity[2] - self.forward[2] * self.current_speed,
+        ];
+        self.velocity = [velocity[0], 0.0, velocity[2]];
     }
 }
 
@@ -295,6 +321,24 @@ fn distance_sq(a: [f32; 3], b: [f32; 3]) -> f32 {
 mod tests {
     use super::*;
     use nfs_formats::SplinePoint;
+
+    #[test]
+    fn collision_velocity_survives_next_kinematic_step() {
+        let points: Vec<_> = (0..12)
+            .map(|i| SplinePoint {
+                x: 0.0,
+                z: i as f32 * 10.0,
+            })
+            .collect();
+        let course = TrackCourse::from_spline_points(&points, false, |_, _| 0.0).unwrap();
+        let mut ai = AiOpponent::new(0, "Rival", "boxster", AiProfile::default(), 0, &course);
+        ai.forward = [0.0, 0.0, -1.0];
+        ai.yaw = 0.0;
+        ai.apply_collision_velocity([8.0, 0.0, -5.0]);
+        assert!((ai.current_speed - 5.0).abs() < 1e-5);
+        ai.step_kinematics(1.0 / 60.0, &course, |_, _| 0.0);
+        assert!(ai.velocity[0] > 7.0, "side impact was erased by steering");
+    }
 
     #[test]
     fn test_grid_slot_generation() {

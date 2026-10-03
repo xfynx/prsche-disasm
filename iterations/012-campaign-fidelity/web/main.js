@@ -10,6 +10,21 @@ function factoryGoalSatisfied(driver, elapsed, timeLimit) {
     && driver.get_mission_goal_reached() === true;
 }
 
+// The authoritative evaluation (including penalties) must precede pass audio/UI.
+function evaluateFactoryResult(driver, event, profile, elapsed, position, evaluate) {
+  if (!factoryGoalSatisfied(driver, elapsed, event.time_limit) || !profile
+      || !Number.isInteger(event.mission_index) || event.mission_index < 1
+      || typeof evaluate !== "function") return null;
+  const result = JSON.parse(evaluate(JSON.stringify(profile), event.mission_index, elapsed,
+    driver.get_stunt_180?.() ?? false, driver.get_stunt_360?.() ?? false,
+    driver.get_stunt_jturn?.() ?? false, driver.get_cone_hits?.() ?? 0,
+    0.0, position === 1));
+  if (typeof result.passed !== "boolean" || !result.profile) {
+    throw new Error("Invalid Factory result");
+  }
+  return result;
+}
+
 const KNOWN_TRACKS = [
   { id: "skidpad", name: "Skidpad (Полигон)" },
   { id: "alps", name: "Alps (Альпы)" },
@@ -2438,8 +2453,26 @@ function updateNavigation(dt) {
         if (activeCareerEvent && !eventFinishedHandled) {
           eventFinishedHandled = true;
           let passed = false;
+          let factoryResult = null;
           if (activeCareerEvent.is_factory) {
-            passed = factoryGoalSatisfied(viewer, elapsed, activeCareerEvent.time_limit);
+            try {
+              factoryResult = evaluateFactoryResult(viewer, activeCareerEvent, currentProfile,
+                elapsed, pos, typeof shell_complete_factory_mission === "function"
+                  ? shell_complete_factory_mission : null);
+              passed = factoryResult?.passed === true;
+              if (factoryResult) {
+                currentProfile = factoryResult.profile;
+                saveProfile();
+                if (resultsLapTime) resultsLapTime.textContent = formatRaceTime(factoryResult.total_time);
+                if (factoryResult.penalty > 0 && resultsSubtitle) {
+                  resultsSubtitle.textContent += ` · Штраф: +${factoryResult.penalty.toFixed(1)} с`;
+                }
+              }
+            } catch (e) {
+              console.error("WASM factory mission completion error:", e);
+              passed = false;
+              setStatus("Не удалось сохранить результат испытания.");
+            }
           } else {
             passed = pos === 1;
           }
@@ -2470,45 +2503,21 @@ function updateNavigation(dt) {
             }
           }
 
-          if (activeCareerEvent.is_factory && passed && activeCareerEvent.mission_index && typeof shell_complete_factory_mission === "function" && currentProfile) {
-            try {
-              const has180 = typeof viewer.get_stunt_180 === "function" ? viewer.get_stunt_180() : false;
-              const has360 = typeof viewer.get_stunt_360 === "function" ? viewer.get_stunt_360() : false;
-              const hasJturn = typeof viewer.get_stunt_jturn === "function" ? viewer.get_stunt_jturn() : false;
-              const coneHits = typeof viewer.get_cone_hits === "function" ? viewer.get_cone_hits() : 0;
-
-              const resJson = shell_complete_factory_mission(
-                JSON.stringify(currentProfile),
-                activeCareerEvent.mission_index,
-                elapsed,
-                has180,
-                has360,
-                hasJturn,
-                coneHits,
-                0.0,  // damage
-                pos === 1
-              );
-              const evalRes = JSON.parse(resJson);
-              currentProfile = evalRes.profile;
-              saveProfile();
-              if (evalRes.passed) {
-                if (evalRes.rank && evalRes.rank.length > 0) {
-                  setStatus(`Испытание пройдено! Присвоено новое звание: ${evalRes.rank}`);
-                  if (rewardBadge) {
-                    rewardBadge.textContent = `★ ПОВЫШЕНИЕ: ${evalRes.rank.toUpperCase()}`;
-                    rewardBadge.style.color = "#22c55e";
-                  }
-                }
-                if (evalRes.reward_car && evalRes.reward_car.length > 0) {
-                  setStatus(`ПОЛУЧЕН НАГРАДНОЙ АВТОМОБИЛЬ: ${evalRes.reward_car}! Добавлен в гараж.`);
-                  if (rewardBadge) {
-                    rewardBadge.textContent = `★ НАГРАДА: ${evalRes.reward_car.toUpperCase()} В ГАРАЖЕ!`;
-                    rewardBadge.style.color = "#d3bd83";
-                  }
-                }
+          if (activeCareerEvent.is_factory && passed && factoryResult) {
+            const evalRes = factoryResult;
+            if (evalRes.rank && evalRes.rank.length > 0) {
+              setStatus(`Испытание пройдено! Присвоено новое звание: ${evalRes.rank}`);
+              if (rewardBadge) {
+                rewardBadge.textContent = `★ ПОВЫШЕНИЕ: ${evalRes.rank.toUpperCase()}`;
+                rewardBadge.style.color = "#22c55e";
               }
-            } catch (e) {
-              console.error("WASM factory mission completion error:", e);
+            }
+            if (evalRes.reward_car && evalRes.reward_car.length > 0) {
+              setStatus(`ПОЛУЧЕН НАГРАДНОЙ АВТОМОБИЛЬ: ${evalRes.reward_car}! Добавлен в гараж.`);
+              if (rewardBadge) {
+                rewardBadge.textContent = `★ НАГРАДА: ${evalRes.reward_car.toUpperCase()} В ГАРАЖЕ!`;
+                rewardBadge.style.color = "#d3bd83";
+              }
             }
           } else if (!activeCareerEvent.is_factory && typeof shell_apply_event_result === "function" && currentProfile) {
             try {

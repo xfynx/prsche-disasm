@@ -6,6 +6,7 @@
 use glam::{Mat4, Quat, Vec3};
 use nfs_formats::SimCar;
 
+use super::chassis::{resolve_chassis_ground, ChassisBounds};
 use super::powertrain::Powertrain;
 use super::rigid_body::RigidBody;
 use super::suspension::{SuspensionSystem, WHEEL_FL, WHEEL_FR, WHEEL_RL, WHEEL_RR};
@@ -93,6 +94,8 @@ pub struct VehicleTelemetry {
 pub struct VehicleSimulation {
     /// 6 DOF rigid chassis body.
     pub body: RigidBody,
+    /// Reconstructed collision envelope in body coordinates.
+    pub chassis_bounds: ChassisBounds,
     /// Engine, clutch, and transmission.
     pub powertrain: Powertrain,
     /// 4-wheel independent suspension system.
@@ -126,6 +129,33 @@ pub struct VehicleSimulation {
 }
 
 impl VehicleSimulation {
+    /// Override reconstructed chassis contacts with selected model body bounds.
+    /// Bounds must already be expressed in the simulation body frame.
+    pub fn apply_model_chassis_bounds(&mut self, bounds: [[f32; 3]; 2]) -> Result<(), String> {
+        self.chassis_bounds = ChassisBounds::from_model(bounds)?;
+        Ok(())
+    }
+
+    /// Use selected model wheel pivots for axle geometry. The existing vertical
+    /// suspension reference remains an adapter, not a recovered original solver.
+    pub fn apply_model_wheels(&mut self, wheels: &[crate::CarWheel]) -> Result<(), String> {
+        if wheels.len() != 4
+            || wheels.iter().enumerate().any(|(i, w)| {
+                w.wheel_index != i
+                    || !w.center.iter().all(|v| v.is_finite())
+                    || !(0.1..0.8).contains(&w.radius)
+            })
+        {
+            return Err("Car model needs four valid ordered wheel pivots".into());
+        }
+        for (wheel, source) in self.suspension.wheels.iter_mut().zip(wheels) {
+            wheel.hardpoint_body.x = source.center[0];
+            wheel.hardpoint_body.z = source.center[2];
+            wheel.tire.radius = source.radius;
+        }
+        Ok(())
+    }
+
     /// Construct a vehicle simulation from reverse-engineered NFS 5 `SimCar` specs.
     pub fn from_sim(sim: &SimCar) -> Self {
         let mass = sim.mass_kg.clamp(400.0, 3000.0);
@@ -156,6 +186,7 @@ impl VehicleSimulation {
 
         Self {
             body,
+            chassis_bounds: ChassisBounds::reconstructed(width, length),
             powertrain,
             suspension,
             brake_bias,
@@ -306,6 +337,8 @@ impl VehicleSimulation {
 
     /// Single fixed-delta physics sub-step.
     fn sub_step(&mut self, surface: Option<&RoadSurface>, controls: &VehicleControls, dt: f32) {
+        let previous_position = self.body.position;
+        let previous_orientation = self.body.orientation;
         // Clear force and torque accumulators
         self.body.clear_accumulators();
 
@@ -432,6 +465,14 @@ impl VehicleSimulation {
 
         // 6. Integrate 6 DOF equations of motion
         self.body.integrate(dt, Vec3::new(0.0, -GRAVITY, 0.0));
+        resolve_chassis_ground(
+            &mut self.body,
+            self.chassis_bounds,
+            surface,
+            previous_position,
+            previous_orientation,
+            dt,
+        );
 
         // When vehicle is near standstill and brakes are applied, halt motion to prevent creep
         if controls.brake > 0.3
@@ -475,6 +516,11 @@ impl VehicleSimulation {
     }
 
     /// Generate complete telemetry package and visual transform matrices.
+    pub fn telemetry(&self, controls: &VehicleControls) -> VehicleTelemetry {
+        self.build_telemetry(controls)
+    }
+
+    /// Generate complete telemetry package and visual transform matrices.
     fn build_telemetry(&self, controls: &VehicleControls) -> VehicleTelemetry {
         let speed_mps = self.body.forward_speed();
         let speed_kmh = speed_mps * 3.6;
@@ -485,8 +531,9 @@ impl VehicleSimulation {
         let mut wheel_transforms = [Mat4::IDENTITY; 4];
         for (i, wheel) in self.suspension.wheels.iter().enumerate() {
             // Wheel position relative to body: hardpoint + (uncompressed_len - compression) along -Y
-            let uncompressed_len = wheel.rest_length + wheel.tire.radius;
-            let current_len = uncompressed_len - wheel.compression;
+            // The suspension ray reaches the contact patch; rendered geometry
+            // is centered one tire radius above that patch along the strut.
+            let current_len = wheel.rest_length - wheel.compression;
             let rel_wheel_pos = wheel.hardpoint_body - Vec3::Y * current_len;
 
             // Wheel rotation: steer angle (Y) * visual roll angle (X)
@@ -495,7 +542,9 @@ impl VehicleSimulation {
             } else {
                 Quat::IDENTITY
             };
-            let roll_quat = Quat::from_rotation_x(self.wheel_visual_angles[i]);
+            // Forward is -Z: at the bottom of the tire, rolling must oppose
+            // vehicle travel so the contact patch stays stationary on the road.
+            let roll_quat = Quat::from_rotation_x(-self.wheel_visual_angles[i]);
 
             let local_wheel_mat =
                 Mat4::from_translation(rel_wheel_pos) * Mat4::from_quat(steer_quat * roll_quat);
@@ -928,6 +977,22 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn visual_tire_spin_opposes_travel_at_the_contact_patch() {
+        let mut vehicle = VehicleSimulation::from_sim(&test_boxster_sim());
+        let controls = VehicleControls::default();
+        let radius = vehicle.suspension.wheels[0].tire.radius;
+        let bottom = -Vec3::Y * radius;
+        let before =
+            vehicle.build_telemetry(&controls).wheel_transforms[0].transform_point3(bottom);
+        for direction in [-1.0, 1.0] {
+            vehicle.wheel_visual_angles[0] = direction * 0.05;
+            let after =
+                vehicle.build_telemetry(&controls).wheel_transforms[0].transform_point3(bottom);
+            assert!((after - before).dot(vehicle.body.forward()) * direction < 0.0);
         }
     }
 }

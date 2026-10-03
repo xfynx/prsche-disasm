@@ -306,6 +306,38 @@ impl BrowserViewer {
         state
     }
 
+    /// Read-only render diagnostics: chassis adapter xyz, then per wheel:
+    /// index, source center xyz, radius, world center xyz, mesh count.
+    pub fn get_car_wheel_render_state(&self) -> Vec<f32> {
+        self.renderer
+            .as_ref()
+            .map(|renderer| renderer.get_car_wheel_render_state())
+            .unwrap_or_default()
+    }
+
+    /// Final wheel render matrices in FL, FR, RL, RR order as 4 column-major
+    /// mat4 values (64 floats) when four wheel groups are bound.
+    pub fn get_car_wheel_visuals(&self) -> Vec<f32> {
+        self.renderer
+            .as_ref()
+            .map(|renderer| renderer.get_car_wheel_visuals())
+            .unwrap_or_default()
+    }
+
+    pub fn get_car_wheel_mesh_count(&self) -> u32 {
+        self.renderer
+            .as_ref()
+            .map(|renderer| renderer.get_car_wheel_mesh_count())
+            .unwrap_or(0)
+    }
+
+    pub fn get_vehicle_contact_count(&self) -> u32 {
+        self.renderer
+            .as_ref()
+            .map(|r| r.vehicle_contact_count)
+            .unwrap_or(0)
+    }
+
     pub fn get_car_rpm(&self) -> f32 {
         self.renderer
             .as_ref()

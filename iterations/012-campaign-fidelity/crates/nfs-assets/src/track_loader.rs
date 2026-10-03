@@ -143,6 +143,7 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
 
     let mut scene = Scene {
         meshes: Vec::new(),
+        car_wheels: Vec::new(),
         textures: Vec::new(),
         materials: Vec::new(),
         bounds: [[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]],

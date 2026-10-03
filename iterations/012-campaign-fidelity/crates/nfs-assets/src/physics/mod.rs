@@ -7,12 +7,14 @@
 //! - Friction ellipse tire slip model with Coulomb friction budget and `.sim` grip multipliers
 //! - Road surface heightfield queries via `surface::RoadSurface`
 
+pub mod chassis;
 pub mod powertrain;
 pub mod rigid_body;
 pub mod suspension;
 pub mod tire;
 pub mod vehicle;
 
+pub use chassis::ChassisBounds;
 pub use powertrain::Powertrain;
 pub use rigid_body::RigidBody;
 pub use suspension::{SuspensionSystem, SuspensionWheel, WHEEL_FL, WHEEL_FR, WHEEL_RL, WHEEL_RR};

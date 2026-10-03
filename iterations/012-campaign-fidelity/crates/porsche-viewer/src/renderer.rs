@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Quat, Vec3};
 use nfs_assets::{AlphaMode, Scene};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use wgpu::util::DeviceExt;
 
 pub fn summarize(scene: &Scene) -> String {
@@ -286,6 +286,18 @@ pub struct TopologyRenderer {
 struct CarRenderState {
     meshes: Vec<GpuMesh>,
     materials: Vec<GpuMaterial>,
+    chassis_mesh_indices: Vec<usize>,
+    wheels: Vec<CarWheelRender>,
+    /// Source body bounds in driving coordinates, before the physics adapter.
+    body_bounds: Option<[Vec3; 2]>,
+}
+
+#[derive(Clone)]
+struct CarWheelRender {
+    wheel_index: usize,
+    source_center: Vec3,
+    radius: f32,
+    mesh_indices: Vec<usize>,
 }
 
 pub struct Renderer {
@@ -311,6 +323,7 @@ pub struct Renderer {
     pub car: Option<crate::arcade::ArcadeCar>,
     pub sim_car: Option<nfs_assets::physics::VehicleSimulation>,
     pub sim_telemetry: Option<nfs_assets::physics::VehicleTelemetry>,
+    pub vehicle_contact_count: u32,
     pub sim_mode: bool,
     pub race_session: Option<nfs_assets::RaceSession>,
     pub track_course: Option<nfs_assets::TrackCourse>,
@@ -370,6 +383,36 @@ fn quick_race_grid(
         ai.push(opponent);
     }
     (session, ai)
+}
+
+fn car_chassis_adapter_body(
+    sim: &nfs_assets::physics::VehicleSimulation,
+    car_render: &CarRenderState,
+) -> Vec3 {
+    if car_render.wheels.is_empty() {
+        return Vec3::ZERO;
+    }
+
+    let mut sum = Vec3::ZERO;
+    let mut count = 0.0;
+    for wheel_render in &car_render.wheels {
+        let Some(wheel) = sim.suspension.wheels.get(wheel_render.wheel_index) else {
+            continue;
+        };
+        let physics_rest_center = wheel.hardpoint_body - Vec3::Y * wheel.rest_length;
+        sum += physics_rest_center - wheel_render.source_center;
+        count += 1.0;
+    }
+    if count == 0.0 {
+        return Vec3::ZERO;
+    }
+
+    let adapter = sum / count;
+    Vec3::new(
+        adapter.x.clamp(-0.25, 0.25),
+        adapter.y.clamp(-1.0, 1.0),
+        adapter.z.clamp(-0.25, 0.25),
+    )
 }
 
 impl Renderer {
@@ -988,6 +1031,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             car_render = Some(CarRenderState {
                 meshes: car_meshes,
                 materials: car_materials,
+                chassis_mesh_indices: (0..geom.parts.len()).collect(),
+                wheels: Vec::new(),
+                body_bounds: None,
             });
         }
 
@@ -1099,6 +1145,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             car,
             sim_car,
             sim_telemetry: None,
+            vehicle_contact_count: 0,
             sim_mode: true,
             race_session,
             track_course,
@@ -1128,6 +1175,101 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             self.depth = depth_view(&self.device, width, height);
         }
     }
+    fn draw_car_meshes(
+        &self,
+        target: &wgpu::TextureView,
+        label: &'static str,
+        car_render: &CarRenderState,
+        model_matrix: Mat4,
+        mesh_indices: &[usize],
+    ) {
+        if mesh_indices.is_empty() {
+            return;
+        }
+
+        let mut uniform = self.camera.uniform(self.width, self.height);
+        uniform.model = model_matrix.to_cols_array_2d();
+        self.queue
+            .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&uniform));
+
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some(label),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+            pass.set_bind_group(0, &self.camera_group, &[]);
+            for &mesh_index in mesh_indices {
+                let Some(mesh) = car_render.meshes.get(mesh_index) else {
+                    continue;
+                };
+                if mesh.material >= car_render.materials.len() {
+                    continue;
+                }
+                let material = &car_render.materials[mesh.material];
+                let pipeline_key = (
+                    material.alpha_mode == AlphaMode::Blend,
+                    material.double_sided,
+                    material.depth_bias,
+                );
+                let pipeline = self
+                    .pipelines
+                    .get(&pipeline_key)
+                    .or_else(|| self.pipelines.get(&(pipeline_key.0, false, 0)))
+                    .or_else(|| self.pipelines.get(&(false, false, 0)));
+                if let Some(pipeline) = pipeline {
+                    pass.set_pipeline(pipeline);
+                    pass.set_bind_group(1, &material.group, &[]);
+                    pass.set_vertex_buffer(0, mesh.vertex.slice(..));
+                    pass.set_index_buffer(mesh.index.slice(..), wgpu::IndexFormat::Uint32);
+                    pass.draw_indexed(0..mesh.count, 0, 0..1);
+                }
+            }
+        }
+        self.queue.submit([encoder.finish()]);
+    }
+
+    fn sim_wheel_world_matrix(
+        &self,
+        sim: &nfs_assets::physics::VehicleSimulation,
+        wheel_index: usize,
+    ) -> Option<Mat4> {
+        if let Some(telemetry) = &self.sim_telemetry {
+            return telemetry.wheel_transforms.get(wheel_index).copied();
+        }
+        let wheel = sim.suspension.wheels.get(wheel_index)?;
+        let rel_wheel_pos =
+            wheel.hardpoint_body - Vec3::Y * (wheel.rest_length - wheel.compression);
+        let steer_quat = if wheel.is_steered {
+            Quat::from_rotation_y(-wheel.steer_angle)
+        } else {
+            Quat::IDENTITY
+        };
+        let roll_quat = Quat::from_rotation_x(-sim.wheel_visual_angles[wheel_index]);
+        Some(
+            sim.body.transform_matrix()
+                * Mat4::from_translation(rel_wheel_pos)
+                * Mat4::from_quat(steer_quat * roll_quat),
+        )
+    }
+
     pub fn cycle_paint_color(&mut self) {
         const COLORS: [[f32; 4]; 6] = [
             [1.0, 1.0, 1.0, 1.0],
@@ -1332,118 +1474,72 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         // 3.5. Draw car on track (if present)
         if let (Some(car), Some(car_render)) = (&self.car, &self.car_render) {
-            let model_matrix = match (&self.sim_car, self.sim_mode) {
-                (Some(sim), true) => sim.body.transform_matrix(),
-                _ => car.model_matrix(),
-            };
-            let mut uniform = self.camera.uniform(self.width, self.height);
-            uniform.model = model_matrix.to_cols_array_2d();
-            self.queue
-                .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&uniform));
-
-            let mut encoder = self.device.create_command_encoder(&Default::default());
-            {
-                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("arcade car"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: target,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: &self.depth,
-                        depth_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        }),
-                        stencil_ops: None,
-                    }),
-                    ..Default::default()
-                });
-                pass.set_bind_group(0, &self.camera_group, &[]);
-                for mesh in &car_render.meshes {
-                    if mesh.material >= car_render.materials.len() {
+            if let (Some(sim), true) = (&self.sim_car, self.sim_mode) {
+                let body_matrix = sim.body.transform_matrix()
+                    * Mat4::from_translation(car_chassis_adapter_body(sim, car_render));
+                self.draw_car_meshes(
+                    target,
+                    "sim car chassis",
+                    car_render,
+                    body_matrix,
+                    &car_render.chassis_mesh_indices,
+                );
+                for wheel in &car_render.wheels {
+                    let Some(wheel_matrix) = self.sim_wheel_world_matrix(sim, wheel.wheel_index)
+                    else {
                         continue;
-                    }
-                    let material = &car_render.materials[mesh.material];
-                    let pipeline_key = (
-                        material.alpha_mode == AlphaMode::Blend,
-                        material.double_sided,
-                        material.depth_bias,
+                    };
+                    self.draw_car_meshes(
+                        target,
+                        "sim car wheel",
+                        car_render,
+                        wheel_matrix * Mat4::from_translation(-wheel.source_center),
+                        &wheel.mesh_indices,
                     );
-                    let pipeline = self
-                        .pipelines
-                        .get(&pipeline_key)
-                        .or_else(|| self.pipelines.get(&(pipeline_key.0, false, 0)))
-                        .or_else(|| self.pipelines.get(&(false, false, 0)));
-                    if let Some(pipeline) = pipeline {
-                        pass.set_pipeline(pipeline);
-                        pass.set_bind_group(1, &material.group, &[]);
-                        pass.set_vertex_buffer(0, mesh.vertex.slice(..));
-                        pass.set_index_buffer(mesh.index.slice(..), wgpu::IndexFormat::Uint32);
-                        pass.draw_indexed(0..mesh.count, 0, 0..1);
-                    }
                 }
+            } else {
+                let all_meshes: Vec<usize> = (0..car_render.meshes.len()).collect();
+                self.draw_car_meshes(
+                    target,
+                    "arcade car",
+                    car_render,
+                    car.model_matrix(),
+                    &all_meshes,
+                );
             }
-            self.queue.submit([encoder.finish()]);
 
-            // Draw AI opponent vehicles on track
+            // Draw AI opponent vehicles on track with the same visible model.
             for ai in &self.ai_opponents {
                 let model_matrix =
                     Mat4::from_translation(Vec3::from(ai.position)) * Mat4::from_rotation_y(ai.yaw);
-                let mut uniform = self.camera.uniform(self.width, self.height);
-                uniform.model = model_matrix.to_cols_array_2d();
-                self.queue
-                    .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&uniform));
-
-                let mut encoder = self.device.create_command_encoder(&Default::default());
-                {
-                    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("ai car"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: target,
-                            depth_slice: None,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                            view: &self.depth,
-                            depth_ops: Some(wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            }),
-                            stencil_ops: None,
-                        }),
-                        ..Default::default()
-                    });
-                    pass.set_bind_group(0, &self.camera_group, &[]);
-                    for mesh in &car_render.meshes {
-                        if mesh.material >= car_render.materials.len() {
-                            continue;
-                        }
-                        let material = &car_render.materials[mesh.material];
-                        let pipeline_key = (
-                            material.alpha_mode == AlphaMode::Blend,
-                            material.double_sided,
-                            material.depth_bias,
-                        );
-                        if let Some(pipeline) = self.pipelines.get(&pipeline_key) {
-                            pass.set_pipeline(pipeline);
-                            pass.set_bind_group(1, &material.group, &[]);
-                            pass.set_vertex_buffer(0, mesh.vertex.slice(..));
-                            pass.set_index_buffer(mesh.index.slice(..), wgpu::IndexFormat::Uint32);
-                            pass.draw_indexed(0..mesh.count, 0, 0..1);
-                        }
-                    }
+                self.draw_car_meshes(
+                    target,
+                    "ai car",
+                    car_render,
+                    model_matrix,
+                    &car_render.chassis_mesh_indices,
+                );
+                for wheel in &car_render.wheels {
+                    let steer = if wheel.wheel_index < 2 {
+                        ai.current_controls.steer * 30.0_f32.to_radians()
+                    } else {
+                        0.0
+                    };
+                    let angle =
+                        (ai.wheel_distance / wheel.radius).rem_euclid(std::f32::consts::TAU);
+                    let matrix = model_matrix
+                        * Mat4::from_translation(wheel.source_center)
+                        * Mat4::from_rotation_y(steer)
+                        * Mat4::from_rotation_x(-angle)
+                        * Mat4::from_translation(-wheel.source_center);
+                    self.draw_car_meshes(
+                        target,
+                        "ai wheel",
+                        car_render,
+                        matrix,
+                        &wheel.mesh_indices,
+                    );
                 }
-                self.queue.submit([encoder.finish()]);
             }
 
             // Restore identity model for remaining passes
@@ -1558,7 +1654,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             }
             CameraMode::Drive => {
                 self.camera.mode = CameraMode::Orbit;
-                if let Some(car) = &self.car {
+                if let (true, Some(sim)) = (self.sim_mode, &self.sim_car) {
+                    self.camera.center = sim.body.position;
+                } else if let Some(car) = &self.car {
                     self.camera.center = car.pos;
                 } else {
                     let forward = Vec3::new(-self.camera.yaw.sin(), 0.0, -self.camera.yaw.cos());
@@ -1575,7 +1673,117 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         self.camera.mode == CameraMode::Drive
     }
 
+    fn vehicle_contact_proxies(&self) -> Vec<nfs_assets::race::collision::VehicleContactProxy> {
+        use nfs_assets::race::collision::VehicleContactProxy;
+        let bounds = self
+            .car_render
+            .as_ref()
+            .and_then(|r| r.body_bounds)
+            .unwrap_or([Vec3::new(-0.85, 0.15, -2.1), Vec3::new(0.85, 1.3, 2.1)]);
+        let center = (bounds[0] + bounds[1]) * 0.5;
+        let half = (bounds[1] - bounds[0]) * 0.5;
+        let mut proxies = Vec::with_capacity(1 + self.ai_opponents.len());
+        let inverse_mass = self
+            .sim_car
+            .as_ref()
+            .map(|s| s.body.inv_mass)
+            .unwrap_or(1.0 / 1200.0);
+        if let (true, Some(sim)) = (self.sim_mode, &self.sim_car) {
+            let adapter = self
+                .car_render
+                .as_ref()
+                .map(|r| car_chassis_adapter_body(sim, r))
+                .unwrap_or(Vec3::ZERO);
+            let c = sim.body.to_world_pos(center + adapter);
+            let forward = sim.body.forward();
+            let yaw = (-forward.x).atan2(-forward.z);
+            // A yaw box enclosing the rolled/pitched body, including its height.
+            let tilt = Quat::from_rotation_y(-yaw) * sim.body.orientation;
+            let h = (tilt * Vec3::X).abs() * half.x
+                + (tilt * Vec3::Y).abs() * half.y
+                + (tilt * Vec3::Z).abs() * half.z;
+            proxies.push(VehicleContactProxy {
+                previous_center: c.to_array(),
+                center: c.to_array(),
+                velocity: sim.body.linear_velocity.to_array(),
+                yaw,
+                half_extents: h.to_array(),
+                inverse_mass,
+            });
+        } else if let Some(car) = &self.car {
+            let c = car.pos + Quat::from_rotation_y(car.yaw) * center;
+            proxies.push(VehicleContactProxy {
+                previous_center: c.to_array(),
+                center: c.to_array(),
+                velocity: (car.forward() * car.speed).to_array(),
+                yaw: car.yaw,
+                half_extents: half.to_array(),
+                inverse_mass,
+            });
+        } else {
+            return proxies;
+        }
+        for ai in &self.ai_opponents {
+            let c = Vec3::from(ai.position) + Quat::from_rotation_y(ai.yaw) * center;
+            proxies.push(VehicleContactProxy {
+                previous_center: c.to_array(),
+                center: c.to_array(),
+                velocity: ai.velocity,
+                yaw: ai.yaw,
+                half_extents: half.to_array(),
+                inverse_mass,
+            });
+        }
+        proxies
+    }
+
+    fn resolve_vehicle_contacts(
+        &mut self,
+        previous: &[nfs_assets::race::collision::VehicleContactProxy],
+    ) {
+        let mut current = self.vehicle_contact_proxies();
+        if current.len() < 2 || current.len() != previous.len() {
+            return;
+        }
+        let before: Vec<[f32; 3]> = current.iter().map(|p| p.center).collect();
+        for (p, old) in current.iter_mut().zip(previous) {
+            p.previous_center = old.center;
+        }
+        let mut contacts = 0;
+        for i in 0..current.len() {
+            let (left, right) = current.split_at_mut(i + 1);
+            for b in right {
+                if nfs_assets::race::collision::resolve_vehicle_contact(&mut left[i], b) {
+                    contacts += 1;
+                }
+            }
+        }
+        if contacts == 0 {
+            return;
+        }
+        self.vehicle_contact_count += contacts;
+        let delta = Vec3::from(current[0].center) - Vec3::from(before[0]);
+        if let (true, Some(sim)) = (self.sim_mode, &mut self.sim_car) {
+            sim.body.position += delta;
+            sim.body.linear_velocity = Vec3::from(current[0].velocity);
+            self.sim_telemetry =
+                Some(sim.telemetry(&nfs_assets::physics::VehicleControls::default()));
+            self.camera.drive_pos += delta;
+            self.camera.drive_target += delta;
+        } else if let Some(car) = &mut self.car {
+            car.pos += delta;
+            car.speed = Vec3::from(current[0].velocity).dot(car.forward());
+        }
+        for (i, ai) in self.ai_opponents.iter_mut().enumerate() {
+            ai.position = (Vec3::from(ai.position) + Vec3::from(current[i + 1].center)
+                - Vec3::from(before[i + 1]))
+            .to_array();
+            ai.apply_collision_velocity(current[i + 1].velocity);
+        }
+    }
+
     pub fn update_car(&mut self, dt: f32, mut throttle: f32, steer: f32, handbrake: bool) {
+        let previous_contacts = self.vehicle_contact_proxies();
         let edges = &self.road_edges;
 
         // Check race session state and restrict inputs during countdown
@@ -1652,6 +1860,30 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             }
         }
 
+        // Advance opponents before resolving all vehicle pairs. Collision response
+        // is applied back to their controller, rather than discarded next frame.
+        if let (Some(course), Some(session)) = (&self.track_course, &self.race_session)
+            && session.phase.is_racing()
+        {
+            let surface = self.road_surface.as_ref();
+            for ai in &mut self.ai_opponents {
+                let reference_y = ai.position[1];
+                ai.step_kinematics(dt, course, |x, z| {
+                    surface
+                        .and_then(|s| s.query(x, z, reference_y, 2.0, 4.0))
+                        .map(|h| h.height)
+                        .unwrap_or(reference_y)
+                });
+            }
+        }
+        self.resolve_vehicle_contacts(&previous_contacts);
+        if let (true, Some(sim)) = (self.sim_mode, &self.sim_car) {
+            player_pos = sim.body.position.to_array();
+            player_fwd = sim.body.forward().to_array();
+        } else if let Some(car) = &self.car {
+            player_pos = car.pos.to_array();
+        }
+
         // Progress tracking along course
         if let (Some(course), Some(tracker), Some(session)) = (
             &self.track_course,
@@ -1672,14 +1904,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
             // Update AI opponents
             if session.phase.is_racing() {
-                let surface = self.road_surface.as_ref();
-                for ai in &mut self.ai_opponents {
-                    ai.step_kinematics(dt, course, |x, z| {
-                        surface
-                            .and_then(|s| s.query(x, z, 0.0, 500.0, 500.0))
-                            .map(|h| h.height)
-                            .unwrap_or(0.0)
-                    });
+                for ai in &self.ai_opponents {
                     if let Some(p) = session.participants.iter_mut().find(|p| p.id == ai.id) {
                         p.distance_along_track = ai.distance_along_course;
                         p.laps_completed = ai.laps_completed;
@@ -1759,6 +1984,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     pub fn reset_car(&mut self) {
+        self.vehicle_contact_count = 0;
         self.reset_scenario_props();
         if let Some(course) = &self.track_course {
             let (pos, _, yaw) = nfs_assets::calculate_grid_slot(0, course);
@@ -1841,8 +2067,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 ai.position = p;
                 ai.forward = ai_fwd;
                 ai.yaw = ai_yaw;
-                ai.current_speed = 0.0;
-                ai.velocity = [0.0; 3];
+                ai.apply_collision_velocity([0.0; 3]);
+                ai.wheel_distance = 0.0;
                 ai.current_controls = Default::default();
                 ai.lookahead_wp_idx = 1;
                 ai.tracker = nfs_assets::CourseProgressTracker::new(p);
@@ -2220,6 +2446,71 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         self.car.as_ref().map(|c| c.rpm).unwrap_or(0.0)
     }
 
+    pub fn get_car_wheel_render_state(&self) -> Vec<f32> {
+        let (Some(sim), Some(car_render)) = (&self.sim_car, &self.car_render) else {
+            return Vec::new();
+        };
+        let adapter = car_chassis_adapter_body(sim, car_render);
+        let mut state = Vec::with_capacity(3 + car_render.wheels.len() * 9);
+        state.extend_from_slice(&adapter.to_array());
+        for wheel in &car_render.wheels {
+            let world_center = self
+                .sim_wheel_world_matrix(sim, wheel.wheel_index)
+                .map(|matrix| matrix.transform_point3(Vec3::ZERO))
+                .unwrap_or(Vec3::ZERO);
+            state.extend_from_slice(&[
+                wheel.wheel_index as f32,
+                wheel.source_center.x,
+                wheel.source_center.y,
+                wheel.source_center.z,
+                wheel.radius,
+                world_center.x,
+                world_center.y,
+                world_center.z,
+                wheel.mesh_indices.len() as f32,
+            ]);
+        }
+        state
+    }
+
+    pub fn get_car_wheel_visuals(&self) -> Vec<f32> {
+        let (Some(sim), Some(car_render)) = (&self.sim_car, &self.car_render) else {
+            return Vec::new();
+        };
+        if car_render.wheels.len() != 4 {
+            return Vec::new();
+        }
+        let mut visuals = Vec::with_capacity(4 * 16);
+        for wheel_index in 0..4 {
+            let Some(wheel) = car_render
+                .wheels
+                .iter()
+                .find(|wheel| wheel.wheel_index == wheel_index)
+            else {
+                return Vec::new();
+            };
+            let Some(wheel_matrix) = self.sim_wheel_world_matrix(sim, wheel.wheel_index) else {
+                return Vec::new();
+            };
+            let render_matrix = wheel_matrix * Mat4::from_translation(-wheel.source_center);
+            visuals.extend_from_slice(&render_matrix.to_cols_array());
+        }
+        visuals
+    }
+
+    pub fn get_car_wheel_mesh_count(&self) -> u32 {
+        self.car_render
+            .as_ref()
+            .map(|car_render| {
+                car_render
+                    .wheels
+                    .iter()
+                    .map(|wheel| wheel.mesh_indices.len() as u32)
+                    .sum()
+            })
+            .unwrap_or(0)
+    }
+
     pub fn toggle_sim_mode(&mut self) -> bool {
         self.sim_mode = !self.sim_mode;
         self.sim_mode
@@ -2237,8 +2528,38 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     /// Parse and validate first so malformed input cannot discard the current car.
     pub fn set_car_sim(&mut self, bytes: &[u8]) -> Result<(), String> {
         let car = self.car.as_ref().ok_or("No car on the current track")?;
-        let sim = simulation_from_bytes_at_pose(bytes, car.pos, car.yaw)?;
+        let mut sim = simulation_from_bytes_at_pose(bytes, car.pos, car.yaw)?;
+        self.apply_car_render_wheels_to_sim(&mut sim)?;
         self.sim_car = Some(sim);
+        self.sim_telemetry = None;
+        Ok(())
+    }
+
+    fn apply_car_render_wheels_to_sim(
+        &self,
+        sim: &mut nfs_assets::physics::VehicleSimulation,
+    ) -> Result<(), String> {
+        let Some(car_render) = &self.car_render else {
+            return Ok(());
+        };
+        if car_render.wheels.is_empty() {
+            return Ok(());
+        }
+        let wheels: Vec<nfs_assets::CarWheel> = car_render
+            .wheels
+            .iter()
+            .map(|wheel| nfs_assets::CarWheel {
+                wheel_index: wheel.wheel_index,
+                center: wheel.source_center.to_array(),
+                radius: wheel.radius,
+                mesh_indices: wheel.mesh_indices.clone(),
+            })
+            .collect();
+        sim.apply_model_wheels(&wheels)?;
+        if let Some(bounds) = car_render.body_bounds {
+            let offset = car_chassis_adapter_body(sim, car_render);
+            sim.apply_model_chassis_bounds(bounds.map(|p| (p + offset).to_array()))?;
+        }
         Ok(())
     }
 
@@ -2361,7 +2682,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
 
         let mut car_meshes = Vec::new();
-        for mesh in &scene.meshes {
+        let mut mesh_index_map = vec![None; scene.meshes.len()];
+        let wheel_source_meshes: BTreeSet<usize> = scene
+            .car_wheels
+            .iter()
+            .flat_map(|w| w.mesh_indices.iter().copied())
+            .collect();
+        let mut body_min = Vec3::splat(f32::INFINITY);
+        let mut body_max = Vec3::splat(f32::NEG_INFINITY);
+        for (scene_mesh_index, mesh) in scene.meshes.iter().enumerate() {
             if mesh.vertices.is_empty() || mesh.indices.is_empty() {
                 continue;
             }
@@ -2379,6 +2708,21 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                     uv: v.uv,
                 })
                 .collect();
+            let material_name = scene
+                .materials
+                .get(mesh.material)
+                .map(|m| m.name.as_str())
+                .unwrap_or("");
+            if !wheel_source_meshes.contains(&scene_mesh_index)
+                && !mesh.name.to_ascii_lowercase().contains("shadow")
+                && (material_name.contains("CarExt") || material_name.contains("CarInt"))
+            {
+                for vertex in &vertices {
+                    let p = Vec3::from(vertex.position);
+                    body_min = body_min.min(p);
+                    body_max = body_max.max(p);
+                }
+            }
             let center = mesh
                 .vertices
                 .iter()
@@ -2391,6 +2735,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 })
                 .sum::<Vec3>()
                 / mesh.vertices.len() as f32;
+            mesh_index_map[scene_mesh_index] = Some(car_meshes.len());
             car_meshes.push(GpuMesh {
                 vertex: self
                     .device
@@ -2412,12 +2757,48 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             });
         }
 
+        let wheels: Vec<CarWheelRender> = scene
+            .car_wheels
+            .iter()
+            .filter_map(|wheel| {
+                let mesh_indices: Vec<usize> = wheel
+                    .mesh_indices
+                    .iter()
+                    .filter_map(|&mesh_index| mesh_index_map.get(mesh_index).and_then(|v| *v))
+                    .collect();
+                (!mesh_indices.is_empty()).then(|| CarWheelRender {
+                    wheel_index: wheel.wheel_index,
+                    source_center: Vec3::from(wheel.center),
+                    radius: wheel.radius,
+                    mesh_indices,
+                })
+            })
+            .collect();
+        let wheel_mesh_indices: BTreeSet<usize> = wheels
+            .iter()
+            .flat_map(|wheel| wheel.mesh_indices.iter().copied())
+            .collect();
+        let chassis_mesh_indices = (0..car_meshes.len())
+            .filter(|mesh_index| !wheel_mesh_indices.contains(mesh_index))
+            .collect();
+
         self.car_render = Some(CarRenderState {
             meshes: car_meshes,
             materials: car_materials,
+            chassis_mesh_indices,
+            wheels,
+            body_bounds: (body_min.is_finite()
+                && body_max.is_finite()
+                && (body_max - body_min).min_element() > 0.0)
+                .then_some([body_min, body_max]),
         });
 
         self.configure_sim_for_model(car_name);
+        if let Some(mut sim) = self.sim_car.take() {
+            self.apply_car_render_wheels_to_sim(&mut sim)?;
+            self.sim_car = Some(sim);
+            self.sim_telemetry = None;
+        }
         Ok(())
     }
 

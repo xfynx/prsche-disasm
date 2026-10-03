@@ -27,6 +27,17 @@ pub struct Mesh {
     pub material: usize,
 }
 
+/// Selected CRP wheel article, shared by vehicle geometry and articulation.
+/// Coordinates are driving body meters: [-raw X, raw Y, raw Z], front faces -Z.
+#[derive(Debug, Clone)]
+pub struct CarWheel {
+    /// FL, FR, RL, RR = 0, 1, 2, 3.
+    pub wheel_index: usize,
+    pub center: [f32; 3],
+    pub radius: f32,
+    pub mesh_indices: Vec<usize>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Texture {
     pub name: String,
@@ -118,6 +129,7 @@ pub struct TrackTopology {
 #[derive(Debug, Clone)]
 pub struct Scene {
     pub meshes: Vec<Mesh>,
+    pub car_wheels: Vec<CarWheel>,
     pub textures: Vec<Texture>,
     pub materials: Vec<Material>,
     pub bounds: [[f32; 3]; 2],
@@ -151,6 +163,7 @@ impl Default for Scene {
     fn default() -> Self {
         Self {
             meshes: Vec::new(),
+            car_wheels: Vec::new(),
             textures: Vec::new(),
             materials: Vec::new(),
             bounds: [[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]],

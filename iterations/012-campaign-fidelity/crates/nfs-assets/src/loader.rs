@@ -324,6 +324,7 @@ pub fn load(files: &AssetFiles, car: &str) -> Result<Scene, String> {
         .unwrap_or(0);
     let mut scene = Scene {
         meshes: Vec::new(),
+        car_wheels: Vec::new(),
         textures: Vec::new(),
         materials: Vec::new(),
         bounds: [[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]],
@@ -516,6 +517,7 @@ pub fn load(files: &AssetFiles, car: &str) -> Result<Scene, String> {
         if vt.data.len() % 16 != 0 {
             return Err(format!("{name}: unaligned vertices"));
         }
+        let first_mesh = scene.meshes.len();
         for pr in a
             .children
             .iter()
@@ -558,9 +560,54 @@ pub fn load(files: &AssetFiles, car: &str) -> Result<Scene, String> {
                 scene.meshes.push(m);
             }
         }
+        // Base geometry domains 13/14 are the selected front/rear wheel articles.
+        // Keep their source pivots and mesh membership instead of guessing axle
+        // widths from unrelated SIM scalars or mesh-name substrings.
+        if matches!((info[0], info[2], info[3]), (13, 10, 77) | (14, 10, 78))
+            && first_mesh < scene.meshes.len()
+        {
+            let center = [
+                -translation[0] * 5.0,
+                translation[1] * 5.0,
+                translation[2] * 5.0,
+            ];
+            let radius = vt
+                .data
+                .as_chunks::<16>()
+                .0
+                .iter()
+                .map(|v| {
+                    let y = f32::from_le_bytes(v[4..8].try_into().unwrap());
+                    let z = f32::from_le_bytes(v[8..12].try_into().unwrap());
+                    // Frontend wheels also contain square billboard vertices;
+                    // their diagonal is not the rolling radius.
+                    y.abs().max(z.abs())
+                })
+                .fold(0.0f32, f32::max);
+            let wheel_index = if info[0] == 13 { 0 } else { 2 } + usize::from(center[0] > 0.0);
+            scene.car_wheels.push(CarWheel {
+                wheel_index,
+                center,
+                radius,
+                mesh_indices: (first_mesh..scene.meshes.len()).collect(),
+            });
+        }
     }
     if scene.meshes.is_empty() {
         return Err("no drawable meshes".into());
+    }
+    scene.car_wheels.sort_by_key(|wheel| wheel.wheel_index);
+    if scene.car_wheels.len() != 4
+        || scene.car_wheels.iter().enumerate().any(|(i, w)| {
+            w.wheel_index != i
+                || !w.center.iter().all(|v| v.is_finite())
+                || !(0.1..0.8).contains(&w.radius)
+        })
+    {
+        scene.car_wheels.clear();
+        scene
+            .diagnostics
+            .push("No complete selected CRP wheel geometry; articulation unavailable".into());
     }
     scene.diagnostics.push(format!(
         "Skipped articles ({}): {}",
@@ -1013,6 +1060,82 @@ mod tests {
         );
     }
     #[test]
+    fn local_boxster_wheel_pivots_drive_geometry_and_visual_centers() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData");
+        if !root.join("CarModel/boxster.crp").exists() {
+            return;
+        }
+        let mut files = AssetFiles::new();
+        for name in [
+            "boxster.crp",
+            "boxster.tpg",
+            "INTGLASS.FSH",
+            "Shadow.fsh",
+            "Cabrio.fsh",
+        ] {
+            files.insert(
+                name.into(),
+                std::fs::read(root.join("CarModel").join(name)).unwrap(),
+            );
+        }
+        let scene = load(&files, "boxster").unwrap();
+        assert_eq!(scene.car_wheels.len(), 4, "{:?}", scene.diagnostics);
+        let w = &scene.car_wheels;
+        assert!((w[1].center[0] - w[0].center[0] - 1.3825873).abs() < 1e-5);
+        assert!((w[3].center[0] - w[2].center[0] - 1.4817582).abs() < 1e-5);
+        assert!((w[2].center[2] - w[0].center[2] - 2.4233546).abs() < 1e-5);
+        for wheel in w {
+            assert!((0.30..0.34).contains(&wheel.radius));
+            assert!(!wheel.mesh_indices.is_empty());
+            assert!(wheel
+                .mesh_indices
+                .iter()
+                .all(|&i| scene.meshes[i].name.starts_with("Wheel")));
+        }
+        let sim_bytes = std::fs::read(root.join("Simulation/CarData/boxster25.sim")).unwrap();
+        let spec = nfs_formats::parse_sim(&sim_bytes).unwrap();
+        let mut sim = VehicleSimulation::from_sim(&spec);
+        sim.apply_model_wheels(w).unwrap();
+        for (physical, source) in sim.suspension.wheels.iter().zip(w) {
+            assert_eq!(physical.hardpoint_body.x, source.center[0]);
+            assert_eq!(physical.hardpoint_body.z, source.center[2]);
+            assert_eq!(physical.tire.radius, source.radius);
+        }
+        for _ in 0..120 {
+            sim.step(None, &VehicleControls::default(), 1.0 / 60.0);
+        }
+        let telemetry = sim.step(None, &VehicleControls::default(), 1.0 / 60.0);
+        for (i, wheel) in sim.suspension.wheels.iter().enumerate() {
+            assert!(wheel.in_contact);
+            let center = telemetry.wheel_transforms[i].transform_point3(glam::Vec3::ZERO);
+            assert!(
+                (center.y - wheel.tire.radius).abs() < 0.002,
+                "render wheel center must be one tire radius above road: {center:?}"
+            );
+        }
+        // Source dimensions must support a sustained moderate-speed turn,
+        // the operation that rolled over with the false 1 m SIM axle widths.
+        sim.body.linear_velocity = sim.body.forward() * 14.0;
+        for wheel in &mut sim.suspension.wheels {
+            wheel.tire.omega = 14.0 / wheel.tire.radius;
+        }
+        let controls = VehicleControls {
+            steer: -0.8,
+            throttle: 0.25,
+            ..VehicleControls::default()
+        };
+        for _ in 0..180 {
+            sim.step(None, &controls, 1.0 / 60.0);
+            assert!(
+                sim.body.up().y > 0.7,
+                "model-based Boxster turned over: {:?}",
+                sim.body.up()
+            );
+        }
+    }
+
+    #[test]
     fn local_356_variants_load_to_complete_scenes() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../..")
@@ -1035,6 +1158,7 @@ mod tests {
                 );
             }
             let scene = load(&files, car).unwrap_or_else(|error| panic!("{car}: {error}"));
+            assert_eq!(scene.car_wheels.len(), 4, "{car}: selected wheel metadata");
             assert_eq!(scene.textures.len(), 11);
             for (name, expected) in [("mt4:", 0), ("mt12:", -3)] {
                 assert_eq!(

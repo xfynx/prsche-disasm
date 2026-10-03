@@ -50,7 +50,7 @@ const source = readFileSync(new URL("main.js", import.meta.url), "utf8")
   .replace(/\bboot\(\);\s*$/, "");
 vm.runInContext(source + `\n globalThis.testApi = {
   setViewer: value => viewer = value,
-  activeKeys, syncTourButton, updateNavigation, showBriefing, factoryGoalSatisfied, findSimResource,
+  activeKeys, syncTourButton, updateNavigation, showBriefing, factoryGoalSatisfied, evaluateFactoryResult, findSimResource,
   primeMotion: () => { velForward = 3; velRight = 2; velZoom = 1; },
   motion: () => [velForward, velRight, velZoom],
 };`, context);
@@ -190,6 +190,26 @@ assert.equal(goal(missionDriver(true, true), 32.01, 32), false, "late goal fails
 assert.equal(goal(missionDriver(true, true), 0, 32), false, "reset is not a finish");
 assert.equal(goal(missionDriver(true, true), NaN, 32), false);
 assert.equal(goal(missionDriver(true, true), 12, 32), true);
+const evaluateFactory = context.testApi.evaluateFactoryResult;
+const factoryEvent = { time_limit: 32, mission_index: 1 };
+let evaluations = 0;
+const penalizedDriver = { ...missionDriver(true, true), get_cone_hits: () => 2 };
+const penaltyEvaluator = (...args) => {
+  evaluations++;
+  assert.equal(args[6], 2, "actual cone hits must reach authoritative evaluation");
+  return JSON.stringify({ passed: false, total_time: 34, penalty: 4, profile: { marker: "unchanged" } });
+};
+const penalizedResult = evaluateFactory(penalizedDriver, factoryEvent, { marker: "unchanged" }, 30, 1, penaltyEvaluator);
+assert.equal(penalizedResult.passed, false, "raw finish before 32 seconds must not override penalty failure");
+assert.equal(penalizedResult.total_time, 34);
+assert.equal(evaluations, 1);
+assert.equal(evaluateFactory(missionDriver(true, false), factoryEvent, {}, 12, 1, penaltyEvaluator), null);
+assert.equal(evaluateFactory(missionDriver(false, true), factoryEvent, {}, 12, 1, penaltyEvaluator), null);
+assert.equal(evaluations, 1, "unreached/unsupported goal must never mutate profile");
+assert.equal(evaluateFactory(penalizedDriver, factoryEvent, {}, 12, 1, null), null);
+const passedResult = evaluateFactory(penalizedDriver, factoryEvent, {}, 12, 1,
+  () => JSON.stringify({ passed: true, total_time: 16, penalty: 4, profile: { progressed: true } }));
+assert.equal(passedResult.passed, true);
 const findSim = context.testApi.findSimResource;
 const simFiles = ["GameData/Simulation/CarData/boxster25.sim", "GameData/Simulation/CarData/356Acoupe16.sim"];
 assert.equal(findSim(simFiles, "BOXSTER25.SIM"), simFiles[0]);
