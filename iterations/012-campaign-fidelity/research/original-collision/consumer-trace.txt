@@ -1,0 +1,50 @@
+Source: Porsche.exe ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39
+Queries: py -3 scripts/research/query-binary-index.py --binary Porsche.exe --address <VA> --disassemble --limit 400/450/700
+Focused VAs: 0x488b50, 0x4876e0 (two views), 0x4879d0, 0x488090, 0x487e80 (two views), 0x483a90, 0x484ae0, 0x495020
+
+00487783 mov dword ptr [ebx + 0x38], 0
+00487884 call 0x4879d0
+00487dad call 0x488090
+004880d8 mov edx, dword ptr [ebx + 0x38]
+004880dc push edx
+004880e1 push ebp
+004880e2 push eax
+004880e3 call 0x487e80
+00487f2d mov ebp, dword ptr [esp + 0x4c]
+00487f3f mov eax, dword ptr [esp + 0x48]
+00487f43 mov dword ptr [ebx], eax
+004882a2 mov ecx, dword ptr [edi]
+004882a4 push ebp
+004882a5 push ecx
+004882a6 call 0x488590
+004883f1 mov ecx, dword ptr [ebx + 0x24]
+004883f4 push ebp
+004883f5 call 0x483a90
+00488416 call 0x4237d0                 ; deallocate pointer-array buffer
+0048841f call 0x59f050                 ; deallocate vector wrapper
+
+00483a9b mov eax, dword ptr [ebx]
+00483a9d mov esi, dword ptr [ebx + 4]
+00483ab5 mov esi, dword ptr [ecx + 4]
+00483acd mov eax, dword ptr [eax]
+00483acf mov dword ptr [edi], eax
+00483ba1 mov esi, dword ptr [ebx]
+00483bac mov eax, dword ptr [esi]
+00483bae mov ecx, edi
+00483bb0 push eax
+00483bb1 call 0x484ae0
+00484b7f call dword ptr [eax + 4]       ; object slot, bounds/midpoint output
+00484be3 call dword ptr [edx + 8]       ; object slot, XZ bounds output
+00484c69 call 0x484ae0                ; recursive child insertion
+
+00487dde call 0x488a60
+00488a65 push 0x56697320              ; 'Vis '
+00488a98 mov dword ptr [esi + 0x28], eax
+00488abd mov dword ptr [esi + 0x2c], eax
+00488ac6 mov dword ptr [esi + 0x30], eax
+00488bee call 0x489cc0                ; Vis path segment predicate
+00488c8b call 0x489cc0
+
+00495039 lea eax, [ebp + 0x33c]
+004950f1 lea ebx, [ebp + 0x330]
+004954ff call 0x494000

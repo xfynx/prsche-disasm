@@ -1,0 +1,72 @@
+Source: Porsche.exe SHA256 ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39
+Queries: py -3 scripts/research/query-binary-index.py --binary Porsche.exe --address <VA> --disassemble --limit 550
+VAs: 0x474060 0x4740d0 0x489f10 0x484630 0x473240 0x4745f0 0x474420
+Caller 0x495020: saved separately in vehicle-0x495020.jsonl.
+
+0049525c lea esi, [esp + 0xc8]         ; first of eight local candidates
+00495263 mov dword ptr [esp + 0x40], 8
+0049526d push esi
+0049526e lea ecx, [esp + 0x88]
+00495275 call 0x474060
+0049556f add esi, 0xc
+00495572 dec eax
+00495577 jne 0x49526b
+
+00474069 mov edi, dword ptr [esi + 0x28]
+00474075 call dword ptr [eax + 0xc]
+00474087 call 0x473240
+0047408e mov dword ptr [esi + 0x28], eax
+0047328b mov ecx, dword ptr [0x628960]
+00473292 mov edx, dword ptr [ecx + 0x24]
+00473297 call 0x484500
+004732c4 cmp byte ptr [esi], 1
+004732cc test byte ptr [edi + 0xa], 0xf
+
+004953ee call 0x4740d0
+00495410 call 0x4740d0
+004740d0 mov eax, dword ptr [ecx + 0x28]
+004740f4 mov edx, dword ptr [0x628960]
+00474104 mov eax, dword ptr [edx + 0x24]
+0047411a call 0x484630
+00484641 mov eax, dword ptr [ebp + 4]
+0048464a cmp dword ptr [ebp + 8], edi
+0048464f cmp dword ptr [ebp + 0xc], edi
+00484654 cmp dword ptr [ebp + 0x10], edi
+00484787 mov dword ptr [ebx], ebp      ; append spatial node
+0048505f mov dl, byte ptr [ebp + 4]   ; object type into leaf record
+0048507f mov dword ptr [eax], edx
+00485085 mov dword ptr [eax + 4], edx ; object pointer into leaf record
+
+00474149 mov edx, dword ptr [edx + 0x14]
+0047415d cmp byte ptr [ebx], 2
+00474162 mov esi, dword ptr [ebx + 4]
+0047416a call dword ptr [eax + 0x10]  ; EDG table target 0x4852f0
+00474177 call dword ptr [edx + 0x14]  ; endpoint index 1
+00474182 call dword ptr [eax + 0x14]  ; endpoint index 0
+00474185 fld dword ptr [ebp + 4]
+00474191 fld dword ptr [edi + 0x10]
+004741b9 fstp dword ptr [esp + 0x30]  ; retain smaller vertical gap
+00474204 call dword ptr [eax + 0x14]
+00474224 call dword ptr [edx + 0x14]
+00474242 mov cx, word ptr [ebp + 8]
+00474246 mov word ptr [eax], cx
+00495419 and ecx, 0xffff
+00495421 mov dword ptr [0x628c88], ecx
+
+00495444 call 0x532330             ; endpoint difference into local vector
+00495450 mov edx, dword ptr [esp + 0x78]
+00495462 fstp dword ptr [esp + 0x38] ; negated second component
+00495468 mov dword ptr [esp + 0x48], edx
+0049546c mov dword ptr [esp + 0x44], 0
+00495474 call 0x489f10             ; point-to-line XZ projection
+00489f51 mov dword ptr [eax + 4], 0
+00489f74 fstp dword ptr [eax]
+00489f84 fstp dword ptr [eax + 8]
+004954f1 lea edx, [esp + 0x34]
+004954f5 push 1
+004954f7 push edx
+004954f8 lea eax, [esp + 0x2c]
+004954fc push esi
+004954fd push eax
+004954fe push ebp
+004954ff call 0x494000

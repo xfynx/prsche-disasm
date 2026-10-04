@@ -42,6 +42,15 @@ rg -n '0046d600' research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/calls.jso
 Проверенные точки входа: `_FStart.scn` → Porsche.exe `0x46d600`;
 nfs5.exe `0x49c922` находится внутри `0x49c6c0`. Семантика требует дальнейшей проверки.
 
+Если ссылка указывает на LAB без распознанной функции, после проверки покрытия
+можно прочитать ограниченный диапазон с проверкой того же SHA256:
+```powershell
+py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x5b484c --size 24 --words
+py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x485210 --size 0x50
+```
+Raw decode не определяет границы функций автоматически. Подтверждённые операции
+и пропуски индекса записываются в отчёт; не подменяйте Ghidra-данные гипотезами.
+
 ## Состав
 
 - `static/binaries.jsonl`: пути, хеши, секции, image base, импорты/экспорты.

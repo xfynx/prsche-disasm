@@ -1,0 +1,241 @@
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x532300 --size 0x97
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=00532300 size=151
+Raw range; function extent and meaning require separate verification.
+00532300 push ebx
+00532301 mov ebx, dword ptr [esp + 8]
+00532305 test ebx, ebx
+00532307 jle 0x53232a
+00532309 mov eax, dword ptr [esp + 0xc]
+0053230d push esi
+0053230e mov esi, dword ptr [esp + 0x18]
+00532312 push edi
+00532313 mov edi, dword ptr [esp + 0x18]
+00532317 push esi
+00532318 push edi
+00532319 push eax
+0053231a call 0x56e660
+0053231f add esp, 0xc
+00532322 add esi, 0xc
+00532325 dec ebx
+00532326 jne 0x532317
+00532328 pop edi
+00532329 pop esi
+0053232a pop ebx
+0053232b ret
+0053232c nop
+0053232d nop
+0053232e nop
+0053232f nop
+00532330 push ebx
+00532331 mov ebx, dword ptr [esp + 8]
+00532335 test ebx, ebx
+00532337 jle 0x53235a
+00532339 mov eax, dword ptr [esp + 0xc]
+0053233d push esi
+0053233e mov esi, dword ptr [esp + 0x18]
+00532342 push edi
+00532343 mov edi, dword ptr [esp + 0x18]
+00532347 push esi
+00532348 push edi
+00532349 push eax
+0053234a call 0x56e6aa
+0053234f add esp, 0xc
+00532352 add esi, 0xc
+00532355 dec ebx
+00532356 jne 0x532347
+00532358 pop edi
+00532359 pop esi
+0053235a pop ebx
+0053235b ret
+0053235c nop
+0053235d nop
+0053235e nop
+0053235f nop
+00532360 mov edx, dword ptr [esp + 4]
+00532364 test edx, edx
+00532366 jle 0x532396
+00532368 mov ecx, dword ptr [esp + 0x10]
+0053236c mov eax, dword ptr [esp + 8]
+00532370 fld dword ptr [esp + 0xc]
+00532374 fmul dword ptr [eax]
+00532376 add eax, 0xc
+00532379 add ecx, 0xc
+0053237c dec edx
+0053237d fstp dword ptr [ecx - 0xc]
+00532380 fld dword ptr [eax - 8]
+00532383 fmul dword ptr [esp + 0xc]
+00532387 fstp dword ptr [ecx - 8]
+0053238a fld dword ptr [eax - 4]
+0053238d fmul dword ptr [esp + 0xc]
+00532391 fstp dword ptr [ecx - 4]
+00532394 jne 0x532370
+00532396 ret
+
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x5328d0 --size 0x53
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=005328d0 size=83
+Raw range; function extent and meaning require separate verification.
+005328d0 push esi
+005328d1 mov esi, dword ptr [esp + 8]
+005328d5 push esi
+005328d6 call 0x532b20
+005328db fdivr dword ptr [0x5b24a8]
+005328e1 mov eax, dword ptr [esp + 0x10]
+005328e5 add esp, 4
+005328e8 fld st(0)
+005328ea fmul dword ptr [esi]
+005328ec fstp dword ptr [eax]
+005328ee fld dword ptr [esi + 4]
+005328f1 fmul st(1)
+005328f3 fstp dword ptr [eax + 4]
+005328f6 fld dword ptr [esi + 8]
+005328f9 fmul st(1)
+005328fb pop esi
+005328fc fstp dword ptr [eax + 8]
+005328ff fstp st(0)
+00532901 ret
+00532902 nop
+00532903 nop
+00532904 nop
+00532905 nop
+00532906 nop
+00532907 nop
+00532908 nop
+00532909 nop
+0053290a nop
+0053290b nop
+0053290c nop
+0053290d nop
+0053290e nop
+0053290f nop
+00532910 mov eax, dword ptr [esp + 8]
+00532914 mov ecx, dword ptr [esp + 4]
+00532918 push eax
+00532919 push ecx
+0053291a call 0x56e8d1
+0053291f add esp, 8
+00532922 ret
+
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x532b20 --size 0x25
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=00532b20 size=37
+Raw range; function extent and meaning require separate verification.
+00532b20 mov eax, dword ptr [esp + 4]
+00532b24 fld dword ptr [eax + 4]
+00532b27 fld dword ptr [eax]
+00532b29 fld dword ptr [eax + 8]
+00532b2c fld st(1)
+00532b2e fmul st(2)
+00532b30 fld st(3)
+00532b32 fmul st(4)
+00532b34 faddp st(1)
+00532b36 fld st(1)
+00532b38 fmul st(2)
+00532b3a faddp st(1)
+00532b3c fsqrt
+00532b3e fstp st(3)
+00532b40 fstp st(0)
+00532b42 fstp st(0)
+00532b44 ret
+
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x56e660 --size 0x77
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=0056e660 size=119
+Raw range; function extent and meaning require separate verification.
+0056e660 push ebp
+0056e661 mov ebp, esp
+0056e663 push ebx
+0056e664 mov eax, dword ptr [ebp + 8]
+0056e667 mov edx, dword ptr [ebp + 0xc]
+0056e66a mov ebx, dword ptr [ebp + 0x10]
+0056e66d fld dword ptr [eax]
+0056e66f fadd dword ptr [edx]
+0056e671 fld dword ptr [eax + 4]
+0056e674 fadd dword ptr [edx + 4]
+0056e677 fld dword ptr [eax + 8]
+0056e67a fadd dword ptr [edx + 8]
+0056e67d fxch st(2)
+0056e67f lea eax, [eax + 0xc]
+0056e682 fstp dword ptr [ebx]
+0056e684 fstp dword ptr [ebx + 4]
+0056e687 fstp dword ptr [ebx + 8]
+0056e68a pop ebx
+0056e68b leave
+0056e68c ret
+0056e68d movq mm0, qword ptr [eax]
+0056e690 pfadd mm0, qword ptr [edx]
+0056e694 movq mm1, qword ptr [eax + 8]
+0056e698 pfadd mm1, qword ptr [edx + 8]
+0056e69d lea eax, [eax + 0xc]
+0056e6a0 movq qword ptr [ebx], mm0
+0056e6a3 movd dword ptr [ebx + 8], mm1
+0056e6a7 pop ebx
+0056e6a8 leave
+0056e6a9 ret
+0056e6aa push ebp
+0056e6ab mov ebp, esp
+0056e6ad push ebx
+0056e6ae mov eax, dword ptr [ebp + 8]
+0056e6b1 mov edx, dword ptr [ebp + 0xc]
+0056e6b4 mov ebx, dword ptr [ebp + 0x10]
+0056e6b7 fld dword ptr [eax]
+0056e6b9 fsub dword ptr [edx]
+0056e6bb fld dword ptr [eax + 4]
+0056e6be fsub dword ptr [edx + 4]
+0056e6c1 fld dword ptr [eax + 8]
+0056e6c4 fsub dword ptr [edx + 8]
+0056e6c7 fxch st(2)
+0056e6c9 lea eax, [eax + 0xc]
+0056e6cc fstp dword ptr [ebx]
+0056e6ce fstp dword ptr [ebx + 4]
+0056e6d1 fstp dword ptr [ebx + 8]
+0056e6d4 pop ebx
+0056e6d5 leave
+0056e6d6 ret
+
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x56e8d1 --size 0x24
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=0056e8d1 size=36
+Raw range; function extent and meaning require separate verification.
+0056e8d1 push ebp
+0056e8d2 mov ebp, esp
+0056e8d4 mov eax, dword ptr [ebp + 8]
+0056e8d7 mov edx, dword ptr [ebp + 0xc]
+0056e8da sub esp, 4
+0056e8dd fld dword ptr [eax]
+0056e8df fmul dword ptr [edx]
+0056e8e1 fld dword ptr [eax + 4]
+0056e8e4 fmul dword ptr [edx + 4]
+0056e8e7 fld dword ptr [eax + 8]
+0056e8ea fmul dword ptr [edx + 8]
+0056e8ed fxch st(2)
+0056e8ef faddp st(1)
+0056e8f1 faddp st(1)
+0056e8f3 leave
+0056e8f4 ret
+
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x516950 --size 1
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=00516950 size=1
+Raw range; function extent and meaning require separate verification.
+00516950 ret
+
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x5b27a4 --size 4 --words
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=005b27a4 size=4
+Raw range; function extent and meaning require separate verification.
+005b27a4 3f8ccccd float=1.10000002
+
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x5b272c --size 4 --words
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=005b272c size=4
+Raw range; function extent and meaning require separate verification.
+005b272c 3e000000 float=0.125
+
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x5b49b0 --size 4 --words
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=005b49b0 size=4
+Raw range; function extent and meaning require separate verification.
+005b49b0 3daaaaab float=0.0833333358
+
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x5b2600 --size 4 --words
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=005b2600 size=4
+Raw range; function extent and meaning require separate verification.
+005b2600 40400000 float=3
+
+COMMAND: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x5b2468 --size 4 --words
+Porsche.exe SHA256=ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39 VA=005b2468 size=4
+Raw range; function extent and meaning require separate verification.
+005b2468 3e800000 float=0.25

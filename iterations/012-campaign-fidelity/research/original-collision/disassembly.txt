@@ -1,0 +1,52 @@
+Source: Porsche.exe ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39
+Queries: py -3 scripts/research/query-binary-index.py --binary Porsche.exe --address <VA> --disassemble --limit 500
+Focused VAs: 0x485100, 0x488090, 0x5b484c, 0x485210, 0x4750b0, 0x488440, 0x488590, 0x4879d0, 0x488a60, 0x4888b0
+
+004880a2 push 0x5d05fc          ; "%s.edg"
+004880e3 call 0x487e80
+00487e8b call 0x59da80          ; open, inferred from subsequent file-handle test
+00487ea5 call 0x556640          ; size, inferred from subsequent count arithmetic
+00487eac mov eax, 0x24924925  ; division-like count arithmetic
+00487ef3 push 0x2c
+00487f01 call 0x47c180          ; allocation
+00487f0d movzx cx, byte ptr [esi - 8]
+00487f1a call 0x485100
+
+0048510a mov dword ptr [ecx], 0x5b484c
+00485118 mov ebx, dword ptr [esi]
+0048511a mov dword ptr [edi], ebx         ; object +0xc
+0048512e lea edi, [eax + 0x10]
+00485131 lea esi, [ecx + 0x1c]
+00485138 mov ebp, dword ptr [eax]
+0048513a mov dword ptr [ebx], ebp         ; object +0x1c
+004851f0 mov byte ptr [ecx + 4], 2
+004851f4 mov word ptr [ecx + 8], dx
+
+005b484c DATA reference -> 00485210 (indexed reference; no function returned by --address 0x485210)
+
+004882a6 call 0x488590
+004885f7 test byte ptr [ebp + 0xa], 0xf
+00488642 test byte ptr [esi + 0xa], 0xf
+0048864e call 0x488440
+004886f6 push 0x2c
+00488710 call 0x485100
+00488785 fld dword ptr [esp + 0x48]
+00488789 fcomp dword ptr [esp + 0x54]
+00488794 fld dword ptr [esp + 0x4c]
+00488798 fcomp dword ptr [esp + 0x58]
+004887a3 fld dword ptr [esp + 0x50]
+004887a7 fcomp dword ptr [esp + 0x5c]
+004887b2 cmp word ptr [esi + 8], 0
+004887ce cmp word ptr [edi + 8], 0
+0048881e cmp eax, ebx
+00488826 mov dword ptr [eax], ecx         ; append pointer
+
+004884af fld dword ptr [edx]
+004884b1 fsub dword ptr [ecx]
+004884c2 fcomp dword ptr [0x5b4960]
+00488563 cmp ebx, 2                      ; pair match count
+
+00487dad call 0x488090
+00487dde call 0x488a60
+00487dee call 0x4888b0
+00487dfe call 0x4888b0
