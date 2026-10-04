@@ -914,7 +914,6 @@ const CAR_SPECS = {
 
 function showBriefing(eventData) {
   activeCareerEvent = eventData;
-  eventFinishedHandled = false;
   const modal = document.querySelector("#eventBriefingModal");
   if (!modal) return;
 
@@ -1342,9 +1341,11 @@ if (briefingMapBtn) {
 const raceContinueBtn = document.querySelector("#raceContinueBtn");
 if (raceContinueBtn) {
   raceContinueBtn.addEventListener("click", () => {
+    const wasFactory = Boolean(activeCareerEvent?.is_factory);
     if (raceResultsModal) raceResultsModal.hidden = true;
     activeCareerEvent = null;
     setMenuVisible(true);
+    if (wasFactory) openFactoryLadder();
   });
 }
 
@@ -1805,7 +1806,6 @@ quickRaceStartBtn.addEventListener('click', async () => {
   clearNavigation();
   // Clear career identity before loading or restarting any race; no rewards are possible.
   activeCareerEvent = null;
-  eventFinishedHandled = false;
   if (raceResultsModal) raceResultsModal.hidden = true;
   try {
     modeSelect.value = 'track';
@@ -2331,6 +2331,10 @@ function updateNavigation(dt) {
     // Update Race HUD
     const phase = viewer.get_race_phase ? viewer.get_race_phase() : 0;
     const isRacingActive = phase > 0;
+    const isFinished = phase === 4 || phase === 5;
+    // Dismissal does not end the simulation's terminal phase. Re-arm only when
+    // a new attempt actually begins, including keyboard and toolbar restarts.
+    if (!isFinished) eventFinishedHandled = false;
 
     if (raceHudTop) {
       raceHudTop.hidden = !(hudVisible && isRacingActive);
@@ -2432,7 +2436,8 @@ function updateNavigation(dt) {
 
     // Race Finished / Results Modal
     if (raceResultsModal) {
-      if ((phase === 4 || phase === 5) && raceResultsModal.hidden) {
+      if (isFinished && !eventFinishedHandled) {
+        eventFinishedHandled = true;
         raceResultsModal.hidden = false;
         const pos = viewer.get_player_position();
         const total = viewer.get_total_participants();
@@ -2450,8 +2455,7 @@ function updateNavigation(dt) {
         if (resultsLapTime) resultsLapTime.textContent = formatRaceTime(elapsed);
         if (resultsBestTime) resultsBestTime.textContent = formatRaceTime(bestTime);
 
-        if (activeCareerEvent && !eventFinishedHandled) {
-          eventFinishedHandled = true;
+        if (activeCareerEvent) {
           let passed = false;
           let factoryResult = null;
           if (activeCareerEvent.is_factory) {
@@ -2538,8 +2542,7 @@ function updateNavigation(dt) {
             }
             saveProfile();
           }
-        } else if (!activeCareerEvent && !eventFinishedHandled) {
-          eventFinishedHandled = true;
+        } else {
           if (pos === 1) soundManager.playPass();
           else soundManager.playFail();
         }

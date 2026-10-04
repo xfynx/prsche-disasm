@@ -42,7 +42,7 @@ document.querySelectorAll = () => [];
 document.createElement = () => new Element();
 const window = new Element();
 const context = vm.createContext({
-  document, window, console,
+  document, window, console, setTimeout,
   HTMLInputElement: Input, HTMLTextAreaElement: Textarea, HTMLSelectElement: Select,
 });
 const source = readFileSync(new URL("main.js", import.meta.url), "utf8")
@@ -219,4 +219,44 @@ assert.throws(() => findSim(simFiles, ""), /Не указан/);
 assert.throws(() => findSim([...simFiles, "other/boxster25.sim"], "boxster25"), /несколько/);
 const customSim = { path: "Chosen\\GameData\\boxster25.sim" };
 assert.equal(findSim([customSim], "boxster25", file => file.path), customSim);
-console.log("UI state: drive/menu/HUD/focus/selector/diagnostics/shell/modals/mission goal/SIM selection checks passed");
+// Exercise the actual frame loop and Continue handler with terminal race telemetry.
+let phase = 2;
+context.testApi.setViewer({
+  is_drive_mode: () => true, has_car: () => true, update_car() {},
+  get_car_speed: () => 0, get_car_gear: () => 0, get_car_rpm: () => 0,
+  get_race_phase: () => phase, get_player_position: () => 1,
+  get_total_participants: () => 1, get_current_lap: () => 1,
+  get_total_laps: () => 1, get_current_lap_time: () => 12,
+  get_best_lap_time: () => 12, is_wrong_way: () => false,
+  get_countdown_remaining: () => 3, restart_race: () => { phase = 1; },
+});
+const tick = () => context.testApi.updateNavigation(1 / 60);
+const resultModal = element("#raceResultsModal");
+for (const terminalPhase of [4, 5]) {
+  phase = 2;
+  tick();
+  phase = terminalPhase;
+  tick();
+  assert.equal(resultModal.hidden, false, `phase ${phase} presents results`);
+  element("#raceContinueBtn").dispatch("click");
+  for (let i = 0; i < 60; i++) tick();
+  assert.equal(resultModal.hidden, true, "Continue must stay dismissed on subsequent frames");
+  context.testApi.showBriefing({ title: "Next event", is_factory: true, mission_obj: { code: "1m01" } });
+  tick();
+  assert.equal(resultModal.hidden, true, "next briefing must not consume the previous finish");
+  element("#briefingCancelBtn").dispatch("click");
+  for (const restart of [
+    () => key("keydown", "KeyR"),
+    () => element("#resetButton").dispatch("click"),
+    () => element("#raceRestartBtn").dispatch("click"),
+  ]) {
+    restart();
+    assert.equal(phase, 1, "each restart starts a new countdown");
+    tick();
+    phase = terminalPhase;
+    tick();
+    assert.equal(resultModal.hidden, false, "restart arms results for a new attempt");
+    element("#raceContinueBtn").dispatch("click");
+  }
+}
+console.log("UI state: existing checks and result Continue/restart lifecycle passed");

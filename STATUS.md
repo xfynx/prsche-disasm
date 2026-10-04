@@ -1,5 +1,12 @@
 # Состояние проекта
 
+2026-10-04: пользователь подтвердил прохождение первой Factory-миссии, но
+«Продолжить» повторно открывает результат. Run 010 исправляет JS lifecycle;
+UI regression и пять Factory Rust-тестов прошли. Windows/WASM собраны.
+Chromium: Continue → список → 1m01 → реальный старт, сохранение после reload,
+fail/retry без цикла, 0 JS errors. Финиш задан тестовой фикстурой; проходимость
+1m01 не заявляется. Исправлен её SIM: boxster.sim (отсутствует) → boxster25.sim.
+
 
 Обновлено 2026-10-03. Активна **012-campaign-fidelity** из завершённой 011.
 Текущий план: [iterations/012-campaign-fidelity/PLAN.md](iterations/012-campaign-fidelity/PLAN.md).

@@ -236,7 +236,8 @@ pub fn get_factory_missions_catalog() -> Vec<FactoryMission> {
             briefing: "Первый рабочий день: короткий слалом на автодроме Skid Pad. Лимит времени — 26 секунд.".into(),
             tip: "Не превышайте предел сцепления в поворотах между конусами.".into(),
             car_model: "boxster".into(),
-            car_sim: "boxster".into(),
+            // nfs5.car record 60: Boxster model -> Boxster25 SIM (0xb0).
+            car_sim: "boxster25".into(),
             track_id: "skidpad".into(),
             track_name: "Weissach Skid Pad".into(),
             mission_type: MissionType::SlalomCourse { time_limit_sec: 26.0, cone_penalty_sec: 2.0 },
