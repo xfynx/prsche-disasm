@@ -6,6 +6,12 @@
 Полный перенос, включая Evolution, Factory Driver и остальные режимы: [дорожная карта](docs/roadmap.md).
 Документация проекта: [План работ](PLAN.md) &bull; [Текущее состояние](STATUS.md) &bull; [Сборка](docs/building.md) &bull; [Форматы топологии](docs/track-topology-formats.md) &bull; [Роли агентов](docs/agents.md).
 
+[Run 016 внутри 012](iterations/012-campaign-fidelity/runs/016-original-support-assembly/README.md):
+Base/pr readers и child constructor дерева перенесены по оригинальным consumers.
+317 primitive / 60 Base / 256 child случаев сверены с x86; Rust проверил все
+74 300 pr на 15 трассах. 16 тестов, fmt/clippy/wasm32 прошли. Полная сборка опор,
+вставка дерева и подключение к заезду ещё открыты; игровая сборка fa56d05.
+
 [Run 015 внутри 012](iterations/012-campaign-fidelity/runs/015-original-support-loader/README.md):
 доказан источник флагов опоры mt+0; перенесены material lookup и plane/split
 helpers. 208+10 случаев сверены с оригинальным x86, Rust проверил материалы

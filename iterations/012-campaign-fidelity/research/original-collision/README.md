@@ -1,5 +1,12 @@
 # Porsche.exe EDG object trace (2026-10-04)
 
+2026-10-05, [support-assembly.md](support-assembly.md): Base mask and original
+primitive channel/index readers restored and replayed (317 payload cases,
+60 Base cases). Rust independently decoded all 74,300 pr records on 15 tracks.
+[spatial-insertion.md](spatial-insertion.md): child constructor restored from
+0x483bd0, 256 original cases; recursive insertion 0x484ae0 remains open.
+Full assembly and gameplay binding remain open; these are bounded pure ports.
+
 2026-10-05, [material-loader.md](material-loader.md): source support flags are
 the first mt payload word; the owner/container pointer chain is proven and 208
 original-x86 cases passed. The 15-track material corpus is independently checked

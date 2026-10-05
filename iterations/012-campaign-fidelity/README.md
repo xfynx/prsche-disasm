@@ -1,5 +1,11 @@
 # 012-campaign-fidelity
 
+2026-10-05, [Run 016](runs/016-original-support-assembly/README.md): перенесены
+исходные Base/pr readers и child constructor дерева. 317 primitive / 60 Base /
+256 child случаев сверены с исходным x86; Rust проверил 74 300 pr на 15 трассах.
+16 тестов, fmt/clippy/wasm32 прошли. Далее рекурсивная вставка и полная сборка
+опор; подключение к заезду ещё впереди. Игровая сборка fa56d05, 012 открыта.
+
 2026-10-05, [Run 015](runs/015-original-support-loader/README.md): source flags
 найдены в mt payload+0 и перенесены в Rust вместе с plane/gap/quad split.
 208 material и 10 plane случаев совпали с исполнением оригинального x86;

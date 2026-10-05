@@ -18,6 +18,22 @@ pub struct SpatialNode {
     pub records_present: bool,
 }
 
+impl SpatialNode {
+    /// Child constructor 0x483bd0, independently replayed in Run 016.
+    /// The original's selectors other than 0, 1, and 3 take the same branch
+    /// as 2. Each packed coordinate wraps within its own fourteen bits.
+    pub fn child(parent: u32, selector: u32) -> Self {
+        let x = ((parent & 0x3fff) * 2 + u32::from(selector == 1 || selector == 3)) & 0x3fff;
+        let z =
+            (((parent >> 14) & 0x3fff) * 2 + u32::from(selector == 0 || selector == 1)) & 0x3fff;
+        Self {
+            packed: (parent & 0xf0000000).wrapping_add(0x10000000) | (z << 14) | x,
+            children: [None; 4],
+            records_present: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct SpatialGrid {
     pub half_extent: f32,

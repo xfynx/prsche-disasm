@@ -1,5 +1,16 @@
 # Состояние проекта
 
+Run 016 внутри 012, 2026-10-05: Base/pr readers и child constructor дерева
+перенесены из оригинальных consumers в отдельные Rust-модули. 317 primitive
+payload cases / 2536 helper outputs, 60 Base и 256 child cases сверены с x86.
+Rust проверил 15 трасс: 74 300 pr / 16 591 Base. 16 тестов, fmt/clippy -D warnings
+и wasm32 check прошли; источник/команды — runs/016-original-support-assembly.
+Исполнитель по insertion остановлен лимитом; source export сохранён, child
+constructor завершён координатором. Активных назначений нет. Сборка fa56d05,
+012 открыта; новые модули пока вне игрового цикла. Следом координатор:
+0x484320 + type-1 vtable+4/+8 callbacks → insertion replay; затем полный loader
+(ordinal producer/special/alternate/degeneracy) и связь с state/cadence авто.
+
 Run 015 внутри 012, 2026-10-05: material flags = mt payload+0 доказаны;
 208 x86 material cases и 10 plane/gap cases проверены, перенесены в pure Rust.
 Rust независимо проверил 15 трасс / 3651 mt entries; 11 тестов, fmt/clippy

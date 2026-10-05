@@ -11,6 +11,7 @@ pub mod chassis;
 pub mod original_contact;
 pub mod original_spatial;
 pub mod original_support;
+pub mod original_support_assembly;
 pub mod original_support_material;
 pub mod powertrain;
 pub mod rigid_body;
