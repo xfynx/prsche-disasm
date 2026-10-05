@@ -1,5 +1,14 @@
 # Need for Speed: Porsche Unleashed — открытый движок и просмотрщик
 
+[Run 018 внутри 012](iterations/012-campaign-fidelity/runs/018-original-support-runtime/README.md):
+восстановленные type-1 опоры уже в заезде: исходный resource loader → дерево →
+кэш/плоскость → четыре колеса. Подбор RD* и mt53/54 убран. 15 трасс, 237 395
+полигонов; 215 тестов и native/web release прошли. Quick Race на Skidpad/Alps/
+Canyon и 21 общий browser check прошли. Запуск новой сборки:
+`local/builds/012-campaign-fidelity/Launch-desktop.cmd`.
+Это подключение геометрии; оригинальные силы/impact kernel и mixed-object tree
+ещё незавершены. 012 открыта.
+
 Современная независимая реализация игрового движка **Need for Speed: Porsche Unleashed** (NFS 5, 2000) на **Rust + wgpu + winit** для Windows, Linux, macOS и браузера (WebAssembly / WebGPU).
 
 Активная итерация: **[012-campaign-fidelity](iterations/012-campaign-fidelity/README.md)**. Последний завершённый снимок: [011-factory-driver](iterations/011-factory-driver/README.md), тег `iteration-011`. Снимки 001–011 заморожены; прежние отчёты не подтверждают полного совпадения с оригиналом 1:1.

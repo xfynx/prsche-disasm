@@ -41,6 +41,10 @@ fn load_track_assets(track_dir: &Path, track_name: &str) -> Option<AssetFiles> {
     let mut files = AssetFiles::new();
     files.insert(format!("{track_name}.crp"), std::fs::read(&crp_path).ok()?);
     files.insert(format!("{track_name}.fsh"), std::fs::read(&fsh_path).ok()?);
+    files.insert(
+        "animdefs.txt".into(),
+        std::fs::read(track_dir.join("animdefs.txt")).ok()?,
+    );
 
     let edg_path = track_dir.join(format!("{track_name}.edg"));
     if edg_path.exists() {
@@ -129,6 +133,10 @@ fn test_all_15_tracks_complete_physics_and_collision_audit() {
             "Track {track_name} missing road surface"
         );
         let surface = scene.road_surface.as_ref().unwrap();
+        assert!(
+            surface.uses_original_support(),
+            "{track_name}: original support backend absent"
+        );
         assert!(
             surface.triangle_count() > 0,
             "Track {track_name} has 0 road surface triangles"

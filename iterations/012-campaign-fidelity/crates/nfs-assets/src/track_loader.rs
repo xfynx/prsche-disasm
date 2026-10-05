@@ -240,9 +240,7 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
     }
 
     let mut raw_meshes = Vec::new();
-    // `RD*` comes from the article Name field. It identifies candidate road geometry,
-    // but does not establish the original game's collision/tyre semantics.
-    let mut road_triangles = Vec::new();
+    // Rendering and source collision resources are assembled separately.
     let mut prop_templates: Vec<(u32, Vec<Mesh>)> = Vec::new();
     let mut total_tris = 0;
     for (ai, a) in crp.articles.iter().enumerate() {
@@ -360,26 +358,6 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                 format!("{article_name}#{ai}/{}", pr.index),
             )?;
             if !m.indices.is_empty() {
-                // Skidpad CRP mt53 is the complete segmented flat pad; mt54 is
-                // its sloped outer rim. These source material IDs select geometry,
-                // not tyre properties. MESH04 alone covers only Start and is also
-                // a reused building name. See Run 006's source inventory.
-                let skidpad_pad = track.eq_ignore_ascii_case("skidpad")
-                    && [53, 54]
-                        .iter()
-                        .any(|id| matmap.get(id) == Some(&m.material));
-                if skidpad_pad
-                    || article_name
-                        .get(..2)
-                        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rd"))
-                {
-                    road_triangles.extend(surface::triangles_from_mesh(
-                        &article_name,
-                        ai,
-                        pr.index,
-                        &m,
-                    ));
-                }
                 total_tris += m.indices.len() / 3;
                 for v in &m.vertices {
                     for k in 0..3 {
@@ -392,16 +370,30 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         }
     }
 
-    let road_surface = RoadSurface::from_triangles(road_triangles);
-    let road_report = road_surface.report();
+    let anim = nfs_formats::animdefs::parse_animdefs(&String::from_utf8_lossy(find(
+        files,
+        "animdefs.txt",
+    )?))?;
+    let support = physics::original_support_loader::assemble_initial_track_support(&crp, &anim)?;
+    let skipped_special = support.skipped_special_articles;
+    let skipped_disabled = support.skipped_disabled_articles;
+    let skipped_library = support.skipped_library_articles;
+    let names = crp
+        .articles
+        .iter()
+        .enumerate()
+        .map(|(index, article)| {
+            article
+                .find("Name", 0)
+                .map(|entry| c_string(&entry.data))
+                .unwrap_or_else(|| format!("article{index}"))
+        })
+        .collect::<Vec<_>>();
+    let road_surface = RoadSurface::from_original_support(support, &names)?;
+    let (polygons, nodes) = road_surface.original_support_counts().unwrap();
     scene.diagnostics.push(format!(
-        "Road-surface hypothesis (static RD* and sourced Skidpad mt53/mt54 geometry before batching): {} accepted; rejected degenerate={}, vertical={}, non-finite={}, out-of-bounds={}, giant={}",
-        road_report.accepted,
-        road_report.rejected_degenerate,
-        road_report.rejected_vertical,
-        road_report.rejected_non_finite,
-        road_report.rejected_out_of_bounds,
-        road_report.rejected_giant,
+        "Original type-1 support: {polygons} polygons, {nodes} nodes; special={skipped_special}, disabled={skipped_disabled}, library={skipped_library}, degenerate={}. Porsche.exe 4750b0/48839f -> 484ae0 -> 474060/499a70; source Base+4, mt flags, no RD name filter. Mixed object tree and original force solver remain incomplete.",
+        road_surface.report().rejected_degenerate,
     ));
     scene.road_surface = Some(road_surface);
 
@@ -974,6 +966,10 @@ mod tests {
         let mut files = AssetFiles::new();
         files.insert("skidpad.crp".into(), std::fs::read(&crp_path).unwrap());
         files.insert("skidpad.fsh".into(), std::fs::read(&fsh_path).unwrap());
+        files.insert(
+            "animdefs.txt".into(),
+            std::fs::read(root.join("animdefs.txt")).unwrap(),
+        );
 
         let scene = load(&files, "skidpad").unwrap();
         assert_eq!(scene.meshes.len(), 180);
@@ -994,11 +990,12 @@ mod tests {
         assert!(scene.bounds[0][0] < -200.0);
         assert!(scene.bounds[1][0] > 200.0);
         let surface = scene.road_surface.as_ref().unwrap();
-        assert!(
-            surface.triangle_count() > 0,
-            "no static RD* support triangles"
+        assert!(surface.triangle_count() > 0, "no original support polygons");
+        assert!(surface.uses_original_support());
+        assert_eq!(
+            surface.report().accepted,
+            surface.original_support_counts().unwrap().0
         );
-        assert_eq!(surface.report().accepted, surface.triangle_count());
     }
 
     #[test]
@@ -1187,6 +1184,10 @@ mod tests {
             let path = root.join(format!("{track_name}.crp"));
             let fsh_path = root.join(format!("{track_name}.fsh"));
             let mut files = AssetFiles::new();
+            files.insert(
+                "animdefs.txt".into(),
+                std::fs::read(root.join("animdefs.txt")).unwrap(),
+            );
             files.insert(format!("{track_name}.crp"), std::fs::read(&path).unwrap());
             files.insert(
                 format!("{track_name}.fsh"),
@@ -1237,6 +1238,10 @@ mod tests {
         files.insert("skidpad.crp".into(), std::fs::read(&crp_path).unwrap());
         files.insert("skidpad.fsh".into(), std::fs::read(&fsh_path).unwrap());
         files.insert("skidpad.edg".into(), std::fs::read(&edg_path).unwrap());
+        files.insert(
+            "animdefs.txt".into(),
+            std::fs::read(root.join("animdefs.txt")).unwrap(),
+        );
         files.insert("skidpad.jnc".into(), std::fs::read(&jnc_path).unwrap());
         files.insert("skidpad.map".into(), std::fs::read(&map_path).unwrap());
         if lsp_path.exists() {

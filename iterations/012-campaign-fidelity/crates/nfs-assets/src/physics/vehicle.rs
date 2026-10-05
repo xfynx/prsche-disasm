@@ -216,6 +216,7 @@ impl VehicleSimulation {
         self.powertrain.current_gear = 1;
         self.prev_linear_velocity = Vec3::ZERO;
         for w in &mut self.suspension.wheels {
+            w.support_owner = Default::default();
             w.tire.omega = 0.0;
             w.compression = 0.0;
         }

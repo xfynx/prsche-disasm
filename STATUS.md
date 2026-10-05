@@ -1,5 +1,21 @@
 # Состояние проекта
 
+Run 018 внутри 012, 2026-10-06: восстановленные type-1 опоры подключены
+к реальной загрузке трасс и четырём колёсам. Ordinary Base filter, retained
+flag-1 loader, mt/vt/df/pr, дерево, два кэша и plane query работают в заезде;
+RD* и Skidpad mt53/54 подбор исключён. На 15 трассах 237 395 полигонов.
+9 loader / 10 owner случаев совпали с x86; 215 Rust-тестов прошли (3 ignored),
+fmt/clippy workspace -D warnings, wasm32 и native+web release прошли.
+Quick Race Skidpad/Alps/Canyon: реальные кэши четырёх колёс, нагрузка, движение,
+высота проверены; 21 общий browser check прошёл. Отчёт/команды/кадры:
+runs/018-original-support-runtime. Запуск: local/builds/012-campaign-fidelity/Launch-desktop.cmd.
+Силы подвески и body response пока прежний adapter; prepared-contact kernel
+не подключён. Type-2/box/cylinder в общем дереве, mutable Base ordinal и
+полный original wheel state/forces остаются незавершёнными; 012 открыта.
+Назначения исполнителей завершены. Следующий конкретный шаг координатора:
+смешанная сцена → original 0x499a70 state/alternate height/force consumers →
+геометрия 0x495020 и response 0x494000. Сверка реальной езды с оригиналом обязательна.
+
 Run 017 внутри 012, 2026-10-05: исходные type-1 insertion/split и cached
 support query соединены в отдельном Rust-модуле. 38 callback / 304 predicate
 cases, 36 полных деревьев и 72 полных запроса совпали с исходным x86. Original

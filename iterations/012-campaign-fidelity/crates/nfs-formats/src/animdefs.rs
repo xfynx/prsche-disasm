@@ -5,6 +5,9 @@ use crate::Result;
 pub struct AnimDefinition {
     pub tag: u32,
     pub triggerable: bool,
+    /// Porsche.exe 0x47dcf0: +0x10, default 0; kCylinder=1, kBox=2,
+    /// kSmackable=3. Unknown textual values retain the initialized value.
+    pub collide_type: u32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -64,12 +67,21 @@ pub fn parse_animdefs(input: &str) -> Result<AnimDefs> {
                         }
                         let mut bytes = [0; 4];
                         bytes[..value.len()].copy_from_slice(value.as_bytes());
+                        bytes.make_ascii_uppercase();
                         definition.tag = u32::from_le_bytes(bytes);
                     } else if token.eq_ignore_ascii_case("triggerable") {
                         definition.triggerable = value
                             .parse::<i32>()
                             .map_err(|e| format!("animdefs triggerable: {e}"))?
                             != 0;
+                    } else if token.eq_ignore_ascii_case("collideType") {
+                        if value.eq_ignore_ascii_case("kCylinder") {
+                            definition.collide_type = 1;
+                        } else if value.eq_ignore_ascii_case("kBox") {
+                            definition.collide_type = 2;
+                        } else if value.eq_ignore_ascii_case("kSmackable") {
+                            definition.collide_type = 3;
+                        }
                     }
                 }
                 _ => {}
@@ -179,6 +191,26 @@ mod tests {
         }
         let defs = parse_animdefs(&std::fs::read_to_string(path).unwrap()).unwrap();
         assert_eq!(defs.definitions[0].tag, u32::from_le_bytes(*b"ENDW"));
+        assert_eq!(defs.definitions[0].collide_type, 2);
+        assert_eq!(defs.find_tag_or_first(123).unwrap().collide_type, 2);
+        assert_eq!(
+            defs.find_tag_or_first(u32::from_le_bytes(*b"TEMP"))
+                .unwrap()
+                .collide_type,
+            1
+        );
+        assert_eq!(
+            defs.find_tag_or_first(u32::from_le_bytes(*b"SIGN"))
+                .unwrap()
+                .collide_type,
+            3
+        );
+        assert_eq!(
+            defs.find_tag_or_first(u32::from_le_bytes(*b"FNSH"))
+                .unwrap()
+                .collide_type,
+            0
+        );
         for tag in [*b"ARW1", *b"ARW2", *b"ARW3", *b"ARW4"] {
             let def = defs.find_tag_or_first(u32::from_le_bytes(tag)).unwrap();
             assert_eq!(def.tag, u32::from_le_bytes(tag));

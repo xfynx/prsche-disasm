@@ -6,6 +6,7 @@
 use glam::Vec3;
 use nfs_formats::SimCar;
 
+use super::original_support_owner::OriginalSupportOwner;
 use crate::physics::rigid_body::RigidBody;
 use crate::physics::tire::Tire;
 use crate::surface::RoadSurface;
@@ -18,6 +19,9 @@ pub const WHEEL_RR: usize = 3;
 /// A single wheel suspension assembly.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SuspensionWheel {
+    /// Original per-wheel polygon/node cache. The force solver below remains
+    /// the existing adapter; this state belongs only to recovered geometry queries.
+    pub support_owner: OriginalSupportOwner,
     /// Suspension top mount position in vehicle body frame (m).
     pub hardpoint_body: Vec3,
     /// Uncompressed suspension spring length (m).
@@ -64,6 +68,7 @@ impl SuspensionWheel {
         grip_mult: f32,
     ) -> Self {
         Self {
+            support_owner: OriginalSupportOwner::default(),
             hardpoint_body,
             rest_length: 0.35,
             max_compression: 0.20,
@@ -196,8 +201,26 @@ impl SuspensionSystem {
             let ground = if let Some(surf) = surface {
                 // Search only the suspension's reach. A missing road triangle is
                 // not a hidden plane at y=0, nor permission to attach to another deck.
-                surf.suspension_ray(mount_world, up, uncompressed_len, 0.49)
-                    .map(|(distance, hit)| (distance, Vec3::from_array(hit.normal)))
+                if surf.uses_original_support() {
+                    // Porsche.exe 0x499a70 selects by wheel XZ and evaluates
+                    // its cached plane. Keep the existing force adapter's local
+                    // spring-length conversion, explicitly separate from the
+                    // unrecovered original suspension/alternate-height branch.
+                    surf.original_support(mount_world.to_array(), &mut wheel.support_owner)
+                        .and_then(|hit| {
+                            let normal = Vec3::from_array(hit.normal);
+                            let denominator = up.dot(normal);
+                            (denominator > 0.01).then(|| {
+                                (
+                                    (mount_world.y - hit.height) * normal.y / denominator,
+                                    normal,
+                                )
+                            })
+                        })
+                } else {
+                    surf.suspension_ray(mount_world, up, uncompressed_len, 0.49)
+                        .map(|(distance, hit)| (distance, Vec3::from_array(hit.normal)))
+                }
             } else {
                 // Explicit flat-ground fixture used by CPU calibration benches.
                 (up.y > 0.01).then(|| (mount_world.y / up.y, Vec3::Y))

@@ -306,6 +306,31 @@ impl BrowserViewer {
         state
     }
 
+    /// Read-only acceptance evidence: original backend, polygon/node counts,
+    /// then one cached support polygon index per live simulation wheel (-1=miss).
+    pub fn get_original_support_state(&self) -> Vec<f64> {
+        let Some(renderer) = self.renderer.as_ref() else {
+            return vec![];
+        };
+        let Some((polygons, nodes)) = renderer
+            .road_surface
+            .as_ref()
+            .and_then(nfs_assets::RoadSurface::original_support_counts)
+        else {
+            return vec![];
+        };
+        let mut state = vec![1.0, polygons as f64, nodes as f64];
+        if let Some(sim) = renderer.sim_car.as_ref() {
+            state.extend(sim.suspension.wheels.iter().map(|wheel| {
+                wheel
+                    .support_owner
+                    .polygon
+                    .map_or(-1.0, |index| index as f64)
+            }));
+        }
+        state
+    }
+
     /// Read-only render diagnostics: chassis adapter xyz, then per wheel:
     /// index, source center xyz, radius, world center xyz, mesh count.
     pub fn get_car_wheel_render_state(&self) -> Vec<f32> {

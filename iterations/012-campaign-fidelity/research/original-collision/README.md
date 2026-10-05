@@ -1,5 +1,13 @@
 # Porsche.exe EDG object trace (2026-10-04)
 
+2026-10-06, [support-loader.md](support-loader.md) и
+[runtime-contact-integration.md](runtime-contact-integration.md): retained
+flag-1 ordinary resource loader и owner cache/plane перенесены и подключены
+к track_loader/RoadSurface/SuspensionSystem. 9 loader / 10 owner x86 cases;
+15-track corpus и три живых Quick Race проверены в
+[Run 018](../../runs/018-original-support-runtime/README.md).
+Полный original force/impact state и mixed-object tree остаются открыты.
+
 2026-10-05, [support-tree.md](support-tree.md): original dynamic insertion,
 splitting and full cached support selection now compose in Rust. 36 original
 tree snapshots and 72 full queries match, with actual original allocator code.

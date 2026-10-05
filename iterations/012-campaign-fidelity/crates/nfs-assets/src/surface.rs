@@ -1,12 +1,14 @@
-//! CPU-only support-surface queries for static `RD*` track articles.
-//!
-//! `RD*` is selected from the CRP article `Name` as a geometric road-surface
-//! hypothesis. The format parser proves the article and its triangles exist;
-//! it does not prove NFS5 used this set for collision or tyre physics.
+//! CPU support queries. Real tracks use source-loaded type-1 polygons and
+//! original selection/cache/plane callbacks. The legacy triangle/ray adapter
+//! remains available for explicit CPU fixtures, without a real-track fallback.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
-use crate::Mesh;
+use crate::physics::original_support::{SupportPolygon, SupportVertices};
+use crate::physics::original_support_loader::SupportLoad;
+use crate::physics::original_support_owner::OriginalSupportOwner;
+use crate::physics::original_support_tree::SupportTree;
 
 const CELL_SIZE: f32 = 16.0;
 const MAX_ABS_COORDINATE: f32 = 1_000_000.0;
@@ -58,15 +60,106 @@ struct IndexedTriangle {
     normal: [f32; 3],
 }
 
-/// A bounded XZ spatial grid for the static `RD*` geometry hypothesis.
+#[derive(Debug)]
+struct OriginalSupportSurface {
+    polygons: Vec<SupportPolygon>,
+    identities: Vec<RoadTriangleIdentity>,
+    tree: SupportTree,
+}
+
+/// Original type-1 support backend for tracks, or an explicit bounded triangle
+/// grid for CPU fixtures. Scene clones share the immutable original arena.
 #[derive(Debug, Clone, Default)]
 pub struct RoadSurface {
     triangles: Vec<IndexedTriangle>,
     grid: BTreeMap<(i32, i32), Vec<usize>>,
     report: RoadSurfaceReport,
+    original: Option<Arc<OriginalSupportSurface>>,
 }
 
 impl RoadSurface {
+    /// Source polygons remain in original XYZ coordinates. Only the scene API
+    /// reflects Z, so the original winding/signed-zero tests run unchanged.
+    pub fn from_original_support(
+        load: SupportLoad,
+        article_names: &[String],
+    ) -> Result<Self, String> {
+        let mut surface = Self::default();
+        let mut polygons = Vec::with_capacity(load.polygons.len());
+        let mut identities = Vec::with_capacity(load.polygons.len());
+        for assembled in load.polygons {
+            let identity = RoadTriangleIdentity {
+                article_name: article_names
+                    .get(assembled.article_index)
+                    .ok_or("support article identity outside archive")?
+                    .clone(),
+                article_index: assembled.article_index,
+                mesh_name: format!("original/{}", assembled.primitive_index),
+                primitive_index: assembled.primitive_index,
+                triangle_index: assembled.polygon_index as usize,
+            };
+            // The triangulated copy is for existing read-only geometry audits.
+            // Live selection uses the original tri/quad arena below.
+            let pieces = match &assembled.polygon.vertices {
+                SupportVertices::Triangle(p) => vec![*p],
+                SupportVertices::Quad(p) => vec![[p[0], p[1], p[2]], [p[0], p[2], p[3]]],
+            };
+            for positions in pieces {
+                let positions = positions.map(crate::track_loader::to_scene_coordinates);
+                surface.triangles.push(IndexedTriangle {
+                    normal: triangle_normal(positions),
+                    source: RoadTriangle {
+                        identity: identity.clone(),
+                        positions,
+                    },
+                });
+            }
+            identities.push(identity);
+            polygons.push(assembled.polygon);
+        }
+        let mut tree = SupportTree::original_scene();
+        for index in 0..polygons.len() {
+            tree.insert(&polygons, index)?;
+        }
+        surface.report.accepted = polygons.len();
+        surface.report.rejected_degenerate = load.rejected_degenerate;
+        surface.original = Some(Arc::new(OriginalSupportSurface {
+            polygons,
+            identities,
+            tree,
+        }));
+        Ok(surface)
+    }
+
+    pub fn uses_original_support(&self) -> bool {
+        self.original.is_some()
+    }
+
+    pub fn original_support_counts(&self) -> Option<(usize, usize)> {
+        self.original
+            .as_ref()
+            .map(|source| (source.polygons.len(), source.tree.nodes.len()))
+    }
+
+    /// Original wheel call 0x499b64 uses per-wheel owner state and permits
+    /// polygon reuse. No legacy RD grid fallback is used when this backend exists.
+    pub fn original_support(
+        &self,
+        point: [f32; 3],
+        owner: &mut OriginalSupportOwner,
+    ) -> Option<SurfaceHit> {
+        let original = self.original.as_ref()?;
+        let point = crate::track_loader::to_scene_coordinates(point);
+        let hit = owner
+            .select(&original.tree, &original.polygons, point, true)
+            .ok()??;
+        Some(SurfaceHit {
+            height: hit.height,
+            normal: crate::track_loader::to_scene_coordinates(hit.normal),
+            identity: original.identities[hit.polygon].clone(),
+        })
+    }
+
     /// Builds a grid while rejecting malformed and impractically large triangles.
     pub fn from_triangles(triangles: impl IntoIterator<Item = RoadTriangle>) -> Self {
         let mut surface = Self::default();
@@ -115,6 +208,13 @@ impl RoadSurface {
         {
             return None;
         }
+        if self.original.is_some() {
+            let hit =
+                self.original_support([x, reference_y, z], &mut OriginalSupportOwner::default())?;
+            return (hit.height <= reference_y + max_step_up
+                && hit.height >= reference_y - max_drop)
+                .then_some(hit);
+        }
         let cell = cell_for(x, z)?;
         let mut best: Option<(f32, &IndexedTriangle, f32)> = None;
         for &index in self.grid.get(&cell)? {
@@ -140,7 +240,7 @@ impl RoadSurface {
         })
     }
 
-    /// Cast along a suspension's local down axis against finite source triangles.
+    /// Legacy fixture adapter: cast along local down against finite triangles.
     /// The signed distance permits a small existing ground penetration to recover.
     /// Upward/back-face rays cannot attach inverted wheels to the road.
     pub fn suspension_ray(
@@ -294,37 +394,6 @@ impl RoadSurface {
         }
         self.report.accepted += 1;
     }
-}
-
-pub(crate) fn triangles_from_mesh(
-    article_name: &str,
-    article_index: usize,
-    primitive_index: u16,
-    mesh: &Mesh,
-) -> Vec<RoadTriangle> {
-    mesh.indices
-        .as_chunks::<3>()
-        .0
-        .iter()
-        .enumerate()
-        .filter_map(|(triangle_index, indices)| {
-            let positions = (*indices).map(|index| {
-                mesh.vertices
-                    .get(index as usize)
-                    .map(|vertex| vertex.position)
-            });
-            Some(RoadTriangle {
-                identity: RoadTriangleIdentity {
-                    article_name: article_name.into(),
-                    article_index,
-                    mesh_name: mesh.name.clone(),
-                    primitive_index,
-                    triangle_index,
-                },
-                positions: [positions[0]?, positions[1]?, positions[2]?],
-            })
-        })
-        .collect()
 }
 
 fn cell_for(x: f32, z: f32) -> Option<(i32, i32)> {

@@ -1,5 +1,15 @@
 # 012-campaign-fidelity
 
+2026-10-06, [Run 018](runs/018-original-support-runtime/README.md): type-1
+опоры подключены к игровым колёсам и surface queries. Реальные CRP проходят
+ordinary/retained flag-1 consumer, mt/vt/df/pr сборку, дерево и исходные кэши/
+плоскость; RD*/Skidpad material-name отбор больше не используется.
+15 трасс / 237 395 полигонов; x86: 9 loader + 10 owner cases. 215 тестов,
+fmt/clippy/wasm32 и native/web release прошли. Quick Race на трёх трассах и
+21 общий browser check прошли. Сборка — local/builds/012-campaign-fidelity.
+Original force solver, complete impact path и mixed-object tree не завершены;
+это не доказательство совпадения езды/визуала с оригиналом. 012 открыта.
+
 2026-10-05, [Run 017](runs/017-original-support-insertion/README.md): исходные
 вставка/деление дерева соединены с полным cached support query. 36 деревьев и
 72 запроса совпали с x86, включая record order/cache; 38+304 callback/predicate
