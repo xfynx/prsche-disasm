@@ -1,5 +1,11 @@
 # Porsche.exe EDG object trace (2026-10-04)
 
+2026-10-05, [spatial-query.md](spatial-query.md): original packed-node bounds,
+point traversal, and cached support selection restored in a separate Rust module.
+572 original-x86 results match the Rust port; scene construction/runtime binding
+remain open. [support-material.md](support-material.md) records the bounded
+material-word consumer trace and the unresolved raw-resource mapping.
+
 Module: `Porsche.exe`, SHA-256 `ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39`. Addresses are virtual addresses. Source: `research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d` and focused `scripts/research/query-binary-index.py --disassemble` queries. Selected instruction evidence is in [disassembly.txt](disassembly.txt).
 
 Confirmed from the indexed instructions:

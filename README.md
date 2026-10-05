@@ -6,6 +6,12 @@
 Полный перенос, включая Evolution, Factory Driver и остальные режимы: [дорожная карта](docs/roadmap.md).
 Документация проекта: [План работ](PLAN.md) &bull; [Текущее состояние](STATUS.md) &bull; [Сборка](docs/building.md) &bull; [Форматы топологии](docs/track-topology-formats.md) &bull; [Роли агентов](docs/agents.md).
 
+[Run 014 внутри 012](iterations/012-campaign-fidelity/runs/014-original-spatial-query/README.md):
+исходные spatial bounds, обход дерева и кэш опоры перенесены в Rust;
+572 результата совпали с исполнением оригинального x86. Native/WASM проверки
+прошли. Загрузка/построение сцены и подключение к заезду ещё открыты;
+последняя игровая сборка — fa56d05.
+
 [Run 013 внутри 012](iterations/012-campaign-fidelity/runs/013-original-support-query/README.md):
 исходные проверки опорных полигонов и выбор уровня перенесены в Rust и сверены
 с исполнением оригинального x86. Прослежены CRP consumer и исходный таймер.

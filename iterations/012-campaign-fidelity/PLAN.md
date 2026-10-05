@@ -1,5 +1,13 @@
 # 012-campaign-fidelity: рабочий план
 
+Run 014 внутри 012, 2026-10-05: исходный spatial bounds/traversal/cache
+перенесён в pure Rust. 572 результата совпали с исполнением оригинального x86;
+семь Rust-тестов, fmt/clippy и wasm32 check прошли. Source/fixtures — Run 014.
+Путь owner → material flags установлен; raw mt offset ещё неизвестен.
+Runtime не подключён, сборка fa56d05.
+Ближайший шаг: raw flags linkage, plane/split loader, построение дерева
+и связь с состоянием авто. Исполнители завершили работу.
+
 Run 013 (не новая итерация), 2026-10-05: type-1 опоры — quad/triangle,
 containment по signed float bits, выбор по abs(centerY-queryY) внутри листа.
 36 polygon/10 selection/10 quad split случаев прошли на исходных инструкциях.

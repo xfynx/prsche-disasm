@@ -1,5 +1,11 @@
 # 012-campaign-fidelity
 
+2026-10-05, [Run 014](runs/014-original-spatial-query/README.md): восстановлены
+spatial bounds, traversal и cache опорной поверхности; 572 результата Rust
+совпали с исполнением оригинального x86. Семь тестов, fmt/clippy/wasm32 прошли.
+Далее raw material mapping, построение дерева и подключение к состоянию авто.
+Игровая сборка остаётся fa56d05; эта логика ещё вне игрового цикла.
+
 2026-10-05, [Run 013](runs/013-original-support-query/README.md): перенесены
 исходные опорные polygon predicates/выбор листа, 36+10 результатов совпали с x86.
 Исходный quad split проверен отдельно; timer128/derived counters64Гц прослежены.
