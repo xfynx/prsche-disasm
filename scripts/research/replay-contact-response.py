@@ -1,7 +1,7 @@
 """Differential probe of an original contact-response slice, not a game solver.
 
 Install unicorn==2.1.3 into local/tools/python-unicorn. Runs original x86 bytes
-from 0x4940ae after geometry preparation, with the angular callback disabled.
+from 0x4940ae after geometry preparation, including the optional angular callback.
 No original instruction is patched or replaced. See original-collision/response.md.
 """
 import argparse
@@ -31,7 +31,23 @@ def approximate_speed(v):
     return f32(max(abs(v[0]), abs(v[2])) + .25 * min(abs(v[0]), abs(v[2])))
 
 
-def machine(module, data):
+def angular_response(strength, old_forward, normal, old_angular):
+    # 0x493f10: gate uses the OLD projection, before 0x493e40 refreshes it.
+    if strength >= 15 and old_forward >= 20:
+        return old_angular
+    a, b = normal[0], -normal[2]  # dot with fixture car+4a8 / car+490
+    value = min(abs(a), abs(b)) * .25
+    if a < 0:
+        if b < 0:
+            value = -value
+    else:
+        if b > 0:
+            value = -value
+        value *= .5
+    return f32(value)
+
+
+def machine(module, data, extra_ranges=()):
     uc = Uc(UC_ARCH_X86, UC_MODE_32)
     base = int(module['image_base'], 16)
     end = max(s['rva'] + max(s['vsize'], s['raw_size']) for s in module['sections'])
@@ -44,9 +60,9 @@ def machine(module, data):
     uc.mem_map(EXIT, 0x1000)
     # Harness only: store the returned x87 float. Original bytes stay intact.
     uc.mem_write(EXIT, b'\xd9\x1d' + struct.pack('<I', RESULT))
-    allowed = ((0x4940ae, 0x4943a0), (0x493dd0, 0x493f01),
+    allowed = ((0x4940ae, 0x4943a0), (0x493dd0, 0x493f01), (0x493f10, 0x493ff4),
                (0x532360, 0x532397), (0x532910, 0x532923),
-               (0x56e8d1, 0x56e8f5), (0x516950, 0x516951), (EXIT, EXIT + 6))
+               (0x56e8d1, 0x56e8f5), (0x516950, 0x516951), (EXIT, EXIT + 6)) + extra_ranges
 
     def guard(_uc, address, _size, _user):
         if not any(lo <= address < hi for lo, hi in allowed):
@@ -73,7 +89,9 @@ def run_case(module, data, fixture):
     for offset, basis in ((0x364, (1, 0, 0)), (0x370, (0, 1, 0)),
                           (0x37c, (0, 0, 1)), (0x490, (0, 0, -1)), (0x4a8, (1, 0, 0))):
         put(CAR + offset, *basis)
-    put(CAR + 0xd58, 11., 12., 13.)
+    put(CAR + 0xd58, 11., 12., fixture['old_forward'])
+    put(CAR + 0x38c, .375)
+    put(CAR + 0x434, 1234.)
     for offset in WHEELS:
         put(CAR + offset, 40., 50., 60.)
         put(CAR + offset + 0x78, 9.)
@@ -84,6 +102,7 @@ def run_case(module, data, fixture):
     put(NORMAL, *normal)
     put(STACK + 0xc, *correction)
     uc.mem_write(STACK + 0x54, struct.pack('<I', EXIT))
+    uc.mem_write(STACK + 0x68, struct.pack('<I', fixture['angular']))
     # At 0x4940ae, four arguments to the preceding scale call remain on stack.
     uc.reg_write(UC_X86_REG_ESP, STACK - 16)
     uc.reg_write(UC_X86_REG_EBX, CAR)
@@ -95,9 +114,11 @@ def run_case(module, data, fixture):
     actual = {'velocity': get(CAR + 0x33c, 3), 'position': get(CAR + 0x330, 3),
               'local_velocity': get(CAR + 0xd58, 3), 'speed': get(CAR + 0x35c),
               'return': get(RESULT), 'wheels': [x for off in WHEELS for x in get(CAR + off, 3)],
+              'angular': get(CAR + 0x38c), 'contact_field_434': get(CAR + 0x434),
               'resets': [get(CAR + off + 0x78)[0] for off in WHEELS] + get(CAR + 0xdb8) + get(CAR + 0xdc0)}
     strength = f32(-sum(a * b for a, b in zip(velocity, normal)))
-    expected = {'velocity': velocity, 'position': position, 'local_velocity': [11., 12., 13.],
+    expected = {'velocity': velocity, 'position': position, 'local_velocity': [11., 12., fixture['old_forward']],
+                'angular': [.375], 'contact_field_434': [1234.],
                 'speed': [speed], 'return': [0.], 'wheels': [40., 50., 60.] * 4,
                 'resets': [9.] * 4 + [7., 8.]}
     if strength > 0:
@@ -111,6 +132,9 @@ def run_case(module, data, fixture):
         expected['return'] = expected.pop('return_value')
         if fixture['alternate']:
             expected['resets'] = [0.] * 6
+        if fixture['angular']:
+            expected['contact_field_434'] = [0.]
+            expected['angular'] = [angular_response(strength, fixture['old_forward'], normal, .375)]
     for key, values in expected.items():
         for want, got in zip(values, actual[key], strict=True):
             if not math.isclose(want, got, rel_tol=2e-6, abs_tol=2e-6):
@@ -121,6 +145,7 @@ def run_case(module, data, fixture):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--fixture-tsv', type=Path, help='Export original outputs for the Rust regression')
     args = parser.parse_args()
     modules = [json.loads(line) for line in (ROOT / 'research/binary-index/static/binaries.jsonl').read_text(encoding='utf-8').splitlines()]
     module, = [m for m in modules if m['file'] == 'Porsche.exe']
@@ -138,18 +163,40 @@ def main():
         vectors.append((f'oblique_{index}', [rng.uniform(-80, 80) for _ in range(3)],
                         [math.cos(angle), 0., math.sin(angle)]))
     results = []
+    for strength in (14.999, 15., 15.001):
+        vectors.append((f'gate_{strength}', [-strength, 0., 0.], [1., 0., 0.]))
+    for a in (-.6, .6):
+        for z in (-.8, .8):
+            vectors.append((f'quadrant_{a}_{z}', [-10*a, 0., -10*z], [a, 0., z]))
     for name, velocity, normal in vectors:
         for alternate in (False, True):
-            fixture = {'name': name + ('_alternate' if alternate else ''),
-                       'velocity': list(map(f32, velocity)), 'normal': list(map(f32, normal)),
-                       'correction': list(map(f32, [.125, -.25, .5])),
-                       'alternate': alternate, 'surface': rng.choice([0, 0x10, 0x20, 0x60, 0xff])}
-            results.append(run_case(module, data, fixture))
+            for angular in (False, True):
+                for old_forward in (19.999, 20., 20.001):
+                    fixture = {'name': f'{name}_alt{int(alternate)}_angular{int(angular)}_forward{old_forward}',
+                               'velocity': list(map(f32, velocity)), 'normal': list(map(f32, normal)),
+                               'correction': list(map(f32, [.125, -.25, .5])),
+                               'alternate': alternate, 'angular': angular, 'old_forward': f32(old_forward),
+                               'surface': rng.choice([0, 0x10, 0x20, 0x60, 0xff])}
+                    results.append(run_case(module, data, fixture))
     output = {'module': 'Porsche.exe', 'sha256': SHA, 'entry': '0x4940ae',
-              'scope': 'prepared geometry; angular callback disabled; original x86 scalar path in Unicorn 2.1.3',
+              'scope': 'prepared geometry; optional angular callback enabled/disabled; original x86 scalar path in Unicorn 2.1.3',
               'cases_passed': len(results), 'results': results}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output, indent=2) + '\n', encoding='utf-8')
+    if args.fixture_tsv:
+        header = ['name', 'vx', 'vy', 'vz', 'nx', 'ny', 'nz', 'alternate', 'angular', 'old_forward']
+        fields = [('velocity', 3), ('position', 3), ('local_velocity', 3), ('speed', 1),
+                  ('return', 1), ('wheels', 12), ('resets', 6), ('angular', 1), ('contact_field_434', 1)]
+        header += [f'out_{name}_{i}' for name, count in fields for i in range(count)]
+        rows = ['\t'.join(header)]
+        for result in results:
+            fixture = result['input']
+            row = [fixture['name'], *fixture['velocity'], *fixture['normal'],
+                   int(fixture['alternate']), int(fixture['angular']), fixture['old_forward']]
+            row += [v for name, _ in fields for v in result['original'][name]]
+            rows.append('\t'.join(map(str, row)))
+        args.fixture_tsv.parent.mkdir(parents=True, exist_ok=True)
+        args.fixture_tsv.write_text('\n'.join(rows) + '\n', encoding='utf-8')
     print(f'{len(results)} original-x86 differential cases passed; {args.output}')
 
 

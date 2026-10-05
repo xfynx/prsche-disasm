@@ -1,0 +1,54 @@
+Original: Porsche.exe SHA256 ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39
+Index queries: py -3 scripts/research/query-binary-index.py --binary Porsche.exe --address <VA> --disassemble
+Raw: py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address <VA> --size <N> [--words]
+Raw 0x49b8e0 is not a Ghidra-indexed function; nearby 0x49b870 ends at 0x49b8dd and next indexed entry is 0x49ba30.
+
+00493fd7 fstp dword ptr [esi + 0x38c]
+00493fec fstp dword ptr [esi + 0x38c]
+00494348 call 0x493f10
+
+0049fada fld dword ptr [esi + 0xd38]
+0049fae0 test eax, eax              ; eax from [car+0x558]+0x518
+0049fae4 fmul dword ptr [0x5b24b8] ; 0.03125
+0049faec fmul dword ptr [0x5b4a74] ; 0.020833334 alternate
+0049faf2 fadd dword ptr [esi + 0x38c]
+0049faf8 fstp dword ptr [esi + 0x38c]
+0049fab2 fld dword ptr [esi + 0xd34]
+0049fabe fadd dword ptr [eax]       ; car+0x388
+0049fac2 fmul dword ptr [0x5b24b8]
+0049fac8 fadd dword ptr [esi + 0x390]
+
+0049b8e0 sub esp, 0xc0              ; hash-checked raw range, not indexed function
+0049b905 fld dword ptr [esi + 0x388]
+0049b90b fmul dword ptr [0x5b2828] ; 0.015625
+0049b91c fld dword ptr [esi + 0x38c]
+0049b922 fmul dword ptr [0x5b2828]
+0049b92c fld dword ptr [esi + 0x390]
+0049b932 fmul dword ptr [0x5b2828]
+0049b942 call 0x532600             ; Y rotation matrix
+0049b951 call 0x5325a0             ; X rotation matrix
+0049b968 call 0x532470             ; 3x3 matrix multiplication
+0049b977 call 0x532660             ; Z rotation matrix
+0049b991 call 0x532470
+0049b996 lea edi, [esi + 0x364]    ; orientation matrix
+0049b9a6 call 0x532470
+
+00532625 fstp dword ptr [eax]
+0053262b mov dword ptr [eax + 4], 0
+0053262e mov dword ptr [eax + 0xc], 0
+0053263b mov dword ptr [eax + 0x10], 0x3f800000 ; Y diagonal 1
+00532642 fchs
+00532644 fstp dword ptr [eax + 8]
+00532647 mov dword ptr [eax + 0x18], edx
+0053264a mov dword ptr [eax + 0x20], ecx
+005327e4 fmul qword ptr [0x5bb2c0]
+005327ea fsin
+005327f4 fmul qword ptr [0x5bb2c0]
+005327fa fcos
+005bb2c0..005bb2c7 double=6.28318452835083
+
+0049bc18 fcom dword ptr [ecx + 0x38c]
+0049bc25 fst dword ptr [ecx + 0x38c]
+0049bc3e fstp dword ptr [ecx + 0x38c]
+0049a71f call 0x532910
+0049a735 fstp dword ptr [esi + 0x38c]

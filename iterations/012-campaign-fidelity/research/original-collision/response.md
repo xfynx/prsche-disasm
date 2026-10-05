@@ -1,5 +1,11 @@
 # Vehicle response: source and executable check
 
+Follow-up: [Run 012](../../runs/012-original-contact-kernel/README.md) extends the
+historical 64-case probe below to 468 cases including the angular callback,
+adds a Rust implementation tested against the original outputs, and verifies
+candidate/selected-edge preparation. See [angular-response.md](angular-response.md)
+and [angular-field.md](angular-field.md). The game loop is not switched yet.
+
 2026-10-05. `Porsche.exe`, SHA256
 `ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39`.
 Addresses below belong to this module only. Full indexed instructions are in
@@ -56,10 +62,10 @@ Those pair and secondary response functions still need their own contracts.
 
 ```
 py -3 -m pip install --target local/tools/python-unicorn unicorn==2.1.3 --index-url https://pypi.org/simple --disable-pip-version-check
-py -3 scripts/research/replay-contact-response.py --output iterations/012-campaign-fidelity/runs/011-original-physics-audit/response-replay.json
+py -3 scripts/research/replay-contact-response.py --output iterations/012-campaign-fidelity/runs/012-original-contact-kernel/response-replay.json --fixture-tsv iterations/012-campaign-fidelity/runs/012-original-contact-kernel/response-fixtures.tsv
 ```
 
-64 cases passed against original instructions in Unicorn 2.1.3: head-on,
+The historical Run 011 had 64 cases against original instructions in Unicorn 2.1.3: head-on,
 departing, stationary, tangent, glancing, 27 seeded oblique inputs, each with
 both values of the alternate-state bit. Inputs, original outputs and module hash
 are recorded in [response-replay.json](../../runs/011-original-physics-audit/response-replay.json).
