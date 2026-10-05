@@ -1,5 +1,12 @@
 # 012-campaign-fidelity
 
+2026-10-05, [Run 017](runs/017-original-support-insertion/README.md): исходные
+вставка/деление дерева соединены с полным cached support query. 36 деревьев и
+72 запроса совпали с x86, включая record order/cache; 38+304 callback/predicate
+cases проверены отдельно. 20 тестов, fmt/clippy/wasm32 прошли. Далее полный
+ресурсный loader и state/cadence; первая игровая трасса — цель внутри 012.
+Новая связка пока вне заезда, build fa56d05. 012 открыта.
+
 2026-10-05, [Run 016](runs/016-original-support-assembly/README.md): перенесены
 исходные Base/pr readers и child constructor дерева. 317 primitive / 60 Base /
 256 child случаев сверены с исходным x86; Rust проверил 74 300 pr на 15 трассах.

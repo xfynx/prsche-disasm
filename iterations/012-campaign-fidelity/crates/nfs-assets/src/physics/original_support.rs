@@ -113,22 +113,29 @@ impl SupportPolygon {
         };
         let mut center = [0.0; 3];
         for axis in 0..3 {
-            // The original triangle callback adds 0+1+2. The quad callback
-            // adds 2+1+0+3 before multiplying by its factor.
+            // Triangle constructor 0x485ca2 uses 1+2+0 for X and 0+1+2
+            // for Y/Z. Quad constructor calls +4, which uses 1+0+2+3.
             let sum = match &vertices {
+                SupportVertices::Triangle(_) if axis == 0 => {
+                    points[1][axis] as f64 + points[2][axis] as f64 + points[0][axis] as f64
+                }
                 SupportVertices::Triangle(_) => {
                     points[0][axis] as f64 + points[1][axis] as f64 + points[2][axis] as f64
                 }
                 SupportVertices::Quad(_) => {
-                    points[2][axis] as f64
-                        + points[1][axis] as f64
+                    points[1][axis] as f64
                         + points[0][axis] as f64
+                        + points[2][axis] as f64
                         + points[3][axis] as f64
                 }
             };
             center[axis] = (sum * factor as f64) as f32;
         }
         let winding_8 = edges_agree(points, center, true);
+        // Constructor orientation center and later +4 callback use distinct
+        // summation orders; preserve the former for winding and the latter
+        // for queries. Callback source/replay is in Run 017.
+        let center = super::original_support_bounds::center(points);
         Self {
             vertices,
             flags_word_a,

@@ -1,5 +1,12 @@
 # Porsche.exe EDG object trace (2026-10-04)
 
+2026-10-05, [support-tree.md](support-tree.md): original dynamic insertion,
+splitting and full cached support selection now compose in Rust. 36 original
+tree snapshots and 72 full queries match, with actual original allocator code.
+[support-bounds.md](support-bounds.md): 38 callback / 304 predicate cases.
+[support-special-selection.md](support-special-selection.md): animdefs.txt
+producer and ordered ENDW fallback found; full resource/state binding stays open.
+
 2026-10-05, [support-assembly.md](support-assembly.md): Base mask and original
 primitive channel/index readers restored and replayed (317 payload cases,
 60 Base cases). Rust independently decoded all 74,300 pr records on 15 tracks.

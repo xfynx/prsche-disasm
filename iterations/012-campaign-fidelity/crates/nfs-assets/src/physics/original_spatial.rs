@@ -73,7 +73,16 @@ impl SpatialGrid {
     /// Traverse an already supplied acyclic arena whose root is index zero.
     /// A missing selected child returns the original root.
     pub fn query(&self, nodes: &[SpatialNode], point: [f32; 3]) -> usize {
-        let root = &nodes[0];
+        self.query_nodes(|index| &nodes[index], point)
+    }
+
+    /// Same traversal over an arena whose records and cells share ownership.
+    pub(crate) fn query_nodes<'a>(
+        &self,
+        get_node: impl Fn(usize) -> &'a SpatialNode,
+        point: [f32; 3],
+    ) -> usize {
+        let root = get_node(0);
         if root.children.iter().all(Option::is_none) {
             return 0;
         }
@@ -85,7 +94,7 @@ impl SpatialGrid {
         let mut center_z = (z + 0.5) * width - self.half_extent as f64;
         let mut node_index = 0;
         loop {
-            let node = &nodes[node_index];
+            let node = get_node(node_index);
             if node.records_present {
                 return node_index;
             }

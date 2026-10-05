@@ -6,6 +6,12 @@
 Полный перенос, включая Evolution, Factory Driver и остальные режимы: [дорожная карта](docs/roadmap.md).
 Документация проекта: [План работ](PLAN.md) &bull; [Текущее состояние](STATUS.md) &bull; [Сборка](docs/building.md) &bull; [Форматы топологии](docs/track-topology-formats.md) &bull; [Роли агентов](docs/agents.md).
 
+[Run 017 внутри 012](iterations/012-campaign-fidelity/runs/017-original-support-insertion/README.md):
+исходное построение/деление дерева соединено с cached support query. 36 полных
+деревьев и 72 запроса совпали с x86; 20 тестов, fmt/clippy/wasm32 прошли.
+Следом полный ресурсный loader и state/cadence для подключения первой трассы
+в 012. Игровая сборка пока fa56d05; восстановленная связка ещё вне заезда.
+
 [Run 016 внутри 012](iterations/012-campaign-fidelity/runs/016-original-support-assembly/README.md):
 Base/pr readers и child constructor дерева перенесены по оригинальным consumers.
 317 primitive / 60 Base / 256 child случаев сверены с x86; Rust проверил все

@@ -1,5 +1,17 @@
 # Состояние проекта
 
+Run 017 внутри 012, 2026-10-05: исходные type-1 insertion/split и cached
+support query соединены в отдельном Rust-модуле. 38 callback / 304 predicate
+cases, 36 полных деревьев и 72 полных запроса совпали с исходным x86. Original
+allocator/vector code исполнен на заданной арене; Win32 locks — один поток.
+20 Rust-тестов, fmt/clippy -D warnings и wasm32 прошли. Источник/команды —
+runs/017-original-support-insertion. Runtime fa56d05, 012 открыта.
+Найден special producer: animdefs.txt → 0x47eba0 → 0x628ba0; 0x47ed90 на
+неизвестном ненулевом Base tag возвращает первый ENDW/kBox, а не null.
+Следом координатор: полный polygon loader 0x475543..0x47591e, original
+special lookup/parser и Base ordinal producer, затем state/cadence автомобиля.
+Цель подключения в 012 — первая трасса с исходными опорами и контактом.
+
 Run 016 внутри 012, 2026-10-05: Base/pr readers и child constructor дерева
 перенесены из оригинальных consumers в отдельные Rust-модули. 317 primitive
 payload cases / 2536 helper outputs, 60 Base и 256 child cases сверены с x86.
