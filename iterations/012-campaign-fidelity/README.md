@@ -1,5 +1,12 @@
 # 012-campaign-fidelity
 
+2026-10-05, [Run 015](runs/015-original-support-loader/README.md): source flags
+найдены в mt payload+0 и перенесены в Rust вместе с plane/gap/quad split.
+208 material и 10 plane случаев совпали с исполнением оригинального x86;
+Rust проверил 15 трасс / 3651 mt entries. 11 тестов, fmt/clippy/wasm32 прошли.
+Далее Base/pr/vt selection и заполнение пространственного дерева. Подключение
+к заезду ещё впереди; сборка fa56d05, 012 открыта.
+
 2026-10-05, [Run 014](runs/014-original-spatial-query/README.md): восстановлены
 spatial bounds, traversal и cache опорной поверхности; 572 результата Rust
 совпали с исполнением оригинального x86. Семь тестов, fmt/clippy/wasm32 прошли.

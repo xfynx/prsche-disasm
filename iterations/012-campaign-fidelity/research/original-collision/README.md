@@ -1,5 +1,11 @@
 # Porsche.exe EDG object trace (2026-10-04)
 
+2026-10-05, [material-loader.md](material-loader.md): source support flags are
+the first mt payload word; the owner/container pointer chain is proven and 208
+original-x86 cases passed. The 15-track material corpus is independently checked
+by Rust. [support-plane.md](support-plane.md) restores the original plane/gap/split
+helpers; full primitive loading and spatial insertion remain open.
+
 2026-10-05, [spatial-query.md](spatial-query.md): original packed-node bounds,
 point traversal, and cached support selection restored in a separate Rust module.
 572 original-x86 results match the Rust port; scene construction/runtime binding

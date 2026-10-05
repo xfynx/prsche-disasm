@@ -1,5 +1,10 @@
 # Support polygon material word: bounded original trace
 
+Run 015 follow-up: the raw offset is now proven to be **mt payload+0x00**.
+The completed owner/loader identity and original replay are documented in
+[material-loader.md](material-loader.md). The sections below retain Run 014's
+bounded findings and previous unresolved steps as history.
+
 Source: `local/game/Porsche.exe`, SHA-256 `ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39`. Navigation: `research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d`, `query-binary-index.py --binary Porsche.exe --address <VA> --disassemble`, then a hash-verified Capstone scan of `.text` for writes to `+0x18`/`+0x2c`. Selected address/instruction records are in `support-material-source.jsonl`.
 
 **Confirmed consumer:** `0x4753a0` calls `0x539f30`, which is exactly `mov eax,[ecx+4]; ret`. `0x4753a5` reads `[eax+0x2c]`, `0x4753b1` dereferences it as a pointer to the material array, and `0x4753a8–0x4753b3` selects `array[primitive[+4] & 0xffff]`. `0x4753bf–0x4753c4` then loads `flags = *(*(material+0x18))` as a full 32-bit word. `0x4753ca` gates on `flags & 0xffffff0f`; the same word is later forwarded to support polygon constructors and quad-split logic (see `support-polygons.md`). This proves the in-memory consumer path, **not** the raw `mt` payload offset.

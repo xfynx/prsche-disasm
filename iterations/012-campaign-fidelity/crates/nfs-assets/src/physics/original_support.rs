@@ -13,6 +13,66 @@ pub enum SupportVertices {
     Quad([[f32; 3]; 4]),
 }
 
+/// The plane helper at 0x489f90 for the first three vertices of a quad.
+/// Subtractions, cross components, and normalized components pass through
+/// original f32 stores; arithmetic between those stores approximates x87
+/// extended precision with f64.
+pub fn plane_normal(vertices: [[f32; 3]; 3]) -> [f32; 3] {
+    let mut a = [0.0; 3];
+    let mut b = [0.0; 3];
+    for axis in 0..3 {
+        a[axis] = (vertices[1][axis] as f64 - vertices[0][axis] as f64) as f32;
+        b[axis] = (vertices[0][axis] as f64 - vertices[2][axis] as f64) as f32;
+    }
+    let cross = |i: usize, j: usize, k: usize, l: usize| {
+        (a[i] as f64 * b[j] as f64 - a[k] as f64 * b[l] as f64) as f32
+    };
+    let mut normal = [cross(1, 2, 2, 1), cross(2, 0, 0, 2), cross(0, 1, 1, 0)];
+    let length = ((normal[0] as f64 * normal[0] as f64)
+        + (normal[1] as f64 * normal[1] as f64)
+        + (normal[2] as f64 * normal[2] as f64))
+        .sqrt();
+    if length >= 0.01 {
+        let scale = 1.0 / length;
+        for component in &mut normal {
+            *component = (*component as f64 * scale) as f32;
+        }
+        if normal[1] < f32::from_bits(0x3f7ff972) {
+            return normal;
+        }
+    }
+    normal[1] = f32::from_bits(0x3f7ff972);
+    normal
+}
+
+/// Absolute vertical deviation of vertex 3 from the plane of vertices 0..2,
+/// as returned by 0x48a0a0. A vertical plane may return NaN: no epsilon or
+/// alternate normal is introduced by this port.
+pub fn quad_plane_gap(vertices: [[f32; 3]; 4]) -> f32 {
+    let normal = plane_normal([vertices[0], vertices[1], vertices[2]]);
+    let base = vertices[0];
+    let last = vertices[3];
+    let plane_y = base[1] as f64
+        - ((last[0] as f64 - base[0] as f64) * normal[0] as f64
+            + (last[2] as f64 - base[2] as f64) * normal[2] as f64)
+            / normal[1] as f64;
+    (last[1] as f64 - plane_y).abs() as f32
+}
+
+/// Loader branch at 0x47562d. A nonzero material-derived word and gap strictly
+/// greater than the original float threshold produce triangles (0,1,2) and
+/// (0,2,3); otherwise the original quad is retained.
+pub fn split_quad_if_needed(vertices: [[f32; 3]; 4], flags: u32) -> Vec<SupportVertices> {
+    if flags != 0 && quad_plane_gap(vertices) > f32::from_bits(0x3d23d70a) {
+        vec![
+            SupportVertices::Triangle([vertices[0], vertices[1], vertices[2]]),
+            SupportVertices::Triangle([vertices[0], vertices[2], vertices[3]]),
+        ]
+    } else {
+        vec![SupportVertices::Quad(vertices)]
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct SupportPolygon {
     pub vertices: SupportVertices,

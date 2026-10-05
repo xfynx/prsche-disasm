@@ -1,5 +1,10 @@
 # Original type-1 support geometry
 
+Run 015 follow-up: [material-loader.md](material-loader.md) proves mt payload+0
+as the source word; [support-plane.md](support-plane.md) records the restored
+plane/gap/split helpers. Rust differential tests cover these separate modules.
+The complete primitive loader, spatial insertion and live binding remain open.
+
 2026-10-05, Porsche.exe SHA256
 `ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39`.
 Queries: `query-binary-index.py --binary Porsche.exe --address <VA> --disassemble`

@@ -1,5 +1,13 @@
 # Состояние проекта
 
+Run 015 внутри 012, 2026-10-05: material flags = mt payload+0 доказаны;
+208 x86 material cases и 10 plane/gap cases проверены, перенесены в pure Rust.
+Rust независимо проверил 15 трасс / 3651 mt entries; 11 тестов, fmt/clippy
+и wasm32 check прошли. Источник/команды — runs/015-original-support-loader.
+Исполнители завершили работу. Runtime пока прежний (fa56d05), 012 открыта.
+Следом координатор: Base/pr/vt selection в0x4750b0, insertion0x484ae0/483bd0,
+затем сцена → state автомобиля и исходный cadence; приближений не подключать.
+
 Run 014 внутри 012, 2026-10-05: исходный spatial bounds/traversal/cache
 перенесён в pure Rust. 572 результата совпали с исполнением оригинального x86;
 семь Rust-тестов, fmt/clippy и wasm32 check прошли. Source/fixtures — Run 014.

@@ -6,6 +6,12 @@
 Полный перенос, включая Evolution, Factory Driver и остальные режимы: [дорожная карта](docs/roadmap.md).
 Документация проекта: [План работ](PLAN.md) &bull; [Текущее состояние](STATUS.md) &bull; [Сборка](docs/building.md) &bull; [Форматы топологии](docs/track-topology-formats.md) &bull; [Роли агентов](docs/agents.md).
 
+[Run 015 внутри 012](iterations/012-campaign-fidelity/runs/015-original-support-loader/README.md):
+доказан источник флагов опоры mt+0; перенесены material lookup и plane/split
+helpers. 208+10 случаев сверены с оригинальным x86, Rust проверил материалы
+всех 15 трасс. 11 тестов и native/WASM проверки прошли. Далее полный загрузчик
+полигонов и построение дерева; игровой цикл ещё прежний, сборка fa56d05.
+
 [Run 014 внутри 012](iterations/012-campaign-fidelity/runs/014-original-spatial-query/README.md):
 исходные spatial bounds, обход дерева и кэш опоры перенесены в Rust;
 572 результата совпали с исполнением оригинального x86. Native/WASM проверки
