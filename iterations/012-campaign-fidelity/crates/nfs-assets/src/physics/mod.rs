@@ -9,6 +9,7 @@
 
 pub mod chassis;
 pub mod original_contact;
+pub mod original_support;
 pub mod powertrain;
 pub mod rigid_body;
 pub mod suspension;

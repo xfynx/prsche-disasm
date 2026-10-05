@@ -1,5 +1,16 @@
 # 012-campaign-fidelity: рабочий план
 
+Run 013 (не новая итерация), 2026-10-05: type-1 опоры — quad/triangle,
+containment по signed float bits, выбор по abs(centerY-queryY) внутри листа.
+36 polygon/10 selection/10 quad split случаев прошли на исходных инструкциях.
+0x4750b0 связывает Base/pr/vt/df с конструкторами этих объектов; исходный runtime
+не выбирает их по имени RD*. Rust-предикаты и leaf selection готовы и сверены;
+original_support + original_contact, fmt, clippy и wasm32 check прошли.
+Clock source128/derived counters64Гц доказаны; связь с cadence integration ещё открыта.
+Исполнители завершили работу. Далее координатор: raw material flags и spatial leaf
+query; перенос plane helper/split и подключение к игровому циклу. Runtime ещё не переключён.
+Команда/границы: [Run 013](runs/013-original-support-query/README.md).
+
 Run 012, 2026-10-05: callback 0x493f10 восстановлен и включён в x86 replay:
 468 состояний прошли. Rust-модуль original_contact и сравнение с исходными
 результатами добавлены, пока вне игрового цикла. Геометрия: 3 basis/12 edge cases

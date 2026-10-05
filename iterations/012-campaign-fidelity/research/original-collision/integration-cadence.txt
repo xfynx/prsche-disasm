@@ -1,0 +1,93 @@
+Porsche.exe SHA-256 ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39
+Index: research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d
+Queries: query-binary-index.py --binary Porsche.exe --address 0x410d60 / 0x411130 / 0x414c30 / 0x414d30 / 0x414ff0 / 0x4152e0 / 0x49fd30 / 0x49f160 --disassemble
+Raw hash-checked ranges: inspect-pe-range.py --binary Porsche.exe --address 0x49b8e0 --size 380; constants 0x5b24b8 and 0x5b4a74 --size 4 --words
+
+00410e1b mov dword ptr [esi + 0xe28], 0x49b8e0
+00410dfd mov dword ptr [esi + 0xe1c], 0x49fd30
+00411335 mov eax, dword ptr [esi + 0xe28]
+0041133b mov ecx, dword ptr [0x606acc]
+00411344 push 0x1e
+00411346 push esi
+00411347 push eax
+00411348 push ecx
+00411349 call 0x414c30
+00414c9a mov dword ptr [eax + 8], ecx      ; queue priority
+00414c9d mov dword ptr [eax + 0xc], edx     ; function
+00414ca4 mov dword ptr [edi + ebp], eax    ; car context
+0041509b test al, 1                       ; al = [0x606ac4]
+0041509d jne 0x4150c1
+004150ae mov eax, dword ptr [0x606ad0]
+004150b4 call 0x414d30                    ; only even steps
+004150c1 mov ecx, dword ptr [0x606acc]
+004150c8 call 0x414d30                    ; every step
+00415101 inc dword ptr [0x606ac4]
+00414d43 mov eax, dword ptr [esi]
+00414d49 mov ecx, dword ptr [esi + 4]
+00414d4c push ecx
+00414d4d call eax                          ; queue callback(car)
+00415c43 call 0x414ff0
+00415c48 call 0x414ff0
+00415c58 inc ecx                           ; [0x606aa0]
+00415c5b mov dword ptr [0x606aa0], ecx
+00415c61 jle 0x415bd4                    ; until target [0x606a9c]
+0049b8ef mov al, byte ptr [esi + 0x7f]
+0049b8f4 je 0x49ba24
+0049b8fa mov al, byte ptr [esi + 0x7d]
+0049b8ff jne 0x49ba24
+0049b91c fld dword ptr [esi + 0x38c]
+0049b922 fmul dword ptr [0x5b2828]
+0049fd35 fld dword ptr [esi + 0x3a0]
+0049fd3b fcomp dword ptr [0x5b23f0]
+0049fd46 je 0x49fe11
+0049fe12 call 0x49f160
+0049fa85 mov ecx, dword ptr [esi + 0x558]
+0049fad4 mov eax, dword ptr [ecx + 0x518]
+0049fada fld dword ptr [esi + 0xd38]
+0049fae0 test eax, eax
+0049fae2 je 0x49faec
+0049fae4 fmul dword ptr [0x5b24b8]      ; 0.03125
+0049faea jmp 0x49faf2
+0049faec fmul dword ptr [0x5b4a74]      ; 0.020833334
+0049faf2 fadd dword ptr [esi + 0x38c]
+0049faf8 fstp dword ptr [esi + 0x38c]
+
+Focused timebase follow-up:
+004a543f push 0x80                      ; requested timer rate argument
+004a5444 call 0x565030
+0056503c mov esi, dword ptr [esp + 0x1c]
+00565098 mov eax, 0x3e80000           ; 1000 << 16
+005650a4 idiv esi                       ; 512000 for rate=128
+005650a6 mov dword ptr [0x6a5bf8], eax
+00565135 push 0x565270                 ; worker entry
+0056513a call 0x55f420
+005651b6 mov edi, dword ptr [0x5b2080] ; KERNEL32.GetTickCount import
+00565272 mov ebp, dword ptr [0x5b2080]
+0056527b call ebp
+005652a0 mov eax, dword ptr [0x6b7c7c]
+005652b8 call ebp
+005652ef mov esi, 0x6b7c20
+005652f4 mov eax, dword ptr [esi]
+005652fa call eax                       ; registered callback
+004a4717 push 0x4a45d0
+004a4726 call 0x560140                 ; register callback
+004a467e mov eax, dword ptr [0x6559e8]
+004a4683 inc eax
+004a4684 mov dword ptr [0x6559e8], eax
+004a4696 test al, 1
+004a4698 jne 0x4a46d6
+004a469a mov eax, dword ptr [0x6559ec]
+004a469f mov edx, dword ptr [0x6559f8]
+004a46a5 inc eax
+004a46a6 inc edx
+004a46a9 mov dword ptr [0x6559ec], eax
+004a46ae mov dword ptr [0x6559f8], edx
+004a46cc call 0x412e70
+004a46d1 call 0x413800
+00413744 mov eax, dword ptr [0x5e99b8]
+0041374d inc eax
+00413750 mov dword ptr [0x5e99b8], eax
+0041385c mov eax, dword ptr [0x5cc818]
+00413864 inc eax
+00413865 mov dword ptr [0x5cc818], eax
+00415edf inc dword ptr [0x5cc818]

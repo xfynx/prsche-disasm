@@ -37,6 +37,9 @@
 `--fixture-tsv` выгружает оригинальные результаты для Rust-регрессии.
 `replay-contact-geometry.py` отдельно исполняет создание восьми точек и подготовку
 нормали/смещения выбранного ребра; выбор геометрии сцены остаётся вне проверки.
+`replay-support-polygons.py` исполняет исходные type-1 constructors/containment,
+выбор в заданном листе и quad-split branch; TSV-флагами экспортирует результаты
+для Rust. Команды/границы: [Run 013](../../iterations/012-campaign-fidelity/runs/013-original-support-query/README.md).
 Установка локальной зависимости, команда, адреса и ограничения:
 [response.md](../../iterations/012-campaign-fidelity/research/original-collision/response.md).
 Это исследовательская проверка; игровой код она не заменяет.

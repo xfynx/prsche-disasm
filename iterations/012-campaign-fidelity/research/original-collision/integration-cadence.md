@@ -1,0 +1,22 @@
+# Original integration call cadence (bounded trace)
+
+Source: `local/game/Porsche.exe`, SHA-256 `ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39`; VAs below refer to that image. Navigation used `py -3 scripts/research/query-binary-index.py --binary Porsche.exe --address <VA> --disassemble --limit <N>` against `research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d`, then hash-checking `inspect-pe-range.py` for the unindexed `0x49b8e0` and constants. Focused instruction excerpts are in `integration-cadence.txt`.
+
+## Proven call chain
+
+- `0x410e1b` assigns car `+0xe28 = 0x49b8e0`; `0x411335–0x411349` and `0x411437–0x41144b` register that function with the car as context, priority `0x1e`, in queue `[0x606acc]`. `0x414c30` stores priority, function, context in 16-byte entries.
+- `0x414ff0` examines the low bit of step counter `[0x606ac4]` at `0x41509b`: on even steps it dispatches queue `[0x606ad0]` (`0x4150b4`); on **every** step it dispatches `[0x606acc]` (`0x4150c8`); it increments the counter at `0x415101`. `0x414d30` loops current queue entries and calls each non-null function pointer at `0x414d4d` with its stored car context. Thus `0x49b8e0` is scheduled once per such queue dispatch, if that car's entry remains registered and its own guards pass.
+- `0x49b8e0` is absent from indexed functions; raw bytes `0x49b8e0–0x49ba2c` show early guards `car+0x7f != 0`, `car+0x7d == 0`, then component rotations by `car+0x388/+0x38c/+0x390 × [0x5b2828]` (prior `angular-field.md` establishes this constant as `1/64`). This is an orientation update per callback, **not** proof of 64 callbacks/second.
+- `0x4152e0` is the caller of `0x414ff0` at `0x415c43/0x415c48`; one branch (`0x415c3e`, value `3` in `[0x606864]`) executes both calls in succession. Its loop increments `[0x606aa0]` until it passes target `[0x606a9c]`. Target is set from `[0x6559f8]` or `2×[0x5cc818]` with a clock comparison using `[0x6559ec]` (`0x41546f–0x4154d0`).
+
+## Timebase found in the original
+
+- Startup `0x4a5410` pushes `0x80` (128) at `0x4a543f` to `0x565030` at `0x4a5444`. The latter computes `(1000 << 16) / 128 = 512000` fixed-point milliseconds per requested timer iteration (`0x565098–0x5650a6`), starts worker entry `0x565270` (`0x565135`), and reads imported `KERNEL32.GetTickCount` via `[0x5b2080]` (`0x5651b6`, `0x565272`). This proves a **requested nominal 128 Hz timer base**, not exact observed timing under OS scheduling.
+- `0x4a4700` registers unindexed callback `0x4a45d0` into the timer callback array (`0x4a4717–0x4a4726`); timer loop `0x565270` calls array entries at `0x5652ef–0x565305`. Callback `0x4a45d0` increments `[0x6559e8]` every permitted invocation (`0x4a467e–0x4a4684`), and increments `[0x6559ec]` and `[0x6559f8]` only when the first counter becomes even (`0x4a4696–0x4a46ae`). Thus these two counters advance at **nominal 64 ticks/s** when the 128 Hz callback runs unblocked. The callback has state guards and a branch that can process two iterations, so this is not a guarantee of 64 wall-clock dispatches in every state.
+- `[0x5e99b8]` is a separate input-poll generation: `0x412e70` increments it at `0x413744–0x413750`; `0x4a45d0` calls `0x412e70` only after additional parity/guard checks (`0x4a46a7–0x4a46d1`). In inspected paths, `[0x5cc818]` counts events: `0x413800` increments it at `0x41385c–0x413865`, and `0x415e80` can also increment it at `0x415ed9–0x415edf`. These writers do not establish an independent wall clock.
+
+## Separate condition inside `0x49f160`
+
+`0x410dfd` assigns car `+0xe1c = 0x49fd30`; that callback calls `0x49f160` at `0x49fe12` **only** along its `car+0x3a0` comparison branch (`0x49fd35–0x49fd46`). Within `0x49f160`, `ecx = [car+0x558]` at `0x49fa85`; `eax = [ecx+0x518]` at `0x49fad4`. Nonzero selects multiplication of `[car+0xd38]` by `[0x5b24b8] = 0.03125 (1/32)`; zero selects `[0x5b4a74] = 0.020833334 (approximately 1/48)`. Both add to `[car+0x38c]` at `0x49faf2–0x49faf8`. The semantic meaning and writers of config `+0x518` are **not proven** here. These branch multipliers must not be equated with scheduler rate.
+
+Next exact gap: trace writers/initialization of `[car+0x558]+0x518`; for exact dispatch cadence, isolate `0x4152e0` state branches selecting `[0x6559f8]` versus `2×[0x5cc818]` and the double-call branch at `0x415c3e`, then compare original queue dispatch timestamps. The nominal 64 Hz clock counter does not alone prove seconds per `0x49b8e0` call in all states.
