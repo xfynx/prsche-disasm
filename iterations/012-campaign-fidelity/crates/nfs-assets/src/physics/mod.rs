@@ -8,7 +8,10 @@
 //! - Road surface heightfield queries via `surface::RoadSurface`
 
 pub mod chassis;
+pub mod original_body_contact;
 pub mod original_contact;
+pub mod original_scene_contact;
+pub mod original_scene_objects;
 pub mod original_spatial;
 pub mod original_support;
 pub mod original_support_assembly;
@@ -17,6 +20,7 @@ pub mod original_support_loader;
 pub mod original_support_material;
 pub mod original_support_owner;
 pub mod original_support_tree;
+pub mod original_wheel_state;
 pub mod powertrain;
 pub mod rigid_body;
 pub mod suspension;

@@ -26,7 +26,7 @@ const {spawn,spawnSync} = require('node:child_process');
     const page = await browser.newPage({viewport:{width:1280,height:800}});
     await page.route('**/main.js',async route=> {
       const response = await route.fetch();
-      await route.fulfill({response,body:(await response.text())+'\nglobalThis.supportState=()=>({support:Array.from(viewer.get_original_support_state()),physics:Array.from(viewer.get_car_physics_state()),pose:Array.from(viewer.get_car_pose()),speed:viewer.get_car_speed(),phase:viewer.get_race_phase(),sim:viewer.is_sim_mode()});'});
+      await route.fulfill({response,body:(await response.text())+'\nglobalThis.supportState=()=>({support:Array.from(viewer.get_original_support_state()),edges:viewer.get_original_scene_object_count(),physics:Array.from(viewer.get_car_physics_state()),pose:Array.from(viewer.get_car_pose()),speed:viewer.get_car_speed(),phase:viewer.get_race_phase(),sim:viewer.is_sim_mode()});'});
     });
     page.on('pageerror',error=>errors.push(String(error)));
     page.on('console',message=>{if(message.type()==='error') errors.push(message.text());});
@@ -45,6 +45,7 @@ const {spawn,spawnSync} = require('node:child_process');
       const before = await page.evaluate(()=>supportState());
       assert.equal(before.sim,true);
       assert.equal(before.support[0],1,`${track}: original backend not active`);
+      assert.ok(before.edges>0,`${track}: original EDG objects absent from live tree`);
       assert.ok(before.support[1]>0&&before.support[2]>1,`${track}: no original polygons/tree`);
       assert.ok(before.support.slice(3).every(index=>index>=0),`${track}: wheel support cache misses`);
       assert.ok([0,1,2,3].some(i=>before.physics[6+i*5]===1),`${track}: no wheel load`);

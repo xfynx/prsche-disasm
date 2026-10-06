@@ -1,5 +1,14 @@
 # 012-campaign-fidelity
 
+2026-10-06, [Run 019](runs/019-original-contact-runtime/README.md): EDG и
+type-1 опоры в одном игровом дереве, 15 трасс проверены. Первая body selection,
+подготовка/response и wheel material state перенесены в исходные API и сверены
+с x86 (3 дерева / 27 queries / 8 body / 45 responses / 5 height / 29 material).
+220 тестов, fmt/clippy/wasm32, native/web, 3 Quick Race и 21 browser check прошли.
+Силы/body response в игре пока adapter; поля, cadence и полный force loop не
+завершены. UI/миссия/визуальная сверка обязательны. 012 открыта; активных
+исполнителей нет, координатор завершил и проверил частичный код после лимита.
+
 2026-10-06, [Run 018](runs/018-original-support-runtime/README.md): type-1
 опоры подключены к игровым колёсам и surface queries. Реальные CRP проходят
 ordinary/retained flag-1 consumer, mt/vt/df/pr сборку, дерево и исходные кэши/

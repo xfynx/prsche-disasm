@@ -1,5 +1,11 @@
 # Porsche.exe EDG object trace (2026-10-04)
 
+2026-10-06, [Run 019](../../runs/019-original-contact-runtime/README.md):
+[mixed scene / contact preparation](contact-runtime-019.md). Direct EDG load
+success skips temporary-tree generation at 0x4880ed. Constructed EDG now share
+the live polygon tree. Original first-contact, complete scene-response and
+material RNG APIs are separately verified, without guessing live car fields.
+
 2026-10-06, [support-loader.md](support-loader.md) и
 [runtime-contact-integration.md](runtime-contact-integration.md): retained
 flag-1 ordinary resource loader и owner cache/plane перенесены и подключены

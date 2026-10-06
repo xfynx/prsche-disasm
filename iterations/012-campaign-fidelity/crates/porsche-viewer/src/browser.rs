@@ -331,6 +331,16 @@ impl BrowserViewer {
         state
     }
 
+    /// Constructed EDG entries share the live original support tree. This is
+    /// geometry evidence, not a claim that body response is already restored.
+    pub fn get_original_scene_object_count(&self) -> u32 {
+        self.renderer
+            .as_ref()
+            .and_then(|r| r.road_surface.as_ref())
+            .and_then(nfs_assets::RoadSurface::original_scene_object_count)
+            .unwrap_or(0) as u32
+    }
+
     /// Read-only render diagnostics: chassis adapter xyz, then per wheel:
     /// index, source center xyz, radius, world center xyz, mesh count.
     pub fn get_car_wheel_render_state(&self) -> Vec<f32> {

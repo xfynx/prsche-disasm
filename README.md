@@ -1,5 +1,13 @@
 # Need for Speed: Porsche Unleashed — открытый движок и просмотрщик
 
+[Run 019 внутри 012](iterations/012-campaign-fidelity/runs/019-original-contact-runtime/README.md):
+исходные EDG подключены к общему дереву с опорами дороги. 3 дерева / 27 queries,
+8 body contacts, 45 responses, 5+29 wheel-state cases сверены с x86. 220 тестов,
+native/web, 3 Quick Race и 21 browser check прошли. Запуск:
+`local/builds/012-campaign-fidelity/Launch-desktop.cmd`.
+Силы подвески/body response пока adapter; исходные API требуют доказанного
+состояния автомобиля. Остаток 012 указан в плане; итерация открыта.
+
 [Run 018 внутри 012](iterations/012-campaign-fidelity/runs/018-original-support-runtime/README.md):
 восстановленные type-1 опоры уже в заезде: исходный resource loader → дерево →
 кэш/плоскость → четыре колеса. Подбор RD* и mt53/54 убран. 15 трасс, 237 395

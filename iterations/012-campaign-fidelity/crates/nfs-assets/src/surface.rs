@@ -5,10 +5,12 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::physics::original_scene_objects::SceneObject;
 use crate::physics::original_support::{SupportPolygon, SupportVertices};
 use crate::physics::original_support_loader::SupportLoad;
 use crate::physics::original_support_owner::OriginalSupportOwner;
 use crate::physics::original_support_tree::SupportTree;
+use crate::physics::original_support_tree::{SceneEdgeHit, SceneRef};
 
 const CELL_SIZE: f32 = 16.0;
 const MAX_ABS_COORDINATE: f32 = 1_000_000.0;
@@ -65,6 +67,7 @@ struct OriginalSupportSurface {
     polygons: Vec<SupportPolygon>,
     identities: Vec<RoadTriangleIdentity>,
     tree: SupportTree,
+    objects: Vec<SceneObject>,
 }
 
 /// Original type-1 support backend for tracks, or an explicit bounded triangle
@@ -83,6 +86,17 @@ impl RoadSurface {
     pub fn from_original_support(
         load: SupportLoad,
         article_names: &[String],
+    ) -> Result<Self, String> {
+        Self::from_original_scene_support(load, article_names, vec![])
+    }
+
+    /// Retained scene insertion order 0x4883bc then 0x4883f5: original
+    /// flag-1 polygons first, constructed EDG objects second. Special objects
+    /// and the no-EDG temporary-tree fallback remain outside this loader.
+    pub fn from_original_scene_support(
+        load: SupportLoad,
+        article_names: &[String],
+        objects: Vec<SceneObject>,
     ) -> Result<Self, String> {
         let mut surface = Self::default();
         let mut polygons = Vec::with_capacity(load.polygons.len());
@@ -119,7 +133,10 @@ impl RoadSurface {
         }
         let mut tree = SupportTree::original_scene();
         for index in 0..polygons.len() {
-            tree.insert(&polygons, index)?;
+            tree.insert_scene(&polygons, &objects, SceneRef::Polygon(index))?;
+        }
+        for index in 0..objects.len() {
+            tree.insert_scene(&polygons, &objects, SceneRef::Object(index))?;
         }
         surface.report.accepted = polygons.len();
         surface.report.rejected_degenerate = load.rejected_degenerate;
@@ -127,12 +144,35 @@ impl RoadSurface {
             polygons,
             identities,
             tree,
+            objects,
         }));
         Ok(surface)
     }
 
     pub fn uses_original_support(&self) -> bool {
         self.original.is_some()
+    }
+
+    pub fn original_scene_object_count(&self) -> Option<usize> {
+        self.original.as_ref().map(|source| source.objects.len())
+    }
+
+    /// Expose the restored original edge query in scene coordinates. Callers
+    /// must supply the original owner gate; body response binding is separate.
+    pub fn original_edge_query(
+        &self,
+        segment: [[f32; 3]; 2],
+        owner_has_support: bool,
+    ) -> Result<Option<SceneEdgeHit>, String> {
+        let source = self.original.as_ref().ok_or("no original scene backend")?;
+        let segment = segment.map(crate::track_loader::to_scene_coordinates);
+        let hit = source
+            .tree
+            .query_scene_edges(&source.objects, segment, owner_has_support)?;
+        Ok(hit.map(|mut hit| {
+            hit.endpoints = hit.endpoints.map(crate::track_loader::to_scene_coordinates);
+            hit
+        }))
     }
 
     pub fn original_support_counts(&self) -> Option<(usize, usize)> {

@@ -1,5 +1,25 @@
 # 012-campaign-fidelity: рабочий план
 
+Run 019, 2026-10-06: смешанное polygon+EDG дерево подключено к загрузке трасс
+и запросам четырёх колёс. Успешный EDG load пропускает временную генерацию:
+0x4880ed → 0x4882c4; гипотеза обязательной обрезки EDG отвергнута. Вставка
+исходных полигонов, затем построенных EDG: 0x4883bc → 0x4883f5. С x86 совпали
+3 смешанных дерева / 27 запросов EDG, 8 первых контактов кузова, 45 полных
+scene-dependent responses, 5 height branches / 29 material-state transitions.
+220 Rust tests, 3 ignored; fmt/clippy/wasm32, native+web release, 3 Quick Race
+и 21 общий browser check прошли. Финальная native/web упаковка после RNG
+уточнения завершена; SHA WASM совпал с проверенным браузерами артефактом.
+Первый body contact и response API требуют исходные поля и пока вне игрового
+solver; старые spring/body forces остаются adapter. Кузовные размеры, полный
+0x499a70, исходная угловая cadence, special objects и car-car response не готовы.
+Активных исполнителей нет: mixed worker остановлен лимитом; частичный код
+принят, исправлен, дополнен и проверен координатором. Владелец остатка — координатор.
+Следующий шаг: 0x499bc4..0x499d15 fallback/front offset 0x493bc0, затем
+0x499d15..0x499eec +0x64/+0x6c и downstream forces. Extent producer искать
+перед reset 0x4110a0 → 0x410730, а не принимать visible bounds за источник.
+UI/миссия/визуальная сверка T01–T04 сохраняются, 012 открыта.
+Артефакты: runs/019-original-contact-runtime, research/original-collision/contact-runtime-019.md.
+
 Run 018 внутри 012, 2026-10-06: восстановленные type-1 опоры подключены
 к реальной загрузке трасс и четырём колёсам. Ordinary Base filter, retained
 flag-1 loader, mt/vt/df/pr, дерево, два кэша и plane query работают в заезде;

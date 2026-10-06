@@ -1,5 +1,14 @@
 # Состояние проекта
 
+Run 019, 2026-10-06: общие polygon+EDG tree и wheel support работают в игре.
+3 дерева / 27 EDG queries, 8 body selections, 45 scene-dependent responses,
+5 height / 29 material-state cases совпали с x86. 220 tests (3 ignored),
+fmt/clippy/wasm32, native/web, 3 Quick Race и 21 browser check прошли.
+Body/wheel APIs ещё не заменяют force adapter. Остаток: исходные поля,
+full 0x499a70/cadence, special/car-car, UI/миссия/визуальная приёмка.
+012 открыта, активных исполнителей нет; координатор завершил частичный код
+после лимита worker. Запуск: local/builds/012-campaign-fidelity/Launch-desktop.cmd.
+
 Run 018 внутри 012, 2026-10-06: восстановленные type-1 опоры подключены
 к реальной загрузке трасс и четырём колёсам. Ordinary Base filter, retained
 flag-1 loader, mt/vt/df/pr, дерево, два кэша и plane query работают в заезде;

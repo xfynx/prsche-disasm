@@ -133,6 +133,11 @@ fn test_all_15_tracks_complete_physics_and_collision_audit() {
             "Track {track_name} missing road surface"
         );
         let surface = scene.road_surface.as_ref().unwrap();
+        assert_eq!(
+            surface.original_scene_object_count(),
+            Some(scene.topology.as_ref().unwrap().edges.len()),
+            "{track_name}: source EDG vector missing from shared support tree"
+        );
         assert!(
             surface.uses_original_support(),
             "{track_name}: original support backend absent"

@@ -389,10 +389,21 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                 .unwrap_or_else(|| format!("article{index}"))
         })
         .collect::<Vec<_>>();
-    let road_surface = RoadSurface::from_original_support(support, &names)?;
+    let original_edges = match find(files, &format!("{track}.edg")) {
+        Ok(bytes) => physics::original_scene_objects::load_raw_edg_objects(bytes)?,
+        Err(_) => {
+            scene.diagnostics.push(
+                "Original EDG absent: temporary-tree boundary generation 488590 remains incomplete"
+                    .into(),
+            );
+            vec![]
+        }
+    };
+    let edge_count = original_edges.len();
+    let road_surface = RoadSurface::from_original_scene_support(support, &names, original_edges)?;
     let (polygons, nodes) = road_surface.original_support_counts().unwrap();
     scene.diagnostics.push(format!(
-        "Original type-1 support: {polygons} polygons, {nodes} nodes; special={skipped_special}, disabled={skipped_disabled}, library={skipped_library}, degenerate={}. Porsche.exe 4750b0/48839f -> 484ae0 -> 474060/499a70; source Base+4, mt flags, no RD name filter. Mixed object tree and original force solver remain incomplete.",
+        "Original scene support: {polygons} polygons, {edge_count} EDG objects, {nodes} nodes; special={skipped_special}, disabled={skipped_disabled}, library={skipped_library}, degenerate={}. Porsche.exe 4750b0/48839f + 487e80/485100 -> 4883bc/4883f5 -> 484ae0 -> 474060/499a70. Special objects and original force/body response binding remain incomplete.",
         road_surface.report().rejected_degenerate,
     ));
     scene.road_surface = Some(road_surface);

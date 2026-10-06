@@ -1,5 +1,15 @@
 # План восстановления Porsche Unleashed
 
+Run 019, 2026-10-06: исходные EDG подключены к общему дереву игровых опор.
+3 mixed trees / 27 EDG queries, 8 body selections, 45 complete responses,
+5 height branches / 29 material states совпали с x86. 220 Rust tests, 3 ignored;
+fmt/clippy/wasm32, native/web release, 3 Quick Race и 21 browser check прошли.
+Original-state body/wheel API отдельно от force adapter; поля/силы/cadence,
+special/car-car, UI/миссия/визуальная сверка остаются в 012. Активных исполнителей
+нет, владелец остатка — координатор. Следом 0x499bc4..0x499eec: fallback/front
+offset и wheel +0x64/+0x6c → forces. Источник/границы/команды:
+iterations/012-campaign-fidelity/runs/019-original-contact-runtime.
+
 Run 018 внутри 012, 2026-10-06: восстановленные type-1 опоры подключены
 к реальной загрузке трасс и четырём колёсам. Ordinary Base filter, retained
 flag-1 loader, mt/vt/df/pr, дерево, два кэша и plane query работают в заезде;

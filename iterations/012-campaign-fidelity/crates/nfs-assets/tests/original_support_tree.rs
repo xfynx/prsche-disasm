@@ -1,6 +1,6 @@
 use nfs_assets::physics::original_spatial::SpatialGrid;
 use nfs_assets::physics::original_support::{SupportPolygon, SupportVertices};
-use nfs_assets::physics::original_support_tree::SupportTree;
+use nfs_assets::physics::original_support_tree::{SceneRef, SupportTree};
 use std::collections::BTreeMap;
 
 fn polygons(text: &str) -> Vec<SupportPolygon> {
@@ -34,7 +34,10 @@ fn canonical(tree: &SupportTree) -> String {
             Some(records) if records.is_empty() => "_".to_string(),
             Some(records) => records
                 .iter()
-                .map(usize::to_string)
+                .map(|record| match record {
+                    SceneRef::Polygon(index) => index.to_string(),
+                    SceneRef::Object(_) => panic!("unexpected object in polygon fixture"),
+                })
                 .collect::<Vec<_>>()
                 .join(","),
         };
