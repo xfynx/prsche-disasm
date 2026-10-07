@@ -20,6 +20,8 @@ CORPUS = ROOT / "research/v2/binaries"
 STATIC = ROOT / "research/binary-index/static"
 CATALOG = ROOT / "iterations/v2/001-original-recovery/source/catalog"
 RECOVERED = ROOT / "iterations/v2/001-original-recovery/source/recovered/functions.json"
+sys.path.insert(0, str(ROOT / "scripts/research"))
+from v2_manual_index import records as manual_records
 
 
 def read_json(path: Path):
@@ -166,10 +168,31 @@ def write_catalog() -> int:
     reference = read_json(REFERENCE)
     recovered = load_sources_manifest()
     index = load_static_index()
+    manual = manual_records()
+    manual_by_sha = {}
+    for row in manual:
+        manual_by_sha.setdefault(row["sha256"], []).append(row)
     summaries = []
     total = 0
+    automatic_total = 0
+    supplementary_total = 0
     for entry in sorted(reference["binaries"], key=lambda row: row["paths"][0]):
         summary, records = module_info(entry, recovered, index)
+        supplementary = []
+        for row in manual_by_sha.get(entry["sha256"], []):
+            supplementary.append({
+                "module": row["module"], "source_sha256": row["sha256"],
+                "va": row["entry_va"], "name": row["name"],
+                "signature": row.get("signature", ""),
+                "body_ranges": row["ranges"], "body_bytes": row["body_bytes"],
+                "pseudo_c": None, "status": row["status"],
+                "warnings": [], "warning_count": 0,
+                "recovered_status": recovered.get((row["sha256"], row["entry_va"].lower()), "unrecovered"),
+                "supplementary": True,
+                "evidence": "research/binary-index/manual-functions.jsonl",
+                "reason": row["reason"],
+            })
+        records.extend(supplementary)
         module_name = Path(summary["module"]).name
         directory = CATALOG / f"{module_name}-{summary['source_sha256'][:12]}"
         directory.mkdir(parents=True, exist_ok=True)
@@ -177,14 +200,26 @@ def write_catalog() -> int:
             for record in records:
                 stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
         summary["catalog"] = str((directory / "functions.jsonl").relative_to(ROOT)).replace("\\", "/")
+        summary["automatic_function_count"] = summary["function_count"]
+        summary["supplementary_function_count"] = len(supplementary)
+        summary["catalog_function_count"] = len(records)
         summaries.append(summary)
         total += len(records)
-    if total != reference['counts']['analyzed_functions']:
-        fail('catalog function count differs from inventory')
+        automatic_total += summary["function_count"]
+        supplementary_total += len(supplementary)
+    if automatic_total != reference['counts']['analyzed_functions']:
+        fail('automatic catalog function count differs from inventory')
+    expected_supplementary = reference['counts'].get('supplementary_manual_functions', supplementary_total)
+    if supplementary_total != expected_supplementary:
+        fail('supplementary catalog function count differs from inventory')
     if sum(s['warning_functions'] for s in summaries) != reference['counts']['pseudo_c_warning_functions']:
         fail('catalog warning count differs from inventory')
     with (CATALOG / "modules.json").open("w", encoding="utf-8", newline="\n") as stream:
-        json.dump({"schema": 1, "modules": summaries, "function_count": total}, stream, ensure_ascii=False, sort_keys=True, indent=2)
+        json.dump({"schema": 1, "modules": summaries,
+                   "function_count": total,
+                   "automatic_function_count": automatic_total,
+                   "supplementary_function_count": supplementary_total},
+                  stream, ensure_ascii=False, sort_keys=True, indent=2)
         stream.write("\n")
     return len(summaries)
 

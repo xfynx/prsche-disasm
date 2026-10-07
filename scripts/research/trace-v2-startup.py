@@ -44,12 +44,13 @@ def main():
               'stages': stages, 'statically_reachable_functions': len(reached),
               'total_analyzed_functions': len(functions), 'reachable_entries': sorted(reached),
               'complete_reachability': False,
-              'next_bundle': ['0059e040', '00533de0', '00533bf0', '00533da0',
-                              '00533c20', '00568b90', '00568ae0', '00568b10'],
-              'next_proof': 'Trace grouped file handles, completion/status callbacks and disk/archive backends; recover FE open/read/size/close services, then verify FE with original heap and IO together.',
+              'next_bundle': ['0056e5f0', '0056e640', '00568390', '00568530',
+                              '005919a0', '00591df0', '00592140', '00592290'],
+              'next_proof': 'Recover original VirtualAlloc wrappers and file device initialization/worker, then disk/archive dispatch. Replace Run005 immediate worker fixture and prove scheduled FE/heap/IO before application startup binding.',
               'unrecovered': ['CRT initialization/termination', 'app_main 004b6a50',
                               'heap OS/CRT/optimized-copy callees and startup binding',
-                              'FE file/locale services and callback effects', 'render/audio/input initialization',
+                              'file device threads/wait/events, disk/archive backend and allocation wrappers',
+                              'FE locale services and callback effects', 'render/audio/input initialization',
                               'main-loop global state and indirect calls']}
     target = ITERATION / 'reference/startup.json'
     target.write_text(json.dumps(report, indent=2) + '\n', encoding='utf8', newline='\n')

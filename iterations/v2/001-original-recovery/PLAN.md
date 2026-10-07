@@ -2,8 +2,9 @@
 
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
-Владелец — координатор. Run 004 завершён: heap init/alloc/free/resize и helpers
-сверены с x86. Стенд исполнителя heap_probe принят; активных поручений нет.
+Владелец — координатор. Run 005 завершён: файловая очередь и совместный
+FE/heap/IO frontend сверены с x86. Поручения исполнителей приняты;
+активных поручений нет. Игровой EXE и критерии всей итерации ещё открыты.
 
 ## Цель и готовность 001
 
@@ -112,32 +113,62 @@ FE regression всё ещё использует свой записывающи
 исполнение ещё не проверено. CRT formatting/fill, OS locks, SIMD-copy targets
 и allocation-failure callback проверены на записывающих границах, не восстановлены.
 
+## Выполнено в Run 005
+
+29 новых C++ функций файловых requests/queue/status/completion/chunk read
+и списков операций сверены с x86 на 89 joint FE/heap/IO случаях.
+551 heap и 236 FE регрессий сохранены в новых подпапках Run005.
+Проверены byte group, serial wrap, сортировка с равными ключами, поиск/удаление,
+EOF/short read/отказ, primary/fallback и настоящий fe.txt (23 записи/188 bytes).
+Whole heap/device/operation/list/buffer/name/stream/global state и calls совпали.
+
+3 missed callbacks 0x533cd0/0x567bf0/0x5684c0 добавлены в supplementary
+SHA/body index: 36 587 automatic + 3 manual. Всего 50 проверенных ручных
+функций, 0 byte matches/модулей. ABI bool open сравнивается по AL, read/close
+по EAX. Source/VA/calls/layout/globals/toolchain и границы проверки —
+runs/005-original-files/README.md и verification.json.
+
+FE связан с реальными heap и IO frontend в joint probe. Worker выполняет
+completion немедленно только в fixture: исходный scheduler ещё не восстановлен.
+Disk/archive/VirtualAlloc wrappers, OS/CRT/SIMD и эффекты FE callbacks внешние.
+Archive opcodes и fatal/concurrent/locale/runtime-null-name состояния не приняты.
+Старые runs 001–004 сохранены; registry указывает актуальные Run005 SHA.
+
 ## Текущий шаг и передача
 
-Владелец — координатор; активных исполнителей нет. Следующий цельный пакет:
-файловые службы 0x59e040/0x533de0/0x533bf0/0x533da0, группы handles,
-completion/status и disk/archive backend. Уже просмотрены wrappers:
-size → 0x568b90, close → 0x568ae0; затем 0x567f70/0x567df0.
-read → 0x533c20 с callback 0x568b10. Это не прямые fopen/fread/fclose.
-Первый конкретный шаг: извлечь 0x59e040/0x533c20 и перечисленные callees,
-установить handle layout, группу 100, mode 1, порядок completion и backend.
-После доказательства — C++, сверка; затем совместный FE/heap/IO и startup
-0x4b6a50. OS/CRT/SIMD heap callees и инициализация до main остаются открытыми.
-CRT/0x4b6a50/main-loop/render/audio/input,
-четыре ошибки декомпиляции и unclassified executable bytes остаются открытыми.
+Владелец — координатор; активных поручений нет. Исполнители heap_probe/io_backend
+передали files_probe.cpp, io_lists.cpp и supplementary index/catalog scripts;
+интеграция и последние исправления стенда приняты координатором.
 
-Команды проверки:
+Следующий конкретный пакет:
+1. Индекс 0x56e5f0/0x56e640: GetSystemInfo/VirtualAlloc/VirtualFree wrappers,
+   page_size 0x6a6418, signed page-rounding и возвращаемый EAX.
+2. Supplementary index косвенного worker 0x568530: границы/ветви/targets;
+   device init 0x568390, list constructors 0x580630/0x580680 и event/thread
+   lifecycle/dispatcher по инструкциям оригинала.
+3. Disk open/read/seek/close 0x5919a0/0x591df0/0x592140/0x592290 и archive
+   0x568900: handles, mapping/cache, flags/errors и OS imports.
+4. Заменить соответствующие границы joint probe исходными consumers;
+   сверить input → промежуточное состояние → output с x86. Далее startup
+   binding 0x4b6a50, heap constructor/setup и initialization до main.
+
+CRT/0x4b6a50/main-loop/render/audio/input, compiler/flags, четыре decompile
+errors и unclassified executable bytes открыты. Данные local/game неизменяемы.
+
+Команды текущей проверки:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
-py -3 scripts/research/verify-v2-heap.py
-py -3 scripts/research/verify-v2-fe-stream.py --report-dir iterations/v2/001-original-recovery/runs/004-original-heap/fe-regression
+py -3 scripts/research/v2_manual_index.py
+py -3 scripts/research/verify-v2-files.py
+py -3 scripts/research/verify-v2-heap.py --report-dir iterations/v2/001-original-recovery/runs/005-original-files/heap-regression
+py -3 scripts/research/verify-v2-fe-stream.py --report-dir iterations/v2/001-original-recovery/runs/005-original-files/fe-regression
 py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts
 py -3 scripts/research/structure-v2.py
 py -3 scripts/research/trace-v2-startup.py
-py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification --verification-output iterations/v2/001-original-recovery/runs/004-original-heap/corpus-verification.json
+py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification
 ```
 
 MSVC 19.44.35229 собирает x86; это не доказанный исходный MSVC/CRT/flags.
-Объявлять 001 закрытой по probe нельзя: игровой EXE, оригинальная езда,
-карьеры и визуальные переходы v2 ещё не приняты.
+Игровой EXE, оригинальная езда, карьеры и визуальная приёмка открыты;
+по probes нельзя объявлять итерацию 001 завершённой.

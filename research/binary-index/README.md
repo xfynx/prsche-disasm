@@ -61,6 +61,12 @@ Raw decode не определяет границы функций автома�
 
 ## Состав
 
+Supplementary callback records that Ghidra did not promote to functions are
+SHA-guarded in `manual-functions.jsonl` and validated by
+`scripts/research/v2_manual_index.py`.  The v2 inventory and catalog report
+automatic analyzed functions separately from these supplementary records;
+manual records carry no pseudo-C span.
+
 - `static/binaries.jsonl`: пути, хеши, секции, image base, импорты/экспорты.
 - `static/strings.jsonl`: строки с file offset/RVA/VA; возможен шум.
 - `static/imports.jsonl`, `resources.jsonl`: IAT и каталоги PE-ресурсов.

@@ -117,6 +117,14 @@ py -3 scripts/research/verify-v2-heap.py
 py -3 scripts/research/verify-v2-fe-stream.py --report-dir iterations/v2/001-original-recovery/runs/004-original-heap/fe-regression
 ```
 
-Следующий пакет — файловые службы FE, группы handles и completion/status;
-затем совместная проверка FE/heap/IO и связь со startup 0x4b6a50.
+[Run 005](runs/005-original-files/README.md): восстановлены 29 функций
+файловых очередей, completion/status, чтения блоками и списков. Все 89
+совместных FE/heap/IO проверок с x86 прошли, включая настоящий fe.txt;
+551 heap и 236 FE регрессий сохранены в новом run. Всего 50 проверенных
+ручных функций. Дополнительный SHA index содержит 3 пропущенных callbacks:
+каталог 36 587 automatic + 3 supplementary = 36 590 записей.
+Disk/thread/VirtualAlloc/OS/CRT остаются внешними границами; игрового EXE нет.
+
+Следующий пакет — исходные allocation wrappers, device init/worker,
+disk/archive dispatch, затем привязка к startup 0x4b6a50.
 Точные адреса и первый шаг — [в плане](PLAN.md).

@@ -1,0 +1,206 @@
+{
+  "schema": 1,
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "queries": [
+    "CreateFileA|ReadFile|GetFileSize|SetFilePointer|CloseHandle",
+    "FUN_005919a0/FUN_00591df0/FUN_00592140/FUN_00592290",
+    "FUN_00533b90/FUN_00533c20/FUN_00568ae0/FUN_00568b10/FUN_00568b90/FUN_00567df0"
+  ],
+  "index_files": [
+    "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+    "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/calls.jsonl",
+    "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+    "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/symbols.jsonl",
+    "research/v2/binaries/Porsche.exe-ddd748fdbe6d/decompiled.c"
+  ],
+  "backend": {
+    "open": {
+      "va": "0x5919a0",
+      "function": "FUN_005919a0",
+      "range": "0x5919a0-0x591c40",
+      "calls": [
+        {
+          "api": "KERNEL32.DLL::CreateFileA",
+          "callsite": "0x591b1a",
+          "iat_pointer": "0x5b21fc"
+        },
+        {
+          "api": "KERNEL32.DLL::GetFileSize",
+          "callsite": "0x591b6f",
+          "iat_pointer": "0x5b2238"
+        }
+      ],
+      "support": [
+        "0x591c50 slot allocation",
+        "0x591760 path/device byte",
+        "0x591af3 GetDiskFreeSpaceA"
+      ]
+    },
+    "read": {
+      "va": "0x591df0",
+      "function": "FUN_00591df0",
+      "range": "0x591df0-0x591f96",
+      "calls": [
+        {
+          "api": "KERNEL32.DLL::ReadFile",
+          "callsite": "0x591ee2",
+          "iat_pointer": "0x5b21f4"
+        }
+      ],
+      "support": [
+        "0x55f740 retry/status call",
+        "0x5323e0 mapped-copy call"
+      ]
+    },
+    "seek": {
+      "va": "0x592140",
+      "function": "FUN_00592140",
+      "range": "0x592140-0x592206",
+      "calls": [
+        {
+          "api": "KERNEL32.DLL::SetFilePointer",
+          "callsite": "0x5921d3",
+          "iat_pointer": "0x5b223c"
+        }
+      ]
+    },
+    "close": {
+      "va": "0x592290",
+      "function": "FUN_00592290",
+      "range": "0x592290-0x592350",
+      "calls": [
+        {
+          "api": "KERNEL32.DLL::CloseHandle",
+          "callsites": [
+            "0x59230f",
+            "0x592320"
+          ],
+          "iat_pointer": "0x5b2164"
+        }
+      ],
+      "support": [
+        "0x5922fe UnmapViewOfFile before mapped-handle close"
+      ]
+    }
+  },
+  "fe_wrappers": {
+    "open_sync": {
+      "va": "0x533b90",
+      "calls": [
+        "0x533ba4 -> 0x568aa0",
+        "0x533bb3 -> 0x567f70",
+        "0x533bb9 -> 0x567af0",
+        "0x533bc7 -> 0x567df0"
+      ]
+    },
+    "read_async": {
+      "va": "0x533c20",
+      "calls": [
+        "0x533c99 -> 0x5680c0",
+        "0x533cb2 -> 0x567f70",
+        "0x533cd7 -> 0x567df0"
+      ],
+      "callback": "0x568b10"
+    },
+    "close": {
+      "va": "0x533da0",
+      "calls": [
+        "0x533daf -> 0x568ae0",
+        "0x533dc4 -> 0x567df0"
+      ]
+    },
+    "size": {
+      "va": "0x533de0",
+      "calls": [
+        "0x533def -> 0x568b90",
+        "0x533e04 -> 0x567df0"
+      ]
+    },
+    "completion_dispatch": {
+      "va": "0x567df0",
+      "close_calls": [
+        "0x567e71",
+        "0x567e8a",
+        "0x567ed2",
+        "0x567ef0"
+      ],
+      "device_table": "0x6a5c7c"
+    }
+  },
+  "handler_table": {
+    "operation_allocator": {
+      "va": "0x5682a0",
+      "queue": "0x568200",
+      "callsites": [
+        "0x568ae0",
+        "0x568b10",
+        "0x568b90"
+      ]
+    },
+    "device_dispatch": "0x6a5c7c",
+    "import_pointers": {
+      "CloseHandle": "0x5b2164",
+      "ReadFile": "0x5b21f4",
+      "CreateFileA": "0x5b21fc",
+      "GetFileSize": "0x5b2238",
+      "SetFilePointer": "0x5b223c"
+    }
+  },
+  "additional_direct_import_callers": [
+    {
+      "function": "0x583ff0",
+      "callsite": "0x58400d",
+      "api": "ReadFile",
+      "iat_pointer": "0x5b21f4"
+    },
+    {
+      "function": "0x5a78eb",
+      "callsites": [
+        "0x5a7965",
+        "0x5a7a35"
+      ],
+      "api": "ReadFile",
+      "iat_pointer": "0x5b21f4"
+    },
+    {
+      "function": "0x5ad2ea",
+      "callsites": [
+        "0x5ad49d",
+        "0x5ad4c9"
+      ],
+      "apis": [
+        "CreateFileA",
+        "CloseHandle"
+      ],
+      "iat_pointers": [
+        "0x5b21fc",
+        "0x5b2164"
+      ]
+    }
+  ],
+  "status": "indexed navigation evidence; no implementation or semantic hypothesis",
+  "allocation_wrappers": {
+    "allocate": {
+      "va": "0056e5f0",
+      "dependencies": [
+        "GetSystemInfo",
+        "VirtualAlloc"
+      ],
+      "page_size_global": "006a6418",
+      "arithmetic": "signed integer page rounding in original instructions; not transferred in Run005"
+    },
+    "free": {
+      "va": "0056e640",
+      "dependencies": [
+        "VirtualFree(pointer,0,0x8000)"
+      ]
+    },
+    "status": "Unrecovered. Probe bump allocation does not model page allocation semantics."
+  },
+  "set_last_error": {
+    "iat_pointer": "005b21a4",
+    "callsite": "00592600",
+    "evidence": "CALL [005b21a4] in mapped original listing; external index import identifiers are not callable VA."
+  }
+}

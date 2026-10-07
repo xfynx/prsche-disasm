@@ -16,12 +16,17 @@ fe.txt/аргументов, создания и применения FE stream 
 Настоящий fe.txt даёт 23 записи / 188 байтов. Run 004: 11 новых C++ функций
 heap init/alloc/free/resize и helpers; 551 случай совпал с x86 по всей арене
 после каждой операции. Повторные 236 FE регрессий прошли; free возвращает 1.
-Всего 21 проверенная ручная функция. Heap подключён к библиотеке, его OS/CRT/
-SIMD callees ещё внешние. 0 байтовых совпадений/модулей; игрового v2 EXE нет.
+Run 005: 29 функций файловой очереди/completion/chunk read и списков;
+89 совместных FE/heap/IO сравнений с x86 прошли. 551 heap и 236 FE регрессий
+повторены в новом run. Всего 50 проверенных ручных функций; библиотека
+содержит реальный FE/heap/IO frontend. Disk/thread/VirtualAlloc/OS/CRT/SIMD
+ещё внешние; в стенде completion немедленный, это не исходный scheduler.
+Три пропущенных callbacks добавлены в SHA-guarded index: каталог 36 590 записей,
+из них 36 587 automatic. 0 байтовых совпадений/модулей; игрового v2 EXE нет.
 MSVC 19.44.35229 доступен; точный исходный compiler/CRT/flags не подтверждён.
-Следующий пакет — группы файловых handles, completion/status и исходные IO
-consumers FE, затем совместный FE/heap/IO и startup 0x4b6a50.
-Отчёт: runs/004-original-heap внутри v2/001. Визуальная приёмка открыта.
+Следующий пакет — allocation wrappers, device init/worker и disk/archive
+backend; затем совместная сверка с исходным scheduler и startup 0x4b6a50.
+Отчёт: runs/005-original-files внутри v2/001. Визуальная приёмка открыта.
 Пути: iterations/v2/001-original-recovery, research/v2/binaries,
 local/builds/v2/001-original-recovery. Исполнитель — координатор.
 

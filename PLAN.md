@@ -13,13 +13,18 @@
 функций fe.txt/command-line → FE stream → dispatch сверены на 236 случаях,
 включая настоящий fe.txt. Run 004: ещё 11 функций собственного heap на C++;
 551 случай совпал по всей арене после каждой операции, 236 FE регрессий прошли.
-Всего 21 проверенная ручная функция. Внешние CRT/OS/SIMD/file/callback callees
-ещё открыты; 0 байтовых совпадений/целых модулей. Игра v2 пока не запускается.
-Startup и открытые зависимости — reference/startup.json. Владелец — координатор.
-Следующий пакет: файловые службы FE 0x59e040/0x533de0/0x533bf0/0x533da0;
-группы handles, completion/status и disk/archive backend. Затем совместная
-сверка FE с исходным heap/IO и связь с 0x4b6a50. Сначала индекс/callees/layout.
-Отчёт: iterations/v2/001-original-recovery/runs/004-original-heap/README.md.
+Run 005: ещё 29 функций файловых запросов/очередей/completion/chunk read;
+89 совместных FE/heap/IO сравнений прошли, 551 heap и 236 FE регрессий прошли.
+Всего 50 проверенных ручных функций. Три пропущенных callbacks добавлены
+в supplementary SHA index: 36 587 automatic + 3 = 36 590 записей каталога.
+Внешние CRT/OS/SIMD/disk/thread/callback callees ещё открыты; 0 байтовых
+совпадений/целых модулей. Игрового v2 EXE нет. История runs сохранена.
+Startup и открытые зависимости — reference/startup.json. Владелец — координатор,
+активных исполнителей нет. Следующий пакет: VirtualAlloc wrappers 0x56e5f0/
+0x56e640 → device init/worker 0x568390/0x568530 → disk/archive dispatch.
+Сначала supplementary index worker/callees, затем заменить записывающие
+границы совместного стенда. Далее startup 0x4b6a50.
+Отчёт: iterations/v2/001-original-recovery/runs/005-original-files/README.md.
 
 2026-10-08: по запросу пользователя сохраняем 012 как есть и меняем подход.
 Run 020: 47 original four-wheel loops / 188 состояний совпали с Rust;

@@ -21,6 +21,10 @@
   записи и сравнение строк не добавляются в библиотеку оригинала.
 - `recovered/heap_probe.cpp`: сравнение полного heap; фиксированная VA арены
   применяется только в стенде, внешние OS/CRT/SIMD вызовы записываются.
+- `recovered/Porsche.exe/files.cpp`, `io_lists.cpp`: 29 функций запросов,
+  очередей, completion и чтения блоками; layout в `include/porsche/files.hpp`.
+- `recovered/files_probe.cpp`: 89 совместных FE/heap/IO сравнений с x86;
+  immediate worker, disk/VirtualAlloc/OS endpoints находятся только в стенде.
 - `catalog`: адресный каталог всех модулей и функций, байтовые диапазоны
   псевдо-C, пути данных/листингов/вызовов/импортов и статусы восстановления.
 
@@ -34,8 +38,10 @@ py -3 scripts/research/structure-v2.py --extract Porsche.exe --address 0x59e040 
 ```
 
 `porsche_original.lib` содержит восстановленные объекты и ещё имеет
-неразрешённые зависимости; это не готовая игра. 21 функция проверена в
+неразрешённые зависимости; это не готовая игра. 50 функций проверены в
 зафиксированных границах стендов. Это не подтверждает UI, физику, main loop,
-внешние OS/CRT/SIMD/file callees или байтовое совпадение EXE. Актуальные
-свидетельства FE после уточнения ABI free — runs/004-original-heap/fe-regression;
-старый Run 003 сохраняет хеши исходников на момент своего checkpoint.
+внешние OS/CRT/SIMD/disk/thread callees или байтовое совпадение EXE. Актуальные
+совместные свидетельства и регрессии — runs/005-original-files;
+Run 001–004 сохраняют состояние своих checkpoint. Три supplementary callbacks
+без pseudo-C доступны через SHA-проверяемый manual index; каталог имеет
+36 590 записей. Извлечение pseudo-C для этих трёх функций недоступно.

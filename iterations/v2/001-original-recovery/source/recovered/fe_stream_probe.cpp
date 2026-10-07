@@ -39,19 +39,21 @@ std::int32_t __cdecl compare_005ae3c0(const char* a,const char* b) {
     while (*a && lower(static_cast<unsigned char>(*a))==lower(static_cast<unsigned char>(*b))) { ++a; ++b; }
     return lower(static_cast<unsigned char>(*a))-lower(static_cast<unsigned char>(*b));
 }
-void __cdecl open_0059e040(const char* name,std::uint32_t mode,std::uint32_t group,void** handle) {
+bool __cdecl open_0059e040(const char* name,std::uint32_t mode,std::uint32_t group,void** handle) {
     calls.push_back("[\"open\","+quoted(name)+","+std::to_string(mode)+","+std::to_string(group)+"]");
     auto f=files.find(name); *handle=f==files.end() ? nullptr : &f->second;
+    return *handle!=nullptr;
 }
 std::int32_t __cdecl size_00533de0(void* handle,std::uint32_t group) {
     auto* f=static_cast<std::vector<char>*>(handle);
     calls.push_back("[\"size\","+std::to_string(group)+"]"); return static_cast<std::int32_t>(f->size());
 }
-void __cdecl read_00533bf0(void* handle,std::uint32_t offset,void* dest,std::uint32_t size,std::uint32_t group) {
+std::uint32_t __cdecl read_00533bf0(void* handle,std::uint32_t offset,void* dest,std::uint32_t size,std::uint32_t group) {
     calls.push_back("[\"read\","+std::to_string(offset)+","+std::to_string(size)+","+std::to_string(group)+"]");
     std::memcpy(dest,static_cast<std::vector<char>*>(handle)->data()+offset,size);
+    return size;
 }
-void __cdecl close_00533da0(void*,std::uint32_t group) { calls.push_back("[\"close\","+std::to_string(group)+"]"); }
+std::uint32_t __cdecl close_00533da0(void*,std::uint32_t group) { calls.push_back("[\"close\","+std::to_string(group)+"]"); return 1; }
 void* __cdecl allocate_00531ca0(const char* name,std::int32_t size,std::uint32_t flags) {
     calls.push_back("[\"allocate\","+quoted(name)+","+std::to_string(size)+","+std::to_string(flags)+"]");
     auto a=std::make_unique<Allocation>(); a->name=name; a->size=size;

@@ -9,9 +9,12 @@ import json
 from pathlib import Path
 import re
 import struct
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 ITERATION = ROOT / 'iterations/v2/001-original-recovery'
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from v2_manual_index import records as manual_records
 
 
 def load(path):
@@ -24,9 +27,10 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/004-original-heap/corpus-verification.json',
+                        default=ITERATION/'runs/005-original-files/corpus-verification.json',
                         help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
+    verification_output = args.verification_output if args.verification_output.is_absolute() else ROOT / args.verification_output
     original = ROOT / 'local/game'
     old = load(ROOT / 'research/binary-index/coverage.json')
     known = {entry['sha256']: entry for entry in old['binaries']}
@@ -81,6 +85,10 @@ def main():
         entry['listing'] = listing or {'status':'not-exported'}
         entry['automatic_decompilation'] = decompile or {'status':'not-exported'}
         binaries[sha] = entry
+    manual = manual_records()
+    manual_addresses = {}
+    for record in manual:
+        manual_addresses.setdefault(record['sha256'], set()).add(record['entry_va'].lower())
     recovered = load(ITERATION/'source/recovered/functions.json') or {'functions': []}
     seen = set()
     for function in recovered['functions']:
@@ -92,9 +100,10 @@ def main():
         if not source.is_file():
             raise RuntimeError(f'Recovered source is missing: {source}')
         entry = binaries[key[0]]
-        indexed = {json.loads(line)['entry_va'] for line in
+        indexed = {json.loads(line)['entry_va'].lower() for line in
                    (ROOT/entry['export_directory']/'functions.jsonl').read_text(encoding='utf8').splitlines()}
-        if key[1] not in indexed:
+        indexed.update(manual_addresses.get(key[0], set()))
+        if key[1].lower() not in indexed:
             raise RuntimeError(f'Recovered function is absent from corpus: {key}')
         if function['status'] == 'native-differential-verified':
             verification = load(ROOT/function['verification_report'])
@@ -109,6 +118,26 @@ def main():
             entry['recovered_functions'] += 1
         if function.get('binary_matched'):
             raise RuntimeError('Binary-match evidence validation has not been implemented; do not count unchecked claims')
+    automatic_addresses = {}
+    for sha, entry in binaries.items():
+        export_functions = ROOT / entry['export_directory'] / 'functions.jsonl'
+        automatic_addresses[sha] = {json.loads(line)['entry_va'].lower() for line in
+                                    export_functions.read_text(encoding='utf-8').splitlines()}
+        entry['supplementary_functions'] = []
+    for record in manual:
+        sha = record['sha256']
+        if sha not in binaries:
+            raise RuntimeError(f'Manual function references unknown binary SHA: {sha}')
+        address = record['entry_va'].lower()
+        if address in automatic_addresses[sha]:
+            raise RuntimeError(f'Manual function overlaps automatic catalog: {(sha, address)}')
+        binaries[sha]['supplementary_functions'].append({
+            'entry_va': record['entry_va'], 'name': record['name'],
+            'status': record['status'], 'reason': record['reason'],
+            'body_bytes': record['body_bytes'], 'ranges': record['ranges'],
+        })
+    for entry in binaries.values():
+        entry['supplementary_function_count'] = len(entry['supplementary_functions'])
     entries = list(binaries.values())
     listing_done = sum(bool(e['listing'].get('complete_listing_of_analyzed_instructions')) for e in entries)
     decompile_done = sum(bool(e['automatic_decompilation'].get('attempted_all_functions')) for e in entries)
@@ -118,6 +147,8 @@ def main():
               'analyzed_functions':sum(e['listing'].get('functions',0) for e in entries),
               'unclassified_executable_bytes':sum(e['listing'].get('unclassified_executable_bytes',0) for e in entries),
               'automatic_pseudo_c_functions':sum(e['automatic_decompilation'].get('pseudo_c_functions',0) for e in entries),
+              'supplementary_manual_functions':sum(e['supplementary_function_count'] for e in entries),
+              'indexed_functions':sum(e['listing'].get('functions',0) for e in entries) + sum(e['supplementary_function_count'] for e in entries),
               'decompile_failures':sum(e['automatic_decompilation'].get('failed',0) for e in entries),
               'pseudo_c_warning_functions':sum(e['automatic_decompilation'].get('warning_functions',0) for e in entries),
               'recovered_functions':sum(e['recovered_functions'] for e in entries),
@@ -146,6 +177,10 @@ def main():
                   'scripts/research/trace-v2-startup.py','scripts/research/verify-v2-startup.py',
                   'scripts/research/export-v2-fe-tables.py','scripts/research/verify-v2-fe-stream.py',
                   'scripts/research/verify-v2-heap.py')]
+        paths += [ROOT/'scripts/research/v2_manual_index.py', ROOT/'scripts/research/verify-v2-files.py', ROOT/'research/binary-index/manual-functions.jsonl']
+        run005 = ITERATION/'runs/005-original-files'
+        if run005.exists():
+            paths += [path for path in run005.rglob('*') if path.resolve() != verification_output.resolve()]
         paths += list((ITERATION/'source').rglob('*'))
         paths += [ITERATION/'CMakeLists.txt', ITERATION/'reference/startup.json']
         paths += [ROOT/p for p in sorted({f['verification_report'] for f in recovered['functions']})]
@@ -174,8 +209,8 @@ def main():
                 'Four functions failed/timed out; details remain in the manifest.',
                 'Warnings and unclassified executable bytes remain unresolved.',
                 'Exact original compiler/CRT/flags/layout are not confirmed.']}
-        args.verification_output.parent.mkdir(parents=True,exist_ok=True)
-        args.verification_output.write_text(json.dumps(verification,indent=2)+'\n',encoding='utf-8',newline='\n')
+        verification_output.parent.mkdir(parents=True,exist_ok=True)
+        verification_output.write_text(json.dumps(verification,indent=2)+'\n',encoding='utf-8',newline='\n')
 
 
 if __name__ == '__main__':

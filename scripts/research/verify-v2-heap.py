@@ -143,7 +143,12 @@ def original(wire,module,data,functions):
     return {'returns':returns,'arena':states[-1],'calls':calls,'states':states},coverage
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int);args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--limit',type=int)
+    parser.add_argument('--report-dir',type=Path,default=RUN,
+                        help='checkpoint directory for mismatch and full verification reports')
+    args=parser.parse_args()
+    report_dir=args.report_dir if args.report_dir.is_absolute() else ROOT/args.report_dir
     module=next(r for r in map(json.loads,(ROOT/'research/binary-index/static/binaries.jsonl').read_text().splitlines()) if r['file']=='Porsche.exe')
     data=(ROOT/'local/game'/module['path']).read_bytes()
     if hashlib.sha256(data).hexdigest()!=module['sha256']:raise RuntimeError('Original SHA differs')
@@ -157,7 +162,8 @@ def main():
     for i,(wire,actual) in enumerate(zip(inputs,outputs)):
         expected,hit=original(wire,module,data,funcs);coverage|=hit
         if expected!=actual:
-            p=ROOT/'local/reports/v2-heap-mismatch.json';p.write_text(json.dumps({'case':i,'wire':wire,'expected':expected,'actual':actual},indent=2)+'\n')
+            report_dir.mkdir(parents=True,exist_ok=True)
+            p=report_dir/'heap-mismatch.json';p.write_text(json.dumps({'case':i,'wire':wire,'expected':expected,'actual':actual},indent=2)+'\n')
             diffs=[k for k in expected if expected[k]!=actual[k]]
             byte_diffs=[j for j,(a,b) in enumerate(zip(bytes.fromhex(expected['arena']),bytes.fromhex(actual['arena']))) if a!=b]
             raise RuntimeError(f'Case {i} differs: {diffs}, first memory bytes {byte_diffs[:12]}; {p}')
@@ -175,7 +181,7 @@ def main():
             'comparison':'Whole arena bytes after every operation including physical headers/free rings/payload/trailers, returns and external calls; fixed VA is probe-only',
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
-        RUN.mkdir(parents=True,exist_ok=True);(RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
-        (RUN/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**funcs[va]})+'\n' for va in sorted(coverage)),newline='\n')
+        report_dir.mkdir(parents=True,exist_ok=True);(report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
+        (report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**funcs[va]})+'\n' for va in sorted(coverage)),newline='\n')
 
 if __name__=='__main__':main()

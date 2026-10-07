@@ -16,10 +16,10 @@ extern std::uint32_t fe_action_state_005e9130[0x21e];
 
 // Original service declarations; recovery status is in recovered/functions.json.
 std::int32_t __cdecl compare_005ae3c0(const char*, const char*);
-void __cdecl open_0059e040(const char*, std::uint32_t, std::uint32_t, void**);
+bool __cdecl open_0059e040(const char*, std::uint32_t, std::uint32_t, void**);
 std::int32_t __cdecl size_00533de0(void*, std::uint32_t);
-void __cdecl read_00533bf0(void*, std::uint32_t, void*, std::uint32_t, std::uint32_t);
-void __cdecl close_00533da0(void*, std::uint32_t);
+std::uint32_t __cdecl read_00533bf0(void*, std::uint32_t, void*, std::uint32_t, std::uint32_t);
+std::uint32_t __cdecl close_00533da0(void*, std::uint32_t);
 void* __cdecl allocate_00531ca0(const char*, std::int32_t, std::uint32_t);
 std::uint32_t __cdecl free_00531f90(void*);
 void* __cdecl resize_00569640(void*, std::int32_t);
