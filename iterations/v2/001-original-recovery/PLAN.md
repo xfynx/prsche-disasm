@@ -2,7 +2,8 @@
 
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
-Владелец — координатор. Назначения Run 002 завершены; активных исполнителей нет.
+Владелец — координатор. Run 003 завершён; инвентарь/экспорт таблиц исполнителя
+v2_build принят. Активных поручений исполнителям нет.
 
 ## Цель и готовность 001
 
@@ -59,23 +60,56 @@ Run 001: полный корпус 24 PE + 1 NE, 36 587 функций / 2 827 3
 Startup: четыре стадии, 3093 статически достижимые функции; косвенные
 цели и пропуски открыты. Полный отчёт: runs/002-cpp-startup.
 
+## Выполнено в Run 003
+
+Найден реальный fe.txt (13 805 байтов), экспортированы
+48 definitions / 144 values / 7 actions (с терминаторами), 53 имени машин,
+42 исходных global words. C++ producer/file/arguments/dispatcher включён
+в библиотеку; все 236 случаев совпали с оригинальным x86. Сравнены поток,
+длины записей, глобальные поля, buffers, callbacks и порядок file/heap вызовов.
+Реальный fe.txt даёт 23 записи / 47 слов с терминатором (188 байтов), аргументы
+поверх него — 25 записей / 51 слово. Indexed/string/vector/action ветки
+проверены отдельными таблицами только в памяти стенда; оригинальные таблицы
+в библиотеке не заменялись. Нестандартная обработка # и empty-file ветка
+сохранены по инструкциям оригинала.
+
+Запрос индекса: FE_Data_Stream/fe.txt → callers/callees 0x4b6660/0x4b5ee0/
+0x4b60d0 → assignment/token/value/action 0x4b5470/0x4b51e0/0x4b5250/0x4b5430
+→ dispatch/record length 0x4b4b80/0x4b4cd0. Porsche.exe SHA указан выше.
+Типизированные таблицы: 0x5d1e40/0x5d63a0/0x5cc5c8/0x5d61e8.
+Свидетельства и команды: runs/003-fe-stream/README.md, verification.json,
+tables.json, source-functions.jsonl, source-calls.jsonl.
+
+Итого 10 проверенных ручных функций, 0 байтовых совпадений/целых модулей.
+Неизвестные file/heap/callback callees остаются extern в библиотеке. Их
+записывающие замены находятся только в fe_stream_probe; оригинальный CRT
+compare исполнен в C locale, native стенд проверяет равенство ASCII строк.
+Это не восстановление эффектов callbacks, VFS, allocator или смены locale.
+Реальный игровой запуск и визуальная приёмка открыты.
+
 ## Текущий шаг и передача
 
-Владелец — координатор; активных исполнителей после Run 002 нет.
-Следующий цельный пакет: FE_Data_Stream 0x4b6660; производители fe.txt
-0x4b5ee0 и command-line 0x4b60d0; dispatch/record length 0x4b4b80/0x4b4cd0,
-таблица 0x5d1e40. Установить allocator/формат/поля и сверить producer→stream→consumer.
-Затем включить доказанный C++ в библиотеку. CRT/0x4b6a50/main-loop/render/audio/input,
+Владелец — координатор; активных исполнителей нет. Следующий цельный пакет:
+heap/file службы FE 0x531ca0/0x531f90/0x569640 и 0x59e040/0x533de0/
+0x533bf0/0x533da0, их инициализация и подключение к 0x4b6a50.
+Первый конкретный шаг: извлечь 0x531ca0 и его callers/callees из индекса,
+проследить header/layout/flags (FE stream использует 0x10), начальное heap
+состояние, resize/free; связать с порядком startup. Не заменять calloc/realloc.
+После доказательства — C++, сверка входов/метаданных/выделенного состояния;
+затем файловый слой с исходными группами/handles и FE без записывающих замен.
+CRT/0x4b6a50/main-loop/render/audio/input,
 четыре ошибки декомпиляции и unclassified executable bytes остаются открытыми.
 
 Команды проверки:
 
 ```powershell
+py -3 scripts/research/export-v2-fe-tables.py
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
-py -3 scripts/research/verify-v2-startup.py
+py -3 scripts/research/verify-v2-fe-stream.py
 py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts
 py -3 scripts/research/structure-v2.py
 py -3 scripts/research/trace-v2-startup.py
+py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification --verification-output iterations/v2/001-original-recovery/runs/003-fe-stream/corpus-verification.json
 ```
 
 MSVC 19.44.35229 собирает x86; это не доказанный исходный MSVC/CRT/flags.

@@ -7,8 +7,8 @@
 [Run 001](runs/001-full-corpus/README.md): все 25 модулей экспортированы,
 36 587 функций попытаны декомпилятором; 36 583 псевдо-C результата и
 4 failed/timeout сохранены. Основной Porsche.exe — 5772/5772 без failed/timeout.
-Это полный автоматический корпус обнаруженного кода; собираемых исходников
-и v2 EXE пока нет. Следом toolchain/ABI/layout и восстановление всего графа.
+Это полный автоматический корпус обнаруженного кода. Ручные собираемые
+исходники появились в Run 002–003; игрового v2 EXE пока нет.
 
 Цель v2 — восстановить игру целиком из бинарников, получить собираемый
 исходный код и исходное поведение, затем переносить платформенные зависимости.
@@ -29,7 +29,7 @@ SHA Rangers.exe; для Porsche такое совпадение ещё не до
 - `research/v2/binaries`: полный листинг каждого модуля, автоматический
   псевдо-C, результаты всех функций и явно нераспознанные области.
 - `local/builds/v2/001-original-recovery`: отдельная x86 C++ библиотека и
-  консольный verification probe; игровой EXE пока отсутствует.
+  консольные verification probes; игровой EXE пока отсутствует.
 - `local/experiments/v2-*`: изменяемые эксперименты и дополнительные базы Ghidra.
 
 Существующий индекс покрывает 24 уникальных PE. В v2 учитываются также
@@ -86,4 +86,22 @@ py -3 scripts/research/structure-v2.py
 py -3 scripts/research/trace-v2-startup.py
 ```
 
-Следующий пакет: fe.txt/command-line → FE stream → исполнение записей.
+[Run 003](runs/003-fe-stream/README.md): восстановлен цельный участок
+fe.txt/command-line → FE stream → исполнение записей: девять новых C++ функций,
+таблицы команд/значений/действий и исходные глобальные слова. 236 native/x86
+сравнений прошли, настоящий fe.txt даёт 23 записи / 188 байтов. Всего десять
+проверенных ручных функций; число байтовых совпадений и целых модулей — ноль.
+IO/heap/callback callees ещё не восстановлены: их заменяет запись только в
+стенде. Общий реестр — source/recovered/functions.json.
+
+```powershell
+py -3 scripts/research/export-v2-fe-tables.py
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
+py -3 scripts/research/verify-v2-fe-stream.py
+py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts
+py -3 scripts/research/structure-v2.py
+py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification --verification-output iterations/v2/001-original-recovery/runs/003-fe-stream/corpus-verification.json
+```
+
+Следующий пакет — исходные heap/file службы FE, их инициализация и связь
+со startup 0x4b6a50; точные адреса и первый шаг — [в плане](PLAN.md).

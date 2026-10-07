@@ -12,6 +12,9 @@ def main():
     functions = {r['entry_va']: r for r in map(json.loads, (index/'functions.jsonl')
                  .read_text(encoding='utf8').splitlines())}
     calls = list(map(json.loads, (index/'calls.jsonl').read_text(encoding='utf8').splitlines()))
+    recovered = {r['entry_va']: r for r in json.loads(
+        (ITERATION/'source/recovered/functions.json').read_text(encoding='utf8'))['functions']
+        if r['sha256'] == SHA}
     roots = {'005a2d1a': 'PE/CRT entry', '004b6710': 'WinMain argument dispatch',
              '004b6a50': 'application startup and main control loop',
              '004b6660': 'FE_Data_Stream: fe.txt plus command-line inputs'}
@@ -21,7 +24,9 @@ def main():
         stages.append({'entry_va': entry, 'role': role, 'ranges': functions[entry]['ranges'],
                        'incoming': [r for r in calls if r.get('to_function') == entry],
                        'outgoing': outgoing,
-                       'dependencies': sorted({r['to_function'] for r in outgoing if r.get('to_function')})})
+                       'dependencies': sorted({r['to_function'] for r in outgoing if r.get('to_function')}),
+                       'recovery': {k: recovered[entry][k] for k in ('status', 'source', 'verification_report')}
+                                   if entry in recovered else {'status': 'unrecovered'}})
     # Direct/static discovery only: indirect targets and undecoded code remain.
     reached, pending = set(), ['005a2d1a']
     graph = {}
@@ -39,10 +44,11 @@ def main():
               'stages': stages, 'statically_reachable_functions': len(reached),
               'total_analyzed_functions': len(functions), 'reachable_entries': sorted(reached),
               'complete_reachability': False,
-              'next_bundle': ['004b6660', '004b5ee0', '004b60d0', '004b4b80', '004b4cd0'],
-              'next_proof': 'Recover FE stream allocation/layout, fe.txt records, argument opcode producer and dispatch table at 0x5d1e40; trace data before implementing.',
+              'next_bundle': ['00531ca0', '00531f90', '00569640', '0059e040',
+                              '00533de0', '00533bf0', '00533da0'],
+              'next_proof': 'Trace original heap headers/layout/flags and initialization before 004b6a50; recover allocation/resize/free, then grouped file handles and IO used by verified FE stream.',
               'unrecovered': ['CRT initialization/termination', 'app_main 004b6a50',
-                              'FE input stream and dispatch', 'render/audio/input initialization',
+                              'FE heap/file/locale services and callback effects', 'render/audio/input initialization',
                               'main-loop global state and indirect calls']}
     target = ITERATION / 'reference/startup.json'
     target.write_text(json.dumps(report, indent=2) + '\n', encoding='utf8', newline='\n')

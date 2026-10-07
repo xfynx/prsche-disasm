@@ -6,10 +6,16 @@
 - `include/porsche`: проверенные объявления и ABI.
 - `recovered/Porsche.exe/startup.cpp`: первый восстановленный переход
   `0x4b6710`, четыре аргумента stdcall; 175 native/x86 сравнений.
+- `recovered/Porsche.exe/fe_stream.cpp`: девять cdecl функций чтения конфигурации,
+  формирования и применения FE записей; 236 native/x86 сравнений.
+- `recovered/Porsche.exe/fe_tables.inc`: типизированные данные из исходного PE,
+  повторяемый экспорт `scripts/research/export-v2-fe-tables.py`.
 - `recovered/functions.json`: реестр ручных функций, зависимостей и свидетельств.
 - `recovered/sources.cmake`: явный список исходников библиотеки `porsche_original`.
 - `recovered/recovery_probe.cpp`: отдельный консольный стенд; записывающая
   замена пока не восстановленного `0x4b6a50` существует только здесь.
+- `recovered/fe_stream_probe.cpp`: отдельный стенд FE; file/heap/callback
+  записи и сравнение строк не добавляются в библиотеку оригинала.
 - `catalog`: адресный каталог всех модулей и функций, байтовые диапазоны
   псевдо-C, пути данных/листингов/вызовов/импортов и статусы восстановления.
 
@@ -19,9 +25,10 @@
 
 ```powershell
 py -3 scripts/research/structure-v2.py
-py -3 scripts/research/structure-v2.py --extract Porsche.exe --address 0x4b6660 --output local/experiments/v2-fe-stream/004b6660.c
+py -3 scripts/research/structure-v2.py --extract Porsche.exe --address 0x531ca0 --output local/experiments/v2-heap/00531ca0.c
 ```
 
 `porsche_original.lib` содержит восстановленные объекты и ещё имеет
-неразрешённые зависимости; это не готовая игра. Проверка стартового перехода
-не подтверждает UI, физику, main loop или байтовое совпадение EXE.
+неразрешённые зависимости; это не готовая игра. Десять функций проверены в
+зафиксированных границах стендов. Это не подтверждает UI, физику, main loop,
+оригинальные службы памяти/файлов или байтовое совпадение EXE.

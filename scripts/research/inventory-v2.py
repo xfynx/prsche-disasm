@@ -24,8 +24,8 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/002-cpp-startup/corpus-verification.json',
-                        help='Current checkpoint report; Run 001 historical hashes are preserved')
+                        default=ITERATION/'runs/003-fe-stream/corpus-verification.json',
+                        help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
     original = ROOT / 'local/game'
     old = load(ROOT / 'research/binary-index/coverage.json')
@@ -99,7 +99,8 @@ def main():
         if function['status'] == 'native-differential-verified':
             verification = load(ROOT/function['verification_report'])
             source_sha = hashlib.sha256(source.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
-            if not verification or verification['sha256'] != key[0] or verification['function_va'] != key[1] or not verification['native_cpp_equal_original_x86'] or verification['source_sha256'].get(function['source']) != source_sha:
+            verified_vas = verification.get('function_vas', [verification.get('function_va')]) if verification else []
+            if not verification or verification['sha256'] != key[0] or key[1] not in verified_vas or not verification['native_cpp_equal_original_x86'] or verification['source_sha256'].get(function['source']) != source_sha:
                 raise RuntimeError(f'Missing/stale native verification: {key}')
             for relative, expected_sha in verification['source_sha256'].items():
                 dependency = ROOT/relative
@@ -142,9 +143,13 @@ def main():
         paths += [ROOT/p for p in ('scripts/research/export-v2.ps1',
                   'scripts/research/inventory-v2.py','scripts/research/ghidra/ExportRecoveryCorpus.java',
                   'scripts/build-v2.ps1','scripts/research/structure-v2.py',
-                  'scripts/research/trace-v2-startup.py','scripts/research/verify-v2-startup.py')]
+                  'scripts/research/trace-v2-startup.py','scripts/research/verify-v2-startup.py',
+                  'scripts/research/export-v2-fe-tables.py','scripts/research/verify-v2-fe-stream.py')]
         paths += list((ITERATION/'source').rglob('*'))
         paths += [ITERATION/'CMakeLists.txt', ITERATION/'reference/startup.json']
+        paths += [ROOT/p for p in sorted({f['verification_report'] for f in recovered['functions']})]
+        paths += [ITERATION/'runs/003-fe-stream'/name for name in
+                  ('tables.json', 'resource-inventory.json', 'source-functions.jsonl', 'source-calls.jsonl')]
         for path in sorted(paths):
             if path.is_file():
                 data = path.read_bytes()

@@ -177,7 +177,10 @@
         "EXTERNAL:0000003b",
         "EXTERNAL:00000041",
         "EXTERNAL:00000050"
-      ]
+      ],
+      "recovery": {
+        "status": "unrecovered"
+      }
     },
     {
       "entry_va": "004b6710",
@@ -212,7 +215,12 @@
       ],
       "dependencies": [
         "004b6a50"
-      ]
+      ],
+      "recovery": {
+        "status": "native-differential-verified",
+        "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/startup.cpp",
+        "verification_report": "iterations/v2/001-original-recovery/runs/002-cpp-startup/verification.json"
+      }
     },
     {
       "entry_va": "004b6a50",
@@ -761,7 +769,10 @@
         "005a246e",
         "EXTERNAL:00000014",
         "EXTERNAL:0000008c"
-      ]
+      ],
+      "recovery": {
+        "status": "unrecovered"
+      }
     },
     {
       "entry_va": "004b6660",
@@ -835,7 +846,12 @@
         "004b60d0",
         "00531ca0",
         "00569640"
-      ]
+      ],
+      "recovery": {
+        "status": "native-differential-verified",
+        "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/fe_stream.cpp",
+        "verification_report": "iterations/v2/001-original-recovery/runs/003-fe-stream/verification.json"
+      }
     }
   ],
   "statically_reachable_functions": 3093,
@@ -3937,17 +3953,19 @@
   ],
   "complete_reachability": false,
   "next_bundle": [
-    "004b6660",
-    "004b5ee0",
-    "004b60d0",
-    "004b4b80",
-    "004b4cd0"
+    "00531ca0",
+    "00531f90",
+    "00569640",
+    "0059e040",
+    "00533de0",
+    "00533bf0",
+    "00533da0"
   ],
-  "next_proof": "Recover FE stream allocation/layout, fe.txt records, argument opcode producer and dispatch table at 0x5d1e40; trace data before implementing.",
+  "next_proof": "Trace original heap headers/layout/flags and initialization before 004b6a50; recover allocation/resize/free, then grouped file handles and IO used by verified FE stream.",
   "unrecovered": [
     "CRT initialization/termination",
     "app_main 004b6a50",
-    "FE input stream and dispatch",
+    "FE heap/file/locale services and callback effects",
     "render/audio/input initialization",
     "main-loop global state and indirect calls"
   ]

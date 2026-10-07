@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(porsche_v2_recovery_probe LANGUAGES CXX)
+if(NOT MSVC)
+    message(FATAL_ERROR "The measured v2 recovery toolchain is MSVC")
+endif()
 
 if(NOT WIN32)
     message(FATAL_ERROR "v2 native probe build requires Windows/MSVC; no cross-platform game target is defined")
@@ -30,6 +33,11 @@ endif()
 
 add_library(porsche_original STATIC ${PORSCHE_RECOVERED_SOURCES})
 add_executable(recovery_probe "${PORSCHE_RECOVERY_PROBE}")
+add_executable(fe_stream_probe "${PORSCHE_SOURCE_ROOT}/recovered/fe_stream_probe.cpp")
+target_link_libraries(fe_stream_probe PRIVATE porsche_original)
+target_compile_options(fe_stream_probe PRIVATE /W4 /EHsc /permissive-)
+target_link_options(fe_stream_probe PRIVATE /machine:X86 "/MAP:${CMAKE_BINARY_DIR}/fe_stream_probe.map")
+set_target_properties(fe_stream_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(PORSCHE_RECOVERY_TARGET recovery_probe)
 
 target_include_directories(porsche_original PUBLIC "${PORSCHE_RECOVERY_INCLUDE}")
@@ -40,6 +48,7 @@ target_compile_features(recovery_probe PRIVATE cxx_std_17)
 target_compile_definitions(recovery_probe PRIVATE PORSCHE_V2_RECOVERY_PROBE=1)
 
 if(MSVC)
+    target_compile_definitions(porsche_original PRIVATE _CRT_SECURE_NO_WARNINGS)
     target_compile_options(porsche_original PRIVATE /W4 /EHsc /permissive-)
     target_compile_options(recovery_probe PRIVATE /W4 /EHsc /permissive-)
     target_link_options(recovery_probe PRIVATE /machine:X86 "/MAP:${CMAKE_BINARY_DIR}/recovery_probe.map")
