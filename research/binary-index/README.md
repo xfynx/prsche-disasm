@@ -4,6 +4,14 @@
 Индексы — обычный текст под Git, доступный `rg` и всем исполнителям.
 Правило закреплено в [AGENTS.md](../../AGENTS.md).
 
+С 2026-10-08 полный корпус восстановления v2 (включая отдельный NE анализ)
+находится в [research/v2/binaries](../v2/binaries), адресный каталог —
+[source/catalog](../../iterations/v2/001-original-recovery/source/catalog/modules.json).
+Прежний индекс ниже сохраняет PE строки/ссылки/call graph; каталог v2 ведёт
+к листингам, данным и автоматическому псевдо-C всех 25 уникальных модулей.
+`scripts/research/structure-v2.py --extract Porsche.exe --address 0x4b6660 --output local/experiments/v2-fe-stream/004b6660.c`
+извлекает материал для восстановления; это ещё не подтверждённый C++.
+
 ## Покрытие
 
 [coverage.json](coverage.json) сопоставляет пути и SHA256 с результатами анализа.

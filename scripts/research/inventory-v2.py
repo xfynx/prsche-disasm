@@ -23,6 +23,9 @@ def main():
     parser.add_argument('--require-listing', action='store_true')
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
+    parser.add_argument('--verification-output', type=Path,
+                        default=ITERATION/'runs/002-cpp-startup/corpus-verification.json',
+                        help='Current checkpoint report; Run 001 historical hashes are preserved')
     args = parser.parse_args()
     original = ROOT / 'local/game'
     old = load(ROOT / 'research/binary-index/coverage.json')
@@ -78,6 +81,33 @@ def main():
         entry['listing'] = listing or {'status':'not-exported'}
         entry['automatic_decompilation'] = decompile or {'status':'not-exported'}
         binaries[sha] = entry
+    recovered = load(ITERATION/'source/recovered/functions.json') or {'functions': []}
+    seen = set()
+    for function in recovered['functions']:
+        key = (function['sha256'], function['entry_va'])
+        if key in seen or key[0] not in binaries:
+            raise RuntimeError(f'Duplicate or unknown recovered function: {key}')
+        seen.add(key)
+        source = ROOT/function['source']
+        if not source.is_file():
+            raise RuntimeError(f'Recovered source is missing: {source}')
+        entry = binaries[key[0]]
+        indexed = {json.loads(line)['entry_va'] for line in
+                   (ROOT/entry['export_directory']/'functions.jsonl').read_text(encoding='utf8').splitlines()}
+        if key[1] not in indexed:
+            raise RuntimeError(f'Recovered function is absent from corpus: {key}')
+        if function['status'] == 'native-differential-verified':
+            verification = load(ROOT/function['verification_report'])
+            source_sha = hashlib.sha256(source.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
+            if not verification or verification['sha256'] != key[0] or verification['function_va'] != key[1] or not verification['native_cpp_equal_original_x86'] or verification['source_sha256'].get(function['source']) != source_sha:
+                raise RuntimeError(f'Missing/stale native verification: {key}')
+            for relative, expected_sha in verification['source_sha256'].items():
+                dependency = ROOT/relative
+                if not dependency.is_file() or hashlib.sha256(dependency.read_bytes().replace(b'\r\n', b'\n')).hexdigest() != expected_sha:
+                    raise RuntimeError(f'Stale verified source dependency: {relative}')
+            entry['recovered_functions'] += 1
+        if function.get('binary_matched'):
+            raise RuntimeError('Binary-match evidence validation has not been implemented; do not count unchecked claims')
     entries = list(binaries.values())
     listing_done = sum(bool(e['listing'].get('complete_listing_of_analyzed_instructions')) for e in entries)
     decompile_done = sum(bool(e['automatic_decompilation'].get('attempted_all_functions')) for e in entries)
@@ -89,7 +119,8 @@ def main():
               'automatic_pseudo_c_functions':sum(e['automatic_decompilation'].get('pseudo_c_functions',0) for e in entries),
               'decompile_failures':sum(e['automatic_decompilation'].get('failed',0) for e in entries),
               'pseudo_c_warning_functions':sum(e['automatic_decompilation'].get('warning_functions',0) for e in entries),
-              'recovered_functions':0,'matched_functions':0,'matched_modules':0}
+              'recovered_functions':sum(e['recovered_functions'] for e in entries),
+              'matched_functions':0,'matched_modules':0}
     output = {'schema':1,'snapshot_date':'2026-10-08','generation':'v2',
               'v1_checkpoint':'dc6b9d8','original_data':'local/game (read-only)',
               'reference_method':'matching source recovery; native Windows/x86 baseline before portable adaptation',
@@ -109,7 +140,11 @@ def main():
         hashes = {}
         paths = list((ROOT/'research/v2/binaries').rglob('*')) + [target]
         paths += [ROOT/p for p in ('scripts/research/export-v2.ps1',
-                  'scripts/research/inventory-v2.py','scripts/research/ghidra/ExportRecoveryCorpus.java')]
+                  'scripts/research/inventory-v2.py','scripts/research/ghidra/ExportRecoveryCorpus.java',
+                  'scripts/build-v2.ps1','scripts/research/structure-v2.py',
+                  'scripts/research/trace-v2-startup.py','scripts/research/verify-v2-startup.py')]
+        paths += list((ITERATION/'source').rglob('*'))
+        paths += [ITERATION/'CMakeLists.txt', ITERATION/'reference/startup.json']
         for path in sorted(paths):
             if path.is_file():
                 data = path.read_bytes()
@@ -125,15 +160,14 @@ def main():
             'pe_export':'cached analyzed project, noanalysis/readOnly',
             'ne_export':'separate NeLoader project, subsequent readOnly decompile',
             'exporter_compilation_check':'drvmgt.dll full listing succeeded after SHA/resume guards',
-            'new_v2_executable':False,'recovered_compilable_source':False,
+            'new_v2_game_executable':False,'recovered_compilable_source':counts['recovered_functions'] > 0,
             'original_native_behavior_acceptance':False,'files':hashes,
             'limitations':['Automatic pseudo-C is not recovered compilable source.',
                 'Four functions failed/timed out; details remain in the manifest.',
                 'Warnings and unclassified executable bytes remain unresolved.',
                 'Exact original compiler/CRT/flags/layout are not confirmed.']}
-        run = ITERATION/'runs/001-full-corpus'
-        run.mkdir(parents=True,exist_ok=True)
-        (run/'verification.json').write_text(json.dumps(verification,indent=2)+'\n',encoding='utf-8',newline='\n')
+        args.verification_output.parent.mkdir(parents=True,exist_ok=True)
+        args.verification_output.write_text(json.dumps(verification,indent=2)+'\n',encoding='utf-8',newline='\n')
 
 
 if __name__ == '__main__':
