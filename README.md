@@ -1,5 +1,11 @@
 # Need for Speed: Porsche Unleashed — открытый движок и просмотрщик
 
+**Активная разработка с 2026-10-08: [v2 — восстановление полного оригинала](iterations/v2/001-original-recovery/README.md).**
+Сначала полный корпус бинарников и собираемый Windows/x86 original baseline,
+после — современный native/web порт. v1 сохранена в `dc6b9d8`; 012 не завершена,
+её дальнейшая интеграция остановлена. Каталоги v2 отделены в итерациях и сборках.
+Ниже — исторические результаты прежнего пути; новый v2 EXE ещё не создан.
+
 [Run 019 внутри 012](iterations/012-campaign-fidelity/runs/019-original-contact-runtime/README.md):
 исходные EDG подключены к общему дереву с опорами дороги. 3 дерева / 27 queries,
 8 body contacts, 45 responses, 5+29 wheel-state cases сверены с x86. 220 тестов,
@@ -19,7 +25,7 @@ Canyon и 21 общий browser check прошли. Запуск новой сб
 
 Современная независимая реализация игрового движка **Need for Speed: Porsche Unleashed** (NFS 5, 2000) на **Rust + wgpu + winit** для Windows, Linux, macOS и браузера (WebAssembly / WebGPU).
 
-Активная итерация: **[012-campaign-fidelity](iterations/012-campaign-fidelity/README.md)**. Последний завершённый снимок: [011-factory-driver](iterations/011-factory-driver/README.md), тег `iteration-011`. Снимки 001–011 заморожены; прежние отчёты не подтверждают полного совпадения с оригиналом 1:1.
+Активная итерация: **[v2/001-original-recovery](iterations/v2/001-original-recovery/README.md)**. Предыдущая [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md) сохранена незавершённой. Последний завершённый v1 снимок: [011-factory-driver](iterations/011-factory-driver/README.md), тег `iteration-011`. Снимки 001–011 заморожены; прежние отчёты не подтверждают полного совпадения с оригиналом 1:1.
 Полный перенос, включая Evolution, Factory Driver и остальные режимы: [дорожная карта](docs/roadmap.md).
 Документация проекта: [План работ](PLAN.md) &bull; [Текущее состояние](STATUS.md) &bull; [Сборка](docs/building.md) &bull; [Форматы топологии](docs/track-topology-formats.md) &bull; [Роли агентов](docs/agents.md).
 
