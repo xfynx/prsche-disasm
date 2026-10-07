@@ -850,7 +850,7 @@
       "recovery": {
         "status": "native-differential-verified",
         "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/fe_stream.cpp",
-        "verification_report": "iterations/v2/001-original-recovery/runs/003-fe-stream/verification.json"
+        "verification_report": "iterations/v2/001-original-recovery/runs/004-original-heap/fe-regression/verification.json"
       }
     }
   ],
@@ -3953,19 +3953,21 @@
   ],
   "complete_reachability": false,
   "next_bundle": [
-    "00531ca0",
-    "00531f90",
-    "00569640",
     "0059e040",
     "00533de0",
     "00533bf0",
-    "00533da0"
+    "00533da0",
+    "00533c20",
+    "00568b90",
+    "00568ae0",
+    "00568b10"
   ],
-  "next_proof": "Trace original heap headers/layout/flags and initialization before 004b6a50; recover allocation/resize/free, then grouped file handles and IO used by verified FE stream.",
+  "next_proof": "Trace grouped file handles, completion/status callbacks and disk/archive backends; recover FE open/read/size/close services, then verify FE with original heap and IO together.",
   "unrecovered": [
     "CRT initialization/termination",
     "app_main 004b6a50",
-    "FE heap/file/locale services and callback effects",
+    "heap OS/CRT/optimized-copy callees and startup binding",
+    "FE file/locale services and callback effects",
     "render/audio/input initialization",
     "main-loop global state and indirect calls"
   ]

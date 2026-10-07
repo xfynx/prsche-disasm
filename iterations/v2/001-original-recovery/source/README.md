@@ -10,12 +10,17 @@
   формирования и применения FE записей; 236 native/x86 сравнений.
 - `recovered/Porsche.exe/fe_tables.inc`: типизированные данные из исходного PE,
   повторяемый экспорт `scripts/research/export-v2-fe-tables.py`.
+- `recovered/Porsche.exe/heap.cpp`: 11 функций собственного heap и helpers;
+  551 сравнение состояния арены после каждой операции. `include/porsche/heap.hpp`
+  сохраняет исходный 16-байтовый header и 64-байтовый control block.
 - `recovered/functions.json`: реестр ручных функций, зависимостей и свидетельств.
 - `recovered/sources.cmake`: явный список исходников библиотеки `porsche_original`.
 - `recovered/recovery_probe.cpp`: отдельный консольный стенд; записывающая
   замена пока не восстановленного `0x4b6a50` существует только здесь.
 - `recovered/fe_stream_probe.cpp`: отдельный стенд FE; file/heap/callback
   записи и сравнение строк не добавляются в библиотеку оригинала.
+- `recovered/heap_probe.cpp`: сравнение полного heap; фиксированная VA арены
+  применяется только в стенде, внешние OS/CRT/SIMD вызовы записываются.
 - `catalog`: адресный каталог всех модулей и функций, байтовые диапазоны
   псевдо-C, пути данных/листингов/вызовов/импортов и статусы восстановления.
 
@@ -25,10 +30,12 @@
 
 ```powershell
 py -3 scripts/research/structure-v2.py
-py -3 scripts/research/structure-v2.py --extract Porsche.exe --address 0x531ca0 --output local/experiments/v2-heap/00531ca0.c
+py -3 scripts/research/structure-v2.py --extract Porsche.exe --address 0x59e040 --output local/experiments/v2-files/0059e040.c
 ```
 
 `porsche_original.lib` содержит восстановленные объекты и ещё имеет
-неразрешённые зависимости; это не готовая игра. Десять функций проверены в
+неразрешённые зависимости; это не готовая игра. 21 функция проверена в
 зафиксированных границах стендов. Это не подтверждает UI, физику, main loop,
-оригинальные службы памяти/файлов или байтовое совпадение EXE.
+внешние OS/CRT/SIMD/file callees или байтовое совпадение EXE. Актуальные
+свидетельства FE после уточнения ABI free — runs/004-original-heap/fe-regression;
+старый Run 003 сохраняет хеши исходников на момент своего checkpoint.

@@ -14,14 +14,14 @@ extern char fe_car_names_005d61e8[][7];
 extern std::uint32_t fe_enabled_0065b298;
 extern std::uint32_t fe_action_state_005e9130[0x21e];
 
-// Still unresolved original CRT / allocator / file-system boundaries.
+// Original service declarations; recovery status is in recovered/functions.json.
 std::int32_t __cdecl compare_005ae3c0(const char*, const char*);
 void __cdecl open_0059e040(const char*, std::uint32_t, std::uint32_t, void**);
 std::int32_t __cdecl size_00533de0(void*, std::uint32_t);
 void __cdecl read_00533bf0(void*, std::uint32_t, void*, std::uint32_t, std::uint32_t);
 void __cdecl close_00533da0(void*, std::uint32_t);
 void* __cdecl allocate_00531ca0(const char*, std::int32_t, std::uint32_t);
-void __cdecl free_00531f90(void*);
+std::uint32_t __cdecl free_00531f90(void*);
 void* __cdecl resize_00569640(void*, std::int32_t);
 
 std::uint32_t __cdecl fe_read_token_004b51e0(char**, char, std::int16_t, char*);

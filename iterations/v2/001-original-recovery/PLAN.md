@@ -2,8 +2,8 @@
 
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
-Владелец — координатор. Run 003 завершён; инвентарь/экспорт таблиц исполнителя
-v2_build принят. Активных поручений исполнителям нет.
+Владелец — координатор. Run 004 завершён: heap init/alloc/free/resize и helpers
+сверены с x86. Стенд исполнителя heap_probe принят; активных поручений нет.
 
 ## Цель и готовность 001
 
@@ -87,29 +87,55 @@ compare исполнен в C locale, native стенд проверяет ра�
 Это не восстановление эффектов callbacks, VFS, allocator или смены locale.
 Реальный игровой запуск и визуальная приёмка открыты.
 
+## Выполнено в Run 004
+
+Восстановлены 11 функций собственного heap: 0x5697f0 init,
+0x531ca0 allocation, 0x531f90 free, 0x569640 resize;
+helpers 0x531c60/0x5320b0/0x556620/0x556650/0x56e2c0/0x5323e0/0x5b0000.
+Запрос индекса: FE allocation/free/resize → callers/callees → ссылки
+таблицы 0x6b4f20 → constructor 0x5697f0 и startup wrapper 0x5aef80.
+Исходные VA/ranges/calls, globals и toolchain сохранены в runs/004-original-heap.
+
+Все 551 случай совпали с исходным x86: полная арена после каждого шага,
+включая физические headers, свободные списки, payload, suffix/name/guard,
+returns и внешние вызовы. Flag 0x10 выбирает верхний конец, 0x20 — самый
+большой подходящий блок; граница split строго >0x40. Resize сохраняет pointer,
+может ограничить рост доступным соседним пространством; -1 запрашивает максимум.
+16-byte header / 64-byte control block подтверждены native/x86 сравнением.
+005deb10 исходно равен 1, остальные copy flags равны 0 — проверены по PE данным.
+
+Исправлен ABI free (возврат 1); 236 FE регрессий повторены в новом
+runs/004-original-heap/fe-regression, реестр ссылается на новые SHA.
+Run 001–003 сохранены как исторические. Итого 21 проверенная ручная функция.
+В библиотеке FE allocator/free/resize теперь разрешаются в heap.cpp;
+FE regression всё ещё использует свой записывающий heap. Совместное FE/heap/IO
+исполнение ещё не проверено. CRT formatting/fill, OS locks, SIMD-copy targets
+и allocation-failure callback проверены на записывающих границах, не восстановлены.
+
 ## Текущий шаг и передача
 
 Владелец — координатор; активных исполнителей нет. Следующий цельный пакет:
-heap/file службы FE 0x531ca0/0x531f90/0x569640 и 0x59e040/0x533de0/
-0x533bf0/0x533da0, их инициализация и подключение к 0x4b6a50.
-Первый конкретный шаг: извлечь 0x531ca0 и его callers/callees из индекса,
-проследить header/layout/flags (FE stream использует 0x10), начальное heap
-состояние, resize/free; связать с порядком startup. Не заменять calloc/realloc.
-После доказательства — C++, сверка входов/метаданных/выделенного состояния;
-затем файловый слой с исходными группами/handles и FE без записывающих замен.
+файловые службы 0x59e040/0x533de0/0x533bf0/0x533da0, группы handles,
+completion/status и disk/archive backend. Уже просмотрены wrappers:
+size → 0x568b90, close → 0x568ae0; затем 0x567f70/0x567df0.
+read → 0x533c20 с callback 0x568b10. Это не прямые fopen/fread/fclose.
+Первый конкретный шаг: извлечь 0x59e040/0x533c20 и перечисленные callees,
+установить handle layout, группу 100, mode 1, порядок completion и backend.
+После доказательства — C++, сверка; затем совместный FE/heap/IO и startup
+0x4b6a50. OS/CRT/SIMD heap callees и инициализация до main остаются открытыми.
 CRT/0x4b6a50/main-loop/render/audio/input,
 четыре ошибки декомпиляции и unclassified executable bytes остаются открытыми.
 
 Команды проверки:
 
 ```powershell
-py -3 scripts/research/export-v2-fe-tables.py
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
-py -3 scripts/research/verify-v2-fe-stream.py
+py -3 scripts/research/verify-v2-heap.py
+py -3 scripts/research/verify-v2-fe-stream.py --report-dir iterations/v2/001-original-recovery/runs/004-original-heap/fe-regression
 py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts
 py -3 scripts/research/structure-v2.py
 py -3 scripts/research/trace-v2-startup.py
-py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification --verification-output iterations/v2/001-original-recovery/runs/003-fe-stream/corpus-verification.json
+py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification --verification-output iterations/v2/001-original-recovery/runs/004-original-heap/corpus-verification.json
 ```
 
 MSVC 19.44.35229 собирает x86; это не доказанный исходный MSVC/CRT/flags.

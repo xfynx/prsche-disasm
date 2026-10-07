@@ -59,9 +59,10 @@ void* __cdecl allocate_00531ca0(const char* name,std::int32_t size,std::uint32_t
     if (flags==0x10) std::memset(a->pointer,0xcc,size);
     void* result=a->pointer; allocations.push_back(std::move(a)); return result;
 }
-void __cdecl free_00531f90(void* p) {
+std::uint32_t __cdecl free_00531f90(void* p) {
     auto it=std::find_if(allocations.begin(),allocations.end(),[p](const auto& a) { return a->pointer==p; });
     calls.push_back("[\"free\","+quoted((*it)->name.c_str())+"]");
+    return 1;
 }
 void* __cdecl resize_00569640(void* p,std::int32_t size) {
     calls.push_back("[\"resize\","+std::to_string(size)+"]"); used=size; return p;

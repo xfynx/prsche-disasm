@@ -103,5 +103,20 @@ py -3 scripts/research/structure-v2.py
 py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification --verification-output iterations/v2/001-original-recovery/runs/003-fe-stream/corpus-verification.json
 ```
 
-Следующий пакет — исходные heap/file службы FE, их инициализация и связь
-со startup 0x4b6a50; точные адреса и первый шаг — [в плане](PLAN.md).
+[Run 004](runs/004-original-heap/README.md): восстановлены 11 функций собственного
+heap: создание, выделение с двух концов, выбор максимального подходящего блока,
+free со слиянием, resize без перемещения указателя и helpers. Все 551 случай
+совпали с оригинальным x86 по всей арене после каждой операции. ABI free
+уточнён (возврат 1), 236 FE регрессий повторены в новом run; старые отчёты сохранены.
+Всего 21 проверенная ручная функция, 0 байтовых совпадений/целых модулей.
+OS/CRT/оптимизированные копировщики пока внешние зависимости.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
+py -3 scripts/research/verify-v2-heap.py
+py -3 scripts/research/verify-v2-fe-stream.py --report-dir iterations/v2/001-original-recovery/runs/004-original-heap/fe-regression
+```
+
+Следующий пакет — файловые службы FE, группы handles и completion/status;
+затем совместная проверка FE/heap/IO и связь со startup 0x4b6a50.
+Точные адреса и первый шаг — [в плане](PLAN.md).

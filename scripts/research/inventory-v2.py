@@ -24,7 +24,7 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/003-fe-stream/corpus-verification.json',
+                        default=ITERATION/'runs/004-original-heap/corpus-verification.json',
                         help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
     original = ROOT / 'local/game'
@@ -144,12 +144,15 @@ def main():
                   'scripts/research/inventory-v2.py','scripts/research/ghidra/ExportRecoveryCorpus.java',
                   'scripts/build-v2.ps1','scripts/research/structure-v2.py',
                   'scripts/research/trace-v2-startup.py','scripts/research/verify-v2-startup.py',
-                  'scripts/research/export-v2-fe-tables.py','scripts/research/verify-v2-fe-stream.py')]
+                  'scripts/research/export-v2-fe-tables.py','scripts/research/verify-v2-fe-stream.py',
+                  'scripts/research/verify-v2-heap.py')]
         paths += list((ITERATION/'source').rglob('*'))
         paths += [ITERATION/'CMakeLists.txt', ITERATION/'reference/startup.json']
         paths += [ROOT/p for p in sorted({f['verification_report'] for f in recovered['functions']})]
         paths += [ITERATION/'runs/003-fe-stream'/name for name in
                   ('tables.json', 'resource-inventory.json', 'source-functions.jsonl', 'source-calls.jsonl')]
+        paths += [ITERATION/'runs/004-original-heap'/name for name in
+                  ('source-functions.jsonl', 'source-calls.jsonl', 'heap-table-references.jsonl', 'toolchain.json', 'globals.json')]
         for path in sorted(paths):
             if path.is_file():
                 data = path.read_bytes()

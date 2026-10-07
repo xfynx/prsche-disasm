@@ -158,6 +158,7 @@ def original(case,module,data,functions,definitions):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int)
+    parser.add_argument('--report-dir',type=Path,default=RUN,help='Preserve historical checks by selecting a new run directory')
     args=parser.parse_args()
     module=next(r for r in map(json.loads,(ROOT/'research/binary-index/static/binaries.jsonl').read_text(encoding='utf8').splitlines()) if r['file']=='Porsche.exe')
     data=(ROOT/'local/game'/module['path']).read_bytes()
@@ -195,9 +196,10 @@ def main():
                 'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
                 'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),
                 'fixtures':fixtures}
-        (RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8',newline='\n')
+        args.report_dir.mkdir(parents=True,exist_ok=True)
+        (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8',newline='\n')
         indexed=[{'sha256':module['sha256'],**functions[va]} for va in sorted(coverage)]
-        (RUN/'source-functions.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in indexed),encoding='utf8',newline='\n')
+        (args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in indexed),encoding='utf8',newline='\n')
 
 
 if __name__=='__main__':main()
