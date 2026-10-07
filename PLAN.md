@@ -1,5 +1,12 @@
 # План восстановления Porsche Unleashed
 
+2026-10-08: по запросу пользователя сохраняем 012 как есть и меняем подход.
+Run 020: 47 original four-wheel loops / 188 состояний совпали с Rust;
+221 tests (3 ignored), fmt/clippy/wasm32/native/web и 3 Quick Race прошли.
+Общий browser прогон Run 020 не завершён. Игровой force adapter сохраняется,
+012 не закрыта. Дальнейший перенос в 012 остановлен для разработки v2.
+Run 019 запушен: 13b70f1.
+
 Run 019, 2026-10-06: исходные EDG подключены к общему дереву игровых опор.
 3 mixed trees / 27 EDG queries, 8 body selections, 45 complete responses,
 5 height branches / 29 material states совпали с x86. 220 Rust tests, 3 ignored;

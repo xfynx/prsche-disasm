@@ -1,5 +1,12 @@
 # Состояние проекта
 
+2026-10-08: пользователь попросил закоммитить текущее состояние и перейти
+к отдельной v2 с полным восстановлением бинарников. 012 сохраняется незавершённой.
+Run 020: 47 исходных four-wheel loops / 188 состояний совпали с Rust.
+221 tests (3 ignored), fmt/clippy/wasm32/native/web и 3 Quick Race прошли.
+Общий browser прогон Run 020 не завершён; force adapter/binding открыты.
+Run 019 запушен: 13b70f1. Дальнейшие игровые правки 012 остановлены.
+
 Run 019, 2026-10-06: общие polygon+EDG tree и wheel support работают в игре.
 3 дерева / 27 EDG queries, 8 body selections, 45 scene-dependent responses,
 5 height / 29 material-state cases совпали с x86. 220 tests (3 ignored),

@@ -59,6 +59,17 @@ pub fn advance_material_height(
     material_flags: u32,
     rng: &mut MaterialRandomState,
 ) -> f32 {
+    advance_material_height_unrounded(state, car_gate, car_speed, material_flags, rng) as f32
+}
+
+// 0x499730 returns an x87 value. A caller may add it before storing to f32.
+pub(super) fn advance_material_height_unrounded(
+    state: &mut MaterialHeightState,
+    car_gate: f32,
+    car_speed: f32,
+    material_flags: u32,
+    rng: &mut MaterialRandomState,
+) -> f64 {
     if car_gate < f32::from_bits(0x3f5c28f6) {
         return 0.0;
     }
@@ -83,6 +94,6 @@ pub fn advance_material_height(
             - random_word as f64 * amplitude as f64 * (1.0 / 65536.0))
             as f32;
     }
-    ((state.current as f64 - state.previous as f64) * (state.phase as f64 / period as f64)
-        + state.previous as f64) as f32
+    (state.current as f64 - state.previous as f64) * (state.phase as f64 / period as f64)
+        + state.previous as f64
 }

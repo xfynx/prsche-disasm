@@ -20,6 +20,7 @@ pub mod original_support_loader;
 pub mod original_support_material;
 pub mod original_support_owner;
 pub mod original_support_tree;
+pub mod original_wheel_loop;
 pub mod original_wheel_state;
 pub mod powertrain;
 pub mod rigid_body;
