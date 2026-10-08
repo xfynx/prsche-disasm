@@ -19,7 +19,8 @@ FirstThunk + ordinal_index*4, независимо от положения Origi
 
 Run010: trampoline 0x55f4f0..0x55f552 дополнен в manual-functions.jsonl;
 SHA/RET4/priority/IAT — [thread-index.json](../../iterations/v2/001-original-recovery/runs/010-file-threads/thread-index.json).
-Всего шесть supplementary функций; полный каталог v2 содержит 36593 записи.
+Run012: Button callback 0x4119e0..0x411a40 дополнен по body SHA/двум RET.
+Всего семь supplementary функций; полный каталог v2 содержит 36594 записи.
 
 ## Покрытие
 

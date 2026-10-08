@@ -223,3 +223,27 @@ CRT/main-loop/render/audio/input, compiler/flags, четыре decompile errors 
 unclassified bytes открыты. MSVC 19.44.35229 — измеренный современный инструмент,
 не доказанный оригинальный compiler. local/game только читается.
 Игровой EXE и visual acceptance отсутствуют; итерация не закрыта.
+
+2026-10-09: Run010 checkpoint 6839d44 запушен. Оба агента возобновлены после quota;
+11 targets подключены. FE callback ABI исправлен на u32 EAX=0 по Run012;
+затронутые proofs повторяются в свежих Run012 regression folders.
+
+Run013: fe_callbacks (worker, gpt-6-sol medium) — новые input_state header/source/probe,
+verifier и run; 532e10/56fce0/56fd00/56fd30, controlled DirectInput vtables.
+Run014: heap_locks (worker, gpt-6-sol medium) — новые lock header/source/probe,
+verifier и run; 5321f0/532250/5322b0/5322c0/5322d0, exact pool и Win32 calls.
+Координатор владеет общими файлами, checkpoints и следующим joint disk binding.
+
+## Выполнено в Run011/012 — 2026-10-09
+
+4 disk consumers сверены на31 случаях, 3 FE callbacks на1320.
+Ближайшие consumers подтверждены индексом; Button4119e0 вручную дополнен
+по body SHA/97bytes/двум RET, каталог36594 (7 supplementary).
+FE callback u32 ABI изменён в header/table/exporter/probes. Все затронутые
+proofs повторены в новых Run012 regression folders; registry обновлён.
+Всего92 verified функций,11 собираемых стендов. OS I/O/concurrency/getstate
+пока явные boundaries. Игрового EXE и visual acceptance нет.
+Диск-backend Run011 принят; следующий disk_backend Run016 — только новые
+physical-open файлы и x86 fixtures. Run013 input и Run014 locks активны.
+Координатор: checkpoint Run011/012, build новых targets, joint disk/callback
+binding в Run015. Незавершённые agent sources исключены из corpus manifest.

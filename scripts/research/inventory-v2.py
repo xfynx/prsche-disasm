@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/010-file-threads/corpus-verification.json',
+                        default=ITERATION/'runs/012-fe-callbacks/corpus-verification.json',
                         help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
     verification_output = args.verification_output if args.verification_output.is_absolute() else ROOT / args.verification_output
@@ -153,7 +153,7 @@ def main():
               'pseudo_c_warning_functions':sum(e['automatic_decompilation'].get('warning_functions',0) for e in entries),
               'recovered_functions':sum(e['recovered_functions'] for e in entries),
               'matched_functions':0,'matched_modules':0}
-    output = {'schema':1,'snapshot_date':'2026-10-08','generation':'v2',
+    output = {'schema':1,'snapshot_date':'2026-10-09','generation':'v2',
               'v1_checkpoint':'dc6b9d8','original_data':'local/game (read-only)',
               'reference_method':'matching source recovery; native Windows/x86 baseline before portable adaptation',
               'counts':counts,'binaries':entries,
@@ -190,6 +190,9 @@ def main():
         paths += [path for path in (ITERATION/'runs/009-file-events').rglob('*') if path.resolve() != verification_output.resolve()]
         paths += [ROOT/'scripts/research/index-v2-threads.py', ROOT/'scripts/research/verify-v2-file-threads.py']
         paths += [path for path in (ITERATION/'runs/010-file-threads').rglob('*') if path.resolve() != verification_output.resolve()]
+        paths += [ROOT/'scripts/research/verify-v2-file-disk.py', ROOT/'scripts/research/verify-v2-fe-callbacks.py']
+        for run_name in ('011-file-disk','012-fe-callbacks'):
+            paths += [path for path in (ITERATION/'runs'/run_name).rglob('*') if path.resolve() != verification_output.resolve()]
         # Pending parallel work is excluded until its dependency hashes are accepted.
         paths += list((ITERATION/'source/catalog').rglob('*'))
         paths += [ITERATION/'source/recovered/functions.json', ITERATION/'source/recovered/sources.cmake']
@@ -210,7 +213,7 @@ def main():
                 hashes[path.relative_to(ROOT).as_posix()] = {
                     'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),
                     'hash_text_normalization':'CRLF to LF' if source_script else 'none; corpus stored as LF'}
-        verification = {'schema':1,'date':'2026-10-08','counts':counts,
+        verification = {'schema':1,'date':'2026-10-09','counts':counts,
             'original_input_hashes_verified':True,'all_listing_files_present':True,
             'all_function_status_counts_verified':True,'ghidra':'12.1.3',
             'pe_export':'cached analyzed project, noanalysis/readOnly',

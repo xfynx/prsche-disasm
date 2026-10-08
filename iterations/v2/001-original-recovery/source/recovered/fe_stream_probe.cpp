@@ -31,9 +31,9 @@ std::string quoted(const char* p) { return '"'+hex(p,std::strlen(p))+'"'; }
 void callback(int index,std::int32_t value) { calls.push_back("[\"callback\","+std::to_string(index)+","+std::to_string(value)+"]"); }
 }
 namespace porsche {
-void __cdecl callback_004119e0(std::int32_t v) { callback(2,v); }
-void __cdecl callback_00411a80(std::int32_t v) { callback(5,v); }
-void __cdecl callback_00411b40(std::int32_t v) { callback(1,v); }
+std::uint32_t __cdecl callback_004119e0(std::int32_t v) { callback(2,v); return 0; }
+std::uint32_t __cdecl callback_00411a80(std::int32_t v) { callback(5,v); return 0; }
+std::uint32_t __cdecl callback_00411b40(std::int32_t v) { callback(1,v); return 0; }
 std::int32_t __cdecl compare_005ae3c0(const char* a,const char* b) {
     auto lower=[](unsigned char c) { return c>='A' && c<='Z' ? c+32 : c; };
     while (*a && lower(static_cast<unsigned char>(*a))==lower(static_cast<unsigned char>(*b))) { ++a; ++b; }

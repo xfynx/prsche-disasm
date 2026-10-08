@@ -95,7 +95,7 @@ def original(input_line,module,data,functions):
             'arena':bytes(uc.mem_read(ARENA,0x1000)).hex(),'calls':calls},coverage
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int);args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int);parser.add_argument('--report-dir',type=Path,default=RUN);args=parser.parse_args();report_dir=args.report_dir if args.report_dir.is_absolute() else ROOT/args.report_dir
     module=next(x for x in map(json.loads,(ROOT/'research/binary-index/static/binaries.jsonl').read_text().splitlines()) if x['file']=='Porsche.exe')
     data=(ROOT/'local/game'/module['path']).read_bytes()
     if hashlib.sha256(data).hexdigest()!=module['sha256']:raise RuntimeError('Original SHA differs')
@@ -125,8 +125,8 @@ def main():
             'boundaries':{'Win32':'CreateEvent/SetEvent/ResetEvent/WaitForMultipleObjectsEx/CloseHandle/GetLastError/SleepEx use recording stdcall endpoints; no real scheduler or OS event semantics.'},
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
-    RUN.mkdir(parents=True,exist_ok=True)
-    (RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
-    (RUN/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage)),newline='\n')
+    report_dir.mkdir(parents=True,exist_ok=True)
+    (report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
+    (report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage)),newline='\n')
 
 if __name__=='__main__':main()

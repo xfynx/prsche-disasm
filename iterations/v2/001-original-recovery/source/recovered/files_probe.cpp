@@ -32,7 +32,7 @@ void reset_list(IoList&l,void*lock){std::memset(&l,0,sizeof(l));l.lock=lock;}
 
 namespace porsche {
 std::int32_t __cdecl compare_005ae3c0(const char*a,const char*b){while(*a&&*b){auto x=(unsigned char)*a++,y=(unsigned char)*b++;if(x>='A'&&x<='Z')x+=32;if(y>='A'&&y<='Z')y+=32;if(x!=y)return x-y;}return (unsigned char)*a-(unsigned char)*b;}
-void __cdecl callback_004119e0(std::int32_t){} void __cdecl callback_00411a80(std::int32_t){} void __cdecl callback_00411b40(std::int32_t){}
+std::uint32_t __cdecl callback_004119e0(std::int32_t){return 0;} std::uint32_t __cdecl callback_00411a80(std::int32_t){return 0;} std::uint32_t __cdecl callback_00411b40(std::int32_t){return 0;}
 void __cdecl heap_enter_005322b0(void*p){rec("[\"enter\","+std::to_string((std::uintptr_t)p)+"]");}
 void __cdecl heap_leave_005322c0(void*p){rec("[\"leave\","+std::to_string((std::uintptr_t)p)+"]");}
 void* __cdecl heap_lock_create_005321f0(){rec("[\"create\"]");return nullptr;}

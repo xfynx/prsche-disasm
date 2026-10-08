@@ -5,7 +5,7 @@
 namespace porsche {
 struct FeDefinition { std::int32_t opcode; std::uint32_t* target; const char* name; };
 struct FeValue { const char* name; std::uint32_t value; };
-struct FeAction { const char* name; std::uint32_t prepare_va; void (__cdecl* apply)(std::int32_t); };
+struct FeAction { const char* name; std::uint32_t prepare_va; std::uint32_t (__cdecl* apply)(std::int32_t); };
 static_assert(sizeof(FeDefinition)==12 && sizeof(FeValue)==8 && sizeof(FeAction)==12);
 extern FeDefinition fe_definitions_005d1e40[];
 extern FeValue fe_values_005d63a0[];

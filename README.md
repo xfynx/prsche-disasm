@@ -1,11 +1,12 @@
 # Need for Speed: Porsche Unleashed — восстановление оригинала
 
-Текущий результат — [Run010](iterations/v2/001-original-recovery/runs/010-file-threads/README.md): **85 проверенных C++ функций**.
-10 thread registry/init/start/bootstrap/identity/priority функций совпали с x86
-на 94 случаях; event wrappers включены в общий FE/heap/IO, 89 сравнений прошли.
-Девять MSVC Win32 стендов собираются; игровой EXE пока не восстановлен.
-Run011 disk backend и Run012 FE callbacks разбираются независимыми агентами.
-Далее thread shutdown/exit, общий thread binding и startup.
+Текущий результат — [Run012](iterations/v2/001-original-recovery/runs/012-fe-callbacks/README.md): **92 проверенные C++ функции**.
+Run011: 4 disk read/seek/close/info функции, 31 сравнение с x86.
+Run012: 3 FE callbacks, 1320 сравнений; исходный u32 callback ABI исправлен.
+Все затронутые регрессии прошли: heap551/FE236/device474/worker69/wait87/
+events249/threads94/joint89. Одиннадцать MSVC Win32 стендов собираются.
+Три агента продолжают DirectInput, блокировки heap/очередей и physical open.
+Игрового EXE пока нет; следующий общий пакет — joint disk/callback binding.
 
 **Активная разработка с 2026-10-08: [v2 — восстановление полного оригинала](iterations/v2/001-original-recovery/README.md).**
 Сначала полный корпус бинарников и собираемый Windows/x86 original baseline,

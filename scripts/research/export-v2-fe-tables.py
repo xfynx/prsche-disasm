@@ -134,7 +134,7 @@ def export(output: Path, provenance: Path) -> dict:
         else:
             lines.append(f"std::uint32_t global_{target:08x} = 0x{target_words[target]:08x}u;")
     for callback in callbacks:
-        lines.append(f"extern void __cdecl callback_{callback:08x}(std::int32_t);")
+        lines.append(f"extern std::uint32_t __cdecl callback_{callback:08x}(std::int32_t);")
     lines.append("")
     lines.append("FeDefinition fe_definitions_005d1e40[] = {")
     for row in definitions:

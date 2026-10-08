@@ -11,4 +11,6 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_wait.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_events.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_threads.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_disk.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/fe_callbacks.cpp"
 )

@@ -44,9 +44,9 @@ std::uint32_t global_00699f24 = 0x00000000u;
 std::uint32_t global_00699f2c = 0x00000000u;
 std::uint32_t global_00699f30 = 0x00000000u;
 std::uint32_t global_00699fb4 = 0x00000000u;
-extern void __cdecl callback_004119e0(std::int32_t);
-extern void __cdecl callback_00411a80(std::int32_t);
-extern void __cdecl callback_00411b40(std::int32_t);
+extern std::uint32_t __cdecl callback_004119e0(std::int32_t);
+extern std::uint32_t __cdecl callback_00411a80(std::int32_t);
+extern std::uint32_t __cdecl callback_00411b40(std::int32_t);
 
 FeDefinition fe_definitions_005d1e40[] = {
     {1, nullptr, "IMPORT"}, // VA 0x005d1e40
