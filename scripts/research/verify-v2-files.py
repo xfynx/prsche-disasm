@@ -10,7 +10,7 @@ import sys
 from v2_manual_index import records as manual_records
 
 ROOT=Path(__file__).resolve().parents[2]
-RUN=ROOT/'iterations/v2/001-original-recovery/runs/009-file-events/files-regression'
+RUN=ROOT/'iterations/v2/001-original-recovery/runs/010-file-threads/files-regression'
 sys.path.insert(0,str(ROOT/'local/tools/python-unicorn'))
 from unicorn import Uc,UC_ARCH_X86,UC_MODE_32,UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_EAX,UC_X86_REG_EBX,UC_X86_REG_ECX,UC_X86_REG_EDX,UC_X86_REG_ESI,UC_X86_REG_EDI,UC_X86_REG_EBP,UC_X86_REG_EFLAGS,UC_X86_REG_ESP,UC_X86_REG_EIP
@@ -20,7 +20,9 @@ FILES=[0x533b90,0x533bf0,0x533c20,0x533cd0,0x533da0,0x533de0,0x59e040,
 LISTS=[0x5806e0,0x580730,0x580790,0x580850,0x5808f0,0x580930,0x580ad0,0x580c10,0x580ea0,0x580ec0]
 HEAP=[0x531c60,0x531ca0,0x531f90,0x5320b0,0x5323e0,0x556620,0x556650,0x569640,0x5697f0,0x56e2c0,0x5b0000,0x56e5f0,0x56e640]
 FE=[0x4b51e0,0x4b5250,0x4b5430,0x4b5470,0x4b5ee0,0x4b60d0,0x4b6660,0x4b4b80,0x4b4cd0]
-FUNCTIONS=FILES+LISTS+HEAP+FE+[0x568530,0x567f70]
+EVENTS=[0x55f740,0x55fb20,0x55fb30,0x55fb40,0x55fb60,0x55fb90,0x55fbb0,0x55fbf0,
+        0x55fc10,0x55fc20,0x55fc30,0x55fc40,0x55fc60,0x55fc80,0x55fce0]
+FUNCTIONS=FILES+LISTS+HEAP+FE+[0x568530,0x567f70]+EVENTS
 IO,HEAP_ARENA,BUFFER,STACK,EXIT=0x3100000,0x3000000,0x3200000,0x200f000,0x2200000
 
 def cases():
@@ -82,10 +84,13 @@ def original(wire,module,data,functions,definitions):
     put(0x6b4f20,*([0]*16));put(0x69cb00,0)
     put(0x5b21a4,EXIT+0x100) # Actual CALL [005b21a4] in 00592600; stdcall import.
     put(0x5b21b0,EXIT+0x300);put(0x5b2144,EXIT+0x400);put(0x5b2148,EXIT+0x500)
+    for iat,target in [(0x5b2160,EXIT+0x700),(0x5b2190,EXIT+0x800),(0x5b2194,EXIT+0x900),
+                       (0x5b2198,EXIT+0xa00),(0x5b219c,EXIT+0xb00),(0x5b2164,EXIT+0xc00),
+                       (0x5b213c,EXIT+0xd00)]:put(iat,target)
     if mode=='O':
         uc.mem_write(0x6af370,bytes([int(offset!=0)]));uc.mem_write(0x6af168,b'root/\0');uc.mem_write(0x6af26c,b'\0' if offset==4 else b'fallback/\0');put(0x6afbe4,EXIT+0x200)
     ranges=[(int(a,16),int(b,16)) for va in FUNCTIONS+[0x5ae3c0] for a,b in functions[f'{va:08x}']['ranges']]
-    calls=[];event_states=[];coverage=set();object_used=0;resumes=[];backend_error=0
+    calls=[];event_states=[];coverage=set();object_used=0;resumes=[];backend_error=0;worker_active=False
     def event_snapshot():
         state=bytearray(uc.mem_read(devices,4*112))
         for i in range(4):
@@ -98,20 +103,21 @@ def original(wire,module,data,functions,definitions):
         state.extend(uc.mem_read(0x6a5c58,28));state.extend(uc.mem_read(0x6a5c38,28));state.extend(uc.mem_read(0x6a5c80,4))
         return state.hex()
     endpoints={0x5322b0:1,0x5322c0:1,0x5321f0:0,0x5a0fbf:3,0x53c290:3,
-               EXIT+0x300:1,EXIT+0x400:4,EXIT+0x500:3,0x568e90:1,0x568390:1,0x55fb30:1,
-               0x55fc30:1,0x55fb90:1,0x55fce0:0,0x568900:3,0x592140:2,0x591df0:3,0x591fa0:3,0x591ce0:5,
-               0x5924d0:2,0x592490:1,0x591980:1,0x55f780:1,0x5366e0:1,0x55f740:1,0x55fc60:1,0x55fc40:1,
+               EXIT+0x300:1,EXIT+0x400:4,EXIT+0x500:3,0x568e90:1,0x568390:1,
+               EXIT+0x700:2,EXIT+0x800:4,EXIT+0x900:1,EXIT+0xa00:5,EXIT+0xb00:1,EXIT+0xc00:1,EXIT+0xd00:0,
+               0x568900:3,0x592140:2,0x591df0:3,0x591fa0:3,0x591ce0:5,
+               0x5924d0:2,0x592490:1,0x591980:1,0x55f780:1,0x5366e0:1,
                0x592290:1,0x561b80:1,0x565340:1,EXIT+0x100:1,EXIT+0x200:2,0x4119e0:1,0x411a80:1,0x411b40:1}
     saved_regs=[UC_X86_REG_EBX,UC_X86_REG_ECX,UC_X86_REG_EDX,UC_X86_REG_ESI,UC_X86_REG_EDI,UC_X86_REG_EBP,UC_X86_REG_EFLAGS]
     def hook(machine,p,length,user):
-        nonlocal object_used,backend_error
+        nonlocal object_used,backend_error,worker_active
         if p in FUNCTIONS:coverage.add(f'{p:08x}')
         if p==EXIT:machine.emu_stop();return
         if p==EXIT+0x600:
-            sp,ret,registers=resumes.pop()
+            sp,ret,registers,index=resumes.pop()
             for reg,value in registers.items():uc.reg_write(reg,value)
-            uc.reg_write(UC_X86_REG_EAX,0);uc.reg_write(UC_X86_REG_ESP,sp+4);uc.reg_write(UC_X86_REG_EIP,ret)
-            put(0x6a5c80,0);put(devices+device*112,1)
+            uc.reg_write(UC_X86_REG_EAX,1);uc.reg_write(UC_X86_REG_ESP,sp+8);uc.reg_write(UC_X86_REG_EIP,ret)
+            put(0x6a5c80,0);put(devices+index*112,1);worker_active=False
             return
         nargs=endpoints.get(p)
         if nargs is None:
@@ -139,18 +145,27 @@ def original(wire,module,data,functions,definitions):
         elif p==EXIT+0x500:calls.append(['virtual_free',*args]);result=1
         elif p==0x568e90:calls.append(['route',hxstr(args[0])]);result=device
         elif p==0x568390:put(devices+args[0]*112,1)
-        elif p==0x55fb30:
-            event_states.append(event_snapshot());calls.append(['signal',args[0]])
-            for i in range(4):
-                if args[0]==devices+i*112:
-                    put(0x6a5c80,0)
-                    resumes.append((sp,ret,{reg:uc.reg_read(reg) for reg in saved_regs}))
-                    put(sp-8,EXIT+0x600,i)
-                    uc.reg_write(UC_X86_REG_ESP,sp-8);uc.reg_write(UC_X86_REG_EIP,0x568530)
-                    return
-        elif p==0x55fc30:event_states.append(event_snapshot());calls.append(['worker_signal',args[0]])
-        elif p==0x55fb90:event_states.append(event_snapshot());calls.append(['worker_wait',args[0]]);put(0x6a5c80,1)
-        elif p==0x55fce0:calls.append(['error']);result=backend_error
+        elif p==EXIT+0x700:calls.append(['sleep',*args]);result=0
+        elif p==EXIT+0x800:calls.append(['create_event',*args]);result=0
+        elif p==EXIT+0x900:
+            event_states.append(event_snapshot());calls.append(['set_event',args[0]]);result=1
+            if not worker_active:
+                for i in range(4):
+                    if args[0]==devices+i*112:
+                        put(0x6a5c80,0);worker_active=True
+                        resumes.append((sp,ret,{reg:uc.reg_read(reg) for reg in saved_regs},i))
+                        put(sp-8,EXIT+0x600,i)
+                        uc.reg_write(UC_X86_REG_ESP,sp-8);uc.reg_write(UC_X86_REG_EIP,0x568530)
+                        return
+        elif p==EXIT+0xa00:
+            handles=list(words(args[1],args[0])) if args[0] else []
+            event_states.append(event_snapshot());calls.append(['wait_events',args[0],handles,args[2],args[3],args[4]])
+            if worker_active and args[0]==1 and handles and any(handles[0]==devices+i*112 for i in range(4)):
+                put(0x6a5c80,1)
+            result=0
+        elif p==EXIT+0xb00:event_states.append(event_snapshot());calls.append(['reset_event',args[0]]);result=1
+        elif p==EXIT+0xc00:calls.append(['close_event',args[0]]);result=1
+        elif p==EXIT+0xd00:calls.append(['error']);result=backend_error
         elif p==0x568900:
             calls.append(['backend_open',hxstr(args[0]),args[1],args[2]])
             result=0xffffffff if present and string(args[0])==expected_name else 0
@@ -171,9 +186,6 @@ def original(wire,module,data,functions,definitions):
         elif p in (0x5924d0,0x592490,0x591980):result=1
         elif p==0x55f780:calls.append(['current_thread']);result=0
         elif p==0x5366e0:calls.append(['pump']);result=0
-        elif p==0x55f740:calls.append(['sleep',args[0]])
-        elif p==0x55fc60:event_states.append(event_snapshot());calls.append(['wait_event',args[0]])
-        elif p==0x55fc40:event_states.append(event_snapshot());calls.append(['reset_event',args[0]])
         elif p==0x592290:
             calls.append(['physical_close',args[0]]);result=1
             if args[0]==0xffffffff:uc.mem_write(physical,b'\0')
@@ -183,7 +195,8 @@ def original(wire,module,data,functions,definitions):
         elif p==0x565340:calls.append(['diagnostic',words(0x5deb78,1)[0],hxstr(args[0])])
         # FE action callbacks are unresolved, with no effects in this fixture.
         uc.reg_write(UC_X86_REG_EAX,result&0xffffffff)
-        uc.reg_write(UC_X86_REG_ESP,sp+(4*(nargs+1) if p in [EXIT+0x100,EXIT+0x300,EXIT+0x400,EXIT+0x500] else 4));uc.reg_write(UC_X86_REG_EIP,ret)
+        stdcall={EXIT+0x100,EXIT+0x300,EXIT+0x400,EXIT+0x500,EXIT+0x700,EXIT+0x800,EXIT+0x900,EXIT+0xa00,EXIT+0xb00,EXIT+0xc00,EXIT+0xd00}
+        uc.reg_write(UC_X86_REG_ESP,sp+(4*(nargs+1) if p in stdcall else 4));uc.reg_write(UC_X86_REG_EIP,ret)
     uc.hook_add(UC_HOOK_CODE,hook)
     def execute(va,args):
         put(STACK,EXIT,*args);uc.reg_write(UC_X86_REG_ESP,STACK);uc.emu_start(va,EXIT+1,count=8000000)
@@ -260,14 +273,14 @@ def main():
     print(json.dumps({'cases':len(inputs),'functions':sorted(coverage),'native_equal_original':True}))
     if args.limit:return
     source=ROOT/'iterations/v2/001-original-recovery/source'
-    names={'files_probe.cpp','fe_stream.hpp','heap.hpp','files.hpp','file_device.hpp','file_worker.hpp','file_wait.hpp',
+    names={'files_probe.cpp','fe_stream.hpp','heap.hpp','files.hpp','file_device.hpp','file_worker.hpp','file_wait.hpp','file_events.hpp',
            'fe_stream.cpp','heap.cpp','heap_callbacks.cpp','io_lists.cpp','io_worker_lists.cpp','files.cpp',
-           'file_pages.cpp','file_device.cpp','file_worker.cpp','file_wait.cpp'}
+           'file_pages.cpp','file_device.cpp','file_worker.cpp','file_wait.cpp','file_events.cpp'}
     paths=[p for p in source.rglob('*') if p.is_file() and p.name in names]
     report={'schema':1,'sha256':module['sha256'],'function_vas':sorted(coverage),'cases':len(inputs),'native_cpp_equal_original_x86':True,
             'binary_matched':False,'game_launch_verified':False,
             'comparison':'Whole heap, IO/device/operation state, copied names, buffers, streams, global words, ordered boundary calls and state at each event. Stack contexts and recovered code pointers use documented VA identities.',
-            'boundaries':{'worker':'Original worker and wait execute synchronously through the event fixture; backend disk/archive calls, thread identity, pump and platform event semantics remain recording endpoints.',
+            'boundaries':{'worker':'Original worker, wait and event wrappers execute synchronously through recording Win32 endpoints; backend disk/archive calls, thread identity, pump, OS scheduling and real thread creation remain unverified.',
                           'Win32_allocation':'Original 0056e5f0/0056e640 execute; GetSystemInfo/VirtualAlloc/VirtualFree are recording OS endpoints, without OS lifetime or failure fidelity claims.',
                           'OS_CRT':'Recording lock/format/fill/physical close/exists/routing/diagnostic endpoints; original CRT ASCII comparator executes in C locale.',
                           'FE_callbacks':'No effects at 004119e0/00411a80/00411b40 test endpoints; callback semantics remain unrecovered.'},

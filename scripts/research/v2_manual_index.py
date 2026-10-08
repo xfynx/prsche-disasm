@@ -18,7 +18,8 @@ def records(sha=None):
         body=data[row['file_offset']:row['file_offset']+row['body_bytes']]
         if hashlib.sha256(body).hexdigest()!=row['body_sha256']:raise RuntimeError('Manual index instruction bytes differ')
         start,end=map(lambda x:int(x,16),row['ranges'][0])
-        if start!=int(row['entry_va'],16) or end-start+1!=row['body_bytes'] or body[-1]!=0xc3:
+        terminal_ret=body[-1]==0xc3 or (len(body)>=3 and body[-3]==0xc2)
+        if start!=int(row['entry_va'],16) or end-start+1!=row['body_bytes'] or not terminal_ret:
             raise RuntimeError('Invalid manual function range/RET')
     return [row for row in rows if sha is None or row['sha256']==sha]
 

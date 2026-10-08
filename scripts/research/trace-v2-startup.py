@@ -44,12 +44,12 @@ def main():
               'stages': stages, 'statically_reachable_functions': len(reached),
               'total_analyzed_functions': len(functions), 'reachable_entries': sorted(reached),
               'complete_reachability': False,
-              'next_bundle': ['0055f4f0', '0055f5f0', '0055f320', '0055f560', '0055f780',
+              'next_bundle': ['0055f1c0', '00557380',
                               '00568900', '005919a0', '00591df0', '00592140', '00592290'],
-              'next_proof': 'Worker/wait and event/sleep wrappers verified. Move joint event boundaries to Win32 imports, recover thread trampoline/start/identity/registry, then disk/archive dispatch; prove original scheduling before startup binding.',
+              'next_proof': 'Thread registry/start/bootstrap and joint event wrappers verified. Recover disk/archive backend and FE callback effects in parallel, then thread shutdown/exit registration and joint thread integration before startup binding.',
               'unrecovered': ['CRT initialization/termination', 'app_main 004b6a50',
                               'heap OS/CRT/optimized-copy callees and startup binding',
-                              'file threads, joint event integration/OS scheduling and disk/archive backend',
+                              'thread exit/shutdown, joint thread integration/OS scheduling and disk/archive backend',
                               'FE locale services and callback effects', 'render/audio/input initialization',
                               'main-loop global state and indirect calls']}
     target = ITERATION / 'reference/startup.json'

@@ -179,19 +179,34 @@ Run009 reports. Реальный fe.txt 23 records/188 bytes. Всего 75 фу
 стендов. Сравнение событий пока unit; в joint event wrappers ещё границы.
 Назначения worker_probe/import_index завершены, незавершённых поручений нет.
 
+## Выполнено в Run010
+
+10 thread функций и 94 full-state сравнения с original x86 приняты.
+Event wrappers в joint FE/heap/IO выполняются в C++; 89 случаев прошли.
+Всего 85 verified функций, девять стендов; supplementary trampoline делает
+каталог 36593 записи. Старые reports не менялись. Run010 README и reports
+сохраняют SHA, адреса, наблюдаемые возвраты и ограничения handshake/concurrency.
+
 ## Текущий шаг и передача
 
-Координатор: интеграция, сложный reverse и приёмка.
-Следующий Run010: убрать event wrapper stubs в joint, перенести границы на Win32
-imports; восстановить thread trampoline/start 0x55f4f0/0x55f5f0, registry
-0x55f560, init 0x55f320/0x55f3b0 и identity 0x55f780. Trampoline отсутствует
-в auto index, его инструкции 0x55f4f0..0x55f552 нужно дополнить по SHA/body.
-После этого disk open/read/seek/close и archive, heap setup, startup 0x4b6a50.
-Timer rate 0x5deb48 initial0 подтверждён, writer и OS thread scheduling ещё открыты.
+Координатор — интеграция и приёмка; worker_probe и import_index завершили Run010.
+По запросу пользователя разбор параллелен. disk_backend (formats, фиксированный
+сильный профиль) владеет только file_disk.hpp/cpp, disk_probe, verifier и Run011:
+0x591ce0/0x591df0/0x592140/0x592290; open 0x5919a0 при подтверждённой семантике.
+fe_callbacks (worker, gpt-6-sol medium) — только новые callback header/source/probe,
+verifier и Run012: 0x4119e0/0x411a80/0x411b40. Оба восстановлены после quota;
+их незавершённые файлы исключены из принятого Run010 checkpoint.
+Ближайший шаг координатора: commit/push Run010, подключить отдельные targets,
+исправить общий FE callback return ABI и повторить затронутые FE/joint proofs.
+После disk/callback acceptance — thread shutdown 0x55f1c0/exit registration,
+совместное выполнение thread consumers, archive и startup 0x4b6a50.
+Unknown callees — явные записывающие границы; OS concurrency и игровой запуск
+не приняты. Timer rate writer 0x5deb48 и compiler/CRT/flags остаются открытыми.
 
 Текущие команды:
 
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
+    py -3 scripts/research/verify-v2-file-threads.py
     py -3 scripts/research/verify-v2-file-events.py
     py -3 scripts/research/verify-v2-file-device.py
     py -3 scripts/research/verify-v2-file-worker.py

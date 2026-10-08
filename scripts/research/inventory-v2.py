@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/009-file-events/corpus-verification.json',
+                        default=ITERATION/'runs/010-file-threads/corpus-verification.json',
                         help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
     verification_output = args.verification_output if args.verification_output.is_absolute() else ROOT / args.verification_output
@@ -188,7 +188,13 @@ def main():
         paths += [path for path in (ITERATION/'runs/008-file-scheduler').rglob('*') if path.resolve() != verification_output.resolve()]
         paths += [ROOT/'scripts/research/verify-v2-file-events.py', ROOT/'scripts/research/index-binaries.py', ROOT/'scripts/research/test_index_binaries.py', ROOT/'research/binary-index/static/imports.jsonl']
         paths += [path for path in (ITERATION/'runs/009-file-events').rglob('*') if path.resolve() != verification_output.resolve()]
-        paths += list((ITERATION/'source').rglob('*'))
+        paths += [ROOT/'scripts/research/index-v2-threads.py', ROOT/'scripts/research/verify-v2-file-threads.py']
+        paths += [path for path in (ITERATION/'runs/010-file-threads').rglob('*') if path.resolve() != verification_output.resolve()]
+        # Pending parallel work is excluded until its dependency hashes are accepted.
+        paths += list((ITERATION/'source/catalog').rglob('*'))
+        paths += [ITERATION/'source/recovered/functions.json', ITERATION/'source/recovered/sources.cmake']
+        for report_path in sorted({f['verification_report'] for f in recovered['functions']}):
+            paths += [ROOT/p for p in load(ROOT/report_path)['source_sha256']]
         paths += [ITERATION/'CMakeLists.txt', ITERATION/'reference/startup.json']
         paths += [ROOT/p for p in sorted({f['verification_report'] for f in recovered['functions']})]
         paths += [ITERATION/'runs/003-fe-stream'/name for name in

@@ -17,6 +17,10 @@ FirstThunk + ordinal_index*4, независимо от положения Origi
 `scripts/research/structure-v2.py --extract Porsche.exe --address 0x4b6660 --output local/experiments/v2-fe-stream/004b6660.c`
 извлекает материал для восстановления; это ещё не подтверждённый C++.
 
+Run010: trampoline 0x55f4f0..0x55f552 дополнен в manual-functions.jsonl;
+SHA/RET4/priority/IAT — [thread-index.json](../../iterations/v2/001-original-recovery/runs/010-file-threads/thread-index.json).
+Всего шесть supplementary функций; полный каталог v2 содержит 36593 записи.
+
 ## Покрытие
 
 [coverage.json](coverage.json) сопоставляет пути и SHA256 с результатами анализа.

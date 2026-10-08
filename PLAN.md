@@ -1,10 +1,11 @@
 # План восстановления Porsche Unleashed
 
-Текущий результат — [Run009](iterations/v2/001-original-recovery/runs/009-file-events/README.md): **75 проверенных C++ функций**.
-15 event/sleep wrappers совпали с x86 на 249 случаях; device/worker/wait/joint
-регрессии 474/69/87/89 прошли. Исправлены 3751 IAT-адрес в индексе импортов.
-Восемь MSVC Win32 стендов собираются; игровой EXE пока не восстановлен.
-Далее event wrappers в общем стенде, thread trampoline/start и disk/archive.
+Текущий результат — [Run010](iterations/v2/001-original-recovery/runs/010-file-threads/README.md): **85 проверенных C++ функций**.
+10 thread registry/init/start/bootstrap/identity/priority функций совпали с x86
+на 94 случаях; event wrappers включены в общий FE/heap/IO, 89 сравнений прошли.
+Девять MSVC Win32 стендов собираются; игровой EXE пока не восстановлен.
+Run011 disk backend и Run012 FE callbacks разбираются независимыми агентами.
+Далее thread shutdown/exit, общий thread binding и startup.
 
 Активный путь с 2026-10-08 — [v2/001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 Полный корпус всех бинарников → собираемый original Windows/x86 → современный
@@ -26,7 +27,7 @@ Run 005: ещё 29 функций файловых запросов/очеред
 Внешние CRT/OS/SIMD/disk/thread/callback callees ещё открыты; 0 байтовых
 совпадений/целых модулей. Игрового v2 EXE нет. История runs сохранена.
 Startup и открытые зависимости — reference/startup.json. Владелец — координатор,
-активных исполнителей нет. Allocation wrappers/device init уже сделаны в Run006;
+Run011 disk_backend и Run012 fe_callbacks. Allocation wrappers/device init уже сделаны в Run006;
 worker/thread/wait/events/disk/archive и startup 0x4b6a50 ещё открыты.
 Run 006: ещё 6 page/list/device init функций; 474 x86 сравнения и 89 joint
 регрессий прошли. Page wrappers перенесены в общий стенд, OS APIs остаются
