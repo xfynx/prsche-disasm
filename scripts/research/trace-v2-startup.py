@@ -44,12 +44,12 @@ def main():
               'stages': stages, 'statically_reachable_functions': len(reached),
               'total_analyzed_functions': len(functions), 'reachable_entries': sorted(reached),
               'complete_reachability': False,
-              'next_bundle': ['0056e5f0', '0056e640', '00568390', '00568530',
-                              '005919a0', '00591df0', '00592140', '00592290'],
-              'next_proof': 'Recover original VirtualAlloc wrappers and file device initialization/worker, then disk/archive dispatch. Replace Run005 immediate worker fixture and prove scheduled FE/heap/IO before application startup binding.',
+              'next_bundle': ['00568530', '0055f4f0', '0055f5f0', '00567f70',
+                              '00568900', '005919a0', '00591df0', '00592140', '00592290'],
+              'next_proof': 'Decode 11 cells of worker jump table 005688d0 and recover worker/control/completion branches, then thread trampoline/start, wait/events and disk/archive dispatch. Replace immediate worker fixture and prove scheduled FE/heap/IO before startup binding.',
               'unrecovered': ['CRT initialization/termination', 'app_main 004b6a50',
                               'heap OS/CRT/optimized-copy callees and startup binding',
-                              'file device threads/wait/events, disk/archive backend and allocation wrappers',
+                              'file device worker/threads/wait/events and disk/archive backend',
                               'FE locale services and callback effects', 'render/audio/input initialization',
                               'main-loop global state and indirect calls']}
     target = ITERATION / 'reference/startup.json'

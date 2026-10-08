@@ -25,6 +25,11 @@
   очередей, completion и чтения блоками; layout в `include/porsche/files.hpp`.
 - `recovered/files_probe.cpp`: 89 совместных FE/heap/IO сравнений с x86;
   immediate worker, disk/VirtualAlloc/OS endpoints находятся только в стенде.
+- `recovered/Porsche.exe/file_pages.cpp`, `file_device.cpp`: ещё 6 функций
+  page wrappers, list constructors/default key и startdevice.
+- `recovered/device_probe.cpp`: 474 сравнения с x86; OS/thread/event endpoints
+  записываются, worker loop ещё не исполнен. Реальные page wrappers подключены
+  к files_probe; внешние границы allocation теперь на Win32 imports.
 - `catalog`: адресный каталог всех модулей и функций, байтовые диапазоны
   псевдо-C, пути данных/листингов/вызовов/импортов и статусы восстановления.
 
@@ -38,10 +43,10 @@ py -3 scripts/research/structure-v2.py --extract Porsche.exe --address 0x59e040 
 ```
 
 `porsche_original.lib` содержит восстановленные объекты и ещё имеет
-неразрешённые зависимости; это не готовая игра. 50 функций проверены в
+неразрешённые зависимости; это не готовая игра. 56 функций проверены в
 зафиксированных границах стендов. Это не подтверждает UI, физику, main loop,
 внешние OS/CRT/SIMD/disk/thread callees или байтовое совпадение EXE. Актуальные
-совместные свидетельства и регрессии — runs/005-original-files;
-Run 001–004 сохраняют состояние своих checkpoint. Три supplementary callbacks
-без pseudo-C доступны через SHA-проверяемый manual index; каталог имеет
-36 590 записей. Извлечение pseudo-C для этих трёх функций недоступно.
+совместные свидетельства — runs/006-file-device; standalone FE/heap регрессии
+остаются в Run005. Run001–005 сохраняют состояние своих checkpoint.
+Пять supplementary функций без pseudo-C доступны через SHA-проверяемый manual
+index; каталог имеет 36 592 записи. Worker в нём пока unrecovered.

@@ -14,7 +14,7 @@ import sys
 from v2_manual_index import records as manual_records
 
 ROOT=Path(__file__).resolve().parents[2]
-RUN=ROOT/'iterations/v2/001-original-recovery/runs/005-original-files'
+RUN=ROOT/'iterations/v2/001-original-recovery/runs/006-file-device/files-regression'
 sys.path.insert(0,str(ROOT/'local/tools/python-unicorn'))
 from unicorn import Uc,UC_ARCH_X86,UC_MODE_32,UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_EAX,UC_X86_REG_ESP,UC_X86_REG_EIP
@@ -22,7 +22,7 @@ FILES=[0x533b90,0x533bf0,0x533c20,0x533cd0,0x533da0,0x533de0,0x59e040,
        0x567af0,0x567b80,0x567bf0,0x567df0,0x5680c0,0x568200,0x5682a0,
        0x5684c0,0x5684e0,0x568aa0,0x568ae0,0x568b10,0x568b90,0x5925d0]
 LISTS=[0x580730,0x580790,0x580850,0x580930,0x580ad0,0x580c10,0x580ea0,0x580ec0]
-HEAP=[0x531c60,0x531ca0,0x531f90,0x5320b0,0x5323e0,0x556620,0x556650,0x569640,0x5697f0,0x56e2c0,0x5b0000]
+HEAP=[0x531c60,0x531ca0,0x531f90,0x5320b0,0x5323e0,0x556620,0x556650,0x569640,0x5697f0,0x56e2c0,0x5b0000,0x56e5f0,0x56e640]
 FE=[0x4b51e0,0x4b5250,0x4b5430,0x4b5470,0x4b5ee0,0x4b60d0,0x4b6660,0x4b4b80,0x4b4cd0]
 FUNCTIONS=FILES+LISTS+HEAP+FE
 IO,HEAP_ARENA,BUFFER,STACK,EXIT=0x3100000,0x3000000,0x3200000,0x200f000,0x2200000
@@ -84,12 +84,13 @@ def original(wire,module,data,functions,definitions):
     put(0x6af084,physical);put(0x6af080,1);uc.mem_write(physical,b'\0'*32);put(physical,1|(device<<8),0xffffffff)
     put(0x6b4f20,*([0]*16));put(0x69cb00,0)
     put(0x5b21a4,EXIT+0x100) # Actual CALL [005b21a4] in 00592600; stdcall import.
+    put(0x5b21b0,EXIT+0x300);put(0x5b2144,EXIT+0x400);put(0x5b2148,EXIT+0x500)
     if mode=='O':
         uc.mem_write(0x6af370,bytes([int(offset!=0)]));uc.mem_write(0x6af168,b'root/\0');uc.mem_write(0x6af26c,b'\0' if offset==4 else b'fallback/\0');put(0x6afbe4,EXIT+0x200)
     ranges=[(int(a,16),int(b,16)) for va in FUNCTIONS+[0x5ae3c0] for a,b in functions[f'{va:08x}']['ranges']]
     calls=[];coverage=set();object_used=0
     endpoints={0x5322b0:1,0x5322c0:1,0x5321f0:0,0x5a0fbf:3,0x53c290:3,
-               0x56e5f0:1,0x56e640:1,0x568e90:1,0x568390:1,0x55fb30:1,0x567f70:1,
+               EXIT+0x300:1,EXIT+0x400:4,EXIT+0x500:3,0x568e90:1,0x568390:1,0x55fb30:1,0x567f70:1,
                0x592290:1,0x561b80:1,0x565340:1,EXIT+0x100:1,EXIT+0x200:2,0x4119e0:1,0x411a80:1,0x411b40:1}
     def complete_worker(d):
         queued=d+0x24;completed=d+0x40
@@ -132,10 +133,13 @@ def original(wire,module,data,functions,definitions):
             uc.mem_write(args[0],text+b'\0')
         elif p==0x53c290:
             calls.append(['fill',*args]);uc.mem_write(args[0],bytes([args[1]&255])*args[2])
-        elif p==0x56e5f0:
-            n=words(args[0],1)[0];object_used=(object_used+15)&~15;result=IO+0x5000+object_used;object_used+=n
-            calls.append(['object_alloc',n,result])
-        elif p==0x56e640:calls.append(['object_free',args[0]])
+        elif p==EXIT+0x300:
+            uc.mem_write(args[0],b'\0'*36);put(args[0]+4,4096);calls.append(['system_info',4096])
+        elif p==EXIT+0x400:
+            n=args[1];object_used=(object_used+4095)&~4095;result=IO+0x5000+object_used if n else 0
+            if n:uc.mem_write(result,b'\0'*n);object_used+=n
+            calls.append(['virtual_alloc',*args,result])
+        elif p==EXIT+0x500:calls.append(['virtual_free',*args]);result=1
         elif p==0x568e90:calls.append(['route',hxstr(args[0])]);result=device
         elif p==0x568390:put(devices+args[0]*112,1)
         elif p==0x55fb30:calls.append(['signal',args[0]]);complete_worker(args[0])
@@ -153,7 +157,7 @@ def original(wire,module,data,functions,definitions):
         elif p==0x565340:calls.append(['diagnostic',words(0x5deb78,1)[0],hxstr(args[0])])
         # FE action callbacks are unresolved, with no effects in this fixture.
         uc.reg_write(UC_X86_REG_EAX,result&0xffffffff)
-        uc.reg_write(UC_X86_REG_ESP,sp+(8 if p==EXIT+0x100 else 4));uc.reg_write(UC_X86_REG_EIP,ret)
+        uc.reg_write(UC_X86_REG_ESP,sp+(4*(nargs+1) if p in [EXIT+0x100,EXIT+0x300,EXIT+0x400,EXIT+0x500] else 4));uc.reg_write(UC_X86_REG_EIP,ret)
     uc.hook_add(UC_HOOK_CODE,hook)
     def execute(va,args):
         put(STACK,EXIT,*args);uc.reg_write(UC_X86_REG_ESP,STACK);uc.emu_start(va,EXIT+1,count=8000000)
@@ -204,7 +208,8 @@ def original(wire,module,data,functions,definitions):
             'heap':bytes(uc.mem_read(HEAP_ARENA,65536)).hex(),'calls':calls,'stream':streamhex,'globals':globals_text,'actions':actions,'lengths':lengths},coverage
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int);args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int)
+    parser.add_argument('--report-dir',type=Path,default=RUN);args=parser.parse_args()
     module=next(json.loads(l) for l in (ROOT/'research/binary-index/static/binaries.jsonl').read_text().splitlines() if json.loads(l)['file']=='Porsche.exe')
     data=(ROOT/'local/game'/module['path']).read_bytes()
     if hashlib.sha256(data).hexdigest()!=module['sha256']:raise RuntimeError('Original SHA differs')
@@ -231,14 +236,14 @@ def main():
             'binary_matched':False,'game_launch_verified':False,
             'comparison':'Whole heap, IO/device/operation state, copied names, buffers, streams, global words and ordered boundary calls. Stack contexts and recovered code pointers use documented VA identities.',
             'boundaries':{'worker':'Immediate byte-file completion only in probes; original worker threads, wait, events and disk/archive implementations are not recovered.',
-                          'allocation_wrappers':'Recording bump arena; original 0056e5f0/0056e640 page-rounding and VirtualAlloc/VirtualFree semantics remain unrecovered.',
+                          'Win32_allocation':'Original 0056e5f0/0056e640 execute; GetSystemInfo/VirtualAlloc/VirtualFree are recording OS endpoints, without OS lifetime or failure fidelity claims.',
                           'OS_CRT':'Recording lock/format/fill/physical close/exists/routing/diagnostic endpoints; original CRT ASCII comparator executes in C locale.',
                           'FE_callbacks':'No effects at 004119e0/00411a80/00411b40 test endpoints; callback semantics remain unrecovered.'},
             'source_sha256':{str(p.relative_to(ROOT)).replace('\\','/'):hashlib.sha256(p.read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
-    RUN.mkdir(parents=True,exist_ok=True);(RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
-    (RUN/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage)),newline='\n')
+    args.report_dir.mkdir(parents=True,exist_ok=True);(args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
+    (args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage)),newline='\n')
     calls=[json.loads(l) for l in (ROOT/'research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/calls.jsonl').read_text().splitlines()]
-    (RUN/'source-calls.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in calls if r.get('from_function') in coverage),newline='\n')
+    (args.report_dir/'source-calls.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in calls if r.get('from_function') in coverage),newline='\n')
 
 if __name__=='__main__':main()

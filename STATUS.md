@@ -24,9 +24,14 @@ Run 005: 29 функций файловой очереди/completion/chunk read
 Три пропущенных callbacks добавлены в SHA-guarded index: каталог 36 590 записей,
 из них 36 587 automatic. 0 байтовых совпадений/модулей; игрового v2 EXE нет.
 MSVC 19.44.35229 доступен; точный исходный compiler/CRT/flags не подтверждён.
-Следующий пакет — allocation wrappers, device init/worker и disk/archive
-backend; затем совместная сверка с исходным scheduler и startup 0x4b6a50.
-Отчёт: runs/005-original-files внутри v2/001. Визуальная приёмка открыта.
+Worker/thread/wait/events и disk/archive backend открыты; после них совместная
+сверка с исходным scheduler и startup 0x4b6a50.
+Run 006: 6 новых C++ page/list/device startup функций, 474 сравнения с x86
+и 89 совместных регрессий прошли. Настоящие page wrappers включены в FE/heap/IO;
+Win32 APIs остаются записывающими границами. Всего 56 проверенных функций,
+каталог 36 592 записей (5 supplementary). Worker 0x568530 проиндексирован,
+его loop/thread/wait/events/disk ещё открыты. Следом worker jump table/dispatch.
+Отчёт: runs/006-file-device внутри v2/001. Визуальная приёмка открыта.
 Пути: iterations/v2/001-original-recovery, research/v2/binaries,
 local/builds/v2/001-original-recovery. Исполнитель — координатор.
 

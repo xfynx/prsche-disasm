@@ -2,8 +2,8 @@
 
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
-Владелец — координатор. Run 005 завершён: файловая очередь и совместный
-FE/heap/IO frontend сверены с x86. Поручения исполнителей приняты;
+Владелец — координатор. Run 006 завершён: page wrappers, list/device startup
+и общий FE/heap/IO сверены с x86. Поручения исполнителей приняты;
 активных поручений нет. Игровой EXE и критерии всей итерации ещё открыты.
 
 ## Цель и готовность 001
@@ -134,18 +134,33 @@ Disk/archive/VirtualAlloc wrappers, OS/CRT/SIMD и эффекты FE callbacks �
 Archive opcodes и fatal/concurrent/locale/runtime-null-name состояния не приняты.
 Старые runs 001–004 сохранены; registry указывает актуальные Run005 SHA.
 
+## Выполнено в Run 006
+
+6 новых функций page wrappers/list constructors/default key/device init
+сверены на 474 случаях с x86. 89 совместных FE/heap/IO случаев повторены
+с настоящими page wrappers; recording allocation теперь на Win32 imports.
+Signed page-rounding с LEA/IDIV/IMUL и EAX VirtualFree сохранены.
+Всего 56 проверенных функций. Heap/FE standalone отчёты Run005 актуальны
+по SHA; старые runs не изменены. Общий отчёт — runs/006-file-device.
+
+Worker 0x568530..0x5688cc (925 bytes) и default key 0x580670..0x580674
+добавлены в supplementary SHA/body index. Каталог: 36 587 automatic + 5.
+Worker пока unrecovered, вне счётчика 56; OS/thread/event/lock/diagnostic
+и raw disk/archive остаются границами. Fixture thread start поставляет лишь
+исходную initialized=1 запись; выполнение worker loop и concurrency не принято.
+
 ## Текущий шаг и передача
 
 Владелец — координатор; активных поручений нет. Исполнители heap_probe/io_backend
-передали files_probe.cpp, io_lists.cpp и supplementary index/catalog scripts;
+передали device_probe.cpp и worker-index.json;
 интеграция и последние исправления стенда приняты координатором.
 
 Следующий конкретный пакет:
-1. Индекс 0x56e5f0/0x56e640: GetSystemInfo/VirtualAlloc/VirtualFree wrappers,
-   page_size 0x6a6418, signed page-rounding и возвращаемый EAX.
-2. Supplementary index косвенного worker 0x568530: границы/ветви/targets;
-   device init 0x568390, list constructors 0x580630/0x580680 и event/thread
-   lifecycle/dispatcher по инструкциям оригинала.
+1. Экспортировать 11 ячеек jump table 0x5688d0 с SHA/VA/bytes, восстановить
+   worker 0x568530 по ветвям 0..10, cancel/default, completion/callback и
+   очередям. Index/RET/calls/fields — Run006 worker-index.json.
+2. Thread trampoline 0x55f4f0/start 0x55f5f0, wait 0x567f70 и события;
+   initialization/file-device dispatcher и shutdown по инструкциям.
 3. Disk open/read/seek/close 0x5919a0/0x591df0/0x592140/0x592290 и archive
    0x568900: handles, mapping/cache, flags/errors и OS imports.
 4. Заменить соответствующие границы joint probe исходными consumers;
@@ -160,9 +175,8 @@ errors и unclassified executable bytes открыты. Данные local/game 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
 py -3 scripts/research/v2_manual_index.py
+py -3 scripts/research/verify-v2-file-device.py
 py -3 scripts/research/verify-v2-files.py
-py -3 scripts/research/verify-v2-heap.py --report-dir iterations/v2/001-original-recovery/runs/005-original-files/heap-regression
-py -3 scripts/research/verify-v2-fe-stream.py --report-dir iterations/v2/001-original-recovery/runs/005-original-files/fe-regression
 py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts
 py -3 scripts/research/structure-v2.py
 py -3 scripts/research/trace-v2-startup.py

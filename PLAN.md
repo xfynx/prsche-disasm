@@ -20,11 +20,15 @@ Run 005: ещё 29 функций файловых запросов/очеред
 Внешние CRT/OS/SIMD/disk/thread/callback callees ещё открыты; 0 байтовых
 совпадений/целых модулей. Игрового v2 EXE нет. История runs сохранена.
 Startup и открытые зависимости — reference/startup.json. Владелец — координатор,
-активных исполнителей нет. Следующий пакет: VirtualAlloc wrappers 0x56e5f0/
-0x56e640 → device init/worker 0x568390/0x568530 → disk/archive dispatch.
-Сначала supplementary index worker/callees, затем заменить записывающие
-границы совместного стенда. Далее startup 0x4b6a50.
-Отчёт: iterations/v2/001-original-recovery/runs/005-original-files/README.md.
+активных исполнителей нет. Allocation wrappers/device init уже сделаны в Run006;
+worker/thread/wait/events/disk/archive и startup 0x4b6a50 ещё открыты.
+Run 006: ещё 6 page/list/device init функций; 474 x86 сравнения и 89 joint
+регрессий прошли. Page wrappers перенесены в общий стенд, OS APIs остаются
+границами. Всего 56 проверенных функций; каталог 36 592 (5 supplementary).
+Worker 0x568530 проиндексирован (925 bytes), пока не восстановлен.
+Следующий конкретный шаг — 0x5688d0 jump table → worker/control/completion,
+thread trampoline/start 0x55f4f0/0x55f5f0, wait/events → disk/archive backend.
+Отчёт: iterations/v2/001-original-recovery/runs/006-file-device/README.md.
 
 2026-10-08: по запросу пользователя сохраняем 012 как есть и меняем подход.
 Run 020: 47 original four-wheel loops / 188 состояний совпали с Rust;

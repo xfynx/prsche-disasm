@@ -55,14 +55,14 @@ bool __cdecl file_open_00533b90(const char*,std::uint32_t,std::uint32_t,void**);
 std::uint32_t __cdecl file_chunks_00533c20(void*,std::uint32_t,void*,std::int32_t,std::uint32_t,FileReader);
 void __cdecl file_chunk_complete_00533cd0(std::uint32_t,std::int32_t,void*);
 
-// Unrecovered backend, scheduler, object pool, diagnostics and platform endpoints.
+// Backend/scheduler/diagnostics remain unrecovered; allocation wrappers are in file_pages.cpp.
 std::int32_t __cdecl file_exists_00561b80(const char*);
 std::uint32_t __cdecl file_device_name_00568e90(const char*);
 void __cdecl file_start_device_00568390(std::uint32_t);
 std::int32_t __cdecl file_wait_00567f70(std::uint32_t);
 void __cdecl file_event_signal_0055fb30(void*);
 void* __cdecl file_object_allocate_0056e5f0(std::uint32_t*);
-void __cdecl file_object_free_0056e640(void*);
+std::uint32_t __cdecl file_object_free_0056e640(void*);
 std::uint32_t __cdecl file_physical_close_00592290(void*);
 void __cdecl file_format_005a0fbf(char*,const char*,const char*,const char*);
 extern const char* diagnostic_file_005deb74;

@@ -14,7 +14,10 @@ wrappers 0x56e5f0/0x56e640, device init/worker 0x568390/0x568530 и disk/archive
 dispatch. Немедленный worker стенда пока не воспроизводит исходные потоки;
 после восстановления — новая совместная сверка и startup 0x4b6a50.
 Неизвестные OS/CRT/SIMD и прочие callees остаются внешними зависимостями;
-их записывающие замены есть только в стендах.
+их записывающие замены есть только в стендах. Run006 уже восстановил page
+wrappers/list constructors/device init: 474 сравнения и 89 joint регрессий
+прошли, всего 56 функций. Далее worker 0x568530, jump table 0x5688d0,
+thread trampoline/start/wait/events и disk/archive dispatch.
 Сборки — `local/builds/v2/001-original-recovery`; данные `local/game` общие,
 неизменяемые. 012 не объявляется завершённой. Прежний план ниже исторический,
 включая перенос повреждений/б/у в 013: в v2 эти системы восстанавливаются

@@ -125,6 +125,12 @@ py -3 scripts/research/verify-v2-fe-stream.py --report-dir iterations/v2/001-ori
 каталог 36 587 automatic + 3 supplementary = 36 590 записей.
 Disk/thread/VirtualAlloc/OS/CRT остаются внешними границами; игрового EXE нет.
 
-Следующий пакет — исходные allocation wrappers, device init/worker,
-disk/archive dispatch, затем привязка к startup 0x4b6a50.
+[Run 006](runs/006-file-device/README.md): ещё 6 функций page wrappers,
+list constructors/default key/device init сверены на 474 случаях с x86.
+89 совместных проверок повторены с настоящими page wrappers; всего 56 функций.
+Каталог 36 587 automatic + 5 supplementary = 36 592 записей.
+Worker 0x568530 проиндексирован, но пока не восстановлен.
+
+Следующий пакет — worker/control/completion, thread/wait/events и disk/archive
+dispatch, затем привязка к startup 0x4b6a50.
 Точные адреса и первый шаг — [в плане](PLAN.md).

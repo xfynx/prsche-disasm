@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "module": "Porsche.exe",
+  "path": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "source": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "records": [
+    {
+      "name": "file_worker_00568530",
+      "status": "manual-disassembly-index",
+      "ranges": [["00568530", "005688cc"]],
+      "file_offset": 1475888,
+      "body_bytes": 925,
+      "body_sha256": "242c6b13b9f54c5fef841ac5f6f007cf95f6cedb3a0833eaf5692b46cc4d6c16",
+      "reason": "Worker entry is a disassembly label absent from the automatic function catalog; contiguous range ends at terminal RET 005688c5/005688cc before the 005688d0 dispatch table."
+    },
+    {
+      "name": "io_default_key_00580670",
+      "status": "manual-disassembly-index",
+      "ranges": [["00580670", "00580674"]],
+      "file_offset": 1574512,
+      "body_bytes": 5,
+      "body_sha256": "6d072d11a5144359746b0e9d2eaf5a06531a0162b9f7d07a44dd01f51006e142",
+      "reason": "Default IoKey callback is referenced by list constructors at 00580664/00580669/005806ae/005806b3 but absent from the automatic function catalog; range is the two-instruction RET-terminated callback."
+    }
+  ],
+  "worker": {
+    "entry_va": "00568530",
+    "terminal_rets": ["005688c5", "005688cc"],
+    "direct_calls": [
+      {"target": "0055fc30", "callsites": ["00568556", "005688a9"]},
+      {"target": "00580ea0", "callsites": ["00568579", "00568846"]},
+      {"target": "00580790", "callsites": ["0056858b"]},
+      {"target": "00580850", "callsites": ["005685ad"]},
+      {"target": "00580ec0", "callsites": ["005685c6", "00568870"]},
+      {"target": "0055fb90", "callsites": ["005685d9"]},
+      {"target": "00568900", "callsites": ["0056864a", "00568705", "005687c7"]},
+      {"target": "0055fce0", "callsites": ["00568662", "0056869f", "005686e4", "00568768", "0056879c"]},
+      {"target": "00592140", "callsites": ["0056867b", "005686c0"]},
+      {"target": "00591df0", "callsites": ["00568690"]},
+      {"target": "00591fa0", "callsites": ["005686d5"]},
+      {"target": "00592290", "callsites": ["00568715"]},
+      {"target": "00591ce0", "callsites": ["00568745"]},
+      {"target": "005924d0", "callsites": ["0056877d"]},
+      {"target": "00592490", "callsites": ["005687db"]},
+      {"target": "005808f0", "callsites": ["005687f1"]},
+      {"target": "00591980", "callsites": ["00568803"]},
+      {"target": "00565340", "callsites": ["00568832"], "call_type": "computed"},
+      {"target": "005806e0", "callsites": ["00568859"]}
+    ],
+    "confirmed_fields": {
+      "device_base": "006a5c7c + index * 0x70",
+      "device_initialized": "device + 0x00",
+      "queued_list": "device + 0x24",
+      "current_operation": "device + 0x20",
+      "worker_loop_state": "006a5c80",
+      "operation_type": "operation + 0x08",
+      "operation_flags": "operation + 0x0c",
+      "operation_status": "operation + 0x10",
+      "operation_id": "operation + 0x04",
+      "operation_handle_or_result": "operation + 0x18",
+      "operation_callback": "operation + 0x20",
+      "operation_callback_argument": "operation + 0x1c"
+    },
+    "indirect_dispatch": {
+      "jump_table": "005688d0",
+      "selector": "operation + 0x08",
+      "range_check": "selector <= 0x0a; default branch at 00568815",
+      "callback_callsite": "005688a0",
+      "callback_target_source": "[operation + 0x20]",
+      "callback_arguments": ["operation + 0x04", "operation + 0x10 or -1 when flags bit 0x02", "operation + 0x1c"]
+    }
+  },
+  "boundary": "Exact RET-terminated byte ranges are confirmed from original disassembly and SHA-checked local/game/Porsche.exe; automatic Ghidra function entries are absent, so this remains manual index evidence rather than recovered C++ semantics."
+}

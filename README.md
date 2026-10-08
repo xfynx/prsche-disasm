@@ -20,6 +20,11 @@ v2 восстанавливается сразу на C/C++; первый зап
 Всего 50 проверенных ручных функций. Три пропущенных callbacks добавлены
 в SHA-проверяемый индекс. Далее — исходные disk/thread/VirtualAlloc службы;
 пока они остаются записывающими границами стенда. Игрового v2 EXE ещё нет.
+[Run 006](iterations/v2/001-original-recovery/runs/006-file-device/README.md):
+ещё 6 C++ функций page allocation/list construction/device startup;
+474 сравнения и 89 совместных регрессий прошли. Всего 56 проверенных функций.
+Page wrappers исполняются и в общем FE/heap/IO стенде; граница теперь на
+Win32 imports. Worker проиндексирован, его loop/thread/disk ещё открыты.
 Ниже — история v1.
 
 [Run 019 внутри 012](iterations/012-campaign-fidelity/runs/019-original-contact-runtime/README.md):

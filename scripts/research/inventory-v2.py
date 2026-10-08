@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/005-original-files/corpus-verification.json',
+                        default=ITERATION/'runs/006-file-device/corpus-verification.json',
                         help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
     verification_output = args.verification_output if args.verification_output.is_absolute() else ROOT / args.verification_output
@@ -177,10 +177,11 @@ def main():
                   'scripts/research/trace-v2-startup.py','scripts/research/verify-v2-startup.py',
                   'scripts/research/export-v2-fe-tables.py','scripts/research/verify-v2-fe-stream.py',
                   'scripts/research/verify-v2-heap.py')]
-        paths += [ROOT/'scripts/research/v2_manual_index.py', ROOT/'scripts/research/verify-v2-files.py', ROOT/'research/binary-index/manual-functions.jsonl']
+        paths += [ROOT/'scripts/research/v2_manual_index.py', ROOT/'scripts/research/verify-v2-files.py', ROOT/'scripts/research/verify-v2-file-device.py', ROOT/'research/binary-index/manual-functions.jsonl']
         run005 = ITERATION/'runs/005-original-files'
         if run005.exists():
             paths += [path for path in run005.rglob('*') if path.resolve() != verification_output.resolve()]
+        paths += [path for path in (ITERATION/'runs/006-file-device').rglob('*') if path.resolve() != verification_output.resolve()]
         paths += list((ITERATION/'source').rglob('*'))
         paths += [ITERATION/'CMakeLists.txt', ITERATION/'reference/startup.json']
         paths += [ROOT/p for p in sorted({f['verification_report'] for f in recovered['functions']})]
