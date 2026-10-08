@@ -1,5 +1,9 @@
 # Need for Speed: Porsche Unleashed — открытый движок и просмотрщик
 
+[Run 007](iterations/v2/001-original-recovery/runs/007-file-worker/README.md):
+исходный worker и две list-функции сверены на 69 случаях; всего 59 функций.
+Следом подключаем worker к общему FE/heap/IO стенду и восстанавливаем wait.
+
 **Активная разработка с 2026-10-08: [v2 — восстановление полного оригинала](iterations/v2/001-original-recovery/README.md).**
 Сначала полный корпус бинарников и собираемый Windows/x86 original baseline,
 после — современный native/web порт. v1 сохранена в `dc6b9d8`; 012 не завершена,

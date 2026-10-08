@@ -149,40 +149,40 @@ Worker пока unrecovered, вне счётчика 56; OS/thread/event/lock/di
 и raw disk/archive остаются границами. Fixture thread start поставляет лишь
 исходную initialized=1 запись; выполнение worker loop и concurrency не принято.
 
+## Выполнено в Run007 — worker и completion
+
+Запрос индекса: `00568530`, таблица `005688d0`, consumers `005806e0/005808f0`.
+SHA/11 targets/bytes — runs/007-file-worker/dispatch.json. Координатор владеет
+file_worker.cpp, io_worker_lists.cpp, ABI, интеграцией и приёмкой.
+worker_probe (worker, gpt-6-sol, medium) — native probe и x86 verifier.
+Восстановлены C++ ветви 0..10, отмена, group gate, completion и callback.
+69 differential случаев прошли, включая полную арену и промежуточные состояния.
+3 новые функции приняты, всего 59. Все шесть MSVC Win32 стендов собираются.
+OS/backend/event/lock пока записываемые границы; concurrency не доказана.
+
 ## Текущий шаг и передача
 
-Владелец — координатор; активных поручений нет. Исполнители heap_probe/io_backend
-передали device_probe.cpp и worker-index.json;
-интеграция и последние исправления стенда приняты координатором.
+Владелец — координатор. Run007 задания завершены; незавершённых правок стенда нет.
+Следующий пакет Run008: удалить ручную имитацию completion в files_probe,
+подключить worker 0x568530 и восстановить operation wait 0x567f70.
+Сравнить joint FE/heap/IO и реальные очереди с исходным x86; OS события,
+thread ID/pump/sleep и disk APIs пока явные записываемые границы.
+Далее event wrappers 0x55fb20..0x55fce0, thread trampoline/start 0x55f4f0/0x55f5f0,
+disk open/read/seek/close 0x5919a0/0x591df0/0x592140/0x592290, archive 0x568900.
+После них heap setup и startup binding 0x4b6a50.
 
-Следующий конкретный пакет:
-1. Экспортировать 11 ячеек jump table 0x5688d0 с SHA/VA/bytes, восстановить
-   worker 0x568530 по ветвям 0..10, cancel/default, completion/callback и
-   очередям. Index/RET/calls/fields — Run006 worker-index.json.
-2. Thread trampoline 0x55f4f0/start 0x55f5f0, wait 0x567f70 и события;
-   initialization/file-device dispatcher и shutdown по инструкциям.
-3. Disk open/read/seek/close 0x5919a0/0x591df0/0x592140/0x592290 и archive
-   0x568900: handles, mapping/cache, flags/errors и OS imports.
-4. Заменить соответствующие границы joint probe исходными consumers;
-   сверить input → промежуточное состояние → output с x86. Далее startup
-   binding 0x4b6a50, heap constructor/setup и initialization до main.
+Текущие проверки:
 
-CRT/0x4b6a50/main-loop/render/audio/input, compiler/flags, четыре decompile
-errors и unclassified executable bytes открыты. Данные local/game неизменяемы.
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
+    py -3 scripts/research/index-v2-worker.py
+    py -3 scripts/research/verify-v2-file-worker.py
+    py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts
+    py -3 scripts/research/structure-v2.py
+    py -3 scripts/research/trace-v2-startup.py
+    py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification
 
-Команды текущей проверки:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
-py -3 scripts/research/v2_manual_index.py
-py -3 scripts/research/verify-v2-file-device.py
-py -3 scripts/research/verify-v2-files.py
-py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts
-py -3 scripts/research/structure-v2.py
-py -3 scripts/research/trace-v2-startup.py
-py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification
-```
-
-MSVC 19.44.35229 собирает x86; это не доказанный исходный MSVC/CRT/flags.
-Игровой EXE, оригинальная езда, карьеры и визуальная приёмка открыты;
-по probes нельзя объявлять итерацию 001 завершённой.
+Heap/FE/file/device SHA reports прежних runs остаются актуальны; история не меняется.
+CRT/main-loop/render/audio/input, compiler/flags, четыре decompile errors и
+unclassified bytes открыты. MSVC 19.44.35229 — измеренный современный инструмент,
+не доказанный оригинальный compiler. local/game только читается.
+Игровой EXE и visual acceptance отсутствуют; итерация не закрыта.
