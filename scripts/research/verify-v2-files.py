@@ -1,8 +1,4 @@
-"""Compare recovered FE/heap/file queues with unchanged original x86 instructions.
-
-The disk worker completes immediately in the fixture. OS locks, scheduling,
-allocation wrappers and disk access remain recorded boundaries, not game implementations.
-"""
+"""Compare recovered FE/heap/file queues, worker and wait with original x86."""
 import argparse
 import hashlib
 import json
@@ -14,17 +10,17 @@ import sys
 from v2_manual_index import records as manual_records
 
 ROOT=Path(__file__).resolve().parents[2]
-RUN=ROOT/'iterations/v2/001-original-recovery/runs/006-file-device/files-regression'
+RUN=ROOT/'iterations/v2/001-original-recovery/runs/008-file-scheduler/files-regression'
 sys.path.insert(0,str(ROOT/'local/tools/python-unicorn'))
 from unicorn import Uc,UC_ARCH_X86,UC_MODE_32,UC_HOOK_CODE
-from unicorn.x86_const import UC_X86_REG_EAX,UC_X86_REG_ESP,UC_X86_REG_EIP
+from unicorn.x86_const import UC_X86_REG_EAX,UC_X86_REG_EBX,UC_X86_REG_ECX,UC_X86_REG_EDX,UC_X86_REG_ESI,UC_X86_REG_EDI,UC_X86_REG_EBP,UC_X86_REG_EFLAGS,UC_X86_REG_ESP,UC_X86_REG_EIP
 FILES=[0x533b90,0x533bf0,0x533c20,0x533cd0,0x533da0,0x533de0,0x59e040,
        0x567af0,0x567b80,0x567bf0,0x567df0,0x5680c0,0x568200,0x5682a0,
        0x5684c0,0x5684e0,0x568aa0,0x568ae0,0x568b10,0x568b90,0x5925d0]
-LISTS=[0x580730,0x580790,0x580850,0x580930,0x580ad0,0x580c10,0x580ea0,0x580ec0]
+LISTS=[0x5806e0,0x580730,0x580790,0x580850,0x5808f0,0x580930,0x580ad0,0x580c10,0x580ea0,0x580ec0]
 HEAP=[0x531c60,0x531ca0,0x531f90,0x5320b0,0x5323e0,0x556620,0x556650,0x569640,0x5697f0,0x56e2c0,0x5b0000,0x56e5f0,0x56e640]
 FE=[0x4b51e0,0x4b5250,0x4b5430,0x4b5470,0x4b5ee0,0x4b60d0,0x4b6660,0x4b4b80,0x4b4cd0]
-FUNCTIONS=FILES+LISTS+HEAP+FE
+FUNCTIONS=FILES+LISTS+HEAP+FE+[0x568530,0x567f70]
 IO,HEAP_ARENA,BUFFER,STACK,EXIT=0x3100000,0x3000000,0x3200000,0x200f000,0x2200000
 
 def cases():
@@ -77,8 +73,9 @@ def original(wire,module,data,functions,definitions):
     def signed(x):return x if x<0x80000000 else x-0x100000000
     devices=IO+0x100;pool=IO+0x2000;physical=IO+0x4000
     put(0x6a5c7c,devices);uc.mem_write(devices,b'\0'*(4*112))
+    put(0x6a5c80,0)
     for i in range(4):
-        d=devices+i*112;put(d,1);put(d+0x34,0x5684c0);put(d+0x5c,d);put(d+0x68,serial if i==device else 1)
+        d=devices+i*112;put(d,1);put(d+0x34,0x5684c0);put(d+0x5c,d);put(d+0x64,d+0x64);put(d+0x68,serial if i==device else 1);put(d+0x6c,0xff)
     put(0x6a5c58,16,0,pool,pool+15*48,0,0,0);put(0x6a5c38,0,0,0,0,0,0,0)
     for i in range(16):put(pool+i*48,pool+(i+1)*48 if i<15 else 0);put(pool+i*48+12,0)
     put(0x6af084,physical);put(0x6af080,1);uc.mem_write(physical,b'\0'*32);put(physical,1|(device<<8),0xffffffff)
@@ -88,34 +85,34 @@ def original(wire,module,data,functions,definitions):
     if mode=='O':
         uc.mem_write(0x6af370,bytes([int(offset!=0)]));uc.mem_write(0x6af168,b'root/\0');uc.mem_write(0x6af26c,b'\0' if offset==4 else b'fallback/\0');put(0x6afbe4,EXIT+0x200)
     ranges=[(int(a,16),int(b,16)) for va in FUNCTIONS+[0x5ae3c0] for a,b in functions[f'{va:08x}']['ranges']]
-    calls=[];coverage=set();object_used=0
+    calls=[];event_states=[];coverage=set();object_used=0;resumes=[];backend_error=0
+    def event_snapshot():
+        state=bytearray(uc.mem_read(devices,4*112))
+        for i in range(4):
+            at=i*112+0x34
+            if struct.unpack_from('<I',state,at)[0]:struct.pack_into('<I',state,at,0x5684c0)
+        for i in range(16):
+            o=pool+i*48;start=len(state);state.extend(uc.mem_read(o,48))
+            context=words(o+0x1c,1)[0]
+            if context not in (0,0xcccccccc):struct.pack_into('<I',state,start+0x1c,0x2200200)
+        state.extend(uc.mem_read(0x6a5c58,28));state.extend(uc.mem_read(0x6a5c38,28));state.extend(uc.mem_read(0x6a5c80,4))
+        return state.hex()
     endpoints={0x5322b0:1,0x5322c0:1,0x5321f0:0,0x5a0fbf:3,0x53c290:3,
-               EXIT+0x300:1,EXIT+0x400:4,EXIT+0x500:3,0x568e90:1,0x568390:1,0x55fb30:1,0x567f70:1,
+               EXIT+0x300:1,EXIT+0x400:4,EXIT+0x500:3,0x568e90:1,0x568390:1,0x55fb30:1,
+               0x55fc30:1,0x55fb90:1,0x55fce0:0,0x568900:3,0x592140:2,0x591df0:3,0x591fa0:3,0x591ce0:5,
+               0x5924d0:2,0x592490:1,0x591980:1,0x55f780:1,0x5366e0:1,0x55f740:1,0x55fc60:1,0x55fc40:1,
                0x592290:1,0x561b80:1,0x565340:1,EXIT+0x100:1,EXIT+0x200:2,0x4119e0:1,0x411a80:1,0x411b40:1}
-    def complete_worker(d):
-        queued=d+0x24;completed=d+0x40
-        while (op:=words(queued+8,1)[0]):
-            nxt,opid,typ,flags,status,field14,handle,context,callback,off,n,buf=words(op,12)
-            qcount=words(queued,1)[0]-1;put(queued,qcount,words(queued+4,1)[0]|1,nxt,words(queued+12,1)[0] if qcount else 0)
-            put(op,0);uc.mem_write(op+16,b'\x01')
-            if typ==0:
-                ok=present and string(buf)==expected_name;put(op+24,0xffffffff if ok else 0)
-                if not ok:uc.mem_write(op+16,b'\0')
-            elif typ==2:
-                got=min(n,max(0,len(filedata)-off)) if off<len(filedata) else 0
-                if readfail or not present:got=0;uc.mem_write(op+16,b'\0')
-                if got:uc.mem_write(buf,filedata[off:off+got])
-                put(op+40,got)
-            elif typ==4:put(op+36,len(filedata))
-            tail=words(completed+12,1)[0]
-            if tail:put(tail,op)
-            else:put(completed+8,op)
-            put(completed,words(completed,1)[0]+1,words(completed+4,1)[0]|1)
-            put(completed+12,op)
+    saved_regs=[UC_X86_REG_EBX,UC_X86_REG_ECX,UC_X86_REG_EDX,UC_X86_REG_ESI,UC_X86_REG_EDI,UC_X86_REG_EBP,UC_X86_REG_EFLAGS]
     def hook(machine,p,length,user):
-        nonlocal object_used
+        nonlocal object_used,backend_error
         if p in FUNCTIONS:coverage.add(f'{p:08x}')
         if p==EXIT:machine.emu_stop();return
+        if p==EXIT+0x600:
+            sp,ret,registers=resumes.pop()
+            for reg,value in registers.items():uc.reg_write(reg,value)
+            uc.reg_write(UC_X86_REG_EAX,0);uc.reg_write(UC_X86_REG_ESP,sp+4);uc.reg_write(UC_X86_REG_EIP,ret)
+            put(0x6a5c80,0);put(devices+device*112,1)
+            return
         nargs=endpoints.get(p)
         if nargs is None:
             if not any(a<=p<=b for a,b in ranges):raise RuntimeError(f'Unexpected original code {p:08x}')
@@ -142,12 +139,41 @@ def original(wire,module,data,functions,definitions):
         elif p==EXIT+0x500:calls.append(['virtual_free',*args]);result=1
         elif p==0x568e90:calls.append(['route',hxstr(args[0])]);result=device
         elif p==0x568390:put(devices+args[0]*112,1)
-        elif p==0x55fb30:calls.append(['signal',args[0]]);complete_worker(args[0])
-        elif p==0x567f70:
-            calls.append(['wait',args[0]]);node=words(devices+(args[0]&31)*112+0x48,1)[0];result=-3
-            while node:
-                if words(node+4,1)[0]==args[0]:result=struct.unpack('<b',uc.mem_read(node+16,1))[0];break
-                node=words(node,1)[0]
+        elif p==0x55fb30:
+            event_states.append(event_snapshot());calls.append(['signal',args[0]])
+            for i in range(4):
+                if args[0]==devices+i*112:
+                    put(0x6a5c80,0)
+                    resumes.append((sp,ret,{reg:uc.reg_read(reg) for reg in saved_regs}))
+                    put(sp-8,EXIT+0x600,i)
+                    uc.reg_write(UC_X86_REG_ESP,sp-8);uc.reg_write(UC_X86_REG_EIP,0x568530)
+                    return
+        elif p==0x55fc30:event_states.append(event_snapshot());calls.append(['worker_signal',args[0]])
+        elif p==0x55fb90:event_states.append(event_snapshot());calls.append(['worker_wait',args[0]]);put(0x6a5c80,1)
+        elif p==0x55fce0:calls.append(['error']);result=backend_error
+        elif p==0x568900:
+            calls.append(['backend_open',hxstr(args[0]),args[1],args[2]])
+            result=0xffffffff if present and string(args[0])==expected_name else 0
+            backend_error=0 if result else 2
+        elif p==0x592140:
+            calls.append(['backend_seek',*args]);result=int(args[0]==0xffffffff and not readfail)
+            backend_error=0 if result else 5
+        elif p==0x591df0:
+            calls.append(['backend_read',*args]);current=words(devices+device*112+0x20,1)[0]
+            off=words(current+0x24,1)[0] if current else 0
+            result=min(args[2],len(filedata)-off) if off<len(filedata) else 0
+            if result:uc.mem_write(args[1],filedata[off:off+result])
+            backend_error=0
+        elif p==0x591fa0:calls.append(['backend_write',*args]);result=args[2];backend_error=0
+        elif p==0x591ce0:
+            calls.append(['backend_info',args[0],args[1],args[2],0x200ff00,args[4]])
+            put(args[3],len(filedata));result=1;backend_error=0
+        elif p in (0x5924d0,0x592490,0x591980):result=1
+        elif p==0x55f780:calls.append(['current_thread']);result=0
+        elif p==0x5366e0:calls.append(['pump']);result=0
+        elif p==0x55f740:calls.append(['sleep',args[0]])
+        elif p==0x55fc60:event_states.append(event_snapshot());calls.append(['wait_event',args[0]])
+        elif p==0x55fc40:event_states.append(event_snapshot());calls.append(['reset_event',args[0]])
         elif p==0x592290:
             calls.append(['physical_close',args[0]]);result=1
             if args[0]==0xffffffff:uc.mem_write(physical,b'\0')
@@ -205,7 +231,7 @@ def original(wire,module,data,functions,definitions):
     return {'returns':returns,'buffer':bytes(uc.mem_read(BUFFER,count+16)).hex(),'io':snapshot.hex(),
             'objects':bytes(uc.mem_read(IO+0x5000,object_used)).hex(),
             'free_operations':bytes(uc.mem_read(0x6a5c58,28)).hex(),'free_auxiliary':bytes(uc.mem_read(0x6a5c38,28)).hex(),
-            'heap':bytes(uc.mem_read(HEAP_ARENA,65536)).hex(),'calls':calls,'stream':streamhex,'globals':globals_text,'actions':actions,'lengths':lengths},coverage
+            'heap':bytes(uc.mem_read(HEAP_ARENA,65536)).hex(),'calls':calls,'event_states':event_states,'stream':streamhex,'globals':globals_text,'actions':actions,'lengths':lengths},coverage
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int)
@@ -228,14 +254,20 @@ def main():
             path=ROOT/'local/reports/v2-files-mismatch.json';path.write_text(json.dumps({'case':i,'input':wire,'expected':expected,'actual':actual},indent=2)+'\n')
             raise RuntimeError(f'Case {i} differs: {[k for k in expected if expected[k]!=actual.get(k)]}; {path}')
         fixtures.append({'input':wire,'output_sha256':hashlib.sha256(json.dumps(expected,sort_keys=True).encode()).hexdigest(),'records':len(expected['lengths']),'stream_bytes':len(expected['stream'])//2})
+        if wire.startswith('F|') and wire.split('|',2)[1]==(ROOT/'local/game/fe.txt').read_bytes().hex():
+            if (len(expected['lengths']),len(expected['stream'])//2)!=(23,188):
+                raise RuntimeError('Real fe.txt did not produce 23 records / 188 bytes')
     print(json.dumps({'cases':len(inputs),'functions':sorted(coverage),'native_equal_original':True}))
     if args.limit:return
     source=ROOT/'iterations/v2/001-original-recovery/source'
-    paths=[p for p in source.rglob('*') if p.is_file() and p.suffix in ['.hpp','.cpp','.inc'] and ('catalog' not in p.parts) and p.name not in ['recovery_probe.cpp','heap_probe.cpp','fe_stream_probe.cpp']]
+    names={'files_probe.cpp','fe_stream.hpp','heap.hpp','files.hpp','file_device.hpp','file_worker.hpp','file_wait.hpp',
+           'fe_stream.cpp','heap.cpp','heap_callbacks.cpp','io_lists.cpp','io_worker_lists.cpp','files.cpp',
+           'file_pages.cpp','file_device.cpp','file_worker.cpp','file_wait.cpp'}
+    paths=[p for p in source.rglob('*') if p.is_file() and p.name in names]
     report={'schema':1,'sha256':module['sha256'],'function_vas':sorted(coverage),'cases':len(inputs),'native_cpp_equal_original_x86':True,
             'binary_matched':False,'game_launch_verified':False,
-            'comparison':'Whole heap, IO/device/operation state, copied names, buffers, streams, global words and ordered boundary calls. Stack contexts and recovered code pointers use documented VA identities.',
-            'boundaries':{'worker':'Immediate byte-file completion only in probes; original worker threads, wait, events and disk/archive implementations are not recovered.',
+            'comparison':'Whole heap, IO/device/operation state, copied names, buffers, streams, global words, ordered boundary calls and state at each event. Stack contexts and recovered code pointers use documented VA identities.',
+            'boundaries':{'worker':'Original worker and wait execute synchronously through the event fixture; backend disk/archive calls, thread identity, pump and platform event semantics remain recording endpoints.',
                           'Win32_allocation':'Original 0056e5f0/0056e640 execute; GetSystemInfo/VirtualAlloc/VirtualFree are recording OS endpoints, without OS lifetime or failure fidelity claims.',
                           'OS_CRT':'Recording lock/format/fill/physical close/exists/routing/diagnostic endpoints; original CRT ASCII comparator executes in C locale.',
                           'FE_callbacks':'No effects at 004119e0/00411a80/00411b40 test endpoints; callback semantics remain unrecovered.'},

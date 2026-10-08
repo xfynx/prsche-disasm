@@ -160,28 +160,35 @@ worker_probe (worker, gpt-6-sol, medium) — native probe и x86 verifier.
 3 новые функции приняты, всего 59. Все шесть MSVC Win32 стендов собираются.
 OS/backend/event/lock пока записываемые границы; concurrency не доказана.
 
+## Выполнено в Run008
+
+Operation wait 0x567f70 сверён на 87 unit случаях. Общий files_probe выполняет
+настоящие worker/wait/find/status вместо имитации completion; 89 joint случаев
+совпали по всей арене и промежуточным event snapshots. Реальный fe.txt даёт
+23 записи / 188 байтов (assertion). Всего 60 функций, семь собираемых стендов.
+Registry 29 файловых функций переведён на текущий Run008 joint report.
+Старые runs сохранены. OS/backend/thread/pump/CRT/SIMD/FE callbacks ещё границы.
+
 ## Текущий шаг и передача
 
-Владелец — координатор. Run007 задания завершены; незавершённых правок стенда нет.
-Следующий пакет Run008: удалить ручную имитацию completion в files_probe,
-подключить worker 0x568530 и восстановить operation wait 0x567f70.
-Сравнить joint FE/heap/IO и реальные очереди с исходным x86; OS события,
-thread ID/pump/sleep и disk APIs пока явные записываемые границы.
-Далее event wrappers 0x55fb20..0x55fce0, thread trampoline/start 0x55f4f0/0x55f5f0,
-disk open/read/seek/close 0x5919a0/0x591df0/0x592140/0x592290, archive 0x568900.
-После них heap setup и startup binding 0x4b6a50.
+Координатор: интеграция, сложный reverse и приёмка. Run008 задания завершены.
+Следующий Run009: event wrappers 0x55fb20..0x55fce0 и sleep 0x55f740,
+исправление lookup/IAT адресов в static imports index; затем thread
+trampoline/start 0x55f4f0/0x55f5f0. Disk open/read/seek/close и archive ещё открыты.
+После них heap setup и startup binding 0x4b6a50. Делегирование ограничено
+отдельными исходниками/стендами или индексом; назначение фиксируется при старте.
 
-Текущие проверки:
+Текущие команды:
 
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
-    py -3 scripts/research/index-v2-worker.py
-    py -3 scripts/research/verify-v2-file-worker.py
+    py -3 scripts/research/verify-v2-file-wait.py
+    py -3 scripts/research/verify-v2-files.py
     py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts
     py -3 scripts/research/structure-v2.py
     py -3 scripts/research/trace-v2-startup.py
     py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification
 
-Heap/FE/file/device SHA reports прежних runs остаются актуальны; история не меняется.
+Heap/FE/device/worker SHA reports прежних runs остаются актуальны; история не меняется.
 CRT/main-loop/render/audio/input, compiler/flags, четыре decompile errors и
 unclassified bytes открыты. MSVC 19.44.35229 — измеренный современный инструмент,
 не доказанный оригинальный compiler. local/game только читается.

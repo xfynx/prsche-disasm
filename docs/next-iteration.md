@@ -1,8 +1,10 @@
 # Текущий этап: v2/001-original-recovery
 
-Текущий результат Run007: 59 проверенных C++ функций; worker и 2 list helpers
-совпали с x86 на 69 случаях. Ближайший шаг — исходный worker в общем стенде
-и operation wait 0x567f70, затем события/thread/disk/archive.
+Текущий результат — [Run008](../iterations/v2/001-original-recovery/runs/008-file-scheduler/README.md): **60 проверенных C++ функций**.
+87 unit сравнений operation wait и 89 joint FE/heap/IO сравнений прошли.
+Имитация completion удалена; в общем стенде выполняются исходные worker/wait.
+Семь MSVC Win32 стендов собираются; игровой EXE пока не восстановлен.
+Далее события/thread, disk/archive backend и startup binding.
 
 Решение пользователя 2026-10-08 заменяет прежний порядок: сохранить v1 как есть,
 создать отдельную v2 и восстанавливать полный собираемый оригинал из бинарников.

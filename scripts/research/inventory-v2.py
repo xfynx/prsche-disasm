@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/007-file-worker/corpus-verification.json',
+                        default=ITERATION/'runs/008-file-scheduler/corpus-verification.json',
                         help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
     verification_output = args.verification_output if args.verification_output.is_absolute() else ROOT / args.verification_output
@@ -184,6 +184,8 @@ def main():
         paths += [path for path in (ITERATION/'runs/006-file-device').rglob('*') if path.resolve() != verification_output.resolve()]
         paths += [ROOT/'scripts/research/index-v2-worker.py', ROOT/'scripts/research/verify-v2-file-worker.py']
         paths += [path for path in (ITERATION/'runs/007-file-worker').rglob('*') if path.resolve() != verification_output.resolve()]
+        paths += [ROOT/'scripts/research/verify-v2-file-wait.py']
+        paths += [path for path in (ITERATION/'runs/008-file-scheduler').rglob('*') if path.resolve() != verification_output.resolve()]
         paths += list((ITERATION/'source').rglob('*'))
         paths += [ITERATION/'CMakeLists.txt', ITERATION/'reference/startup.json']
         paths += [ROOT/p for p in sorted({f['verification_report'] for f in recovered['functions']})]

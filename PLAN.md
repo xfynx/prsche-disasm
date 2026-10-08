@@ -1,11 +1,12 @@
 # План восстановления Porsche Unleashed
 
+Текущий результат — [Run008](iterations/v2/001-original-recovery/runs/008-file-scheduler/README.md): **60 проверенных C++ функций**.
+87 unit сравнений operation wait и 89 joint FE/heap/IO сравнений прошли.
+Имитация completion удалена; в общем стенде выполняются исходные worker/wait.
+Семь MSVC Win32 стендов собираются; игровой EXE пока не восстановлен.
+Далее события/thread, disk/archive backend и startup binding.
+
 Активный путь с 2026-10-08 — [v2/001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
-Run007 принят: 3 новые C++ функции worker/list helpers, 69 сравнений с исходным x86.
-Всего 59 проверенных функций. Все шесть стендов собираются. Следующий пакет —
-настоящий worker в общем FE/heap/IO стенде и operation wait 0x567f70; затем
-события, thread trampoline/start, disk/archive и startup 0x4b6a50.
-Владелец — координатор; назначения Run007 завершены.
 Полный корпус всех бинарников → собираемый original Windows/x86 → современный
 порт. Отдельные итерации `iterations/v2/*`, сборки `local/builds/v2/*`.
 Текущий результат: 24 PE + 1 NE / 36 587 функций / 2 827 310 инструкций
