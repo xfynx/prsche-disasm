@@ -1,5 +1,6 @@
 """Compare original operation wait control flow and native C++ with recording services."""
 import hashlib
+import argparse
 import json
 from pathlib import Path
 import struct
@@ -64,6 +65,7 @@ def original(wire,module,data,functions):
     value=uc.reg_read(UC_X86_REG_EAX)
     return {'result':value if value<0x80000000 else value-0x100000000,'devices':words(0x6a5c7c,1)[0],'arena':bytes(uc.mem_read(BASE,0x3000)).hex(),'calls':calls},coverage
 def main():
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--report-dir',type=Path,default=ROOT/'iterations/v2/001-original-recovery/runs/009-file-events/wait-regression');args=parser.parse_args()
     module=next(r for r in map(json.loads,(ROOT/'research/binary-index/static/binaries.jsonl').read_text().splitlines()) if r['file']=='Porsche.exe')
     data=(ROOT/'local/game'/module['path']).read_bytes();assert hashlib.sha256(data).hexdigest()==module['sha256']
     functions={r['entry_va']:r for r in map(json.loads,(ROOT/'research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl').read_text().splitlines())}
@@ -78,7 +80,8 @@ def main():
         fixtures.append({'input':wire,'output_sha256':hashlib.sha256(json.dumps(expected,sort_keys=True).encode()).hexdigest()})
     paths=['source/recovered/Porsche.exe/file_wait.cpp','source/recovered/Porsche.exe/io_lists.cpp','source/recovered/wait_probe.cpp','source/include/porsche/file_wait.hpp','source/include/porsche/file_worker.hpp','source/include/porsche/file_device.hpp','source/include/porsche/files.hpp','source/include/porsche/heap.hpp']
     paths=['iterations/v2/001-original-recovery/'+p for p in paths]
+    paths.append('iterations/v2/001-original-recovery/source/include/porsche/fe_stream.hpp')
     report={'schema':1,'sha256':module['sha256'],'function_vas':sorted(coverage),'cases':len(inputs),'native_cpp_equal_original_x86':True,'binary_matched':False,'game_launch_verified':False,'comparison':'Device arenas, retained/reloaded device identities, results and ordered find/status/thread/pump/sleep/event/lock calls. Pending/find/status are controlled fixtures; real consumers are exercised in joint files-regression.','source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
-    RUN.mkdir(parents=True,exist_ok=True);(RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n');(RUN/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[v]})+'\n' for v in sorted(coverage)),newline='\n')
+    args.report_dir.mkdir(parents=True,exist_ok=True);(args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n');(args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[v]})+'\n' for v in sorted(coverage)),newline='\n')
     print(json.dumps({'cases':len(inputs),'functions':sorted(coverage),'native_equal_original':True}))
 if __name__=='__main__':main()

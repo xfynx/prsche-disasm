@@ -169,26 +169,41 @@ Operation wait 0x567f70 сверён на 87 unit случаях. Общий fil
 Registry 29 файловых функций переведён на текущий Run008 joint report.
 Старые runs сохранены. OS/backend/thread/pump/CRT/SIMD/FE callbacks ещё границы.
 
+## Выполнено в Run009
+
+15 event/sleep wrappers 0x55f740/0x55fb20..0x55fce0 сверены на 249 случаях.
+3751 IAT адрес исправлен при сохранении 4217 path/dll/symbol/order записей.
+Исходные u32/HANDLE return signatures восстановлены, recording probes исправлены.
+Device/worker/wait/joint регрессии 474/69/87/89 прошли; registry указывает новые
+Run009 reports. Реальный fe.txt 23 records/188 bytes. Всего 75 функций и восемь
+стендов. Сравнение событий пока unit; в joint event wrappers ещё границы.
+Назначения worker_probe/import_index завершены, незавершённых поручений нет.
+
 ## Текущий шаг и передача
 
-Координатор: интеграция, сложный reverse и приёмка. Run008 задания завершены.
-Следующий Run009: event wrappers 0x55fb20..0x55fce0 и sleep 0x55f740,
-исправление lookup/IAT адресов в static imports index; затем thread
-trampoline/start 0x55f4f0/0x55f5f0. Disk open/read/seek/close и archive ещё открыты.
-После них heap setup и startup binding 0x4b6a50. Делегирование ограничено
-отдельными исходниками/стендами или индексом; назначение фиксируется при старте.
+Координатор: интеграция, сложный reverse и приёмка.
+Следующий Run010: убрать event wrapper stubs в joint, перенести границы на Win32
+imports; восстановить thread trampoline/start 0x55f4f0/0x55f5f0, registry
+0x55f560, init 0x55f320/0x55f3b0 и identity 0x55f780. Trampoline отсутствует
+в auto index, его инструкции 0x55f4f0..0x55f552 нужно дополнить по SHA/body.
+После этого disk open/read/seek/close и archive, heap setup, startup 0x4b6a50.
+Timer rate 0x5deb48 initial0 подтверждён, writer и OS thread scheduling ещё открыты.
 
 Текущие команды:
 
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1
+    py -3 scripts/research/verify-v2-file-events.py
+    py -3 scripts/research/verify-v2-file-device.py
+    py -3 scripts/research/verify-v2-file-worker.py
     py -3 scripts/research/verify-v2-file-wait.py
     py -3 scripts/research/verify-v2-files.py
+    py -3 scripts/research/test_index_binaries.py
     py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts
     py -3 scripts/research/structure-v2.py
     py -3 scripts/research/trace-v2-startup.py
     py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification
 
-Heap/FE/device/worker SHA reports прежних runs остаются актуальны; история не меняется.
+История runs не меняется. Heap/FE standalone SHA proofs Run005 актуальны.
 CRT/main-loop/render/audio/input, compiler/flags, четыре decompile errors и
 unclassified bytes открыты. MSVC 19.44.35229 — измеренный современный инструмент,
 не доказанный оригинальный compiler. local/game только читается.

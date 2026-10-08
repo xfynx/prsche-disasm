@@ -96,7 +96,8 @@ def original(wire,module,data,functions):
     return {'returns':returns,'arena':bytes(uc.mem_read(ARENA,0x10000)).hex(),'calls':calls},coverage
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int);args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int)
+    parser.add_argument('--report-dir',type=Path,default=ROOT/'iterations/v2/001-original-recovery/runs/009-file-events/device-regression');args=parser.parse_args()
     module=next(json.loads(l) for l in (ROOT/'research/binary-index/static/binaries.jsonl').read_text().splitlines() if json.loads(l)['file']=='Porsche.exe')
     data=(ROOT/'local/game'/module['path']).read_bytes()
     if hashlib.sha256(data).hexdigest()!=module['sha256']:raise RuntimeError('Original SHA differs')
@@ -122,7 +123,7 @@ def main():
                           'thread':'0055f5f0 records parameters; fixture supplies only worker initialized=1 write confirmed at 0056854b. Worker loop, events, concurrency, real thread state not executed.',
                           'lock_event_diagnostic':'Recording 005321f0/005322b0/005322c0, 0055fb20/0055fc20/0055fc60/0055fc40 and 00565340.'},
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
-    RUN.mkdir(parents=True,exist_ok=True);(RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
-    (RUN/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage)),newline='\n')
+    args.report_dir.mkdir(parents=True,exist_ok=True);(args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
+    (args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage)),newline='\n')
 
 if __name__=='__main__':main()

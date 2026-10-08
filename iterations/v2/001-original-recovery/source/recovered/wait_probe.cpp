@@ -33,9 +33,9 @@ std::int32_t __cdecl file_current_thread_0055f780(std::uint32_t id){
     return static_cast<std::int32_t>(thread_value);
 }
 std::uint32_t __cdecl file_pump_005366e0(std::uint32_t arg){record("[\"pump\","+std::to_string(arg)+"]");return 0xfedcba98;}
-void __cdecl file_sleep_0055f740(std::uint32_t arg){record("[\"sleep\","+std::to_string(arg)+"]");}
-void __cdecl file_wait_event_0055fc60(void* p){record("[\"wait_event\","+ptr(p)+"]");}
-void __cdecl file_reset_event_0055fc40(void* p){record("[\"reset_event\","+ptr(p)+"]");}
+std::uint32_t __cdecl file_sleep_0055f740(std::uint32_t arg){record("[\"sleep\","+std::to_string(arg)+"]");return 0;}
+void* __cdecl file_wait_event_0055fc60(void* p){record("[\"wait_event\","+ptr(p)+"]");return nullptr;}
+std::uint32_t __cdecl file_reset_event_0055fc40(void* p){record("[\"reset_event\","+ptr(p)+"]");return 0;}
 }
 int main(){using namespace porsche;
     arena=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>(BASE),0x10000,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!arena)return 3;

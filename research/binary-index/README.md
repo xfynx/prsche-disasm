@@ -1,6 +1,11 @@
 # Индекс оригинальных бинарников
 
 Обновлено 2026-10-03. **Перед реализацией поведения ищем свидетельства здесь.**
+Исправление 2026-10-08: static/imports.jsonl теперь вычисляет IAT как
+FirstThunk + ordinal_index*4, независимо от положения OriginalFirstThunk.
+Исправлены 3751 адрес при сохранении всех 4217 записей/имён/порядка.
+Свидетельства PE descriptor, SHA и исходных CALL —
+[Run009 import-iat.json](../../iterations/v2/001-original-recovery/runs/009-file-events/import-iat.json).
 Индексы — обычный текст под Git, доступный `rg` и всем исполнителям.
 Правило закреплено в [AGENTS.md](../../AGENTS.md).
 

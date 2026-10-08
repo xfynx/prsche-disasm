@@ -39,9 +39,9 @@ void* __cdecl heap_lock_create_005321f0(){rec("[\"create\"]");return nullptr;}
 void __cdecl heap_format_005a0fbf(char*out,const char*fmt,const char*arg){std::sprintf(out,fmt,arg);rec("[\"heap_format\",\""+hx(fmt,std::strlen(fmt)+1)+"\",\""+hx(arg,std::strlen(arg)+1)+"\"]");}
 void __cdecl heap_fill_0053c290(void*p,std::uint32_t v,std::uint32_t n){std::memset(p,(int)v,n);rec("[\"fill\","+std::to_string((std::uintptr_t)p)+","+std::to_string(v)+","+std::to_string(n)+"]");}
 void __cdecl heap_copy_005b0100(void*d,const void*s,std::uint32_t n){heap_copy_005b0000(d,s,n);} void __cdecl heap_copy_005b02c0(void*d,const void*s,std::uint32_t n){heap_copy_005b0000(d,s,n);} void __cdecl heap_copy_005b0480(void*d,const void*s,std::uint32_t n){heap_copy_005b0000(d,s,n);}
-void __cdecl file_event_signal_0055fb30(void*e){event_rec("[\"signal\","+std::to_string((std::uintptr_t)e)+"]");for(int i=0;i<4;++i)if(devices_006a5c7c[i].queued_event==e){file_shutdown_006a5c80=0;worker_signals=0;file_worker_00568530(i);devices_006a5c7c[i].initialized=1;file_shutdown_006a5c80=0;break;}}
-void __cdecl file_worker_signal_0055fc30(void*e){event_rec("[\"worker_signal\","+std::to_string((std::uintptr_t)e)+"]");++worker_signals;}
-void __cdecl file_worker_wait_0055fb90(void*e){event_rec("[\"worker_wait\","+std::to_string((std::uintptr_t)e)+"]");file_shutdown_006a5c80=1;}
+std::uint32_t __cdecl file_event_signal_0055fb30(void*e){event_rec("[\"signal\","+std::to_string((std::uintptr_t)e)+"]");for(int i=0;i<4;++i)if(devices_006a5c7c[i].queued_event==e){file_shutdown_006a5c80=0;worker_signals=0;file_worker_00568530(i);devices_006a5c7c[i].initialized=1;file_shutdown_006a5c80=0;break;}return 0;}
+std::uint32_t __cdecl file_worker_signal_0055fc30(void*e){event_rec("[\"worker_signal\","+std::to_string((std::uintptr_t)e)+"]");++worker_signals;return 0;}
+void* __cdecl file_worker_wait_0055fb90(void*e){event_rec("[\"worker_wait\","+std::to_string((std::uintptr_t)e)+"]");file_shutdown_006a5c80=1;return nullptr;}
 std::uint32_t __cdecl file_last_error_0055fce0(){rec("[\"error\"]");return backend_error;}
 void* __cdecl file_backend_open_00568900(const char*n,std::uint32_t a,std::uint32_t b){rec("[\"backend_open\",\""+nhex(n)+"\","+std::to_string(a)+","+std::to_string(b)+"]");const auto ok=present&&n&&std::strcmp(n,expected_name.c_str())==0;backend_error=ok?0:2;return ok?(void*)(std::uintptr_t)~0u:nullptr;}
 std::uint32_t __cdecl file_backend_seek_00592140(void*p,std::uint32_t n){rec("[\"backend_seek\","+std::to_string((std::uintptr_t)p)+","+std::to_string(n)+"]");const auto ok=p==(void*)(std::uintptr_t)~0u&&!readfail;backend_error=ok?0:5;return ok;}
@@ -53,9 +53,9 @@ std::uint32_t __cdecl file_backend_00592490(void*){return 1;}
 std::uint32_t __cdecl file_backend_00591980(void*){return 1;}
 std::int32_t __cdecl file_current_thread_0055f780(std::uint32_t){rec("[\"current_thread\"]");return 0;}
 std::uint32_t __cdecl file_pump_005366e0(std::uint32_t){rec("[\"pump\"]");return 0;}
-void __cdecl file_sleep_0055f740(std::uint32_t n){rec("[\"sleep\","+std::to_string(n)+"]");}
-void __cdecl file_wait_event_0055fc60(void*e){event_rec("[\"wait_event\","+std::to_string((std::uintptr_t)e)+"]");}
-void __cdecl file_reset_event_0055fc40(void*e){event_rec("[\"reset_event\","+std::to_string((std::uintptr_t)e)+"]");}
+std::uint32_t __cdecl file_sleep_0055f740(std::uint32_t n){rec("[\"sleep\","+std::to_string(n)+"]");return 0;}
+void* __cdecl file_wait_event_0055fc60(void*e){event_rec("[\"wait_event\","+std::to_string((std::uintptr_t)e)+"]");return nullptr;}
+std::uint32_t __cdecl file_reset_event_0055fc40(void*e){event_rec("[\"reset_event\","+std::to_string((std::uintptr_t)e)+"]");return 0;}
 void __stdcall platform_system_info(void* info) { std::memset(info,0,36);static_cast<std::uint32_t*>(info)[1]=4096;rec("[\"system_info\",4096]"); }
 void* __stdcall platform_virtual_alloc(void* requested,std::uint32_t size,std::uint32_t type,std::uint32_t protect) {
     object_used=(object_used+4095)&~4095u;void* result=size ? io+0x5000+object_used : nullptr;

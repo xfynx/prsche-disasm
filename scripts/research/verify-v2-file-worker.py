@@ -127,7 +127,8 @@ def original(wire,module,data,functions):
             'shutdown':words(0x6a5c80,1)[0],'calls':calls,'states':states},coverage
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int);args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--limit',type=int)
+    parser.add_argument('--report-dir',type=Path,default=ROOT/'iterations/v2/001-original-recovery/runs/009-file-events/worker-regression');args=parser.parse_args()
     module=next(x for x in map(json.loads,(ROOT/'research/binary-index/static/binaries.jsonl').read_text().splitlines()) if x['file']=='Porsche.exe')
     data=(ROOT/'local/game'/module['path']).read_bytes()
     assert hashlib.sha256(data).hexdigest()==module['sha256'],'Original SHA differs'
@@ -150,11 +151,12 @@ def main():
     if args.limit:return
     paths=['source/recovered/Porsche.exe/file_worker.cpp','source/recovered/Porsche.exe/io_lists.cpp','source/recovered/Porsche.exe/io_worker_lists.cpp','source/recovered/worker_probe.cpp','source/include/porsche/file_worker.hpp','source/include/porsche/file_device.hpp','source/include/porsche/files.hpp']
     paths=['iterations/v2/001-original-recovery/'+p for p in paths]
+    paths += ['iterations/v2/001-original-recovery/source/include/porsche/'+name for name in ['heap.hpp','fe_stream.hpp']]
     report={'schema':1,'sha256':module['sha256'],'function_vas':sorted(coverage),'cases':len(inputs),'native_cpp_equal_original_x86':True,'binary_matched':False,'game_launch_verified':False,
             'comparison':'Full worker arena, auxiliary list, shutdown state, ordered boundary calls and a device/operation/list state snapshot at every boundary; fixture stops loop via shutdown global only.',
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
-    RUN.mkdir(parents=True,exist_ok=True)
-    (RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
-    (RUN/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage) if va in functions),newline='\n')
+    args.report_dir.mkdir(parents=True,exist_ok=True)
+    (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
+    (args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage) if va in functions),newline='\n')
 
 if __name__=='__main__':main()

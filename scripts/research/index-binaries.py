@@ -92,8 +92,14 @@ def parse_pe(path: Path):
             else:
                 symbol = cstr(file_offset(value) + 2 if file_offset(value) is not None else None)
             symbols.append(symbol)
+            # ``thunk`` walks the lookup table (OriginalFirstThunk, or the
+            # FirstThunk fallback).  The imported function pointer lives in
+            # the IAT at FirstThunk + entry index * sizeof(IMAGE_THUNK_DATA).
+            lookup_base = file_offset(original or first)
+            entry_index = (thunk - lookup_base) // 4 if lookup_base is not None else None
             import_rows.append({"dll": dll, "symbol": symbol,
-                                "iat_rva": f"0x{(first + (thunk - file_offset(first))):x}" if file_offset(first) is not None else None})
+                                "iat_rva": f"0x{(first + entry_index * 4):x}"
+                                if entry_index is not None else None})
             thunk += 4
         imports.append({"dll": dll, "symbols": symbols})
         imp += 20

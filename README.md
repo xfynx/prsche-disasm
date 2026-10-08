@@ -1,10 +1,10 @@
-# Need for Speed: Porsche Unleashed — открытый движок и просмотрщик
+# Need for Speed: Porsche Unleashed — восстановление оригинала
 
-Текущий результат — [Run008](iterations/v2/001-original-recovery/runs/008-file-scheduler/README.md): **60 проверенных C++ функций**.
-87 unit сравнений operation wait и 89 joint FE/heap/IO сравнений прошли.
-Имитация completion удалена; в общем стенде выполняются исходные worker/wait.
-Семь MSVC Win32 стендов собираются; игровой EXE пока не восстановлен.
-Далее события/thread, disk/archive backend и startup binding.
+Текущий результат — [Run009](iterations/v2/001-original-recovery/runs/009-file-events/README.md): **75 проверенных C++ функций**.
+15 event/sleep wrappers совпали с x86 на 249 случаях; device/worker/wait/joint
+регрессии 474/69/87/89 прошли. Исправлены 3751 IAT-адрес в индексе импортов.
+Восемь MSVC Win32 стендов собираются; игровой EXE пока не восстановлен.
+Далее event wrappers в общем стенде, thread trampoline/start и disk/archive.
 
 **Активная разработка с 2026-10-08: [v2 — восстановление полного оригинала](iterations/v2/001-original-recovery/README.md).**
 Сначала полный корпус бинарников и собираемый Windows/x86 original baseline,

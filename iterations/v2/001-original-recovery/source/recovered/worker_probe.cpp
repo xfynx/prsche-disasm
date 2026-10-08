@@ -35,8 +35,8 @@ std::uint32_t __cdecl io_default_key_00580670(IoNode*n,std::uint32_t){return sta
 void __cdecl heap_enter_005322b0(void*p){record("[\"enter\","+pointer(p)+"]");}
 void __cdecl heap_leave_005322c0(void*p){record("[\"leave\","+pointer(p)+"]");}
 void* __cdecl heap_lock_create_005321f0(){return nullptr;}
-void __cdecl file_worker_signal_0055fc30(void*p){record("[\"signal\","+pointer(p)+"]");if(++signal_count>=stop_after)file_shutdown_006a5c80=1;}
-void __cdecl file_worker_wait_0055fb90(void*p){record("[\"wait\","+pointer(p)+"]");++wait_count;file_shutdown_006a5c80=1;}
+std::uint32_t __cdecl file_worker_signal_0055fc30(void*p){record("[\"signal\","+pointer(p)+"]");if(++signal_count>=stop_after)file_shutdown_006a5c80=1;return 0;}
+void* __cdecl file_worker_wait_0055fb90(void*p){record("[\"wait\","+pointer(p)+"]");++wait_count;file_shutdown_006a5c80=1;return nullptr;}
 std::uint32_t __cdecl file_last_error_0055fce0(){record("[\"error\"]");return error_value;}
 void* __cdecl file_backend_open_00568900(const char*p,std::uint32_t a,std::uint32_t b){record("[\"open\","+pointer(p)+","+std::to_string(a)+","+std::to_string(b)+"]");return reinterpret_cast<void*>(static_cast<std::uintptr_t>(backend_value));}
 std::uint32_t __cdecl file_backend_seek_00592140(void*p,std::uint32_t a){record("[\"seek\","+pointer(p)+","+std::to_string(a)+"]");return backend_value;}

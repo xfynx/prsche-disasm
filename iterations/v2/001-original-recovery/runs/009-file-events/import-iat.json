@@ -1,0 +1,27 @@
+{
+  "module": {
+    "path": "Porsche.exe",
+    "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+    "image_base": "0x400000",
+    "pe_import_descriptor": {
+      "dll": "KERNEL32.dll",
+      "original_first_thunk_rva": "0x1c9c18",
+      "first_thunk_rva": "0x1b2034",
+      "descriptor_count": 12
+    }
+  },
+  "correction": {
+    "formula": "FirstThunk + entry_index * 4; entry_index is relative to OriginalFirstThunk, or FirstThunk when OriginalFirstThunk is zero",
+    "static_import_rows_before": 4217,
+    "static_import_rows_after": 4217,
+    "iat_rows_changed": 3751,
+    "preserved_keys": "path,dll,symbol,order,count"
+  },
+  "proven_instruction_iat": [
+    {"symbol": "GetLastError", "iat_rva": "0x1b213c", "iat_va": "0x5b213c"},
+    {"symbol": "CreateEventA", "iat_rva": "0x1b2190", "iat_va": "0x5b2190"},
+    {"symbol": "SetEvent", "iat_rva": "0x1b2194", "iat_va": "0x5b2194"},
+    {"symbol": "WaitForMultipleObjectsEx", "iat_rva": "0x1b2198", "iat_va": "0x5b2198"},
+    {"symbol": "ResetEvent", "iat_rva": "0x1b219c", "iat_va": "0x5b219c"}
+  ]
+}
