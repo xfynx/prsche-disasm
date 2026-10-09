@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/061-startup-platform-integration/corpus-verification.json',
+                        default=ITERATION/'runs/067-main-callback-integration/corpus-verification.json',
                         help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
     verification_output = args.verification_output if args.verification_output.is_absolute() else ROOT / args.verification_output
@@ -181,6 +181,16 @@ def main():
     if args.write_verification:
         if listing_done != len(entries) or decompile_done != len(entries):
             raise SystemExit('Cannot record complete export verification before every module is attempted')
+        catalog = load(ITERATION/'source/catalog/modules.json')
+        if not catalog or catalog['function_count'] != counts['indexed_functions']:
+            raise RuntimeError('Stale source catalog; run structure-v2.py after inventory-v2.py')
+        for module in catalog['modules']:
+            sha = module['source_sha256']
+            rows = [json.loads(line) for line in (ROOT/module['catalog']).read_text(encoding='utf8').splitlines()]
+            addresses = {row['va'].lower() for row in rows}
+            expected = automatic_addresses[sha] | manual_addresses.get(sha, set())
+            if addresses != expected or len(rows) != len(expected):
+                raise RuntimeError(f'Stale/duplicate source catalog addresses: {module["catalog"]}')
         hashes = {}
         paths = list((ROOT/'research/v2/binaries').rglob('*')) + [target]
         paths += [ROOT/p for p in ('scripts/research/export-v2.ps1',
@@ -189,7 +199,7 @@ def main():
                   'scripts/research/trace-v2-startup.py','scripts/research/verify-v2-startup.py',
                   'scripts/research/export-v2-fe-tables.py','scripts/research/verify-v2-fe-stream.py',
                   'scripts/research/verify-v2-heap.py')]
-        paths += [ROOT/'scripts/research/v2_manual_index.py', ROOT/'scripts/research/verify-v2-files.py', ROOT/'scripts/research/verify-v2-file-device.py', ROOT/'research/binary-index/manual-functions.jsonl']
+        paths += [ROOT/'scripts/research/audit-v2-link-frontier.py', ROOT/'scripts/research/v2_manual_index.py', ROOT/'scripts/research/verify-v2-files.py', ROOT/'scripts/research/verify-v2-file-device.py', ROOT/'research/binary-index/manual-functions.jsonl']
         run005 = ITERATION/'runs/005-original-files'
         if run005.exists():
             paths += [path for path in run005.rglob('*') if path.resolve() != verification_output.resolve()]
@@ -203,7 +213,7 @@ def main():
         paths += [ROOT/'scripts/research/index-v2-threads.py', ROOT/'scripts/research/verify-v2-file-threads.py']
         paths += [path for path in (ITERATION/'runs/010-file-threads').rglob('*') if path.resolve() != verification_output.resolve()]
         paths += [ROOT/'scripts/research/verify-v2-file-disk.py', ROOT/'scripts/research/verify-v2-fe-callbacks.py']
-        for run_name in ('011-file-disk','012-fe-callbacks','013-input-state','014-heap-locks','015-joint-disk','017-input-modes','018-lock-bootstrap','016-disk-open','019-input-buffer','020-thread-bootstrap','022-startup-services','023-resource-paths','024-render-startup','025-application-heap','026-render-objects','027-window-runtime','030-startup-integration','028-render-loader','029-window-create','031-application-alloc','033-application-heap-init','034-window-procedure','036-native-window','032-render-display','035-window-worker','037-application-pool','038-window-handlers','039-window-state','040-application-bootstrap','041-startup-chain','042-render-registry','043-startup-subsystems','044-window-thread-start','045-window-messages','046-startup-input','047-application-fe','048-window-position','049-render-activate','050-application-instance','051-render-window','052-exit-registry','053-crt-shutdown','054-thread-shutdown','055-native-platform','056-render-driver-calls','057-native-thread-chain','059-window-keys','060-render-event-route','061-startup-platform-integration'):
+        for run_name in ('011-file-disk','012-fe-callbacks','013-input-state','014-heap-locks','015-joint-disk','017-input-modes','018-lock-bootstrap','016-disk-open','019-input-buffer','020-thread-bootstrap','022-startup-services','023-resource-paths','024-render-startup','025-application-heap','026-render-objects','027-window-runtime','030-startup-integration','028-render-loader','029-window-create','031-application-alloc','033-application-heap-init','034-window-procedure','036-native-window','032-render-display','035-window-worker','037-application-pool','038-window-handlers','039-window-state','040-application-bootstrap','041-startup-chain','042-render-registry','043-startup-subsystems','044-window-thread-start','045-window-messages','046-startup-input','047-application-fe','048-window-position','049-render-activate','050-application-instance','051-render-window','052-exit-registry','053-crt-shutdown','054-thread-shutdown','055-native-platform','056-render-driver-calls','057-native-thread-chain','059-window-keys','060-render-event-route','061-startup-platform-integration','058-application-main','063-render-mode','064-window-callback-bindings','065-window-callback-integration','067-main-callback-integration'):
             paths += [path for path in (ITERATION/'runs'/run_name).rglob('*') if path.resolve() != verification_output.resolve()]
         paths += [ROOT/'scripts/research/verify-v2-input-state.py', ROOT/'scripts/research/verify-v2-heap-locks.py', ROOT/'scripts/research/verify-v2-joint-disk.py']
         paths += [ROOT/'scripts/research/verify-v2-disk-open.py', ROOT/'scripts/research/verify-v2-input-buffer.py', ROOT/'scripts/research/verify-v2-thread-bootstrap.py']
@@ -213,6 +223,7 @@ def main():
         paths += [ITERATION/'source/recovered/functions.json', ITERATION/'source/recovered/sources.cmake']
         source_reports = {f['verification_report'] for f in recovered['functions']}
         source_reports.add('iterations/v2/001-original-recovery/runs/039-window-state/verification.json')
+        source_reports.add('iterations/v2/001-original-recovery/runs/067-main-callback-integration/window-callback-bindings/verification.json')
         source_reports.update(f['integration_verification_report'] for f in recovered['functions'] if f.get('integration_verification_report'))
         for report_path in sorted(source_reports):
             paths += [ROOT/p for p in load(ROOT/report_path)['source_sha256']]

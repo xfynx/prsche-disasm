@@ -75,6 +75,7 @@ add_executable(render_loader_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_load
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_loader.cpp"
 )
 add_executable(window_create_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_create_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_callback_bindings.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_create.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_init.cpp"
 )
@@ -281,3 +282,36 @@ foreach(probe window_keys_probe window_messages_probe startup_input_probe applic
     set_target_properties(${probe} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 endforeach()
 add_subdirectory(runs/057-native-thread-chain native-thread)
+
+add_executable(render_mode_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_mode_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_mode.cpp")
+add_executable(window_callback_bindings_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_callback_bindings_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_callback_bindings.cpp")
+foreach(probe render_mode_probe window_callback_bindings_probe)
+    target_include_directories(${probe} PRIVATE "${PORSCHE_RECOVERY_INCLUDE}")
+    target_compile_features(${probe} PRIVATE cxx_std_17)
+    target_compile_definitions(${probe} PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
+    target_compile_options(${probe} PRIVATE /W4 /EHsc /permissive-)
+    set_target_properties(${probe} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+endforeach()
+
+add_executable(application_main_probe "${PORSCHE_SOURCE_ROOT}/recovered/application_main_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_main.cpp")
+target_include_directories(application_main_probe PRIVATE "${PORSCHE_RECOVERY_INCLUDE}")
+target_compile_features(application_main_probe PRIVATE cxx_std_17)
+target_compile_definitions(application_main_probe PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
+target_compile_options(application_main_probe PRIVATE /W4 /EHsc /permissive-)
+set_target_properties(application_main_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+add_executable(window_callback_integration_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_callbacks_integration_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_callback_bindings.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_handlers.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_procedure.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_messages.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_keys.cpp"
+)
+target_include_directories(window_callback_integration_probe PRIVATE "${PORSCHE_RECOVERY_INCLUDE}")
+target_compile_features(window_callback_integration_probe PRIVATE cxx_std_17)
+target_compile_definitions(window_callback_integration_probe PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
+target_compile_options(window_callback_integration_probe PRIVATE /W4 /EHsc /permissive-)
+set_target_properties(window_callback_integration_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

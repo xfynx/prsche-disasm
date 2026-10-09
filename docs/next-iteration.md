@@ -1,12 +1,11 @@
 # Текущий этап: v2/001-original-recovery
 
-Текущий результат — [Run061](../iterations/v2/001-original-recovery/runs/061-startup-platform-integration/README.md): **188 проверенных C++ функций** и 4 частичных consumer.
-Общая MSVC Win32 сборка: 50 comparison probes и 3 нативных стенда. Подключены клавиатурные
-хуки, мышь, DirectInput startup, позиционирование окна, renderer routing, CRT callbacks и
-завершение потоков. 5 678 свежих сравнений с original x86 прошли. Реальные Win32 threads,
-events, pages и locks проверены отдельными запущенными EXE (Run055/057); окно — Run041.
-Это проверки отдельных связок; игрового v2 EXE и визуальной приёмки ещё нет.
-Следующий рубеж — полный main, native callback bindings и оставшиеся renderer consumers.
+Текущий результат — [Run067](../iterations/v2/001-original-recovery/runs/067-main-callback-integration/README.md): **193 проверенные C++ функции** и 4 частичных consumer.
+Общая MSVC Win32 сборка: 54 comparison probes и 3 native fixtures. Подключены полный main,
+renderer modes и реальные C++ callbacks всех 27 регистраций окна. Совместный registrar → WndProc → callbacks
+сверён с original x86; 4 260 свежих сравнений прошли. Сгенерированный каталог синхронизирован
+с supplementary index: 36 618 записей. Игрового v2 EXE и визуальной приёмки ещё нет.
+Следом — единая application arena, link adapters, Win32 window bindings и оставшиеся renderer consumers.
 
 Решение пользователя 2026-10-08 заменяет прежний порядок: сохранить v1 как есть,
 создать отдельную v2 и восстанавливать полный собираемый оригинал из бинарников.

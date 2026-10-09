@@ -50,4 +50,7 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_messages.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_position.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_keys.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_mode.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_callback_bindings.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_main.cpp"
 )

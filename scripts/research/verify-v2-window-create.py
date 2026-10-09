@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare Porsche.exe 0x53ac20 registration prefix with native x86 C++."""
 import argparse
 import hashlib
@@ -188,6 +189,7 @@ def main():
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest()}
     report['function_vas']=['0053ac20']
+    report['source_sha256']=source_hashes(report['source_sha256'].keys(),compiled_sources=['iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_create.cpp', 'iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_init.cpp', 'iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_callback_bindings.cpp', 'iterations/v2/001-original-recovery/source/recovered/window_create_probe.cpp'])
     args.report.parent.mkdir(parents=True,exist_ok=True)
     args.report.write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
 

@@ -3,18 +3,20 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Последний принятый пакет [Run061](runs/061-startup-platform-integration/README.md): 188 full + 4 partial,
-50 comparison probes + 3 native fixtures. 5 678 свежих x86 сравнений прошли.
-Реальные native window/thread/platform запуски сохранены в Run041/055/057.
-Игровой EXE ещё не готов; автоматический pseudo-C не считается восстановленным исходником.
-Владельцы: heap_init_recovery — Run058 full main (возобновлён после quota);
-render_mode_completion (gpt-6-luna/high) — доведение Run063 render modes;
-window_worker_recovery — Run064 callback relocation. Координатор — интеграция/реестр/линковка.
-Run058/063/064 исключены из принятого числа. Full main memory clear6573e8/3e24 остаётся
-явной границей до восстановления единой арены; никаких memset независимых globals.
-Проверка: scripts/build-v2.ps1; verify-v2-* со свежими report-dir/report под Run061;
-inventory-v2.py --require-listing --require-decompile-attempts --write-verification.
-Ближайший шаг: завершить доказательства main/mode и подключить настоящие callbacks вместо guest VA.
+Последний принятый пакет [Run067](runs/067-main-callback-integration/README.md): 193 full + 4 partial,
+54 comparison probes + 3 native fixtures. Общая сборка и 4 260 свежих original-x86 сравнений прошли.
+Полный main и все 27 window callback registrations связаны с native C++ functions; joint dispatch проверен.
+Игровой EXE ещё не готов. Автоматический pseudo-C не считается восстановленным исходником.
+Каталог 36 618 синхронизирован с 31 supplementary functions; manifest проверяет точное множество адресов.
+Владельцы (gpt-6-luna/high): heap_init_recovery — Run068 shared arena/fill;
+render_mode_completion — Run073 joint renderer state (066/071 готовы);
+window_worker_recovery — Run072 window callee adapters (069/070 готовы).
+Координатор — проверка ABI, интеграция и коммиты. Пакеты 066/068–073 ещё не входят в число 193.
+Подтверждено: 00657a60 — DWORD, строка 657a84 без доказанного extent; main: 15 cases passed.
+Main 6573e8/3e24 clear пока boundary. Original fill повторяет DWORD pattern, не общий memset (068 проверяется).
+Проверка: scripts/build-v2.ps1; verify-v2-* со свежими report-dir/report под Run067;
+audit-v2-link-frontier.py (нужен tool-env); inventory-v2.py → structure-v2.py → inventory-v2.py --write-verification.
+Ближайший шаг: принять 066/069/070/071, затем единую arena и ABI-проверенные adapters к существующим callees.
 Предыдущие назначения/числа ниже — история; актуальны этот блок и последний run.
 
 ## Цель и готовность 001

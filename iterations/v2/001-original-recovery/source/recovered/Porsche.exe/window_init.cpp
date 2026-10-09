@@ -1,4 +1,5 @@
 #include "porsche/window_create.hpp"
+#include "porsche/window_callback_bindings.hpp"
 
 namespace porsche {
 // Full 0053ac20..0053b03f. Every nontrivial callee below is an explicit
@@ -20,7 +21,14 @@ std::uint32_t __cdecl window_init_0053ac20(std::uint32_t width,std::uint32_t hei
             {0x209,0x53b710},{0x206,0x53b710},{0x202,0x53b770},
             {0x208,0x53b770},{0x205,0x53b770},{0x200,0x53b770},
             {0x218,0x53b8b0}};
-        for(const auto& row:handlers)window_handler_register_0053a800(row[0],row[1]);
+        // Original literal code addresses become native C++ callback addresses.
+        // No guest VA is stored as an executable pointer in the rebuilt table.
+        for(const auto& row:handlers) {
+            const auto callback=window_callback_resolve(row[1]);
+            if(!callback)return 0; // An incomplete reconstruction cannot start.
+            window_handler_register_0053a800(row[0],static_cast<std::uint32_t>(
+                reinterpret_cast<std::uintptr_t>(callback)));
+        }
         window_handlers_registered_0069e598=1;
     } else if (window_hwnd_006b7bf8 && fullscreen!=window_fullscreen_006b7c01) {
         window_resize_0053bec0(width,height);

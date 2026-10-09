@@ -1,4 +1,8 @@
 #include "porsche/window_create.hpp"
+#include "porsche/window_callback_bindings.hpp"
+#include "porsche/window_handlers.hpp"
+#include "porsche/window_keys.hpp"
+#include <cstdlib>
 #include <cstdint>
 #include <iostream>
 #include <sstream>
@@ -12,6 +16,25 @@ bool worker_success;
 void add(const std::string& s){calls.push_back(s);}
 }
 namespace porsche {
+// Callback leaves are not executed by this registration-only fixture.
+#define CALLBACK_STUB(name,ret) std::uint32_t __stdcall name(void*,void*,std::uint32_t,std::uint32_t,std::int32_t,std::int32_t*){std::exit(ret);}
+CALLBACK_STUB(window_handler_0053b040,0x40)
+CALLBACK_STUB(window_key_activation_0053b050,0x50)
+CALLBACK_STUB(window_handler_0053b230,0x230)
+CALLBACK_STUB(window_handler_0053b260,0x260)
+CALLBACK_STUB(window_handler_0053b290,0x290)
+CALLBACK_STUB(window_handler_0053b2a0,0x2a0)
+CALLBACK_STUB(window_handler_0053b2e0,0x2e0)
+CALLBACK_STUB(window_message_0053b360,0x360)
+CALLBACK_STUB(window_message_0053b3d0,0x3d0)
+CALLBACK_STUB(window_key_down_0053b450,0x450)
+CALLBACK_STUB(window_message_0053b6b0,0x6b0)
+CALLBACK_STUB(window_message_0053b710,0x710)
+CALLBACK_STUB(window_message_0053b770,0x770)
+CALLBACK_STUB(window_message_0053b7d0,0x7d0)
+CALLBACK_STUB(window_handler_0053b870,0x870)
+CALLBACK_STUB(window_handler_0053b8b0,0x8b0)
+#undef CALLBACK_STUB
 // Standalone fixture state; production definitions belong to window_runtime.cpp.
 const char* window_class_name_0069e5a8=nullptr;
 void* window_instance_006b7794=nullptr;
@@ -52,7 +75,15 @@ void* __stdcall window_set_cursor(void*){return nullptr;}
 std::int32_t __stdcall window_show_cursor(std::int32_t){return 0;}
 void __cdecl window_channel_005739b0(std::uint32_t,std::uint32_t){}
 std::uint32_t __stdcall window_handler_register_0053a800(std::uint32_t message,std::uint32_t handler){
-    add("[\"handler\","+std::to_string(message)+","+std::to_string(handler)+"]");
+    std::size_t count=0;
+    const auto* bindings=window_callback_relocations(&count);
+    std::uint32_t original=0;
+    for(std::size_t i=0;i<count;++i) {
+        const auto native=static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(bindings[i].native_callback));
+        if(native==handler){original=bindings[i].original_va;break;}
+    }
+    if(!original || original==handler)std::abort();
+    add("[\"handler\","+std::to_string(message)+","+std::to_string(original)+"]");
     return 1;
 }
 void __cdecl window_resize_0053bec0(std::uint32_t width,std::uint32_t height){
