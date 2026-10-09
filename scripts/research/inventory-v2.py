@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/012-fe-callbacks/corpus-verification.json',
+                        default=ITERATION/'runs/015-joint-disk/corpus-verification.json',
                         help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
     verification_output = args.verification_output if args.verification_output.is_absolute() else ROOT / args.verification_output
@@ -105,17 +105,20 @@ def main():
         indexed.update(manual_addresses.get(key[0], set()))
         if key[1].lower() not in indexed:
             raise RuntimeError(f'Recovered function is absent from corpus: {key}')
-        if function['status'] == 'native-differential-verified':
+        if function['status'] in ('native-differential-verified', 'partial-native-differential-verified'):
             verification = load(ROOT/function['verification_report'])
             source_sha = hashlib.sha256(source.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
-            verified_vas = verification.get('function_vas', [verification.get('function_va')]) if verification else []
+            verified_vas = verification.get('function_vas', verification.get('full_function_vas', []) + verification.get('partial_function_vas', []) or [verification.get('function_va')]) if verification else []
             if not verification or verification['sha256'] != key[0] or key[1] not in verified_vas or not verification['native_cpp_equal_original_x86'] or verification['source_sha256'].get(function['source']) != source_sha:
                 raise RuntimeError(f'Missing/stale native verification: {key}')
             for relative, expected_sha in verification['source_sha256'].items():
                 dependency = ROOT/relative
                 if not dependency.is_file() or hashlib.sha256(dependency.read_bytes().replace(b'\r\n', b'\n')).hexdigest() != expected_sha:
                     raise RuntimeError(f'Stale verified source dependency: {relative}')
-            entry['recovered_functions'] += 1
+            if function['status'] == 'native-differential-verified':
+                if key[1] in verification.get('partial_function_vas', []):
+                    raise RuntimeError(f'Partial proof cannot count as full function: {key}')
+                entry['recovered_functions'] += 1
         if function.get('binary_matched'):
             raise RuntimeError('Binary-match evidence validation has not been implemented; do not count unchecked claims')
     automatic_addresses = {}
@@ -152,6 +155,7 @@ def main():
               'decompile_failures':sum(e['automatic_decompilation'].get('failed',0) for e in entries),
               'pseudo_c_warning_functions':sum(e['automatic_decompilation'].get('warning_functions',0) for e in entries),
               'recovered_functions':sum(e['recovered_functions'] for e in entries),
+              'partially_verified_functions':sum(f['status']=='partial-native-differential-verified' for f in recovered['functions']),
               'matched_functions':0,'matched_modules':0}
     output = {'schema':1,'snapshot_date':'2026-10-09','generation':'v2',
               'v1_checkpoint':'dc6b9d8','original_data':'local/game (read-only)',
@@ -191,8 +195,9 @@ def main():
         paths += [ROOT/'scripts/research/index-v2-threads.py', ROOT/'scripts/research/verify-v2-file-threads.py']
         paths += [path for path in (ITERATION/'runs/010-file-threads').rglob('*') if path.resolve() != verification_output.resolve()]
         paths += [ROOT/'scripts/research/verify-v2-file-disk.py', ROOT/'scripts/research/verify-v2-fe-callbacks.py']
-        for run_name in ('011-file-disk','012-fe-callbacks'):
+        for run_name in ('011-file-disk','012-fe-callbacks','013-input-state','014-heap-locks','015-joint-disk','017-input-modes','018-lock-bootstrap'):
             paths += [path for path in (ITERATION/'runs'/run_name).rglob('*') if path.resolve() != verification_output.resolve()]
+        paths += [ROOT/'scripts/research/verify-v2-input-state.py', ROOT/'scripts/research/verify-v2-heap-locks.py', ROOT/'scripts/research/verify-v2-joint-disk.py']
         # Pending parallel work is excluded until its dependency hashes are accepted.
         paths += list((ITERATION/'source/catalog').rglob('*'))
         paths += [ITERATION/'source/recovered/functions.json', ITERATION/'source/recovered/sources.cmake']

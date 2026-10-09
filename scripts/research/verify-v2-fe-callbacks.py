@@ -80,6 +80,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--probe', type=Path, default=ROOT / 'local/builds/v2/001-original-recovery/bin/Release/fe_callbacks_probe.exe')
     parser.add_argument('--limit', type=int, default=0)
+    parser.add_argument('--report-dir', type=Path, default=RUN)
     args = parser.parse_args()
     binaries = ROOT / 'research/binary-index/static/binaries.jsonl'
     module = next(row for row in map(json.loads, binaries.read_text(encoding='utf8').splitlines())
@@ -123,8 +124,8 @@ def main():
     report['source_sha256'] = {name: hashlib.sha256((ROOT / name).read_bytes().replace(b'\r\n', b'\n')).hexdigest()
                                for name in dependencies}
     if not args.limit:
-        RUN.mkdir(parents=True, exist_ok=True)
-        (RUN / 'verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf8')
+        args.report_dir.mkdir(parents=True, exist_ok=True)
+        (args.report_dir / 'verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf8')
     print(json.dumps({'cases': len(inputs), 'native_cpp_equal_original_x86': True,
                       'function_vas': report['function_vas']}))
 

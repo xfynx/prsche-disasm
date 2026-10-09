@@ -13,4 +13,6 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_threads.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_disk.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/fe_callbacks.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/input_state.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/heap_locks.cpp"
 )

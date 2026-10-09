@@ -247,3 +247,18 @@ proofs повторены в новых Run012 regression folders; registry об
 physical-open файлы и x86 fixtures. Run013 input и Run014 locks активны.
 Координатор: checkpoint Run011/012, build новых targets, joint disk/callback
 binding в Run015. Незавершённые agent sources исключены из corpus manifest.
+
+## Принято Run013/014/015
+
+100 полностью verified C++ functions и1 частичная532e10. 1026 input/31locks/
+89 joint disk/1320 callback cases прошли; 14 MSVC targets собраны.
+Run017 input modes и Run018 lock bootstrap evidence приняты, не исполняемые proofs.
+Назначения после возобновления: input_check (worker,gpt-6-sol medium) — Run019
+только новые input_buffer files/verifier/run, consumers56fdb0/56fff0.
+heap_locks (worker,gpt-6-sol medium) — Run020 новые bootstrap_probe/verifier/run,
+совместный55f320→lockpool/pages/Win32. fe_callbacks (worker,gpt-6-sol medium)
+переназначен на Run016 новые disk_open files/verifier/run вместо отсутствующего
+disk_backend. Прежний input_state принадлежит принятому Run013; больше не менять
+до нового назначенного переноса. Координатор: интеграция, builds и checkpoints.
+Ближайший шаг: commit/push100, затем targets готовых016/019/020, x86 proofs,
+thread shutdown/exit и startup4b6a50. No gameplay approximations; original only.

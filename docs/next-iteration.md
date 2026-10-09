@@ -1,12 +1,11 @@
 # Текущий этап: v2/001-original-recovery
 
-Текущий результат — [Run012](../iterations/v2/001-original-recovery/runs/012-fe-callbacks/README.md): **92 проверенные C++ функции**.
-Run011: 4 disk read/seek/close/info функции, 31 сравнение с x86.
-Run012: 3 FE callbacks, 1320 сравнений; исходный u32 callback ABI исправлен.
-Все затронутые регрессии прошли: heap551/FE236/device474/worker69/wait87/
-events249/threads94/joint89. Одиннадцать MSVC Win32 стендов собираются.
-Три агента продолжают DirectInput, блокировки heap/очередей и physical open.
-Игрового EXE пока нет; следующий общий пакет — joint disk/callback binding.
+Текущий результат — [Run015](../iterations/v2/001-original-recovery/runs/015-joint-disk/README.md): **100 полностью проверенных C++ функций**.
+Run013: 3 DirectInput helpers,1026 сравнений; 532e10 mode6 PARTIAL вне счётчика.
+Run014: 5 lock/pool consumers,31 сравнение. Run015: реальные disk consumers
+в общем FE/heap/IO,89 сравнений; fe.txt23 records/188 bytes.
+14 MSVC Win32 стендов собираются; игрового EXE пока нет.
+Параллельно: physical open, input buffers и совместный thread/lock bootstrap.
 
 Решение пользователя 2026-10-08 заменяет прежний порядок: сохранить v1 как есть,
 создать отдельную v2 и восстанавливать полный собираемый оригинал из бинарников.

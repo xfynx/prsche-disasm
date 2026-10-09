@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "module": "Porsche.exe",
+  "status": "call_graph_and_fixture_specification_only",
+  "index_query": ["0055f320", "0055f3b0", "005321f0", "00532250", "0056e5f0"],
+  "proven_original_edges": [
+    {"from": "005321f0", "call_va": "005321fb", "to": "0055f320", "condition": "006a57dc == 0"},
+    {"from": "0055f320", "call_va": "0055f342", "to": "0055f3b0", "condition": "006a57dc was 0 at entry"},
+    {"from": "0055f3b0", "call_va": "0055f3ba", "to": "005321f0", "condition": "006a57ec == 0"},
+    {"from": "0055f3b0", "call_va": "0055f3e0", "to": "0056e5f0", "condition": "006a57e4 == 0"},
+    {"from": "0055f320", "call_va": "0055f379", "to": "005321f0", "condition": "006a57dc was 0 at entry"},
+    {"from": "005321f0", "call_va": "0053220e", "to": "00532250", "condition": "0069cb04 == 0"},
+    {"from": "00532250", "call_va": "00532269", "to": "0056e5f0", "condition": "unconditional within pool grow"}
+  ],
+  "original_order": [
+    "0055f320 tests 006a57dc; when zero, writes 1 at 0055f32d before any lock creation",
+    "0055f320 substitutes count 100 for zero and calls 0055f3b0",
+    "0055f3b0 creates table lock 006a57ec before allocating the thread table 006a57e4",
+    "nested 005321f0 reads initialized flag 1 and skips its 0055f320 edge",
+    "00532250 grows an empty lock pool through 0056e5f0, whose first call reads GetSystemInfo and then VirtualAlloc",
+    "0055f3b0 allocates and fills the thread table, then stores capacity 006a57e8",
+    "0055f320 obtains thread ID, duplicates current-thread handle, creates start lock 006a57d8, then sets exit-registration flag 006a57e0 before calling 00557380"
+  ],
+  "globals": {
+    "006a57dc": "initialized flag; 0 to 1 before nested lock create",
+    "006a57ec": "thread table lock; first cell from lock pool",
+    "006a57e4": "thread table pointer",
+    "006a57e8": "thread table capacity; floor of rounded bytes / 12",
+    "006a57d4": "main thread ID",
+    "006a57d0": "duplicated main thread handle",
+    "006a57d8": "thread start lock; second cell from lock pool",
+    "006a57e0": "exit callback registration flag",
+    "0069cb04": "lock pool free-list head",
+    "005de000": "lock pool cell count, PE initial word 32",
+    "006a6418": "page size cached by 0056e5f0"
+  },
+  "next_executable_fixture": {
+    "entry_va": "0055f320",
+    "arguments": [0],
+    "initial": {"006a57dc": 0, "006a57ec": 0, "006a57e4": 0, "006a57d8": 0, "0069cb04": 0, "005de000": 32, "006a6418": 0},
+    "recording_boundaries": ["GetSystemInfo", "VirtualAlloc", "InitializeCriticalSection", "GetCurrentThreadId", "GetCurrentProcess", "GetCurrentThread", "DuplicateHandle", "0053c290 fill", "00557380 exit registration"],
+    "expected_for_page_size_4096_and_successful_virtual_alloc": {"pool_cells": 128, "thread_table_requested_bytes": 1200, "thread_table_rounded_bytes": 4096, "thread_table_capacity": 341, "critical_sections_initialized": 2, "get_system_info_calls": 1, "virtual_alloc_calls": 2, "initialized_flag": 1, "exit_registration_flag": 1},
+    "compare": ["ordered real-function entry sequence", "OS call order and arguments", "all listed globals after each write", "pool and table arena snapshots", "return and ABI"],
+    "native_sources": ["source/recovered/Porsche.exe/file_threads.cpp", "source/recovered/Porsche.exe/file_pages.cpp", "source/recovered/Porsche.exe/heap_locks.cpp"],
+    "why_pending": "Run014 and Run010 each record the other function family as an endpoint; their isolated equality does not establish composed bootstrap behavior."
+  }
+}
