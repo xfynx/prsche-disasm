@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/020-thread-bootstrap/corpus-verification.json',
+                        default=ITERATION/'runs/030-startup-integration/corpus-verification.json',
                         help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
     verification_output = args.verification_output if args.verification_output.is_absolute() else ROOT / args.verification_output
@@ -203,10 +203,11 @@ def main():
         paths += [ROOT/'scripts/research/index-v2-threads.py', ROOT/'scripts/research/verify-v2-file-threads.py']
         paths += [path for path in (ITERATION/'runs/010-file-threads').rglob('*') if path.resolve() != verification_output.resolve()]
         paths += [ROOT/'scripts/research/verify-v2-file-disk.py', ROOT/'scripts/research/verify-v2-fe-callbacks.py']
-        for run_name in ('011-file-disk','012-fe-callbacks','013-input-state','014-heap-locks','015-joint-disk','017-input-modes','018-lock-bootstrap','016-disk-open','019-input-buffer','020-thread-bootstrap'):
+        for run_name in ('011-file-disk','012-fe-callbacks','013-input-state','014-heap-locks','015-joint-disk','017-input-modes','018-lock-bootstrap','016-disk-open','019-input-buffer','020-thread-bootstrap','022-startup-services','023-resource-paths','024-render-startup','025-application-heap','026-render-objects','027-window-runtime','030-startup-integration'):
             paths += [path for path in (ITERATION/'runs'/run_name).rglob('*') if path.resolve() != verification_output.resolve()]
         paths += [ROOT/'scripts/research/verify-v2-input-state.py', ROOT/'scripts/research/verify-v2-heap-locks.py', ROOT/'scripts/research/verify-v2-joint-disk.py']
         paths += [ROOT/'scripts/research/verify-v2-disk-open.py', ROOT/'scripts/research/verify-v2-input-buffer.py', ROOT/'scripts/research/verify-v2-thread-bootstrap.py']
+        paths += [ROOT/('scripts/research/verify-v2-'+name+'.py') for name in ('startup-services','resource-paths','application-heap','render-startup','render-objects','window-runtime')]
         # Pending parallel work is excluded until its dependency hashes are accepted.
         paths += list((ITERATION/'source/catalog').rglob('*'))
         paths += [ITERATION/'source/recovered/functions.json', ITERATION/'source/recovered/sources.cmake']

@@ -17,4 +17,10 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/heap_locks.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/disk_open.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/input_buffer.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/startup_services.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/resource_paths.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_startup.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_objects.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_runtime.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_heap.cpp"
 )

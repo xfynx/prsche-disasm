@@ -1,12 +1,12 @@
 # Текущий этап: v2/001-original-recovery
 
-Текущий результат — [Run020](../iterations/v2/001-original-recovery/runs/020-thread-bootstrap/README.md): **103 полностью проверенные C++ функции**.
-Ещё2 consumers частично восстановлены (532e10 mode6,56fdb0 error exit), вне счётчика.
-Run016 physical open/slot allocator:1672 сравнения. Run019 input property:37.
-Run020 совместный thread/lock/page bootstrap:27 full-state сравнений.
-17 MSVC Win32 стендов собираются. Игрового EXE пока нет.
-Приоритет — startup→первое окно: services, resource paths, renderer startup
-разбираются тремя исполнителями; координатор ведёт общую интеграцию.
+Текущий результат — [Run030](../iterations/v2/001-original-recovery/runs/030-startup-integration/README.md): **115 полностью проверенных C++ функций**.
+Ещё 3 consumers частично восстановлены, вне счётчика (input и display prefix).
+Run022–027: startup services, resource paths, application heap, renderer startup,
+core constructor, timed callbacks и настоящий CreateWindowExA consumer.
+23 MSVC Win32 стенда собираются; готовые группы интегрированы в общую библиотеку.
+Игрового EXE и подтверждённого окна пока нет. Приоритет — allocator → THRASH loader
+→ регистрация окна/исходная конфигурация → линковка и реальная попытка запуска.
 
 Решение пользователя 2026-10-08 заменяет прежний порядок: сохранить v1 как есть,
 создать отдельную v2 и восстанавливать полный собираемый оригинал из бинарников.

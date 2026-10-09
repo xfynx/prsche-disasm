@@ -2,9 +2,14 @@
 
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
-Владелец — координатор. Run 006 завершён: page wrappers, list/device startup
-и общий FE/heap/IO сверены с x86. Поручения исполнителей приняты;
-активных поручений нет. Игровой EXE и критерии всей итерации ещё открыты.
+Владелец — координатор. Приоритет пользователя 2026-10-09: пакетное
+восстановление C/C++ и цепочка startup → линковка EXE → настоящее окно.
+Готовые Run022–027 интегрируются вместе, вместо отдельных циклов на функцию.
+Три исполнителя: startup_heap — настоящий allocator (Run031), display_ctor —
+загрузчик THRASH (Run028), window_runtime — регистрация окна/конфигурация
+(Run029). Координатор — общая сборка, зависимости, registry и checkpoint Run030.
+Win32/CRT связываются штатными API; неизвестная игровая логика остаётся явной.
+Игровой EXE, реальное окно и критерии всей итерации пока не подтверждены.
 
 ## Цель и готовность 001
 
@@ -281,3 +286,21 @@ Run016/019/020 приняты, прежние assignments выполнены. Ro
 Первый игровой window/menu требует реальных constructor/renderer/FE bindings;
 принятые probes не объявляются игровым запуском. Startup fields/aliases должны
 совпадать с исходными consumers, не создавать независимые дубликаты globals.
+
+## Run030 — интеграция startup пакета, 2026-10-09
+
+Приняты Run022–027: 12 новых полных функций и один display prefix; всего115 full,
+3 partial. Запросы индекса, SHA/адреса и boundaries — в README каждого run.
+23 MSVC Win32 probes собраны общей командой; новые fixtures сверены с x86.
+Fresh input/callback/diskopen/inputbuffer регрессии находятся в Run030.
+Прежние assignments Run020/013/014 — история, не активные назначения.
+
+Владельцы: startup_heap — allocator Run031 и heap init Run033;
+display_ctor — THRASH Run028 и display constructor Run032;
+window_runtime — Run029 RegisterClass53ac20/конфигурация/caller53b8d0.
+Координатор — общая линковка/Win32 bindings, обновление registry и checkpoint.
+
+Проверки: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-v2.ps1`
+и `py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification`.
+Все proof commands/fresh directories — Run030/README. Дальше интеграция028/029/031
+и настоящий startup/window путь. Unit CreateWindow fixture ещё не реальное окно.

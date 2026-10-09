@@ -59,11 +59,23 @@ add_executable(input_buffer_probe "${PORSCHE_SOURCE_ROOT}/recovered/input_buffer
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/input_buffer.cpp")
 add_executable(bootstrap_probe "${PORSCHE_SOURCE_ROOT}/recovered/bootstrap_probe.cpp")
 target_link_libraries(bootstrap_probe PRIVATE porsche_original)
-foreach(probe input_probe lock_probe disk_open_probe input_buffer_probe)
+add_executable(startup_services_probe "${PORSCHE_SOURCE_ROOT}/recovered/startup_services_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/startup_services.cpp")
+add_executable(resource_paths_probe "${PORSCHE_SOURCE_ROOT}/recovered/resource_paths_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/resource_paths.cpp")
+add_executable(render_startup_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_startup_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_startup.cpp")
+add_executable(application_heap_probe "${PORSCHE_SOURCE_ROOT}/recovered/application_heap_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_heap.cpp")
+add_executable(render_objects_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_objects_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_objects.cpp")
+add_executable(window_runtime_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_runtime_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_runtime.cpp")
+foreach(probe input_probe lock_probe disk_open_probe input_buffer_probe startup_services_probe resource_paths_probe render_startup_probe render_objects_probe window_runtime_probe application_heap_probe)
     target_include_directories(${probe} PRIVATE "${PORSCHE_RECOVERY_INCLUDE}")
     target_compile_features(${probe} PRIVATE cxx_std_17)
 endforeach()
-foreach(probe disk_probe fe_callbacks_probe input_probe lock_probe joint_disk_probe disk_open_probe input_buffer_probe bootstrap_probe)
+foreach(probe disk_probe fe_callbacks_probe input_probe lock_probe joint_disk_probe disk_open_probe input_buffer_probe bootstrap_probe startup_services_probe resource_paths_probe render_startup_probe render_objects_probe window_runtime_probe application_heap_probe)
     target_compile_definitions(${probe} PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
     target_compile_options(${probe} PRIVATE /W4 /EHsc /permissive-)
     target_link_options(${probe} PRIVATE /machine:X86 "/MAP:${CMAKE_BINARY_DIR}/${probe}.map")

@@ -54,7 +54,7 @@ $ConfigureArgs = @('-S', $IterationRoot, '-B', $BuildRoot, '-G', $VsGenerator, '
 & $CMake.Source @ConfigureArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed with exit code $LASTEXITCODE" }
 
-& $CMake.Source '--build' $BuildRoot '--config' $Configuration '--target' 'recovery_probe' 'fe_stream_probe' 'heap_probe' 'files_probe' 'device_probe' 'worker_probe' 'wait_probe' 'event_probe' 'thread_probe' 'disk_probe' 'fe_callbacks_probe' 'input_probe' 'lock_probe' 'joint_disk_probe' 'disk_open_probe' 'input_buffer_probe' 'bootstrap_probe' '--parallel'
+& $CMake.Source '--build' $BuildRoot '--config' $Configuration '--target' 'recovery_probe' 'fe_stream_probe' 'heap_probe' 'files_probe' 'device_probe' 'worker_probe' 'wait_probe' 'event_probe' 'thread_probe' 'disk_probe' 'fe_callbacks_probe' 'input_probe' 'lock_probe' 'joint_disk_probe' 'disk_open_probe' 'input_buffer_probe' 'bootstrap_probe' 'startup_services_probe' 'resource_paths_probe' 'render_startup_probe' 'render_objects_probe' 'window_runtime_probe' 'application_heap_probe' '--parallel'
 if ($LASTEXITCODE -ne 0) { throw "CMake build failed with exit code $LASTEXITCODE" }
 
 $Probe = Join-Path $BuildRoot "bin/$Configuration/recovery_probe.exe"
