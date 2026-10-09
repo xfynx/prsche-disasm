@@ -1,11 +1,12 @@
 # v2 / 001 — восстановление исходного кода оригинала
 
-Текущий результат — [Run015](runs/015-joint-disk/README.md): **100 полностью проверенных C++ функций**.
-Run013: 3 DirectInput helpers,1026 сравнений; 532e10 mode6 PARTIAL вне счётчика.
-Run014: 5 lock/pool consumers,31 сравнение. Run015: реальные disk consumers
-в общем FE/heap/IO,89 сравнений; fe.txt23 records/188 bytes.
-14 MSVC Win32 стендов собираются; игрового EXE пока нет.
-Параллельно: physical open, input buffers и совместный thread/lock bootstrap.
+Текущий результат — [Run020](runs/020-thread-bootstrap/README.md): **103 полностью проверенные C++ функции**.
+Ещё2 consumers частично восстановлены (532e10 mode6,56fdb0 error exit), вне счётчика.
+Run016 physical open/slot allocator:1672 сравнения. Run019 input property:37.
+Run020 совместный thread/lock/page bootstrap:27 full-state сравнений.
+17 MSVC Win32 стендов собираются. Игрового EXE пока нет.
+Приоритет — startup→первое окно: services, resource paths, renderer startup
+разбираются тремя исполнителями; координатор ведёт общую интеграцию.
 
 Начато 2026-10-08 по решению пользователя. Предыдущая разработка сохранена
 в коммите `dc6b9d8`; 012 незавершена, продолжение её интеграции остановлено.

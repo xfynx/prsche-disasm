@@ -113,6 +113,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--probe', type=Path, default=ROOT / 'local/builds/v2/001-original-recovery/bin/Release/input_probe.exe')
     parser.add_argument('--limit', type=int, default=0)
+    parser.add_argument('--report-dir', type=Path, default=RUN)
     args = parser.parse_args()
     module = next(row for row in map(json.loads, (ROOT / 'research/binary-index/static/binaries.jsonl').read_text(encoding='utf8').splitlines()) if row['file'] == 'Porsche.exe')
     expected_sha = 'ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39'
@@ -145,8 +146,8 @@ def main():
             'iterations/v2/001-original-recovery/source/recovered/sources.cmake']
     report['source_sha256'] = {name: hashlib.sha256((ROOT / name).read_bytes().replace(b'\r\n', b'\n')).hexdigest() for name in deps}
     if not args.limit:
-        RUN.mkdir(parents=True, exist_ok=True)
-        (RUN / 'verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf8')
+        args.report_dir.mkdir(parents=True, exist_ok=True)
+        (args.report_dir / 'verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf8')
     print(json.dumps({'cases': len(inputs), 'native_cpp_equal_original_x86': True,
                       'partial_function_vas': report['partial_function_vas'],
                       'full_function_vas': report['full_function_vas']}))

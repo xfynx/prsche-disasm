@@ -262,3 +262,22 @@ disk_backend. Прежний input_state принадлежит принятом
 до нового назначенного переноса. Координатор: интеграция, builds и checkpoints.
 Ближайший шаг: commit/push100, затем targets готовых016/019/020, x86 proofs,
 thread shutdown/exit и startup4b6a50. No gameplay approximations; original only.
+
+## Run016/019/020 и приоритет первого запуска
+
+103 full functions,2 partial. Physicalopen1672/inputproperty37/jointbootstrap27
+native-original comparisons прошли. 17 Win32 targets собираются. Joint graph
+55f320→55f3b0→5321f0/532250→56e5f0 использует настоящий source, подтверждает
+BSS flag order и прекращение вложенной init; OS contention ещё не принято.
+Fresh Run020 input1026/callback1320 reports записаны с текущими build SHA.
+По запросу ускорения выбираем следующий код по startup path4b6a50, а не счётчику
+мелких functions. Всего3 worker slots + координатор, общие buildsпоследовательны.
+Актуальные назначения (worker,gpt-6-sol medium): heap_locks→Run022 только новые
+startup_services2consumers4a5410/4a5c30; input_check→Run023 новые resource_paths
+59d650; fe_callbacks→Run024 новые render_startup467470. C++ consumers сверяются
+по original asm; их неизвестные callees остаются типизированными границами.
+Run016/019/020 приняты, прежние assignments выполнены. Root: checkpoint103,
+затем Win32 bindings/shared startup state и общий startup consumer4b6a50.
+Первый игровой window/menu требует реальных constructor/renderer/FE bindings;
+принятые probes не объявляются игровым запуском. Startup fields/aliases должны
+совпадать с исходными consumers, не создавать независимые дубликаты globals.

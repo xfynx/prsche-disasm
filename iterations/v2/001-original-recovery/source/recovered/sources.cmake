@@ -15,4 +15,6 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/fe_callbacks.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/input_state.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/heap_locks.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/disk_open.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/input_buffer.cpp"
 )

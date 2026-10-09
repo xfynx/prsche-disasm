@@ -53,11 +53,17 @@ add_executable(input_probe "${PORSCHE_SOURCE_ROOT}/recovered/input_probe.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/input_state.cpp")
 add_executable(lock_probe "${PORSCHE_SOURCE_ROOT}/recovered/lock_probe.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/heap_locks.cpp")
-foreach(probe input_probe lock_probe)
+add_executable(disk_open_probe "${PORSCHE_SOURCE_ROOT}/recovered/disk_open_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/disk_open.cpp")
+add_executable(input_buffer_probe "${PORSCHE_SOURCE_ROOT}/recovered/input_buffer_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/input_buffer.cpp")
+add_executable(bootstrap_probe "${PORSCHE_SOURCE_ROOT}/recovered/bootstrap_probe.cpp")
+target_link_libraries(bootstrap_probe PRIVATE porsche_original)
+foreach(probe input_probe lock_probe disk_open_probe input_buffer_probe)
     target_include_directories(${probe} PRIVATE "${PORSCHE_RECOVERY_INCLUDE}")
     target_compile_features(${probe} PRIVATE cxx_std_17)
 endforeach()
-foreach(probe disk_probe fe_callbacks_probe input_probe lock_probe joint_disk_probe)
+foreach(probe disk_probe fe_callbacks_probe input_probe lock_probe joint_disk_probe disk_open_probe input_buffer_probe bootstrap_probe)
     target_compile_definitions(${probe} PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
     target_compile_options(${probe} PRIVATE /W4 /EHsc /permissive-)
     target_link_options(${probe} PRIVATE /machine:X86 "/MAP:${CMAKE_BINARY_DIR}/${probe}.map")
