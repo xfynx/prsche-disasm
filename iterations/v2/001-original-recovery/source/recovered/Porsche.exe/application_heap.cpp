@@ -6,8 +6,6 @@ std::uint32_t application_page_size_006af3f8=0;
 std::uint8_t application_heap_initialized_006af3f4=0;
 void* application_primary_arena_006af3b4=nullptr;
 std::int32_t application_object_heap_006af3fc=0;
-std::uint32_t application_diagnostic_source_005deb74=0;
-std::uint32_t application_diagnostic_line_005deb78=0;
 std::uint8_t application_heap_records[0x8c0]{};
 void* application_queue_indices[16]{};
 

@@ -19,7 +19,7 @@ bool window_message_has_resize_notification_005df9b8();
 std::uint32_t __cdecl window_message_resize_notification_005df9b8();
 std::uint8_t __cdecl window_message_translate_key_0069e5a0(std::uint32_t);
 extern std::uint8_t window_virtual_key_state_005de028[256];
-extern void* window_paint_lock_006a57d8;
+extern void*& window_paint_lock_006a57d8;
 
 // Recovered original registered callbacks, each with six stdcall arguments/RET 18.
 std::uint32_t __stdcall window_message_0053b360(void*,void*,std::uint32_t,std::uint32_t,std::int32_t,std::int32_t*);

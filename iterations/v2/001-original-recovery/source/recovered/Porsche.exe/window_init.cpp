@@ -39,7 +39,7 @@ std::uint32_t __cdecl window_init_0053ac20(std::uint32_t width,std::uint32_t hei
     window_height_006b77b8=height;
     window_fullscreen_006b7c01=static_cast<std::uint8_t>(fullscreen);
     std::uint32_t state[7]{};
-    if (!window_thread_start_0055f420(reinterpret_cast<void*>(&window_worker_0053b8d0),0,1,0xffffffffu,state))return 0;
+    if (!window_thread_start_0055f420(reinterpret_cast<void*>(&window_worker_thread_entry),0,1,0xffffffffu,state))return 0;
     while(!window_thread_handle_0069e574) {
         window_timed_callback_005366e0(0);
         window_idle_0055f740(0);

@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Differential Porsche.exe physical-open and slot-allocation unit."""
 import argparse
 import hashlib
@@ -154,6 +155,7 @@ def main():
             'original_body_sha256':body_hashes,
             'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest(),'fixtures':fixtures}
     report_dir.mkdir(parents=True,exist_ok=True)
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     (report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
     (report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':sha,'body_sha256':body_hashes[v],**functions[v]})+'\n' for v in ('005919a0','00591c50')),encoding='utf8')
 

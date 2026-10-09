@@ -29,7 +29,8 @@ std::uint32_t window_input_read_0069e0d8=0,window_input_write_0069e568=0;
 std::uint32_t window_channels_initialized_0069e5a0=0;
 std::uint32_t worker_accelerator_006bd9dc=0;
 std::uint32_t window_saved_parameter_0069e57c=0,window_saved_parameter_0069e580=0;
-void* window_paint_lock_006a57d8=reinterpret_cast<void*>(0x8888u);
+void* paint_lock_fixture=reinterpret_cast<void*>(0x8888u);
+void*& window_paint_lock_006a57d8=paint_lock_fixture;
 
 struct Event {std::uint32_t id,a,b,c,d;};
 std::vector<Event> events;

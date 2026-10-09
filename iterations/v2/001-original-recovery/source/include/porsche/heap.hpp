@@ -1,5 +1,6 @@
 #pragma once
 #include "porsche/fe_stream.hpp"
+#include "porsche/shared_runtime_globals.hpp"
 
 namespace porsche {
 struct HeapBlock {
@@ -20,7 +21,7 @@ static_assert(sizeof(HeapBlock)==16 && sizeof(HeapFreeBlock)==24 && sizeof(Origi
 static_assert(offsetof(OriginalHeap, quantum)==0x28 && offsetof(OriginalHeap, lock)==0x38);
 extern OriginalHeap* heaps_006b4f20[16];
 extern std::int32_t (__cdecl* allocation_failure_0069cb00)(const char*, std::int32_t, std::uint32_t);
-extern std::uint32_t copy_flag_005deb1c, copy_flag_005deb18, copy_flag_005deb10, copy_flag_005deb30;
+extern std::uint32_t copy_flag_005deb18, copy_flag_005deb10, copy_flag_005deb30;
 
 std::int32_t __cdecl heap_extra_00531c60(const char*, std::uint32_t);
 std::int32_t __cdecl heap_block_005320b0(HeapBlock*, const char*, std::int32_t, std::int32_t,

@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Differentially verify recovered Porsche.exe thread and registry functions."""
 import argparse
 import hashlib
@@ -192,6 +193,7 @@ def main():
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
     report_dir.mkdir(parents=True,exist_ok=True)
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     (report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
     (report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage)),newline='\n')
 

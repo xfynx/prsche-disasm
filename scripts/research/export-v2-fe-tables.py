@@ -14,6 +14,8 @@ SHA = "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39"
 DEFAULT_OUTPUT = ROOT / "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/fe_tables.inc"
 DEFAULT_PROVENANCE = ROOT / "iterations/v2/001-original-recovery/runs/003-fe-stream/tables.json"
 BASE = 0x400000
+APPLICATION_STATE_START = 0x006573E8
+APPLICATION_STATE_END = 0x0065B20C
 
 
 def u32(data: bytes, offset: int) -> int:
@@ -131,6 +133,10 @@ def export(output: Path, provenance: Path) -> dict:
     for target in targets:
         if target == 0x65B298:
             lines.append("extern std::uint32_t fe_enabled_0065b298;")
+        elif APPLICATION_STATE_START <= target < APPLICATION_STATE_END:
+            if (target - APPLICATION_STATE_START) % 4:
+                raise RuntimeError(f'FE target 0x{target:08x} is not an aligned arena word')
+            lines.append(f"extern std::uint32_t& global_{target:08x};")
         else:
             lines.append(f"std::uint32_t global_{target:08x} = 0x{target_words[target]:08x}u;")
     for callback in callbacks:

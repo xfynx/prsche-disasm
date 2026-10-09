@@ -13,9 +13,10 @@ static_assert(sizeof(RenderCore)==4 && sizeof(RenderDisplay)==0x80);
 
 extern RenderCore* render_core_0065b39c;
 extern RenderDisplay* render_display_00628130;
-extern char render_selector_00657a38[16];
-extern std::uint32_t render_width_00657a48,render_height_00657a4c;
-extern std::uint32_t render_selected_00657a58;
+extern char* render_selector_00657a38;
+extern std::uint32_t& render_width_00657a48;
+extern std::uint32_t& render_height_00657a4c;
+extern std::uint32_t& render_selected_00657a58;
 extern const char* render_display_name_0065b304;
 
 // Typed unresolved boundaries. Constructors are thiscall in original asm;

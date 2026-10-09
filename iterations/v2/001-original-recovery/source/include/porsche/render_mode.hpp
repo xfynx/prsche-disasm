@@ -10,13 +10,13 @@ struct RenderModeRecord10 { std::uint32_t words[10]; };
 // Canonical state storage for the contiguous original byte range 0x619790..0x619800.
 extern std::uint8_t render_mode_state_00619790[0x71];
 // Original settings/data globals, each defined once by this owner.
-extern std::int32_t render_mode_setting_00657d5c;
-extern std::int32_t render_mode_setting_00657d60;
-extern std::int32_t render_mode_setting_00657d68;
-extern std::int32_t render_mode_setting_00657d6c;
-extern std::int32_t render_mode_setting_00657d70;
-extern std::int32_t render_mode_setting_00657d78;
-extern std::int32_t render_mode_setting_00657d80;
+extern std::int32_t& render_mode_setting_00657d5c;
+extern std::int32_t& render_mode_setting_00657d60;
+extern std::int32_t& render_mode_setting_00657d68;
+extern std::int32_t& render_mode_setting_00657d6c;
+extern std::int32_t& render_mode_setting_00657d70;
+extern std::int32_t& render_mode_setting_00657d78;
+extern std::int32_t& render_mode_setting_00657d80;
 extern std::uint32_t render_mode_time_value_005ce908;
 extern std::uint8_t render_mode_option_0069dd1d;
 

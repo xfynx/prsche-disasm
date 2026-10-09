@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare Porsche.exe startup resource path consumer with a native C++ probe."""
 import argparse
 import hashlib
@@ -133,6 +134,7 @@ def main():
               'probe_sha256': hashlib.sha256(args.probe.read_bytes()).hexdigest(),
               'source_sha256': {name: hashlib.sha256((ROOT / name).read_bytes().replace(b'\r\n', b'\n')).hexdigest() for name in deps}}
     report_dir.mkdir(parents=True, exist_ok=True)
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     (report_dir / 'verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf8')
     print(json.dumps({'cases': len(inputs), 'full_function_vas': report['full_function_vas']}))
 

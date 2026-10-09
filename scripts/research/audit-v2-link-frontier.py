@@ -39,7 +39,10 @@ def main():
     if not dumpbin:
         raise RuntimeError('Dot-source scripts/tool-env.ps1 before this command')
     paths = [ROOT / 'local/builds/v2/001-original-recovery/Release/porsche_original.lib',
-             ROOT / 'local/builds/v2/001-original-recovery/native-thread/platform/Release/porsche_platform_win32.lib']
+             ROOT / 'local/builds/v2/001-original-recovery/native-thread/platform/Release/porsche_platform_win32.lib',
+             ROOT / 'local/builds/v2/001-original-recovery/native-window-bindings/Release/win32_window_bindings.lib',
+             ROOT / 'local/builds/v2/001-original-recovery/recovered-links/Release/porsche_recovered_links.lib',
+             ROOT / 'local/builds/v2/001-original-recovery/Release/porsche_window_links.lib']
     definitions, references, labels = Counter(), set(), {}
     inputs = []
     for path in paths:

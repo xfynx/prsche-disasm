@@ -1,3 +1,5 @@
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/heap.hpp"
 #include <windows.h>
 #include <algorithm>

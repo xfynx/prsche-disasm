@@ -89,7 +89,7 @@ int main(){
         porsche::window_instance_006b7794=reinterpret_cast<void*>(0x1234000);
         client_left=l;client_top=t;client_right=r;client_bottom=b;screen_x=sx;screen_y=sy;
         porsche::window_thread_handle_0069e574=nullptr;porsche::window_running_006b7c14=0;
-        auto result=porsche::window_worker_0053b8d0(nullptr);
+        auto result=porsche::window_worker_0053b8d0();
         std::cout<<"{\"result\":"<<result<<",\"hwnd\":"<<reinterpret_cast<std::uintptr_t>(porsche::window_hwnd_006b7bf8)
                  <<",\"pos\":["<<porsche::window_pos_x_006b7c08<<","<<porsche::window_pos_y_006b7c0c<<"],\"calls\":[";
         for(std::size_t i=0;i<calls.size();++i){if(i)std::cout<<',';std::cout<<calls[i];}

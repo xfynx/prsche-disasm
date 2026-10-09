@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Differential mode-6 input state and DirectInput helper proof against Porsche.exe."""
 import argparse
 import hashlib
@@ -147,6 +148,7 @@ def main():
     report['source_sha256'] = {name: hashlib.sha256((ROOT / name).read_bytes().replace(b'\r\n', b'\n')).hexdigest() for name in deps}
     if not args.limit:
         args.report_dir.mkdir(parents=True, exist_ok=True)
+        report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
         (args.report_dir / 'verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf8')
     print(json.dumps({'cases': len(inputs), 'native_cpp_equal_original_x86': True,
                       'partial_function_vas': report['partial_function_vas'],

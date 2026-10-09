@@ -7,7 +7,9 @@ set(ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
 get_filename_component(ROOT "${ROOT}" ABSOLUTE)
 add_executable(application_main_probe
   "${ROOT}/source/recovered/application_main_probe.cpp"
-  "${ROOT}/source/recovered/Porsche.exe/application_main.cpp")
+  "${ROOT}/source/recovered/Porsche.exe/application_main.cpp"
+  "${ROOT}/source/recovered/Porsche.exe/application_state.cpp"
+  "${ROOT}/source/recovered/Porsche.exe/application_globals.cpp")
 target_include_directories(application_main_probe PRIVATE "${ROOT}/source/include")
 target_compile_features(application_main_probe PRIVATE cxx_std_17)
 target_compile_options(application_main_probe PRIVATE /W4 /EHsc /permissive-)

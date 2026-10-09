@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Differentially verify startup pool allocation against Porsche.exe x86."""
 import argparse
 import hashlib
@@ -172,6 +173,7 @@ def main():
               'scope': 'Initial application pool startup and first disk-slot initialization; lock, fill, Win32 allocation and callback-registry insertion are explicit boundaries. Reinitialization cleanup and shutdown callback are outside startup scope.',
               'source_sha256': {p: hashlib.sha256((ROOT / p).read_bytes().replace(b'\r\n', b'\n')).hexdigest() for p in paths},
               'probe_sha256': hashlib.sha256(binary.read_bytes()).hexdigest()}
+    result['source_sha256']=source_hashes([*result['source_sha256'],Path(__file__)])
     (report / 'verification.json').write_text(json.dumps(result, indent=2) + '\n', newline='\n')
     print(json.dumps({'cases': len(inputs), 'function_vas': result['function_vas'], 'native_cpp_equal_original_x86': True}))
 

@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "question": "Does original VA 005e8e50 support both a 32-byte heap-name object and a one-byte FE/file fallback, and what alias contract is evidenced?",
+  "original": {
+    "module": "Porsche.exe",
+    "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+    "index": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/",
+    "decompilation_corpus": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/",
+    "pe_inventory": "research/binary-index/static/binaries.jsonl"
+  },
+  "native_owners": [
+    {
+      "name": "application_object_heap_name_005e8e50",
+      "type": "char[32]",
+      "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_heap_init.cpp:9",
+      "use": "passed as the heap-init C-string name"
+    },
+    {
+      "name": "file_null_name_005e8e50",
+      "type": "char[1]",
+      "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/files.cpp:69",
+      "use": "substituted when a file operation name is null"
+    }
+  ],
+  "pe_layout": {
+    "image_base": "00400000",
+    "section": ".data",
+    "section_rva": "001cb000",
+    "section_va": "005cb000",
+    "raw_offset": "001cb000",
+    "raw_size": "0001c000",
+    "raw_rva_end_exclusive": "001e7000",
+    "raw_va_end_exclusive": "005e7000",
+    "virtual_size": "000f6358",
+    "virtual_va_end_exclusive": "006c1538",
+    "target_va": "005e8e50",
+    "target_rva": "001e8e50",
+    "target_rva_delta_from_section_start": "0001de50",
+    "target_in_file_backed_range": false,
+    "target_in_virtual_range": true,
+    "interpretation": "PE virtual tail is zero-filled; address has no raw file offset/byte.",
+    "verification": {
+      "command": "py -3 scripts/research/inspect-pe-range.py --binary Porsche.exe --address 0x5e8e50 --size 0x40 --words",
+      "result": "Rejected: requested range must fit one file-backed section; consistent with virtual-tail mapping."
+    }
+  },
+  "defined_data": {
+    "source": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/defined-data.jsonl:19453",
+    "record": {
+      "va": "005e8e50",
+      "bytes": 1,
+      "type": "/undefined1",
+      "value": "0x0"
+    },
+    "limits": "Ghidra's undefined-byte records show contents, not source-level object extents."
+  },
+  "reference_index": {
+    "source": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+    "target_va": "005e8e50",
+    "total_references": 226,
+    "types": {
+      "READ": 71,
+      "DATA": 155,
+      "WRITE": 0
+    },
+    "read_function_count": 30,
+    "read_instruction_sites": [
+      "0046bc45", "0046bc54", "0046bc5d", "0046c274", "0048a640", "0048a668", "0048a68d", "0048a6b2", "0048a6da", "0048febd", "00491f39", "00492f08", "004b7327", "004b74c0", "004bc90a", "004bd000", "004bd26e", "004c1283", "004c144d", "004c16e1", "004c1789", "004c185c", "004c19a4", "004c19ff", "004c1a92", "004c2164", "004c2252", "004ca7ba", "004d13d1", "004d18f4", "004d1b17", "004d1d32", "004d3b87", "004de563", "004de60d", "004dea12", "004dedc2", "004e0b09", "004e0b1e", "004e0b69", "004e0b7e", "004e0bc9", "004e0bde", "004e654a", "004faa2c", "004fab2f", "004fab9d", "004fcaaf", "004fcc55", "004fccea", "00509032", "005098c7", "00509eac", "0050ae0c", "0050b199", "0050fb7f", "00510318", "005107cc", "00511344", "00514897", "00514a2e", "0051c05d", "0052a969", "0052aec6", "0052b568", "0052b65b", "0052bef4", "005684f7", "0059e57d", "0059e5a8", "0059e622"
+    ],
+    "reader_functions": [
+      "0046bbf0", "0046c220", "0048a570", "0048fc80", "00491cd0", "00492cf0", "004b7240", "004b73f0", "004bc8b0", "004bcf90", "004bd230", "004ca790", "004d1160", "004d18d0", "004d1a90", "004d1bd0", "004d3420", "004de510", "004de5b0", "004de9b0", "004deda0", "004e6520", "00509550", "005149a0", "0051c050", "0052a880", "0052ade0", "005684e0", "0059e440", "unattributed"
+    ],
+    "explicit_absolute_instructions_in_exported_listing": [
+      {
+        "va": "004b7327",
+        "instruction": "MOV CL, byte ptr [005e8e50]",
+        "consumer": "004b7240; writes this byte to the supplied text buffer on registry-query fallback"
+      },
+      {
+        "va": "004b74c0",
+        "instruction": "MOV AL, [005e8e50]",
+        "consumer": "004b73f0; writes this byte to a local text buffer on fallback"
+      }
+    ],
+    "registry_helpers_callers": [
+      {"function": "00467470", "calls_004b7240_at": ["00467520", "004675ff"]},
+      {"function": "0048dbe0", "calls_004b7240_at": ["0048dc00", "0048dc25"]},
+      {"function": "00509550", "calls_004b7240_at": ["00509953"]},
+      {"function": "005099a0", "calls_004b7240_at": ["005099b6"]},
+      {"function": "0041e170", "calls_004b73f0_at": ["0041e1f0"]},
+      {"function": "004a5d20", "calls_004b73f0_at": ["004a5d31"]},
+      {"function": "004e04f0", "calls_004b73f0_at": ["004e0581"]},
+      {"function": "00508b70", "calls_004b73f0_at": ["00508c6a"]}
+    ],
+    "scope_limit": "No indexed direct write; does not rule out unindexed indirect writes."
+  },
+  "string_consumers": [
+    {
+      "function": "005684e0",
+      "instructions": ["005684eb", "005684f7", "0056851a"],
+      "behavior": "Null name selects 005e8e50; SCASB searches NUL; allocation uses length plus one; copy uses that count.",
+      "effect_on_target": "Read only; empty string requires the byte at 005e8e50 to be zero."
+    },
+    {
+      "function": "0059ebc0",
+      "instruction": "0059ec27",
+      "behavior": "Pushes 005e8e50 as the name argument to 005697f0.",
+      "callers": ["004e0760", "0059e9d0"]
+    },
+    {
+      "function": "005697f0",
+      "callers": ["00553fc0", "0059ebc0", "005aef80"],
+      "behavior": "Consumes name as C string for LOW/HIGH formatting and heap-name copy; only the 0059ebc0 path supplies 005e8e50."
+    }
+  ],
+  "contract": {
+    "supported": "Both recovered symbols should view one zero-initialized empty-string backing at 005e8e50; demonstrated consumers need the first byte and C-string termination there.",
+    "not_supported": "Cannot claim original declared object extent is exactly one byte or 32 bytes.",
+    "residual": "Before production consolidation, check pointer flow for unknown indirect writers. If none exist, use one shared minimal empty-string backing and preserve the unknown-original-extent note."
+  }
+}

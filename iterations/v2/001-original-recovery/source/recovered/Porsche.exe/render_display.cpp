@@ -3,15 +3,11 @@
 #include <cstring>
 
 namespace porsche {
-std::uint32_t render_display_clock_005deb1c;
 std::uint32_t render_display_name_0069ecf8;
 std::uint32_t render_display_callback1_0069ecfc,render_display_callback2_0069ed00;
 std::uint32_t render_display_selected_0069ed08;
 std::uint32_t render_display_actual_width_00619784,render_display_actual_height_00619788;
 std::uint32_t render_display_actual_mode_0061978c;
-std::uint32_t& render_display_requested_width_00657a48=render_width_00657a48;
-std::uint32_t& render_display_requested_height_00657a4c=render_height_00657a4c;
-std::uint32_t render_display_requested_mode_00657a50;
 std::uint32_t render_display_texture_width_005deac8,render_display_texture_height_005deacc;
 
 RenderDisplay* __cdecl render_display_through_004679c7(RenderDisplay* object,

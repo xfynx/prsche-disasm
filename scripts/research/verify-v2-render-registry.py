@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Differentially execute recovered render registry routines in Porsche.exe x86."""
 import argparse
 import hashlib, json, struct, subprocess, sys
@@ -129,6 +130,7 @@ def main():
         fixtures.append({'input':case,'output_sha256':hashlib.sha256(json.dumps(want,sort_keys=True).encode()).hexdigest()})
     rel=['iterations/v2/001-original-recovery/source/include/porsche/render_registry.hpp','iterations/v2/001-original-recovery/source/include/porsche/render_objects.hpp','iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_registry.cpp','iterations/v2/001-original-recovery/source/recovered/render_registry_probe.cpp','iterations/v2/001-original-recovery/runs/042-render-registry/CMakeLists.txt','scripts/research/verify-v2-render-registry.py']
     result={'schema':1,'module':'Porsche.exe','sha256':SHA,'function_vas':sorted(coverage),'cases':len(inputs),'native_cpp_equal_original_x86':True,'binary_matched':False,'game_launch_verified':False,'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in rel},'fixtures':fixtures}
+    result['source_sha256']=source_hashes([*result['source_sha256'],Path(__file__)])
     (report_dir/'verification.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     print(f"PASS {len(inputs)} differential cases; covered {', '.join(result['function_vas'])}; report {report_dir/'verification.json'}")
 if __name__=='__main__':main()

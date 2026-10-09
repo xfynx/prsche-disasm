@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "original": {
+    "module": "Porsche.exe",
+    "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+    "binary_index": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/",
+    "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+    "defined_data": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/defined-data.jsonl"
+  },
+  "discovery": {
+    "command": "py -3 scripts/research/audit-v2-global-aliases.py",
+    "script": "scripts/research/audit-v2-global-aliases.py",
+    "scope": "file-scope definitions in iterations/v2/001-original-recovery/source/{recovered,platform}; .cpp/.inc; probe TUs excluded; VA suffix is a candidate key only",
+    "limits": "Does not prove linker storage identity or enumerate definitions that omit VA suffixes. Manifest classifies pointer/access bridges and reference aliases separately."
+  },
+  "confirmed_duplicate_owners": [
+    {
+      "va": "0x005deb1c",
+      "original_storage": "one initialized 4-byte cell; Porsche.exe RVA/raw offset 0x001deb1c contains 00 00 00 00",
+      "owners": [
+        {"name":"copy_flag_005deb1c","type":"uint32_t","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/heap.cpp:9"},
+        {"name":"render_display_clock_005deb1c","type":"uint32_t","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_display.cpp:6"}
+      ],
+      "original_consumers": ["0044ed7b store 0","0044f06e store 0","00467849 store 0","00555bce/00555df6/00555eba/00555eda writes in 00555bc0","005323e3, 0053c293, 0053d645, 0056277f reads"],
+      "classification": "confirmed duplicate native owners; original cell is shared across consumers; semantic naming conflict remains",
+      "next_trace": "Trace callers and all reads/writes of 00555bc0, 005323e0, 0053c290, 0053d570 and 00562680 to determine lifecycle/meaning before consolidating to one owner."
+    },
+    {
+      "va": "0x005deb74",
+      "original_storage": "one 4-byte cell; zero-initialized in original image; x86 stores source-address values",
+      "owners": [
+        {"name":"application_diagnostic_source_005deb74","type":"uint32_t","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_heap.cpp:9"},
+        {"name":"diagnostic_file_005deb74","type":"const char*","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/files.cpp:13"},
+        {"name":"render_error_file_005deb74","type":"uint32_t","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_loader.cpp:10"},
+        {"name":"class_error_file_005deb74","type":"uint32_t","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_create.cpp:13"}
+      ],
+      "original_consumers": ["0044919f stores 0x005cdf04; paired line store at 004491a9","other paired file/line writes include 00449748/52 and 00449954/5e; index has 136 refs to this address"],
+      "classification": "confirmed duplicate owners; pointer and integer views have equal 32-bit width on original x86, but native storage is duplicated",
+      "next_trace": "Trace every pair writer plus diagnostic formatting/reporting readers; verify null handling and whether the pair is one process-wide mutable diagnostic context before selecting a canonical pointer-typed owner."
+    },
+    {
+      "va": "0x005deb78",
+      "original_storage": "one 4-byte line-number cell paired with 0x005deb74",
+      "owners": [
+        {"name":"application_diagnostic_line_005deb78","type":"uint32_t","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_heap.cpp:10"},
+        {"name":"diagnostic_line_005deb78","type":"uint32_t","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/files.cpp:14"},
+        {"name":"render_error_line_005deb78","type":"uint32_t","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_loader.cpp:11"},
+        {"name":"class_error_line_005deb78","type":"uint32_t","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_create.cpp:14"}
+      ],
+      "original_consumers": ["paired stores at 004491a9, 00449752, 0044995e; defined original image value 0"],
+      "classification": "confirmed duplicate owners; line DWORD role is supported by paired source writes",
+      "next_trace": "Trace the paired diagnostic sinks and writers identified under 0x005deb74; confirm whether all modules share one source/line pair or use it in disjoint synchronous phases."
+    },
+    {
+      "va": "0x005e8e50",
+      "original_storage": "address 0x005e8e50 lies in .data virtual zero-fill: .data begins at VA 0x005cb000, raw size 0x1c000 ends at VA 0x005e7000, and virtual size extends to 0x006c1538; Ghidra defined-data records one zero byte",
+      "owners": [
+        {"name":"application_object_heap_name_005e8e50","type":"char[32]","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_heap_init.cpp:9"},
+        {"name":"file_null_name_005e8e50","type":"char[1]","file":"iterations/v2/001-original-recovery/source/recovered/Porsche.exe/files.cpp:71"}
+      ],
+      "original_consumers": ["004b7327 reads byte [0x005e8e50] into caller output","004b74c0 reads same byte into local text buffer; index has 71 READ refs, 155 analysis DATA refs, and no WRITE refs for this VA"],
+      "classification": "confirmed duplicate native owning definitions over a zero-filled original address; C++ extents (32 and 1 bytes) conflict, but original object's full extent/name is unresolved",
+      "next_trace": "Trace the 71 read references with callers of 004b7240/004b73f0 and their producer paths; determine whether any unindexed runtime writer exists before assigning the original object's extent/type."
+    }
+  ],
+  "known_correct_aliases": [
+    {
+      "va":"0x006a57d8",
+      "owner":"thread_start_lock_006a57d8 (void*) in file_threads.cpp:4",
+      "alias":"window_paint_lock_006a57d8 (void*&) = thread_start_lock_006a57d8 in source/platform/window_links.cpp:16",
+      "evidence":"Original 0055f320 calls lock creation at 0055f379 and stores EAX at 0055f37e. Original wait/dispatch paths read the same cell; WM_PAINT callback 0053b7d0..0053b86d must remain live because Windows can send WM_PAINT automatically.",
+      "status":"one canonical owner plus reference alias; do not add a second lock cell or suppress WM_PAINT"
+    },
+    {
+      "va":"0x006573e8",
+      "owner":"ApplicationStateArena application_state_006573e8 in application_state.cpp:10",
+      "alias":"global_006573e8 is uint32_t& into arena_u32(0x006573e8) in application_globals.cpp:33",
+      "status":"correct backing-store view; not duplicate storage"
+    },
+    {
+      "va":"0x00657a48 / 0x00657a4c",
+      "aliases":"render_width/render_display_requested_width and render_height/render_display_requested_height are paired uint32_t& views into the same arena words",
+      "status":"same type/width, same canonical arena; known correct aliases"
+    }
+  ],
+  "type_width_and_boundary_conflicts": [
+    {
+      "va":"0x0069e5a0",
+      "native_definitions":"window_channels_initialized_0069e5a0 uint32_t owner; startup_keyboard_value_0069e5a0 uint32_t& view",
+      "evidence":"Original 00564e70 conditionally stores 0x005df934; original 0053b47f/0053b6cb read the DWORD and use it as a nullable translation-table base. Thus width is correct for x86, but 'channels initialized' is a misleading boolean name; null is an intentional absent-table case.",
+      "next_trace":"Trace 00564e70 callers 004a5472 and 00556cb4, table bytes at 005df934 and key consumers 0053b47f/0053b6cb before assigning a typed pointer alias."
+    },
+    {
+      "va":"0x006b77a0",
+      "native_definitions":"OriginalWindowConfiguration window_configuration_storage_006b77a0 is the backing object. window_configuration_address_006b77a0 is a host-side void* initialized to its address; worker_configuration_006b77a0 references that pointer variable.",
+      "evidence":"Original 00558350 receives 0x006b77a0, reads the object's first DWORD/vtable and accesses fields through offsets; C++ recovered structure fields include +0x14/+0x18, +0x458/+0x461 and +0x468/+0x474.",
+      "classification":"suffix collision is an access-bridge naming hazard, not a second original storage owner; adapter pointer nullability/type contract is not established by the suffix"
+    },
+    {
+      "va":"0x005deb74",
+      "type_width":"uint32_t and const char* are both 4 bytes in the original x86 image; a zero source pointer is possible from zero initialization, but consumers' null behavior still needs tracing",
+      "next_trace":"Included with duplicate-owner finding above; do not treat width equality as semantic proof."
+    }
+  ],
+  "source_sha256": {
+    "scripts/research/audit-v2-global-aliases.py":"74e13adc2c472535f3d86d2a50d926879aceb1b19aafe94995f1df0a29e401ae",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/heap.cpp":"056338f4b5b0f546a8d075788aa5794fa25495c1bd192432144b01c1f0d23d2f",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_display.cpp":"e01226cb74bbcece87cf46c34f89c977da896d1fa4a9a89d79fe8ce01dd145fa",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_heap.cpp":"be81a20f9de199b31343088d25ad12e63e66e856ca8b4a7dc441ab8d6f65e208",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/files.cpp":"362e41bb304d4e08533ef3ed836d7c01259a0335bce2f79a10fa897db08c9a9b",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_loader.cpp":"67cc89fbf40a13ab65d9d0ed7d98fba5a0f68a6ac81b00ca9fa38f1e5a5c431c",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_create.cpp":"61ba87dc3c9a704848564d96f8452ca88aa9e5f7133829647ed06bd0810564fb",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_heap_init.cpp":"8deea392280ea118486a9174b2053a7190e29de26b34a6f95f7c5a085cd0b8a7",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp":"a1ad65f8506af7e03fecda2bd24880074ce9c926c8aa657135508b11aaf75f76",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_globals.cpp":"77a3dcee44b893af219de4e097f7fa714de4604999bdd14fd7f5b5242481880a",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/startup_subsystems.cpp":"1281c2b656d4531ddb4ce663e9e21b8c29494cdab8443d169a9cc272933c9219",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_runtime.cpp":"7f78bf064607eeb7b598b374c02b8b6d6e459aacf10830b7f4f4c468890c019a",
+    "iterations/v2/001-original-recovery/source/platform/window_links.cpp":"115343434e766e8e259955db3635d78edf19706c00ec5f5ccb162a0c7fe71af4",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/file_threads.cpp":"a9ea49f8fa11de3bf599e37f9cace5b2a220069dbb92f5502faf1ee44814a4a8",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_state.cpp":"0976a49dc5f4e5c6d8b0171e0dd4967c7890ee471dbff7b32f920ead70e4fc10",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_messages.cpp":"edc8e1bf4b2461671250298a5779cde3406430767e8c4e96b64d594b30b47031"
+  }
+}

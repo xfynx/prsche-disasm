@@ -6,7 +6,7 @@
 namespace porsche {
 OriginalHeap* heaps_006b4f20[16];
 std::int32_t (__cdecl* allocation_failure_0069cb00)(const char*, std::int32_t, std::uint32_t);
-std::uint32_t copy_flag_005deb1c, copy_flag_005deb18, copy_flag_005deb30;
+std::uint32_t copy_flag_005deb18, copy_flag_005deb30;
 std::uint32_t copy_flag_005deb10=1; // Original initialized PE data; the other flags are zero.
 
 static std::uint32_t address(const void* p) { return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(p)); }

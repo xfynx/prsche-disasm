@@ -31,7 +31,7 @@ CASES.append((0,0,1,0,0,1,3,1,0,0,0))
 CALLS={
  0x59ed40:('0059ed40',1,0),0x59ed90:('0059ed90',1,0),
  0x4a5c30:('004a5c30',0,0),0x4a5410:('004a5410',0,0),0x5a246e:('005a246e',1,0),
- 0x59d650:('0059d650',0,0),0x53c290:('0053c290',3,0),
+ 0x59d650:('0059d650',0,0),
  0x4b6660:('004b6660',2,STREAM),0x531f90:('00531f90',1,1),
  0x4a6840:('004a6840',2,0),0x5a177b:('005a177b',1,0),
  0x467470:('00467470',0,0),0x0048dcb0:('0048dcb0',2,0),
@@ -78,6 +78,13 @@ def original(case,module,binary):
         nonlocal setup_count
         if 0x004b6a50<=addr<=0x004b6fe5 or 0x004b4b80<=addr<=0x004b4d55:return
         if addr==EXIT:machine.emu_stop();return
+        if addr==0x0053c290:
+            calls.append('0053c290')
+            return
+        if (0x0053c290<addr<0x0053c2dd
+            or 0x005b0980<=addr<0x005b0a3a or 0x005b0a40<=addr<0x005b0af0
+            or 0x005b0b00<=addr<0x005b0bf2):
+            return
         row=names.get(addr)
         if row is None:
             raise RuntimeError(f'Unexpected original PC {addr:08x}; calls={calls[-8:]}')
@@ -150,13 +157,14 @@ def main():
       'function_vas':['004b6a50'],'full_function_vas':full,'partial_function_vas':[],
       'cases':len(CASES),'native_cpp_equal_original_x86':True,'game_launch_verified':False,
       'comparison':'Return value, ordered boundary calls, selected startup/FE globals, and network fields/string across 15 controlled x86/native cases covering allocation success/failure, setup exit/re-entry, both startup waits, FE modes, simulation tick, configuration-name copy, and network continuation/action branches.',
-      'boundaries':{'arena_fill':'0053c290 is recorded only; the 0x3e24-byte FE arena is not present as a unified host allocation, so no native memset is performed.',
+      'boundaries':{'arena_fill':'Original x86 0053c290 and its scalar fill callee execute directly. Native application_main_fill_fe_arena_0053c290 writes the shared 0x3e24-byte arena; unsupported spans are rejected.',
         'callees':'Unknown game/network/UI consumers are intercepted as typed fixture boundaries on both sides. Tests drive return values and network state; their internal behavior is not claimed.',
         'wrappers':'The production source calls accepted page, startup, FE, resource, and render wrappers directly. This isolated probe substitutes those signatures to compare the main caller only.'},
       'source_sha256':source_hashes(paths,compiled_sources=[
           'iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_main.cpp',
           'iterations/v2/001-original-recovery/source/recovered/application_main_probe.cpp']),
       'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':outputs}
+    report['source_sha256']=source_hashes(report['source_sha256'].keys(),compiled_sources=['iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp','iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_globals.cpp'])
     (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8',newline='\n')
     print(json.dumps({'functions':full,'cases':len(CASES),'native_cpp_equal_original_x86':True,'report':str(args.report_dir/'verification.json')}))
 if __name__=='__main__':main()

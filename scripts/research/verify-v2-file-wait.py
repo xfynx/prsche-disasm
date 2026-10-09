@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare original operation wait control flow and native C++ with recording services."""
 import hashlib
 import argparse
@@ -82,6 +83,7 @@ def main():
     paths=['iterations/v2/001-original-recovery/'+p for p in paths]
     paths.append('iterations/v2/001-original-recovery/source/include/porsche/fe_stream.hpp')
     report={'schema':1,'sha256':module['sha256'],'function_vas':sorted(coverage),'cases':len(inputs),'native_cpp_equal_original_x86':True,'binary_matched':False,'game_launch_verified':False,'comparison':'Device arenas, retained/reloaded device identities, results and ordered find/status/thread/pump/sleep/event/lock calls. Pending/find/status are controlled fixtures; real consumers are exercised in joint files-regression.','source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     args.report_dir.mkdir(parents=True,exist_ok=True);(args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n');(args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[v]})+'\n' for v in sorted(coverage)),newline='\n')
     print(json.dumps({'cases':len(inputs),'functions':sorted(coverage),'native_equal_original':True}))
 if __name__=='__main__':main()

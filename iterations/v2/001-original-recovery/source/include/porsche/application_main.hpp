@@ -7,20 +7,23 @@ namespace porsche {
 // flow; unknown subsystem consumers remain typed boundaries below.
 std::int32_t __cdecl app_main_004b6a50(std::int32_t argc,char** argv);
 
-// Canonical globals owned by other recovered modules or pending arena wiring.
-extern std::uint32_t global_006573e8;
-extern std::uint32_t global_00657424,global_00657428,global_0065743c;
-extern std::uint32_t global_006577d8,global_006577dc;
-extern std::uint32_t global_00657a60;
-extern std::uint8_t global_00657a64,global_00657e34;
+// Canonical aliases backed by the unified application arena owner.
+extern std::uint32_t& global_006573e8;
+extern std::uint32_t& global_00657424;
+extern std::uint32_t& global_00657428;
+extern std::uint32_t& global_0065743c;
+extern std::uint32_t& global_006577d8;
+extern std::uint32_t& global_006577dc;
+extern std::uint32_t& global_00657a60;
+extern std::uint8_t& global_00657a64;
+extern std::uint8_t& global_00657e34;
 extern std::uint32_t global_00606a88,global_00606874;
 extern std::uint32_t global_005e99f4;
 // Original consumers test the first byte and scan to NUL; no extent proved.
-extern char global_00657a84[];
+extern char* global_00657a84;
 
-// 0053c290 is deliberately a boundary here: its original span starts at
-// 006573e8 and covers 0x3e24 bytes of the FE arena, whose aliases are not yet
-// unified in the host build.
+// 0053c290 adapter writes the shared arena using the verified repeated-DWORD
+// semantics and accepts only its proven original target/span.
 void __cdecl application_main_fill_fe_arena_0053c290(std::uint32_t va,
     std::uint32_t value,std::uint32_t bytes);
 

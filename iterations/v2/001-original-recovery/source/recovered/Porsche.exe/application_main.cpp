@@ -62,7 +62,7 @@ std::int32_t __cdecl app_main_004b6a50(std::int32_t argc,char** argv) {
     application_main_create_directory(0x0065b360);
     resource_paths_0059d650();
     // The original 0053c290 clears 0x3e24 bytes beginning at 006573e8.
-    // This remains a typed boundary until FE storage and aliases share an arena.
+    // The original helper is adapted over the shared, bounded FE arena span.
     application_main_fill_fe_arena_0053c290(kFeArena,0,0x3e24);
 
     auto* initial=fe_build_004b6660(argc,argv);

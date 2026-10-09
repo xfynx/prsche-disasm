@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare complete 0x467700 and bounded 0x4677e0 prefix against original x86."""
 import argparse
 import hashlib
@@ -89,6 +90,7 @@ def source_record(module,data,va):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--probe',type=Path,default=ROOT/'local/builds/v2/001-original-recovery/bin/Release/render_objects_probe.exe')
+    parser.add_argument('--report-dir',type=Path,default=RUN)
     args=parser.parse_args()
     module,data=module_and_data()
     cases=[(s,f,c1,c2) for s in (0,0x5a,0xcc,0xff) for f in (0,1,0x102,0xffffffff)
@@ -101,8 +103,8 @@ def main():
     for i,(case,row) in enumerate(zip(cases,actual)):
         expected=original(module,data,*case)
         if row!=expected:
-            RUN.mkdir(parents=True,exist_ok=True)
-            dest=RUN/'mismatch.json'
+            args.report_dir.mkdir(parents=True,exist_ok=True)
+            dest=args.report_dir/'mismatch.json'
             dest.write_text(json.dumps({'case':case,'expected':expected,'actual':row},indent=2)+'\n')
             raise RuntimeError(f'case {i} differs in {[k for k in expected if expected[k]!=row.get(k)]}: {dest}')
         fixtures.append({'case':case,'output_sha256':hashlib.sha256(json.dumps(expected,sort_keys=True).encode()).hexdigest()})
@@ -119,9 +121,10 @@ def main():
             'binary_matched':False,'game_launch_verified':False,
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest(),'fixtures':fixtures}
-    RUN.mkdir(parents=True,exist_ok=True)
-    (RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
-    (RUN/'source-functions.jsonl').write_text(''.join(json.dumps(v)+'\n' for v in records),encoding='utf8')
+    args.report_dir.mkdir(parents=True,exist_ok=True)
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
+    (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
+    (args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps(v)+'\n' for v in records),encoding='utf8')
     print(json.dumps({'cases':len(cases),'full_core':True,'display_prefix':True,'native_cpp_equal_original_x86':True}))
 
 if __name__=='__main__':main()

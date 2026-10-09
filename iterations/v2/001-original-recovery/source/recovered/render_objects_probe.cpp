@@ -1,3 +1,5 @@
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/render_objects.hpp"
 #include <cstdio>
 #include <cstring>
@@ -21,7 +23,6 @@ std::string hex(const void* buffer,std::size_t size) {
 }
 namespace porsche {
 RenderDisplay* render_display_00628130;
-std::uint32_t render_display_clock_005deb1c;
 void __cdecl render_core_first_004b76f0(RenderCore*) {event("first");}
 void __cdecl render_display_member_00466380(void* member) {
     event(clock_index==0?"member14":"member34");

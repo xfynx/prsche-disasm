@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Differentially compare recovered Porsche.exe 0055f420 with original x86."""
 import argparse
 import hashlib
@@ -157,6 +158,7 @@ def main():
         'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
     report_dir=args.report_dir if args.report_dir.is_absolute() else ROOT/args.report_dir
     report_dir.mkdir(parents=True,exist_ok=True)
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     (report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8',newline='\n')
     print(json.dumps({'report':str(report_dir/'verification.json'),'native_equal_original_x86':True}))
 if __name__=='__main__':main()

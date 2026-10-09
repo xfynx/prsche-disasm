@@ -53,4 +53,12 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_mode.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_callback_bindings.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_main.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_state.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_globals.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_settings.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_state_init.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_event_queue.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/shared_runtime_globals.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_channels.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_scheduler.cpp"
 )

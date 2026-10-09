@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Differential FE producer -> stream -> dispatcher against unchanged original x86.
 
 Heap, file, callback endpoints are recording fixtures, not recovered game callees.
@@ -197,6 +198,7 @@ def main():
                 'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),
                 'fixtures':fixtures}
         args.report_dir.mkdir(parents=True,exist_ok=True)
+        report['source_sha256']=source_hashes(report['source_sha256'].keys(),compiled_sources=['iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp','iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_globals.cpp'])
         (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8',newline='\n')
         indexed=[{'sha256':module['sha256'],**functions[va]} for va in sorted(coverage)]
         (args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in indexed),encoding='utf8',newline='\n')

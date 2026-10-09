@@ -30,7 +30,7 @@ void __cdecl file_start_device_00568390(std::uint32_t index) {
             file_reset_event_0055fc40(device->completed_event);
             io_unlock_00580ec0(&free_operations_006a5c58,token);return;
         }
-        diagnostic_file_005deb74="\\real\\pc\\nfile.c";diagnostic_line_005deb78=0xb4;
+        diagnostic_file_005deb74_set("\\real\\pc\\nfile.c");diagnostic_line_005deb78=0xb4;
         diagnostic_handler_005debf0("FILE_startdevice - FAILED TO START THREAD FOR FILE SYSTEM DEVICE.\n");
         io_unlock_00580ec0(&free_operations_006a5c58,token);
     }

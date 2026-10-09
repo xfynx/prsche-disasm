@@ -1,3 +1,5 @@
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/application_pool.hpp"
 #include "porsche/disk_open.hpp"
 #include "porsche/file_device.hpp"
@@ -59,8 +61,6 @@ FileDevice* devices_006a5c7c=nullptr;
 IoList free_operations_006a5c58{},free_auxiliary_006a5c38{};
 void* disk_slot_mutex_006af07c=nullptr;
 void* disk_mutexes_006aeffc[32]{};
-const char* diagnostic_file_005deb74=nullptr;
-std::uint32_t diagnostic_line_005deb78=0;
 void (__cdecl* diagnostic_handler_005debf0)(const char*)=nullptr;
 void __cdecl application_pool_disk_slots_release_005918c0(){}
 void __cdecl application_pool_shutdown_005678f0(){}

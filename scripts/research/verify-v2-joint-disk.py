@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare recovered FE/heap/file queues, worker and wait with original x86."""
 import argparse
 import hashlib
@@ -285,6 +286,7 @@ def main():
                           'FE_callbacks':'No effects at 004119e0/00411a80/00411b40 test endpoints; callback semantics remain unrecovered.'},
             'source_sha256':{str(p.relative_to(ROOT)).replace('\\','/'):hashlib.sha256(p.read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     args.report_dir.mkdir(parents=True,exist_ok=True);(args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
     (args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage)),newline='\n')
     calls=[json.loads(l) for l in (ROOT/'research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/calls.jsonl').read_text().splitlines()]

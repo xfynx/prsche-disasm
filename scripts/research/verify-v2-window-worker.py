@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Differentially compare Porsche.exe 0053b8d0 with the recovered C++ worker."""
 import argparse, hashlib, json, struct, subprocess, sys
 from pathlib import Path
@@ -122,5 +123,6 @@ def main():
             pending.append(owned/'include'/inc)
     files=sorted(set(files)|{p.relative_to(ROOT).as_posix() for p in seen})
     report={'schema':1,'sha256':SHA,'range':'0053b8d0..0053bad8','function_vas':['0053b8d0'],'full_function_vas':['0053b8d0'],'partial_function_vas':[],'cases':len(selected),'native_cpp_equal_original_x86':True,'binary_matched':False,'game_launch_verified':False,'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in files},'probe_sha256':hashlib.sha256(a.probe.read_bytes()).hexdigest()}
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     a.report.parent.mkdir(parents=True,exist_ok=True);a.report.write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
 if __name__=='__main__':main()

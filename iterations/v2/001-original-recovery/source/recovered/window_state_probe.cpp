@@ -1,3 +1,5 @@
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/window_create.hpp"
 #include "porsche/window_worker.hpp"
 #include <cstddef>
@@ -93,7 +95,7 @@ int main(){
     bool pointer_alias=window_configuration_address_006b77a0==&alternate;
     worker_configuration_006b77a0=&config;
     config.fullscreen_006b7c01=0;config.hwnd_006b7bf8=nullptr;window_override_0069e5b0=0;
-    window_worker_0053b8d0(nullptr);
+    window_worker_0053b8d0();
     bool worker_shared=create_config_ok && get_message_calls==1 &&
         window_pos_x_006b7c08==37 && window_pos_y_006b7c0c==48 &&
         config.pos_x_006b7c08==37 && config.pos_y_006b7c0c==48 &&

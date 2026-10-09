@@ -1,5 +1,6 @@
 #pragma once
 #include "porsche/render_startup.hpp"
+#include "porsche/shared_runtime_globals.hpp"
 #include <cstdint>
 
 namespace porsche {
@@ -20,5 +21,4 @@ void __cdecl render_display_prefix_004677e0(RenderDisplay* object,
     const char* resolution);
 void __cdecl render_display_member_00466380(void* member);
 std::uint32_t __cdecl render_clock_00555bc0();
-extern std::uint32_t render_display_clock_005deb1c;
 }

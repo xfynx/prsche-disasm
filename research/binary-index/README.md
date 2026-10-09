@@ -32,6 +32,11 @@ Run061: index дополнен ещё11 callback/CRT bodies (включая53b05
 общий каталог36618. Полные RET18 байты клавиатурных callbacks включены в SHA ranges.
 Текущая приёмка — [Run061](../../iterations/v2/001-original-recovery/runs/061-startup-platform-integration/README.md).
 
+Run078: каталог36 618/31 supplementary сохранён;200 full C++ functions и4 partial.
+Приняты renderer settings/state, event queue, keyboard toggles и scheduler; источники VA/SHA,
+original-x86 сравнения и явные границы — [Run078](../../iterations/v2/001-original-recovery/runs/078-shared-runtime-integration/README.md).
+Общий оконный EXE проверяет линковку16 callback functions для27 регистраций; запуск игры ещё не доказан.
+
 ## Покрытие
 
 [coverage.json](coverage.json) сопоставляет пути и SHA256 с результатами анализа.

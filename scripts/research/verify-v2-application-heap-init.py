@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare recovered heap commit/object-start wrappers with Porsche.exe x86."""
 import argparse
 import hashlib
@@ -130,8 +131,10 @@ def original(case, module, data):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--probe',type=Path,default=ROOT/'local/builds/v2/001-original-recovery/bin/Release/application_heap_init_probe.exe')
-    binary=parser.parse_args().probe
-    report = ROOT / 'iterations/v2/001-original-recovery/runs/033-application-heap-init'
+    parser.add_argument('--report-dir',type=Path,default=ROOT/'iterations/v2/001-original-recovery/runs/033-application-heap-init')
+    args=parser.parse_args();binary=args.probe
+    report=args.report_dir
+    report.mkdir(parents=True,exist_ok=True)
     module = next(x for x in map(json.loads, (ROOT / 'research/binary-index/static/binaries.jsonl').read_text().splitlines()) if x['file'] == 'Porsche.exe')
     data = (ROOT / 'local/game' / module['path']).read_bytes()
     expected_sha = 'ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39'
@@ -162,6 +165,7 @@ def main():
               'scope': 'Primary heap commit and optional object heap start; page allocation is exercised through the Run025 consumer; 005679f0 pool initialization remains a separate dependency.',
               'source_sha256': {p: hashlib.sha256((ROOT / p).read_bytes().replace(b'\r\n', b'\n')).hexdigest() for p in paths},
               'probe_sha256': hashlib.sha256(binary.read_bytes()).hexdigest()}
+    result['source_sha256']=source_hashes([*result['source_sha256'],Path(__file__)])
     (report / 'verification.json').write_text(json.dumps(result, indent=2) + '\n', newline='\n')
     print(json.dumps({'cases': len(inputs), 'function_vas': result['function_vas'], 'native_cpp_equal_original_x86': True}))
 

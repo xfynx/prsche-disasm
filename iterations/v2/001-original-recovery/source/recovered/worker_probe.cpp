@@ -1,3 +1,5 @@
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/file_worker.hpp"
 #include <windows.h>
 #include <cstdarg>
@@ -27,8 +29,6 @@ void __cdecl completed(std::uint32_t id,std::int32_t status,void* ctx){record("[
 namespace porsche {
 FileDevice* devices_006a5c7c;
 IoList free_operations_006a5c58,free_auxiliary_006a5c38;
-const char* diagnostic_file_005deb74;
-std::uint32_t diagnostic_line_005deb78;
 void(__cdecl*diagnostic_handler_005debf0)(const char*);
 std::uint32_t __cdecl operation_key_005684c0(IoNode*n,std::uint32_t){auto*o=reinterpret_cast<FileOperation*>(n);return ((o->id>>5)&0xffffffu)|(std::uint32_t(o->group)<<24);}
 std::uint32_t __cdecl io_default_key_00580670(IoNode*n,std::uint32_t){return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(n));}
@@ -47,7 +47,7 @@ std::uint32_t __cdecl file_backend_005924d0(void*p,std::uint32_t a){record("[\"b
 std::uint32_t __cdecl file_backend_00592490(void*p){record("[\"backend_90\","+pointer(p)+"]");return backend_value;}
 std::uint32_t __cdecl file_backend_00591980(void*p){record("[\"backend_80\","+pointer(p)+"]");return backend_value;}
 std::uint32_t __cdecl file_physical_close_00592290(void*p){record("[\"close\","+pointer(p)+"]");return backend_value;}
-void __cdecl diagnostic_stub(const char* message,...){va_list args;va_start(args,message);const auto type=va_arg(args,std::uint32_t);va_end(args);record("[\"diagnostic\","+std::to_string(diagnostic_line_005deb78)+",\""+texthex(message)+"\",\""+texthex(diagnostic_file_005deb74)+"\","+std::to_string(type)+"]");}
+void __cdecl diagnostic_stub(const char* message,...){va_list args;va_start(args,message);const auto type=va_arg(args,std::uint32_t);va_end(args);record("[\"diagnostic\","+std::to_string(diagnostic_line_005deb78)+",\""+texthex(message)+"\",\""+texthex(diagnostic_file_005deb74())+"\","+std::to_string(type)+"]");}
 }
 
 int main(){using namespace porsche;mem=static_cast<unsigned char*>(VirtualAlloc(reinterpret_cast<void*>(BASE),ARENA_BYTES,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!mem)return 3;std::string line;

@@ -9,8 +9,7 @@ std::uint32_t worker_accelerator_006bd9dc=0;
 
 // 0053b8d0..0053bad8. The imported USER32 calls and unresolved helpers are
 // kept as observable boundaries; branch and state updates follow the original.
-std::uint32_t __cdecl window_worker_0053b8d0(void* configuration) {
-    (void)configuration; // Original thread argument is unused; 0x6b77a0 is loaded directly.
+std::uint32_t __cdecl window_worker_0053b8d0() {
     auto* config=static_cast<std::uint8_t*>(worker_configuration_006b77a0);
     void* const hwnd=window_create_0053bb00(config);
     const std::uint32_t tick=window_worker_wait_0055fb20();

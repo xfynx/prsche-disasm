@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Verify original page allocation, list construction and file-device startup.
 
 OS imports and event/thread/lock creation are explicit recording boundaries.
@@ -123,6 +124,7 @@ def main():
                           'thread':'0055f5f0 records parameters; fixture supplies only worker initialized=1 write confirmed at 0056854b. Worker loop, events, concurrency, real thread state not executed.',
                           'lock_event_diagnostic':'Recording 005321f0/005322b0/005322c0, 0055fb20/0055fc20/0055fc60/0055fc40 and 00565340.'},
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     args.report_dir.mkdir(parents=True,exist_ok=True);(args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
     (args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage)),newline='\n')
 

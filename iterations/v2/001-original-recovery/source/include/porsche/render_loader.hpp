@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "porsche/shared_runtime_globals.hpp"
 
 namespace porsche {
 // Porsche.exe SHA256 ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39.
@@ -9,8 +10,6 @@ extern std::uint32_t render_library_handle_0069e5e8;
 extern std::uint32_t render_cleanup_token_0069e5ec;
 extern std::uint32_t render_driver_name_006a64b4;
 extern std::uint32_t render_error_flag_005deb70;
-extern std::uint32_t render_error_file_005deb74;
-extern std::uint32_t render_error_line_005deb78;
 
 // The original makes Win32 imports through its IAT. These typed recording
 // boundaries let the native fixture compare calls without loading a DLL.

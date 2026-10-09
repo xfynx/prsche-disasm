@@ -48,5 +48,5 @@ void __cdecl window_worker_callback();
 std::uint32_t __cdecl window_worker_idle_callback(std::uint32_t,std::uint32_t,std::uint32_t);
 std::uint32_t __stdcall window_worker_destroy_window(void*);
 std::uint32_t __cdecl window_worker_prepare_exit_00558350(void*);
-std::uint32_t __cdecl window_worker_0053b8d0(void* configuration);
+std::uint32_t __cdecl window_worker_0053b8d0();
 }

@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Run original Porsche.exe THRASH DLL loader beside native C++ with typed Win32 hooks."""
 import argparse
 import hashlib
@@ -132,6 +133,7 @@ def source_record(module,data):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--probe',type=Path,default=ROOT/'local/builds/v2/render-loader-028/bin/Release/render_loader_probe.exe')
+    parser.add_argument('--report-dir',type=Path,default=RUN)
     args=parser.parse_args();module,data=module_and_data();inputs=cases()
     native=subprocess.run([str(args.probe)],input='\n'.join(' '.join(map(str,v)) for v in inputs)+'\n',
                           text=True,capture_output=True,check=True,timeout=60)
@@ -141,8 +143,8 @@ def main():
     for i,(case,actual) in enumerate(zip(inputs,rows)):
         expected=original(module,data,case)
         if actual!=expected:
-            RUN.mkdir(parents=True,exist_ok=True)
-            dest=RUN/'mismatch.json';dest.write_text(json.dumps({'case':case,'expected':expected,'actual':actual},indent=2)+'\n')
+            args.report_dir.mkdir(parents=True,exist_ok=True)
+            dest=args.report_dir/'mismatch.json';dest.write_text(json.dumps({'case':case,'expected':expected,'actual':actual},indent=2)+'\n')
             raise RuntimeError(f'case {i} differs: {[k for k in expected if expected[k]!=actual.get(k)]}; {dest}')
         fixtures.append({'case':case,'output_sha256':hashlib.sha256(json.dumps(expected,sort_keys=True).encode()).hexdigest()})
     paths=['iterations/v2/001-original-recovery/source/include/porsche/render_loader.hpp',
@@ -154,9 +156,10 @@ def main():
             'binary_matched':False,'game_launch_verified':False,
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest(),'fixtures':fixtures}
-    RUN.mkdir(parents=True,exist_ok=True)
-    (RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
-    (RUN/'source-functions.jsonl').write_text(json.dumps(source_record(module,data))+'\n',encoding='utf8')
+    args.report_dir.mkdir(parents=True,exist_ok=True)
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
+    (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
+    (args.report_dir/'source-functions.jsonl').write_text(json.dumps(source_record(module,data))+'\n',encoding='utf8')
     print(json.dumps({'cases':len(inputs),'function_vas':['00574fa0'],'native_cpp_equal_original_x86':True}))
 
 if __name__=='__main__':main()

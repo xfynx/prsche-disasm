@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare the combined recovered application heap and live allocation path to x86."""
 import argparse
 import hashlib
@@ -167,6 +168,7 @@ def main():
                     'locks':'005321f0 create and 005322b0/005322c0 enter/leave; single-thread fixture'},
       'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
       'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
+    result['source_sha256']=source_hashes([*result['source_sha256'],Path(__file__)])
     args.report_dir.mkdir(parents=True,exist_ok=True);(args.report_dir/'verification.json').write_text(json.dumps(result,indent=2)+'\n',newline='\n')
     print(json.dumps({'cases':len(inputs),'functions':sorted(coverage),'native_equal_original_x86':True}))
 

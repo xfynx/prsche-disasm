@@ -6,13 +6,6 @@
 
 namespace porsche {
 std::uint8_t render_mode_state_00619790[0x71]{};
-std::int32_t render_mode_setting_00657d5c{};
-std::int32_t render_mode_setting_00657d60{};
-std::int32_t render_mode_setting_00657d68{};
-std::int32_t render_mode_setting_00657d6c{};
-std::int32_t render_mode_setting_00657d70{};
-std::int32_t render_mode_setting_00657d78{};
-std::int32_t render_mode_setting_00657d80{};
 std::uint32_t render_mode_time_value_005ce908{};
 std::uint8_t render_mode_option_0069dd1d{};
 

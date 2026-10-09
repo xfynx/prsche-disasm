@@ -1,3 +1,5 @@
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/file_events.hpp"
 #include "porsche/file_disk.hpp"
 #include "porsche/fe_stream.hpp"

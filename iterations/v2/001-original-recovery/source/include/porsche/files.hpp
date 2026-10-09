@@ -1,4 +1,5 @@
 #pragma once
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/heap.hpp"
 namespace porsche {
 struct IoNode { IoNode* next; };
@@ -65,8 +66,6 @@ void* __cdecl file_object_allocate_0056e5f0(std::uint32_t*);
 std::uint32_t __cdecl file_object_free_0056e640(void*);
 std::uint32_t __cdecl file_physical_close_00592290(void*);
 void __cdecl file_format_005a0fbf(char*,const char*,const char*,const char*);
-extern const char* diagnostic_file_005deb74;
-extern std::uint32_t diagnostic_line_005deb78;
 extern void (__cdecl* diagnostic_handler_005debf0)(const char*);
 void __cdecl file_diagnostic_00565340(const char*);
 void __cdecl file_set_last_error(std::uint32_t);

@@ -46,7 +46,7 @@ void __cdecl startup_input_reset_key_ring_0053bf90(std::uint32_t count){
 std::uint32_t __cdecl startup_input_set_key_state_0055fe50(std::uint32_t state,void* value){
     if(!state){startup_input_reset_key_ring_0053bf90(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(value)));return 1;}
     if(state==10){startup_input_key_callback_005df6a4=value;return 1;}
-    diagnostic_file_005deb74="\\real\\patch3\\pc\\key.c";diagnostic_line_005deb78=0x10a;
+    diagnostic_file_005deb74_set("\\real\\patch3\\pc\\key.c");diagnostic_line_005deb78=0x10a;
     diagnostic_handler_005debf0("[KEY] - Invalid setstate\n");
     return 0;
 }

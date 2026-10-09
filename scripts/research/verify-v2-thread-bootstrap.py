@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare original x86 and native C++ thread/lock/page bootstrap jointly."""
 import argparse
 import hashlib
@@ -133,6 +134,7 @@ def main():
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest(),'fixtures':fixtures}
     args.report_dir.mkdir(parents=True,exist_ok=True)
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
     print(json.dumps({'cases':len(inputs),'function_vas':sorted(hits),'native_cpp_equal_original_x86':True}))
 

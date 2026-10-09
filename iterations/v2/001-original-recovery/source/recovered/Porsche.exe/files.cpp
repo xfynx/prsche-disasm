@@ -10,11 +10,9 @@ PhysicalFile* physical_files_006af084;
 std::int32_t physical_count_006af080;
 char file_root_006af168[260],file_fallback_006af26c[260],file_roots_enabled_006af370;
 void (__cdecl* missing_file_006afbe4)(const char*,std::int32_t);
-const char* diagnostic_file_005deb74;
-std::uint32_t diagnostic_line_005deb78;
 void (__cdecl* diagnostic_handler_005debf0)(const char*)=file_diagnostic_00565340;
 static void error(std::uint32_t line,const char* message) {
-    diagnostic_file_005deb74="\\real\\pc\\nfile.c";diagnostic_line_005deb78=line;
+    diagnostic_file_005deb74_set("\\real\\pc\\nfile.c");diagnostic_line_005deb78=line;
     diagnostic_handler_005debf0(message);
 }
 static std::uint32_t number(const void* p) { return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(p)); }

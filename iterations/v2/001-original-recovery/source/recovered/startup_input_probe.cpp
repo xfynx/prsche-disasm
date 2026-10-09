@@ -1,3 +1,5 @@
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/startup_input.hpp"
 #include <windows.h>
 #include <array>
@@ -80,7 +82,6 @@ std::uint32_t worker_accelerator_006bd9dc=0;
 std::uint32_t window_input_capacity_0069e560=0,window_input_read_0069e0d8=0,window_input_write_0069e568=0;
 void* class_lock_0069e59c=nullptr;
 void* hwnd_storage=nullptr;void*& window_hwnd_006b7bf8=hwnd_storage;
-const char* diagnostic_file_005deb74=nullptr;std::uint32_t diagnostic_line_005deb78=0;
 void(__cdecl* diagnostic_handler_005debf0)(const char*)=nullptr;
 void* __stdcall startup_input_get_module_handle(){event("[\"get_module\",0]");return reinterpret_cast<void*>(0x4001000);}
 std::int32_t __stdcall startup_input_direct_input_create(void* module,std::uint32_t version,void** output,void* outer){
@@ -106,7 +107,7 @@ int main(){
         porsche::worker_accelerator_006bd9dc=1;porsche::class_lock_0069e59c=has_lock?reinterpret_cast<void*>(0x2003000):nullptr;
         porsche::window_hwnd_006b7bf8=hwnd?reinterpret_cast<void*>(hwnd):nullptr;
         porsche::window_input_capacity_0069e560=capacity;porsche::window_input_read_0069e0d8=read;porsche::window_input_write_0069e568=write;
-        porsche::diagnostic_file_005deb74=nullptr;porsche::diagnostic_line_005deb78=0;porsche::diagnostic_handler_005debf0=nullptr;
+        porsche::diagnostic_file_005deb74_set(nullptr);porsche::diagnostic_line_005deb78=0;porsche::diagnostic_handler_005debf0=nullptr;
         create_result=static_cast<std::int32_t>(create);device_result=static_cast<std::int32_t>(create_device);
         query_result=static_cast<std::int32_t>(query);format_result=static_cast<std::int32_t>(format);cooperative_result=static_cast<std::int32_t>(cooperative);
         const auto result=porsche::startup_input_initialize_0055fcf0();
@@ -127,7 +128,7 @@ int main(){
             std::to_string(porsche::window_input_read_0069e0d8)+","+
             std::to_string(porsche::window_input_write_0069e568)+","+
             std::to_string(ptr(porsche::startup_input_key_callback_005df6a4))+","+
-            std::to_string(ptr(porsche::diagnostic_file_005deb74))+","+
+            std::to_string(ptr(porsche::diagnostic_file_005deb74()))+","+
             std::to_string(porsche::diagnostic_line_005deb78)+"]";
         std::cout<<"{\"return\":"<<result<<",\"globals\":"<<globals<<",\"arena\":\""<<hex(snapshot.data(),bytes)
                  <<"\",\"calls\":["<<call_list()<<"]}\n";

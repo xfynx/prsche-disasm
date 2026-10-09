@@ -1,3 +1,5 @@
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/window_create.hpp"
 #include "porsche/window_callback_bindings.hpp"
 #include "porsche/window_handlers.hpp"
@@ -89,12 +91,13 @@ std::uint32_t __stdcall window_handler_register_0053a800(std::uint32_t message,s
 void __cdecl window_resize_0053bec0(std::uint32_t width,std::uint32_t height){
     add("[\"resize\","+std::to_string(width)+","+std::to_string(height)+"]");
 }
-std::uint32_t __cdecl window_worker_0053b8d0(void*){return 0;}
+std::uint32_t __cdecl window_worker_0053b8d0(){return 0;}
+void __cdecl window_worker_thread_entry(){(void)window_worker_0053b8d0();}
 std::uint32_t __cdecl window_thread_start_0055f420(void* worker,std::uint32_t a,std::uint32_t b,
     std::uint32_t c,std::uint32_t* state){
     add("[\"thread_start\",\"worker\","+std::to_string(a)+","+std::to_string(b)+","+
         std::to_string(c)+"]");
-    if(worker!=reinterpret_cast<void*>(&window_worker_0053b8d0))return 0;
+    if(worker!=reinterpret_cast<void*>(&window_worker_thread_entry))return 0;
     if(!worker_success)return 0;
     for(std::uint32_t i=0;i<7;++i)state[i]=0x100+i;
     window_thread_handle_0069e574=reinterpret_cast<void*>(0x1238000);

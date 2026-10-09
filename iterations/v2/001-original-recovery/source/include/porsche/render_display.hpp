@@ -1,13 +1,13 @@
 #pragma once
 #include "porsche/render_objects.hpp"
 #include "porsche/render_startup.hpp"
+#include "porsche/shared_runtime_globals.hpp"
 #include <cstdint>
 
 namespace porsche {
 struct DisplayModeRecord { std::uint32_t a,b,format; };
 // Porsche.exe SHA256 ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39.
 // Original constructor entry 0x4677e0; full fixture reaches RET 0x10.
-extern std::uint32_t render_display_clock_005deb1c;
 extern std::uint32_t render_display_name_0069ecf8;
 extern std::uint32_t render_display_callback1_0069ecfc,render_display_callback2_0069ed00;
 extern std::uint32_t render_display_selected_0069ed08;
@@ -15,7 +15,7 @@ extern std::uint32_t render_display_actual_width_00619784,render_display_actual_
 extern std::uint32_t render_display_actual_mode_0061978c;
 extern std::uint32_t& render_display_requested_width_00657a48;
 extern std::uint32_t& render_display_requested_height_00657a4c;
-extern std::uint32_t render_display_requested_mode_00657a50;
+extern std::uint32_t& render_display_requested_mode_00657a50;
 extern std::uint32_t render_display_texture_width_005deac8,render_display_texture_height_005deacc;
 
 // Typed recording boundaries for the original direct Win32 and engine calls.

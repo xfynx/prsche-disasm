@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/window_runtime.hpp"
 #include "porsche/window_state.hpp"
 
@@ -22,8 +23,6 @@ static_assert(sizeof(OriginalWndClassA)==40,"original x86 WNDCLASSA");
 extern void* class_lock_0069e59c;
 extern std::uint32_t class_refcount_0069e594;
 extern const char** class_name_override_006afcc0;
-extern std::uint32_t class_error_file_005deb74;
-extern std::uint32_t class_error_line_005deb78;
 
 void* __cdecl window_lock_create_005321f0();
 void* __stdcall window_module_handle(const char*);
@@ -56,7 +55,8 @@ extern std::uint32_t window_saved_parameter_0069e580;
 
 std::uint32_t __stdcall window_handler_register_0053a800(std::uint32_t,std::uint32_t);
 void __cdecl window_resize_0053bec0(std::uint32_t,std::uint32_t);
-std::uint32_t __cdecl window_worker_0053b8d0(void*);
+std::uint32_t __cdecl window_worker_0053b8d0();
+void __cdecl window_worker_thread_entry();
 std::uint32_t __cdecl window_thread_start_0055f420(void*,std::uint32_t,std::uint32_t,
     std::uint32_t,std::uint32_t*);
 std::uint32_t __cdecl window_timed_callback_005366e0(std::uint32_t);

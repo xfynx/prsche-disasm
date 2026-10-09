@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare three recovered FE callbacks with original Porsche.exe x86."""
 import argparse
 import hashlib
@@ -125,6 +126,7 @@ def main():
                                for name in dependencies}
     if not args.limit:
         args.report_dir.mkdir(parents=True, exist_ok=True)
+        report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
         (args.report_dir / 'verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf8')
     print(json.dumps({'cases': len(inputs), 'native_cpp_equal_original_x86': True,
                       'function_vas': report['function_vas']}))

@@ -73,6 +73,7 @@ void __cdecl render_misc_00449b40(){record("[\"misc2\"]");}
 }
 int main(){
     using namespace porsche;
+    constexpr std::size_t selector_capacity=16;
     std::string line,display_name;
     while(std::getline(std::cin,line)){
         const auto f=split(line);if(f.size()!=9)return 2;
@@ -81,8 +82,8 @@ int main(){
         render_width_00657a48=static_cast<std::uint32_t>(std::stoul(f[5]));
         render_height_00657a4c=static_cast<std::uint32_t>(std::stoul(f[6]));
         const bool existing=std::stoul(f[7])!=0;choice=static_cast<std::uint32_t>(std::stoul(f[8]));
-        if(selector.size()>=sizeof(render_selector_00657a38))return 3;
-        std::memset(render_selector_00657a38,0,sizeof(render_selector_00657a38));
+        if(selector.size()>=selector_capacity)return 3;
+        std::memset(render_selector_00657a38,0,selector_capacity);
         std::memcpy(render_selector_00657a38,selector.c_str(),selector.size()+1);
         render_display_name_0065b304=display_name.c_str();
         render_core_0065b39c=nullptr;render_display_00628130=existing?&display:nullptr;
@@ -92,7 +93,7 @@ int main(){
         render_startup_00467470();
         std::cout<<"{\"core\":"<<(render_core_0065b39c!=nullptr)<<",\"display\":"
                  <<(render_display_00628130!=nullptr)<<",\"selector\":\""
-                 <<hexbytes(render_selector_00657a38,sizeof(render_selector_00657a38))
+                 <<hexbytes(render_selector_00657a38,selector_capacity)
                  <<"\",\"display_state\":\""<<hexbytes(display.bytes,sizeof(display.bytes))
                  <<"\",\"calls\":[";
         for(std::size_t i=0;i<calls.size();++i)std::cout<<(i?",":"")<<calls[i];

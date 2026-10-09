@@ -3,21 +3,17 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Последний принятый пакет [Run067](runs/067-main-callback-integration/README.md): 193 full + 4 partial,
-54 comparison probes + 3 native fixtures. Общая сборка и 4 260 свежих original-x86 сравнений прошли.
-Полный main и все 27 window callback registrations связаны с native C++ functions; joint dispatch проверен.
-Игровой EXE ещё не готов. Автоматический pseudo-C не считается восстановленным исходником.
-Каталог 36 618 синхронизирован с 31 supplementary functions; manifest проверяет точное множество адресов.
-Владельцы (gpt-6-luna/high): heap_init_recovery — Run068 shared arena/fill;
-render_mode_completion — Run073 joint renderer state (066/071 готовы);
-window_worker_recovery — Run072 window callee adapters (069/070 готовы).
-Координатор — проверка ABI, интеграция и коммиты. Пакеты 066/068–073 ещё не входят в число 193.
-Подтверждено: 00657a60 — DWORD, строка 657a84 без доказанного extent; main: 15 cases passed.
-Main 6573e8/3e24 clear пока boundary. Original fill повторяет DWORD pattern, не общий memset (068 проверяется).
-Проверка: scripts/build-v2.ps1; verify-v2-* со свежими report-dir/report под Run067;
-audit-v2-link-frontier.py (нужен tool-env); inventory-v2.py → structure-v2.py → inventory-v2.py --write-verification.
-Ближайший шаг: принять 066/069/070/071, затем единую arena и ABI-проверенные adapters к существующим callees.
-Предыдущие назначения/числа ниже — история; актуальны этот блок и последний run.
+Последний принятый пакет [Run078](runs/078-shared-runtime-integration/README.md):200 full +4 partial.
+63 comparison/alias probes +3 native OS fixtures +3 link fixtures. Общая сборка,54 свежих отчёта,
+10 175 bounded original-x86 сравнений и реальные Win32 проверки прошли.
+Runs066/068–082 приняты; unknown005e8e50 extent/indirect writers остаются открыты по081.
+Единые application/diagnostic owners подключены; FE static initialization и worker ABI исправлены.
+Агенты heap_init_recovery/render_mode_completion/window_worker_recovery(gpt-6-luna/high)
+завершили назначения; активных изменений вне checkpoint нет. Координатор — manifest/коммит.
+Ближайший шаг: связать scheduler082 с077, восстановить0053bae0→00534550/exit,
+затем проверить полную оконную цепочку. Fullscreen/position/input/game routes остаются границами.
+Проверки и пределы доказательства — Run078 README; registry хранит актуальные fresh reports.
+История ниже не является активным назначением. Итерация и игровой запуск не завершены.
 
 ## Цель и готовность 001
 

@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "porsche/shared_runtime_globals.hpp"
 
 namespace porsche {
 // Porsche.exe ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39.
@@ -8,8 +9,6 @@ extern std::uint32_t application_page_size_006af3f8;
 extern std::uint8_t application_heap_initialized_006af3f4;
 extern void* application_primary_arena_006af3b4;
 extern std::int32_t application_object_heap_006af3fc;
-extern std::uint32_t application_diagnostic_source_005deb74;
-extern std::uint32_t application_diagnostic_line_005deb78;
 extern std::uint8_t application_heap_records[0x8c0];
 extern void* application_queue_indices[16];
 void* __cdecl application_page_alloc_0059ed40(std::uint32_t* bytes);

@@ -87,7 +87,7 @@ void __cdecl file_worker_00568530(std::uint32_t index) {
                     io_locked_remove_005808f0(&free_auxiliary_006a5c38,static_cast<IoNode*>(operation->buffer));
                     operation->status=1;break;
                 default:
-                    diagnostic_file_005deb74="\\real\\pc\\nfile.c";diagnostic_line_005deb78=0x1f8;
+                    diagnostic_file_005deb74_set("\\real\\pc\\nfile.c");diagnostic_line_005deb78=0x1f8;
                     reinterpret_cast<void(__cdecl*)(const char*,...)>(diagnostic_handler_005debf0)(
                         "FILE_devicethread - UNKNOWN TYPE OF OPERATION %d.\n",operation->type);
                     break;

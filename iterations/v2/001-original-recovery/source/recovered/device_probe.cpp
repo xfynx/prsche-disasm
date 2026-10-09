@@ -1,3 +1,5 @@
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/file_device.hpp"
 #include <windows.h>
 #include <algorithm>
@@ -13,7 +15,7 @@ std::string hex(const void*p,size_t n){static const char*d="0123456789abcdef";au
 void rec(const std::string&s){calls.push_back(s);} std::uint32_t num(const std::string&s){return std::stoul(s,nullptr,0);}
 }
 namespace porsche {
-FileDevice* devices_006a5c7c; IoList free_operations_006a5c58,free_auxiliary_006a5c38; const char* diagnostic_file_005deb74; std::uint32_t diagnostic_line_005deb78; void(__cdecl*diagnostic_handler_005debf0)(const char*);
+FileDevice* devices_006a5c7c; IoList free_operations_006a5c58,free_auxiliary_006a5c38; void(__cdecl*diagnostic_handler_005debf0)(const char*);
 std::uint32_t __cdecl operation_key_005684c0(IoNode*n,std::uint32_t){auto*o=(FileOperation*)n;return ((o->id>>5)&0xffffffu)|((std::uint32_t)o->group<<24);}
 void __cdecl heap_enter_005322b0(void*p){rec("[\"enter\","+std::to_string((std::uintptr_t)p)+"]");} void __cdecl heap_leave_005322c0(void*p){rec("[\"leave\","+std::to_string((std::uintptr_t)p)+"]");} void* __cdecl heap_lock_create_005321f0(){rec("[\"create\"]");return (void*)(std::uintptr_t)(0x02002000+lock_counter++*16);}
 void __stdcall platform_system_info(void*p){std::memset(p,0,36);*(std::uint32_t*)((unsigned char*)p+4)=system_page,lock_counter;rec("[\"system_info\"]");}

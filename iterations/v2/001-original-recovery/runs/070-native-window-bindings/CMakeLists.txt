@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.20)
+project(native_window_bindings LANGUAGES CXX)
+if(NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
+  message(FATAL_ERROR "Win32 x86 MSVC ABI required")
+endif()
+add_library(win32_window_bindings STATIC ../../source/platform/win32_window.cpp)
+target_include_directories(win32_window_bindings PUBLIC ../../source/include)
+target_compile_features(win32_window_bindings PUBLIC cxx_std_17)
+target_compile_options(win32_window_bindings PRIVATE /W4 /EHsc /permissive-)
+target_link_libraries(win32_window_bindings PUBLIC user32 gdi32 kernel32)
+
+add_executable(win32_window_bindings_compile_fixture compile_fixture.cpp)
+target_link_libraries(win32_window_bindings_compile_fixture PRIVATE win32_window_bindings)
+target_compile_definitions(win32_window_bindings_compile_fixture PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_compile_features(win32_window_bindings_compile_fixture PRIVATE cxx_std_17)
+target_compile_options(win32_window_bindings_compile_fixture PRIVATE /W4 /EHsc /permissive-)
+set_target_properties(win32_window_bindings_compile_fixture PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

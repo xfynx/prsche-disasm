@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare Porsche.exe 0x467470 renderer startup consumer with bounded C++ unit."""
 import argparse
 import hashlib
@@ -150,6 +151,7 @@ def main():
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest(),'fixtures':fixtures}
     report_dir.mkdir(parents=True,exist_ok=True)
+    report['source_sha256']=source_hashes(report['source_sha256'].keys(),compiled_sources=['iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp','iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_globals.cpp'])
     (report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
     (report_dir/'source-functions.jsonl').write_text(json.dumps({'sha256':sha,'body_sha256':body_sha,**function})+'\n',encoding='utf8')
 

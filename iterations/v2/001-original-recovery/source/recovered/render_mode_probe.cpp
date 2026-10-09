@@ -1,3 +1,5 @@
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
 #include "porsche/render_mode.hpp"
 #include "porsche/render_activate.hpp"
 #include <cstdint>
@@ -9,7 +11,6 @@ RenderDisplay* render_display_00628130{};
 std::uint32_t render_display_mode_index_00619780{};
 std::uint32_t render_display_actual_width_00619784{}, render_display_actual_height_00619788{};
 std::uint32_t render_display_actual_mode_0061978c{};
-std::uint32_t render_display_clock_005deb1c{};
 static std::uint8_t object_bytes[0x100]{};
 static std::uint8_t driver_bytes[0x20]{};
 static std::uint8_t records[0x28 * 4]{};

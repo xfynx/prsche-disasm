@@ -1,11 +1,12 @@
 # Need for Speed: Porsche Unleashed — восстановление оригинала
 
-Текущий результат — [Run067](iterations/v2/001-original-recovery/runs/067-main-callback-integration/README.md): **193 проверенные C++ функции** и 4 частичных consumer.
-Общая MSVC Win32 сборка: 54 comparison probes и 3 native fixtures. Подключены полный main,
-renderer modes и реальные C++ callbacks всех 27 регистраций окна. Совместный registrar → WndProc → callbacks
-сверён с original x86; 4 260 свежих сравнений прошли. Сгенерированный каталог синхронизирован
-с supplementary index: 36 618 записей. Игрового v2 EXE и визуальной приёмки ещё нет.
-Следом — единая application arena, link adapters, Win32 window bindings и оставшиеся renderer consumers.
+Текущий результат — [Run078](iterations/v2/001-original-recovery/runs/078-shared-runtime-integration/README.md): **200 проверенных C++ функций** и 4 частичных consumer.
+Общая MSVC Win32 сборка прошла: 63 comparison/alias probes, 3 native OS fixtures и 3 link fixtures.
+54 свежих отчёта, 10 175 ограниченных сравнений с original x86; единая application arena,
+общие diagnostic globals, renderer settings/state, очередь событий и планировщик подключены.
+Реальные Win32 потоки завершились штатно; оконный стенд создал и закрыл окно640×480.
+Полная оконная цепочка линкуется:16 unique callbacks на27 регистраций, GUI в ней ещё не запускается.
+Игрового запуска v2 и визуальной приёмки нет. Следом — scheduler→оконный shutdown callback0053bae0.
 
 **Активная разработка с 2026-10-08: [v2 — восстановление полного оригинала](iterations/v2/001-original-recovery/README.md).**
 Сначала полный корпус бинарников и собираемый Windows/x86 original baseline,

@@ -7,8 +7,6 @@ std::uint32_t render_library_handle_0069e5e8;
 std::uint32_t render_cleanup_token_0069e5ec;
 std::uint32_t render_driver_name_006a64b4;
 std::uint32_t render_error_flag_005deb70;
-std::uint32_t render_error_file_005deb74;
-std::uint32_t render_error_line_005deb78;
 
 namespace {
 constexpr std::uint32_t source_file=0x005c0dd0;

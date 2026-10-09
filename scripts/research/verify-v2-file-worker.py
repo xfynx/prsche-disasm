@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare the recovered file worker with SHA-guarded Porsche.exe x86 execution."""
 import argparse
 import hashlib
@@ -156,6 +157,7 @@ def main():
             'comparison':'Full worker arena, auxiliary list, shutdown state, ordered boundary calls and a device/operation/list state snapshot at every boundary; fixture stops loop via shutdown global only.',
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':fixtures}
     args.report_dir.mkdir(parents=True,exist_ok=True)
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
     (args.report_dir/'source-functions.jsonl').write_text(''.join(json.dumps({'sha256':module['sha256'],**functions[va]})+'\n' for va in sorted(coverage) if va in functions),newline='\n')
 

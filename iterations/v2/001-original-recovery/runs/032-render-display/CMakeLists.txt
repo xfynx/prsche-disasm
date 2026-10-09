@@ -7,7 +7,9 @@ set(SOURCE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../source")
 add_executable(render_display_probe
     "${SOURCE_ROOT}/recovered/render_display_probe.cpp"
     "${SOURCE_ROOT}/recovered/Porsche.exe/render_display.cpp"
-    "${SOURCE_ROOT}/recovered/Porsche.exe/render_objects.cpp")
+    "${SOURCE_ROOT}/recovered/Porsche.exe/render_objects.cpp"
+    "${SOURCE_ROOT}/recovered/Porsche.exe/application_state.cpp"
+    "${SOURCE_ROOT}/recovered/Porsche.exe/application_globals.cpp")
 target_include_directories(render_display_probe PRIVATE "${SOURCE_ROOT}/include")
 target_compile_features(render_display_probe PRIVATE cxx_std_17)
 target_compile_options(render_display_probe PRIVATE /W4 /EHsc /permissive-)

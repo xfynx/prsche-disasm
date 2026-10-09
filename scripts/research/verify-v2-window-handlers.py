@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Original 53a800 handler table and eight callbacks versus native x86 C++."""
 import argparse, hashlib, json, struct, subprocess, sys
 from pathlib import Path
@@ -129,6 +130,7 @@ def main():
         'boundaries':'Native 005a112b is fixture CRT qsort for unique bounded keys; original qsort executes in the oracle. Its algorithm/call ordering is not recovered. 005322b0/005322c0 lock wrappers and Win32 PostQuitMessage/SystemParametersInfoA are fixtures; original search, comparator, qsort, and callbacks execute from x86 image.',
         'source_sha256':{x:hashlib.sha256((ROOT/x).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for x in deps},
         'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest(),'fixtures':outputs}
+    report['source_sha256']=source_hashes([*report['source_sha256'],Path(__file__)])
     args.report.parent.mkdir(parents=True,exist_ok=True);args.report.write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
     print(json.dumps({'cases':len(inputs),'function_vas':report['function_vas'],'native_cpp_equal_original_x86':True}))
 if __name__=='__main__':main()

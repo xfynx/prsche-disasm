@@ -1,3 +1,4 @@
+from v2_source_dependencies import source_hashes
 """Compare the display constructor's measured prefix and full entry with original x86."""
 import argparse
 import hashlib
@@ -260,6 +261,7 @@ def main():
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest(),'fixtures':fixtures}
     args.report_dir.mkdir(parents=True,exist_ok=True)
+    report['source_sha256']=source_hashes(report['source_sha256'].keys(),compiled_sources=['iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp','iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_globals.cpp'])
     (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
     (args.report_dir/'source-functions.jsonl').write_text(json.dumps(source_record(module,data))+'\n',encoding='utf8')
     print(json.dumps({'cases':len(inputs),'full_constructor_cases':full_cases,
