@@ -1,13 +1,15 @@
 # План восстановления Porsche Unleashed
 
-Текущий результат — [Run036](iterations/v2/001-original-recovery/runs/036-native-window/README.md): **129 полностью проверенных C++ функций**
-и 3 частичных consumer. Общая MSVC Win32 сборка: 28 comparison probes + native_window_smoke.
-Нативный x86 EXE оконного стенда запущен: настоящий HWND 640×480, восстановленная
-WndProc, 39 Win32 сообщений, корректное закрытие. Это ограниченный platform smoke;
-полный startup игры, драйвер, игровой цикл и визуальное соответствие ещё не приняты.
-Готовые allocator/heap-init, THRASH loader, RegisterClass/CreateWindow и WndProc
-включены в общее дерево исходников. Следом — shared-state/window worker, остальной
-конструктор дисплея и совместный bootstrap настоящего heap.
+Текущий результат — [Run041](iterations/v2/001-original-recovery/runs/041-startup-chain/README.md): **150 полностью проверенных C++ функций**
+и 4 частичных consumer. Общая MSVC Win32 сборка: 37 comparison probes + native_window_smoke.
+Полный конструктор дисплея, оконный поток, регистрация/обработчики сообщений, startup
+пулов, registry и thread start включены в общее дерево. Конфигурация окна и известные
+одноимённые globals используют общий storage. 4 848 свежих сравнений с original x86 прошли;
+совместный heap сравнивается по всей арене после каждого выделения/освобождения.
+Пересобранный нативный оконный EXE реально запущен: HWND 640×480, recovered WndProc,
+39 сообщений, корректное закрытие. Это platform fixture; игровой startup, renderer/loop
+и визуальная приёмка ещё открыты. Следом — FE main consumer, input init, positioning,
+renderer activation и реальные callback/platform bindings.
 
 Активный путь с 2026-10-08 — [v2/001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 Полный корпус всех бинарников → собираемый original Windows/x86 → современный

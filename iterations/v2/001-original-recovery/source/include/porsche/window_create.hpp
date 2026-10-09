@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "porsche/window_runtime.hpp"
+#include "porsche/window_state.hpp"
 
 namespace porsche {
 // Porsche.exe 0x53ac20..0x53ad23 registration prefix only.
@@ -43,17 +44,17 @@ extern void* window_input_lock_0069e564;
 extern std::uint32_t window_input_capacity_0069e560;
 extern std::uint32_t window_input_read_0069e0d8;
 extern std::uint32_t window_input_write_0069e568;
-extern std::uint32_t window_running_006b7c14;
-extern std::uint32_t window_width_006b77b4;
-extern std::uint32_t window_height_006b77b8;
-extern std::uint8_t window_fullscreen_006b7c01;
+extern std::uint32_t& window_running_006b7c14;
+extern std::uint32_t& window_width_006b77b4;
+extern std::uint32_t& window_height_006b77b8;
+extern std::uint8_t& window_fullscreen_006b7c01;
 extern void* window_thread_handle_0069e574;
-extern void* window_hwnd_006b7bf8;
+extern void*& window_hwnd_006b7bf8;
 extern std::uint32_t window_worker_state_006bd9e0[7];
 extern std::uint32_t window_saved_parameter_0069e57c;
 extern std::uint32_t window_saved_parameter_0069e580;
 
-void __stdcall window_handler_register_0053a800(std::uint32_t,std::uint32_t);
+std::uint32_t __stdcall window_handler_register_0053a800(std::uint32_t,std::uint32_t);
 void __cdecl window_resize_0053bec0(std::uint32_t,std::uint32_t);
 std::uint32_t __cdecl window_worker_0053b8d0(void*);
 std::uint32_t __cdecl window_thread_start_0055f420(void*,std::uint32_t,std::uint32_t,

@@ -68,6 +68,7 @@ def original(module,data,case):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--probe',type=Path,default=ROOT/'local/builds/v2/window-procedure-034/bin/Release/window_procedure_probe.exe')
+    parser.add_argument('--report-dir',type=Path,default=RUN)
     args=parser.parse_args()
     module=next(r for r in map(json.loads,(ROOT/'research/binary-index/static/binaries.jsonl').read_text(encoding='utf8').splitlines()) if r['file']=='Porsche.exe')
     data=(ROOT/'local/game'/module['path']).read_bytes()
@@ -80,15 +81,15 @@ def main():
         expected=original(module,data,case)
         if actual!=expected:raise RuntimeError(f'{case}: expected {expected}, actual {actual}')
         fixtures.append({'input':case,'output':actual})
-    deps=['source/include/porsche/window_procedure.hpp','source/recovered/Porsche.exe/window_procedure.cpp','source/recovered/window_procedure_probe.cpp']
+    deps=['source/include/porsche/window_state.hpp','source/include/porsche/window_procedure.hpp','source/recovered/Porsche.exe/window_procedure.cpp','source/recovered/window_procedure_probe.cpp']
     deps=['iterations/v2/001-original-recovery/'+p for p in deps]+['scripts/research/verify-v2-window-procedure.py']
     report={'schema':1,'sha256':SHA,'function_vas':['0053a7f0','0053aba0','005a2f23'],'cases':len(inputs),
         'native_cpp_equal_original_x86':True,'binary_matched':False,'game_launch_verified':False,
         'boundaries':'Callback bodies and DefWindowProcA are recorded; original binary search/comparator execute directly. Valid sorted 0..128-entry arrays.',
         'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in deps},
         'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest(),'fixtures':fixtures}
-    RUN.mkdir(parents=True,exist_ok=True)
-    (RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
+    args.report_dir.mkdir(parents=True,exist_ok=True)
+    (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
     print(json.dumps({'cases':len(inputs),'function_vas':report['function_vas'],'native_cpp_equal_original_x86':True}))
 
 if __name__=='__main__':main()

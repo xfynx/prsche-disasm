@@ -173,3 +173,57 @@ set_target_properties(recovery_probe PROPERTIES
 
 # Explicit native Win32 fixture; not an original game executable.
 add_subdirectory(runs/036-native-window native-window)
+
+# Integrated startup packages; platform/game callees stay explicit boundaries.
+add_executable(render_display_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_display_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_display.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_objects.cpp"
+)
+add_executable(window_worker_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_worker_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_runtime.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_worker.cpp"
+)
+add_executable(application_pool_probe "${PORSCHE_SOURCE_ROOT}/recovered/application_pool_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_pool.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_pages.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_device.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/io_worker_lists.cpp"
+)
+add_executable(window_handlers_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_handlers_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_handlers.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_procedure.cpp"
+)
+add_executable(window_state_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_state_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_create.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_worker.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_state.cpp"
+)
+add_executable(application_bootstrap_probe "${PORSCHE_SOURCE_ROOT}/recovered/application_bootstrap_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_heap.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_heap_init.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_alloc.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/heap.cpp"
+)
+add_executable(startup_subsystems_probe "${PORSCHE_SOURCE_ROOT}/recovered/startup_subsystems_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/startup_subsystems.cpp"
+)
+add_executable(window_thread_start_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_threads_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_threads.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_threads.cpp"
+)
+foreach(probe render_display_probe window_worker_probe application_pool_probe window_handlers_probe window_state_probe application_bootstrap_probe startup_subsystems_probe window_thread_start_probe)
+    target_include_directories(${probe} PRIVATE "${PORSCHE_RECOVERY_INCLUDE}")
+    target_compile_features(${probe} PRIVATE cxx_std_17)
+    target_compile_definitions(${probe} PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
+    target_compile_options(${probe} PRIVATE /W4 /EHsc /permissive-)
+    set_target_properties(${probe} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+endforeach()
+
+add_executable(render_registry_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_registry_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_registry.cpp")
+target_include_directories(render_registry_probe PRIVATE "${PORSCHE_RECOVERY_INCLUDE}")
+target_compile_features(render_registry_probe PRIVATE cxx_std_17)
+target_compile_definitions(render_registry_probe PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
+target_compile_options(render_registry_probe PRIVATE /W4 /EHsc /permissive-)
+target_link_libraries(render_registry_probe PRIVATE advapi32)
+set_target_properties(render_registry_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

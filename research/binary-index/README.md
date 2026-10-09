@@ -22,6 +22,12 @@ SHA/RET4/priority/IAT — [thread-index.json](../../iterations/v2/001-original-r
 Run012: Button callback 0x4119e0..0x411a40 дополнен по body SHA/двум RET.
 Всего семь supplementary функций; полный каталог v2 содержит 36594 записи.
 
+Run041: ещё 11 omitted window/registry bodies дополнены по SHA и полным RET bytes.
+В manual-functions.jsonl теперь20 supplementary функций; общий каталог36607.
+Адреса:53b040/230/260/290/2a0/2e0/870/8b0/8d0 и4b7150/4b76f0.
+Индекс не доказывает готовность callees или запуск игры; текущая приёмка —
+[Run041](../../iterations/v2/001-original-recovery/runs/041-startup-chain/README.md).
+
 ## Покрытие
 
 [coverage.json](coverage.json) сопоставляет пути и SHA256 с результатами анализа.

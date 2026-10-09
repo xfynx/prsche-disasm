@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.20)
+project(render_registry_probe LANGUAGES CXX)
+if(NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
+  message(FATAL_ERROR "Original Win32 MSVC ABI required")
+endif()
+add_executable(render_registry_probe
+  ../../source/recovered/render_registry_probe.cpp
+  ../../source/recovered/Porsche.exe/render_registry.cpp)
+target_include_directories(render_registry_probe PRIVATE ../../source/include)
+target_compile_features(render_registry_probe PRIVATE cxx_std_17)
+target_compile_definitions(render_registry_probe PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
+target_compile_options(render_registry_probe PRIVATE /W4 /EHsc /permissive- /Gy /Gw)
+target_link_libraries(render_registry_probe PRIVATE advapi32.lib)
+target_link_options(render_registry_probe PRIVATE /OPT:REF)
+set_target_properties(render_registry_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

@@ -1,6 +1,12 @@
 #include "porsche/window_create.hpp"
 
 namespace porsche {
+OriginalWindowConfiguration window_configuration_storage_006b77a0{};
+std::uint32_t& window_running_006b7c14=window_configuration_storage_006b77a0.running_006b7c14;
+std::uint32_t& window_width_006b77b4=window_configuration_storage_006b77a0.width_006b77b4;
+std::uint32_t& window_height_006b77b8=window_configuration_storage_006b77a0.height_006b77b8;
+std::uint8_t& window_fullscreen_006b7c01=window_configuration_storage_006b77a0.fullscreen_006b7c01;
+void*& window_hwnd_006b7bf8=window_configuration_storage_006b77a0.hwnd_006b7bf8;
 void* class_lock_0069e59c=nullptr;
 std::uint32_t class_refcount_0069e594=0;
 const char** class_name_override_006afcc0=nullptr;
@@ -11,12 +17,7 @@ void* window_input_lock_0069e564=nullptr;
 std::uint32_t window_input_capacity_0069e560=0;
 std::uint32_t window_input_read_0069e0d8=0;
 std::uint32_t window_input_write_0069e568=0;
-std::uint32_t window_running_006b7c14=0;
-std::uint32_t window_width_006b77b4=0;
-std::uint32_t window_height_006b77b8=0;
-std::uint8_t window_fullscreen_006b7c01=0;
 void* window_thread_handle_0069e574=nullptr;
-void* window_hwnd_006b7bf8=nullptr;
 std::uint32_t window_worker_state_006bd9e0[7]{};
 std::uint32_t window_saved_parameter_0069e57c=0;
 std::uint32_t window_saved_parameter_0069e580=0;

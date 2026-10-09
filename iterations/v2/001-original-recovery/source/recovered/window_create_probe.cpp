@@ -51,8 +51,9 @@ void* __stdcall window_create_ex(std::uint32_t,const char*,const char*,std::uint
 void* __stdcall window_set_cursor(void*){return nullptr;}
 std::int32_t __stdcall window_show_cursor(std::int32_t){return 0;}
 void __cdecl window_channel_005739b0(std::uint32_t,std::uint32_t){}
-void __stdcall window_handler_register_0053a800(std::uint32_t message,std::uint32_t handler){
+std::uint32_t __stdcall window_handler_register_0053a800(std::uint32_t message,std::uint32_t handler){
     add("[\"handler\","+std::to_string(message)+","+std::to_string(handler)+"]");
+    return 1;
 }
 void __cdecl window_resize_0053bec0(std::uint32_t width,std::uint32_t height){
     add("[\"resize\","+std::to_string(width)+","+std::to_string(height)+"]");

@@ -133,6 +133,7 @@ def original(module,data,case,full=False):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--probe',type=Path,default=ROOT/'local/builds/v2/001-original-recovery/bin/Release/window_create_probe.exe')
+    parser.add_argument('--report',type=Path,default=RUN/'verification.json')
     parser.add_argument('--limit',type=int,default=0)
     args=parser.parse_args()
     module=next(x for x in map(json.loads,(ROOT/'research/binary-index/static/binaries.jsonl').read_text(encoding='utf8').splitlines()) if x['file']=='Porsche.exe')
@@ -162,10 +163,24 @@ def main():
                       'range':'0053ac20..0053b03f','native_cpp_equal_original_x86':True}))
     if args.limit:return
     paths=['iterations/v2/001-original-recovery/source/include/porsche/window_create.hpp',
+           'iterations/v2/001-original-recovery/source/include/porsche/window_state.hpp',
            'iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_create.cpp',
+           'iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_state.cpp',
            'iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_init.cpp',
            'iterations/v2/001-original-recovery/source/recovered/window_create_probe.cpp',
            'scripts/research/verify-v2-window-create.py']
+    # Pin every compiled translation unit and its owned transitive headers.
+    import re
+    owned=ROOT/'iterations/v2/001-original-recovery/source'
+    pending=[owned/'recovered/Porsche.exe'/x for x in ['window_create.cpp', 'window_init.cpp']]
+    seen=set()
+    while pending:
+        path=pending.pop()
+        if path in seen:continue
+        seen.add(path)
+        for inc in re.findall(r'#include "(porsche/[^"]+)"',path.read_text(encoding='utf8')):
+            pending.append(owned/'include'/inc)
+    paths=sorted(set(paths)|{p.relative_to(ROOT).as_posix() for p in seen})
     report={'schema':1,'sha256':sha,'range':'0053ac20..0053b03f',
             'scope':'full 0053ac20 with typed worker, window and input boundaries',
             'function_vas':['0053ac20'],'prefix_cases':len(selected),'full_cases':len(full_cases),'native_cpp_equal_original_x86':True,
@@ -173,7 +188,7 @@ def main():
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest()}
     report['function_vas']=['0053ac20']
-    RUN.mkdir(parents=True,exist_ok=True)
-    (RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
+    args.report.parent.mkdir(parents=True,exist_ok=True)
+    args.report.write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
 
 if __name__=='__main__':main()

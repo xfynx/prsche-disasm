@@ -3,12 +3,13 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Последний принятый пакет Run036: 129 full + 3 partial, 28 comparison probes и
-нативный оконный smoke EXE, реально запущенный на Win32. Сам игровой EXE ещё не готов.
-Три активных worker gpt-6-luna/high: window_worker_recovery (035/038 shared state
-и handlers), display_recovery (032 full display ctor), heap_init_recovery
-(040 совместный настоящий heap). Координатор — интеграция, main startup и Win32.
-Предыдущие назначения/числа ниже сохраняют историю; актуальны этот блок и последний run.
+Последний принятый пакет Run041: 150 full + 4 partial, 37 comparison probes и
+нативный оконный smoke EXE, реально запущенный на Win32. Игровой EXE ещё не готов.
+Три worker gpt-6-luna/high: window_worker_recovery — Run048 positioning;
+display_recovery — Run051 render/window bridge; heap_init_recovery — Run052 exit registry.
+Готовые045/046/047/049/050 ожидают приёмки следующим пакетом; не включены в число150.
+Координатор — общий build/registry/checkpoint, main startup и Win32/callback bindings.
+Предыдущие назначения/числа ниже — история; актуальны этот блок и последний run.
 
 ## Цель и готовность 001
 
@@ -327,3 +328,18 @@ units с одинаковыми VA не должны иметь независи
 require-decompile-attempts,write-verification; proof commands028/029/031/033/034;
 036native_window_smoke реально выполнен отдельно. Следующий checkpoint — принятые
 035/032/038/040 и расширенная исходная startup chain, без заявлений о готовой игре.
+
+## Run041 — общая startup-сборка, 2026-10-09
+
+Приняты032/035/037/038/039/040/042/043/044. 150 full,4 partial; 20 supplementary
+bodies и36607 indexed функций. Запросы индекса/SHA/VA/layout — README пакетов;
+принятый отчёт/ограничения/точные команды — runs/041-startup-chain/README.md.
+37 probes + native_window_smoke собираются. 4848 comparisons, 6 alias assertions,
+actual HWND640x480/recovered WndProc/39messages/clean close прошли. Run037 частичный,
+original qsort005a112b остаётся typed boundary, не std::sort. История runs сохранена.
+
+Следующий конкретный шаг: checkpoint041; принять045 messages,046 DirectInput setup,
+047 FE startup; завершить048 window positioning,049 render activation,050 instance.
+Дальше связать оригинальные callback VAs с native C++ pointers и OS/CRT adapters,
+восстановить оставшийся main004b6a50 и проверить настоящую startup chain. Отсутствие
+silent no-op обязательно; доказательства fixture не заменяют game/visual acceptance.
