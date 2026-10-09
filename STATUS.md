@@ -1,13 +1,15 @@
 # Состояние проекта
 
-Текущий результат — [Run090](iterations/v2/001-original-recovery/runs/090-native-window-integration/README.md): **213 проверенных C++ функций** и 5 частичных consumer.
-Общая MSVC Win32 сборка прошла:71 comparison/alias probes,4 native OS fixtures,3 link fixtures.
-Полная восстановленная оконная цепочка реально выполнила startup→27 регистраций→event/thread handshake→
-видимое окно640×480→original cleanup message0x466→destroy→join; процесс завершился с кодом0.
-16 свежих отчётов/5091 original-x86 сравнений;69 актуальных source closures проверены.
-Каталог36619 функций/32 supplementary. Полный игровой запуск и визуальная приёмка ещё открыты.
-Следующий шаг — обязательные FE/engine consumers; intro MAD playback выделен отдельно.
-Три агента:093 intro/resource caller,095 splash/progress,096 input snapshot;094 MAD header готов(partial).
+Текущий результат — [Run098](iterations/v2/001-original-recovery/runs/098-startup-integration/README.md): **221 проверенная C++ функция** и 6 частичных consumer.
+Общая MSVC Win32 сборка прошла:80 comparison/alias probes,4 native OS fixtures,3 link fixtures.
+28 свежих отчётов /4934 bounded original-x86 сравнений; создание окна и завершение потока повторно проверены.
+Включены startup sequence, splash/progress, input snapshot, цикл кадра и службы запуска;
+MAD header остаётся partial: playback/audio/render loop ещё открыт.
+Настоящая game-link попытка:0 compile errors,256 unresolved symbols/276 references после интеграции101/103.
+[Run102](iterations/v2/001-original-recovery/runs/102-original-game-link/README.md) сохраняет исходный frontier251; новые consumers раскрыли дополнительные вызовы.
+Игровой EXE не собран, запуск и визуальная приёмка открыты. Каталог36619 функций/32 supplementary.
+Параллельно: render_mode_completion —104 ABI/alias audit; heap_init_recovery —105 frame services;
+window_worker_recovery —106 resource predicate. Координатор — приёмка/commit098, затем подтверждённые link adapters.
 
 2026-10-08: активна [v2/001-original-recovery](iterations/v2/001-original-recovery/README.md).
 v1 сохранена и запушена: dc6b9d8; 012 незавершена и её интеграция остановлена.

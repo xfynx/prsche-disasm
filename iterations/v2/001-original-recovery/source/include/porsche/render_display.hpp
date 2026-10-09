@@ -55,12 +55,12 @@ void __cdecl render_display_transform_compose_00539b30(void* matrix,void* transf
                                                         std::uint32_t x,std::uint32_t y);
 void __cdecl render_display_transform_attach_00539b00(void* surface,void* transform);
 void __cdecl render_display_local_transform_00466e80(void* object,std::uint32_t zero);
-std::uint32_t __cdecl render_display_getstate_006bd984(std::uint32_t key);
-void __cdecl render_display_setstate_006bd97c(std::uint32_t key,std::uint32_t value);
+std::uint32_t __stdcall render_display_getstate_006bd984(std::uint32_t key);
+void __stdcall render_display_setstate_006bd97c(std::uint32_t key,std::uint32_t value);
 void __cdecl render_display_thr_cleanup_00555390();
-void __cdecl render_display_window_006bd9b0(std::uint32_t mode);
-void __cdecl render_display_set_texture_006bd954(std::uint32_t value);
-void __cdecl render_display_clear_window_006bd91c();
+void __stdcall render_display_window_006bd9b0(std::uint32_t mode);
+void __stdcall render_display_set_texture_006bd954(std::uint32_t value);
+void __stdcall render_display_clear_window_006bd91c();
 void* __cdecl render_display_texture_create_00535950(std::uint32_t w,std::uint32_t h,
                                                       std::uint32_t bits,std::uint32_t flags);
 void __cdecl render_display_texture_bind_00534480(void* texture);
@@ -72,12 +72,12 @@ void* __cdecl render_display_texture_alloc_00554960(std::uint32_t w,std::uint32_
 void __cdecl render_display_texture_update_005550e0();
 void __cdecl render_display_texture_copy_00554d70(void* texture,void* pixels,std::uint32_t zero);
 void __cdecl render_display_texture_release_00555440(void* texture);
-void __cdecl render_display_draw_quad_006bd9a8(const void* a,const void* b,const void* c,const void* d);
-void __cdecl render_display_flush_006bd970();
-void __cdecl render_display_sync_006bd978(std::uint32_t zero);
+void __stdcall render_display_draw_quad_006bd9a8(const void* a,const void* b,const void* c,const void* d);
+void __stdcall render_display_flush_006bd970();
+void __stdcall render_display_sync_006bd978(std::uint32_t zero);
 void* __cdecl render_display_buffer_alloc_00531ca0(const char* format,std::uint32_t bytes,
                                                     std::uint32_t zero);
-void __cdecl render_display_read_rect_006bd96c(std::uint32_t x,std::uint32_t y,
+void __stdcall render_display_read_rect_006bd96c(std::uint32_t x,std::uint32_t y,
     std::uint32_t width,std::uint32_t height,void* output);
 bool __cdecl render_display_compare_pixel_00468110(std::uint32_t pixel,std::uint32_t format);
 void __cdecl render_display_release_texture_00533f80(void* texture);

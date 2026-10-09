@@ -14,8 +14,59 @@
 #include "porsche/render_event_route.hpp"
 #include "porsche/fe_stream.hpp"
 #include "porsche/file_wait.hpp"
+#include "porsche/game_setup.hpp"
+#include "porsche/engine_service_427a60.hpp"
+#include "porsche/frame_pump.hpp"
+#include "porsche/startup_sequence.hpp"
+#include "porsche/splash_progress.hpp"
+#include "porsche/startup_service_56a490.hpp"
+#include "porsche/startup_service_516950.hpp"
+#include "porsche/window_shutdown.hpp"
+#include "porsche/heap.hpp"
+#include <cstring>
 
 namespace porsche {
+void __cdecl application_main_function_004dd600() {
+    game_setup_004dd600();
+}
+void __cdecl application_main_function_004b67b0() {
+    startup_sequence_004b67b0();
+}
+void __cdecl application_main_function_004a4a70(std::uint32_t phase_word) {
+    std::int32_t phase;
+    std::memcpy(&phase,&phase_word,sizeof(phase));
+    splash_progress_004a4a70(phase);
+}
+void __cdecl startup_sequence_call_0056a490() {
+    startup_service_release_0056a490();
+}
+void __cdecl startup_sequence_call_00516950() {
+    startup_service_noop_00516950();
+}
+void __cdecl startup_sequence_call_00427a60() {
+    engine_service_00427a60();
+}
+void __cdecl startup_sequence_call_004b0d70() {
+    frame_pump_004b0d70();
+}
+void __cdecl splash_progress_frame_begin_004b0d70() {
+    frame_pump_004b0d70();
+}
+void __cdecl splash_progress_pump_005366e0(std::uint32_t argument) {
+    (void)timed_callbacks_005366e0(argument);
+}
+void __cdecl splash_progress_enter_lock_005322b0(void* lock) {
+    heap_enter_005322b0(lock);
+}
+void __cdecl splash_progress_leave_lock_005322c0(void* lock) {
+    heap_leave_005322c0(lock);
+}
+void __cdecl splash_progress_free_00531f90(void* allocation) {
+    (void)free_00531f90(allocation);
+}
+void __cdecl splash_progress_driver_frame_end_00534550() {
+    (void)window_shutdown_prepare_00534550();
+}
 // Link names retained by independently recovered callers to canonical bodies.
 // No original algorithm is reimplemented here. Run075 records ABI evidence.
 void* __cdecl render_allocate_0059ef90(std::uint32_t bytes) {

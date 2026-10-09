@@ -117,19 +117,19 @@ void __cdecl render_display_transform_compose_00539b30(void*,void*,std::uint32_t
 }
 void __cdecl render_display_transform_attach_00539b00(void*,void*){record("transform-attach");}
 void __cdecl render_display_local_transform_00466e80(void*,std::uint32_t zero) {record("local-transform|"+std::to_string(zero));}
-std::uint32_t __cdecl render_display_getstate_006bd984(std::uint32_t key) {
+std::uint32_t __stdcall render_display_getstate_006bd984(std::uint32_t key) {
     record("getstate|"+std::to_string(key));
     if(key==2)return 0x102; if(key==7)return 0x107; if(key==10)return 0x10a;
     if(key==3)return 0x103; mode_record={0,0,render_display_selected_0069ed08};
     return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&mode_record));
 }
-void __cdecl render_display_setstate_006bd97c(std::uint32_t key,std::uint32_t value) {
+void __stdcall render_display_setstate_006bd97c(std::uint32_t key,std::uint32_t value) {
     record("setstate|"+std::to_string(key)+"|"+std::to_string(value));
 }
 void __cdecl render_display_thr_cleanup_00555390(){record("thr-cleanup");}
-void __cdecl render_display_window_006bd9b0(std::uint32_t mode){record("window|"+std::to_string(mode));}
-void __cdecl render_display_set_texture_006bd954(std::uint32_t value){record("set-texture|"+std::to_string(value));}
-void __cdecl render_display_clear_window_006bd91c(){record("clear-window");}
+void __stdcall render_display_window_006bd9b0(std::uint32_t mode){record("window|"+std::to_string(mode));}
+void __stdcall render_display_set_texture_006bd954(std::uint32_t value){record("set-texture|"+std::to_string(value));}
+void __stdcall render_display_clear_window_006bd91c(){record("clear-window");}
 void* __cdecl render_display_texture_create_00535950(std::uint32_t w,std::uint32_t h,std::uint32_t bits,std::uint32_t flags) {
     record("texture-create|"+std::to_string(w)+"|"+std::to_string(h)+"|"+
            std::to_string(bits)+"|"+std::to_string(flags));return texture;
@@ -147,13 +147,13 @@ void* __cdecl render_display_texture_alloc_00554960(std::uint32_t w,std::uint32_
 void __cdecl render_display_texture_update_005550e0(){record("texture-update");}
 void __cdecl render_display_texture_copy_00554d70(void*,void*,std::uint32_t z){record("texture-copy|"+std::to_string(z));}
 void __cdecl render_display_texture_release_00555440(void*){record("texture-release");}
-void __cdecl render_display_draw_quad_006bd9a8(const void*,const void*,const void*,const void*){record("draw-quad");}
-void __cdecl render_display_flush_006bd970(){record("flush");}
-void __cdecl render_display_sync_006bd978(std::uint32_t zero){record("sync|"+std::to_string(zero));}
+void __stdcall render_display_draw_quad_006bd9a8(const void*,const void*,const void*,const void*){record("draw-quad");}
+void __stdcall render_display_flush_006bd970(){record("flush");}
+void __stdcall render_display_sync_006bd978(std::uint32_t zero){record("sync|"+std::to_string(zero));}
 void* __cdecl render_display_buffer_alloc_00531ca0(const char*,std::uint32_t bytes,std::uint32_t zero) {
     record("readback-alloc|"+std::to_string(bytes)+"|"+std::to_string(zero));return readback;
 }
-void __cdecl render_display_read_rect_006bd96c(std::uint32_t x,std::uint32_t y,std::uint32_t w,
+void __stdcall render_display_read_rect_006bd96c(std::uint32_t x,std::uint32_t y,std::uint32_t w,
     std::uint32_t h,void*){record("readrect|"+std::to_string(x)+"|"+std::to_string(y)+"|"+
     std::to_string(w)+"|"+std::to_string(h));}
 bool __cdecl render_display_compare_pixel_00468110(std::uint32_t pixel,std::uint32_t format) {

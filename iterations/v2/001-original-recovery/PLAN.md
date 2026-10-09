@@ -3,21 +3,31 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Последний принятый пакет [Run090](runs/090-native-window-integration/README.md):213 full +5 partial.
-71 comparison/alias probes +4 native OS fixtures +3 link fixtures. Общая MSVCWin32сборка,
-16 свежих отчётов/5091 bounded original-x86 сравнений и69 source closures прошли.
-Run086 реально выполнил production window_init→27 callbacks→event/thread handshake→
-видимое окно640×480→original cleanup0x466→destroy→join; exit0, дваresize notifications.
-Исправлен caller53bcef→0053a8e0(0x466,0,0,0); fresh proof сравнивает все4 аргумента.
-Приняты083–092;094 partial MAD header готов, пока вне общего build/registry090.
-Активные исполнители: heap_init_recovery —093 original004dd600 (intro/resource caller);
-window_worker_recovery —096 input snapshot0055feb0; render_mode_completion —095 splash/progress004a4a70.
-Координатор — manifest/промежуточныйcommit090, затем связываниеmandatory FE/engine consumers.
-Подтверждено:004dc850 — MAD playback/audio/render loop, не универсальныйgame setup;
-004a4a70 — progress/splash presentation, не полныйFE bootstrap.
-Условие intro в main:0065b298!=0 && !bVar11 &&0065743c==0; bVar11 ещё требует consumer tracing.
-Никакого придуманного skip. Игровой EXE/полнаяграфика/карьеры не готовы, iteration не закрыта.
+Текущий принятый пакет — Run098:221 full +6 partial; предыдущий запушенный89f242b /Run090.
+Общая MSVC Win32 сборка:94 reachable MSBuild projects,173 TUs,80 comparison/alias probes+4 native+3 link fixtures.
+28 свежих reports /4934 bounded original-x86 comparisons; все4 native OS fixtures повторно прошли.
+Включены093–103: startup, splash, input snapshot, frame pump, engine/release/noop services;
+094 остаётся partial MAD header и не подменяет полный playback004dc850.
+Свежая реальная game-link попытка:0 compile errors,256 unresolved symbols/276 references;
+Run102 хранит предыдущие251/263. Рост вызван раскрытием новых callees, EXE пока нет.
+Подтверждено: THRASH exports stdcall по decorated loader names; декларации исправлены.
+BSS roots65b32c/334/360 и movie service69ed0c используют единых владельцев; path producers открыты.
+Compile proof098 использует reachable ALL_BUILD ProjectReference graph (173TUs).
+Исторический090 rglob захватил standalone094 и дал156 вместо154 тогдашних общихTUs;090 не переписан.
+084 verifier добавлен в manifest/self-pins; его current proof повторён.
+Активные исполнители: render_mode_completion —104 проверка ABI aliases по game-link frontier;
+heap_init_recovery —105 frame services004ab150/200; window_worker_recovery —106 resource predicate0059dd00.
+104–106 вне принятого098; coordinator ведёт commit/push и следующие подтверждённые adapters.
+Проверки: scripts/build-v2.ps1; final-refresh в098; четыре native OS fixtures;
+inventory-v2.py --require-listing --require-decompile-attempts; structure-v2.py;
+inventory-v2.py --require-listing --require-decompile-attempts --write-verification.
+Точные команды/доказательства в runs098/README.md и acceptance.json.
+Неизвестные engine/FSH/movie/vtable consumers остаются явными внешними границами.
+Run086/098 окно640×480→original cleanup0x466→destroy→join не является запуском игры.
+Следующий шаг — интегрировать только доказанные ABI adapters104, затем недостающие callees105/106 и повторить game-link.
 История ниже не является активным назначением. Итерация и игровой запуск не завершены.
+Отложенные проверки с условиями возврата: [validation backlog](../../../docs/recovery-validation-backlog.md).
+
 
 ## Цель и готовность 001
 
