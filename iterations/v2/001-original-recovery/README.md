@@ -1,12 +1,13 @@
 # v2 / 001 — восстановление исходного кода оригинала
 
-Текущий результат — [Run030](runs/030-startup-integration/README.md): **115 полностью проверенных C++ функций**.
-Ещё 3 consumers частично восстановлены, вне счётчика (input и display prefix).
-Run022–027: startup services, resource paths, application heap, renderer startup,
-core constructor, timed callbacks и настоящий CreateWindowExA consumer.
-23 MSVC Win32 стенда собираются; готовые группы интегрированы в общую библиотеку.
-Игрового EXE и подтверждённого окна пока нет. Приоритет — allocator → THRASH loader
-→ регистрация окна/исходная конфигурация → линковка и реальная попытка запуска.
+Текущий результат — [Run036](runs/036-native-window/README.md): **129 полностью проверенных C++ функций**
+и 3 частичных consumer. Общая MSVC Win32 сборка: 28 comparison probes + native_window_smoke.
+Нативный x86 EXE оконного стенда запущен: настоящий HWND 640×480, восстановленная
+WndProc, 39 Win32 сообщений, корректное закрытие. Это ограниченный platform smoke;
+полный startup игры, драйвер, игровой цикл и визуальное соответствие ещё не приняты.
+Готовые allocator/heap-init, THRASH loader, RegisterClass/CreateWindow и WndProc
+включены в общее дерево исходников. Следом — shared-state/window worker, остальной
+конструктор дисплея и совместный bootstrap настоящего heap.
 
 Начато 2026-10-08 по решению пользователя. Предыдущая разработка сохранена
 в коммите `dc6b9d8`; 012 незавершена, продолжение её интеграции остановлено.

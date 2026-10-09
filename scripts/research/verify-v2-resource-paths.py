@@ -103,7 +103,9 @@ def original(module, data, case):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--probe', type=Path, default=ROOT / 'local/builds/v2/001-original-recovery/bin/Release/resource_paths_probe.exe')
+    parser.add_argument('--report-dir',type=Path,default=RUN)
     args = parser.parse_args()
+    report_dir=args.report_dir
     module = next(row for row in map(json.loads, (ROOT / 'research/binary-index/static/binaries.jsonl').read_text(encoding='utf8').splitlines()) if row['file'] == 'Porsche.exe')
     data = (ROOT / 'local/game' / module['path']).read_bytes()
     if module['sha256'] != SOURCE_SHA or hashlib.sha256(data).hexdigest() != SOURCE_SHA:
@@ -130,8 +132,8 @@ def main():
               'boundary': 'valid NUL-terminated GetModuleFileNameA paths containing a backslash; Win32/CRT/file_exists are typed recording endpoints',
               'probe_sha256': hashlib.sha256(args.probe.read_bytes()).hexdigest(),
               'source_sha256': {name: hashlib.sha256((ROOT / name).read_bytes().replace(b'\r\n', b'\n')).hexdigest() for name in deps}}
-    RUN.mkdir(parents=True, exist_ok=True)
-    (RUN / 'verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf8')
+    report_dir.mkdir(parents=True, exist_ok=True)
+    (report_dir / 'verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf8')
     print(json.dumps({'cases': len(inputs), 'full_function_vas': report['full_function_vas']}))
 
 

@@ -108,7 +108,9 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--probe',type=Path,default=ROOT/'local/builds/v2/001-original-recovery/bin/Release/render_startup_probe.exe')
     parser.add_argument('--limit',type=int,default=0)
+    parser.add_argument('--report-dir',type=Path,default=RUN)
     args=parser.parse_args()
+    report_dir=args.report_dir
     module=next(v for v in map(json.loads,(ROOT/'research/binary-index/static/binaries.jsonl').read_text(encoding='utf8').splitlines()) if v['file']=='Porsche.exe')
     data=(ROOT/'local/game'/module['path']).read_bytes()
     sha='ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39'
@@ -147,8 +149,8 @@ def main():
             'boundary':'allocators, constructors, registry, format, display, misc and virtual first call controlled; null-allocation original faults excluded; no real render acceptance',
             'source_sha256':{p:hashlib.sha256((ROOT/p).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for p in paths},
             'probe_sha256':hashlib.sha256(args.probe.read_bytes()).hexdigest(),'fixtures':fixtures}
-    RUN.mkdir(parents=True,exist_ok=True)
-    (RUN/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
-    (RUN/'source-functions.jsonl').write_text(json.dumps({'sha256':sha,'body_sha256':body_sha,**function})+'\n',encoding='utf8')
+    report_dir.mkdir(parents=True,exist_ok=True)
+    (report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
+    (report_dir/'source-functions.jsonl').write_text(json.dumps({'sha256':sha,'body_sha256':body_sha,**function})+'\n',encoding='utf8')
 
 if __name__=='__main__':main()

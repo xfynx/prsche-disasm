@@ -2,14 +2,13 @@
 
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
-Владелец — координатор. Приоритет пользователя 2026-10-09: пакетное
-восстановление C/C++ и цепочка startup → линковка EXE → настоящее окно.
-Готовые Run022–027 интегрируются вместе, вместо отдельных циклов на функцию.
-Три исполнителя: startup_heap — настоящий allocator (Run031), display_ctor —
-загрузчик THRASH (Run028), window_runtime — регистрация окна/конфигурация
-(Run029). Координатор — общая сборка, зависимости, registry и checkpoint Run030.
-Win32/CRT связываются штатными API; неизвестная игровая логика остаётся явной.
-Игровой EXE, реальное окно и критерии всей итерации пока не подтверждены.
+Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
+Последний принятый пакет Run036: 129 full + 3 partial, 28 comparison probes и
+нативный оконный smoke EXE, реально запущенный на Win32. Сам игровой EXE ещё не готов.
+Три активных worker gpt-6-luna/high: window_worker_recovery (035/038 shared state
+и handlers), display_recovery (032 full display ctor), heap_init_recovery
+(040 совместный настоящий heap). Координатор — интеграция, main startup и Win32.
+Предыдущие назначения/числа ниже сохраняют историю; актуальны этот блок и последний run.
 
 ## Цель и готовность 001
 
@@ -304,3 +303,27 @@ window_runtime — Run029 RegisterClass53ac20/конфигурация/caller53b
 и `py -3 scripts/research/inventory-v2.py --require-listing --require-decompile-attempts --write-verification`.
 Все proof commands/fresh directories — Run030/README. Дальше интеграция028/029/031
 и настоящий startup/window путь. Unit CreateWindow fixture ещё не реальное окно.
+
+## Run036 — нативный оконный стенд, 2026-10-09
+
+Run030 checkpoint1e8d25c запушен. Приняты028/029/031/033/034: всего129 full,
+3 partial. Supplementary index9 функций; новые53a7f0/53aba0 привязаны к SHA/RET.
+Общая сборка28 comparison probes + native_window_smoke проходит. Fresh input,
+callback,diskopen,inputbuffer,paths,renderer reports — под036; история не изменена.
+Фактический запуск Win32 EXE: HWND/client640×480, зарегистрирован recovered WndProc,
+39 default messages, корректное уничтожение,exit0. Точные входы/ограничения и хеши —
+036/native-window-result.json. Это platform fixture, не original game acceptance.
+
+После лимита прежних агентов назначены gpt-6-luna/high workers:
+window_worker_recovery — shared-state correction035, затем handler table038;
+display_recovery — полный constructor4677e0, mutable032;
+heap_init_recovery — joint real application allocator/heap040 (037 evidence ready,
+пока не принят). Координатор — common linking, actual Win32 bindings, главный startup.
+Архитектурный остаток: единый storage/aliases original window configuration; source
+units с одинаковыми VA не должны иметь независимые копии globals. Неизвестные calls
+не связываются silent no-op. Прежде полного EXE восстановить4b6a50 и нужные callees.
+
+Проверки: scripts/build-v2.ps1; inventory-v2.py с require-listing,
+require-decompile-attempts,write-verification; proof commands028/029/031/033/034;
+036native_window_smoke реально выполнен отдельно. Следующий checkpoint — принятые
+035/032/038/040 и расширенная исходная startup chain, без заявлений о готовой игре.

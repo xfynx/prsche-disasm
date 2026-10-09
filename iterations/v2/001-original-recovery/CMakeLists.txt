@@ -71,11 +71,28 @@ add_executable(render_objects_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_obj
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_objects.cpp")
 add_executable(window_runtime_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_runtime_probe.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_runtime.cpp")
-foreach(probe input_probe lock_probe disk_open_probe input_buffer_probe startup_services_probe resource_paths_probe render_startup_probe render_objects_probe window_runtime_probe application_heap_probe)
+add_executable(render_loader_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_loader_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_loader.cpp"
+)
+add_executable(window_create_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_create_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_create.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_init.cpp"
+)
+add_executable(application_alloc_probe "${PORSCHE_SOURCE_ROOT}/recovered/application_alloc_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_alloc.cpp"
+)
+add_executable(application_heap_init_probe "${PORSCHE_SOURCE_ROOT}/recovered/application_heap_init_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_heap_init.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_heap.cpp"
+)
+add_executable(window_procedure_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_procedure_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_procedure.cpp"
+)
+foreach(probe input_probe lock_probe disk_open_probe input_buffer_probe startup_services_probe resource_paths_probe render_startup_probe render_objects_probe window_runtime_probe application_heap_probe render_loader_probe window_create_probe application_alloc_probe application_heap_init_probe window_procedure_probe)
     target_include_directories(${probe} PRIVATE "${PORSCHE_RECOVERY_INCLUDE}")
     target_compile_features(${probe} PRIVATE cxx_std_17)
 endforeach()
-foreach(probe disk_probe fe_callbacks_probe input_probe lock_probe joint_disk_probe disk_open_probe input_buffer_probe bootstrap_probe startup_services_probe resource_paths_probe render_startup_probe render_objects_probe window_runtime_probe application_heap_probe)
+foreach(probe disk_probe fe_callbacks_probe input_probe lock_probe joint_disk_probe disk_open_probe input_buffer_probe bootstrap_probe startup_services_probe resource_paths_probe render_startup_probe render_objects_probe window_runtime_probe application_heap_probe render_loader_probe window_create_probe application_alloc_probe application_heap_init_probe window_procedure_probe)
     target_compile_definitions(${probe} PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
     target_compile_options(${probe} PRIVATE /W4 /EHsc /permissive-)
     target_link_options(${probe} PRIVATE /machine:X86 "/MAP:${CMAKE_BINARY_DIR}/${probe}.map")
@@ -153,3 +170,6 @@ set_target_properties(recovery_probe PROPERTIES
     CXX_EXTENSIONS OFF
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+
+# Explicit native Win32 fixture; not an original game executable.
+add_subdirectory(runs/036-native-window native-window)
