@@ -3,16 +3,20 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Последний принятый пакет [Run078](runs/078-shared-runtime-integration/README.md):200 full +4 partial.
-63 comparison/alias probes +3 native OS fixtures +3 link fixtures. Общая сборка,54 свежих отчёта,
-10 175 bounded original-x86 сравнений и реальные Win32 проверки прошли.
-Runs066/068–082 приняты; unknown005e8e50 extent/indirect writers остаются открыты по081.
-Единые application/diagnostic owners подключены; FE static initialization и worker ABI исправлены.
-Агенты heap_init_recovery/render_mode_completion/window_worker_recovery(gpt-6-luna/high)
-завершили назначения; активных изменений вне checkpoint нет. Координатор — manifest/коммит.
-Ближайший шаг: связать scheduler082 с077, восстановить0053bae0→00534550/exit,
-затем проверить полную оконную цепочку. Fullscreen/position/input/game routes остаются границами.
-Проверки и пределы доказательства — Run078 README; registry хранит актуальные fresh reports.
+Последний принятый пакет [Run090](runs/090-native-window-integration/README.md):213 full +5 partial.
+71 comparison/alias probes +4 native OS fixtures +3 link fixtures. Общая MSVCWin32сборка,
+16 свежих отчётов/5091 bounded original-x86 сравнений и69 source closures прошли.
+Run086 реально выполнил production window_init→27 callbacks→event/thread handshake→
+видимое окно640×480→original cleanup0x466→destroy→join; exit0, дваresize notifications.
+Исправлен caller53bcef→0053a8e0(0x466,0,0,0); fresh proof сравнивает все4 аргумента.
+Приняты083–092;094 partial MAD header готов, пока вне общего build/registry090.
+Активные исполнители: heap_init_recovery —093 original004dd600 (intro/resource caller);
+window_worker_recovery —096 input snapshot0055feb0; render_mode_completion —095 splash/progress004a4a70.
+Координатор — manifest/промежуточныйcommit090, затем связываниеmandatory FE/engine consumers.
+Подтверждено:004dc850 — MAD playback/audio/render loop, не универсальныйgame setup;
+004a4a70 — progress/splash presentation, не полныйFE bootstrap.
+Условие intro в main:0065b298!=0 && !bVar11 &&0065743c==0; bVar11 ещё требует consumer tracing.
+Никакого придуманного skip. Игровой EXE/полнаяграфика/карьеры не готовы, iteration не закрыта.
 История ниже не является активным назначением. Итерация и игровой запуск не завершены.
 
 ## Цель и готовность 001

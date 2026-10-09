@@ -18,7 +18,7 @@ void __cdecl window_position_cleanup_0053bcb0() {
             window_system_parameters(0x11,window_saved_parameter_0069e57c,nullptr,2);
         if(window_saved_parameter_0069e580)
             window_system_parameters(0x56,window_saved_parameter_0069e580,nullptr,2);
-        window_position_remove_0053a8e0(0,0,0,0x466);
+        window_position_remove_0053a8e0(0x466,0,0,0);
         while(window_hwnd_006b7bf8) {
             window_position_idle_0055f740(0);
             window_position_timed_005366e0(0);

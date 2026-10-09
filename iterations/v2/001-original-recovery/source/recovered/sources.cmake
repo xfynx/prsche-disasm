@@ -61,4 +61,12 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/shared_runtime_globals.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_channels.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_scheduler.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/mouse_input.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_input_bindings.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_support.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_exit_cleanup.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/object_cleanup.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_shutdown.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_event_translation.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/object_update.cpp"
 )

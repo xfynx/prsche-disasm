@@ -37,6 +37,12 @@ Run078: каталог36 618/31 supplementary сохранён;200 full C++ func
 original-x86 сравнения и явные границы — [Run078](../../iterations/v2/001-original-recovery/runs/078-shared-runtime-integration/README.md).
 Общий оконный EXE проверяет линковку16 callback functions для27 регистраций; запуск игры ещё не доказан.
 
+Run090: SHA-indexed shutdown callback0053bae0..0053baf9 (26bytes, полныйRET),
+32 supplementary/36619 catalog entries;213 full+5 partial C++ consumers.
+Полныйwindowstartup/cleanup/native-threadjoin реально выполнен (640×480,27handlers).
+Источники/границы — [Run090](../../iterations/v2/001-original-recovery/runs/090-native-window-integration/README.md).
+Игрового запуска ещё нет.
+
 ## Покрытие
 
 [coverage.json](coverage.json) сопоставляет пути и SHA256 с результатами анализа.

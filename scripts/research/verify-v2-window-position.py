@@ -39,6 +39,7 @@ def original(module,data,c):
  u.mem_write(CONFIG_NAME,b'DLL\0');put(u,0x69e5a8,CONFIG_NAME);put(u,0x6b7794,INSTANCE)
  put(u,0x6b7bf8,0x1234 if has_hwnd else 0);put(u,0x69e594,refs);put(u,0x69e57c,s1);put(u,0x69e580,s2)
  calls={'spi':0,'remove':0,'unreg':0,'idle':0,'timed':0,'metrics':0,'rect':0,'style':0,'adjust':0,'setpos':0,'screen':0};args=[0]*5;actions=[0,0];uis=[0,0];posargs=[0]*5
+ remove_args=[0]*4
  provenance={'entry_esp':None,'lea_esp':None,'rect_pointer':None,'rect_words':None}
  put(u,0x5b2314,SPI);put(u,0x5b22b4,UNREG);put(u,0x5b22c4,METRICS)
  put(u,0x5b22f0,GETCLIENT);put(u,0x5b22b8,GETLONG);put(u,0x5b22bc,ADJUST);put(u,0x5b22b0,SETPOS);put(u,0x5b231c,CLIENTSCREEN)
@@ -60,7 +61,9 @@ def original(module,data,c):
     calls['spi']+=1
    cleanup=16
   elif address==UNREG:calls['unreg']+=1;cleanup=8;value=1
-  elif address==REMOVE:calls['remove']+=1
+  elif address==REMOVE:
+   calls['remove']+=1;remove_args[:]=[word(m,sp+4+i*4) for i in range(4)]
+   assert remove_args==[0x466,0,0,0], remove_args
   elif address==IDLE:
    calls['idle']+=1
    if cycles and calls['idle']>=cycles:put(m,0x6b7bf8,0)
@@ -96,7 +99,7 @@ def original(module,data,c):
  callargs=[] if mode==0 else [w,h] if mode==1 else [0,0,w,h] if mode==3 else [mx,my,w,h]
  for i,v in enumerate([EXIT]+callargs):put(u,STACK+i*4,v)
  u.reg_write(UC_X86_REG_ESP,STACK);u.emu_start(entry,EXIT,count=200000)
- return (word(u,0x69e594),int(bool(word(u,0x6b7bf8))),calls['spi'],calls['remove'],calls['unreg'],calls['idle'],calls['timed'],calls['metrics'],0,*actions,*uis,*args,calls['rect'],calls['style'],calls['adjust'],calls['setpos'],calls['screen'],*posargs,word(u,0x6b7c08),word(u,0x6b7c0c),word(u,0x6b77b4),word(u,0x6b77b8))
+ return (word(u,0x69e594),int(bool(word(u,0x6b7bf8))),calls['spi'],calls['remove'],calls['unreg'],calls['idle'],calls['timed'],calls['metrics'],0,*actions,*uis,*args,calls['rect'],calls['style'],calls['adjust'],calls['setpos'],calls['screen'],*posargs,word(u,0x6b7c08),word(u,0x6b7c0c),word(u,0x6b77b4),word(u,0x6b77b8),*remove_args)
 def main():
  p=argparse.ArgumentParser();p.add_argument('--probe',type=Path,default=ROOT/'local/builds/v2/window-position-048/bin/Release/window_position_probe.exe');p.add_argument('--report',type=Path,default=RUN/'verification.json');a=p.parse_args()
  module=next(json.loads(x) for x in (ROOT/'research/binary-index/static/binaries.jsonl').read_text(encoding='utf8').splitlines() if json.loads(x)['file']=='Porsche.exe')

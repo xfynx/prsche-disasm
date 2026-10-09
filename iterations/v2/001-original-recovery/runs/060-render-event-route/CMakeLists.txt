@@ -6,6 +6,7 @@ endif()
 add_executable(render_event_route_probe
   ../../source/recovered/render_event_route_probe.cpp
   ../../source/recovered/Porsche.exe/render_event_route.cpp
+  ../../source/recovered/Porsche.exe/mouse_input.cpp
   ../../source/recovered/Porsche.exe/render_driver_calls.cpp)
 target_include_directories(render_event_route_probe PRIVATE ../../source/include)
 target_compile_features(render_event_route_probe PRIVATE cxx_std_17)

@@ -10,6 +10,8 @@
 #include "porsche/window_position.hpp"
 #include "porsche/window_procedure.hpp"
 #include "porsche/render_event_route.hpp"
+#include "porsche/window_support.hpp"
+#include "porsche/object_update.hpp"
 
 #include <cstdint>
 
@@ -23,6 +25,22 @@ static_assert(sizeof(porsche::WindowWorkerMessage) == sizeof(MSG));
 static_assert(sizeof(porsche::OriginalWndClassA) == sizeof(WNDCLASSA));
 
 namespace porsche {
+std::uint32_t __stdcall platform_get_tick_count() {
+    return ::GetTickCount();
+}
+std::uint32_t __stdcall window_support_send_notify_message_a(
+    void* hwnd,std::uint32_t message,std::uint32_t wparam,std::int32_t lparam) {
+    return static_cast<std::uint32_t>(::SendNotifyMessageA(
+        static_cast<HWND>(hwnd),message,wparam,lparam));
+}
+std::uint32_t __stdcall window_support_post_message_a(
+    void* hwnd,std::uint32_t message,std::uint32_t wparam,std::int32_t lparam) {
+    return static_cast<std::uint32_t>(::PostMessageA(
+        static_cast<HWND>(hwnd),message,wparam,lparam));
+}
+std::uint32_t __stdcall window_support_get_last_error() {
+    return ::GetLastError();
+}
 namespace {
 BOOL adjust_rect(RECT* rect, DWORD style, BOOL has_menu, DWORD exstyle) {
     return ::AdjustWindowRectEx(rect, style, has_menu, exstyle);

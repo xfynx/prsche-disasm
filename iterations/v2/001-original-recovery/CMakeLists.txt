@@ -271,6 +271,7 @@ add_executable(render_driver_calls_probe "${PORSCHE_SOURCE_ROOT}/recovered/rende
 add_executable(render_event_route_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_event_route_probe.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_driver_calls.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_event_route.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/mouse_input.cpp"
 )
 add_executable(window_keys_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_keys_probe.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_keys.cpp")
@@ -341,3 +342,13 @@ add_subdirectory(runs/079-window-channels window-channels)
 add_subdirectory(runs/080-shared-diagnostic-storage shared-diagnostic-storage)
 add_subdirectory(runs/082-window-scheduler window-scheduler)
 target_sources(native_window_smoke PRIVATE "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/shared_runtime_globals.cpp")
+
+add_subdirectory(runs/083-window-shutdown window-shutdown)
+add_subdirectory(runs/084-window-support window-support)
+add_subdirectory(runs/085-window-exit-cleanup window-exit-cleanup)
+add_subdirectory(runs/086-native-window-lifecycle native-window-lifecycle)
+add_subdirectory(runs/087-window-notifications window-notifications)
+add_subdirectory(runs/088-object-cleanup object-cleanup)
+add_subdirectory(runs/089-mouse-input mouse-input)
+add_subdirectory(runs/091-window-event-translation window-event-translation)
+add_subdirectory(runs/092-object-update object-update)

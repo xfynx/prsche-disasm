@@ -19,6 +19,7 @@ std::uint32_t window_override_0069e5b0;
 std::int32_t window_override_x_006bda00,window_override_y_006bda04;
 std::uint32_t spi_calls,remove_calls,unregister_calls,idle_calls,timed_calls,metrics_calls,resize_calls;
 std::uint32_t spi_action[2],spi_ui[2],resize_args[5],clear_after;
+std::uint32_t remove_args[4]{};
 std::int32_t metric_x,metric_y;
 WindowPositionRect client_rect_fixture{0,0,640,480},work_rect_fixture{0,0,1920,1080};
 std::int32_t frame_left=-8,frame_top=-31,frame_right=8,frame_bottom=8,style_fixture=0x10,exstyle_fixture=0x20;
@@ -28,7 +29,7 @@ std::int32_t setpos_args[6];
 std::uint32_t __stdcall window_system_parameters(std::uint32_t action,std::uint32_t ui,void*,std::uint32_t) {
   if(spi_calls<2){spi_action[spi_calls]=action;spi_ui[spi_calls]=ui;}++spi_calls;return 1;
 }
-std::uint32_t __cdecl window_position_remove_0053a8e0(std::uint32_t,std::uint32_t,std::uint32_t,std::uint32_t){++remove_calls;return 1;}
+std::uint32_t __cdecl window_position_remove_0053a8e0(std::uint32_t a,std::uint32_t b,std::uint32_t c,std::uint32_t d){++remove_calls;remove_args[0]=a;remove_args[1]=b;remove_args[2]=c;remove_args[3]=d;return 1;}
 std::uint32_t __stdcall window_position_unregister_class(const char*,void*){++unregister_calls;return 1;}
 std::uint32_t __cdecl window_position_idle_0055f740(std::uint32_t){++idle_calls;if(clear_after && idle_calls>=clear_after)window_hwnd_006b7bf8=nullptr;return 0;}
 std::uint32_t __cdecl window_position_timed_005366e0(std::uint32_t){++timed_calls;return 0;}
@@ -60,6 +61,7 @@ int main(){
     rect_calls=style_calls=adjust_calls=setpos_calls=client_to_screen_calls=0;
     spi_action[0]=spi_action[1]=spi_ui[0]=spi_ui[1]=0;metric_x=static_cast<std::int32_t>(mx);metric_y=static_cast<std::int32_t>(my);
     for(auto& a:resize_args)a=0;
+    for(auto& a:remove_args)a=0;
     window_pos_x_006b7c08=window_pos_y_006b7c0c=0;
     window_override_0069e5b0=mode==3?1u:0u;
     window_override_x_006bda00=static_cast<std::int32_t>(mx);window_override_y_006bda04=static_cast<std::int32_t>(my);
@@ -75,6 +77,7 @@ int main(){
       <<' '<<static_cast<std::uint32_t>(setpos_args[2])<<' '<<static_cast<std::uint32_t>(setpos_args[3])
       <<' '<<static_cast<std::uint32_t>(setpos_args[4])<<' '<<static_cast<std::uint32_t>(window_pos_x_006b7c08)
       <<' '<<static_cast<std::uint32_t>(window_pos_y_006b7c0c)<<' '<<window_width_006b77b4<<' '<<window_height_006b77b8;
+    for(auto a:remove_args)std::cout<<' '<<a;
     std::cout<<'\n';
   }
 }

@@ -1,12 +1,13 @@
 # План восстановления Porsche Unleashed
 
-Текущий результат — [Run078](iterations/v2/001-original-recovery/runs/078-shared-runtime-integration/README.md): **200 проверенных C++ функций** и 4 частичных consumer.
-Общая MSVC Win32 сборка прошла: 63 comparison/alias probes, 3 native OS fixtures и 3 link fixtures.
-54 свежих отчёта, 10 175 ограниченных сравнений с original x86; единая application arena,
-общие diagnostic globals, renderer settings/state, очередь событий и планировщик подключены.
-Реальные Win32 потоки завершились штатно; оконный стенд создал и закрыл окно640×480.
-Полная оконная цепочка линкуется:16 unique callbacks на27 регистраций, GUI в ней ещё не запускается.
-Игрового запуска v2 и визуальной приёмки нет. Следом — scheduler→оконный shutdown callback0053bae0.
+Текущий результат — [Run090](iterations/v2/001-original-recovery/runs/090-native-window-integration/README.md): **213 проверенных C++ функций** и 5 частичных consumer.
+Общая MSVC Win32 сборка прошла:71 comparison/alias probes,4 native OS fixtures,3 link fixtures.
+Полная восстановленная оконная цепочка реально выполнила startup→27 регистраций→event/thread handshake→
+видимое окно640×480→original cleanup message0x466→destroy→join; процесс завершился с кодом0.
+16 свежих отчётов/5091 original-x86 сравнений;69 актуальных source closures проверены.
+Каталог36619 функций/32 supplementary. Полный игровой запуск и визуальная приёмка ещё открыты.
+Следующий шаг — обязательные FE/engine consumers; intro MAD playback выделен отдельно.
+Три агента:093 intro/resource caller,095 splash/progress,096 input snapshot;094 MAD header готов(partial).
 
 Активный путь с 2026-10-08 — [v2/001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 Полный корпус всех бинарников → собираемый original Windows/x86 → современный
