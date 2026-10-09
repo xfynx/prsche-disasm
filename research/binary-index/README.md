@@ -28,6 +28,10 @@ Run041: ещё 11 omitted window/registry bodies дополнены по SHA и 
 Индекс не доказывает готовность callees или запуск игры; текущая приёмка —
 [Run041](../../iterations/v2/001-original-recovery/runs/041-startup-chain/README.md).
 
+Run061: index дополнен ещё11 callback/CRT bodies (включая53b050/53b450), всего31,
+общий каталог36618. Полные RET18 байты клавиатурных callbacks включены в SHA ranges.
+Текущая приёмка — [Run061](../../iterations/v2/001-original-recovery/runs/061-startup-platform-integration/README.md).
+
 ## Покрытие
 
 [coverage.json](coverage.json) сопоставляет пути и SHA256 с результатами анализа.

@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "range": "005a2382..005a2411 plus init 005a2412..005a2440",
+  "function_vas": [
+    "005a2382",
+    "005a2400",
+    "005a2412",
+    "005a2535",
+    "005a253e",
+    "005a2e22",
+    "005a3be5",
+    "005a4ba4",
+    "005a4c05",
+    "005a8029",
+    "005a8161"
+  ],
+  "full_function_vas": [
+    "005a2382",
+    "005a2400",
+    "005a2412",
+    "005a2535",
+    "005a253e"
+  ],
+  "partial_function_vas": [
+    "005a2e22",
+    "005a3be5",
+    "005a4ba4",
+    "005a4c05",
+    "005a8029",
+    "005a8161"
+  ],
+  "cases": 8,
+  "native_cpp_equal_original_x86": true,
+  "binary_matched": false,
+  "game_launch_verified": false,
+  "comparison": "Full 64 KiB allocation arena, base/next globals, per-registration return values, allocator and lock call order across initialization, capacity growth, failed growth, null callback, and CRT initialization failure.",
+  "boundaries": {
+    "crt_allocator": "005a3be5 initial malloc and 005a8161 allocation-size / 005a8029 realloc are typed deterministic boundaries. The fixture relocates/copies the full old allocation on successful growth and can force allocation failure.",
+    "lock": "005a2535/005a253e are recovered wrappers around lock enter/leave 0xD; underlying 005a4ba4/005a4c05 synchronization is a recording boundary.",
+    "fatal": "Initial allocation failure calls __amsg_exit 005a2e22 with 0x18; comparison stops at this terminal boundary.",
+    "integration": "The accepted 00557380 forwarding implementation and application-pool caller are not redefined. A void linker adapter calls the recovered result-returning 005a2400 and discards its result."
+  },
+  "source_sha256": {
+    "iterations/v2/001-original-recovery/source/include/porsche/exit_registry.hpp": "eb10b10683fcf151b72eb2aaf6bdace49ec8bbc63d915fb911eaa4c570d67c40",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/exit_registry.cpp": "19a2783f6f4d0dbdf3039d6ef69628270086408cdfaadb7c46f2f08968d93da8",
+    "iterations/v2/001-original-recovery/source/recovered/exit_registry_probe.cpp": "bf1999edc7f2c3b39982a47bd04d4d7279b8c179013609df8c55ea06b0b80473",
+    "iterations/v2/001-original-recovery/runs/052-exit-registry/CMakeLists.txt": "ba29f66e5fc6303a8190b3bedc21153c2a6ff006d9d1d00505d596f7933f9136",
+    "scripts/research/verify-v2-exit-registry.py": "1e4315b1b7e70d15d179067e460e28a297c731f929f02fdea2129b3bfb486837"
+  },
+  "probe_sha256": "07ba8115672e7c273d00fc97892baca1e914e1f4bead14bcb2e56d0eedc9c7dc",
+  "fixtures": [
+    {
+      "input": [
+        1,
+        0,
+        0,
+        -1
+      ],
+      "output_sha256": "c553f1722f5583e70a854396a2e55afc229c4706ac43015edb6ec6b701cd8f00"
+    },
+    {
+      "input": [
+        1,
+        0,
+        1,
+        -1
+      ],
+      "output_sha256": "b382dd787291450debdbbaf79876fa924b076c52044871c7b2432b131be9ac3e"
+    },
+    {
+      "input": [
+        1,
+        0,
+        32,
+        -1
+      ],
+      "output_sha256": "2db3c276c22afc84162abe2945d43f82ed61e32dbfa9ccbf705e14987cfb787a"
+    },
+    {
+      "input": [
+        1,
+        0,
+        33,
+        -1
+      ],
+      "output_sha256": "5376ece944a3268954f0fd8df230402114ad0c804eb3ed96b0ad9c0952f19fe3"
+    },
+    {
+      "input": [
+        1,
+        0,
+        37,
+        -1
+      ],
+      "output_sha256": "db9aaa0373a1e8ab0aecd755a46008f0f7f3996ffe55425cb37a9a16a6be4d53"
+    },
+    {
+      "input": [
+        1,
+        1,
+        33,
+        -1
+      ],
+      "output_sha256": "858d39b020ed018d77a574d6d3bd8293653ae048a7cd6d47c781a5aa193b69fa"
+    },
+    {
+      "input": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "output_sha256": "bd8ee04dbb20afc326c0c24630771cf8bcac8e490dd4de6f5e36a462a5b436b3"
+    },
+    {
+      "input": [
+        0,
+        0,
+        4,
+        -1
+      ],
+      "output_sha256": "af36df5867a86b49e5b996bcb4eeff09f4aea6c8b7318e6488015f217359e627"
+    }
+  ]
+}

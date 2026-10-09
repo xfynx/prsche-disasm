@@ -1,15 +1,12 @@
 # v2 / 001 — восстановление исходного кода оригинала
 
-Текущий результат — [Run041](runs/041-startup-chain/README.md): **150 полностью проверенных C++ функций**
-и 4 частичных consumer. Общая MSVC Win32 сборка: 37 comparison probes + native_window_smoke.
-Полный конструктор дисплея, оконный поток, регистрация/обработчики сообщений, startup
-пулов, registry и thread start включены в общее дерево. Конфигурация окна и известные
-одноимённые globals используют общий storage. 4 848 свежих сравнений с original x86 прошли;
-совместный heap сравнивается по всей арене после каждого выделения/освобождения.
-Пересобранный нативный оконный EXE реально запущен: HWND 640×480, recovered WndProc,
-39 сообщений, корректное закрытие. Это platform fixture; игровой startup, renderer/loop
-и визуальная приёмка ещё открыты. Следом — FE main consumer, input init, positioning,
-renderer activation и реальные callback/platform bindings.
+Текущий результат — [Run061](runs/061-startup-platform-integration/README.md): **188 проверенных C++ функций** и 4 частичных consumer.
+Общая MSVC Win32 сборка: 50 comparison probes и 3 нативных стенда. Подключены клавиатурные
+хуки, мышь, DirectInput startup, позиционирование окна, renderer routing, CRT callbacks и
+завершение потоков. 5 678 свежих сравнений с original x86 прошли. Реальные Win32 threads,
+events, pages и locks проверены отдельными запущенными EXE (Run055/057); окно — Run041.
+Это проверки отдельных связок; игрового v2 EXE и визуальной приёмки ещё нет.
+Следующий рубеж — полный main, native callback bindings и оставшиеся renderer consumers.
 
 Начато 2026-10-08 по решению пользователя. Предыдущая разработка сохранена
 в коммите `dc6b9d8`; 012 незавершена, продолжение её интеграции остановлено.

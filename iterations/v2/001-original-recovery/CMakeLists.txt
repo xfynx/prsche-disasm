@@ -227,3 +227,57 @@ target_compile_definitions(render_registry_probe PRIVATE NOMINMAX _CRT_SECURE_NO
 target_compile_options(render_registry_probe PRIVATE /W4 /EHsc /permissive-)
 target_link_libraries(render_registry_probe PRIVATE advapi32)
 set_target_properties(render_registry_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+# Next startup integration: original consumers, isolated recording boundaries.
+add_executable(window_messages_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_messages_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_messages.cpp"
+)
+add_executable(startup_input_probe "${PORSCHE_SOURCE_ROOT}/recovered/startup_input_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/startup_input.cpp"
+)
+add_executable(application_fe_probe "${PORSCHE_SOURCE_ROOT}/recovered/application_fe_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_fe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/fe_stream.cpp"
+)
+add_executable(window_position_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_position_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_position.cpp"
+)
+add_executable(render_activate_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_activate_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_activate.cpp"
+)
+add_executable(application_instance_probe "${PORSCHE_SOURCE_ROOT}/recovered/application_instance_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_instance.cpp"
+)
+add_executable(render_window_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_window_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_window.cpp"
+)
+add_executable(exit_registry_probe "${PORSCHE_SOURCE_ROOT}/recovered/exit_registry_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/exit_registry.cpp"
+)
+add_executable(crt_shutdown_probe "${PORSCHE_SOURCE_ROOT}/recovered/exit_shutdown_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/exit_shutdown.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/exit_registry.cpp"
+)
+add_executable(thread_shutdown_probe "${PORSCHE_SOURCE_ROOT}/recovered/thread_shutdown_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/thread_shutdown.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_threads.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/file_pages.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/heap_locks.cpp"
+)
+add_executable(render_driver_calls_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_driver_calls_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_driver_calls.cpp"
+)
+add_executable(render_event_route_probe "${PORSCHE_SOURCE_ROOT}/recovered/render_event_route_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_driver_calls.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/render_event_route.cpp"
+)
+add_executable(window_keys_probe "${PORSCHE_SOURCE_ROOT}/recovered/window_keys_probe.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/window_keys.cpp")
+foreach(probe window_keys_probe window_messages_probe startup_input_probe application_fe_probe window_position_probe render_activate_probe application_instance_probe render_window_probe exit_registry_probe crt_shutdown_probe thread_shutdown_probe render_driver_calls_probe render_event_route_probe)
+    target_include_directories(${probe} PRIVATE "${PORSCHE_RECOVERY_INCLUDE}")
+    target_compile_features(${probe} PRIVATE cxx_std_17)
+    target_compile_definitions(${probe} PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
+    target_compile_options(${probe} PRIVATE /W4 /EHsc /permissive-)
+    set_target_properties(${probe} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+endforeach()
+add_subdirectory(runs/057-native-thread-chain native-thread)

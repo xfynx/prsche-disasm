@@ -3,12 +3,18 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Последний принятый пакет Run041: 150 full + 4 partial, 37 comparison probes и
-нативный оконный smoke EXE, реально запущенный на Win32. Игровой EXE ещё не готов.
-Три worker gpt-6-luna/high: window_worker_recovery — Run048 positioning;
-display_recovery — Run051 render/window bridge; heap_init_recovery — Run052 exit registry.
-Готовые045/046/047/049/050 ожидают приёмки следующим пакетом; не включены в число150.
-Координатор — общий build/registry/checkpoint, main startup и Win32/callback bindings.
+Последний принятый пакет [Run061](runs/061-startup-platform-integration/README.md): 188 full + 4 partial,
+50 comparison probes + 3 native fixtures. 5 678 свежих x86 сравнений прошли.
+Реальные native window/thread/platform запуски сохранены в Run041/055/057.
+Игровой EXE ещё не готов; автоматический pseudo-C не считается восстановленным исходником.
+Владельцы: heap_init_recovery — Run058 full main (возобновлён после quota);
+render_mode_completion (gpt-6-luna/high) — доведение Run063 render modes;
+window_worker_recovery — Run064 callback relocation. Координатор — интеграция/реестр/линковка.
+Run058/063/064 исключены из принятого числа. Full main memory clear6573e8/3e24 остаётся
+явной границей до восстановления единой арены; никаких memset независимых globals.
+Проверка: scripts/build-v2.ps1; verify-v2-* со свежими report-dir/report под Run061;
+inventory-v2.py --require-listing --require-decompile-attempts --write-verification.
+Ближайший шаг: завершить доказательства main/mode и подключить настоящие callbacks вместо guest VA.
 Предыдущие назначения/числа ниже — история; актуальны этот блок и последний run.
 
 ## Цель и готовность 001
@@ -343,3 +349,27 @@ original qsort005a112b остаётся typed boundary, не std::sort. Исто
 Дальше связать оригинальные callback VAs с native C++ pointers и OS/CRT adapters,
 восстановить оставшийся main004b6a50 и проверить настоящую startup chain. Отсутствие
 silent no-op обязательно; доказательства fixture не заменяют game/visual acceptance.
+
+## Следующая интеграция после b16d4f0
+
+Run041 принят и запушен как b16d4f0. Новые изолированные пакеты045–054/056 готовы,
+но ещё не входят в common CMake/registry. Root готовит061-startup-platform-integration.
+Run055: отдельная библиотека source/platform/win32_core.cpp и реальный OS smoke;
+Run057: реальные original thread init/start/trampoline/unregister/shutdown на Windows,
+оба no-arg/worker-arg пути прошли. Native результаты/хеши сохранены в055/057/native-result.json.
+Остаются два явных CRT fixture boundaries (fill и exit-registration), game не запускался.
+
+На приёмке исправлен053: callback loop обязан перезагружать base006c1534 после callback,
+а не кешировать; unsigned32 arithmetic избегает C++ pointer-before-begin UB. Новый
+mutating-callback case прошёл; теперь8 случаев. В048 исправлена ошибка чтения стека:
+учёт двух PUSH показал инициализированный RECT;66 случаев включают live ESP assertions.
+045 mouse route5728b0 и056 renderer route обращаются к одному consumer;060 добавляет
+единый implementation/adapters. 046557380 уже восстановлен037,050557370 инлайнен,
+047 main fragment не standalone function: не считать их новыми целыми функциями.
+
+Следующий шаг root: ревью готовых пакетов и canonical aliases; новые common targets,
+пересборка, fresh061 differential reports и6 CMake-dependent regressions; supplementary
+index недостающих callback bodies; обновление registry/plans и промежуточный commit/push.
+058 main оставляет очистку6573e8/3e24 явной boundary до общего FE storage: запрещён
+memset по адресу одиночного global. 059 закрывает оставшиеся callbacks перед реальным
+window_init. Ни byte-match, ни целый game executable пока не приняты.

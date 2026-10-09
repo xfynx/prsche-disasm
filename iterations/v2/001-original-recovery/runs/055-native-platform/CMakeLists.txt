@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.20)
+project(porsche_native_core LANGUAGES CXX)
+if(NOT MSVC OR NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
+    message(FATAL_ERROR "Native MSVC Win32/x86 required")
+endif()
+get_filename_component(ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+add_library(porsche_platform_win32 STATIC "${ROOT}/source/platform/win32_core.cpp")
+target_include_directories(porsche_platform_win32 PUBLIC "${ROOT}/source/include")
+target_compile_features(porsche_platform_win32 PUBLIC cxx_std_17)
+target_compile_definitions(porsche_platform_win32 PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_compile_options(porsche_platform_win32 PRIVATE /W4 /EHsc /permissive-)
+add_executable(native_core_smoke native_core.cpp
+    "${ROOT}/source/recovered/Porsche.exe/file_events.cpp"
+    "${ROOT}/source/recovered/Porsche.exe/file_pages.cpp")
+target_link_libraries(native_core_smoke PRIVATE porsche_platform_win32)
+target_compile_definitions(native_core_smoke PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_compile_options(native_core_smoke PRIVATE /W4 /EHsc /permissive-)
+set_target_properties(native_core_smoke PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
