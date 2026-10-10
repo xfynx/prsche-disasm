@@ -23,9 +23,29 @@
 #include "porsche/startup_service_56a490.hpp"
 #include "porsche/startup_service_516950.hpp"
 #include "porsche/resource_predicate.hpp"
+#include "porsche/resource_leaf.hpp"
+#include "porsche/resource_dispatch.hpp"
+#include "porsche/formatter_entry.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/render_startup.hpp"
+#include "porsche/render_display.hpp"
+#include "porsche/render_loader.hpp"
+#include "porsche/game_setup.hpp"
+#include "porsche/splash_progress.hpp"
+#include "porsche/startup_services.hpp"
+#include <cstdarg>
 #include "porsche/window_shutdown.hpp"
 #include "porsche/heap.hpp"
 #include <cstring>
+
+namespace {
+void formatter_forward_va(char* out, const char* format, va_list args) {
+    static_assert(sizeof(va_list) == sizeof(void*),
+                  "the original x86 variadic ABI is a stack pointer");
+    (void)porsche::formatter_entry_raw_005a0fbf(
+        out, format, reinterpret_cast<const std::uint32_t*>(args));
+}
+}
 
 namespace porsche {
 void __cdecl application_main_function_004dd600() {
@@ -133,6 +153,64 @@ std::uint32_t __cdecl frame_pump_boundary_004ab200() {
 }
 std::int32_t __cdecl engine_service_file_exists_0059dd00(const char* path) {
     return resource_predicate_0059dd00(path);
+}
+std::int32_t __cdecl resource_predicate_unrooted_00561ba0(const char* path) {
+    return resource_leaf_00561ba0(path);
+}
+
+// The eleven source spellings in Run 104 are caller-side declarations for
+// this single original variadic entry. These adapters preserve each call's
+// original stack-word order and declared variadic types; none formats on host.
+void __cdecl heap_format_005a0fbf(char* out, const char* format,
+                                  const char* name) {
+    (void)formatter_entry_005a0fbf(out, format, name);
+}
+void __cdecl render_format_005a0fbf(char* out, const char* format,
+                                   std::uint32_t width,
+                                   std::uint32_t height) {
+    (void)formatter_entry_005a0fbf(out, format, width, height);
+}
+void __cdecl resource_format_drive_005a0fbf(char* out, const char* format,
+                                            std::int32_t drive) {
+    (void)formatter_entry_005a0fbf(out, format, drive);
+}
+void __cdecl resource_format_path_005a0fbf(char* out, const char* format,
+    const char* first, const char* second) {
+    (void)formatter_entry_005a0fbf(out, format, first, second);
+}
+void __cdecl startup_drive_format_005a0fbf(char* out, const char* format,
+                                           std::int32_t drive) {
+    (void)formatter_entry_005a0fbf(out, format, drive);
+}
+void __cdecl startup_command_format_005a0fbf(char* out, const char* format,
+                                             const char* command) {
+    (void)formatter_entry_005a0fbf(out, format, command);
+}
+void __cdecl file_format_005a0fbf(char* out, const char* format,
+                                  const char* first, const char* second) {
+    (void)formatter_entry_005a0fbf(out, format, first, second);
+}
+void __cdecl render_format_depth_005a0fbf(char* out, std::int32_t depth) {
+    // Original caller pushes depth as one vararg and the indexed format string
+    // at 005cf8bc contains no conversion: "Please set your display to 256 colors or higher.\n".
+    (void)formatter_entry_005a0fbf(
+        out, "Please set your display to 256 colors or higher.\n", depth);
+}
+void __cdecl render_loader_format_005a0fbf(char* out, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    formatter_forward_va(out, format, args);
+    va_end(args);
+}
+void __cdecl game_setup_string_005a0fbf(char* out, const char* format,
+                                        const char* base, char* scratch) {
+    (void)formatter_entry_005a0fbf(out, format, base, scratch);
+}
+void __cdecl splash_progress_format_005a0fbf(char* out, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    formatter_forward_va(out, format, args);
+    va_end(args);
 }
 void __cdecl render_depth_failure_00557370() {
     window_shutdown_process_exit_00557370();

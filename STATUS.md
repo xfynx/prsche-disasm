@@ -1,14 +1,14 @@
 # Состояние проекта
 
-Текущий результат — [Run107](iterations/v2/001-original-recovery/runs/107-frame-integration/README.md): **224 проверенные C++ функции** и 6 частичных consumer.
-Общая MSVC Win32 сборка:82 comparison/alias targets,4 native OS fixtures,3 link fixtures;96 projects/177 TUs.
-7 свежих отчётов/4139 bounded x86 сравнений; все4 native проверки повторно прошли.
-Интегрированы frame services004ab150/200 и resource predicate0059dd00, добавлен доказанный exit adapter.
-Реальная game-link попытка:0 compile errors,260 unresolved symbols/282 references; игрового EXE пока нет.
-Индекс дополнен omitted clockworker00565270:33 supplementary/catalog36620; его C++ восстанавливается112.
-[Отложенные проверки](docs/recovery-validation-backlog.md) сохраняются до фактического выполнения.
-Следующий пакет111 — готовые108 formatter entry/109 resource leaf; параллельно112 clockworker,
-113 filesystem dispatcher/callback и114 original formatter core. Игра и визуальная приёмка открыты.
+Текущий результат — [Run111](iterations/v2/001-original-recovery/runs/111-runtime-integration/README.md): **229 проверенных C++ функций** и 6 частичных consumer.
+Общая MSVC Win32 сборка:100 projects/186 TUs;86 comparison/alias probes+4 nativeOS+3 linkfixtures.
+10 свежих reports/4153 bounded x86 сравнений; все7 native/link проверок прошли автоматически с dependency hashes.
+Связаны11 formatter aliases, filesystem dispatcher/callback и clockworker; его thread producer ещё открыт.
+Реальная game-link попытка:0 compile errors,250 unresolved symbols/271 references; игрового EXE пока нет.
+Следующий117 — готовые115 exit/116 install.txt loader и shared60pointer path table;118 timer/119 exactformatter в работе.
+[Validation backlog](docs/recovery-validation-backlog.md) проверяется при каждом checkpoint, перед архитектурной схемой и Rust.
+Будущий маршрут: проверенный C/C++ baseline→схема устройства игры по исходникам→Rust native/web.
+Каталог36620/33 supplementary; полный игровой запуск и визуальная приёмка открыты.
 
 2026-10-08: активна [v2/001-original-recovery](iterations/v2/001-original-recovery/README.md).
 v1 сохранена и запушена: dc6b9d8; 012 незавершена и её интеграция остановлена.

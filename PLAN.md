@@ -1,15 +1,34 @@
 # План восстановления Porsche Unleashed
 
-Текущий результат — [Run107](iterations/v2/001-original-recovery/runs/107-frame-integration/README.md): **224 проверенные C++ функции** и 6 частичных consumer.
-Общая MSVC Win32 сборка:82 comparison/alias targets,4 native OS fixtures,3 link fixtures;96 projects/177 TUs.
-7 свежих отчётов/4139 bounded x86 сравнений; все4 native проверки повторно прошли.
-Интегрированы frame services004ab150/200 и resource predicate0059dd00, добавлен доказанный exit adapter.
-Реальная game-link попытка:0 compile errors,260 unresolved symbols/282 references; игрового EXE пока нет.
-Индекс дополнен omitted clockworker00565270:33 supplementary/catalog36620; его C++ восстанавливается112.
-[Отложенные проверки](docs/recovery-validation-backlog.md) сохраняются до фактического выполнения.
-Следующий пакет111 — готовые108 formatter entry/109 resource leaf; параллельно112 clockworker,
-113 filesystem dispatcher/callback и114 original formatter core. Игра и визуальная приёмка открыты.
+Текущий результат — [Run111](iterations/v2/001-original-recovery/runs/111-runtime-integration/README.md): **229 проверенных C++ функций** и 6 частичных consumer.
+Общая MSVC Win32 сборка:100 projects/186 TUs;86 comparison/alias probes+4 nativeOS+3 linkfixtures.
+10 свежих reports/4153 bounded x86 сравнений; все7 native/link проверок прошли автоматически с dependency hashes.
+Связаны11 formatter aliases, filesystem dispatcher/callback и clockworker; его thread producer ещё открыт.
+Реальная game-link попытка:0 compile errors,250 unresolved symbols/271 references; игрового EXE пока нет.
+Следующий117 — готовые115 exit/116 install.txt loader и shared60pointer path table;118 timer/119 exactformatter в работе.
+[Validation backlog](docs/recovery-validation-backlog.md) проверяется при каждом checkpoint, перед архитектурной схемой и Rust.
+Будущий маршрут: проверенный C/C++ baseline→схема устройства игры по исходникам→Rust native/web.
+Каталог36620/33 supplementary; полный игровой запуск и визуальная приёмка открыты.
 
+
+## Схема устройства игры после восстановления кода
+
+- [ ] После полного разбора и восстановления кода построить и версионировать
+  общую архитектурную схему игры в `docs/architecture/`: запуск/завершение,
+  главный игровой цикл, модули и граф их связей, потоки/callbacks,
+  владельцы данных и жизненный цикл ресурсов.
+- [ ] Отдельно раскрыть связи UI/режимов/карьер/сохранений с физикой, ИИ,
+  повреждениями, экономикой/гаражом, рендером, вводом и звуком.
+- [ ] Подкрепить схемы ссылками на восстановленные C/C++ файлы и исходные
+  модуль/SHA/VA. Разделять подтверждённое устройство оригинала, платформенную
+  адаптацию и ещё неизвестные связи. Готовность: по схемам можно проследить
+  запуск→меню→гонку→результат/сохранение→выход и найти код каждого перехода.
+
+Назначение схемы — последующее переписывание игры на Rust (уточнение пользователя
+2026-10-10). Порядок: восстановленный C/C++ baseline → проверка оригинального
+поведения → схема архитектуры → Rust native/web. Для Rust дополнительно показать
+границы модулей, владение/жизненный цикл данных и обмен между подсистемами,
+чтобы перенос сохранял исходную семантику и опирался на понятную структуру.
 
 Активный путь с 2026-10-08 — [v2/001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 Полный корпус всех бинарников → собираемый original Windows/x86 → современный

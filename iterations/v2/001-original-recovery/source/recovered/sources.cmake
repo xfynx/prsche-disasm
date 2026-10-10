@@ -81,4 +81,9 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/engine_service_427a60.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/frame_services.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/resource_predicate.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/formatter_entry.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/resource_leaf.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/resource_dispatch.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/clock_worker.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/resource_dispatch_globals.cpp"
 )

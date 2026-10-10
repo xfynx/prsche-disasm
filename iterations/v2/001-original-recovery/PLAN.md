@@ -3,19 +3,19 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Текущий принятый пакет — Run107:224 full +6 partial; предыдущий запушенныйfead56b /Run098.
-MSVC Win32 ALL_BUILD:96 projects/177TUs,82 probes+4 native+3 link fixtures.
-7 свежих reports/4139 bounded original-x86 comparisons; native4 повторно прошли.
-105/106 linked;104 доказанный exit adapter linked, terminal5a246e остаётся внешним.
-Run110 static evidence/index добавил207B clockworker565270;33 supplementary/catalog36620.
-Настоящий game-link:0 compile errors,260 unresolved symbols/282 references, EXE нет.
-После sandbox parallel4 failure общий script повторён вне sandbox с parallel4 успешно.
-Активные исполнители: heap_init_recovery —112 clockworker; window_worker_recovery —113 FS dispatcher/callback;
-render_mode_completion —114 formatter core.108/109 ready, ожидают checkpoint111.
-Координатор — commit/push107, затем integration108/109 и подтверждённые ABI aliases.
-Точные проверки/команды/limitations: runs107/README.md, acceptance.json, compile-link-proof.json.
-[Отложенные проверки](../../../docs/recovery-validation-backlog.md): WM_CLOSE route остаётся открытым,
-clock producer обнаружен110, но112 ещё не интегрирован. Ни один pending acceptance пункт не снят.
+Текущий принятый пакет —111:229full+6partial; предыдущий запушенныйd663347 /107.
+Общий build:100 projects/186TUs,86 comparison/alias+4nativeOS+3link;10 fresh reports/4153 x86cases.
+Все7 native/linkfixtures прошли черезновый verify-v2-native-fixtures.py, source/EXE hashes закреплены.
+Включены108/109/112/113,11formatter aliases связаны с canonicalvariadic entry.
+Пять новых bodies original/native verified; group005df770 raw-backedDWORD0x64 единого владельца.
+Game-link0compileerrors/250unresolvedsymbols/271refs; полногоEXEнет.
+114 experimental parser NOT accepted: syntheticsentinel и альтернативныйalgorithm внеигровойсборки.
+115process-exit/116install-pathsready;117интеграцияподготовлена,исполнительheap_init_recovery ждётcommit111.
+window_worker_recovery —118timersetup;render_mode_completion —119original table-drivenformatter.
+Координатор —commit/push111 и приёмка117; pathglobals32c/334/360/350/304 должныстатьviews60pointertable116.
+[Отложенные проверки](../../../docs/recovery-validation-backlog.md) обязательнынакаждомcheckpoint,
+передприёмкойархитектурнойсхемы ипереходомнаRust. WM_CLOSEещёоткрыт:112workerесть,producer118неподключён.
+Точныекоманды/проверки/limitations —runs111/README.md,acceptance.json,compile-link-proof.json.
 История ниже не является активным назначением. Итерация и игровой запуск не завершены.
 
 ## Цель и готовность 001
@@ -37,8 +37,16 @@ clock producer обнаружен110, но112 ещё не интегрирова
 4. Полная native Windows/x86 сборка с исходными карьерой, физикой, ИИ,
    экономикой, повреждениями, UI и звуком. Сверка функций/данных/модулей,
    реальная езда и прохождение. Неопределённая логика не заменяется заглушкой.
-5. Современная платформенная адаптация после рабочего оригинального baseline;
-   перенос native/web не меняет игровую семантику.
+5. После полного разбора/восстановления кода построить общую схему работы
+   игры в `docs/architecture/`: startup/shutdown, главный цикл, модули/граф вызовов,
+   потоки/callbacks, данные/ресурсы и связи всех игровых подсистем.
+   Схемы связываются с C/C++ файлами и original module/SHA/VA; неизвестное отдельно.
+   Критерий: прослеживается запуск→меню→гонка→результат/сохранение→выход.
+   Подробное задание — раздел общего PLAN «Схема устройства игры после восстановления кода».
+6. После проверенного C/C++ baseline и архитектурной схемы переписать игру
+   на Rust для native/web (решение пользователя2026-10-10). Схема заранее
+   раскрывает границы модулей, владение/жизненный цикл данных и обмен подсистем;
+   перенос сохраняет игровую семантику и проверяется на тех же original oracles.
 
 ## Подтверждённое
 

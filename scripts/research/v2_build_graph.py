@@ -9,7 +9,12 @@ ITERATION = ROOT / 'iterations/v2/001-original-recovery'
 def projects(build_root, target='ALL_BUILD'):
     entry = Path(build_root).resolve() / (target + '.vcxproj')
     if not entry.is_file():
-        candidates = list(Path(build_root).resolve().rglob(target + '.vcxproj'))
+        common = Path(build_root).resolve() / 'ALL_BUILD.vcxproj'
+        # Reused build roots can contain old standalone projects with the
+        # same target name. Resolve a common target only from ALL_BUILD.
+        candidates = ([p for p in projects(build_root, 'ALL_BUILD')
+                       if p.name == target + '.vcxproj'] if common.is_file()
+                      else list(Path(build_root).resolve().rglob(target + '.vcxproj')))
         if len(candidates) != 1:
             raise RuntimeError(f'Ambiguous/missing MSBuild entry: {target}: {candidates}')
         entry = candidates[0]
