@@ -108,6 +108,11 @@ manual records carry no pseudo-C span.
 - `unresolved-calls.jsonl`: косвенные вызовы без определённой цели.
 - `metadata.json`: хеш, архитектура, блоки памяти, счётчики и состояние анализа.
 
+Run110: omitted timer worker00565270..0056533e (207B) добавлен по push565135→call55f420,
+непрерывным ASM bytes/RET и SHA. [Clock evidence](../../iterations/v2/001-original-recovery/runs/110-clock-worker-index/README.md)
+показывает writer006b7c40 и GetTickCount IAT005b2080. Supplementary33 /catalog36620;
+это навигация, C++/реальный producer ещё не принят. Pending WM_CLOSE check остаётся открытым.
+
 ## Воспроизведение
 
 ```powershell

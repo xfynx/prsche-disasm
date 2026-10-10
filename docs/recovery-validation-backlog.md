@@ -10,7 +10,9 @@
   зависимостей; сначала запуск/выход, затем кадр, ввод, меню и режимы игры.
 - [ ] Проверить закрытие через WM_CLOSE→GetMessage=0→исходный timer callback,
   включая producer времени006b7c40. Run086/098 проверяет другую исходную ветку
-  cleanup message0x466→destroy→join. Возврат: после восстановления clock producer.
+  cleanup message0x466→destroy→join. Возврат: после восстановления clock producer. Run110 нашёл пропущенный
+  worker00565270..533e (207B), исходный setup565030 передаёт его в55f420.
+  Run112 восстанавливает worker; end-to-end проверка пока не выполнена.
 - [ ] Проверить реальные DirectInput devices и caps/read paths со связанной
   оконной цепочкой. Run096 проверяет consumer0055feb0 с контролируемыми границами;
   native lifecycle fixture не подключает весь input graph. Возврат: после bindings.

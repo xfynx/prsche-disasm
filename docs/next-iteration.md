@@ -1,15 +1,14 @@
 # Текущий этап: v2/001-original-recovery
 
-Текущий результат — [Run098](../iterations/v2/001-original-recovery/runs/098-startup-integration/README.md): **221 проверенная C++ функция** и 6 частичных consumer.
-Общая MSVC Win32 сборка прошла:80 comparison/alias probes,4 native OS fixtures,3 link fixtures.
-28 свежих отчётов /4934 bounded original-x86 сравнений; создание окна и завершение потока повторно проверены.
-Включены startup sequence, splash/progress, input snapshot, цикл кадра и службы запуска;
-MAD header остаётся partial: playback/audio/render loop ещё открыт.
-Настоящая game-link попытка:0 compile errors,256 unresolved symbols/276 references после интеграции101/103.
-[Run102](../iterations/v2/001-original-recovery/runs/102-original-game-link/README.md) сохраняет исходный frontier251; новые consumers раскрыли дополнительные вызовы.
-Игровой EXE не собран, запуск и визуальная приёмка открыты. Каталог36619 функций/32 supplementary.
-Параллельно: render_mode_completion —104 ABI/alias audit; heap_init_recovery —105 frame services;
-window_worker_recovery —106 resource predicate. Координатор — приёмка/commit098, затем подтверждённые link adapters.
+Текущий результат — [Run107](../iterations/v2/001-original-recovery/runs/107-frame-integration/README.md): **224 проверенные C++ функции** и 6 частичных consumer.
+Общая MSVC Win32 сборка:82 comparison/alias targets,4 native OS fixtures,3 link fixtures;96 projects/177 TUs.
+7 свежих отчётов/4139 bounded x86 сравнений; все4 native проверки повторно прошли.
+Интегрированы frame services004ab150/200 и resource predicate0059dd00, добавлен доказанный exit adapter.
+Реальная game-link попытка:0 compile errors,260 unresolved symbols/282 references; игрового EXE пока нет.
+Индекс дополнен omitted clockworker00565270:33 supplementary/catalog36620; его C++ восстанавливается112.
+[Отложенные проверки](recovery-validation-backlog.md) сохраняются до фактического выполнения.
+Следующий пакет111 — готовые108 formatter entry/109 resource leaf; параллельно112 clockworker,
+113 filesystem dispatcher/callback и114 original formatter core. Игра и визуальная приёмка открыты.
 
 Решение пользователя 2026-10-08 заменяет прежний порядок: сохранить v1 как есть,
 создать отдельную v2 и восстанавливать полный собираемый оригинал из бинарников.

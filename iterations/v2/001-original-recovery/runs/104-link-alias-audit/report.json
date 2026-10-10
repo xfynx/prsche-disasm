@@ -1,0 +1,1661 @@
+{
+  "schema": 1,
+  "scope": "Read-only audit of the Run102 captured link frontier; Run098 retry is deliberately separate.",
+  "baseline": {
+    "report": "iterations/v2/001-original-recovery/runs/102-original-game-link/link-report.json",
+    "report_sha256": "bb55482b3ebffdbcbf0de552afc144945785de10678eb0bc8030a7e22b0f14f8",
+    "original_module": "Porsche.exe",
+    "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+    "unresolved_symbols": 251,
+    "unresolved_references": 263,
+    "va_named_symbol_count": 206,
+    "semantic_boundary_count": 45,
+    "high_reference_callers": [
+      {
+        "caller": "?render_construct_display_004677e0@porsche@@YAPAURenderDisplay@1@PAXPBDII1@Z",
+        "references": 35
+      },
+      {
+        "caller": "?app_main_004b6a50@porsche@@YAHHPAPAD@Z",
+        "references": 34
+      },
+      {
+        "caller": "?splash_progress_004a4a70@porsche@@YAXH@Z",
+        "references": 24
+      },
+      {
+        "caller": "?startup_sequence_004b67b0@porsche@@YAXXZ",
+        "references": 22
+      },
+      {
+        "caller": "?game_setup_004dd600@porsche@@YAXXZ",
+        "references": 17
+      },
+      {
+        "caller": "<no caller in LNK diagnostic>",
+        "references": 14
+      },
+      {
+        "caller": "?render_display_through_004679c7@porsche@@YAPAURenderDisplay@1@PAU21@PBDII1@Z",
+        "references": 13
+      },
+      {
+        "caller": "?render_load_thrash_00574fa0@porsche@@YAIPBD@Z",
+        "references": 11
+      },
+      {
+        "caller": "?startup_heap_0059e9d0@porsche@@YAXIIII@Z",
+        "references": 9
+      },
+      {
+        "caller": "?resource_paths_0059d650@porsche@@YAHXZ",
+        "references": 6
+      },
+      {
+        "caller": "?startup_cd_relaunch_004a5c30@porsche@@YAXXZ",
+        "references": 6
+      },
+      {
+        "caller": "?application_instance_check_005655f0@porsche@@YAIPBD@Z",
+        "references": 5
+      },
+      {
+        "caller": "?file_worker_00568530@porsche@@YAXI@Z",
+        "references": 5
+      },
+      {
+        "caller": "?render_startup_00467470@porsche@@YAXXZ",
+        "references": 5
+      },
+      {
+        "caller": "?startup_services_004a5410@porsche@@YAXXZ",
+        "references": 5
+      },
+      {
+        "caller": "?application_callback_registry_insert_005a2400@porsche@@YAXP6AXXZ@Z",
+        "references": 4
+      }
+    ]
+  },
+  "cross_reference_counts": {
+    "unique_va_suffixes": 166,
+    "duplicate_va_groups": 23,
+    "va_suffixes_matching_recovery_registry": 7,
+    "va_suffixes_with_index_function_but_no_recovery_registry_entry": 126,
+    "va_suffixes_without_index_function_entry": 33
+  },
+  "current_098_crosscheck": {
+    "report": "iterations/v2/001-original-recovery/runs/098-startup-integration/original-game-link/link-report.json",
+    "report_sha256": "17aa08ca0fa3f17622f91533f53c650c876a2e6f304514f28ac750b7967e47f8",
+    "status": "link_failed_unresolved_frontier",
+    "unresolved_symbols": 256,
+    "baseline_symbols_absent_now": [
+      "?splash_progress_frame_begin_004b0d70@porsche@@YAXXZ",
+      "?startup_sequence_call_00427a60@porsche@@YAXXZ",
+      "?startup_sequence_call_004b0d70@porsche@@YAXXZ"
+    ],
+    "new_symbols_not_in_baseline": [
+      "?engine_service_consume_resource_0048cb50@porsche@@YAXIPAXH@Z",
+      "?engine_service_file_exists_0059dd00@porsche@@YAHPBD@Z",
+      "?frame_pump_boundary_004ab150@porsche@@YAIXZ",
+      "?frame_pump_boundary_004ab200@porsche@@YAIXZ",
+      "?frame_pump_boundary_005360a0@porsche@@YAXPAXI@Z",
+      "?frame_pump_boundary_005363a0@porsche@@YAXPAX@Z",
+      "?frame_pump_boundary_00568f30@porsche@@YAXIIIIII@Z",
+      "?frame_pump_boundary_005693e0@porsche@@YAIXZ"
+    ],
+    "evidence_limit": "A disappeared linker name shows the current link object resolves it; it does not prove full game behavior or close its callees."
+  },
+  "proven_recovered_body_bridge_candidates": [
+    {
+      "baseline_unresolved_symbol": "?startup_sequence_call_00427a60@porsche@@YAXXZ",
+      "native_type": "void __cdecl startup_sequence_call_00427a60(void)",
+      "canonical_recovered_body": "void __cdecl engine_service_00427a60(void)",
+      "adapter_source": "iterations/v2/001-original-recovery/source/platform/recovered_links.cpp",
+      "body_source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/engine_service_427a60.cpp",
+      "registry_status": "native-differential-verified at original entry 00427a60 (Run103)",
+      "original_index_xref": "004b67d1 -> 00427a60, the startup sequence's single indexed incoming call",
+      "abi_evidence": "Both names are global cdecl void(void); Run103 records no incoming parameters, caller-owned cleanup 0x2c for its five cdecl callees, and matched x86/native call order and stack restoration.",
+      "current_098_link": "Resolved after the adapter was added; its own formatter/file/resource callees remain unresolved."
+    },
+    {
+      "baseline_unresolved_symbols": [
+        "?startup_sequence_call_004b0d70@porsche@@YAXXZ",
+        "?splash_progress_frame_begin_004b0d70@porsche@@YAXXZ"
+      ],
+      "native_type": "void __cdecl(void)",
+      "canonical_recovered_body": "void __cdecl frame_pump_004b0d70(void)",
+      "adapter_source": "iterations/v2/001-original-recovery/source/platform/recovered_links.cpp",
+      "body_source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/frame_pump.cpp",
+      "registry_status": "native-differential-verified at original entry 004b0d70 (Run101)",
+      "original_index_evidence": "The 318-byte original function entry has indexed callers from 004b67b0 and 004a4a70; Run101 compares its complete state, ordered boundaries and x86 stack restoration.",
+      "current_098_link": "Both alternate spellings disappeared from the current unresolved set after the exact no-argument cdecl adapters were added."
+    },
+    {
+      "unresolved_symbol": "?render_depth_failure_00557370@porsche@@YAXXZ",
+      "native_type": "void __cdecl render_depth_failure_00557370(void)",
+      "canonical_recovered_body": "void __cdecl window_shutdown_process_exit_00557370(void)",
+      "canonical_body_source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_shutdown.cpp",
+      "registry_status": "native-differential-verified at original entry 00557370",
+      "original_index_xrefs": [
+        {
+          "call_va": "004678a5",
+          "caller_va": "004677e0",
+          "type": "UNCONDITIONAL_CALL"
+        },
+        {
+          "call_va": "0053baf2",
+          "caller_va": null,
+          "type": "UNCONDITIONAL_CALL"
+        },
+        {
+          "call_va": "0056565d",
+          "caller_va": "005655f0",
+          "type": "UNCONDITIONAL_CALL"
+        }
+      ],
+      "abi_and_body_evidence": [
+        "Both C++ declarations are cdecl void() with no stack arguments.",
+        "Original index records the render caller at 004678a5 -> 00557370; original body at 00557370 is PUSH 0; CALL 005a246e.",
+        "Run090 verification records 00557370 as a full function and 005a246e as the terminal boundary."
+      ],
+      "limitation": "This alias can map the already recovered 00557370 body, but its terminal 005a246e boundary still needs one non-returning production implementation; no game-link success follows from this alias alone.",
+      "current_098_link": "Still unresolved; this exact bridge has not yet been added."
+    }
+  ],
+  "same_va_but_not_recovered_body_bridges": [
+    {
+      "va": "0059d650",
+      "link_symbol": "resource_invalid_module_path_0059d650",
+      "existing_entry": "resource_paths_0059d650(void) -> int32",
+      "classification": "internal branch placeholder, not a distinct function entry",
+      "evidence": "Index/function registry show 0059d650 is the resource_paths entry; original ASM at 0059d687 branches to 0059d6c9 within that body. Current source invents a same-entry call only for slash-not-found. Forwarding would recurse; recover the branch."
+    },
+    {
+      "va": "00532e10",
+      "link_symbols": [
+        "input_unrecovered_mode_00532e10",
+        "input_negative_index_00532e10",
+        "input_unmapped_index_00532e10"
+      ],
+      "existing_entry": "fe_input_getstate_00532e10(uint32 index, uint32 mode) -> void*",
+      "classification": "unrecovered intra-function branches, not function entries",
+      "evidence": "Registry marks 00532e10 partial and lists invalid-mode/negative/unmapped branches. Original ASM has one entry and an internal jump table; the link symbols are source-side recording boundaries. Do not forward them back to entry (recursion)."
+    },
+    {
+      "va": "00534480",
+      "link_symbols": [
+        "render_display_texture_bind_00534480(void*)",
+        "splash_progress_bind_texture_00534480(uint32)"
+      ],
+      "existing_entry": "00534480 partial window_shutdown consumer",
+      "classification": "real entry, but its observed null-descriptor branch is the only recovered path",
+      "evidence": "Registry and Run090 verify 00534480 only through the null-input path from 00534550; registry lists non-null setup as unrecovered. Original callers at 00467ca9 and 004a4b98 push live texture values. Return/parameter spellings conflict; recover entry ABI and non-null behavior before bridging."
+    },
+    {
+      "va": "004dc850",
+      "link_symbol": "game_setup_movie_004dc850(void*, uint32*, uint32, uint32, uint32)",
+      "existing_entry": "movie_header_prepare_004dc850 partial MAD-header helper",
+      "classification": "partial internal branch, explicitly not the original entry ABI",
+      "evidence": "Registry boundary says only the accepted MAD header through renderer 004dc180 is recovered and not a replacement for original function ABI; ASM entry 004dc850 starts the much larger stream/playback function."
+    }
+  ],
+  "unimplemented_original_entry_alias_families": [
+    {
+      "va": "005a0fbf",
+      "symbols": [
+        "?heap_format_005a0fbf@porsche@@YAXPADPBD1@Z",
+        "?render_format_005a0fbf@porsche@@YAXPADPBDII@Z",
+        "?resource_format_drive_005a0fbf@porsche@@YAXPADPBDH@Z",
+        "?resource_format_path_005a0fbf@porsche@@YAXPADPBD11@Z",
+        "?startup_drive_format_005a0fbf@porsche@@YAXPADPBDH@Z",
+        "?startup_command_format_005a0fbf@porsche@@YAXPADPBD1@Z",
+        "?file_format_005a0fbf@porsche@@YAXPADPBD11@Z",
+        "?render_format_depth_005a0fbf@porsche@@YAXPADH@Z",
+        "?render_loader_format_005a0fbf@porsche@@YAXPADPBDZZ",
+        "?game_setup_string_005a0fbf@porsche@@YAXPADPBD10@Z",
+        "?splash_progress_format_005a0fbf@porsche@@YAXPADPBDZZ"
+      ],
+      "original_index_entry": {
+        "entry_va": "005a0fbf",
+        "name": "FUN_005a0fbf",
+        "signature": "undefined FUN_005a0fbf(void)",
+        "ranges": [
+          [
+            "005a0fbf",
+            "005a1010"
+          ]
+        ],
+        "body_bytes": 82,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "direct_call_xref_count": 584,
+      "candidate_abi": "int __cdecl format_output_005a0fbf(char* destination, const char* format, ...)",
+      "evidence": "Original ASM uses EBP+8 as destination, EBP+12 as format, EBP+16 as the first variadic slot; forwards its varargs list and returns callee EAX; plain RET gives caller cleanup. Eleven source spellings currently disagree in fixed arity and/or parameter spelling.",
+      "classification": "one known original entry with an unrecovered native body/ABI-normalization task, not eleven distinct missing original functions",
+      "next_trace": "Confirm format pointer and formatter target semantics at 005a4371/005a4259, then implement one exact varargs entry and rebind consumers."
+    },
+    {
+      "va": "005a246e",
+      "symbols": [
+        "?startup_exit_005a246e@porsche@@YAXI@Z",
+        "?render_driver_failure_005a246e@porsche@@YAXI@Z",
+        "?application_instance_exit_005a246e@porsche@@YAXI@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "005a246e",
+        "name": "FUN_005a246e",
+        "signature": "noreturn undefined FUN_005a246e(void)",
+        "ranges": [
+          [
+            "005a246e",
+            "005a247e"
+          ]
+        ],
+        "body_bytes": 17,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "direct_call_xref_count": 13,
+      "candidate_abi": "void __cdecl terminal_exit_005a246e(uint32_t code)",
+      "evidence": "All three source aliases encode void cdecl(DWORD). Original entry reads stack[+4], pushes three arguments, calls 005a2490, cleans 12 bytes, then RET; original index marks the function noreturn. Current native code keeps it as an unresolved typed boundary.",
+      "classification": "ABI-equivalent aliases to one unrecovered terminal body; canonicalizing names alone does not implement it",
+      "next_trace": "Recover 005a2490/CRT termination contract; use one non-returning production owner and route the three declarations through it."
+    }
+  ],
+  "duplicate_va_groups": [
+    {
+      "va": "0048cdf0",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?application_main_function_0048cdf0@porsche@@YAXXZ",
+        "?startup_sequence_call_0048cdf0@porsche@@YAXXZ"
+      ],
+      "decorated_abi_encodings": [
+        "YAXXZ"
+      ],
+      "original_index_entry": {
+        "entry_va": "0048cdf0",
+        "name": "FUN_0048cdf0",
+        "signature": "undefined FUN_0048cdf0(void)",
+        "ranges": [
+          [
+            "0048cdf0",
+            "0048d343"
+          ]
+        ],
+        "body_bytes": 1364,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 8,
+      "top_indexed_callers": [
+        {
+          "va": "004b6a50",
+          "count": 2
+        },
+        {
+          "va": "<unresolved>",
+          "count": 2
+        },
+        {
+          "va": "004152e0",
+          "count": 1
+        },
+        {
+          "va": "0048d3d0",
+          "count": 1
+        },
+        {
+          "va": "0048d6a0",
+          "count": 1
+        },
+        {
+          "va": "004b67b0",
+          "count": 1
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "004b0d70",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?startup_sequence_call_004b0d70@porsche@@YAXXZ",
+        "?splash_progress_frame_begin_004b0d70@porsche@@YAXXZ"
+      ],
+      "decorated_abi_encodings": [
+        "YAXXZ"
+      ],
+      "original_index_entry": {
+        "entry_va": "004b0d70",
+        "name": "FUN_004b0d70",
+        "signature": "undefined FUN_004b0d70(void)",
+        "ranges": [
+          [
+            "004b0d70",
+            "004b0ead"
+          ]
+        ],
+        "body_bytes": 318,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 15,
+      "top_indexed_callers": [
+        {
+          "va": "004b67b0",
+          "count": 11
+        },
+        {
+          "va": "004b0fa0",
+          "count": 2
+        },
+        {
+          "va": "004a4a70",
+          "count": 1
+        },
+        {
+          "va": "004dda00",
+          "count": 1
+        }
+      ],
+      "recovery_registry_entries": [
+        {
+          "module": "Porsche.exe",
+          "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+          "entry_va": "004b0d70",
+          "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/frame_pump.cpp",
+          "status": "native-differential-verified",
+          "calling_convention": "cdecl, no arguments, x86 32-bit",
+          "recovered_dependencies": [
+            "00534550"
+          ],
+          "unrecovered_dependencies": [
+            "004ab150",
+            "004ab200",
+            "005360a0",
+            "005363a0",
+            "00568f30",
+            "005693e0"
+          ],
+          "recovered_indirect_dependencies": [
+            "006bd91c",
+            "006bd948",
+            "006bd970",
+            "006bd978",
+            "006bd97c",
+            "006bd9b0"
+          ],
+          "unrecovered_indirect_dependencies": [
+            "game_setup_movie_service_0069ed0c vtable slots +0x1c and +0x20"
+          ],
+          "binary_matched": false,
+          "verification": "scripts/research/verify-v2-frame-pump.py",
+          "verification_report": "iterations/v2/001-original-recovery/runs/098-startup-integration/frame-pump/verification.json",
+          "verification_boundary": "Full function body and owned state compared to original x86 in eight cases; unresolved service callees and movie vtable targets remain explicit boundaries.",
+          "dependency_scope": "Indexed direct and indirect callees; unknown callee internals are not claimed."
+        }
+      ]
+    },
+    {
+      "va": "00532e10",
+      "unresolved_symbol_count": 3,
+      "symbols": [
+        "?input_unrecovered_mode_00532e10@porsche@@YAPAXIIPAUInputSlot@1@@Z",
+        "?input_negative_index_00532e10@porsche@@YAPAXHI@Z",
+        "?input_unmapped_index_00532e10@porsche@@YAPAXII@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAPAXHI@Z",
+        "YAPAXII@Z",
+        "YAPAXIIPAUInputSlot@1@@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "00532e10",
+        "name": "FUN_00532e10",
+        "signature": "undefined FUN_00532e10(void)",
+        "ranges": [
+          [
+            "00532e10",
+            "00532f34"
+          ]
+        ],
+        "body_bytes": 293,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 49,
+      "top_indexed_callers": [
+        {
+          "va": "00411d20",
+          "count": 5
+        },
+        {
+          "va": "0051ebd0",
+          "count": 5
+        },
+        {
+          "va": "0051f310",
+          "count": 5
+        },
+        {
+          "va": "0051f000",
+          "count": 3
+        },
+        {
+          "va": "0051f2b0",
+          "count": 3
+        },
+        {
+          "va": "0051f3b0",
+          "count": 3
+        },
+        {
+          "va": "0051f170",
+          "count": 2
+        },
+        {
+          "va": "0051f1d0",
+          "count": 2
+        }
+      ],
+      "recovery_registry_entries": [
+        {
+          "module": "Porsche.exe",
+          "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+          "entry_va": "00532e10",
+          "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/input_state.cpp",
+          "status": "partial-native-differential-verified",
+          "calling_convention": "cdecl, x86 32-bit",
+          "unrecovered_dependencies": [
+            "00565340"
+          ],
+          "recovered_dependencies": [
+            "0056fce0",
+            "0056fdb0",
+            "0056fff0"
+          ],
+          "binary_matched": false,
+          "verification": "scripts/research/verify-v2-input-state.py",
+          "verification_report": "iterations/v2/001-original-recovery/runs/098-startup-integration/final-refresh/input-state/verification.json",
+          "verification_boundary": "Only mode6 and valid exits accepted; unknown modes and negative/unmapped index boundaries are explicit.",
+          "unrecovered_branches": [
+            "mode1",
+            "mode2",
+            "mode8",
+            "invalid_mode",
+            "negative_index",
+            "unmapped_index"
+          ]
+        }
+      ]
+    },
+    {
+      "va": "00534480",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?render_display_texture_bind_00534480@porsche@@YAXPAX@Z",
+        "?splash_progress_bind_texture_00534480@porsche@@YAHI@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAHI@Z",
+        "YAXPAX@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "00534480",
+        "name": "FUN_00534480",
+        "signature": "undefined FUN_00534480(void)",
+        "ranges": [
+          [
+            "00534480",
+            "00534528"
+          ]
+        ],
+        "body_bytes": 169,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 27,
+      "top_indexed_callers": [
+        {
+          "va": "<unresolved>",
+          "count": 5
+        },
+        {
+          "va": "00448010",
+          "count": 2
+        },
+        {
+          "va": "004152e0",
+          "count": 1
+        },
+        {
+          "va": "00422df0",
+          "count": 1
+        },
+        {
+          "va": "00423de0",
+          "count": 1
+        },
+        {
+          "va": "00442790",
+          "count": 1
+        },
+        {
+          "va": "00442d50",
+          "count": 1
+        },
+        {
+          "va": "00444130",
+          "count": 1
+        }
+      ],
+      "recovery_registry_entries": [
+        {
+          "module": "Porsche.exe",
+          "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+          "entry_va": "00534480",
+          "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_shutdown.cpp",
+          "status": "partial-native-differential-verified",
+          "calling_convention": "Original x86 typed ABI; see recovered header and package address/stack evidence.",
+          "recovered_dependencies": [
+            "00534430"
+          ],
+          "unrecovered_dependencies": [
+            "00534360",
+            "00535950",
+            "0053c290"
+          ],
+          "binary_matched": false,
+          "verification": "scripts/research/verify-v2-window-shutdown.py",
+          "verification_report": "iterations/v2/001-original-recovery/runs/090-native-window-integration/window-shutdown/verification.json",
+          "verification_boundary": "Only null-descriptor path reached from full wrapper00534550; non-null setup remains unrecovered.",
+          "dependency_scope": "Indexed direct callees; indirect/omitted edges explicitly documented in report.",
+          "unrecovered_branches": [
+            "non-null descriptor setup/allocation in 00534480"
+          ]
+        }
+      ]
+    },
+    {
+      "va": "00534540",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?game_setup_draw_begin_00534540@porsche@@YAXXZ",
+        "?splash_progress_driver_frame_begin_00534540@porsche@@YAXXZ"
+      ],
+      "decorated_abi_encodings": [
+        "YAXXZ"
+      ],
+      "original_index_entry": {
+        "entry_va": "00534540",
+        "name": "FUN_00534540",
+        "signature": "undefined FUN_00534540(void)",
+        "ranges": [
+          [
+            "00534540",
+            "0053454b"
+          ]
+        ],
+        "body_bytes": 12,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 4,
+      "top_indexed_callers": [
+        {
+          "va": "004a4a70",
+          "count": 1
+        },
+        {
+          "va": "<unresolved>",
+          "count": 1
+        },
+        {
+          "va": "004dd600",
+          "count": 1
+        },
+        {
+          "va": "004dda00",
+          "count": 1
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "00535950",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?render_display_texture_create_00535950@porsche@@YAPAXIIII@Z",
+        "?splash_progress_create_texture_00535950@porsche@@YAIIIII@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAIIIII@Z",
+        "YAPAXIIII@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "00535950",
+        "name": "FUN_00535950",
+        "signature": "undefined FUN_00535950(void)",
+        "ranges": [
+          [
+            "00535950",
+            "00535972"
+          ]
+        ],
+        "body_bytes": 35,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 16,
+      "top_indexed_callers": [
+        {
+          "va": "004152e0",
+          "count": 1
+        },
+        {
+          "va": "00422df0",
+          "count": 1
+        },
+        {
+          "va": "00423de0",
+          "count": 1
+        },
+        {
+          "va": "00442790",
+          "count": 1
+        },
+        {
+          "va": "00442d50",
+          "count": 1
+        },
+        {
+          "va": "00443760",
+          "count": 1
+        },
+        {
+          "va": "00447920",
+          "count": 1
+        },
+        {
+          "va": "004479f0",
+          "count": 1
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "00536080",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?game_setup_movie_service_begin_00536080@porsche@@YAXPAX@Z",
+        "?startup_sequence_service_00536080@porsche@@YIXPAX0@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAXPAX@Z",
+        "YIXPAX0@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "00536080",
+        "name": "FUN_00536080",
+        "signature": "undefined FUN_00536080(void)",
+        "ranges": [
+          [
+            "00536080",
+            "0053609a"
+          ]
+        ],
+        "body_bytes": 27,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 13,
+      "top_indexed_callers": [
+        {
+          "va": "004d6d20",
+          "count": 2
+        },
+        {
+          "va": "00468fb0",
+          "count": 1
+        },
+        {
+          "va": "004690f0",
+          "count": 1
+        },
+        {
+          "va": "004b67b0",
+          "count": 1
+        },
+        {
+          "va": "004d3420",
+          "count": 1
+        },
+        {
+          "va": "004d6a10",
+          "count": 1
+        },
+        {
+          "va": "004d6b10",
+          "count": 1
+        },
+        {
+          "va": "004d77a0",
+          "count": 1
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "00555bc0",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?render_clock_00555bc0@porsche@@YAIXZ",
+        "?render_mode_clock_00555bc0@porsche@@YAIXZ"
+      ],
+      "decorated_abi_encodings": [
+        "YAIXZ"
+      ],
+      "original_index_entry": {
+        "entry_va": "00555bc0",
+        "name": "FUN_00555bc0",
+        "signature": "undefined FUN_00555bc0(void)",
+        "ranges": [
+          [
+            "00555bc0",
+            "00555f92"
+          ]
+        ],
+        "body_bytes": 979,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 4,
+      "top_indexed_callers": [
+        {
+          "va": "004677e0",
+          "count": 2
+        },
+        {
+          "va": "0044ed10",
+          "count": 1
+        },
+        {
+          "va": "0044f020",
+          "count": 1
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "00563440",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?game_setup_draw_resource_00563440@porsche@@YAXPBXIIII@Z",
+        "?splash_progress_draw_tile_00563440@porsche@@YAXPBXHHHH@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAXPBXHHHH@Z",
+        "YAXPBXIIII@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "00563440",
+        "name": "FUN_00563440",
+        "signature": "undefined FUN_00563440(void)",
+        "ranges": [
+          [
+            "00563440",
+            "005637c0"
+          ]
+        ],
+        "body_bytes": 897,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 19,
+      "top_indexed_callers": [
+        {
+          "va": "004a4a70",
+          "count": 8
+        },
+        {
+          "va": "004dd600",
+          "count": 5
+        },
+        {
+          "va": "004dda00",
+          "count": 5
+        },
+        {
+          "va": "005637d0",
+          "count": 1
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "00565340",
+      "unresolved_symbol_count": 3,
+      "symbols": [
+        "?file_diagnostic_00565340@porsche@@YAXPBD@Z",
+        "?render_loader_report_00565340@porsche@@YAXPBD@Z",
+        "?window_scheduler_diagnostic_00565340@porsche@@YAXPBD@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAXPBD@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "00565340",
+        "name": "FUN_00565340",
+        "signature": "undefined FUN_00565340(void)",
+        "ranges": [
+          [
+            "00565340",
+            "005654bc"
+          ]
+        ],
+        "body_bytes": 381,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 136,
+      "top_indexed_callers": [
+        {
+          "va": "<unresolved>",
+          "count": 14
+        },
+        {
+          "va": "0056aff0",
+          "count": 5
+        },
+        {
+          "va": "0056b230",
+          "count": 5
+        },
+        {
+          "va": "0044f6e0",
+          "count": 4
+        },
+        {
+          "va": "00565030",
+          "count": 4
+        },
+        {
+          "va": "00535700",
+          "count": 3
+        },
+        {
+          "va": "00568d50",
+          "count": 3
+        },
+        {
+          "va": "0056c620",
+          "count": 3
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "0059d8e0",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?game_setup_resource_file_open_0059d8e0@porsche@@YAPAXPBDI@Z",
+        "?splash_progress_load_resource_0059d8e0@porsche@@YAPAXPBDI@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAPAXPBDI@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "0059d8e0",
+        "name": "FUN_0059d8e0",
+        "signature": "undefined FUN_0059d8e0(void)",
+        "ranges": [
+          [
+            "0059d8e0",
+            "0059d9ad"
+          ]
+        ],
+        "body_bytes": 206,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 28,
+      "top_indexed_callers": [
+        {
+          "va": "004a4a70",
+          "count": 4
+        },
+        {
+          "va": "00443760",
+          "count": 3
+        },
+        {
+          "va": "004dda00",
+          "count": 2
+        },
+        {
+          "va": "<unresolved>",
+          "count": 2
+        },
+        {
+          "va": "0052c430",
+          "count": 2
+        },
+        {
+          "va": "0041e170",
+          "count": 1
+        },
+        {
+          "va": "00422df0",
+          "count": 1
+        },
+        {
+          "va": "00427a60",
+          "count": 1
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "0059dc30",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?game_setup_file_exists_0059dc30@porsche@@YAIPBD@Z",
+        "?splash_progress_file_exists_0059dc30@porsche@@YAHPBD@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAHPBD@Z",
+        "YAIPBD@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "0059dc30",
+        "name": "FUN_0059dc30",
+        "signature": "undefined FUN_0059dc30(void)",
+        "ranges": [
+          [
+            "0059dc30",
+            "0059dcf5"
+          ]
+        ],
+        "body_bytes": 198,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 46,
+      "top_indexed_callers": [
+        {
+          "va": "0041ebf0",
+          "count": 8
+        },
+        {
+          "va": "0041ea50",
+          "count": 4
+        },
+        {
+          "va": "0041f7a0",
+          "count": 4
+        },
+        {
+          "va": "004de5b0",
+          "count": 3
+        },
+        {
+          "va": "004de8a0",
+          "count": 3
+        },
+        {
+          "va": "<unresolved>",
+          "count": 2
+        },
+        {
+          "va": "004a4a70",
+          "count": 2
+        },
+        {
+          "va": "004dd600",
+          "count": 2
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "005a0fbf",
+      "unresolved_symbol_count": 11,
+      "symbols": [
+        "?heap_format_005a0fbf@porsche@@YAXPADPBD1@Z",
+        "?render_format_005a0fbf@porsche@@YAXPADPBDII@Z",
+        "?resource_format_drive_005a0fbf@porsche@@YAXPADPBDH@Z",
+        "?resource_format_path_005a0fbf@porsche@@YAXPADPBD11@Z",
+        "?startup_drive_format_005a0fbf@porsche@@YAXPADPBDH@Z",
+        "?startup_command_format_005a0fbf@porsche@@YAXPADPBD1@Z",
+        "?file_format_005a0fbf@porsche@@YAXPADPBD11@Z",
+        "?render_format_depth_005a0fbf@porsche@@YAXPADH@Z",
+        "?render_loader_format_005a0fbf@porsche@@YAXPADPBDZZ",
+        "?game_setup_string_005a0fbf@porsche@@YAXPADPBD10@Z",
+        "?splash_progress_format_005a0fbf@porsche@@YAXPADPBDZZ"
+      ],
+      "decorated_abi_encodings": [
+        "YAXPADH@Z",
+        "YAXPADPBD10@Z",
+        "YAXPADPBD11@Z",
+        "YAXPADPBD1@Z",
+        "YAXPADPBDH@Z",
+        "YAXPADPBDII@Z",
+        "YAXPADPBDZZ"
+      ],
+      "original_index_entry": {
+        "entry_va": "005a0fbf",
+        "name": "FUN_005a0fbf",
+        "signature": "undefined FUN_005a0fbf(void)",
+        "ranges": [
+          [
+            "005a0fbf",
+            "005a1010"
+          ]
+        ],
+        "body_bytes": 82,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 584,
+      "top_indexed_callers": [
+        {
+          "va": "<unresolved>",
+          "count": 156
+        },
+        {
+          "va": "0041ebf0",
+          "count": 17
+        },
+        {
+          "va": "004b6220",
+          "count": 13
+        },
+        {
+          "va": "004fd4f0",
+          "count": 11
+        },
+        {
+          "va": "004de5b0",
+          "count": 10
+        },
+        {
+          "va": "004fede0",
+          "count": 9
+        },
+        {
+          "va": "0041ea50",
+          "count": 8
+        },
+        {
+          "va": "0041f7a0",
+          "count": 8
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "005a177b",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?render_display_texture_report_005a177b@porsche@@YAXPBDI@Z",
+        "?startup_sequence_report_005a177b@porsche@@YAXII@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAXII@Z",
+        "YAXPBDI@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "005a177b",
+        "name": "FUN_005a177b",
+        "signature": "undefined FUN_005a177b(void)",
+        "ranges": [
+          [
+            "005a177b",
+            "005a17bb"
+          ]
+        ],
+        "body_bytes": 65,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 50,
+      "top_indexed_callers": [
+        {
+          "va": "004acc10",
+          "count": 6
+        },
+        {
+          "va": "004146f0",
+          "count": 4
+        },
+        {
+          "va": "00475c80",
+          "count": 3
+        },
+        {
+          "va": "004af5c0",
+          "count": 3
+        },
+        {
+          "va": "004deda0",
+          "count": 3
+        },
+        {
+          "va": "00467f40",
+          "count": 2
+        },
+        {
+          "va": "00471c40",
+          "count": 2
+        },
+        {
+          "va": "004b68f0",
+          "count": 2
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "005a246e",
+      "unresolved_symbol_count": 3,
+      "symbols": [
+        "?startup_exit_005a246e@porsche@@YAXI@Z",
+        "?render_driver_failure_005a246e@porsche@@YAXI@Z",
+        "?application_instance_exit_005a246e@porsche@@YAXI@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAXI@Z"
+      ],
+      "original_index_entry": {
+        "entry_va": "005a246e",
+        "name": "FUN_005a246e",
+        "signature": "noreturn undefined FUN_005a246e(void)",
+        "ranges": [
+          [
+            "005a246e",
+            "005a247e"
+          ]
+        ],
+        "body_bytes": 17,
+        "thunk": false,
+        "external": false,
+        "source": "DEFAULT"
+      },
+      "original_direct_call_xref_count": 13,
+      "top_indexed_callers": [
+        {
+          "va": "00467470",
+          "count": 1
+        },
+        {
+          "va": "004677e0",
+          "count": 1
+        },
+        {
+          "va": "004a5c30",
+          "count": 1
+        },
+        {
+          "va": "004b6a50",
+          "count": 1
+        },
+        {
+          "va": "004dba70",
+          "count": 1
+        },
+        {
+          "va": "0052f760",
+          "count": 1
+        },
+        {
+          "va": "0053f030",
+          "count": 1
+        },
+        {
+          "va": "00554bd0",
+          "count": 1
+        }
+      ],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "006bd91c",
+      "unresolved_symbol_count": 3,
+      "symbols": [
+        "?render_display_clear_window_006bd91c@porsche@@YGXXZ",
+        "?game_setup_render_reset_006bd91c@porsche@@YGXXZ",
+        "?splash_progress_thrash_clear_window_006bd91c@porsche@@YGXXZ"
+      ],
+      "decorated_abi_encodings": [
+        "YGXXZ"
+      ],
+      "original_index_entry": null,
+      "original_direct_call_xref_count": 0,
+      "top_indexed_callers": [],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "006bd934",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?render_loader_about_006bd934@porsche@@YAPBII@Z",
+        "?render_settings_current_device_006bd934@porsche@@YAPBURenderSettingsDevice@1@XZ"
+      ],
+      "decorated_abi_encodings": [
+        "YAPBII@Z",
+        "YAPBURenderSettingsDevice@1@XZ"
+      ],
+      "original_index_entry": null,
+      "original_direct_call_xref_count": 0,
+      "top_indexed_callers": [],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "006bd948",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?game_setup_render_update_006bd948@porsche@@YGXXZ",
+        "?splash_progress_thrash_pageflip_006bd948@porsche@@YGXXZ"
+      ],
+      "decorated_abi_encodings": [
+        "YGXXZ"
+      ],
+      "original_index_entry": null,
+      "original_direct_call_xref_count": 0,
+      "top_indexed_callers": [],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "006bd970",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?render_display_flush_006bd970@porsche@@YGXXZ",
+        "?game_setup_render_prepare_006bd970@porsche@@YGXXZ"
+      ],
+      "decorated_abi_encodings": [
+        "YGXXZ"
+      ],
+      "original_index_entry": null,
+      "original_direct_call_xref_count": 0,
+      "top_indexed_callers": [],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "006bd978",
+      "unresolved_symbol_count": 3,
+      "symbols": [
+        "?render_display_sync_006bd978@porsche@@YGXI@Z",
+        "?game_setup_render_finish_006bd978@porsche@@YGXI@Z",
+        "?splash_progress_thrash_sync_006bd978@porsche@@YGXI@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YGXI@Z"
+      ],
+      "original_index_entry": null,
+      "original_direct_call_xref_count": 0,
+      "top_indexed_callers": [],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "006bd97c",
+      "unresolved_symbol_count": 3,
+      "symbols": [
+        "?render_display_setstate_006bd97c@porsche@@YGXII@Z",
+        "?render_loader_set_state_006bd97c@porsche@@YAXIII@Z",
+        "?render_settings_set_state_006bd97c@porsche@@YGIII@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YAXIII@Z",
+        "YGIII@Z",
+        "YGXII@Z"
+      ],
+      "original_index_entry": null,
+      "original_direct_call_xref_count": 0,
+      "top_indexed_callers": [],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "006bd984",
+      "unresolved_symbol_count": 2,
+      "symbols": [
+        "?render_display_getstate_006bd984@porsche@@YGII@Z",
+        "?render_settings_get_state_006bd984@porsche@@YGII@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YGII@Z"
+      ],
+      "original_index_entry": null,
+      "original_direct_call_xref_count": 0,
+      "top_indexed_callers": [],
+      "recovery_registry_entries": []
+    },
+    {
+      "va": "006bd9b0",
+      "unresolved_symbol_count": 4,
+      "symbols": [
+        "?render_display_window_006bd9b0@porsche@@YGXI@Z",
+        "?window_shutdown_display_callback_006bd9b0@porsche@@YGXI@Z",
+        "?game_setup_render_begin_006bd9b0@porsche@@YGXI@Z",
+        "?splash_progress_thrash_window_006bd9b0@porsche@@YGXI@Z"
+      ],
+      "decorated_abi_encodings": [
+        "YGXI@Z"
+      ],
+      "original_index_entry": null,
+      "original_direct_call_xref_count": 0,
+      "top_indexed_callers": [],
+      "recovery_registry_entries": []
+    }
+  ],
+  "other_registry_va_matches": [
+    {
+      "va": "00427a60",
+      "symbols": [
+        "?startup_sequence_call_00427a60@porsche@@YAXXZ"
+      ],
+      "registry": [
+        {
+          "module": "Porsche.exe",
+          "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+          "entry_va": "00427a60",
+          "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/engine_service_427a60.cpp",
+          "status": "native-differential-verified",
+          "calling_convention": "cdecl, no arguments, x86 32-bit",
+          "recovered_dependencies": [
+            "005a0fbf",
+            "00531f90"
+          ],
+          "unrecovered_dependencies": [
+            "0048cb50",
+            "0059d8e0",
+            "0059dd00"
+          ],
+          "unrecovered_indirect_dependencies": [],
+          "binary_matched": false,
+          "verification": "scripts/research/verify-v2-engine-service-427a60.py",
+          "verification_report": "iterations/v2/001-original-recovery/runs/098-startup-integration/engine-service/verification.json",
+          "verification_boundary": "Complete linear body, formatted path, five ordered calls, resource pointer flow, and caller-clean stack compared to original x86; file-existence, resource-open, and consumer algorithms remain boundaries.",
+          "dependency_scope": "Indexed direct callees from the function body."
+        }
+      ]
+    },
+    {
+      "va": "004b0d70",
+      "symbols": [
+        "?startup_sequence_call_004b0d70@porsche@@YAXXZ",
+        "?splash_progress_frame_begin_004b0d70@porsche@@YAXXZ"
+      ],
+      "registry": [
+        {
+          "module": "Porsche.exe",
+          "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+          "entry_va": "004b0d70",
+          "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/frame_pump.cpp",
+          "status": "native-differential-verified",
+          "calling_convention": "cdecl, no arguments, x86 32-bit",
+          "recovered_dependencies": [
+            "00534550"
+          ],
+          "unrecovered_dependencies": [
+            "004ab150",
+            "004ab200",
+            "005360a0",
+            "005363a0",
+            "00568f30",
+            "005693e0"
+          ],
+          "recovered_indirect_dependencies": [
+            "006bd91c",
+            "006bd948",
+            "006bd970",
+            "006bd978",
+            "006bd97c",
+            "006bd9b0"
+          ],
+          "unrecovered_indirect_dependencies": [
+            "game_setup_movie_service_0069ed0c vtable slots +0x1c and +0x20"
+          ],
+          "binary_matched": false,
+          "verification": "scripts/research/verify-v2-frame-pump.py",
+          "verification_report": "iterations/v2/001-original-recovery/runs/098-startup-integration/frame-pump/verification.json",
+          "verification_boundary": "Full function body and owned state compared to original x86 in eight cases; unresolved service callees and movie vtable targets remain explicit boundaries.",
+          "dependency_scope": "Indexed direct and indirect callees; unknown callee internals are not claimed."
+        }
+      ]
+    },
+    {
+      "va": "004dc850",
+      "symbols": [
+        "?game_setup_movie_004dc850@porsche@@YAXPAXPAIIII@Z"
+      ],
+      "registry": [
+        {
+          "module": "Porsche.exe",
+          "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+          "entry_va": "004dc850",
+          "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/movie_header.cpp",
+          "status": "partial-native-differential-verified",
+          "calling_convention": "Exact original caller ABI or documented explicit-object adapter; see package report.",
+          "recovered_dependencies": [
+            "00531ca0",
+            "00531f90"
+          ],
+          "unrecovered_dependencies": [
+            "004b0fa0",
+            "004dc180",
+            "004dc610",
+            "00533f80",
+            "005372a0",
+            "0053bfd0",
+            "0055ff60",
+            "00561960",
+            "00565340",
+            "00566910",
+            "00567690",
+            "005678a0",
+            "005693e0",
+            "00569420",
+            "0056afa0",
+            "0056aff0",
+            "0056b230",
+            "0056b3b0",
+            "0056b5b0",
+            "0056b690",
+            "0056c540",
+            "0056c620",
+            "0056c740",
+            "0056c7e0",
+            "0056ca00",
+            "0056ca20",
+            "0056ca50",
+            "0056cce0"
+          ],
+          "binary_matched": false,
+          "verification": "scripts/research/verify-v2-movie-header.py",
+          "verification_report": "iterations/v2/001-original-recovery/runs/098-startup-integration/movie-header/verification.json",
+          "verification_boundary": "Only accepted MAD-family header through renderer004dc180 entry, using explicit MovieHeaderState; not a replacement for original function ABI.",
+          "dependency_scope": "Indexed direct callees plus omitted/indirect edges documented in packet.",
+          "unrecovered_branches": [
+            "stream selection/scanning, playback/audio/input loop and renderer body"
+          ]
+        }
+      ]
+    },
+    {
+      "va": "00532e10",
+      "symbols": [
+        "?input_unrecovered_mode_00532e10@porsche@@YAPAXIIPAUInputSlot@1@@Z",
+        "?input_negative_index_00532e10@porsche@@YAPAXHI@Z",
+        "?input_unmapped_index_00532e10@porsche@@YAPAXII@Z"
+      ],
+      "registry": [
+        {
+          "module": "Porsche.exe",
+          "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+          "entry_va": "00532e10",
+          "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/input_state.cpp",
+          "status": "partial-native-differential-verified",
+          "calling_convention": "cdecl, x86 32-bit",
+          "unrecovered_dependencies": [
+            "00565340"
+          ],
+          "recovered_dependencies": [
+            "0056fce0",
+            "0056fdb0",
+            "0056fff0"
+          ],
+          "binary_matched": false,
+          "verification": "scripts/research/verify-v2-input-state.py",
+          "verification_report": "iterations/v2/001-original-recovery/runs/098-startup-integration/final-refresh/input-state/verification.json",
+          "verification_boundary": "Only mode6 and valid exits accepted; unknown modes and negative/unmapped index boundaries are explicit.",
+          "unrecovered_branches": [
+            "mode1",
+            "mode2",
+            "mode8",
+            "invalid_mode",
+            "negative_index",
+            "unmapped_index"
+          ]
+        }
+      ]
+    },
+    {
+      "va": "00534480",
+      "symbols": [
+        "?render_display_texture_bind_00534480@porsche@@YAXPAX@Z",
+        "?splash_progress_bind_texture_00534480@porsche@@YAHI@Z"
+      ],
+      "registry": [
+        {
+          "module": "Porsche.exe",
+          "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+          "entry_va": "00534480",
+          "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_shutdown.cpp",
+          "status": "partial-native-differential-verified",
+          "calling_convention": "Original x86 typed ABI; see recovered header and package address/stack evidence.",
+          "recovered_dependencies": [
+            "00534430"
+          ],
+          "unrecovered_dependencies": [
+            "00534360",
+            "00535950",
+            "0053c290"
+          ],
+          "binary_matched": false,
+          "verification": "scripts/research/verify-v2-window-shutdown.py",
+          "verification_report": "iterations/v2/001-original-recovery/runs/090-native-window-integration/window-shutdown/verification.json",
+          "verification_boundary": "Only null-descriptor path reached from full wrapper00534550; non-null setup remains unrecovered.",
+          "dependency_scope": "Indexed direct callees; indirect/omitted edges explicitly documented in report.",
+          "unrecovered_branches": [
+            "non-null descriptor setup/allocation in 00534480"
+          ]
+        }
+      ]
+    },
+    {
+      "va": "00557370",
+      "symbols": [
+        "?render_depth_failure_00557370@porsche@@YAXXZ"
+      ],
+      "registry": [
+        {
+          "module": "Porsche.exe",
+          "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+          "entry_va": "00557370",
+          "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_shutdown.cpp",
+          "status": "native-differential-verified",
+          "calling_convention": "Original x86 typed ABI; see recovered header and package address/stack evidence.",
+          "recovered_dependencies": [
+            "005a246e"
+          ],
+          "unrecovered_dependencies": [
+            "005a246e"
+          ],
+          "binary_matched": false,
+          "verification": "scripts/research/verify-v2-window-shutdown.py",
+          "verification_report": "iterations/v2/001-original-recovery/runs/090-native-window-integration/window-shutdown/verification.json",
+          "verification_boundary": "Bounded original-x86 state, branch, argument and ordered-call comparison; dynamic methods and platform/device/terminal services are explicit typed boundaries. See package report for exact scope.",
+          "dependency_scope": "Indexed direct callees; indirect/omitted edges explicitly documented in report."
+        }
+      ]
+    },
+    {
+      "va": "0059d650",
+      "symbols": [
+        "?resource_invalid_module_path_0059d650@porsche@@YAXPBD@Z"
+      ],
+      "registry": [
+        {
+          "module": "Porsche.exe",
+          "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+          "entry_va": "0059d650",
+          "source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/resource_paths.cpp",
+          "status": "native-differential-verified",
+          "calling_convention": "x86 typed C++ adapter; original ECX/stack ABI documented in source",
+          "unrecovered_dependencies": [
+            "00561b80",
+            "005a0fbf",
+            "EXTERNAL:0000000b",
+            "EXTERNAL:0000000c"
+          ],
+          "recovered_dependencies": [],
+          "binary_matched": false,
+          "verification": "scripts/research/verify-v2-resource-paths.py",
+          "verification_report": "iterations/v2/001-original-recovery/runs/098-startup-integration/final-refresh/resource-paths/verification.json",
+          "verification_boundary": "023-resource-paths: recording platform/callee boundaries; see run README; not a game launch.",
+          "dependency_scope": "Indexed direct calls only; indirect/platform boundaries remain as documented in run README."
+        }
+      ]
+    }
+  ],
+  "evidence_sha256": {
+    "iterations/v2/001-original-recovery/runs/102-original-game-link/link-report.json": "bb55482b3ebffdbcbf0de552afc144945785de10678eb0bc8030a7e22b0f14f8",
+    "iterations/v2/001-original-recovery/source/recovered/functions.json": "1bca22d74fe4a006b9974e0cf249d99f836296560c994e22f4672ac9ef9328ea",
+    "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl": "91fbb6d7a04d458620363d31f30df2dc1f9c8db4518a532a4e0ad61272b171e8",
+    "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/calls.jsonl": "2d7a6e930326a97e49309556b81aca01a4eab89b34513ef8f2d6eeddab44027d",
+    "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl": "de53284c58185c6ed26cc0d0ab676f0215a7b59a394abdf084c59b40b9974b55",
+    "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm": "80a788a52be53feaeabb6321ea48990fd92151b86ba7ca87efaec6932e0e4502",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_shutdown.cpp": "34b3066a2ff001c469cb0dda2d3f3ae0a947794dd44af4afa0b5a12a32fefd5c",
+    "iterations/v2/001-original-recovery/source/include/porsche/window_shutdown.hpp": "f7dc9946688c6e1f891621c3133a9b7a848f8fada0335a649dc00e69a7106c3d",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/frame_pump.cpp": "d129177627351bde7f03d8640ec6d31002f40d0b250f2c3b722dfa43aa0852b9",
+    "iterations/v2/001-original-recovery/source/include/porsche/frame_pump.hpp": "0655495b40aea88a45d39b3a4d585c742d5b864190a3e8d64eae6fc01d5993c9",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/engine_service_427a60.cpp": "d35293136cf575f22127090e32c9d3d8d0a4f036c107f8026f269f63c49803eb",
+    "iterations/v2/001-original-recovery/source/include/porsche/engine_service_427a60.hpp": "6066d3125cf38ea3a05a3b8b4c32f0c8b689369aa56226eb4cb879f69613c636",
+    "iterations/v2/001-original-recovery/source/platform/recovered_links.cpp": "5a6dab902228639ac06d59cdfe3e3974266ef3cd65df76d391d007d5ad90db90",
+    "iterations/v2/001-original-recovery/source/recovered/sources.cmake": "93c4f668e6ed4439f23e205329162ed71a66712a966d24123da9a99c1355dbb8",
+    "iterations/v2/001-original-recovery/source/include/porsche/startup_sequence.hpp": "175b7c3059c8a232f918198b8b45f487f6deaf41db99ac745b9f7888a7d21cce",
+    "iterations/v2/001-original-recovery/source/include/porsche/splash_progress.hpp": "332f1aed8be5d6786ee0a731cb4b7c5f261af10e76a095944d523480700a9b56",
+    "iterations/v2/001-original-recovery/runs/101-frame-pump/verification.json": "083eec2759b8ffb49b4fec981f83e6e44d1cc5e1810ba57dc2200fc344d3a3ac",
+    "iterations/v2/001-original-recovery/runs/103-engine-service/verification.json": "0702889918c3289eff89809fffbdeba8fd26deb947221bc83f47b944b17f8b14",
+    "iterations/v2/001-original-recovery/runs/098-startup-integration/original-game-link/link-report.json": "17aa08ca0fa3f17622f91533f53c650c876a2e6f304514f28ac750b7967e47f8",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/resource_paths.cpp": "d98786e4178cc3fbd61b059a3b91ec86e946aeca5a07d9fbb31775a1398008b8",
+    "iterations/v2/001-original-recovery/source/include/porsche/resource_paths.hpp": "b633fa56ba1d9134a0c7c2ab97c675800b57c6ea8f5caf44f9b702dc51bbda18",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/input_state.cpp": "c6f2a5b3397bca1c10bc3f4e1da6adef3eb90e642b9d0d3174e8d4aa28b6b471",
+    "iterations/v2/001-original-recovery/source/include/porsche/input_state.hpp": "6716815012fe2bc907bcb4d568e7d47be22ca5da844c5a256b8736b86e190b68",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/movie_header.cpp": "edf012a511d99a4a54610359851da432455dd5c456de10687cf144ce29dbbee3",
+    "iterations/v2/001-original-recovery/source/include/porsche/movie_header.hpp": "708a158c80703669fed60755fca5111c7916aa99129e4c73180e4b69cf6b6a85",
+    "iterations/v2/001-original-recovery/runs/090-native-window-integration/window-shutdown/verification.json": "a4ada712271e4acc1e677d4be32d86e348431ac198a6cea0001deadd2a76cdc8",
+    "iterations/v2/001-original-recovery/runs/104-link-alias-audit/audit.py": "9729723787644fe4122a2f96636c47d0665a6d8539a9713db7760938b9b1c24d",
+    "iterations/v2/001-original-recovery/runs/104-link-alias-audit/README.md": "1b96735d1bfd8a00978482e646567462a479a1afada3c813a1a2724ff384e07c"
+  },
+  "conclusion": "Three bridge groups cover four baseline symbols with matching recovered bodies. Three symbols in the 00427a60/004b0d70 groups are resolved in the current Run098 link; the 00557370 alias remains unresolved and its terminal exit callee is still open. Other registry collisions are partial or internal-branch placeholders. Several repeated VAs represent one original code entry or indirect data slot but lack a recovered native implementation; they are ABI-normalization/recovery work, not safe aliases. The game remains unlinked and unverified."
+}

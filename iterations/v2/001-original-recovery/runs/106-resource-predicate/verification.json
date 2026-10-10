@@ -1,0 +1,210 @@
+{
+  "schema": 1,
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "function_vas": [
+    "0059dd00"
+  ],
+  "full_function_vas": [
+    "0059dd00"
+  ],
+  "partial_function_vas": [],
+  "cases": 7,
+  "native_cpp_equal_original_x86": true,
+  "original_function": {
+    "va": "0059dd00",
+    "body_bytes": 198,
+    "body_sha256": "5902f21c11724db53d9c9d79ea67a83509ebf6894a107c35f67f654fcc226ed8",
+    "abi": "one pointer argument; cdecl caller-clean; RET leaves the argument for caller cleanup",
+    "caller_va": "00427a84",
+    "callee_vas": [
+      "00561ba0",
+      "005a0fbf",
+      "00561b80"
+    ],
+    "disabled_root_leaf": "00561ba0",
+    "rooted_path_probe": "00561b80"
+  },
+  "reference_comparison": {
+    "va": "0059dc30",
+    "body_bytes": 198,
+    "body_sha256": "b46b53fcde428828d9f64df6e542ff001702e20e9c81d6c93bd42c5f7c6ebd05",
+    "byte_bodies_equal": false,
+    "rooted_miss_cases_equal": true,
+    "rooted_hit_cases_equal": false,
+    "disabled_root_cases_equal": false,
+    "distinction": "0059dd00 calls 00561ba0 when roots are disabled and after a rooted candidate hit; 0059dc30 calls 00561b80 at those return points. Rooted misses share the fallback/diagnostic trace."
+  },
+  "semantics": {
+    "copy_bytes": "input string including terminating NUL into a 260-byte local",
+    "rooted_format": "005a0fbf(out, \"%s%s\", root, original_input)",
+    "primary_and_fallback": "Each candidate is gated by 00561b80; a nonzero result calls 00561ba0(candidate) and returns that raw EAX.",
+    "fallback_enabled": "file_fallback_006af26c[0] != 0",
+    "missing_callback": "if non-null, callback(original_input, -2); then return 0",
+    "return": "unrooted service or successful rooted candidate service raw EAX; missing paths return 0"
+  },
+  "boundaries": {
+    "00561ba0": "unrecovered device/resource service; exact path and raw result are recorded, no filesystem/device behavior claimed",
+    "00561b80": "existing typed canonical file predicate boundary; exact candidate path, gate result and call order are recorded",
+    "005a0fbf": "existing typed formatter boundary; fixture implements the observed fixed \"%s%s\" use only",
+    "missing_file_006afbe4": "nullable original callback retained and compared when present"
+  },
+  "cases_summary": [
+    {
+      "case": 0,
+      "roots_enabled": false,
+      "input": "cars\\pic16.fsh",
+      "native_original_equal": true,
+      "return": -7,
+      "events": 1,
+      "caller_argument_bytes": 4,
+      "callee_saved_equal": true
+    },
+    {
+      "case": 1,
+      "roots_enabled": false,
+      "input": "cars\\pic16.fsh",
+      "native_original_equal": true,
+      "return": 4660,
+      "events": 1,
+      "caller_argument_bytes": 4,
+      "callee_saved_equal": true
+    },
+    {
+      "case": 2,
+      "roots_enabled": true,
+      "input": "cars\\pic16.fsh",
+      "native_original_equal": true,
+      "return": -9,
+      "events": 3,
+      "caller_argument_bytes": 4,
+      "callee_saved_equal": true
+    },
+    {
+      "case": 3,
+      "roots_enabled": true,
+      "input": "ui\\fonts.fsh",
+      "native_original_equal": true,
+      "return": 0,
+      "events": 3,
+      "caller_argument_bytes": 4,
+      "callee_saved_equal": true
+    },
+    {
+      "case": 4,
+      "roots_enabled": true,
+      "input": "ui\\fonts.fsh",
+      "native_original_equal": true,
+      "return": 837,
+      "events": 5,
+      "caller_argument_bytes": 4,
+      "callee_saved_equal": true
+    },
+    {
+      "case": 5,
+      "roots_enabled": true,
+      "input": "missing.fsh",
+      "native_original_equal": true,
+      "return": 0,
+      "events": 5,
+      "caller_argument_bytes": 4,
+      "callee_saved_equal": true
+    },
+    {
+      "case": 6,
+      "roots_enabled": true,
+      "input": "zero-after-hit.fsh",
+      "native_original_equal": true,
+      "return": 0,
+      "events": 3,
+      "caller_argument_bytes": 4,
+      "callee_saved_equal": true
+    }
+  ],
+  "reference_cases": [
+    {
+      "case": 0,
+      "roots_enabled": false,
+      "candidate_hit": false,
+      "same_result_and_trace_as_0059dc30": false,
+      "target_unrooted_call": true,
+      "reference_unrooted_call": false
+    },
+    {
+      "case": 1,
+      "roots_enabled": false,
+      "candidate_hit": false,
+      "same_result_and_trace_as_0059dc30": false,
+      "target_unrooted_call": true,
+      "reference_unrooted_call": false
+    },
+    {
+      "case": 2,
+      "roots_enabled": true,
+      "candidate_hit": true,
+      "same_result_and_trace_as_0059dc30": false,
+      "target_unrooted_call": true,
+      "reference_unrooted_call": false
+    },
+    {
+      "case": 3,
+      "roots_enabled": true,
+      "candidate_hit": false,
+      "same_result_and_trace_as_0059dc30": true,
+      "target_unrooted_call": false,
+      "reference_unrooted_call": false
+    },
+    {
+      "case": 4,
+      "roots_enabled": true,
+      "candidate_hit": true,
+      "same_result_and_trace_as_0059dc30": false,
+      "target_unrooted_call": true,
+      "reference_unrooted_call": false
+    },
+    {
+      "case": 5,
+      "roots_enabled": true,
+      "candidate_hit": false,
+      "same_result_and_trace_as_0059dc30": true,
+      "target_unrooted_call": false,
+      "reference_unrooted_call": false
+    },
+    {
+      "case": 6,
+      "roots_enabled": true,
+      "candidate_hit": true,
+      "same_result_and_trace_as_0059dc30": false,
+      "target_unrooted_call": true,
+      "reference_unrooted_call": false
+    }
+  ],
+  "compiled_translation_units": [
+    "iterations/v2/001-original-recovery/source/recovered/resource_predicate_probe.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/resource_predicate.cpp"
+  ],
+  "source_sha256": {
+    "iterations/v2/001-original-recovery/runs/106-resource-predicate/CMakeLists.txt": "7cdf894ea7aabea6ab034e658bd615a0e8a7d5bbc92ac78b3e56f68f33a1c23f",
+    "iterations/v2/001-original-recovery/runs/106-resource-predicate/README.md": "7e718e52621382a66d0cf2449b12d682d8c5e5f6543f05bca70e00edbd5138f3",
+    "iterations/v2/001-original-recovery/source/include/porsche/fe_stream.hpp": "7bd12248e541e83f326edeb4b166a5f50e9fb809880d2978372fa8d34353dc45",
+    "iterations/v2/001-original-recovery/source/include/porsche/files.hpp": "23b8bac1d7c316d0f1950073f3ba01b8e0dd5d9c6d3abdd81053c609cd6dba24",
+    "iterations/v2/001-original-recovery/source/include/porsche/heap.hpp": "ab65110e0e6326deca139b06960dc5dce50d86da9f70779b29aea298d0eabddf",
+    "iterations/v2/001-original-recovery/source/include/porsche/resource_predicate.hpp": "c87aee8cb230023394e0e193d86c3bc673402491a64a28c944d1f0ae4e2afd20",
+    "iterations/v2/001-original-recovery/source/include/porsche/shared_runtime_globals.hpp": "326c5379138e3ae6af1e87c0b72d039f27c1229548defdd2ff654a6faaeaaf1f",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/resource_predicate.cpp": "04a21b1728de8092b496c3c17f60047e12fc2e39d72b60c83d90daa94908f8b5",
+    "iterations/v2/001-original-recovery/source/recovered/resource_predicate_probe.cpp": "ea3f959763e396518f828765786bf8fd99e863e9d9eee515428c2fd4d4b7d29a",
+    "scripts/research/v2_source_dependencies.py": "e3cf38029dc348859dac4a1769feb33d65832cc269e6dd1080020780451434e7",
+    "scripts/research/verify-v2-resource-predicate.py": "9ff9749b23a9531e0f72d7520f11806104d7604660404a0df9ffbbaee308434e"
+  },
+  "original_evidence": {
+    "disassembly_path": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+    "disassembly_sha256": "80a788a52be53feaeabb6321ea48990fd92151b86ba7ca87efaec6932e0e4502",
+    "function_catalog_path": "iterations/v2/001-original-recovery/source/catalog/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+    "function_catalog_sha256": "b362de68e626be665bdf314064693f50a37bc41b6be30095962490a0cccd88b3",
+    "call_index_path": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/calls.jsonl",
+    "call_index_sha256": "2d7a6e930326a97e49309556b81aca01a4eab89b34513ef8f2d6eeddab44027d"
+  },
+  "probe_sha256": "25988c8aea84ed1902e38b29ff726813d50484c871f172d960047688f8d0e2c4",
+  "game_launch_verified": false
+}

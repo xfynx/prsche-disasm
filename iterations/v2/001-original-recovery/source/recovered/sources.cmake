@@ -79,4 +79,6 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/startup_service_516950.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/frame_pump.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/engine_service_427a60.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/frame_services.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/resource_predicate.cpp"
 )

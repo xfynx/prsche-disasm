@@ -3,31 +3,20 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Текущий принятый пакет — Run098:221 full +6 partial; предыдущий запушенный89f242b /Run090.
-Общая MSVC Win32 сборка:94 reachable MSBuild projects,173 TUs,80 comparison/alias probes+4 native+3 link fixtures.
-28 свежих reports /4934 bounded original-x86 comparisons; все4 native OS fixtures повторно прошли.
-Включены093–103: startup, splash, input snapshot, frame pump, engine/release/noop services;
-094 остаётся partial MAD header и не подменяет полный playback004dc850.
-Свежая реальная game-link попытка:0 compile errors,256 unresolved symbols/276 references;
-Run102 хранит предыдущие251/263. Рост вызван раскрытием новых callees, EXE пока нет.
-Подтверждено: THRASH exports stdcall по decorated loader names; декларации исправлены.
-BSS roots65b32c/334/360 и movie service69ed0c используют единых владельцев; path producers открыты.
-Compile proof098 использует reachable ALL_BUILD ProjectReference graph (173TUs).
-Исторический090 rglob захватил standalone094 и дал156 вместо154 тогдашних общихTUs;090 не переписан.
-084 verifier добавлен в manifest/self-pins; его current proof повторён.
-Активные исполнители: render_mode_completion —104 проверка ABI aliases по game-link frontier;
-heap_init_recovery —105 frame services004ab150/200; window_worker_recovery —106 resource predicate0059dd00.
-104–106 вне принятого098; coordinator ведёт commit/push и следующие подтверждённые adapters.
-Проверки: scripts/build-v2.ps1; final-refresh в098; четыре native OS fixtures;
-inventory-v2.py --require-listing --require-decompile-attempts; structure-v2.py;
-inventory-v2.py --require-listing --require-decompile-attempts --write-verification.
-Точные команды/доказательства в runs098/README.md и acceptance.json.
-Неизвестные engine/FSH/movie/vtable consumers остаются явными внешними границами.
-Run086/098 окно640×480→original cleanup0x466→destroy→join не является запуском игры.
-Следующий шаг — интегрировать только доказанные ABI adapters104, затем недостающие callees105/106 и повторить game-link.
+Текущий принятый пакет — Run107:224 full +6 partial; предыдущий запушенныйfead56b /Run098.
+MSVC Win32 ALL_BUILD:96 projects/177TUs,82 probes+4 native+3 link fixtures.
+7 свежих reports/4139 bounded original-x86 comparisons; native4 повторно прошли.
+105/106 linked;104 доказанный exit adapter linked, terminal5a246e остаётся внешним.
+Run110 static evidence/index добавил207B clockworker565270;33 supplementary/catalog36620.
+Настоящий game-link:0 compile errors,260 unresolved symbols/282 references, EXE нет.
+После sandbox parallel4 failure общий script повторён вне sandbox с parallel4 успешно.
+Активные исполнители: heap_init_recovery —112 clockworker; window_worker_recovery —113 FS dispatcher/callback;
+render_mode_completion —114 formatter core.108/109 ready, ожидают checkpoint111.
+Координатор — commit/push107, затем integration108/109 и подтверждённые ABI aliases.
+Точные проверки/команды/limitations: runs107/README.md, acceptance.json, compile-link-proof.json.
+[Отложенные проверки](../../../docs/recovery-validation-backlog.md): WM_CLOSE route остаётся открытым,
+clock producer обнаружен110, но112 ещё не интегрирован. Ни один pending acceptance пункт не снят.
 История ниже не является активным назначением. Итерация и игровой запуск не завершены.
-Отложенные проверки с условиями возврата: [validation backlog](../../../docs/recovery-validation-backlog.md).
-
 
 ## Цель и готовность 001
 

@@ -17,10 +17,12 @@
 #include "porsche/game_setup.hpp"
 #include "porsche/engine_service_427a60.hpp"
 #include "porsche/frame_pump.hpp"
+#include "porsche/frame_services.hpp"
 #include "porsche/startup_sequence.hpp"
 #include "porsche/splash_progress.hpp"
 #include "porsche/startup_service_56a490.hpp"
 #include "porsche/startup_service_516950.hpp"
+#include "porsche/resource_predicate.hpp"
 #include "porsche/window_shutdown.hpp"
 #include "porsche/heap.hpp"
 #include <cstring>
@@ -122,5 +124,17 @@ void __cdecl application_main_function_005366e0(std::uint32_t argument) {
 }
 std::uint32_t __cdecl file_pump_005366e0(std::uint32_t argument) {
     return timed_callbacks_005366e0(argument);
+}
+std::uint32_t __cdecl frame_pump_boundary_004ab150() {
+    return frame_services_004ab150();
+}
+std::uint32_t __cdecl frame_pump_boundary_004ab200() {
+    return frame_services_004ab200();
+}
+std::int32_t __cdecl engine_service_file_exists_0059dd00(const char* path) {
+    return resource_predicate_0059dd00(path);
+}
+void __cdecl render_depth_failure_00557370() {
+    window_shutdown_process_exit_00557370();
 }
 }
