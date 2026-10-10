@@ -1,14 +1,14 @@
 # План восстановления Porsche Unleashed
 
-Текущий результат — [Run111](iterations/v2/001-original-recovery/runs/111-runtime-integration/README.md): **229 проверенных C++ функций** и 6 частичных consumer.
-Общая MSVC Win32 сборка:100 projects/186 TUs;86 comparison/alias probes+4 nativeOS+3 linkfixtures.
-10 свежих reports/4153 bounded x86 сравнений; все7 native/link проверок прошли автоматически с dependency hashes.
-Связаны11 formatter aliases, filesystem dispatcher/callback и clockworker; его thread producer ещё открыт.
-Реальная game-link попытка:0 compile errors,250 unresolved symbols/271 references; игрового EXE пока нет.
-Следующий117 — готовые115 exit/116 install.txt loader и shared60pointer path table;118 timer/119 exactformatter в работе.
-[Validation backlog](docs/recovery-validation-backlog.md) проверяется при каждом checkpoint, перед архитектурной схемой и Rust.
-Будущий маршрут: проверенный C/C++ baseline→схема устройства игры по исходникам→Rust native/web.
-Каталог36620/33 supplementary; полный игровой запуск и визуальная приёмка открыты.
+Текущий результат — [Run117](iterations/v2/001-original-recovery/runs/117-install-integration/README.md): **233 проверенные C++ функции** и 6 частичных consumer.
+Общая MSVC Win32 сборка: 103 projects / 194 TUs; 89 comparison/alias probes, 4 native OS и 3 link fixtures.
+27 свежих original-x86 отчётов / 4864 сравнений и 7 composed integration cases; все 7 native/link проверок прошли.
+Подключены original install.txt loader, единая таблица 60 указателей с пятью views, три terminal exit aliases и три BSS DWORD владельца.
+Game-link: 0 compile errors / 248 unresolved symbols / 267 references; игрового EXE пока нет.
+Следующий121 — готовые118 timer,119 formatter helpers и122 auxiliary signal; требуется интеграция и приёмка.
+[Validation backlog](docs/recovery-validation-backlog.md) проверяется на каждом checkpoint, перед архитектурной схемой и Rust.
+Маршрут: проверенный C/C++ baseline → схема устройства игры по исходникам → Rust native/web.
+Полный игровой запуск, live timer/WM_CLOSE и визуальная приёмка остаются открытыми.
 
 
 ## Схема устройства игры после восстановления кода

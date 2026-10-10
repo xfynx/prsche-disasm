@@ -1,5 +1,7 @@
 #include "porsche/application_alloc.hpp"
 #include "porsche/application_instance.hpp"
+#include "porsche/process_exit.hpp"
+#include "porsche/install_paths.hpp"
 #include "porsche/application_main.hpp"
 #include "porsche/render_activate.hpp"
 #include "porsche/render_display.hpp"

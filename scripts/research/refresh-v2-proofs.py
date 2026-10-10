@@ -65,6 +65,12 @@ def main():
                    str(output.parent if flag == '--report-dir' else output)]
         executables = re.findall(r'/bin/Release/([A-Za-z0-9_]+\.exe)', source)
         if '--probe' in flags:
+            if not executables:
+                # Required --probe options may have no embedded default path.
+                # Use the pinned probe TU only when its common EXE exists.
+                candidates = {Path(p).stem + '.exe' for p in report['source_sha256']
+                              if p.endswith('_probe.cpp')}
+                executables = sorted(p for p in candidates if (BIN / p).is_file())
             if len(set(executables)) != 1:
                 unsupported.append({'report': relative, 'verifier': script, 'ambiguous_probes': executables})
                 continue

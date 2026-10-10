@@ -11,7 +11,7 @@ extern std::uint8_t splash_progress_enabled_00655a28;
 extern std::uint32_t splash_progress_format_005dead0;
 // Shared loader roots read by multiple original consumers. Ownership stays at
 // the shared runtime layer; this unit only consumes the canonical references.
-extern const char* splash_progress_alternate_base_0065b350;
+extern const char*& splash_progress_alternate_base_0065b350;
 
 void __cdecl splash_progress_004a4a70(std::int32_t phase);
 

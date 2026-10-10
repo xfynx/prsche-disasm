@@ -16,10 +16,6 @@ std::uint8_t splash_progress_enabled_00655a28=0;
 // 005dead0 is a raw-backed .data DWORD in the indexed Porsche.exe. Its
 // original value is zero (inspect-pe-range.py, VA 005dead0, size 4).
 std::uint32_t splash_progress_format_005dead0=0;
-// 0065b350 is a pointer cell in the virtual BSS tail; its initial DWORD is zero. The
-// alternate-root producer is outside this consumer; preserve nullptr here.
-const char* splash_progress_alternate_base_0065b350=nullptr;
-
 namespace {
 std::uint32_t arena_word(std::uint32_t va) {
     return application_state_006573e8.word(va);

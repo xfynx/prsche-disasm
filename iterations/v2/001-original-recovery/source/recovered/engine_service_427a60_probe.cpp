@@ -7,7 +7,8 @@
 #include <vector>
 
 namespace porsche {
-const char* engine_service_root_0065b360 = nullptr;
+namespace { const char* fixture_install_paths[60]{}; }
+const char*& engine_service_root_0065b360 = fixture_install_paths[48];
 }
 
 struct Event {

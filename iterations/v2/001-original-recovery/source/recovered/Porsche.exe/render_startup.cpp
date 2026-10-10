@@ -4,7 +4,6 @@
 namespace porsche {
 RenderCore* render_core_0065b39c;
 RenderDisplay* render_display_00628130;
-const char* render_display_name_0065b304;
 
 static std::uint32_t field(const RenderDisplay* display,std::size_t offset) {
     std::uint32_t result;

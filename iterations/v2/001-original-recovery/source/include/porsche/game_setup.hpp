@@ -9,8 +9,8 @@ namespace porsche {
 
 // Porsche.exe SHA-256 ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39.
 // BSS pointer cells are owned by the shared runtime integration, not this unit.
-extern const char* game_setup_earts_base_0065b32c;
-extern const char* game_setup_load_base_0065b334;
+extern const char*& game_setup_earts_base_0065b32c;
+extern const char*& game_setup_load_base_0065b334;
 extern void* game_setup_movie_service_0069ed0c;
 
 // 004dd600 has no arguments and is the optional startup movie/banner pass.

@@ -35,8 +35,9 @@ void record(std::uint32_t id, std::initializer_list<std::uint32_t> args = {}) {
 }
 
 namespace porsche {
-const char* game_setup_earts_base_0065b32c = "boot/";
-const char* game_setup_load_base_0065b334 = "ui/";
+namespace { const char* fixture_install_paths[60]{}; }
+const char*& game_setup_earts_base_0065b32c = fixture_install_paths[35];
+const char*& game_setup_load_base_0065b334 = fixture_install_paths[37];
 void* game_setup_movie_service_0069ed0c = movie_service;
 RenderDisplay* render_display_00628130 =
     reinterpret_cast<RenderDisplay*>(display_bytes);
@@ -119,6 +120,8 @@ void __cdecl game_setup_movie_004dc850(void* stream, std::uint32_t* stop,
 }
 
 int main() {
+    porsche::game_setup_earts_base_0065b32c = "boot/";
+    porsche::game_setup_load_base_0065b334 = "ui/";
     while (std::cin >> current.earts_exists >> current.load_exists
                     >> current.begin >> current.end >> current.movie_stop) {
         events.clear();

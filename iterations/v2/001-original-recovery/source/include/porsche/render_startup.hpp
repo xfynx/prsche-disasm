@@ -17,7 +17,7 @@ extern char* render_selector_00657a38;
 extern std::uint32_t& render_width_00657a48;
 extern std::uint32_t& render_height_00657a4c;
 extern std::uint32_t& render_selected_00657a58;
-extern const char* render_display_name_0065b304;
+extern const char*& render_display_name_0065b304;
 
 // Typed unresolved boundaries. Constructors are thiscall in original asm;
 // the explicit object parameter exposes ECX for the recovered unit fixture.

@@ -74,7 +74,9 @@ std::string normalize_path(const char* path) { return path?std::string(path):"<n
 
 namespace porsche {
 void* startup_network_00628c70=nullptr;
-const char* game_setup_load_base_0065b334=nullptr;
+namespace { const char* fixture_install_paths[60]{}; }
+const char*& game_setup_load_base_0065b334=fixture_install_paths[37];
+const char*& splash_progress_alternate_base_0065b350=fixture_install_paths[44];
 std::uint32_t render_display_texture_width_005deac8=640;
 std::uint32_t render_display_texture_height_005deacc=480;
 

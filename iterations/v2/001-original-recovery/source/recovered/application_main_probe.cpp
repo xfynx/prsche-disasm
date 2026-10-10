@@ -20,7 +20,8 @@ std::uint32_t fe_enabled_0065b298;
 std::uint32_t render_display_mode_index_00619780;
 RenderCore* render_core_0065b39c=nullptr;
 RenderDisplay* render_display_00628130=nullptr;
-const char* render_display_name_0065b304=nullptr;
+namespace { const char* fixture_install_paths[60]{}; }
+const char*& render_display_name_0065b304=fixture_install_paths[25];
 void* startup_network_00628c70=nullptr;
 
 static std::vector<std::string> events;

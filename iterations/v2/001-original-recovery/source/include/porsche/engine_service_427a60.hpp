@@ -6,7 +6,7 @@ namespace porsche {
 
 // The original consumer reads this pointer cell at 0065b360. Its production
 // storage owner has not yet been identified in the recovered source tree.
-extern const char* engine_service_root_0065b360;
+extern const char*& engine_service_root_0065b360;
 
 // Complete linear caller at 00427a60. External file/resource/UI algorithms
 // remain their existing typed boundaries.

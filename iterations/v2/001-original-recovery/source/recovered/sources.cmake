@@ -86,4 +86,9 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/resource_dispatch.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/clock_worker.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/resource_dispatch_globals.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/process_exit.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/install_paths.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/install_paths_storage.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_main_globals.cpp"
+    "${PORSCHE_SOURCE_ROOT}/platform/startup_install_exit_links.cpp"
 )

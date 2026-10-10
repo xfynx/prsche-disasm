@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--require-decompile-attempts', action='store_true')
     parser.add_argument('--write-verification', action='store_true')
     parser.add_argument('--verification-output', type=Path,
-                        default=ITERATION/'runs/111-runtime-integration/corpus-verification.json',
+                        default=ITERATION/'runs/117-install-integration/corpus-verification.json',
                         help='Current checkpoint report; historical run hashes are preserved')
     args = parser.parse_args()
     verification_output = args.verification_output if args.verification_output.is_absolute() else ROOT / args.verification_output
@@ -192,6 +192,7 @@ def main():
             if addresses != expected or len(rows) != len(expected):
                 raise RuntimeError(f'Stale/duplicate source catalog addresses: {module["catalog"]}')
         hashes = {}
+        original_resources = {}
         paths = list((ROOT/'research/v2/binaries').rglob('*')) + [target]
         paths += [ROOT/p for p in ('scripts/research/export-v2.ps1',
                   'scripts/research/inventory-v2.py','scripts/research/ghidra/ExportRecoveryCorpus.java',
@@ -214,7 +215,7 @@ def main():
         paths += [ROOT/'scripts/research/index-v2-threads.py', ROOT/'scripts/research/verify-v2-file-threads.py']
         paths += [path for path in (ITERATION/'runs/010-file-threads').rglob('*') if path.resolve() != verification_output.resolve()]
         paths += [ROOT/'scripts/research/verify-v2-file-disk.py', ROOT/'scripts/research/verify-v2-fe-callbacks.py']
-        for run_name in ('011-file-disk','012-fe-callbacks','013-input-state','014-heap-locks','015-joint-disk','017-input-modes','018-lock-bootstrap','016-disk-open','019-input-buffer','020-thread-bootstrap','022-startup-services','023-resource-paths','024-render-startup','025-application-heap','026-render-objects','027-window-runtime','030-startup-integration','028-render-loader','029-window-create','031-application-alloc','033-application-heap-init','034-window-procedure','036-native-window','032-render-display','035-window-worker','037-application-pool','038-window-handlers','039-window-state','040-application-bootstrap','041-startup-chain','042-render-registry','043-startup-subsystems','044-window-thread-start','045-window-messages','046-startup-input','047-application-fe','048-window-position','049-render-activate','050-application-instance','051-render-window','052-exit-registry','053-crt-shutdown','054-thread-shutdown','055-native-platform','056-render-driver-calls','057-native-thread-chain','059-window-keys','060-render-event-route','061-startup-platform-integration','058-application-main','063-render-mode','064-window-callback-bindings','065-window-callback-integration','067-main-callback-integration','066-render-settings','068-application-state','069-window-event-queue','070-native-window-bindings','071-render-state-init','072-window-links','073-render-state-integration','074-application-arena','075-recovered-links','076-global-alias-audit','077-native-window-chain','078-shared-runtime-integration','079-window-channels','080-shared-diagnostic-storage','081-bss-fallback-audit','082-window-scheduler','083-window-shutdown','084-window-support','085-window-exit-cleanup','086-native-window-lifecycle','087-window-notifications','088-object-cleanup','089-mouse-input','090-native-window-integration','091-window-event-translation','092-object-update','093-game-setup','094-movie-header','095-splash-progress','096-input-snapshot','097-startup-sequence','098-startup-integration','099-startup-service','100-startup-service','101-frame-pump','102-original-game-link','103-engine-service','104-link-alias-audit','105-frame-services','106-resource-predicate','107-frame-integration','110-clock-worker-index','108-formatter-entry','109-resource-leaf','111-runtime-integration','112-clock-worker','113-resource-dispatch'):
+        for run_name in ('011-file-disk','012-fe-callbacks','013-input-state','014-heap-locks','015-joint-disk','017-input-modes','018-lock-bootstrap','016-disk-open','019-input-buffer','020-thread-bootstrap','022-startup-services','023-resource-paths','024-render-startup','025-application-heap','026-render-objects','027-window-runtime','030-startup-integration','028-render-loader','029-window-create','031-application-alloc','033-application-heap-init','034-window-procedure','036-native-window','032-render-display','035-window-worker','037-application-pool','038-window-handlers','039-window-state','040-application-bootstrap','041-startup-chain','042-render-registry','043-startup-subsystems','044-window-thread-start','045-window-messages','046-startup-input','047-application-fe','048-window-position','049-render-activate','050-application-instance','051-render-window','052-exit-registry','053-crt-shutdown','054-thread-shutdown','055-native-platform','056-render-driver-calls','057-native-thread-chain','059-window-keys','060-render-event-route','061-startup-platform-integration','058-application-main','063-render-mode','064-window-callback-bindings','065-window-callback-integration','067-main-callback-integration','066-render-settings','068-application-state','069-window-event-queue','070-native-window-bindings','071-render-state-init','072-window-links','073-render-state-integration','074-application-arena','075-recovered-links','076-global-alias-audit','077-native-window-chain','078-shared-runtime-integration','079-window-channels','080-shared-diagnostic-storage','081-bss-fallback-audit','082-window-scheduler','083-window-shutdown','084-window-support','085-window-exit-cleanup','086-native-window-lifecycle','087-window-notifications','088-object-cleanup','089-mouse-input','090-native-window-integration','091-window-event-translation','092-object-update','093-game-setup','094-movie-header','095-splash-progress','096-input-snapshot','097-startup-sequence','098-startup-integration','099-startup-service','100-startup-service','101-frame-pump','102-original-game-link','103-engine-service','104-link-alias-audit','105-frame-services','106-resource-predicate','107-frame-integration','110-clock-worker-index','108-formatter-entry','109-resource-leaf','111-runtime-integration','112-clock-worker','113-resource-dispatch','115-process-exit','116-install-paths','117-install-integration','120-application-main-storage'):
             paths += [path for path in (ITERATION/'runs'/run_name).rglob('*') if path.resolve() != verification_output.resolve()]
         paths += [ROOT/'scripts/research/verify-v2-input-state.py', ROOT/'scripts/research/verify-v2-heap-locks.py', ROOT/'scripts/research/verify-v2-joint-disk.py', ROOT/'scripts/research/verify-v2-original-game-link.py']
         paths += [ROOT/'scripts/research/verify-v2-disk-open.py', ROOT/'scripts/research/verify-v2-input-buffer.py', ROOT/'scripts/research/verify-v2-thread-bootstrap.py']
@@ -227,7 +228,7 @@ def main():
         source_reports.add('iterations/v2/001-original-recovery/runs/067-main-callback-integration/window-callback-bindings/verification.json')
         source_reports.update(f['integration_verification_report'] for f in recovered['functions'] if f.get('integration_verification_report'))
         # Fresh layout, storage and platform proofs also pin modern infrastructure.
-        for path in (ITERATION/'runs/111-runtime-integration').rglob('*.json'):
+        for path in (ITERATION/'runs/117-install-integration').rglob('*.json'):
             document = load(path)
             if isinstance(document, dict) and 'source_sha256' in document:
                 source_reports.add(path.relative_to(ROOT).as_posix())
@@ -235,7 +236,7 @@ def main():
             paths += [ROOT/p for p in load(ROOT/report_path)['source_sha256']]
         # Native OS fixtures have dependency pins, separately from differential proofs.
         for name in ('native-core','native-thread','native-window','native-window-lifecycle'):
-            native = load(ITERATION/'runs/111-runtime-integration'/(name+'-result.json'))
+            native = load(ITERATION/'runs/117-install-integration'/(name+'-result.json'))
             if not native:
                 raise RuntimeError(f'Missing Run098 native fixture report: {name}-result.json')
             for relative, expected in native['source_sha256'].items():
@@ -258,13 +259,19 @@ def main():
                 continue
             if path.is_file():
                 data = path.read_bytes()
+                if path.is_relative_to(original):
+                    # Immutable game inputs are pinned separately, never staged
+                    # as recovered sources or redistributed with the corpus.
+                    original_resources[path.relative_to(ROOT).as_posix()] = {
+                        'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+                    continue
                 source_script = path.relative_to(ROOT).as_posix().startswith('scripts/')
                 if source_script:
                     data = data.replace(b'\r\n', b'\n')
                 hashes[path.relative_to(ROOT).as_posix()] = {
                     'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),
                     'hash_text_normalization':'CRLF to LF' if source_script else 'none; corpus stored as LF'}
-        verification = {'schema':1,'date':'2026-10-10','counts':counts,
+        verification = {'schema':1,'date':'2026-10-11','counts':counts,
             'original_input_hashes_verified':True,'all_listing_files_present':True,
             'all_function_status_counts_verified':True,'ghidra':'12.1.3',
             'pe_export':'cached analyzed project, noanalysis/readOnly',
@@ -272,6 +279,7 @@ def main():
             'exporter_compilation_check':'drvmgt.dll full listing succeeded after SHA/resume guards',
             'new_v2_game_executable':False,'recovered_compilable_source':counts['recovered_functions'] > 0,
             'original_native_behavior_acceptance':False,'files':hashes,
+            'original_resource_inputs':original_resources,
             'limitations':['Automatic pseudo-C is not recovered compilable source.',
                 'Four functions failed/timed out; details remain in the manifest.',
                 'Warnings and unclassified executable bytes remain unresolved.',

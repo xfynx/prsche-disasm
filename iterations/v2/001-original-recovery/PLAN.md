@@ -3,19 +3,23 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Текущий принятый пакет —111:229full+6partial; предыдущий запушенныйd663347 /107.
-Общий build:100 projects/186TUs,86 comparison/alias+4nativeOS+3link;10 fresh reports/4153 x86cases.
-Все7 native/linkfixtures прошли черезновый verify-v2-native-fixtures.py, source/EXE hashes закреплены.
-Включены108/109/112/113,11formatter aliases связаны с canonicalvariadic entry.
-Пять новых bodies original/native verified; group005df770 raw-backedDWORD0x64 единого владельца.
-Game-link0compileerrors/250unresolvedsymbols/271refs; полногоEXEнет.
-114 experimental parser NOT accepted: syntheticsentinel и альтернативныйalgorithm внеигровойсборки.
-115process-exit/116install-pathsready;117интеграцияподготовлена,исполнительheap_init_recovery ждётcommit111.
-window_worker_recovery —118timersetup;render_mode_completion —119original table-drivenformatter.
-Координатор —commit/push111 и приёмка117; pathglobals32c/334/360/350/304 должныстатьviews60pointertable116.
-[Отложенные проверки](../../../docs/recovery-validation-backlog.md) обязательнынакаждомcheckpoint,
-передприёмкойархитектурнойсхемы ипереходомнаRust. WM_CLOSEещёоткрыт:112workerесть,producer118неподключён.
-Точныекоманды/проверки/limitations —runs111/README.md,acceptance.json,compile-link-proof.json.
+Текущий принятый пакет — 117: 233 full + 6 partial; предыдущий111 запушен006b6c3.
+Общая сборка: 103 projects / 194 TUs; 89 comparison/alias, 4 native OS, 3 link fixtures.
+27 свежих original-x86 reports / 4864 сравнений плюс7 composed table/alias cases.
+Все7 native/link проверок прошли, source/EXE hashes закреплены.
+115 exit / 116 install loader интегрированы: один владелец60 pointer cells и пять views.
+120 добавляет три exact BSS DWORD владельца; PE storage/56 consumers проверены, без новых функций.
+Game-link: 0 compile errors / 248 unresolved symbols / 267 references; игрового EXE нет.
+118 timer исправлен до приёмки: persistent28-byte ThreadRecord6b7c60 и live event/id loop retests,9 cases.
+119 exact formatter helpers — шесть функций/11 cases; parser4371 и cleanup4259 открыты.
+122 auxiliary signal — одна функция/3 cases; полный event lifecycle ещё открыт.
+Координатор завершает commit/push117; исполнители остановлены, shared mutations запрещены до коммита.
+Следующий121: интеграция118/119/122; heap_init_recovery доступен для назначения после117.
+32-byte formatter descriptor должен быть согласован с108 перед подключением реального cleanup.
+114 отклонён и перенесён вlocal/experiments/formatter-core-114-hypothesis.
+[Отложенные проверки](../../../docs/recovery-validation-backlog.md) пересмотрены117 и обязательны
+на каждом checkpoint, перед архитектурной схемой и Rust. Ни один end-to-end пункт не закрыт.
+Команды и ограничения — runs117/README.md, acceptance.json, compile-link-proof.json.
 История ниже не является активным назначением. Итерация и игровой запуск не завершены.
 
 ## Цель и готовность 001

@@ -42,6 +42,8 @@ int allocations;
 void set_field(std::size_t offset,std::uint32_t value){std::memcpy(display.bytes+offset,&value,4);}
 }
 namespace porsche {
+namespace { const char* fixture_install_paths[60]{}; }
+const char*& render_display_name_0065b304=fixture_install_paths[25];
 void* __cdecl render_allocate_0059ef90(std::uint32_t size){record("[\"alloc\","+std::to_string(size)+"]");return ++allocations==1?static_cast<void*>(&core):static_cast<void*>(&display);}
 RenderCore* __cdecl render_construct_core_00467700(void*,const char* publisher,const char* title){
     record("[\"core_ctor\",\""+hex(publisher)+"\",\""+hex(title)+"\"]");return &core;

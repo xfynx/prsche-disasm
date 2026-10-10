@@ -1,0 +1,322 @@
+{
+  "schema": 1,
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "range": "005a246e..005a247e",
+  "function_vas": [
+    "005a246e"
+  ],
+  "full_function_vas": [
+    "005a246e"
+  ],
+  "partial_function_vas": [],
+  "cases": 6,
+  "native_cpp_equal_original_x86": true,
+  "binary_matched": false,
+  "game_launch_verified": false,
+  "comparison": "Runs the actual original 005a246e and 005a2490 through the imported terminal boundary; compares registry callbacks in reverse order, lock/terminal order, arguments, and shutdown globals against the native adapter plus accepted CRT shutdown/registry sources.",
+  "boundaries": {
+    "ExitProcess": "IAT target is replaced by a controlled terminal hook in Unicorn and a C++ exception signal in the native fixture. It records the exit code and stops without terminating the host probe.",
+    "GetCurrentProcess/TerminateProcess": "Exact Win32 API contracts are recording hooks; the process-state-one cases let TerminateProcess return so the subsequent CRT cleanup order remains observable.",
+    "lock_api": "005a4ba4/005a4c05 are typed recording boundaries reached through recovered 005a2535/005a253e wrappers.",
+    "CRT callbacks": "Registered no-argument callback leaves and static callbacks 005a36d6/005ac147 are deterministic recording leaves; their bodies are not claimed recovered here."
+  },
+  "source_sha256": {
+    "iterations/v2/001-original-recovery/runs/115-process-exit/CMakeLists.txt": "2d2c55bb18eed3203114ff8e0a1eb21ce936389cb7cfe683e4ced89892dfe6cd",
+    "iterations/v2/001-original-recovery/runs/115-process-exit/README.md": "a7322d9ffddb5e46d32b0dfc8d8520c140770ddd2f02f86511be1055517d78c5",
+    "iterations/v2/001-original-recovery/source/include/porsche/exit_registry.hpp": "eb10b10683fcf151b72eb2aaf6bdace49ec8bbc63d915fb911eaa4c570d67c40",
+    "iterations/v2/001-original-recovery/source/include/porsche/exit_shutdown.hpp": "7c583dee587f3347a9eee93163cf3300c4894220d4340cb69c5fbf7a41d0fc97",
+    "iterations/v2/001-original-recovery/source/include/porsche/process_exit.hpp": "7c5d501f69161ccb4027a1a65740692f8e03095425d5a321f961ee61a3055763",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/exit_registry.cpp": "19a2783f6f4d0dbdf3039d6ef69628270086408cdfaadb7c46f2f08968d93da8",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/exit_shutdown.cpp": "50736aca377969fb8979a4c49a529390316a0d0c2656b7746802d416688f364d",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/process_exit.cpp": "fcd0c40e547ef0319b0a2dfdc3959a6a36bb20aa9214a18f0c42b608bed97174",
+    "iterations/v2/001-original-recovery/source/recovered/process_exit_probe.cpp": "dc6d12027c1ff9cb2d011046998ab0cb30e682da3cedd7a56516c720c2bd8163",
+    "scripts/research/v2_source_dependencies.py": "e3cf38029dc348859dac4a1769feb33d65832cc269e6dd1080020780451434e7",
+    "scripts/research/verify-v2-process-exit.py": "023cb2bca846226e77e47c0068e53f9c3857abf4d9e4270e65d7e9188d4d4cab"
+  },
+  "probe_sha256": "398b87ccc8348f05d3a3220a73152fa9ddb7cdd94357f6f05ce93d1ec9b83f85",
+  "fixtures": [
+    {
+      "input": {
+        "process_state": 0,
+        "code": 0,
+        "callbacks": [],
+        "null_index": -1
+      },
+      "output": {
+        "terminal": true,
+        "base": 56639488,
+        "next": 56639488,
+        "process_state": 1,
+        "started": 1,
+        "mode": 2882343424,
+        "events": [
+          [
+            "lock",
+            13
+          ],
+          [
+            "callback",
+            5912278
+          ],
+          [
+            "callback",
+            5947719
+          ],
+          [
+            "exit_process",
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "input": {
+        "process_state": 0,
+        "code": 1,
+        "callbacks": [
+          1
+        ],
+        "null_index": -1
+      },
+      "output": {
+        "terminal": true,
+        "base": 56639488,
+        "next": 56639492,
+        "process_state": 1,
+        "started": 1,
+        "mode": 2882343424,
+        "events": [
+          [
+            "lock",
+            13
+          ],
+          [
+            "callback",
+            1
+          ],
+          [
+            "callback",
+            5912278
+          ],
+          [
+            "callback",
+            5947719
+          ],
+          [
+            "exit_process",
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "input": {
+        "process_state": 0,
+        "code": 2271560481,
+        "callbacks": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "null_index": -1
+      },
+      "output": {
+        "terminal": true,
+        "base": 56639488,
+        "next": 56639504,
+        "process_state": 1,
+        "started": 1,
+        "mode": 2882343424,
+        "events": [
+          [
+            "lock",
+            13
+          ],
+          [
+            "callback",
+            4
+          ],
+          [
+            "callback",
+            3
+          ],
+          [
+            "callback",
+            2
+          ],
+          [
+            "callback",
+            1
+          ],
+          [
+            "callback",
+            5912278
+          ],
+          [
+            "callback",
+            5947719
+          ],
+          [
+            "exit_process",
+            2271560481
+          ]
+        ]
+      }
+    },
+    {
+      "input": {
+        "process_state": 0,
+        "code": 4294967295,
+        "callbacks": [
+          1,
+          2,
+          3
+        ],
+        "null_index": 2
+      },
+      "output": {
+        "terminal": true,
+        "base": 56639488,
+        "next": 56639500,
+        "process_state": 1,
+        "started": 1,
+        "mode": 2882343424,
+        "events": [
+          [
+            "lock",
+            13
+          ],
+          [
+            "callback",
+            3
+          ],
+          [
+            "callback",
+            1
+          ],
+          [
+            "callback",
+            5912278
+          ],
+          [
+            "callback",
+            5947719
+          ],
+          [
+            "exit_process",
+            4294967295
+          ]
+        ]
+      }
+    },
+    {
+      "input": {
+        "process_state": 1,
+        "code": 305419896,
+        "callbacks": [
+          4,
+          2
+        ],
+        "null_index": -1
+      },
+      "output": {
+        "terminal": true,
+        "base": 56639488,
+        "next": 56639496,
+        "process_state": 1,
+        "started": 1,
+        "mode": 2882343424,
+        "events": [
+          [
+            "lock",
+            13
+          ],
+          [
+            "get_current_process"
+          ],
+          [
+            "terminate_process",
+            305419896,
+            305419896
+          ],
+          [
+            "callback",
+            2
+          ],
+          [
+            "callback",
+            4
+          ],
+          [
+            "callback",
+            5912278
+          ],
+          [
+            "callback",
+            5947719
+          ],
+          [
+            "exit_process",
+            305419896
+          ]
+        ]
+      }
+    },
+    {
+      "input": {
+        "process_state": 1,
+        "code": 0,
+        "callbacks": [
+          1,
+          2,
+          3
+        ],
+        "null_index": 1
+      },
+      "output": {
+        "terminal": true,
+        "base": 56639488,
+        "next": 56639500,
+        "process_state": 1,
+        "started": 1,
+        "mode": 2882343424,
+        "events": [
+          [
+            "lock",
+            13
+          ],
+          [
+            "get_current_process"
+          ],
+          [
+            "terminate_process",
+            305419896,
+            0
+          ],
+          [
+            "callback",
+            3
+          ],
+          [
+            "callback",
+            2
+          ],
+          [
+            "callback",
+            5912278
+          ],
+          [
+            "callback",
+            5947719
+          ],
+          [
+            "exit_process",
+            0
+          ]
+        ]
+      }
+    }
+  ]
+}
