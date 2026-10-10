@@ -7,16 +7,26 @@
 и визуальное соответствие — отдельные результаты.
 
 - [ ] Собрать игровой EXE и выполнить исходный startup с настоящими ресурсами.
-  Блокер: Run121 game-link имеет245 unresolved symbols. Возврат: после устранения
+  Блокер: Run126 game-link имеет250 unresolved symbols. Возврат: после устранения
   зависимостей; сначала запуск/выход, затем кадр, ввод, меню и режимы игры.
 - [ ] Проверить закрытие через WM_CLOSE→GetMessage=0→исходный timer callback,
   включая producer времени006b7c40. Run086/098 проверяет другую исходную ветку
-  cleanup message0x466→destroy→join. Возврат: после восстановления clock producer. Run110 нашёл пропущенный
+  cleanup message0x466→destroy→join. Возврат: после подключения исходного diagnostic callback/init и live timer-thread fixture. Run110 нашёл пропущенный
   worker00565270..533e (207B), исходный setup565030 передаёт его в55f420.
   Run112 worker восстановлен и интегрирован111 (6/6 oracle cases); setup/
   thread/timer packet118 интегрирован121: 9 cases, persistent28-byte ThreadRecord,
   live event/id loop retests. OS shutdown bindings125 проверены6 дочерними процессами.
+  123 lifecycle(21 cases),127 wait(16) и130 stop→wait integration(3) приняты126.
   Живое расписание таймера и end-to-end WM_CLOSE ещё не выполнены.
+- [ ] Проверить полный startup context004d1a90→004d3420→004d1ba0 внутри app_main.
+  Review128/129: оригинал резервирует0x188 stack bytes, объект0x180 bytes передаётся
+  в ECX; старый caller описывал лишь два DWORD и fixture скрывал это расхождение.
+  Run129 исправляет caller/storage/ABI;4 span cases и15 main cases с реальными
+  ctor/dtor прошли изолированно. Общая приёмка126 прошла: [15 composed main cases](../iterations/v2/001-original-recovery/runs/126-event-integration/application-main/verification.json) с реальными ctor/dtor.
+  Возврат: после полного parser/context graph и live startup;
+  полный004d3420 (8589B), vtable и его реальные зависимости остаются открытыми.
+  Также открыть единственный owner/extent строки005e8e50: Run081 нашёл две
+  раздельные модели пустой строки;129 использует существующий owner без новой догадки о размере.
 - [ ] Проверить реальные DirectInput devices и caps/read paths со связанной
   оконной цепочкой. Run096 проверяет consumer0055feb0 с контролируемыми границами;
   native lifecycle fixture не подключает весь input graph. Возврат: после bindings.
@@ -47,12 +57,13 @@
 - [ ] Восстановить полный original formatter: state tables005c19a8/c8,
   output helpers, float/wide/locale paths и runtime callback initialization.
   Experimental114 вынесен вlocal/experiments. Шесть exact helpers119 интегрированы121
-  (11 cases); полный parser4371 восстанавливается124. Cleanup4259 остаётся границей.
+  (11 cases); parser4371 isolated124:56 cases, root review pending.
+  Cleanup4259 восстанавливается132; production formatter ещё не связан.
   Возврат: после полного parser/helper differential proof и связанного formatter entry.
   До подключения cleanup005a4259 сохранить полный 32-byte stack descriptor:
   wrapper005a0fbf выделяет0x20 байт (005a0fc2), а cleanup читает+0x10 до
   проверки flags и+0x18 в buffered ветке. Текущий16-byte prefix проверен
   только с записывающими границами; интеграция реального callee ещё не принята.
 
-Владелец всех открытых пунктов — координатор. Состояние на checkpoint121:
+Владелец всех открытых пунктов — координатор. Состояние на checkpoint126:
 ни один из пунктов выше не объявлен выполненным.

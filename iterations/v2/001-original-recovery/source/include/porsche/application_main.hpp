@@ -1,5 +1,6 @@
 #pragma once
 #include "porsche/startup.hpp"
+#include "porsche/application_context.hpp"
 #include <cstdint>
 
 namespace porsche {
@@ -32,10 +33,9 @@ std::uint32_t __cdecl application_main_memory_dialog(const char* text,const char
 void __cdecl application_main_create_directory(std::uint32_t path_va);
 void __cdecl application_main_setup_heaps(std::uint32_t bytes,std::uint32_t reserve);
 void __cdecl application_main_log(const char* text);
-std::int32_t __cdecl application_main_setup_context(void* context);
-std::int32_t __cdecl application_main_game_setup(void* context,const char* name,
+std::int32_t __fastcall application_main_game_setup(
+    ApplicationSetupContext* context,void* unused_edx,const char* name,
     std::uint32_t* stream,std::uint32_t zero);
-void __cdecl application_main_setup_finish(void* context);
 void __cdecl application_main_front_end_display(std::uint32_t* stream);
 void __cdecl application_main_network_poll(std::uint32_t a,std::uint32_t b);
 void __cdecl application_main_network_wait(std::uint32_t a,std::uint32_t b,std::uint8_t* state);

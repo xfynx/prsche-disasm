@@ -298,7 +298,8 @@ foreach(probe render_mode_probe window_callback_bindings_probe)
 endforeach()
 
 add_executable(application_main_probe "${PORSCHE_SOURCE_ROOT}/recovered/application_main_probe.cpp"
-    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_main.cpp")
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_main.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_context.cpp")
 target_include_directories(application_main_probe PRIVATE "${PORSCHE_RECOVERY_INCLUDE}")
 target_compile_features(application_main_probe PRIVATE cxx_std_17)
 target_compile_definitions(application_main_probe PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
@@ -375,11 +376,17 @@ add_subdirectory(runs/118-timer-setup timer-setup-118)
 add_subdirectory(runs/119-formatter-original formatter-original-119)
 add_subdirectory(runs/122-auxiliary-wait auxiliary-wait-122)
 add_subdirectory(runs/121-formatter-timer-integration formatter-timer-integration-121)
+add_subdirectory(runs/123-event-lifecycle event-lifecycle-123)
+add_subdirectory(runs/127-thread-wait thread-wait-127)
+add_subdirectory(runs/128-application-services application-services-128)
+add_subdirectory(runs/130-event-thread-integration event-thread-integration-130)
+add_subdirectory(runs/129-application-context application-context-129)
 
 # The native platform target is defined by Run055's add_subdirectory above.
 if(TARGET porsche_platform_win32)
     target_sources(porsche_platform_win32 PRIVATE
-        "${PORSCHE_SOURCE_ROOT}/platform/win32_shutdown.cpp")
+        "${PORSCHE_SOURCE_ROOT}/platform/win32_shutdown.cpp"
+        "${PORSCHE_SOURCE_ROOT}/platform/application_service_links.cpp")
 endif()
 
 foreach(probe engine_service_427a60_probe frame_services_probe resource_predicate_probe formatter_entry_probe resource_leaf_probe clock_worker_probe resource_dispatch_probe process_exit_probe install_paths_probe install_paths_integration_probe timer_setup_probe formatter_original_probe auxiliary_wait_probe startup_timing_integration_probe)

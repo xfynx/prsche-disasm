@@ -1,5 +1,6 @@
 """Run the native OS and link fixtures with current target dependency pins."""
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -52,7 +53,7 @@ def main():
         if (hashes != source_hashes(deps, compiled_sources=sources) or
             executable_sha != hashlib.sha256(binary.read_bytes()).hexdigest()):
             raise RuntimeError('Sources or executable changed during fixture execution')
-        report = {'schema':1, 'date':'2026-10-10',
+        report = {'schema':1, 'date':datetime.now(timezone.utc).date().isoformat(),
             'command':binary.relative_to(ROOT).as_posix(), 'exit_code':0,
             'stdout':process.stdout, 'stderr':process.stderr,
             'probe_sha256':executable_sha, 'game_launch_verified':False,

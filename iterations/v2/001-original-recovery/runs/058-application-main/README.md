@@ -44,3 +44,9 @@ py -3 scripts/research/verify-v2-application-main.py
 ```
 
 Integration correction: original `004b6b68` tests a DWORD at `00657a60`; its host declaration is DWORD-sized. A nonzero-high-byte `0x100` case proves the branch is not a byte test. The refreshed integration report contains 15 cases.
+
+Run126/129 supersedes the old setup-context fixture boundary below: app_main
+now owns the original0x180-byte stack object, passes ECX through explicit
+fastcall adapters, and executes recovered004d1a90/004d1ba0 in the main oracle.
+The original004d3420 body remains unresolved. Historical058 proof reports
+are preserved; current proof lives under Run129/Run126.

@@ -9,7 +9,7 @@ sys.path.insert(0,str(ROOT/'scripts/research'))
 from v2_source_dependencies import source_hashes
 sys.path.insert(0,str(ROOT/'local/tools/python-unicorn'))
 from unicorn import Uc,UC_ARCH_X86,UC_MODE_32,UC_HOOK_CODE
-from unicorn.x86_const import UC_X86_REG_EAX,UC_X86_REG_EIP,UC_X86_REG_ESP
+from unicorn.x86_const import UC_X86_REG_EAX,UC_X86_REG_ECX,UC_X86_REG_EIP,UC_X86_REG_ESP
 
 IMAGE,IMAGE_BYTES=0x400000,0x300000
 ARENA,ARENA_BYTES,STACK,EXIT=0x03600000,0x10000,0x0200f000,0x02200000
@@ -36,8 +36,8 @@ CALLS={
  0x4a6840:('004a6840',2,0),0x5a177b:('005a177b',1,0),
  0x467470:('00467470',0,0),0x0048dcb0:('0048dcb0',2,0),
  0x0048e1a0:('0048e1a0',3,0),0x4dd600:('004dd600',0,0),
- 0x4d1a90:('004d1a90',0,0),0x4d3420:('004d3420',3,None),
- 0x4d1ba0:('004d1ba0',0,0),0x467fc0:('00467fc0',4,0,16),
+ 0x4d3420:('004d3420',3,None),
+ 0x467fc0:('00467fc0',4,0,16),
  0x4b4da0:('004b4da0',1,0),0x4a4a70:('004a4a70',1,0),
  0x0048da60:('0048da60',2,0),0x4b67b0:('004b67b0',0,0),
  0x4acb80:('004acb80',0,0),0x4a88a0:('004a88a0',0,0),
@@ -67,7 +67,9 @@ def original(case,module,binary):
     put(0x0065b298,enabled);put(0x006573e8,0);put(0x00657424,0);put(0x00657428,0);put(0x0065743c,0)
     put(0x006577d8,17);put(0x006577dc,19);put(0x00606a88,0);put(0x00606874,0);put(0x005e99f4,0)
     put(0x00657a60,0x100 if wait_mode==3 else int(wait_mode==1));put(0x00657a64,int(wait_mode==2));put(0x00657e34,0)
-    uc.mem_write(0x00657a84,(b'LobbyX\0' if config_name else b'')+b'\0'*(0x100-(7 if config_name else 0)));put(0x00628130,0);put(0x00628c70,NETWORK if existing else 0)
+    uc.mem_write(0x00657a84,(b'LobbyX\0' if config_name else b'')+b'\0'*(0x100-(7 if config_name else 0)))
+    uc.mem_write(0x005e8e50,(b'HeapCtx\0' if config_name else b'')+b'\0'*(32-(8 if config_name else 0)))
+    put(0x00628130,0);put(0x00628c70,NETWORK if existing else 0)
     if existing:
         put(NETWORK+8,1);uc.mem_write(NETWORK+0xbe,bytes([1 if existing>1 else 0]));put(NETWORK+0xdc,0 if existing>1 else 0xffffffff)
     put(0x0065b360,0);uc.mem_write(STREAM,b'\0'*16);put(0x005b2084,CREATE_IAT);put(0x005b2270,MESSAGE_IAT)
@@ -76,8 +78,46 @@ def original(case,module,binary):
     names.update({addr:(row[0],row[1],row[2]) for addr,row in CALLS.items()})
     def hook(machine,addr,size,_):
         nonlocal setup_count
-        if 0x004b6a50<=addr<=0x004b6fe5 or 0x004b4b80<=addr<=0x004b4d55:return
+        if (0x004b6a50<=addr<=0x004b6fe5 or 0x004b4b80<=addr<=0x004b4d55 or
+            0x004d1a90<=addr<0x004d1b3c or 0x004d1ba0<=addr<0x004d1bce):return
         if addr==EXIT:machine.emu_stop();return
+        # Preserve the original context ctor/dtor bodies. Only their external
+        # base/member lifetime and allocator callees are controlled boundaries.
+        if addr in (0x00525e20,0x005294c0,0x005295b0,0x00525ec0):
+            name={0x00525e20:'00525e20',0x005294c0:'005294c0',
+                  0x005295b0:'005295b0',0x00525ec0:'00525ec0'}[addr]
+            calls.append(name);sp=machine.reg_read(UC_X86_REG_ESP)
+            ret=struct.unpack('<I',machine.mem_read(sp,4))[0]
+            machine.reg_write(UC_X86_REG_EIP,ret);machine.reg_write(UC_X86_REG_ESP,sp+4)
+            return
+        if addr==0x0059ef90:
+            calls.append('0059ef90');sp=machine.reg_read(UC_X86_REG_ESP)
+            ret=struct.unpack('<I',machine.mem_read(sp,4))[0]
+            if struct.unpack('<I',machine.mem_read(sp+4,4))[0]!=0x2c:
+                raise RuntimeError('context allocation size mismatch')
+            machine.reg_write(UC_X86_REG_EAX,ARENA+0x5000)
+            machine.reg_write(UC_X86_REG_ESP,sp+4);machine.reg_write(UC_X86_REG_EIP,ret)
+            return
+        if addr==0x0059f050:
+            calls.append('0059f050');sp=machine.reg_read(UC_X86_REG_ESP)
+            ret=struct.unpack('<I',machine.mem_read(sp,4))[0]
+            machine.reg_write(UC_X86_REG_EAX,1)
+            machine.reg_write(UC_X86_REG_ESP,sp+4);machine.reg_write(UC_X86_REG_EIP,ret)
+            return
+        if addr==0x004d3420:
+            calls.append('004d3420');sp=machine.reg_read(UC_X86_REG_ESP)
+            ret=struct.unpack('<I',machine.mem_read(sp,4))[0]
+            context=machine.reg_read(UC_X86_REG_ECX)
+            name,stream,zero=struct.unpack('<III',machine.mem_read(sp+4,12))
+            if (name!=0x005d6e78 or stream!=STREAM or zero!=0 or
+                word(context)!=0x005b683c or byte(context+0x17c)!=0):
+                raise RuntimeError('004d3420 thiscall ECX/stack arguments or constructed context mismatch')
+            if config_name and bytes(machine.mem_read(context+0x10c,8))!=b'HeapCtx\0':
+                raise RuntimeError('context source string copy mismatch')
+            result=setup if setup_count==0 else setup_repeat;setup_count+=1
+            machine.reg_write(UC_X86_REG_EAX,result&0xffffffff)
+            machine.reg_write(UC_X86_REG_ESP,sp+16);machine.reg_write(UC_X86_REG_EIP,ret)
+            return
         if addr==0x0053c290:
             calls.append('0053c290')
             return
@@ -92,8 +132,6 @@ def original(case,module,binary):
         ret=struct.unpack('<I',machine.mem_read(sp,4))[0]
         calls.append(name)
         if addr==0x59ed40: result=SWAP if alloc else 0
-        elif addr==0x4d3420:
-            result=setup if setup_count==0 else setup_repeat;setup_count+=1
         elif addr==0x4b67b0:put(0x00606a88,tick)
         elif addr==0x004152e0 and post_mode:put(0x006573e8,post_mode)
         elif addr==0x0048dcb0:
@@ -121,7 +159,7 @@ def original(case,module,binary):
     if uc.reg_read(UC_X86_REG_EIP)!=EXIT:raise RuntimeError(f'main did not return to sentinel pc={uc.reg_read(UC_X86_REG_EIP):08x} sp={uc.reg_read(UC_X86_REG_ESP):08x} wait={word(0x00657a60)} net={word(0x00628c70):08x} calls={calls[-10:]}')
     net=word(0x00628c70)
     network_name=bytes(uc.mem_read(net+0x59,32)).split(b'\0',1)[0].decode('ascii') if net else ''
-    out={'ret':uc.reg_read(UC_X86_REG_EAX),'calls':calls,
+    out={'ret':uc.reg_read(UC_X86_REG_EAX),'calls':calls,'setup_abi_ok':True,
        'globals':[word(0x006573e8),word(0x00657424),word(0x00657428),word(0x0065743c),word(0x006577d8),word(0x006577dc),byte(0x00657e34),word(0x00657a60),byte(0x00657a64),word(0x00606a88),word(0x00606874),word(0x005e99f4)],
        'network':[1 if net else 0,word(net+8) if net else 0,byte(net+0xbc) if net else 0,byte(net+0xbe) if net else 0,byte(net+0xbf) if net else 0,byte(net+0xc4) if net else 0,byte(net+0xc5) if net else 0,struct.unpack('<i',uc.mem_read(net+0xdc,4))[0] if net else 0],
        'network_name':network_name}
@@ -147,24 +185,30 @@ def main():
             keys=[k for k in expected if native.get(k)!=expected[k]]
             raise AssertionError(f'case {i} mismatch {keys}; x86 globals={expected.get("globals")} C++ globals={native.get("globals")}; x86 calls={expected["calls"]}; C++ calls={native.get("calls")}')
         outputs.append({'input':case,'sha256':hashlib.sha256(json.dumps(expected,sort_keys=True).encode()).hexdigest()})
-    full=['004b6a50']
+    full=['004b6a50','004d1a90','004d1ba0']
+    partial=['004d3420']
     paths=['iterations/v2/001-original-recovery/source/include/porsche/application_main.hpp',
+      'iterations/v2/001-original-recovery/source/include/porsche/application_context.hpp',
       'iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_main.cpp',
+      'iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_context.cpp',
       'iterations/v2/001-original-recovery/source/recovered/application_main_probe.cpp',
       'iterations/v2/001-original-recovery/runs/058-application-main/CMakeLists.txt',
+      'iterations/v2/001-original-recovery/runs/129-application-context/CMakeLists.txt',
+      'iterations/v2/001-original-recovery/runs/129-application-context/README.md',
       'scripts/research/verify-v2-application-main.py']
     report={'schema':1,'module':'Porsche.exe','sha256':SHA,'range':'004b6a50..004b6fe5',
-      'function_vas':['004b6a50'],'full_function_vas':full,'partial_function_vas':[],
+      'function_vas':full,'full_function_vas':full,'partial_function_vas':partial,
       'cases':len(CASES),'native_cpp_equal_original_x86':True,'game_launch_verified':False,
-      'comparison':'Return value, ordered boundary calls, selected startup/FE globals, and network fields/string across 15 controlled x86/native cases covering allocation success/failure, setup exit/re-entry, both startup waits, FE modes, simulation tick, configuration-name copy, and network continuation/action branches.',
+      'comparison':'Return value, ordered boundary calls, setup-context ECX/stack ABI, constructor/destructor boundary order, selected startup/FE globals, and network fields/string across controlled original-x86/native cases.',
       'boundaries':{'arena_fill':'Original x86 0053c290 and its scalar fill callee execute directly. Native application_main_fill_fe_arena_0053c290 writes the shared 0x3e24-byte arena; unsupported spans are rejected.',
-        'callees':'Unknown game/network/UI consumers are intercepted as typed fixture boundaries on both sides. Tests drive return values and network state; their internal behavior is not claimed.',
+      'callees':'004d3420 remains a typed game-setup boundary with source-proven thiscall ECX and three stack arguments. Other unknown game/network/UI consumers are controlled typed fixture boundaries; internals are not claimed.',
         'wrappers':'The production source calls accepted page, startup, FE, resource, and render wrappers directly. This isolated probe substitutes those signatures to compare the main caller only.'},
       'source_sha256':source_hashes(paths,compiled_sources=[
           'iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_main.cpp',
+          'iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_context.cpp',
           'iterations/v2/001-original-recovery/source/recovered/application_main_probe.cpp']),
       'probe_sha256':hashlib.sha256(probe.read_bytes()).hexdigest(),'fixtures':outputs}
-    report['source_sha256']=source_hashes(report['source_sha256'].keys(),compiled_sources=['iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp','iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_globals.cpp'])
+    report['source_sha256']=source_hashes(report['source_sha256'].keys(),compiled_sources=['iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp','iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_globals.cpp','iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_context.cpp'])
     (args.report_dir/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8',newline='\n')
     print(json.dumps({'functions':full,'cases':len(CASES),'native_cpp_equal_original_x86':True,'report':str(args.report_dir/'verification.json')}))
 if __name__=='__main__':main()

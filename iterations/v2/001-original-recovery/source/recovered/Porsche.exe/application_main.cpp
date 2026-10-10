@@ -53,7 +53,7 @@ std::int32_t __cdecl app_main_004b6a50(std::int32_t argc,char** argv) {
     void* swap_probe=application_page_alloc_0059ed40(&swap_bytes);
     application_page_release_0059ed90(swap_probe);
     if(!swap_probe) {
-        application_main_memory_dialog("Insufficient space in the swap file.","Memory full");
+        application_main_memory_dialog("Insufficient space in the swap file.  Please make additional space available and try again.","Memory full");
         startup_exit_005a246e(1);
     }
 
@@ -96,11 +96,12 @@ std::int32_t __cdecl app_main_004b6a50(std::int32_t argc,char** argv) {
                 setup_started=1;
                 application_main_function_004dd600();
             }
-            std::uint32_t setup_context[2]{};
-            application_main_setup_context(setup_context);
-            game_setup_result=application_main_game_setup(setup_context,"gamesetup",stream,0);
+            ApplicationSetupContext setup_context;
+            application_setup_context_construct_004d1a90(&setup_context,nullptr);
+            game_setup_result=application_main_game_setup(&setup_context,nullptr,
+                "gamesetup",stream,0);
             global_00657e34=1;
-            application_main_setup_finish(setup_context);
+            application_setup_context_destroy_004d1ba0(&setup_context,nullptr);
         }
         if(game_setup_result!=1) {
             apply_fe_records(stream);

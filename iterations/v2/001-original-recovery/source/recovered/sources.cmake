@@ -95,4 +95,8 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/formatter_original.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/auxiliary_wait.cpp"
     "${PORSCHE_SOURCE_ROOT}/platform/startup_timer_links.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/event_lifecycle.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/thread_wait.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_services.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_context.cpp"
 )

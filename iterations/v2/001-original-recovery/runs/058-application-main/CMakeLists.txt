@@ -8,6 +8,7 @@ get_filename_component(ROOT "${ROOT}" ABSOLUTE)
 add_executable(application_main_probe
   "${ROOT}/source/recovered/application_main_probe.cpp"
   "${ROOT}/source/recovered/Porsche.exe/application_main.cpp"
+  "${ROOT}/source/recovered/Porsche.exe/application_context.cpp"
   "${ROOT}/source/recovered/Porsche.exe/application_state.cpp"
   "${ROOT}/source/recovered/Porsche.exe/application_globals.cpp")
 target_include_directories(application_main_probe PRIVATE "${ROOT}/source/include")

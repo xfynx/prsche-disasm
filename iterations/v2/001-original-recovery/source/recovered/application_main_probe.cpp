@@ -1,4 +1,5 @@
 #include "porsche/application_main.hpp"
+#include "porsche/application_alloc.hpp"
 #include "porsche/application_heap.hpp"
 #include "porsche/application_fe.hpp"
 #include "porsche/fe_stream.hpp"
@@ -31,14 +32,28 @@ static std::uint32_t fixture_post_mode=0;
 static std::uint8_t fixture_network_ready=0;
 static std::uint32_t fixture_alloc_ok=1;
 static std::uint32_t fixture_tick_calls=0;
+static bool fixture_setup_abi_ok=true;
 static std::uint32_t fixture_stream[3]={0,0,0};
 static std::uint8_t fixture_network[0x268]{};
 static int page_token;
+alignas(4) static std::uint8_t fixture_context_member[0x2c]{};
 static void ev(const char* s){events.emplace_back(s);}
 static void prepare_network(std::uint8_t ready){std::memset(fixture_network,0,sizeof(fixture_network));*reinterpret_cast<std::uint32_t*>(fixture_network+8)=1;fixture_network[0xbe]=ready;*reinterpret_cast<std::int32_t*>(fixture_network+0xdc)=ready?0:-1;}
 
 void* __cdecl application_page_alloc_0059ed40(std::uint32_t* bytes){ev("0059ed40");if(fixture_alloc_ok){*bytes=0x08000000;return &page_token;}return nullptr;}
 std::uint32_t __cdecl application_page_release_0059ed90(void*){ev("0059ed90");return 1;}
+char application_object_heap_name_005e8e50[32]{};
+void* __cdecl startup_network_allocate_0059ef90(std::uint32_t bytes){
+    ev("0059ef90");
+    return bytes==0x2c?fixture_context_member:nullptr;
+}
+std::uint32_t __cdecl application_release_0059f050(void* address){
+    (void)address;ev("0059f050");return 1;
+}
+void __fastcall application_context_base_construct_00525e20(ApplicationSetupContext*,void*){ev("00525e20");}
+void __fastcall application_context_member_construct_005294c0(void*,void*){ev("005294c0");}
+void __fastcall application_context_member_destroy_005295b0(void*,void*){ev("005295b0");}
+std::uint32_t __fastcall application_context_base_destroy_00525ec0(ApplicationSetupContext*,void*){ev("00525ec0");return 1;}
 void __cdecl startup_cd_relaunch_004a5c30(){ev("004a5c30");}
 void __cdecl startup_services_004a5410(){ev("004a5410");}
 void __cdecl startup_exit_005a246e(std::uint32_t){ev("005a246e");}
@@ -52,9 +67,13 @@ std::uint32_t __cdecl application_main_memory_dialog(const char*,const char*){ev
 void __cdecl application_main_create_directory(std::uint32_t){ev("CreateDirectoryA");}
 void __cdecl application_main_setup_heaps(std::uint32_t,std::uint32_t){ev("004a6840");}
 void __cdecl application_main_log(const char*){ev("005a177b");}
-std::int32_t __cdecl application_main_setup_context(void*){ev("004d1a90");return 0;}
-std::int32_t __cdecl application_main_game_setup(void*,const char*,std::uint32_t*,std::uint32_t){ev("004d3420");return static_cast<std::int32_t>(fixture_setup_count++?fixture_setup_repeat:fixture_setup_result);}
-void __cdecl application_main_setup_finish(void*){ev("004d1ba0");}
+std::int32_t __fastcall application_main_game_setup(ApplicationSetupContext* context,void* unused_edx,const char* name,std::uint32_t* stream,std::uint32_t zero){
+    (void)unused_edx;
+    ev("004d3420");std::uint32_t vtable=0;std::memcpy(&vtable,context->bytes,4);
+    fixture_setup_abi_ok=fixture_setup_abi_ok && name && std::strcmp(name,"gamesetup")==0 &&
+        stream==fixture_stream && zero==0 && vtable==0x005b683c && context->bytes[0x17c]==0;
+    return static_cast<std::int32_t>(fixture_setup_count++?fixture_setup_repeat:fixture_setup_result);
+}
 void __cdecl application_main_front_end_display(std::uint32_t*){ev("004b4da0");}
 void __cdecl application_main_network_poll(std::uint32_t,std::uint32_t){ev("0048dcb0");prepare_network(fixture_network_ready);if(!startup_network_00628c70)startup_network_00628c70=fixture_network;}
 void __cdecl application_main_network_wait(std::uint32_t,std::uint32_t,std::uint8_t* state){ev("0048e1a0");*state=0;prepare_network(fixture_network_ready);}
@@ -85,9 +104,7 @@ void __cdecl application_main_function_004a54e0(){ev("004a54e0");}
 void __cdecl application_main_create_directory(std::uint32_t);
 void __cdecl application_main_setup_heaps(std::uint32_t,std::uint32_t);
 void __cdecl application_main_log(const char*);
-std::int32_t __cdecl application_main_setup_context(void*);
-std::int32_t __cdecl application_main_game_setup(void*,const char*,std::uint32_t*,std::uint32_t);
-void __cdecl application_main_setup_finish(void*);
+std::int32_t __fastcall application_main_game_setup(ApplicationSetupContext*,void*,const char*,std::uint32_t*,std::uint32_t);
 void __cdecl application_main_front_end_display(std::uint32_t*);
 
 void __cdecl application_main_function_004b67b0();
@@ -101,7 +118,9 @@ int main(){
     while(std::getline(std::cin,line)){
         std::istringstream in(line);std::uint32_t setup,tick,network,enabled,mode,alloc,wait_mode,existing,post_mode,setup_repeat,config_name;
         if(!(in>>setup>>tick>>network>>enabled>>mode>>alloc>>wait_mode>>existing>>post_mode>>setup_repeat>>config_name))return 2;
-        events.clear();fixture_setup_result=setup;fixture_setup_repeat=setup_repeat;fixture_setup_count=0;fixture_tick=tick;fixture_fe_mode=mode;fixture_post_mode=post_mode;fixture_network_ready=network?1:0;fixture_alloc_ok=alloc;
+        events.clear();fixture_setup_result=setup;fixture_setup_repeat=setup_repeat;fixture_setup_count=0;fixture_setup_abi_ok=true;fixture_tick=tick;fixture_fe_mode=mode;fixture_post_mode=post_mode;fixture_network_ready=network?1:0;fixture_alloc_ok=alloc;
+        std::memset(application_object_heap_name_005e8e50,0,sizeof(application_object_heap_name_005e8e50));
+        if(config_name)std::memcpy(application_object_heap_name_005e8e50,"HeapCtx",8);
         global_006573e8=0;fixture_fe_mode=mode;global_00657424=0;global_00657428=0;global_0065743c=0;
         global_006577d8=17;global_006577dc=19;global_00606a88=0;global_00606874=0;global_005e99f4=0;
         global_00657a60=wait_mode==3?0x100u:static_cast<std::uint32_t>(wait_mode==1);global_00657a64=wait_mode==2;global_00657e34=0;
@@ -113,7 +132,7 @@ int main(){
         std::cout<<"{\"ret\":"<<ret<<",\"calls\":[";
         for(std::size_t i=0;i<events.size();++i)std::cout<<(i?",":"")<<'"'<<events[i]<<'"';
         auto* n=static_cast<std::uint8_t*>(startup_network_00628c70);
-        std::cout<<"],\"globals\":["<<global_006573e8<<','<<global_00657424<<','<<global_00657428<<','
+        std::cout<<"],\"setup_abi_ok\":"<<(fixture_setup_abi_ok?"true":"false")<<",\"globals\":["<<global_006573e8<<','<<global_00657424<<','<<global_00657428<<','
           <<global_0065743c<<','<<global_006577d8<<','<<global_006577dc<<','<<static_cast<unsigned>(global_00657e34)<<','
           <<static_cast<unsigned>(global_00657a60)<<','<<static_cast<unsigned>(global_00657a64)<<','<<global_00606a88<<','<<global_00606874<<','<<global_005e99f4<<"],\"network\":["
           <<(n?1:0)<<','<<(n?*reinterpret_cast<std::uint32_t*>(n+8):0)<<','<<(n?static_cast<unsigned>(n[0xbc]):0)<<','

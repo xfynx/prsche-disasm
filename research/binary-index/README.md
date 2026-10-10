@@ -132,3 +132,8 @@ PE-индексы и явную запись пропуска. Повторны�
 `local/experiments/binary-index-ghidra`, временные логи — в `local/reports`.
 Оригинальные бинарники/ресурсы и база Ghidra не входят в этот каталог.
 История: [Run 009](../../iterations/012-campaign-fidelity/runs/009-binary-index/README.md).
+
+Run126: отдельно индексированы callback entries0053c0f0 (120B) и0053c170 (87B),
+35 supplementary entries /36622 catalog entries.0053c170 — shared tail автоматической
+0053c1d0: это новая точка входа, не новое покрытие инструкций. SHA/ASM/literal callers/RET —
+[Run126 event-index](../../iterations/v2/001-original-recovery/runs/126-event-integration/event-index.json).
