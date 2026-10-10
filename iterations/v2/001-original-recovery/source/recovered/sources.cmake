@@ -91,4 +91,8 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/install_paths_storage.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_main_globals.cpp"
     "${PORSCHE_SOURCE_ROOT}/platform/startup_install_exit_links.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/timer_setup.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/formatter_original.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/auxiliary_wait.cpp"
+    "${PORSCHE_SOURCE_ROOT}/platform/startup_timer_links.cpp"
 )

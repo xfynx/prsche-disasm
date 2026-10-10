@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "kind": "native OS binding acceptance; not original-function recovery",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "function_vas": [],
+  "full_function_vas": [],
+  "native_cpp_equal_original_x86": false,
+  "original_import_edges_verified": true,
+  "native_fixture_passed": true,
+  "cases": 6,
+  "fixtures": [
+    {
+      "mode": "exit",
+      "requested_code": 0,
+      "observed_code": 0,
+      "output": "exit",
+      "terminal_call_verified": true
+    },
+    {
+      "mode": "exit",
+      "requested_code": 305419896,
+      "observed_code": 305419896,
+      "output": "exit",
+      "terminal_call_verified": true
+    },
+    {
+      "mode": "exit",
+      "requested_code": 2271560481,
+      "observed_code": 2271560481,
+      "output": "exit",
+      "terminal_call_verified": true
+    },
+    {
+      "mode": "terminate-self",
+      "requested_code": 0,
+      "observed_code": 0,
+      "output": "handle:4294967295",
+      "terminal_call_verified": true
+    },
+    {
+      "mode": "terminate-self",
+      "requested_code": 305419896,
+      "observed_code": 305419896,
+      "output": "handle:4294967295",
+      "terminal_call_verified": true
+    },
+    {
+      "mode": "terminate-self",
+      "requested_code": 2271560481,
+      "observed_code": 2271560481,
+      "output": "handle:4294967295",
+      "terminal_call_verified": true
+    }
+  ],
+  "evidence": [
+    {
+      "call_va": "005a24a5",
+      "iat_va": "005b2094",
+      "import_name": "GetCurrentProcess",
+      "bytes": "ff1594205b00"
+    },
+    {
+      "call_va": "005a24ac",
+      "iat_va": "005b216c",
+      "import_name": "TerminateProcess",
+      "bytes": "ff156c215b00"
+    },
+    {
+      "call_va": "005a252d",
+      "iat_va": "005b21a8",
+      "import_name": "ExitProcess",
+      "bytes": "ff15a8215b00"
+    }
+  ],
+  "source_sha256": {
+    "iterations/v2/001-original-recovery/runs/125-native-shutdown/CMakeLists.txt": "4baf6648bfd3811b1d73117fac6f6bd814a7a3da21e2ebf1407b71581a3420b9",
+    "iterations/v2/001-original-recovery/runs/125-native-shutdown/native_shutdown_probe.cpp": "3cf33dcf71a4e450c65c9d73e41f2c734d5436659becdc1de302d87c9930b7b9",
+    "iterations/v2/001-original-recovery/runs/125-native-shutdown/README.md": "8675c69862883ef47f76bee4c7947460c1a2b22e90877eb13bbad7c48a7bb00e",
+    "iterations/v2/001-original-recovery/source/include/porsche/exit_shutdown.hpp": "7c583dee587f3347a9eee93163cf3300c4894220d4340cb69c5fbf7a41d0fc97",
+    "iterations/v2/001-original-recovery/source/platform/win32_shutdown.cpp": "2c2f2bdc087accb3d5a3be66d291c537a27125ce7f2924d527aa6be16c0b765b",
+    "scripts/research/v2_source_dependencies.py": "e3cf38029dc348859dac4a1769feb33d65832cc269e6dd1080020780451434e7",
+    "scripts/research/verify-v2-native-shutdown.py": "d93f4b9f8e4dc76ff6a755f6572556ec7e11e8df3e94f2af9b33ae7a9c0a783b"
+  },
+  "original_index_sha256": {
+    "research/binary-index/static/binaries.jsonl": "b2545828e39f9c4aaf21a260084ee4242053afef40dd3910b3318cc7d19f6da3",
+    "research/binary-index/static/imports.jsonl": "4a3f10cfd9631d677a6f1ed17761adcc0dc00131a2069028cbb13d52acff71f8"
+  },
+  "probe_sha256": "65d9ae22b186a8fb1b3c9cadf15515c8e499c13949ef6752f36c717122ae9d14",
+  "game_launch_verified": false,
+  "full_crt_shutdown_verified": false,
+  "limitations": [
+    "CRT callbacks and locks remain outside this OS fixture.",
+    "WM_CLOSE and original game startup are still open."
+  ]
+}

@@ -3,23 +3,21 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Текущий принятый пакет — 117: 233 full + 6 partial; предыдущий111 запушен006b6c3.
-Общая сборка: 103 projects / 194 TUs; 89 comparison/alias, 4 native OS, 3 link fixtures.
-27 свежих original-x86 reports / 4864 сравнений плюс7 composed table/alias cases.
-Все7 native/link проверок прошли, source/EXE hashes закреплены.
-115 exit / 116 install loader интегрированы: один владелец60 pointer cells и пять views.
-120 добавляет три exact BSS DWORD владельца; PE storage/56 consumers проверены, без новых функций.
-Game-link: 0 compile errors / 248 unresolved symbols / 267 references; игрового EXE нет.
-118 timer исправлен до приёмки: persistent28-byte ThreadRecord6b7c60 и live event/id loop retests,9 cases.
-119 exact formatter helpers — шесть функций/11 cases; parser4371 и cleanup4259 открыты.
-122 auxiliary signal — одна функция/3 cases; полный event lifecycle ещё открыт.
-Координатор завершает commit/push117; исполнители остановлены, shared mutations запрещены до коммита.
-Следующий121: интеграция118/119/122; heap_init_recovery доступен для назначения после117.
-32-byte formatter descriptor должен быть согласован с108 перед подключением реального cleanup.
-114 отклонён и перенесён вlocal/experiments/formatter-core-114-hypothesis.
-[Отложенные проверки](../../../docs/recovery-validation-backlog.md) пересмотрены117 и обязательны
-на каждом checkpoint, перед архитектурной схемой и Rust. Ни один end-to-end пункт не закрыт.
-Команды и ограничения — runs117/README.md, acceptance.json, compile-link-proof.json.
+Текущий пакет —121: 243 full +6 partial; предыдущий117 запушен6e3cdc3.
+Общая MSVC Win32 сборка: 107 projects /203 TUs; 93 comparison/alias,4 native OS,3 link fixtures.
+9 свежих original-x86 reports /4152 comparisons плюс4 composed cases; все7 native/link checks прошли.
+Интегрированы118 timer(3 functions/9 cases),119 exact formatter helpers(6/11),122 auxiliary signal(1/3).
+Три Win32 shutdown bindings125 подключены к существующему Run055 platform target;6 child-process cases прошли.
+Game-link: 0 compile errors /245 unresolved symbols /264 refs; игрового EXE нет.
+Его source closure теперь читается из actual excluded-target ProjectReference graph, включая platform TUs.
+Координатор завершает приёмку/commit121; shared121 files frozen, heap_init_recovery свободен.
+Run123 event lifecycle готов изолированно: 18 differential cases; требуется review/индекс/интеграция.
+window_worker_recovery свободен; render_mode_completion —isolated124 full original formatter parser.
+32-byte descriptor119 сохранён;108 wrapper/cleanup4259 связь остаётся открытой до полногоparser/cleanup.
+114 отклонён и находится вlocal/experiments/formatter-core-114-hypothesis.
+[Отложенные проверки](../../../docs/recovery-validation-backlog.md) пересмотрены121; live timer/WM_CLOSE,
+полный resource startup/игровой EXE/визуальная приёмка не закрыты отдельными probes или сборкой.
+Команды и ограничения —runs121/README.md, acceptance.json, compile-link-proof.json.
 История ниже не является активным назначением. Итерация и игровой запуск не завершены.
 
 ## Цель и готовность 001

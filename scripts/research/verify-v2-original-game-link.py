@@ -13,23 +13,21 @@ DEFAULT_BUILD = ROOT / 'local/builds/v2/original-game-link-102'
 DEFAULT_LOG = ROOT / 'local/reports/v2-original-game-link-102-msbuild.log'
 
 from v2_source_dependencies import source_hashes
+from v2_build_graph import compiled_sources
 
 
-def source_closure():
+def source_closure(build_dir):
     iteration = ROOT / 'iterations/v2/001-original-recovery'
     source = iteration / 'source'
     recovered = source / 'recovered'
-    listed = (recovered / 'sources.cmake').read_text(encoding='utf-8')
-    recovered_sources = [source / item for item in
-        re.findall(r'\$\{PORSCHE_SOURCE_ROOT\}/([^"\r\n]+\.cpp)', listed)]
-    compiled = [
-        *recovered_sources,
-        source / 'platform/recovered_links.cpp',
-        source / 'platform/window_links.cpp',
-        source / 'platform/win32_window.cpp',
-        source / 'platform/win32_core.cpp',
-        RUN / 'host-entry.cpp',
-    ]
+    # The excluded game target is absent from ALL_BUILD. Find its explicit
+    # project, then follow only that target's actual ProjectReference graph.
+    entries = list(Path(build_dir).resolve().rglob(TARGET + '.vcxproj'))
+    if len(entries) != 1:
+        raise RuntimeError(f'Ambiguous/missing game-link project: {entries}')
+    compiled = [ROOT / p for p in compiled_sources(entries[0].parent, TARGET)]
+    if RUN / 'host-entry.cpp' not in compiled:
+        raise RuntimeError('Actual game-link graph omits the canonical host entry')
     dependencies = [
         ROOT / 'iterations/v2/001-original-recovery/CMakeLists.txt',
         recovered / 'sources.cmake',
@@ -39,6 +37,7 @@ def source_closure():
         ROOT / 'iterations/v2/001-original-recovery/runs/070-native-window-bindings/CMakeLists.txt',
         ROOT / 'iterations/v2/001-original-recovery/runs/075-recovered-links/CMakeLists.txt',
         ROOT / 'scripts/research/v2_source_dependencies.py',
+        ROOT / 'scripts/research/v2_build_graph.py',
         ROOT / 'scripts/research/verify-v2-original-game-link.py',
         RUN / 'README.md',
     ]
@@ -160,7 +159,7 @@ def main():
     else:
         status = 'build_failed_before_link_or_target_missing'
 
-    hashes, compiled = source_closure()
+    hashes, compiled = source_closure(args.build_dir)
     report = {
         'schema': 1,
         'target': TARGET,

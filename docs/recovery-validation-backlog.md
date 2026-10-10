@@ -7,15 +7,16 @@
 и визуальное соответствие — отдельные результаты.
 
 - [ ] Собрать игровой EXE и выполнить исходный startup с настоящими ресурсами.
-  Блокер: Run117 game-link имеет248 unresolved symbols. Возврат: после устранения
+  Блокер: Run121 game-link имеет245 unresolved symbols. Возврат: после устранения
   зависимостей; сначала запуск/выход, затем кадр, ввод, меню и режимы игры.
 - [ ] Проверить закрытие через WM_CLOSE→GetMessage=0→исходный timer callback,
   включая producer времени006b7c40. Run086/098 проверяет другую исходную ветку
   cleanup message0x466→destroy→join. Возврат: после восстановления clock producer. Run110 нашёл пропущенный
   worker00565270..533e (207B), исходный setup565030 передаёт его в55f420.
   Run112 worker восстановлен и интегрирован111 (6/6 oracle cases); setup/
-  thread/timer packet118 готов отдельно (9 cases, persistent ThreadRecord и loop retests),
-  но ещё не принят в общей сборке. End-to-end проверка не выполнена.
+  thread/timer packet118 интегрирован121: 9 cases, persistent28-byte ThreadRecord,
+  live event/id loop retests. OS shutdown bindings125 проверены6 дочерними процессами.
+  Живое расписание таймера и end-to-end WM_CLOSE ещё не выполнены.
 - [ ] Проверить реальные DirectInput devices и caps/read paths со связанной
   оконной цепочкой. Run096 проверяет consumer0055feb0 с контролируемыми границами;
   native lifecycle fixture не подключает весь input graph. Возврат: после bindings.
@@ -45,12 +46,13 @@
 
 - [ ] Восстановить полный original formatter: state tables005c19a8/c8,
   output helpers, float/wide/locale paths и runtime callback initialization.
-  Experimental114 common subset не подключать как полный core;119 восстанавливает
-  исходную цепочку. Возврат: после exact parser/helper differential proofs.
+  Experimental114 вынесен вlocal/experiments. Шесть exact helpers119 интегрированы121
+  (11 cases); полный parser4371 восстанавливается124. Cleanup4259 остаётся границей.
+  Возврат: после полного parser/helper differential proof и связанного formatter entry.
   До подключения cleanup005a4259 сохранить полный 32-byte stack descriptor:
   wrapper005a0fbf выделяет0x20 байт (005a0fc2), а cleanup читает+0x10 до
   проверки flags и+0x18 в buffered ветке. Текущий16-byte prefix проверен
   только с записывающими границами; интеграция реального callee ещё не принята.
 
-Владелец всех открытых пунктов — координатор. Состояние на checkpoint117:
+Владелец всех открытых пунктов — координатор. Состояние на checkpoint121:
 ни один из пунктов выше не объявлен выполненным.

@@ -1,11 +1,11 @@
 # Текущий этап: v2/001-original-recovery
 
-Текущий результат — [Run117](../iterations/v2/001-original-recovery/runs/117-install-integration/README.md): **233 проверенные C++ функции** и 6 частичных consumer.
-Общая MSVC Win32 сборка: 103 projects / 194 TUs; 89 comparison/alias probes, 4 native OS и 3 link fixtures.
-27 свежих original-x86 отчётов / 4864 сравнений и 7 composed integration cases; все 7 native/link проверок прошли.
-Подключены original install.txt loader, единая таблица 60 указателей с пятью views, три terminal exit aliases и три BSS DWORD владельца.
-Game-link: 0 compile errors / 248 unresolved symbols / 267 references; игрового EXE пока нет.
-Следующий121 — готовые118 timer,119 formatter helpers и122 auxiliary signal; требуется интеграция и приёмка.
+Текущий результат — [Run121](../iterations/v2/001-original-recovery/runs/121-formatter-timer-integration/README.md): **243 проверенные C++ функции** и 6 частичных consumer.
+Общая MSVC Win32 сборка: 107 projects / 203 TUs; 93 comparison/alias probes, 4 native OS и 3 link fixtures.
+9 свежих original-x86 отчётов / 4152 сравнений и 4 composed integration cases; все 7 native/link проверок прошли.
+Подключены timer setup/producer/cleanup, шесть exact formatter helpers, auxiliary signal и три реальные Win32 shutdown bindings.
+Game-link: 0 compile errors / 245 unresolved symbols / 264 references; игрового EXE пока нет.
+В работе123 event lifecycle и124 original formatter parser; live timer/WM_CLOSE и полный parser/cleanup ещё открыты.
 [Validation backlog](../docs/recovery-validation-backlog.md) проверяется на каждом checkpoint, перед архитектурной схемой и Rust.
 Маршрут: проверенный C/C++ baseline → схема устройства игры по исходникам → Rust native/web.
 Полный игровой запуск, live timer/WM_CLOSE и визуальная приёмка остаются открытыми.
