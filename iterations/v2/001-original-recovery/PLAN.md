@@ -3,14 +3,14 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Текущий пакет —121: 243 full +6 partial; предыдущий117 запушен6e3cdc3.
+Текущий принятый пакет —121: 243 full +6 partial; запушен1b39936.
 Общая MSVC Win32 сборка: 107 projects /203 TUs; 93 comparison/alias,4 native OS,3 link fixtures.
 9 свежих original-x86 reports /4152 comparisons плюс4 composed cases; все7 native/link checks прошли.
 Интегрированы118 timer(3 functions/9 cases),119 exact formatter helpers(6/11),122 auxiliary signal(1/3).
 Три Win32 shutdown bindings125 подключены к существующему Run055 platform target;6 child-process cases прошли.
 Game-link: 0 compile errors /245 unresolved symbols /264 refs; игрового EXE нет.
 Его source closure теперь читается из actual excluded-target ProjectReference graph, включая platform TUs.
-Координатор завершает приёмку/commit121; shared121 files frozen, heap_init_recovery свободен.
+Checkpoint121 принят и запушен; shared121 files frozen, heap_init_recovery свободен.
 Run123 event lifecycle готов изолированно: 18 differential cases; требуется review/индекс/интеграция.
 window_worker_recovery свободен; render_mode_completion —isolated124 full original formatter parser.
 32-byte descriptor119 сохранён;108 wrapper/cleanup4259 связь остаётся открытой до полногоparser/cleanup.
@@ -19,6 +19,17 @@ window_worker_recovery свободен; render_mode_completion —isolated124 f
 полный resource startup/игровой EXE/визуальная приёмка не закрыты отдельными probes или сборкой.
 Команды и ограничения —runs121/README.md, acceptance.json, compile-link-proof.json.
 История ниже не является активным назначением. Итерация и игровой запуск не завершены.
+
+## Текущий порядок до полного запуска
+
+Цель пользователя2026-10-11 — полный игровой EXE из C/C++, затем полный запуск игры.
+Следующий пакет: review/индексация/интеграция123, доказательство124 и полный formatter
+storage/cleanup. Далее — связанные блоки реального startup/application/render/resource
+графа, выбранные по runs/121-formatter-timer-integration/original-game-link/link-report.json.
+245 unresolved symbols — текущие видимые границы, не оценка общего остатка восстановления.
+После каждого пакета повторять настоящий game-link; команды приёмки —runs121/README.md.
+Первый EXE/startup/меню/выход — промежуточная веха; готовность включает Quick Race,
+обе карьеры и весь исходный игровой цикл. Backlog проверяется при каждом checkpoint.
 
 ## Цель и готовность 001
 
