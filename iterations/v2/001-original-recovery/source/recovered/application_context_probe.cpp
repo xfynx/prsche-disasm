@@ -25,8 +25,8 @@ std::uint32_t __cdecl application_release_0059f050(void* member) {
     event(member == member_storage ? "0059f050:member" : "0059f050:other");
     return 1;
 }
-void __fastcall application_context_base_construct_00525e20(ApplicationSetupContext*,void*) { event("00525e20"); }
-void __fastcall application_context_member_construct_005294c0(void*,void*) { event("005294c0"); }
+ApplicationSetupContext* __fastcall application_context_base_construct_00525e20(ApplicationSetupContext* context,void*) { event("00525e20"); return context; }
+void* __fastcall application_context_member_construct_005294c0(void* member,void*) { event("005294c0"); return member; }
 void __fastcall application_context_member_destroy_005295b0(void*,void*) { event("005295b0"); }
 std::uint32_t __fastcall application_context_base_destroy_00525ec0(ApplicationSetupContext*,void*) { event("00525ec0"); return 0xb16b00b5; }
 } // namespace porsche

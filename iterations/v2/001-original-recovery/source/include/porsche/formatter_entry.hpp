@@ -1,25 +1,20 @@
 #pragma once
 
+#include "porsche/formatter_original.hpp"
+#include "porsche/formatter_cleanup.hpp"
+
 #include <cstdint>
 
 namespace porsche {
 
-// Four DWORD descriptor built by original 005a0fbf at EBP-20h.
-struct FormatterDescriptor005a0fbf {
-    char* cursor;                 // +00: current write cursor
-    std::int32_t remaining;       // +04: decremented after the core returns
-    char* base;                   // +08: caller's destination
-    std::uint32_t flags;          // +0c: initialized to 42h
-};
-static_assert(sizeof(FormatterDescriptor005a0fbf) == 16);
+// Original005a0fbf reserves32 bytes and initializes only the four prefix DWORDs.
+using FormatterDescriptor005a0fbf = FormatterOriginalDescriptor32;
 
-// Explicit unrecovered boundaries: the wrapper's algorithm is recovered;
-// formatting and cleanup effects belong to these callees.
+// Canonical parser binding is provided by formatter_parser_entry_bridge.cpp.
+// Cleanup uses the shared32-byte descriptor and its recovered body.
 std::int32_t __cdecl formatter_core_005a4371(
     FormatterDescriptor005a0fbf* descriptor, const char* format,
     const std::uint32_t* raw_arguments);
-void __cdecl formatter_cleanup_005a4259(
-    std::uint32_t zero, FormatterDescriptor005a0fbf* descriptor);
 
 // Canonical original caller ABI and a testable x86 raw-va adapter.
 std::int32_t __cdecl formatter_entry_005a0fbf(

@@ -7,7 +7,9 @@ namespace porsche {
 
 std::int32_t __cdecl formatter_entry_raw_005a0fbf(
     char* output, const char* format, const std::uint32_t* raw_arguments) {
-    FormatterDescriptor005a0fbf descriptor{};
+    // Original stack tail is uninitialized; cleanup snapshots opaque bytes
+    // and decodes them only after the early0x42 flag gate.
+    FormatterDescriptor005a0fbf descriptor;
     descriptor.cursor = output;
     descriptor.remaining = 0x7fffffff;
     descriptor.base = output;

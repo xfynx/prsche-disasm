@@ -3,22 +3,32 @@
 Решение пользователя 2026-10-08: сохранить v1 как есть, получить полный
 дизассемблированный/декомпилированный корпус и восстановить собираемый оригинал.
 Владелец — координатор. Приоритет: C/C++ startup → линковка → реальный запуск.
-Текущий принятый пакет —126:252 full +6 partial; предыдущий121 запушен1b39936.
-Общая MSVC Win32 сборка:113 projects /213 TUs;98 comparison/alias,4 native OS,3 link fixtures.
-24 свежих original-x86 reports /4813 comparisons плюс4 composed cases; все7 native/link checks прошли.
-Интегрированы123/127/128/129/130;0x180-byte app_main context и ECX/stack ABI исправлены.
-Game-link:0 compile errors /250 unresolved symbols /269 refs; игрового EXE нет.
-Manual index35 /36622 entries:53c0f0 и53c170, последний shared tail без нового instruction coverage.
-Manifest126 проверен:1641 staged blobs совпадают по SHA; готовится commit/push.
-Принятые production/shared файлы заморожены до следующего пакета.
-heap_init_recovery свободен после129; window_worker_recovery завершил isolated131 (ещё не принят).
-render_mode_completion —132 formatter cleanup;124 parser isolated,56 cases, root review pending.
-131 audio-init isolated:startup-domain proof,partial outside pinned table span; не подключён к игре.
-Next: review124/132 + descriptor/canonical callbacks, затем131/actualaudio closure;
-полный004d3420 и base/member context callees/vtable по actual game-link report остаются открытыми.
-[Validation backlog](../../../docs/recovery-validation-backlog.md) обновлён126: live timer/WM_CLOSE,
-полный startup/menu/игровой EXE,005e8e50 storage alias и визуальная приёмка не закрыты.
-Команды и evidence —runs/126-event-integration/README.md,acceptance.json,compile-link-proof.json.
+Текущий принятый пакет —136:267 full +6 registered partial;126 запушен482f28d.
+Общая MSVC Win32 сборка:120 projects /230 unique TUs;105 comparison/alias targets,
+4 native OS и3 link fixtures. Все7 native/link checks прошли.
+25 свежих original-x86 reports /4952 comparisons плюс4 component-proven composed cases.
+Game-link:0 compile errors /259 unresolved symbols /278 refs /0 other diagnostics; игрового EXE нет.
+Manual index35 /36622 entries; новые пакеты не добавляют function boundaries.
+136 соединяет108 actual formatter wrapper→124 parser→119 helpers→132 cleanup;
+canonical descriptor32 сохраняет opaque stack tail, wrapper пишет только исходный prefix.
+124 parser:62 cases после lead-byte table/zero hex prefix/wide padding fixes.
+132 cleanup:23 cases с callback flags rereads;134 actual formatter:12 connected cases
+с настоящими137 unsigned divide/remainder.137 runtime:72 cases.
+133 audio device:10 cases после overlapping copy и authoritative pointer-cell fixes.
+135:6 full context base/member bodies приняты по отдельному16-case scoped proof;
+20-case whole packet честно сохраняет partial00525ec0 с различием null-path EAX.
+Partial destructor — отдельный private TU, не зарегистрирован и не связан в production.
+138 accepted initial-image storage:8 ranges /5057 bytes /10 PE relocations,0 функций;
+исходные callback identities не означают выполненный runtime initialization.
+131 audio-init остаётся isolated:8 cases, signed timer half исправлен, но signed mode
+producer/domain не доказан. Original guard отсутствует; не подключать guessed clamp.
+Активных назначений исполнителей нет; дальнейшее восстановление и приёмка — координатор.
+Ближайший шаг: context allocator/list/range services→полный004d3420; audio mode
+producer004a6a00; formatter005abee8→005a2e22, затем005a0f5d/lowio005a953e.
+[Validation backlog](../../../docs/recovery-validation-backlog.md) обновлён136:
+полный C++ игровой EXE/запуск, live timer/WM_CLOSE,005e8e50 alias и визуальная приёмка открыты.
+Команды/evidence —runs/136-formatter-context-integration/README.md,acceptance.json,
+compile-link-proof.json. Свежие totals включают135 scoped proof, исключают его partial packet.
 История ниже не является активным назначением. Итерация и игровой запуск не завершены.
 
 ## Цель и готовность 001

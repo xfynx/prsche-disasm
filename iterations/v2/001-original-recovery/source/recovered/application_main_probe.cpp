@@ -50,8 +50,8 @@ void* __cdecl startup_network_allocate_0059ef90(std::uint32_t bytes){
 std::uint32_t __cdecl application_release_0059f050(void* address){
     (void)address;ev("0059f050");return 1;
 }
-void __fastcall application_context_base_construct_00525e20(ApplicationSetupContext*,void*){ev("00525e20");}
-void __fastcall application_context_member_construct_005294c0(void*,void*){ev("005294c0");}
+ApplicationSetupContext* __fastcall application_context_base_construct_00525e20(ApplicationSetupContext* context,void*){ev("00525e20");return context;}
+void* __fastcall application_context_member_construct_005294c0(void* member,void*){ev("005294c0");return member;}
 void __fastcall application_context_member_destroy_005295b0(void*,void*){ev("005295b0");}
 std::uint32_t __fastcall application_context_base_destroy_00525ec0(ApplicationSetupContext*,void*){ev("00525ec0");return 1;}
 void __cdecl startup_cd_relaunch_004a5c30(){ev("004a5c30");}

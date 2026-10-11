@@ -1,14 +1,14 @@
 # План восстановления Porsche Unleashed
 
-Текущий результат — [Run126](iterations/v2/001-original-recovery/runs/126-event-integration/README.md): **252 проверенные C++ функции** и 6 частичных consumer.
-Общая MSVC Win32 сборка:113 projects /213 TUs;98 comparison/alias probes,4 native OS и3 link fixtures.
-24 свежих original-x86 отчёта /4813 сравнений плюс4 composed cases; все7 native/link проверок прошли.
-Подключены event lifecycle/thread wait и startup audio setup; исправлены0x180-byte context/ECX ABI в app_main.
-21 lifecycle cases проверяют остановку callback pass на первом null;15 main cases выполняют оригинальные ctor/dtor.
-Game-link:0 compile errors /250 unresolved symbols /269 references; игрового EXE пока нет.
-Новые audio/base-context тела открыли следующие зависимости (121 было245); это текущая граница, не весь остаток.
-124 parser и131 audio-init сохранены изолированно;132 formatter cleanup восстанавливается.
-Отложенные проверки —docs/recovery-validation-backlog.md; полный004d3420, context vtable и005e8e50 alias открыты.
+Текущий результат — [Run136](iterations/v2/001-original-recovery/runs/136-formatter-context-integration/README.md): **267 проверенных C++ функций** и6 зарегистрированных частичных consumers.
+Общая MSVC Win32 сборка:120 projects /230 unique TUs;105 comparison/alias targets,4 native OS и3 link fixtures.
+25 свежих original-x86 отчётов /4952 сравнений плюс4 component-proven composed cases; все7 native/link проверок прошли.
+Соединены actual formatter wrapper/parser/cleanup и runtime leaves; приняты audio device и6 full context bodies.
+Run138 добавляет initial-image storage:8 ranges /5057 bytes /10 PE relocations,0 функций.
+Game-link:0 compile errors /259 unresolved symbols /278 references /0 other diagnostics; игрового EXE нет.
+Это текущая граница зависимостей, а не весь остаток: новые тела открывают следующие callees.
+131 audio-init и partial00525ec0 остаются изолированными и не зарегистрированы в production.
+Отложенные проверки —docs/recovery-validation-backlog.md; полный004d3420, context services и live CRT открыты.
 Маршрут: проверенный полный C/C++ baseline → схема устройства игры → Rust native/web.
 Полный игровой запуск, live timer/WM_CLOSE и визуальная приёмка остаются открытыми.
 
@@ -16,14 +16,15 @@ Game-link:0 compile errors /250 unresolved symbols /269 references; игрово
 ## Ближайшая цель: полный игровой EXE из C/C++
 
 Уточнение пользователя2026-10-11: результат этапа — компиляция и полный запуск игры.
-Checkpoint121 запушен1b39936; принят следующий пакет126. Общая библиотека и проверочные программы собираются;
-реальный игровой target ещё не линкуется:250 видимых unresolved symbols. Это текущая
+Checkpoint126 запушен482f28d; принят следующий пакет136. Общая библиотека и проверочные программы собираются;
+реальный игровой target ещё не линкуется:259 видимых unresolved symbols /278 references. Это текущая
 граница восстановленного графа, а не число всех оставшихся функций: новые тела могут
 открыть новые зависимости, включая косвенные вызовы и частично восстановленные consumers.
 
-1. После принятой126 интеграции123/127/128/129/130 закончить124 formatter/132 cleanup
-   и связать полный descriptor; review131 audio-init и следующие startup consumers.
-   Не считать изолированные пакеты интеграцией.
+1. После принятой136 интеграции продолжить context allocator/list/range services
+   и полный004d3420; проверить signed mode producer004a6a00 для isolated131.
+   Formatter: fatal005abee8→005a2e22, callback writer005a0f5d и lowio005a953e.
+   Partial00525ec0 требует исходного EAX contract; не подключать guessed return.
 2. По actual game-link report восстанавливать целые связанные блоки startup/application,
    render/driver и resource services. После каждого пакета повторять линковку настоящего
    игрового target и учитывать новые зависимости; не закрывать их заглушками.

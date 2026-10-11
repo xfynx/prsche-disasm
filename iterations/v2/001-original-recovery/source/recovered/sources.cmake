@@ -99,4 +99,12 @@ list(APPEND PORSCHE_RECOVERED_SOURCES
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/thread_wait.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_services.cpp"
     "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_context.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/formatter_parser.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/formatter_cleanup.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/formatter_parser_entry_bridge.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_audio_device.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/formatter_runtime.cpp"
+    "${PORSCHE_SOURCE_ROOT}/platform/formatter_runtime_links.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/formatter_runtime_storage.cpp"
+    "${PORSCHE_SOURCE_ROOT}/recovered/Porsche.exe/application_context_base.cpp"
 )

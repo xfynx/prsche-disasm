@@ -7,7 +7,8 @@
 и визуальное соответствие — отдельные результаты.
 
 - [ ] Собрать игровой EXE и выполнить исходный startup с настоящими ресурсами.
-  Блокер: Run126 game-link имеет250 unresolved symbols. Возврат: после устранения
+  Блокер: Run136 game-link имеет259 unresolved symbols /278 references;
+  compiler errors и other linker errors —0. Возврат: после устранения
   зависимостей; сначала запуск/выход, затем кадр, ввод, меню и режимы игры.
 - [ ] Проверить закрытие через WM_CLOSE→GetMessage=0→исходный timer callback,
   включая producer времени006b7c40. Run086/098 проверяет другую исходную ветку
@@ -54,16 +55,34 @@
   Quick Race, обе карьеры, физика/повреждения/ИИ/экономика/сохранения/звук.
   Возврат: после рабочего original baseline; текущие probes этого не доказывают.
 
-- [ ] Восстановить полный original formatter: state tables005c19a8/c8,
-  output helpers, float/wide/locale paths и runtime callback initialization.
-  Experimental114 вынесен вlocal/experiments. Шесть exact helpers119 интегрированы121
-  (11 cases); parser4371 isolated124:56 cases, root review pending.
-  Cleanup4259 восстанавливается132; production formatter ещё не связан.
-  Возврат: после полного parser/helper differential proof и связанного formatter entry.
-  До подключения cleanup005a4259 сохранить полный 32-byte stack descriptor:
-  wrapper005a0fbf выделяет0x20 байт (005a0fc2), а cleanup читает+0x10 до
-  проверки flags и+0x18 в buffered ветке. Текущий16-byte prefix проверен
-  только с записывающими границами; интеграция реального callee ещё не принята.
+- [ ] Завершить полный original formatter: float/wide/locale paths, runtime callback
+  initialization, file-write/auxiliary/descriptor-preparation effects и lowio startup.
+  Run136 соединяет production108 wrapper→124 parser→119 helpers→132 cleanup;
+  canonical descriptor имеет32 bytes, wrapper пишет только исходный16-byte prefix.
+  Непроинициализированный opaque tail не обнуляется; seeded test adapter отдельно.
+  Run124:62 cases после lead-byte table, zero hexadecimal prefix и wide padding fixes.
+  Run132:23 cases, flags перечитываются после callback, tail не декодируется до early exit.
+  Run134:12 connected cases с actual wrapper и actual137 unsigned divide/remainder;
+  Run137:72 runtime cases. Эти bounded проверки не доказывают live CRT/locale.
+  Run138 принят в production archive:8 initial-image ranges /5057 bytes, PE relocations и pointer identities;
+  callbacks не исполнялись, функций не добавлено. Это не runtime initialization.
+  Возврат:005abee8→005a2e22 fatal path,005a0f5d callback writer и его float consumers,
+  lowio initializer005a953e и реальные backend consumers.
+- [ ] Восстановить полный EAX contract base destructor00525ec0.
+  Run135: null-allocation branch сохраняет входной EAX в original x86, typed C++
+  возвращает0; два разных seeds документируют расхождение. Partial destructor
+  изолирован, в production library/реестр не подключён. Шесть full функций имеют
+  отдельный scoped proof на16 cases, весь isolated packet —20 bounded contracts.
+  Возврат: доказать caller-visible return/ABI всех веток и повторить composed
+  ctor→context→dtor со связанными dependencies; vtable004d3420 остаётся открытой.
+- [ ] Доказать signed mode domain audio initializer004a66b0 и полный consumer graph.
+  Run131:8 isolated cases; signed timer half исправлен (−2→−1), query00565680
+  заполняет все124 bytes. Index−9 ещё в pinned span,−10 выходит за него;
+  original guard отсутствует. Не подменять чтение guessed clamp/throw.
+  Возврат: проследить реальные producers mode и таблицы, проверить отрицательные
+  значения с original x86 и затем общий startup/device graph. Пакет изолирован.
 
-Владелец всех открытых пунктов — координатор. Состояние на checkpoint126:
-ни один из пунктов выше не объявлен выполненным.
+Владелец всех открытых пунктов — координатор. Состояние на checkpoint136:
+ни один end-to-end пункт выше не объявлен выполненным. Run133 device имеет10
+bounded cases после overlap/authoritative pointer-cell fixes; это не проверка
+настоящего audio device. Активных назначений исполнителей нет.

@@ -47,7 +47,7 @@ std::int32_t __cdecl formatter_core_005a4371(
     return static_cast<std::int32_t>(active.result);
 }
 
-void __cdecl formatter_cleanup_005a4259(
+std::int32_t __cdecl formatter_cleanup_005a4259(
     std::uint32_t zero, FormatterDescriptor005a0fbf* d) {
     trace.cleanup_called++;
     trace.cleanup_zero = zero;
@@ -55,6 +55,7 @@ void __cdecl formatter_cleanup_005a4259(
     trace.cleanup_cursor_offset = static_cast<std::uint32_t>(d->cursor-current_output);
     trace.cleanup_base_offset = static_cast<std::uint32_t>(d->base-current_output);
     trace.cleanup_flags = d->flags;
+    return 0; // Original wrapper ignores cleanup EAX.
 }
 } // namespace porsche
 

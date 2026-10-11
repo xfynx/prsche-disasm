@@ -1,14 +1,14 @@
 # Текущий этап: v2/001-original-recovery
 
-Текущий результат — [Run126](../iterations/v2/001-original-recovery/runs/126-event-integration/README.md): **252 проверенные C++ функции** и 6 частичных consumer.
-Общая MSVC Win32 сборка:113 projects /213 TUs;98 comparison/alias probes,4 native OS и3 link fixtures.
-24 свежих original-x86 отчёта /4813 сравнений плюс4 composed cases; все7 native/link проверок прошли.
-Подключены event lifecycle/thread wait и startup audio setup; исправлены0x180-byte context/ECX ABI в app_main.
-21 lifecycle cases проверяют остановку callback pass на первом null;15 main cases выполняют оригинальные ctor/dtor.
-Game-link:0 compile errors /250 unresolved symbols /269 references; игрового EXE пока нет.
-Новые audio/base-context тела открыли следующие зависимости (121 было245); это текущая граница, не весь остаток.
-124 parser и131 audio-init сохранены изолированно;132 formatter cleanup восстанавливается.
-Отложенные проверки —docs/recovery-validation-backlog.md; полный004d3420, context vtable и005e8e50 alias открыты.
+Текущий результат — [Run136](../iterations/v2/001-original-recovery/runs/136-formatter-context-integration/README.md): **267 проверенных C++ функций** и6 зарегистрированных частичных consumers.
+Общая MSVC Win32 сборка:120 projects /230 unique TUs;105 comparison/alias targets,4 native OS и3 link fixtures.
+25 свежих original-x86 отчётов /4952 сравнений плюс4 component-proven composed cases; все7 native/link проверок прошли.
+Соединены actual formatter wrapper/parser/cleanup и runtime leaves; приняты audio device и6 full context bodies.
+Run138 добавляет initial-image storage:8 ranges /5057 bytes /10 PE relocations,0 функций.
+Game-link:0 compile errors /259 unresolved symbols /278 references /0 other diagnostics; игрового EXE нет.
+Это текущая граница зависимостей, а не весь остаток: новые тела открывают следующие callees.
+131 audio-init и partial00525ec0 остаются изолированными и не зарегистрированы в production.
+Отложенные проверки —docs/recovery-validation-backlog.md; полный004d3420, context services и live CRT открыты.
 Маршрут: проверенный полный C/C++ baseline → схема устройства игры → Rust native/web.
 Полный игровой запуск, live timer/WM_CLOSE и визуальная приёмка остаются открытыми.
 

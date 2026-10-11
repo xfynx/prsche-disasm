@@ -381,6 +381,13 @@ add_subdirectory(runs/127-thread-wait thread-wait-127)
 add_subdirectory(runs/128-application-services application-services-128)
 add_subdirectory(runs/130-event-thread-integration event-thread-integration-130)
 add_subdirectory(runs/129-application-context application-context-129)
+add_subdirectory(runs/124-formatter-parser formatter-parser-124)
+add_subdirectory(runs/132-formatter-cleanup formatter-cleanup-132)
+add_subdirectory(runs/133-application-audio-device application-audio-device-133)
+add_subdirectory(runs/134-formatter-integration formatter-integration-134)
+add_subdirectory(runs/137-formatter-runtime formatter-runtime-137)
+add_subdirectory(runs/135-application-context-base application-context-base-135)
+add_subdirectory(runs/138-formatter-runtime-storage formatter-runtime-storage-138)
 
 # The native platform target is defined by Run055's add_subdirectory above.
 if(TARGET porsche_platform_win32)
@@ -394,5 +401,9 @@ foreach(probe engine_service_427a60_probe frame_services_probe resource_predicat
     target_compile_features(${probe} PRIVATE cxx_std_17)
     target_compile_definitions(${probe} PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
     target_compile_options(${probe} PRIVATE /W4 /EHsc /permissive-)
+    set_target_properties(${probe} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+endforeach()
+
+foreach(probe formatter_parser_probe formatter_cleanup_probe application_audio_device_probe formatter_integration_probe formatter_runtime_probe application_context_base_probe formatter_runtime_storage_probe)
     set_target_properties(${probe} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 endforeach()
