@@ -1,5 +1,23 @@
 # Состояние проекта
 
+Checkpoint 2026-10-19, Run309 — готовый результат перед разбором PR.
+- Реальный игровой граф: 158 C++ TUs скомпилированы, link264 имён/300 ссылок.
+  После298 закрыты pool shutdown005678f0 и disk-slot shutdown005918c0; новых
+  unresolved нет. EXE не получен, игра не запускалась.
+- 305/307: 248/181 original bytes, по48 native comparisons PASS, существующие
+  canonical providers. 304: отдельный heap-slot release72B/960cases, без подключения
+  до восстановления parent. Общий source base389pins +3/+6delta, audits PASS.
+- REA302/308: CLI и реальная постоянная MCP stdio-сессия PASS, без API.
+  Cold86.7s; повтор24ms из snapshot; другая функция65ms в том же соединении.
+  IDE/global MCP registration не выполнялась; прямой PID Ghidra не наблюдался.
+- 296/301/303: shared root/arena/context layout и исходная инициализация HOLD.
+  Сохраняем явные границы; неподтверждённых storage/нулевых providers не добавлено.
+Активных назначений нет. Пользователь просит закончить коммит и затем разбирать PR.
+310 canonical-binding triage не началась из-за лимита агента; WIP-файлов нет.
+Не начинать новые recovery-пакеты перед следующим поручением по PR.
+Проверки: audit-v2-disk-game-integration-309.py, audit-v2-pool-game-integration-306.py,
+audit-v2-rea-pilot-302.py, audit-v2-rea-mcp-session-308-004.py (scripts/research).
+
 Checkpoint 2026-10-19, Run420: интеграция Heap Shutdown (418) и Frame Root (419) в реальный игровой target.
 - Все 188 C++ TUs реального game graph скомпилированы чисто (MSVC Win32, /MP6). 0 compiler errors, 0 other linker errors.
 - Закрыты 8 контрактов в линкере из фронтира Run417 (включая platform_flush_0059eb20, application_pool_shutdown_005678f0, startup_sequence_call_00471b70, frame_service_root_00628960 и ячейки селектора/состояния heap 005e4fe8/005e4fec).
@@ -9,7 +27,7 @@ Checkpoint 2026-10-19, Run420: интеграция Heap Shutdown (418) и Frame
 
 Checkpoint 2026-10-18, Run419: восстановлен жизненный цикл Frame Root Storage (`00628960`, `00471b70` и `00471c40`).
 - Восстановлены 2 оригинальные функции (263 байта тела PE): `frame_root_init_00471b70` (198B) и `frame_root_teardown_00471c40` (65B).
-- Закрыт долгосрочный HOLD на ячейку хранения frame root `00628960` (известный с Run 296/301), доказана смежность памяти `FrameRootStorageLayout`: `00628940` (32B), `00628960` (4B) и `00628964` (256B).
+- Сужен долгосрочный HOLD на ячейку хранения frame root `00628960` (известный с Run 296/301): ячейка единственная и совпадает с символом, объявленным в замороженном заголовке Run 290, поэтому потребитель `00471b60` читает то, что пишет `00471b70`. Смежность `00628940` → ячейка проверяется фикстурой во время выполнения (32 байта, как в оригинале). Остаётся расхождение: оригинал имеет 4 байта до `00628964`, этот toolchain — 8, поэтому досягаемость копии до следующего буфера не воспроизведена.
 - Закрыты 2 прямых контракта линкера: `?startup_sequence_call_00471b70@porsche@@YAXXZ` (из `004b67b0`) и `pipe_00471c40` (из `004b68f0`).
 - Дифференциальная проверка на физическом слэбе CPU x86 (`native-fixture.exe`): 5/5 сценариев PASS по всем функциям и объектам. Независимый аудит (`audit-v2-frame-root-419.py`) PASS.
 - Ближайшие шаги: подключение восстановленных модулей Run418 и Run419 в `CMakeLists.txt` (`porsche_original_game_link`).
