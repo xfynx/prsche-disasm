@@ -1,20 +1,21 @@
 # Current project status
 
-Updated 2026-10-26. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-10-27. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run413](iterations/v2/001-original-recovery/runs/413-modem-completion-integration/README.md)
-compiles 225 C++ translation units across 8 projects. The game link still has 190 unresolved
-names / 198 references. **There is no recovered playable C++ game executable yet.**
+[Run433](iterations/v2/001-original-recovery/runs/433-startup-modem-audio-integration/README.md)
+compiles 228 C++ translation units across 8 projects. The game link still has 184 unresolved
+names / 191 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates ten original callback/TAPI bodies after 19,936 native
-cases/sequences, 19 detected mutations and a 560-pin audit. These are this batch's
-results, not a project-wide completion percentage. The modem enumerator and callback
-retain explicit partial/opaque domains; full live platform behavior is unverified.
+The latest batch integrates fifteen original modem/audio bodies after 102,108 native
+cases/sequences, 28 detected mutations and a 566-pin audit. Audio views reuse the
+canonical state owner. These are batch results, not a completion percentage.
+The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
-The modem configuration 0055e340 and real DLL/TAPI/device/allocator composition remain
-open. Detailed evidence and the actual next work order live in the
+Modem configuration 0055e340 is integrated in its tested domain. Audio stop00565d60,
+ABI005659f0 and real DLL/TAPI/device/allocator composition remain open.
+Detailed evidence and the next work order live in the
 [iteration PLAN](iterations/v2/001-original-recovery/PLAN.md).
 Full startup, display, menus, careers and gameplay still need integration/acceptance.
 

@@ -1,0 +1,201 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <type_traits>
+#include "modem_configuration.hpp"
+#include "porsche/fe_stream.hpp"
+#include "porsche/formatter_bootstrap.hpp"
+#include "porsche/startup_input.hpp"
+#include "porsche/file_wait.hpp"
+#include "porsche/window_shutdown.hpp"
+#include "porsche/render_loader.hpp"
+#include "porsche/splash_progress.hpp"
+using U=std::uint32_t;using I=std::int32_t;using B=unsigned char;
+static_assert(sizeof(void*)==4);
+using Get=I(__stdcall*)(U,void*,const char*);
+using Set=I(__stdcall*)(U,const void*,U,const char*);
+using Configure=U(__cdecl*)(U);
+static_assert(std::is_same_v<decltype(&porsche::modem_line_get_dev_config_00584c05),Get>);
+static_assert(std::is_same_v<decltype(&porsche::modem_line_set_dev_config_00584e27),Set>);
+static_assert(std::is_same_v<decltype(&porsche::modem_line_configure_0055e340),Configure>);
+static const B raw_get[]={@GET@},raw_set[]={@SET@},raw_config[]={@CONFIG@},raw_probe[]={@PROBE@};
+static const B raw_names[]={@NAMES@},raw_class[]={@CLASS@},raw_selected[]={@SELECTED@};
+static U* cells[]={&porsche::tapi_getdevconfig_cache_006ad168,&porsche::tapi_setdevconfig_cache_006ad2a0};
+static const char* names[]={"lineGetDevConfig","lineSetDevConfig"};
+static B* oracle[4];static B memory[64];static B* config_buffer;
+static U current,mode,return_bits,get_bits,plan,effects,cases,checks;
+static U total_value,needed_value,offset_value,size_value,flags_value;
+template<class T> static U address(T p){return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));}
+static U word(const void* p){U v;std::memcpy(&v,p,4);return v;}
+static void put(void* p,U v){std::memcpy(p,&v,4);}
+static void die(const char* why){std::printf("fixture %s\n",why);ExitProcess(98);}
+struct State{U cache[2],selected;B memory[64];};
+static State state(){State s{};for(U i=0;i<2;++i)s.cache[i]=*cells[i];s.selected=porsche::modem_selected_device_005df478;std::memcpy(s.memory,memory,64);return s;}
+struct Event{U kind,index,args[4];State before;B bytes[8000];};
+static Event events[8];static U event_count;
+static Event& record(U kind,U index,const U* args,U count){if(event_count==8)die("event-overflow");Event& e=events[event_count++];e={};e.kind=kind;e.index=index;e.before=state();for(U i=0;i<count;++i)e.args[i]=args[i];return e;}
+static I endpoint(U which,U variant,const U* args,U count){
+    U normalized[4]{};std::memcpy(normalized,args,count*4);
+    if(current==2){
+        const char* label=reinterpret_cast<const char*>(static_cast<std::uintptr_t>(args[count-1]));
+        if(std::strcmp(label,"comm/datamodem"))die("config-class");
+        normalized[count-1]=0x5bcb3c;
+        if(which==0){config_buffer=reinterpret_cast<B*>(static_cast<std::uintptr_t>(args[1]));normalized[1]=0;}
+        else normalized[1]=args[1]-address(config_buffer);
+    }
+    auto& e=record(2,which+variant*2,normalized,count);
+    if(current==2){
+        if(!config_buffer)die("config-buffer");std::memcpy(e.bytes,config_buffer,8000);
+        if(which==0){
+            for(U i=0;i<8000;++i)if(config_buffer[i]!=(i<4?static_cast<B>(8000u>>(8*i)):0))die("config-zero-init");
+            if(plan!=1){
+                for(U i=0;i<8000;++i)config_buffer[i]=static_cast<B>(i*19u+flags_value);
+                put(config_buffer,total_value);put(config_buffer+4,needed_value);
+                put(config_buffer+16,size_value);put(config_buffer+20,offset_value);
+                // Even wrapping offsets are tested only when the flags DWORD
+                // lands inside the physical8000-byte local. No extra bounds
+                // check is added to the production algorithm.
+                if(offset_value+0x5cu<=7996u&&offset_value+0x5cu!=20u)put(config_buffer+(offset_value+0x5cu),flags_value);
+            }
+            if(effects&1)porsche::modem_selected_device_005df478^=0x18273645u;
+            return static_cast<I>(get_bits);
+        }
+        if(effects&2){config_buffer[7999]^=0x3d;porsche::modem_selected_device_005df478^=0x76543210u;}
+    }else{
+        for(U a=0;a<count;++a)if(args[a]==address(memory+8))for(U i=0;i<16;++i)memory[8+i]^=static_cast<B>(0x31+variant+i*13);
+    }
+    if(mode==8)*cells[which]=0;
+    if(mode==9)*cells[which]=0xffffffffu;
+    return static_cast<I>(return_bits^(variant?0x12736485u:0));
+}
+extern "C" I __stdcall get_a(U a,void* b,const char* c){U x[]={a,address(b),address(c)};return endpoint(0,0,x,3);}
+extern "C" I __stdcall get_b(U a,void* b,const char* c){U x[]={a,address(b),address(c)};return endpoint(0,1,x,3);}
+extern "C" I __stdcall set_a(U a,const void* b,U c,const char* d){U x[]={a,address(b),c,address(d)};return endpoint(1,0,x,4);}
+extern "C" I __stdcall set_b(U a,const void* b,U c,const char* d){U x[]={a,address(b),c,address(d)};return endpoint(1,1,x,4);}
+static U target(U which,U variant){U f[2][2]={{address(&get_a),address(&set_a)},{address(&get_b),address(&set_b)}};return f[variant][which];}
+namespace porsche {
+// Unused consumers of canonical403/401/374 owners are fail-closed fixture
+// endpoints, as in410. They never enter the production graph.
+U __cdecl free_00531f90(void*){die("unused-free");return 0;}
+void* __cdecl allocate_00531ca0(const char*,I,U){die("unused-allocate");return nullptr;}
+I __cdecl modem_device_capabilities_0055e6e0(U){die("unused-capabilities");return 0;}
+I __cdecl modem_line_open_0055e270(){die("unused-open");return 0;}
+I __stdcall modem_line_negotiate_00584d7c(U,U,U,U,U*,void*){die("unused-negotiate");return 0;}
+void* __cdecl startup_window_handle_00557460(){die("unused-window");return nullptr;}
+U __cdecl file_sleep_0055f740(U){die("unused-sleep");return 0;}
+void __stdcall modem_callback_0055df80(U,U,U,U,U,U){die("unused-callback");}
+I __stdcall modem_line_initialize_00584ce0(U*,U,ModemCallback,const char*,U*){die("unused-initialize");return 0;}
+I __stdcall modem_line_status_00584c9d(U,void*){die("unused-status");return 0;}
+I __stdcall modem_line_shutdown_00584eb9(U){die("unused-shutdown");return 0;}
+I __stdcall modem_line_close_00584af2(U){die("unused-close");return 0;}
+void* __stdcall formatter_dialog_load_library(const char*){die("unused-dialog-load");return nullptr;}
+void* __stdcall formatter_dialog_get_proc_address(void*,const char*){die("unused-dialog-proc");return nullptr;}
+void* window_shutdown_handle_0069dd18=nullptr;U window_shutdown_config_005de620[12]{};std::uint8_t window_shutdown_source_005de65c=0,window_shutdown_source_005de65d=0;U render_thrash_exports_006bd910[43]{};U splash_progress_format_005dead0=0;
+void __stdcall window_shutdown_display_callback_006bd9b0(U){die("unused-render-display");}
+void __cdecl window_shutdown_runtime_state_00534430(){die("unused-render-runtime");}
+void* __cdecl render_descriptor_allocate_00535700(U,U,U,U,U){die("unused-render-allocation");return nullptr;}
+I __stdcall tapi_resolve_00584a60(const char* name,U* cache){
+    U index=2;for(U i=0;i<2;++i)if(!std::strcmp(name,names[i]))index=i;
+    if(index==2||cache!=cells[index])die("resolver-name-or-cell");
+    U args[]={index,0};record(1,index,args,2);
+    if(current!=2)*cells[1-index]=target(1-index,1);
+    if(mode>=3&&mode<=6){*cache=mode==3?0:mode==4?target(index,1):0xffffffffu;return static_cast<I>(mode==6?0x80000049u:mode==5?1u:0xf137953bu);}
+    *cache=mode==2?0xffffffffu:target(index,mode==1?1:0);return 0;
+}
+}
+static void install(){
+    if(word(raw_selected)!=0xffffffffu||std::strcmp(reinterpret_cast<const char*>(raw_class),"comm/datamodem"))die("raw-data");
+    B* block=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!block)die("allocation");
+    const B* raws[]={raw_get,raw_set,raw_config,raw_probe};const U lengths[]={sizeof raw_get,sizeof raw_set,sizeof raw_config,sizeof raw_probe};
+    U bases[]={0x584c05,0x584e27,0x55e340,0x5a1e90};
+    for(U i=0;i<4;++i){oracle[i]=block+i*256;std::memcpy(oracle[i],raws[i],lengths[i]);}
+    for(U k=0;k<2;++k){U cache_va=k?0x6ad2a0:0x6ad168,name_va=k?0x5c12cc:0x5c1250,cache_n=0,name_n=0,call_n=0;
+        if(std::strcmp(reinterpret_cast<const char*>(raw_names+name_va-0x5c1214),names[k]))die("raw-name");
+        for(U i=0;i+4<=lengths[k];++i){if(word(raws[k]+i)==cache_va){put(oracle[k]+i,address(cells[k]));++cache_n;}if(word(raws[k]+i)==name_va){put(oracle[k]+i,address(names[k]));++name_n;}
+            if(i+5<=lengths[k]&&raws[k][i]==0xe8&&bases[k]+i+5+word(raws[k]+i+1)==0x584a60){put(oracle[k]+i+1,address(&porsche::tapi_resolve_00584a60)-address(oracle[k]+i+5));++call_n;}}
+        if(cache_n!=4||name_n!=1||call_n!=1)die("wrapper-relocations");
+    }
+    U selected_n=0,class_n=0,call_n=0;
+    for(U i=0;i+4<=sizeof raw_config;++i){
+        if(word(raw_config+i)==0x5df478){put(oracle[2]+i,address(&porsche::modem_selected_device_005df478));++selected_n;}
+        if(word(raw_config+i)==0x5bcb3c){put(oracle[2]+i,address(raw_class));++class_n;}
+        if(i+5<=sizeof raw_config&&raw_config[i]==0xe8){U dest=0x55e340+i+5+word(raw_config+i+1);U index=dest==0x5a1e90?3:dest==0x584c05?0:dest==0x584e27?1:9;if(index==9)die("config-call");put(oracle[2]+i+1,address(oracle[index])-address(oracle[2]+i+5));++call_n;}
+    }
+    if(selected_n!=2||class_n!=2||call_n!=3)die("config-relocations");
+    DWORD old;if(!VirtualProtect(block,4096,PAGE_EXECUTE_READ,&old))die("protect");FlushInstructionCache(GetCurrentProcess(),block,4096);
+}
+struct Capture{U sp0,sp1,bp0,bp1,bx0,bx1,si0,si1,di0,di1,eax;};
+static Capture invoke(const void* fn,U argc,bool callee_pop,const U* args){Capture r{};
+    __asm {
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,6a31c5e7h
+        lea edx,r
+        mov [edx],esp
+        mov [edx+8],ebp
+        mov [edx+16],ebx
+        mov [edx+24],esi
+        mov [edx+32],edi
+        mov ecx,argc
+        mov edx,args
+    nextarg:
+        test ecx,ecx
+        jz callit
+        push dword ptr [edx+ecx*4-4]
+        dec ecx
+        jmp nextarg
+    callit:
+        call fn
+        cmp callee_pop,0
+        jne capture
+        mov ecx,argc
+        lea esp,[esp+ecx*4]
+    capture:
+        lea edx,r
+        mov [edx+40],eax
+        mov [edx+4],esp
+        mov [edx+12],ebp
+        mov [edx+20],ebx
+        mov [edx+28],esi
+        mov [edx+36],edi
+    }return r;
+}
+static bool abi(const Capture& r){++checks;return r.sp0==r.sp1&&r.bp0==r.bp1&&r.bx0==r.bx1&&r.si0==r.si1&&r.di0==r.di1;}
+struct Step{Event events[8];U event_count,eax,abi;State after;};struct Result{Step steps[3];};
+static Result expected,actual;
+static void execute(const void* fn,U initial,const U* args,Result& result){
+    for(U i=0;i<2;++i)*cells[i]=current==2?0:initial;
+    porsche::modem_selected_device_005df478=0x81234567u^effects;
+    for(U i=0;i<64;++i)memory[i]=static_cast<B>(0x37+i*19);
+    std::memset(&result,0,sizeof result);config_buffer=nullptr;
+    for(U i=0;i<(current==2?1u:3u);++i){event_count=0;std::memset(events,0,sizeof events);auto c=invoke(fn,current==2?1:current==0?3:4,current!=2,args);auto& s=result.steps[i];std::memcpy(s.events,events,sizeof events);s.event_count=event_count;s.eax=c.eax;s.abi=abi(c);s.after=state();}
+}
+static bool test(U initial,const U* args){
+    U funcs[]={address(&porsche::modem_line_get_dev_config_00584c05),address(&porsche::modem_line_set_dev_config_00584e27),address(&porsche::modem_line_configure_0055e340)};
+    execute(oracle[current],initial,args,expected);execute(reinterpret_cast<const void*>(funcs[current]),initial,args,actual);
+    bool valid=true;for(U i=0;i<(current==2?1u:3u);++i)valid&=expected.steps[i].abi&&actual.steps[i].abi;
+    if(!valid||std::memcmp(&expected,&actual,sizeof expected)){std::printf("divergence kind=%u mode=%u initial=%08x get=%08x set=%08x plan=%u offset=%08x flags=%08x effects=%u expected=%08x actual=%08x\n",current,mode,initial,get_bits,return_bits,plan,offset_value,flags_value,effects,expected.steps[0].eax,actual.steps[0].eax);return false;}++cases;checks+=6;return true;
+}
+int main(){
+    if(*cells[0]||*cells[1]||porsche::modem_selected_device_005df478!=0xffffffffu)die("production-initial-state");install();
+    const U values[]={0,1,0x7fffffffu,0x80000000u,0x80000049u,0xffffffffu,0x12345678u};
+    for(current=0;current<2;++current)for(mode=0;mode<10;++mode)for(U init=0;init<4;++init)for(U result:values)for(U pattern=0;pattern<4;++pattern){
+        U args[4];for(U i=0;i<4;++i)args[i]=pattern==0?0:pattern==1?0xffffffffu:(0x81234567u+0x1a2b3c4u*i)^(pattern*0x18764325u);
+        if(pattern==3)args[0]=args[1]=args[current==0?2:3]=address(memory+8);
+        return_bits=result;U initial=init==0?0:init==1?0xffffffffu:target(current,init-2);if(!test(initial,args))return 1;
+    }
+    U wrapper_cases=cases;current=2;
+    const U offsets[]={0,1,4,16,20,24,128,7904,0xffffffa4u,0xffffffa8u,0xffffffa9u,0xffffffb4u,0xffffffb8u};
+    const U totals[]={0,7999,8000,0x80000000u,0xffffffffu};
+    const U sizes[]={0,1,8000,0x80000000u,0xffffffffu};
+    for(mode=0;mode<7;++mode)for(plan=0;plan<2;++plan)for(U get:values)for(U set:values)for(effects=0;effects<4;++effects){
+        get_bits=get;return_bits=set;total_value=8000;needed_value=8000;offset_value=24;size_value=128;flags_value=0xffffffffu;U args[]={0xdeadbeef};if(!test(0,args))return 1;
+    }
+    mode=0;plan=0;get_bits=0;
+    for(U offset:offsets)for(U total:totals)for(U need:totals)for(U size:sizes)for(U flags:values)for(effects=0;effects<4;++effects){
+        offset_value=offset;total_value=total;needed_value=need;size_value=size;flags_value=flags;return_bits=values[(offset+total+need+size+flags)%7];U args[]={effects&1?0:0xffffffffu};if(!test(0,args))return 1;
+    }
+    std::printf("modem_configuration_original_x86_vs_cpp=PASS cases=%u wrapper_sequences=%u configure_cases=%u checks=%u\n",cases,wrapper_cases,cases-wrapper_cases,checks);return 0;
+}

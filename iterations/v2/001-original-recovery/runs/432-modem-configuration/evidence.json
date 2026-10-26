@@ -1,0 +1,209 @@
+{
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "query": "0055e340,00584c05,00584e27; lineGetDevConfig,lineSetDevConfig; comm/datamodem;005df478,006ad168,006ad2a0",
+  "index": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+  "assembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "original_bodies": [
+    {
+      "token": "@GET@",
+      "va": "00584c05",
+      "bytes": 71,
+      "sha256": "1e6711a671b9ee23bd72716331178919f2a1a19a5c61bdb448a875ed8fbb5fa5"
+    },
+    {
+      "token": "@SET@",
+      "va": "00584e27",
+      "bytes": 75,
+      "sha256": "5dbc4ffe64bcf9f3d595f32192f1261d6ee36a27d54979000e95d7b434555e1b"
+    },
+    {
+      "token": "@CONFIG@",
+      "va": "0055e340",
+      "bytes": 143,
+      "sha256": "904dd7041dba4c582a487f6b5e8eee22805afd8315998c98a90a25deb7af63d2"
+    },
+    {
+      "token": "@PROBE@",
+      "va": "005a1e90",
+      "bytes": 47,
+      "sha256": "4be32df90e8e3db3f5eed0d31857bddd88255c7ed09ae57e0e20e4510124a255"
+    },
+    {
+      "token": "@NAMES@",
+      "va": "005c1214",
+      "bytes": 241,
+      "sha256": "5cec875091b316879f7285e8fdddb98ded1f0562a7dcab14a9fe408968d9fbde"
+    },
+    {
+      "token": "@CLASS@",
+      "va": "005bcb3c",
+      "bytes": 15,
+      "sha256": "56b727dd1125bf6ac7f817402652e9de23e4ffaec6b8dabd76b8d9111082d2de"
+    },
+    {
+      "token": "@SELECTED@",
+      "va": "005df478",
+      "bytes": 4,
+      "sha256": "ad95131bc0b799c0b1af477fb14fcf26a6a9f76079e48bf090acb7e8367bfd0e"
+    }
+  ],
+  "new_bodies": [
+    {
+      "entry_va": "0055e340",
+      "end_va": "0055e3ce",
+      "bytes": 143,
+      "abi": "cdecl1/plainRET; uint32 EAX",
+      "facts": [
+        "Caller0055e270 passes line value but143B body never reads argument; canonical005df478 used before getter and reloaded after getter success/size check.",
+        "Original005a1e90 stackprobe allocates8000;REP STOSD clears2000DWORDs; total field initialized8000.",
+        "Getter00584c05(device,VARSTRING,comm/datamodem); any nonzero result returns0.",
+        "Unsigned needed(+4)>total(+0) returns0 with no setter. No offset/size/version/used-field validation exists.",
+        "Config pointer = 32bit buffer base + DWORD(+20). Load device beforeflags update; flagsDWORD at config+0x5c &=0xfffffff8.",
+        "SizeDWORD(+16) is loaded afterflags store; aliasing is preserved. Setter00584e27(device,config,size,class). Nonzero setterEAX normalized1, zero normalized0."
+      ]
+    },
+    {
+      "entry_va": "00584c05",
+      "end_va": "00584c4b",
+      "bytes": 71,
+      "abi": "stdcall3/RET0xc; int32 EAX",
+      "cache": "006ad168",
+      "name_va": "005c1250"
+    },
+    {
+      "entry_va": "00584e27",
+      "end_va": "00584e71",
+      "bytes": 75,
+      "abi": "stdcall4/RET0x10; int32 EAX",
+      "cache": "006ad2a0",
+      "name_va": "005c12cc"
+    }
+  ],
+  "wrapper_facts": [
+    "Zero cache calls canonical00584a60 with original proc name/cache pointer. A nonzero resolverEAX forcescache0xffffffff and returns its exact bits.",
+    "Successful resolve rereads cache. Sentinel0xffffffff returns0x80000049; other targets called with original stdcall argument order/return bits.",
+    "Direct tests retain cross-cell writes, invalidation, first-error vs repeated-sentinel behavior and host function pointer transport."
+  ],
+  "native": {
+    "config": "iterations/v2/001-original-recovery/runs/432-modem-configuration/native-config.json",
+    "receipt": "local/experiments/v2-modem-configuration-native-432/003/receipt.json",
+    "receipt_sha256": "9fb5f96337ac9d616a53b0e0d0aca0f8a399da58695508ed5d562b3be315bdbe",
+    "variants": {
+      "od": {
+        "cases": 50484,
+        "wrapper_sequences": 2240,
+        "configure_cases": 48244,
+        "output": "modem_configuration_original_x86_vs_cpp=PASS cases=50484 wrapper_sequences=2240 configure_cases=48244 checks=412832"
+      },
+      "o2": {
+        "cases": 50484,
+        "wrapper_sequences": 2240,
+        "configure_cases": 48244,
+        "output": "modem_configuration_original_x86_vs_cpp=PASS cases=50484 wrapper_sequences=2240 configure_cases=48244 checks=412832"
+      }
+    },
+    "native_cases": 100968,
+    "mutation_controls": [
+      {
+        "name": "failure-cache",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "59fc3bb4f9e3d8daf19feceff1e5785751355477634d8bf724d0f7769ee5b6ce"
+      },
+      {
+        "name": "first-error-bits",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "00e6c4becaaa36ffcd743cf504532d843ee951ffff796e72422f665474615d6b"
+      },
+      {
+        "name": "sentinel-error-bits",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "ab115589773629714422a7b7530566374cfdfd78ce8926288fdf70b029a3b7fc"
+      },
+      {
+        "name": "get-arg-order",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "42f3b8fda77cb5cd6010904e281714e3f0b77c54e77e98e2643c807772019d70"
+      },
+      {
+        "name": "set-arg-order",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "91a950c96c5d4565e50516b9feb070d4d845fcc77e3916c2caa28cf5a831e317"
+      },
+      {
+        "name": "getter-ignored-argument",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "1082b12fc4a9e2af94c5aa27bcfd84c47c49abd9a2a7775334b3365a86be0b30"
+      },
+      {
+        "name": "size-unsigned",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "2fd17024885c9256f41168cdcf408af73761da921fc2615d8e823560f3fca764"
+      },
+      {
+        "name": "equal-size",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "1082b12fc4a9e2af94c5aa27bcfd84c47c49abd9a2a7775334b3365a86be0b30"
+      },
+      {
+        "name": "flags-mask",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "1082b12fc4a9e2af94c5aa27bcfd84c47c49abd9a2a7775334b3365a86be0b30"
+      },
+      {
+        "name": "size-reload",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "3fd387ecb795dbf5afcd64194d2d9a158230eb228756132737a30bd056dc33a8"
+      },
+      {
+        "name": "device-reload",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "c38118846956dbb21c06ae11001cf60ab519947ccf1236ca05531e2b9eec861f"
+      },
+      {
+        "name": "set-result-normalization",
+        "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+        "detected": true,
+        "exit_code": 1,
+        "log_sha256": "bc06947242211815eb1de5707d0a4239c8c3f8ce012c1affedcd755ddd626923"
+      }
+    ],
+    "source_encoding": "UTF-8 without BOM; LF before003proof",
+    "harness": "Native invoke pushes arguments, records ESP/EBP/EBX/ESI/EDI/EAX; original143B and both raw wrappers compose; raw47B stackprobe is oracle dependency only. Canonical403/401/374 TUs linked; unused consumers fail closed. Controlled resolver fixture is not production provider."
+  },
+  "boundaries": [
+    "No live DLL/TAPI/device acceptance, concurrency, complete modem/game startup or visual acceptance. Existing403 and411 partial domains are unchanged.",
+    "All bytes of8000-byte initial local and getter/setter intermediate local are compared. Getter unmodified zero output also tested.",
+    "Malformed total/needed, zero/huge size, unaligned offsets and wrapping offsets whose flagsDWORD lies within the physical8000-byte local are compared. Negative configuration pointer is transported opaquely to controlled setter.",
+    "Outside-local flag accesses, realAPI dereference of malformed configuration pointers/sizes, stack guard/cookie/fault equivalence remainunverified; no new production bounds checks or guessed behavior added.",
+    "Success with resolver cache0 would callnull as original; direct null-call fault parity is not accepted."
+  ],
+  "attempts": {
+    "failed001": "Missing canonical-owner fixture dependencies at link; preserved.",
+    "superseded002": "Both native variants and12mutations PASS; rawclass span14B excluded terminatingNUL and relied on alignment padding. Corrected span15B and re-proved in003; no productioncode change."
+  },
+  "ownership": "iterations/v2/001-original-recovery/runs/432-modem-configuration/ownership.json",
+  "coff": "iterations/v2/001-original-recovery/runs/432-modem-configuration/coff-evidence.json"
+}

@@ -19,6 +19,9 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
+Latest recovery intake: [Run433](iterations/v2/001-original-recovery/runs/433-startup-modem-audio-integration/README.md).
+Next are the real audio stop consumer and its remaining ABI/state dependencies.
+
 ## Recovery milestones
 
 1. Recover and integrate the original C/C++ startup and subsystem dependencies, using

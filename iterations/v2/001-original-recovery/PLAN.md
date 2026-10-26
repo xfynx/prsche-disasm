@@ -1,5 +1,20 @@
 # v2 / 001 - original source recovery plan
 
+Current433,2026-10-27: frozen432/434 integrated andsharedauditPASS.15originalbodies
+740B;102108nativecases/28mutations/566pins;228TUs/8projects compile,184names191refs,
+noEXE. Sevenoldnamesclose/real00565d60 opens. Canonicalaudio state reused; no new
+loosecells or guessedcallbacks. Fourreferences aliasaccepteddeviceblock; CS24B
+andtwoTAPIcaches have originalzero/ownership proof. Existing403/411 stayPARTIAL.
+Build003 complete after declaring410includedir andrerunning sandbox-stoppedbuild.
+Oldfailed receipts preserved; passednativeinputs frozen. Bothworkers completed;
+no activeassignment. Run433 README owns exactchecks/artifacts. Modelpreference
+recorded in docs/agents.md; Solhigh used forboth recovery batches.
+Nextboundedwork: index00565d60/audio stopconsumer, resolve005659f0signed-return
+ABI throughonecanonicalbody/facade, then0058a8b0/audioallocation/init. No unproved
+Run400 code entersgamegraph. Liveplatform/startup/display/gameacceptance remainsopen.
+
+Historical432/434 assignments follow.
+
 Active2026-10-27: resume originalC++ recovery from acceptedRun413, cleanstartda9a845.
 modem_configuration_432 owns runs/432-modem-configuration: original0055e340143B
 andtwochildren00584c05/00584e27 (71/75B), nativecomparison via sharedrunner.

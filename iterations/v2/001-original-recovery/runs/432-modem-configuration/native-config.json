@@ -1,0 +1,171 @@
+{
+  "run": 432,
+  "experiment": "local/experiments/v2-modem-configuration-native-432",
+  "timeout_seconds": 120,
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+    "iterations/v2/001-original-recovery/runs/403-modem-enumeration/modem_enumeration.cpp",
+    "iterations/v2/001-original-recovery/runs/401-device-table/device_table.cpp",
+    "iterations/v2/001-original-recovery/runs/374-render-descriptor/render_descriptor.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/formatter_strings.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/432-modem-configuration/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/432-modem-configuration",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/410-modem-caps-open",
+    "iterations/v2/001-original-recovery/runs/408-tapi-wrappers",
+    "iterations/v2/001-original-recovery/runs/403-modem-enumeration",
+    "iterations/v2/001-original-recovery/runs/401-device-table",
+    "iterations/v2/001-original-recovery/runs/374-render-descriptor"
+  ],
+  "headers": [],
+  "original_bodies": [
+    {
+      "token": "@GET@",
+      "va": "00584c05",
+      "bytes": 71,
+      "sha256": "1e6711a671b9ee23bd72716331178919f2a1a19a5c61bdb448a875ed8fbb5fa5"
+    },
+    {
+      "token": "@SET@",
+      "va": "00584e27",
+      "bytes": 75,
+      "sha256": "5dbc4ffe64bcf9f3d595f32192f1261d6ee36a27d54979000e95d7b434555e1b"
+    },
+    {
+      "token": "@CONFIG@",
+      "va": "0055e340",
+      "bytes": 143,
+      "sha256": "904dd7041dba4c582a487f6b5e8eee22805afd8315998c98a90a25deb7af63d2"
+    },
+    {
+      "token": "@PROBE@",
+      "va": "005a1e90",
+      "bytes": 47,
+      "sha256": "4be32df90e8e3db3f5eed0d31857bddd88255c7ed09ae57e0e20e4510124a255"
+    },
+    {
+      "token": "@NAMES@",
+      "va": "005c1214",
+      "bytes": 241,
+      "sha256": "5cec875091b316879f7285e8fdddb98ded1f0562a7dcab14a9fe408968d9fbde"
+    },
+    {
+      "token": "@CLASS@",
+      "va": "005bcb3c",
+      "bytes": 15,
+      "sha256": "56b727dd1125bf6ac7f817402652e9de23e4ffaec6b8dabd76b8d9111082d2de"
+    },
+    {
+      "token": "@SELECTED@",
+      "va": "005df478",
+      "bytes": 4,
+      "sha256": "ad95131bc0b799c0b1af477fb14fcf26a6a9f76079e48bf090acb7e8367bfd0e"
+    }
+  ],
+  "pass_marker": "modem_configuration_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "failure-cache",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "cache=0xffffffffu;",
+      "new": "cache=0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "first-error-bits",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "cache=0xffffffffu;return result;",
+      "new": "cache=0xffffffffu;return 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "sentinel-error-bits",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "static_cast<I>(0x80000049u)",
+      "new": "static_cast<I>(0x80000048u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "get-arg-order",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "get_name_005c1250,device,buffer,device_class);",
+      "new": "get_name_005c1250,address(buffer),pointer(device),device_class);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "set-arg-order",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "set_name_005c12cc,device,config,size,device_class);",
+      "new": "set_name_005c12cc,size,config,device,device_class);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getter-ignored-argument",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "modem_line_configure_0055e340(U){\n    alignas(4)",
+      "new": "modem_line_configure_0055e340(U argument){\n    modem_selected_device_005df478=argument;\n    alignas(4)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "size-unsigned",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "if(load(base+4u)>load(base))",
+      "new": "if(static_cast<I>(load(base+4u))>static_cast<I>(load(base)))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "equal-size",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "if(load(base+4u)>load(base))",
+      "new": "if(load(base+4u)>=load(base))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "flags-mask",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "load(config+0x5cu)&~7u",
+      "new": "load(config+0x5cu)&~3u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "size-reload",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "    store(config+0x5cu,load(config+0x5cu)&~7u);\n    const U size=load(base+16u);",
+      "new": "    const U size=load(base+16u);\n    store(config+0x5cu,load(config+0x5cu)&~7u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "device-reload",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": "const U device=modem_selected_device_005df478;",
+      "new": "const U device=0x81234567u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "set-result-normalization",
+      "source": "iterations/v2/001-original-recovery/runs/432-modem-configuration/modem_configuration.cpp",
+      "old": ")!=0?1u:0u;",
+      "new": ")==0?1u:0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ],
+  "extra_libraries": [
+    "user32.lib"
+  ]
+}

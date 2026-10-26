@@ -1,5 +1,14 @@
 # Отложенные проверки восстановления v2
 
+Run433:15 modem/audio bodies740B integrated;102108 nativecases,28mutations,
+566pins PASS.228TUs/8projects compile;184names191refs,noEXE. Fouraudio views reuse
+the accepteddeviceblock; onlyCS24B andtwoTAPIcaches are newlyowned.00565d60 is a
+controlledproof endpoint and remains unresolved inproduction; noRun400 substitute.
+Next:00565d60 composition,0058a8b0 andcanonical005659f0returnABI. Keep live
+TAPI/DLL/device/allocator/concurrency andfaulting/out-of-local domains open.
+Historical421/422 proofs wereOdonly withstaleheapheaders; new434proof covers
+actualcanonicalstate atOd/O2. Existing403/411 partialdomains are notpromoted.
+
 PR25 speech boundary: localzzzxeng.viv SHA256
 f89ab2839d14515a170e3dc2dfff37cff2b3df1be3dfcec6f50b8a3fd52cd64a: referencedbanks
 yield130range errors (header64+dataN=filelength, tag88=128) and25negativecounts.

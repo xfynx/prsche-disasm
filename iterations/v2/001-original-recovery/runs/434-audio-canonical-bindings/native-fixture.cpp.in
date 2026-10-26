@@ -1,0 +1,483 @@
+// Reused 421/422 raw x86 fixtures, canonical physical state and expanded aliases.
+#include "audio_canonical_434.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+// Uncalled canonical-owner function dependencies. Fail closed if reached.
+namespace porsche {
+std::int32_t __cdecl application_audio_backend_initialize_0058a4f0() { ExitProcess(90); }
+void __cdecl application_audio_backend_apply_0058a690() { ExitProcess(90); }
+std::uint32_t __cdecl application_audio_backend_allocate_0058aae0(std::uint32_t) { ExitProcess(90); }
+std::int32_t __cdecl application_audio_backend_start_device_0058fdb0() { ExitProcess(90); }
+void __cdecl application_audio_backend_stop_device_0058fe80() { ExitProcess(90); }
+void __cdecl application_audio_backend_finalize_0058e0e0() { ExitProcess(90); }
+}
+using U = std::uint32_t;
+
+// ---------------------------------------------------------------------------
+// Fixture storage for the original cells (the recovered C++ declares them extern)
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Call trace
+// ---------------------------------------------------------------------------
+struct Trace { U count; U tag[128]; U arg[128]; U depth[128]; };
+static Trace g_trace, s_orig, s_cpp;
+static void rec(U tag, U arg) {
+    // the lock counter at call time makes call-versus-store ordering observable
+    if (g_trace.count < 128) { g_trace.tag[g_trace.count] = tag; g_trace.arg[g_trace.count] = arg;
+        g_trace.depth[g_trace.count] = porsche::audio_backend_lock_depth_006b499f; ++g_trace.count; }
+}
+static bool same_trace(const Trace& a, const Trace& b) {
+    if (a.count != b.count) return false;
+    for (U i = 0; i < a.count; ++i) if (a.tag[i] != b.tag[i] || a.arg[i] != b.arg[i] || a.depth[i] != b.depth[i]) return false;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Hooks. platform_* are the same __stdcall entry points the original reaches
+// through its IAT cells and the recovered C++ calls directly.
+// ---------------------------------------------------------------------------
+static U s_stop_mode = 0;      // 0 record, 1 grow count once, 2 swap table once, 3 zero count once
+static U s_stop_fired = 0;
+static U s_stop_calls = 0;     // calls seen so far in this run
+static U s_stop_fire_at = 1;   // which call applies the mutation (1 = first)
+static U s_table_b = 0;
+
+namespace porsche {
+void __stdcall platform_initialize_critical_section(void* p) { rec(0x1, reinterpret_cast<U>(p)); }
+void __stdcall platform_enter_critical_section(void* p)      { rec(0x2, reinterpret_cast<U>(p)); }
+void __stdcall platform_leave_critical_section(void* p)      { rec(0x3, reinterpret_cast<U>(p)); }
+void __stdcall platform_delete_critical_section(void* p)     { rec(0x4, reinterpret_cast<U>(p)); }
+
+std::int32_t __cdecl audio_channel_stop_00565d60(std::uint32_t handle) {
+    rec(0x565d60, handle);
+    ++s_stop_calls;
+    if (!s_stop_fired && s_stop_calls == s_stop_fire_at) {
+        s_stop_fired = 1;
+        if (s_stop_mode == 1) audio_backend_channel_count_006b49a4 = static_cast<std::int16_t>(audio_backend_channel_count_006b49a4 + 1);
+        if (s_stop_mode == 2) audio_backend_channels_006b4a00 = s_table_b;
+        if (s_stop_mode == 3) audio_backend_channel_count_006b49a4 = 0;
+    }
+    return 0;
+}
+}
+
+static void* s_iat_init  = reinterpret_cast<void*>(&porsche::platform_initialize_critical_section);
+static void* s_iat_enter = reinterpret_cast<void*>(&porsche::platform_enter_critical_section);
+static void* s_iat_leave = reinterpret_cast<void*>(&porsche::platform_leave_critical_section);
+static void* s_iat_del   = reinterpret_cast<void*>(&porsche::platform_delete_critical_section);
+
+// ---------------------------------------------------------------------------
+// Slab
+// ---------------------------------------------------------------------------
+static std::uint8_t* s_slab = nullptr;
+enum : U { O_E2D0 = 0x000, O_E2E0 = 0x020, O_E2F0 = 0x040, O_E300 = 0x060,
+           O_96D0 = 0x080, O_96F0 = 0x0a0, O_AA90 = 0x0c0, O_AAC0 = 0x100,
+           O_FEF0 = 0x140, O_FF10 = 0x180 };
+static bool s_patch_ok = true;
+
+static void abs32(U body, U off, U expected, const void* target) {
+    U* p = reinterpret_cast<U*>(s_slab + body + off);
+    if (*p != expected) { s_patch_ok = false; return; }
+    *p = reinterpret_cast<U>(target);
+}
+static void rel32(U body, U off, std::uint8_t opcode, const void* target) {
+    std::uint8_t* site = s_slab + body + off;
+    if (*site != opcode) { s_patch_ok = false; return; }
+    *reinterpret_cast<std::int32_t*>(site + 1) =
+        static_cast<std::int32_t>(static_cast<const std::uint8_t*>(target) - (site + 5));
+}
+
+static bool init_slab() {
+    s_slab = static_cast<std::uint8_t*>(VirtualAlloc(NULL,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+    if(!s_slab) return false;
+    static const std::uint8_t raw_O_E2D0[]={ @BODY_0058e2d0@ }; memcpy(s_slab+O_E2D0,raw_O_E2D0,sizeof(raw_O_E2D0));
+    static const std::uint8_t raw_O_E2E0[]={ @BODY_0058e2e0@ }; memcpy(s_slab+O_E2E0,raw_O_E2E0,sizeof(raw_O_E2E0));
+    static const std::uint8_t raw_O_E2F0[]={ @BODY_0058e2f0@ }; memcpy(s_slab+O_E2F0,raw_O_E2F0,sizeof(raw_O_E2F0));
+    static const std::uint8_t raw_O_E300[]={ @BODY_0058e300@ }; memcpy(s_slab+O_E300,raw_O_E300,sizeof(raw_O_E300));
+    static const std::uint8_t raw_O_96D0[]={ @BODY_005896d0@ }; memcpy(s_slab+O_96D0,raw_O_96D0,sizeof(raw_O_96D0));
+    static const std::uint8_t raw_O_96F0[]={ @BODY_005896f0@ }; memcpy(s_slab+O_96F0,raw_O_96F0,sizeof(raw_O_96F0));
+    static const std::uint8_t raw_O_AA90[]={ @BODY_0058aa90@ }; memcpy(s_slab+O_AA90,raw_O_AA90,sizeof(raw_O_AA90));
+    static const std::uint8_t raw_O_AAC0[]={ @BODY_0058aac0@ }; memcpy(s_slab+O_AAC0,raw_O_AAC0,sizeof(raw_O_AAC0));
+    static const std::uint8_t raw_O_FEF0[]={ @BODY_0058fef0@ }; memcpy(s_slab+O_FEF0,raw_O_FEF0,sizeof(raw_O_FEF0));
+    static const std::uint8_t raw_O_FF10[]={ @BODY_0058ff10@ }; memcpy(s_slab+O_FF10,raw_O_FF10,sizeof(raw_O_FF10));
+    using namespace porsche;
+    // lock primitives: push 006b1800 (+1), call [IAT] (+7)
+    abs32(O_E2D0, 1, 0x006b1800, audio_backend_lock_cs_006b1800); abs32(O_E2D0, 7, 0x005b207c, &s_iat_init);
+    abs32(O_E2E0, 1, 0x006b1800, audio_backend_lock_cs_006b1800); abs32(O_E2E0, 7, 0x005b2068, &s_iat_del);
+    abs32(O_E2F0, 1, 0x006b1800, audio_backend_lock_cs_006b1800); abs32(O_E2F0, 7, 0x005b2078, &s_iat_enter);
+    abs32(O_E300, 1, 0x006b1800, audio_backend_lock_cs_006b1800); abs32(O_E300, 7, 0x005b206c, &s_iat_leave);
+    // 005896d0: call 0058e2f0 (+0), counter operands (+6, +13)
+    rel32(O_96D0, 0, 0xe8, s_slab + O_E2F0);
+    abs32(O_96D0, 6, 0x006b499f, &audio_backend_lock_depth_006b499f);
+    abs32(O_96D0, 13, 0x006b499f, &audio_backend_lock_depth_006b499f);
+    // 005896f0: counter operands (+1, +8), jmp 0058e300 (+12)
+    abs32(O_96F0, 1, 0x006b499f, &audio_backend_lock_depth_006b499f);
+    abs32(O_96F0, 8, 0x006b499f, &audio_backend_lock_depth_006b499f);
+    rel32(O_96F0, 12, 0xe9, s_slab + O_E300);
+    // 0058aa90: mov [006b4a18],eax (+9)
+    abs32(O_AA90, 9, 0x006b4a18, &audio_backend_pool_006b4a18);
+    // 0058aac0: mov edx,[006b4a18] (+2)
+    abs32(O_AAC0, 2, 0x006b4a18, &audio_backend_pool_006b4a18);
+    // 0058ff10: count (+6, +32), table (+16), call 00565d60 (+24)
+    abs32(O_FF10, 6, 0x006b49a4, &audio_backend_channel_count_006b49a4);
+    abs32(O_FF10, 16, 0x006b4a00, &audio_backend_channels_006b4a00);
+    rel32(O_FF10, 24, 0xe8, reinterpret_cast<const void*>(&audio_channel_stop_00565d60));
+    abs32(O_FF10, 32, 0x006b49a4, &audio_backend_channel_count_006b49a4);
+    return s_patch_ok;
+}
+
+// ---------------------------------------------------------------------------
+// Scene: every byte either side can touch
+// ---------------------------------------------------------------------------
+struct Scene {
+    std::uint8_t physical[0x18c]; std::uint8_t cs[24]; std::uint8_t depth; U pool; std::int16_t count; U table;
+    std::uint8_t arena[0x200];       // pool / memset target, canary filled
+    U table_a[8 * 0x70 / 4];         // channel records, stride 0x70
+    U table_b[8 * 0x70 / 4];
+};
+static Scene g_s;
+static std::uint8_t s_snap_o[sizeof(Scene)], s_snap_c[sizeof(Scene)];
+
+static void load_scene() {
+    using namespace porsche;
+    memcpy(application_audio_device_state_006b48c0.backing.data(),g_s.physical,0x18c);
+    memcpy(audio_backend_lock_cs_006b1800, g_s.cs, 24);
+    audio_backend_lock_depth_006b499f = g_s.depth;
+    audio_backend_pool_006b4a18 = g_s.pool;
+    audio_backend_channel_count_006b49a4 = g_s.count;
+    audio_backend_channels_006b4a00 = g_s.table;
+}
+static void save_scene(std::uint8_t* out) {
+    using namespace porsche;
+    memcpy(g_s.physical,application_audio_device_state_006b48c0.backing.data(),0x18c);
+    memcpy(g_s.cs, audio_backend_lock_cs_006b1800, 24);
+    g_s.depth = audio_backend_lock_depth_006b499f;
+    g_s.pool = audio_backend_pool_006b4a18;
+    g_s.count = audio_backend_channel_count_006b49a4;
+    g_s.table = audio_backend_channels_006b4a00;
+    memcpy(out, &g_s, sizeof(Scene));
+}
+
+struct Case { const char* name; void (*setup)(); void (*orig)(); void (*cpp)(); };
+
+static U P0 = 0, P1 = 0;
+static void base_setup() {
+    memset(&g_s, 0, sizeof(g_s));
+    for (int i = 0; i < 24; ++i) g_s.cs[i] = static_cast<std::uint8_t>(0x40 + i);
+    memset(g_s.physical,0x5a,sizeof(g_s.physical));
+    memset(g_s.arena, 0xcc, sizeof(g_s.arena));
+    for (int r = 0; r < 8; ++r) { g_s.table_a[r * 0x70 / 4] = 0xa000u + r; g_s.table_b[r * 0x70 / 4] = 0xb000u + r; }
+    g_s.table = reinterpret_cast<U>(g_s.table_a);
+    s_table_b = reinterpret_cast<U>(g_s.table_b);
+    s_stop_mode = 0;
+    s_stop_fire_at = 1;
+}
+
+using V = void(__cdecl*)(); using I = std::int32_t(__cdecl*)(); using VUU = void(__cdecl*)(U, U);
+static V   oV(U off)   { return reinterpret_cast<V>(s_slab + off); }
+static I   oI(U off)   { return reinterpret_cast<I>(s_slab + off); }
+static VUU oVUU(U off) { return reinterpret_cast<VUU>(s_slab + off); }
+static std::int32_t s_ret_o, s_ret_c;
+
+#define LOCKCASE(N, OFF, FN) \
+    static void o_##N() { oV(OFF)(); } static void c_##N() { porsche::FN(); }
+LOCKCASE(init, O_E2D0, application_audio_backend_start_0058e2d0)
+LOCKCASE(del,  O_E2E0, application_audio_backend_stop_0058e2e0)
+LOCKCASE(ent,  O_E2F0, audio_backend_enter_0058e2f0)
+LOCKCASE(lev,  O_E300, audio_backend_leave_0058e300)
+LOCKCASE(lock, O_96D0, audio_backend_lock_005896d0)
+LOCKCASE(unl,  O_96F0, audio_backend_unlock_005896f0)
+LOCKCASE(quiet, O_FF10, application_audio_backend_quiet_0058ff10)
+
+static void o_pinit() { oVUU(O_AA90)(P0, P1); }
+static void c_pinit() { porsche::application_audio_backend_configure_0058aa90(P0, P1); }
+static void o_ppct()  { s_ret_o = oI(O_AAC0)(); }
+static void c_ppct()  { s_ret_c = porsche::application_audio_backend_close_0058aac0(); }
+static void o_zero()  { oVUU(O_FEF0)(P0, P1); }
+static void c_zero()  { porsche::application_audio_backend_configure_0058fef0(P0, P1); }
+
+static U arena(U off) { return reinterpret_cast<U>(g_s.arena) + off; }
+static void set_pool(U size, U cursor) {
+    auto* h = reinterpret_cast<porsche::AudioBackendPoolHeader_421*>(arena(0x40));
+    h->size = size; h->cursor = cursor; g_s.pool = arena(0x40);
+}
+
+static void s_none() {}
+static void s_d0() { g_s.depth = 0; }
+static void s_dff() { g_s.depth = 0xff; }
+static void s_d1() { g_s.depth = 1; }
+static void s_pi_al() { P0 = arena(0x40); P1 = 0x100; }
+static void s_pi_un() { P0 = arena(0x41); P1 = 0x37; }
+static void s_pi_tiny() { P0 = arena(0x40); P1 = 1; }
+static void s_pc_75() { set_pool(1000, 250); }
+static void s_pc_neg() { set_pool(100, 150); }
+static void s_pc_wrap() { set_pool(0x7fffffffu, 0); }
+static void s_pc_full() { set_pool(64, 64); }
+static void s_z0() { P0 = arena(0x10); P1 = 0; }
+static void s_zneg() { P0 = arena(0x10); P1 = 0x80000000u; }
+static void s_z1() { P0 = arena(0x10); P1 = 1; }
+static void s_z3() { P0 = arena(0x10); P1 = 3; }
+static void s_z4() { P0 = arena(0x10); P1 = 4; }
+static void s_z13u() { P0 = arena(0x11); P1 = 13; }
+static void s_q0() { g_s.count = 0; }
+static void s_qneg() { g_s.count = -1; }
+static void s_q3() { g_s.count = 3; }
+static void s_qgrow() { g_s.count = 2; s_stop_mode = 1; }
+static void s_qswap() { g_s.count = 3; s_stop_mode = 2; }
+static void s_qzero() { g_s.count = 5; s_stop_mode = 3; }
+// mutate on the SECOND call: a body that reads the count only once, after the
+// first call, behaves identically to the original when the change is on call 1
+static void s_qzero2() { g_s.count = 5; s_stop_mode = 3; s_stop_fire_at = 2; }
+static void s_qgrow2() { g_s.count = 2; s_stop_mode = 1; s_stop_fire_at = 2; }
+static void s_qswap2() { g_s.count = 4; s_stop_mode = 2; s_stop_fire_at = 2; }
+
+
+static U depth_probe;
+static void s_dprobe() { g_s.depth=static_cast<std::uint8_t>(depth_probe); }
+static void s_pi_alias() { P0=reinterpret_cast<U>(porsche::application_audio_device_state_006b48c0.data()+0x150); P1=0x100; }
+static void s_zero_alias() { P0=reinterpret_cast<U>(porsche::application_audio_device_state_006b48c0.data()+0xd9); P1=0x80; }
+static void s_qmin() { g_s.count=static_cast<std::int16_t>(0x8000); }
+static void s_zminusone() { P0=0; P1=0xffffffffu; }
+static void s_pc_signed() { set_pool(0xfffffff9u,0xffffffefu); }
+
+static Case k_cases[] = {
+    {"pool aliases canonical pointer/header",s_pi_alias,o_pinit,c_pinit},
+    {"zero overlaps canonical views",s_zero_alias,o_zero,c_zero},
+    {"quiet signed count minimum",s_qmin,o_quiet,c_quiet},
+    {"zero minus one null",s_zminusone,o_zero,c_zero},
+    {"pool signed divisor",s_pc_signed,o_ppct,c_ppct},
+    {"init critical section", s_none, o_init, c_init},
+    {"delete critical section", s_none, o_del, c_del},
+    {"enter critical section", s_none, o_ent, c_ent},
+    {"leave critical section", s_none, o_lev, c_lev},
+    {"lock depth 0", s_d0, o_lock, c_lock},
+    {"lock depth 0xff wraps", s_dff, o_lock, c_lock},
+    {"unlock depth 1", s_d1, o_unl, c_unl},
+    {"unlock depth 0 wraps", s_d0, o_unl, c_unl},
+    {"pool init aligned", s_pi_al, o_pinit, c_pinit},
+    {"pool init unaligned", s_pi_un, o_pinit, c_pinit},
+    {"pool init size 1 wraps", s_pi_tiny, o_pinit, c_pinit},
+    {"pool usage 75 percent", s_pc_75, o_ppct, c_ppct},
+    {"pool usage negative", s_pc_neg, o_ppct, c_ppct},
+    {"pool usage multiply wraps", s_pc_wrap, o_ppct, c_ppct},
+    {"pool usage zero", s_pc_full, o_ppct, c_ppct},
+    {"zero length 0", s_z0, o_zero, c_zero},
+    {"zero length negative", s_zneg, o_zero, c_zero},
+    {"zero length 1", s_z1, o_zero, c_zero},
+    {"zero length 3", s_z3, o_zero, c_zero},
+    {"zero length 4", s_z4, o_zero, c_zero},
+    {"zero length 13 unaligned", s_z13u, o_zero, c_zero},
+    {"quiet count 0", s_q0, o_quiet, c_quiet},
+    {"quiet count negative", s_qneg, o_quiet, c_quiet},
+    {"quiet count 3", s_q3, o_quiet, c_quiet},
+    {"quiet count grows in callback", s_qgrow, o_quiet, c_quiet},
+    {"quiet table swapped in callback", s_qswap, o_quiet, c_quiet},
+    {"quiet count zeroed in callback", s_qzero, o_quiet, c_quiet},
+    {"quiet count zeroed on second call", s_qzero2, o_quiet, c_quiet},
+    {"quiet count grows on second call", s_qgrow2, o_quiet, c_quiet},
+    {"quiet table swapped on second call", s_qswap2, o_quiet, c_quiet},
+};
+
+static bool run_case(const Case& c) {
+    base_setup(); c.setup(); U p0 = P0, p1 = P1; U mode = s_stop_mode; U at = s_stop_fire_at;
+    load_scene(); g_trace.count = 0; s_stop_fired = 0; s_stop_calls = 0; s_ret_o = s_ret_c = 0x5a5a5a5a;
+    c.orig(); s_orig = g_trace; save_scene(s_snap_o);
+    std::int32_t ro = s_ret_o;
+
+    base_setup(); c.setup(); P0 = p0; P1 = p1; s_stop_mode = mode; s_stop_fire_at = at;
+    load_scene(); g_trace.count = 0; s_stop_fired = 0; s_stop_calls = 0; s_ret_o = s_ret_c = 0x5a5a5a5a;
+    c.cpp(); s_cpp = g_trace; save_scene(s_snap_c);
+    std::int32_t rc = (c.cpp == c_ppct) ? s_ret_c : ro;
+
+    return memcmp(s_snap_o, s_snap_c, sizeof(Scene)) == 0 && same_trace(s_orig, s_cpp) && ro == rc;
+}
+
+
+namespace Voice {
+using U = std::uint32_t;
+using porsche::AudioChannelRecord_422;
+
+struct Trace { U count; U a[256]; U b[256]; };
+static Trace g_trace, s_orig, s_cpp;
+static void rec(U a, U b) { if (g_trace.count < 256) { g_trace.a[g_trace.count] = a; g_trace.b[g_trace.count] = b; ++g_trace.count; } }
+static bool same(const Trace& x, const Trace& y) {
+    if (x.count != y.count) return false;
+    for (U i = 0; i < x.count; ++i) if (x.a[i] != y.a[i] || x.b[i] != y.b[i]) return false;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Slab
+// ---------------------------------------------------------------------------
+static std::uint8_t* s_slab = nullptr;
+enum : U { O_FIND = 0x000, O_NEXT = 0x080 };
+static bool s_ok = true;
+static void abs32(U body, U off, U expected, const void* target) {
+    U* p = reinterpret_cast<U*>(s_slab + body + off);
+    if (*p != expected) { s_ok = false; return; }
+    *p = reinterpret_cast<U>(target);
+}
+static bool init_slab() {
+    s_slab = static_cast<std::uint8_t*>(VirtualAlloc(NULL,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+    if(!s_slab) return false;
+    static const std::uint8_t raw_O_FIND[]={ @BODY_00589d20@ }; memcpy(s_slab+O_FIND,raw_O_FIND,sizeof(raw_O_FIND));
+    static const std::uint8_t raw_O_NEXT[]={ @BODY_00590340@ }; memcpy(s_slab+O_NEXT,raw_O_NEXT,sizeof(raw_O_NEXT));
+    using namespace porsche;
+    abs32(O_FIND, 0x11, 0x006b49a4, &audio_backend_channel_count_006b49a4);
+    abs32(O_FIND, 0x33, 0x006b4a00, &audio_backend_channels_006b4a00);
+    abs32(O_NEXT, 0x07, 0x006b4a00, &audio_backend_channels_006b4a00);
+    abs32(O_NEXT, 0x2d, 0x006b49a4, &audio_backend_channel_count_006b49a4);
+    return s_ok;
+}
+
+// ---------------------------------------------------------------------------
+// Scene
+// ---------------------------------------------------------------------------
+struct Scene { std::uint8_t physical[0x18c]; std::int16_t count; U table; U slot; AudioChannelRecord_422 recs[16]; };
+static Scene g_s;
+static std::uint8_t s_snap_o[sizeof(Scene)], s_snap_c[sizeof(Scene)];
+
+static void put(int i, std::int32_t handle, std::uint8_t active, std::uint8_t group) {
+    g_s.recs[i].handle = handle; g_s.recs[i].active = active; g_s.recs[i].group = group;
+}
+static void standard_table() {
+    memset(&g_s, 0, sizeof(g_s));
+    memset(g_s.physical,0x63,sizeof(g_s.physical));
+    for (int i = 0; i < 16; ++i) memset(&g_s.recs[i], 0x5c, sizeof(AudioChannelRecord_422));
+    for (int i = 0; i < 16; ++i) put(i, 0, 0, 0);
+    put(0, 0x100, 1, 0);
+    put(1, 0x201, 1, 2);
+    put(2, 0x302, 0, 2);          // inactive
+    put(3, 0x403, 1, 2);
+    put(4, -5, 1, 2);             // negative handle: next_voice skips it
+    put(5, 0x305, 2, 2);          // active == 2: next_voice skips, find_channel accepts
+    put(6, 0x606, 1, 3);
+    put(7, 0x707, 1, 2);
+    g_s.count = 9;
+    g_s.table = reinterpret_cast<U>(g_s.recs);
+    g_s.slot = 0;
+}
+static void load() { memcpy(porsche::application_audio_device_state_006b48c0.backing.data(),g_s.physical,0x18c); porsche::audio_backend_channel_count_006b49a4 = g_s.count; porsche::audio_backend_channels_006b4a00 = g_s.table; }
+static void save(std::uint8_t* out) {
+    memcpy(g_s.physical,porsche::application_audio_device_state_006b48c0.backing.data(),0x18c);
+    g_s.count = porsche::audio_backend_channel_count_006b49a4; g_s.table = porsche::audio_backend_channels_006b4a00;
+    memcpy(out, &g_s, sizeof(Scene));
+}
+
+using FindFn = std::int32_t(__cdecl*)(U);
+using NextFn = U(__cdecl*)(std::int32_t, U*);
+static FindFn s_find; static NextFn s_next;
+
+static void find_case(U handle) { rec(0xf1, static_cast<U>(s_find(handle))); }
+static void next_loop(std::int32_t channel, U start) {
+    g_s.slot = start;
+    for (int i = 0; i < 24; ++i) {
+        U r = s_next(channel, &g_s.slot);
+        rec(r, g_s.slot);
+        if (!r) break;
+    }
+}
+static void next_once(std::int32_t channel, U start) { g_s.slot = start; U r = s_next(channel, &g_s.slot); rec(r, g_s.slot); }
+
+static std::int32_t __cdecl cpp_find(U h) { return porsche::audio_backend_find_channel_00589d20(h); }
+static U __cdecl cpp_next(std::int32_t c, U* s) { return porsche::audio_backend_next_voice_00590340(c, s); }
+
+struct Case { const char* name; void (*tweak)(); void (*body)(); };
+
+static void t_none() {}
+static void t_count_neg() { g_s.count = -1; }
+static void t_count_zero() { g_s.count = 0; }
+
+static void b_find_negative()  { find_case(0x80000000u); }
+static void b_find_past_count(){ find_case(0x109u); }
+static void b_find_count_neg() { find_case(0x100u); }
+static void b_find_inactive()  { find_case(0x302u); }
+static void b_find_mismatch()  { find_case(0x101u); }
+static void b_find_hit0()      { find_case(0x100u); }
+static void b_find_hit5()      { find_case(0x305u); }
+static void b_find_high_bits() { find_case(0x7fffff07u); }
+static void b_find_hit7()      { find_case(0x707u); }
+static void b_find_count_zero(){ find_case(0x100u); }
+static void b_next_ungrouped() { next_loop(0, 0xffffffffu); }
+static void b_next_group2()    { next_loop(1, 0xffffffffu); }
+static void b_next_group3()    { next_loop(6, 0xffffffffu); }
+static void b_next_ungrouped_started() { next_once(0, 3); }
+static void b_next_at_end()    { next_once(1, 8); }
+static void b_next_count_neg() { next_once(1, 0xffffffffu); }
+static void b_next_from_middle(){ next_loop(1, 3); }
+
+
+static void b_next_wrap() { next_once(1,0x7fffffffu); }
+static void t_wrap() { put(0,0x100,1,2); }
+static void b_alias_group() { U* slot=reinterpret_cast<U*>(reinterpret_cast<std::uint8_t*>(&g_s.recs[1])+0x1c); *slot=0xffffffffu; put(3,0x403,1,255); U result=s_next(1,slot); rec(result,*slot); }
+static void b_alias_count() { U* slot=reinterpret_cast<U*>(porsche::application_audio_device_state_006b48c0.data()+0xe4); *slot=0xffffffffu; U result=s_next(1,slot); rec(result,*slot); }
+static void b_alias_table() { U* slot=&porsche::audio_backend_channels_006b4a00; U result=s_next(1,slot); rec(result,*slot); }
+static void b_next_ungrouped_min() { next_once(0,0x80000000u); }
+static void t_count_min() { g_s.count=static_cast<std::int16_t>(0x8000); }
+
+static Case k_cases[] = {
+    {"slot signed overflow wraps",t_wrap,b_next_wrap},
+    {"slot aliases group storage",t_none,b_alias_group},
+    {"slot aliases count storage",t_none,b_alias_count},
+    {"slot aliases table storage",t_none,b_alias_table},
+    {"ungrouped INT_MIN slot",t_none,b_next_ungrouped_min},
+    {"find signed count minimum",t_count_min,b_find_count_neg},
+    {"find negative handle", t_none, b_find_negative},
+    {"find index past count", t_none, b_find_past_count},
+    {"find with negative count", t_count_neg, b_find_count_neg},
+    {"find inactive record", t_none, b_find_inactive},
+    {"find handle mismatch", t_none, b_find_mismatch},
+    {"find hit index 0", t_none, b_find_hit0},
+    {"find hit with active 2", t_none, b_find_hit5},
+    {"find high bits mismatch", t_none, b_find_high_bits},
+    {"find hit index 7", t_none, b_find_hit7},
+    {"find with zero count", t_count_zero, b_find_count_zero},
+    {"next ungrouped channel", t_none, b_next_ungrouped},
+    {"next group 2 full walk", t_none, b_next_group2},
+    {"next group 3 full walk", t_none, b_next_group3},
+    {"next ungrouped already started", t_none, b_next_ungrouped_started},
+    {"next grouped at end", t_none, b_next_at_end},
+    {"next grouped negative count", t_count_neg, b_next_count_neg},
+    {"next group 2 from middle", t_none, b_next_from_middle},
+};
+
+static bool run_case(const Case& c) {
+    standard_table(); c.tweak(); load();
+    g_trace.count = 0; s_find = reinterpret_cast<FindFn>(s_slab + O_FIND); s_next = reinterpret_cast<NextFn>(s_slab + O_NEXT);
+    c.body(); s_orig = g_trace; save(s_snap_o);
+
+    standard_table(); c.tweak(); load();
+    g_trace.count = 0; s_find = cpp_find; s_next = cpp_next;
+    c.body(); s_cpp = g_trace; save(s_snap_c);
+
+    return memcmp(s_snap_o, s_snap_c, sizeof(Scene)) == 0 && same(s_orig, s_cpp);
+}
+
+
+}
+
+static bool initial_state() {
+    using namespace porsche;
+    for(auto b:application_audio_device_state_006b48c0.backing) if(b) return false;
+    for(auto b:audio_backend_lock_cs_006b1800) if(b) return false;
+    return reinterpret_cast<U>(audio_backend_lock_cs_006b1800)%4==0 &&
+      &audio_backend_lock_depth_006b499f==application_audio_device_state_006b48c0.data()+0xdf &&
+      reinterpret_cast<void*>(&audio_backend_channel_count_006b49a4)==application_audio_device_state_006b48c0.data()+0xe4 &&
+      reinterpret_cast<void*>(&audio_backend_channels_006b4a00)==application_audio_device_state_006b48c0.data()+0x140 &&
+      reinterpret_cast<void*>(&audio_backend_pool_006b4a18)==application_audio_device_state_006b48c0.data()+0x158;
+}
+int main() {
+    if(!initial_state()) { puts("divergence production initial state"); return 1; }
+    if(!init_slab() || !Voice::init_slab()) { puts("divergence raw slab relocation"); return 1; }
+    unsigned total=0;
+    for(auto& c:k_cases) { ++total; if(!run_case(c)) { printf("divergence backend %s\n",c.name); return 1; } }
+    Case lock_sweep={"all depth bytes lock",s_dprobe,o_lock,c_lock};
+    Case unlock_sweep={"all depth bytes unlock",s_dprobe,o_unl,c_unl};
+    for(depth_probe=0;depth_probe<256;++depth_probe) {
+      total+=2;
+      if(!run_case(lock_sweep) || !run_case(unlock_sweep)) { puts("divergence counter sweep"); return 1; }
+    }
+    for(auto& c:Voice::k_cases) { ++total; if(!Voice::run_case(c)) { printf("divergence voice %s\n",c.name); return 1; } }
+    printf("audio_canonical_original_x86_vs_cpp=PASS cases=%u\n",total); return 0;
+}
