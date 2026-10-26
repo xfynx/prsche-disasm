@@ -1,5 +1,19 @@
 # v2 / 001 - original source recovery plan
 
+Active2026-10-27: resume originalC++ recovery from acceptedRun413, cleanstartda9a845.
+modem_configuration_432 owns runs/432-modem-configuration: original0055e340143B
+andtwochildren00584c05/00584e27 (71/75B), nativecomparison via sharedrunner.
+Coordinator verified allthree unregistered; caller410 provides typedcontract.
+audio_intake_audit independently audits existing421/422 ownership/ABI/proofreuse
+against actual413closure; read-only, no newaudioimplementation authorized yet.
+Coordinator owns sharedregistry, nextintegration433 and startup-path prioritization.
+Solhigh remains coordinator/defaultrecovery; Terra reserved for appropriatevisual
+or scopedtasks per docs/agents.md. No unmeasuredsavingclaim or toolsetupdetour.
+Next: accept frozen432proof, resolve421/422intakeblockers if bounded, then one
+sharedbuild/audit. C++225TUs190names198refs/noEXE isstillthe measuredcheckpoint.
+
+HistoricalPR25/Xerj handoff follows.
+
 PR25 intake,2026-10-26: authorhead d317929 integrated into experimentalRust012.
 Fallbackcollision units and originalFFN signedlinestep corrected; authorpaceholder
 credited inLICENSING. Recorders generated33localfixtures;32 matchafterLFnormalization,
