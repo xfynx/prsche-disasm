@@ -1,5 +1,22 @@
 # v2 / 001 - original source recovery plan
 
+Current440, 2026-10-27: frozen438/439 integrated; shared audit PASS. Five original
+bodies/836B,115,592 sequences/cases,32 mutations,576 pins and322 canonical exports.
+232 TUs/8 projects compile;181 names/188 references,no EXE. Four old names close;
+no new unresolved child. Pool allocation/release/clamp and voice cleanup reuse
+434/435/device state, with no new storage. Existing void release caller uses one
+facade, adding zero original bodies. Both workers finished; no active assignments.
+Run440 README owns commands/artifacts; native inputs are frozen.
+Next: original-vs-C++ combined stop/voice/pool proof using the accepted sources,
+including positive parent channel returns deferred in435. Reuse440 game build
+if production is unchanged; do not rebuild merely for new proof/documentation.
+Then trace0058a4f0/0058a690 initialization on the create-device startup path.
+Group validation00590070/release00565990, real devices/platform, faulty or cyclic
+memory, concurrency and full game remain open.403/411 PARTIAL domains unchanged.
+Keep output concise, reuse shared tools/manifests and do not extend passed batches.
+
+Historical437 follows.
+
 Current437, 2026-10-27: frozen435/436 integrated; shared audit PASS. Three original
 bodies/417B, 27,850 native cases, 30 mutations, 571 pins and316 canonical providers.
 230 TUs/8 projects compile;185 names/192 references, no EXE. Three old names close;

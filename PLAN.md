@@ -19,9 +19,9 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run437](iterations/v2/001-original-recovery/runs/437-audio-stop-integration/README.md).
-Next is the original audio allocation/startup dependency path, with remaining stop
-children explicitly unresolved.
+Latest recovery intake: [Run440](iterations/v2/001-original-recovery/runs/440-audio-pool-cleanup-integration/README.md).
+Next is the combined original stop/voice/pool comparison, then audio initialization
+on the startup path. Remaining group validation/release stays explicitly unresolved.
 
 ## Recovery milestones
 

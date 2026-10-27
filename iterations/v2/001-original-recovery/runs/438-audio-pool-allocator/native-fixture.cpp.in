@@ -1,0 +1,220 @@
+#include "audio_pool_438.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U = std::uint32_t;
+namespace porsche {
+std::int32_t __cdecl application_audio_backend_initialize_0058a4f0() { ExitProcess(90); }
+void __cdecl application_audio_backend_apply_0058a690() { ExitProcess(90); }
+std::int32_t __cdecl application_audio_backend_start_device_0058fdb0() { ExitProcess(90); }
+void __cdecl application_audio_backend_stop_device_0058fe80() { ExitProcess(90); }
+void __cdecl application_audio_backend_finalize_0058e0e0() { ExitProcess(90); }
+std::int32_t __cdecl audio_channel_stop_00565d60(U) { ExitProcess(90); }
+void __stdcall platform_initialize_critical_section(void*) { ExitProcess(90); }
+void __stdcall platform_delete_critical_section(void*) { ExitProcess(90); }
+void __stdcall platform_enter_critical_section(void*) { ExitProcess(90); }
+void __stdcall platform_leave_critical_section(void*) { ExitProcess(90); }
+}
+static U ptr(const void* p) { return reinterpret_cast<U>(p); }
+static U rd(const void* p) { U x; memcpy(&x,p,4); return x; }
+static void wr(void* p,U x) { memcpy(p,&x,4); }
+struct Scene { unsigned char device[0x18c],cs[24],arena[0x1800]; };
+static Scene state,initial;
+enum : U { ALLOC=0,RELEASE=1,CLAMP=2,FACADE=3,CONFIGURE=4,RELEASE_RESULT=5,FACADE_RESULT=6 };
+struct Operation { U kind,a,b; };
+static Operation operations[80]; static U operation_count=0;
+struct Snapshot { Scene scene; U result,abi; };
+static Snapshot original[80],candidate[80];
+static U results[80];
+static unsigned char* slab;
+static bool patch_ok=true;
+static U cases=0,steps=0;
+enum : U { C=0,A=0x100,R=0x300,I=0x400 };
+static void abs32(U body,U off,U expected,const void* target) {
+    if(rd(slab+body+off)!=expected) { patch_ok=false; return; }
+    wr(slab+body+off,ptr(target));
+}
+static void call(U off,U expected,const void* target) {
+    if(slab[A+off]!=0xe8 || 0x58aae0u+off+5+rd(slab+A+off+1)!=expected) { patch_ok=false; return; }
+    wr(slab+A+off+1,ptr(target)-ptr(slab+A+off+5));
+}
+static bool init() {
+    slab=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+    if(!slab) return false;
+    static const unsigned char bc[]={ @BODY_0058aa60@ }; memcpy(slab+C,bc,sizeof(bc));
+    static const unsigned char ba[]={ @BODY_0058aae0@ }; memcpy(slab+A,ba,sizeof(ba));
+    static const unsigned char br[]={ @BODY_0058ac30@ }; memcpy(slab+R,br,sizeof(br));
+    static const unsigned char bi[]={ @BODY_0058aa90@ }; memcpy(slab+I,bi,sizeof(bi));
+    auto* pool=&porsche::audio_backend_pool_006b4a18;
+    abs32(C,6,0x6b4a18,pool);
+    for(U off:{0xcu,0x9au,0xe5u,0x10fu}) abs32(A,off,0x6b4a18,pool);
+    for(U off:{0x33u,0x89u,0xccu}) call(off,0x58aa60,slab+C);
+    abs32(R,2,0x6b4a18,pool); abs32(I,9,0x6b4a18,pool);
+    return patch_ok;
+}
+// Synthetic typed callsite; exactly one/two cdecl stack arguments, actual ABI probe.
+static U invoke(void* fn,U a0,U a1,U argc,U* abi) {
+    U saved_sp,saved_bp,result,fail=0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp,esp
+        mov saved_bp,ebp
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,10203040h
+        cmp argc,2
+        jne one
+        push a1
+    one:
+        push a0
+        call fn
+        mov result,eax
+        mov ecx,argc
+        shl ecx,2
+        add esp,ecx
+        cmp esp,saved_sp
+        jne bad
+        cmp ebp,saved_bp
+        jne bad
+        cmp ebx,13579bdfh
+        jne bad
+        cmp esi,2468ace0h
+        jne bad
+        cmp edi,10203040h
+        je done
+    bad:
+        mov fail,1
+    done:
+        mov esp,saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    *abi=fail; return result;
+}
+static U arena(U off) { return ptr(state.arena)+off; }
+static U device(U off) { return ptr(porsche::application_audio_device_state_006b48c0.backing.data())+off; }
+static void field(U off,U value,U header=0x100) { wr(initial.arena+header+off,value); }
+static void op(U kind,U a=0,U b=0) { operations[operation_count++]={kind,a,b}; }
+static void base(U header=0x100) {
+    memset(&initial,0x5a,sizeof(initial)); operation_count=0;
+    wr(initial.device+0x168,arena(header));
+    field(0,arena(header+0x1c),header); field(4,arena(header+0x3f8),header);
+    field(8,0x400,header); field(0xc,0x3dd,header); field(0x10,0x3fd,header); field(0x14,0,header);
+}
+static void load() {
+    state=initial;
+    memcpy(porsche::application_audio_device_state_006b48c0.backing.data(),initial.device,0x18c);
+    memcpy(porsche::audio_backend_lock_cs_006b1800,initial.cs,24);
+    memset(results,0,sizeof(results));
+}
+static void snapshot(Snapshot& out,U result,U abi) {
+    memcpy(state.device,porsche::application_audio_device_state_006b48c0.backing.data(),0x18c);
+    memcpy(state.cs,porsche::audio_backend_lock_cs_006b1800,24);
+    out.scene=state; out.result=result; out.abi=abi;
+}
+static void execute(bool cpp,Snapshot* out) {
+    load();
+    for(U i=0;i<operation_count;++i) {
+        const auto& o=operations[i]; U a=o.a,argc=1,abi=0; void* target=nullptr; bool used=true;
+        switch(o.kind) {
+        case ALLOC: target=cpp?reinterpret_cast<void*>(&porsche::application_audio_backend_allocate_0058aae0):slab+A; break;
+        case RELEASE: target=cpp?reinterpret_cast<void*>(&porsche::audio_backend_pool_release_0058ac30):slab+R; break;
+        case CLAMP: target=cpp?reinterpret_cast<void*>(&porsche::audio_backend_pool_clamp_0058aa60):slab+C; argc=2; used=false; break;
+        case FACADE: target=cpp?reinterpret_cast<void*>(&porsche::application_audio_backend_release_0058ac30):slab+R; used=false; break;
+        case CONFIGURE: target=cpp?reinterpret_cast<void*>(&porsche::application_audio_backend_configure_0058aa90):slab+I; argc=2; used=false; break;
+        case RELEASE_RESULT: a=results[a]; target=cpp?reinterpret_cast<void*>(&porsche::audio_backend_pool_release_0058ac30):slab+R; break;
+        case FACADE_RESULT: a=results[a]; target=cpp?reinterpret_cast<void*>(&porsche::application_audio_backend_release_0058ac30):slab+R; used=false; break;
+        default: ExitProcess(91);
+        }
+        U result=invoke(target,a,o.b,argc,&abi);
+        results[i]=used?result:0; snapshot(out[i],results[i],abi);
+    }
+}
+static bool run(U family,U id) {
+    execute(false,original); execute(true,candidate);
+    for(U i=0;i<operation_count;++i) {
+        if(original[i].abi || candidate[i].abi || memcmp(&original[i],&candidate[i],sizeof(Snapshot))) {
+            printf("divergence family=%u id=%u step=%u kind=%u return=%08x/%08x ABI=%u/%u\n",family,id,i,operations[i].kind,original[i].result,candidate[i].result,original[i].abi,candidate[i].abi); return false;
+        }
+    }
+    ++cases; steps+=operation_count; return true;
+}
+int main() {
+    using namespace porsche;
+    for(auto x:application_audio_device_state_006b48c0.backing) if(x) return 80;
+    for(auto x:audio_backend_lock_cs_006b1800) if(x) return 81;
+    if(audio_backend_pool_006b4a18 || &audio_backend_pool_006b4a18!=reinterpret_cast<U*>(&application_audio_device_state_006b48c0[0x158])) return 82;
+    if(!init()) { printf("patch failure\n"); return 83; }
+    U id=0;
+    // Real configure->allocate->free sequences, each intermediate state compared.
+    for(U size:{0x60u,0x80u,0x100u,0x180u,0x400u}) for(U align=0;align<4;++align) for(U seed=0;seed<64;++seed) {
+        const U h=0x100+align; base(h); op(CONFIGURE,arena(h),size);
+        for(U i=0;i<6;++i) op(ALLOC,((seed*13+i*17)&63));
+        op(RELEASE_RESULT,3); op(RELEASE_RESULT,1); op(ALLOC,(seed&15));
+        op(FACADE_RESULT,2); op(ALLOC,seed&31); op(RELEASE_RESULT,6); op(RELEASE_RESULT,5); op(RELEASE_RESULT,4);
+        op(ALLOC,size); op(RELEASE,0); op(RELEASE_RESULT,3);
+        if(!run(0,id++)) return 1;
+    }
+    // Every gap/descriptor index, split bound, zero size, exact fit and miss.
+    for(U count=1;count<=5;++count) for(U hole=0;hole<count;++hole) for(U request=0;request<70;++request) {
+        base(); field(0x14,0u-count);
+        for(U i=0;i<count;++i) {
+            // Table is sorted by offset, descending descriptor indices.
+            wr(initial.arena+0x4f8-i*8,i*0x50+0x20); wr(initial.arena+0x4fc-i*8,0x40);
+        }
+        // Free a selected descriptor to create/reorder gaps, then allocate.
+        op(RELEASE,arena(0x11c)+hole*0x50+0x20); op(ALLOC,request); op(ALLOC,request+1); op(FACADE_RESULT,1);
+        if(!run(1,id++)) return 1;
+    }
+    // Wrapped/signed requests and cursor extrema with bounded metadata accesses.
+    for(U request:{0u,1u,3u,4u,0x3ddu,0x3dcu,0x3deu,0x7ffffffcu,0x7ffffffdu,0x80000000u,0xfffffffcu,0xfffffffdu,0xffffffffu})
+    for(U limit:{0u,3u,4u,0x3ddu,0x7fffffffu,0x80000000u,0xfffffff8u})
+    for(U cursor:{0u,0x3fdu,0x7fffffffu,0x80000000u,0xffffffffu}) {
+        base(); field(0xc,limit); field(0x10,cursor); op(ALLOC,request); op(RELEASE_RESULT,0);
+        if(!run(2,id++)) return 1;
+    }
+    // Clamp pointer aliases: same word, limit word, separate slots, canonical cell.
+    for(U start:{0u,1u,0x3ddu,0x7fffffffu,0x80000000u,0xffffffffu})
+    for(U gap:{0u,1u,0x3ddu,0x7fffffffu,0x80000000u,0xffffffffu})
+    for(U limit:{0u,0x3ddu,0x7fffffffu,0x80000000u}) for(U alias=0;alias<5;++alias) {
+        base(); field(0xc,limit); wr(initial.arena+0x800,start); wr(initial.arena+0x804,gap);
+        U first=arena(0x800),second=arena(0x804);
+        if(alias==1) second=first;
+        if(alias==2) first=arena(0x10c);
+        if(alias==3) second=arena(0x10c);
+        if(alias==4) second=device(0x168);
+        op(CLAMP,first,second); if(!run(3,id++)) return 1;
+    }
+    // Captured pool survives metadata alias of canonical pool pointer. No later op.
+    for(U count:{0u,0xffffffffu,0xfffffffeu}) {
+        base(); field(4,device(0x168)); field(0x14,count);
+        wr(initial.device+0x160,0x40); wr(initial.device+0x164,0x10);
+        wr(initial.device+0x158,0x80); wr(initial.device+0x15c,0x10);
+        op(ALLOC,4); if(!run(4,id++)) return 1;
+    }
+    // Finite crafted alias layouts: metadata lands on header fields; preserve writes/reloads.
+    for(U offset:{0u,4u,8u,0xcu,0x10u,0x14u}) {
+        base(); field(4,arena(0x100+offset)); op(ALLOC,4);
+        if(!run(5,id++)) return 1;
+    }
+    // Release signed-count/no-match/duplicate semantics and facade exactly once.
+    for(U count:{0u,1u,0x7fffffffu,0xffffffffu,0xfffffffeu,0xfffffffdu}) {
+        base(); field(0x14,count);
+        for(U i=0;i<3;++i) { wr(initial.arena+0x4f8-i*8,0x20); wr(initial.arena+0x4fc-i*8,8); }
+        op(RELEASE,arena(0x13c)); if(!run(6,id++)) return 1;
+        base(); field(0x14,count);
+        for(U i=0;i<3;++i) { wr(initial.arena+0x4f8-i*8,0x20); wr(initial.arena+0x4fc-i*8,8); }
+        op(FACADE,arena(0x13c)); if(!run(7,id++)) return 1;
+    }
+    // Positive malformed allocation counts take the raw signed tail branch.
+    for(U count:{1u,2u,0x7fffffffu}) {
+        base(); field(0x14,count); wr(initial.arena+0x500,8); wr(initial.arena+0x504,16); op(ALLOC,4);
+        if(!run(8,id++)) return 1;
+    }
+    printf("audio_pool_original_x86_vs_cpp=PASS cases=%u steps=%u ABI=PASS\n",cases,steps);
+    return 0;
+}

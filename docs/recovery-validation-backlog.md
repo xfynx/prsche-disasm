@@ -1,5 +1,16 @@
 # Отложенные проверки восстановления v2
 
+Run440: five pool/voice-cleanup originals836B integrated;115,592 native sequences/
+cases,32 mutations,576 pins PASS.232 TUs/181 names/188 refs,no EXE; no new storage.
+Native439 still controls0058ac30 independently. Next combine original/C++ stop,
+voice cleanup and real pool release, including positive parent returns from435.
+Keep actual startup/create-device/failed-allocation consumers, malformed or cyclic
+metadata/lists, invalid memory and concurrency open.438's C4701 is a conservative
+warning: every zero-count/interior/tail path assigns offset before use; native
+alias cases and both optimizations pass.439 attempt001 failed a mutation loop
+control;002 narrows that control, with production/fixture unchanged.
+Remaining group children00590070/00565990 and403/411 partial domains stay open.
+
 Run437: three audio stop/shutdown bodies417B integrated;27,850 native cases,
 30 mutations,571 pins PASS.230 TUs/185 names/192 refs,no EXE. Native435 composes
 raw434 children and native436 controls00565d60 independently; actual combined

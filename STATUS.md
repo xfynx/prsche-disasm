@@ -4,17 +4,18 @@ Updated 2026-10-27. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run437](iterations/v2/001-original-recovery/runs/437-audio-stop-integration/README.md)
-compiles 230 C++ translation units across 8 projects. The game link still has 185 unresolved
-names / 192 references. **There is no recovered playable C++ game executable yet.**
+[Run440](iterations/v2/001-original-recovery/runs/440-audio-pool-cleanup-integration/README.md)
+compiles 232 C++ translation units across 8 projects. The game link still has 181 unresolved
+names / 188 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates three original audio stop/shutdown bodies after 27,850 native
-cases, 30 detected mutations and a 571-pin audit. Both existing shutdown caller contracts
-use one canonical body. These are batch results, not a completion percentage.
+The latest batch integrates five original audio pool/cleanup bodies after 115,592 native
+sequences/cases, 32 detected mutations and a 576-pin audit. Existing state owners are reused.
+These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
-Audio stop00565d60/0058a8b0 and shutdown005659f0 are integrated in their tested domains.
-Four real children and actual DLL/TAPI/device/allocator composition remain open.
+Audio pool allocation/release and voice cleanup are integrated in their tested domains.
+Next is the combined original stop/voice/pool comparison; audio initialization,
+group validation/release and actual platform/device startup remain open.
 Detailed evidence and the next work order live in the
 [iteration PLAN](iterations/v2/001-original-recovery/PLAN.md).
 Full startup, display, menus, careers and gameplay still need integration/acceptance.

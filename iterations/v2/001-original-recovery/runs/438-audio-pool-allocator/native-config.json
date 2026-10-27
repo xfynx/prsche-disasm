@@ -1,0 +1,174 @@
+{
+  "run": 438,
+  "experiment": "local/experiments/v2-audio-pool-438",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_0058aa60@",
+      "va": "0058aa60",
+      "bytes": 38,
+      "sha256": "0c1e789a052e024ff79d6bae65bee428f3786a6b7b5f953974a582d2a8d9865d"
+    },
+    {
+      "token": "@BODY_0058aae0@",
+      "va": "0058aae0",
+      "bytes": 335,
+      "sha256": "bb7530375f7e9f516d9e3ae184dc618a63e1da78cb7ee7d8ad45beb76e336d30"
+    },
+    {
+      "token": "@BODY_0058ac30@",
+      "va": "0058ac30",
+      "bytes": 103,
+      "sha256": "231c710d19684c59633d1e9070212c399f6ec267cae2cf1fe68238f838e648a4"
+    },
+    {
+      "token": "@BODY_0058aa90@",
+      "va": "0058aa90",
+      "bytes": 44,
+      "sha256": "e28ca7509211e5e0e22297b8c47094f8b1b51a0886f09c5e19073a6a2c4b3c27"
+    }
+  ],
+  "pass_marker": "audio_pool_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "clamp-compare",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "signed32(begin + gap) > signed32(limit)",
+      "new": "(begin + gap) > limit",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "clamp-difference",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "limit - begin",
+      "new": "limit",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "round-alignment",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "(bytes + 3u) & 0xfffffffcu",
+      "new": "bytes & 0xfffffffcu",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "signed-request",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "if (signed32(aligned) > signed32(available)) return 0;\n    } else",
+      "new": "if (aligned > available) return 0;\n    } else",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "negative-count",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "if (signed32(original_count) < 0)",
+      "new": "if (original_count == 0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scan-end",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "signed32(index) > signed32(load(pool + 0x14u))",
+      "new": "signed32(index) >= signed32(load(pool + 0x14u))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "move-direction",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "entry += 8u;",
+      "new": "entry -= 8u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "move-length",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "const U length = load(entry + 0x0cu);",
+      "new": "const U length = load(entry + 8u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "metadata-store-order",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "const U count = load(pool + 0x14u);\n    store(entry + 4u,aligned);",
+      "new": "store(entry + 4u,aligned);\n    const U count = load(pool + 0x14u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "limit-decrement",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "load(pool + 0x0cu) - 8u",
+      "new": "load(pool + 0x0cu) - 4u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "cursor-signed",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "signed32(remaining) < signed32(cursor)",
+      "new": "remaining < cursor",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "release-count-sign",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "if (signed32(count) >= 0) return -8;",
+      "new": "if (count == 0) return -8;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "release-relative",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "const U offset = address - base;",
+      "new": "const U offset = address;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "release-move",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "source -= 8u;",
+      "new": "source += 8u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "release-return",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "    return 0;\n}\n\n// Existing",
+      "new": "    return 1;\n}\n\n// Existing",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "facade-once",
+      "source": "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+      "old": "(void)audio_backend_pool_release_0058ac30(address);",
+      "new": "(void)audio_backend_pool_release_0058ac30(address);\n    (void)audio_backend_pool_release_0058ac30(address);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

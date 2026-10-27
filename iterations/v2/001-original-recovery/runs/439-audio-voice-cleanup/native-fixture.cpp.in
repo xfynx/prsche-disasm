@@ -1,0 +1,205 @@
+#include "voice_cleanup_439.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+using U=std::uint32_t; using I=std::int32_t;
+using namespace porsche;
+struct Scene {
+    std::uint8_t physical[0x18c],cs[24],channels[6][0x70],voices[7][0xf8],nodes[5][32],descriptor[8];
+    U voice_table;
+};
+static Scene initial,work,original_result,cpp_result;
+struct Event { U address,hash; };
+static Event trace[32],trace_original[32];
+static U traces,original_traces,mode,argument,which,cases,free_calls;
+static std::uint8_t* slab;
+static bool abi_ok=true;
+static U ptr(const void* p) { return reinterpret_cast<U>(p); }
+template<class T> static T get(const void* p) { T v;memcpy(&v,p,sizeof(v));return v; }
+template<class T> static void put(void* p,T v) { memcpy(p,&v,sizeof(v)); }
+static U time_address() { return ptr(application_audio_device_state_006b48c0.data()+0xe8); }
+static U hash() {
+    U h=2166136261u;
+    for(U i=0;i<sizeof(work);++i) { h^=reinterpret_cast<const std::uint8_t*>(&work)[i];h*=16777619u; }
+    for(auto b:application_audio_device_state_006b48c0.backing) { h^=b;h*=16777619u; }
+    h^=audio_backend_voice_table_006b489c;h*=16777619u;
+    return h;
+}
+static void event(U address) {
+    if(traces>=32) ExitProcess(91);
+    trace[traces++]={address,hash()};
+}
+namespace porsche {
+I __cdecl audio_backend_pool_release_0058ac30(U address) {
+    event(address); ++free_calls;
+    const U voice=ptr(work.voices[3])+static_cast<U>(get<std::int16_t>(initial.descriptor+2))*0xf8u;
+    if(mode==1) put(reinterpret_cast<void*>(address),U{0});
+    if(mode==2) put(reinterpret_cast<void*>(voice+0xc4u),ptr(work.nodes[4]));
+    if(mode==3) audio_backend_voice_table_006b489c=ptr(work.voices[2]);
+    if(mode==4) put(work.descriptor+2,std::int16_t{1});
+    if(mode==5 && free_calls==1) {
+        const U next=get<U>(reinterpret_cast<const void*>(address));
+        if(next) put(reinterpret_cast<void*>(next),U{0});
+    }
+    return static_cast<I>(0x80000007u); // Ignored by the original consumer.
+}
+// Fail-closed platform/device endpoints needed by canonical owning TUs only.
+void __stdcall platform_initialize_critical_section(void*) { ExitProcess(90); }
+void __stdcall platform_delete_critical_section(void*) { ExitProcess(90); }
+void __stdcall platform_enter_critical_section(void*) { ExitProcess(90); }
+void __stdcall platform_leave_critical_section(void*) { ExitProcess(90); }
+I __cdecl application_audio_backend_initialize_0058a4f0() { ExitProcess(90); }
+void __cdecl application_audio_backend_apply_0058a690() { ExitProcess(90); }
+U __cdecl application_audio_backend_allocate_0058aae0(U) { ExitProcess(90); }
+I __cdecl application_audio_backend_start_device_0058fdb0() { ExitProcess(90); }
+void __cdecl application_audio_backend_stop_device_0058fe80() { ExitProcess(90); }
+void __cdecl application_audio_backend_finalize_0058e0e0() { ExitProcess(90); }
+}
+static bool init() {
+    slab=static_cast<std::uint8_t*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+    if(!slab) return false;
+    static const std::uint8_t raw_release[]={ @BODY_00597010@ };
+    static const std::uint8_t raw_finalize[]={ @BODY_00589c00@ };
+    memcpy(slab,raw_release,sizeof(raw_release));memcpy(slab+0x100,raw_finalize,sizeof(raw_finalize));
+    struct Abs { U at,old;const void* target; };
+    const Abs patches[]={ {6,0x6b489c,&audio_backend_voice_table_006b489c},
+        {0x108,0x6b4a00,&audio_backend_channels_006b4a00},
+        {0x13c,0x6b49a4,&audio_backend_channel_count_006b49a4},
+        {0x145,0x6b4a00,&audio_backend_channels_006b4a00},
+        {0x192,0x6b49a8,reinterpret_cast<void*>(time_address())},
+        {0x1a1,0x6b4a00,&audio_backend_channels_006b4a00},
+        {0x1ce,0x6b49a8,reinterpret_cast<void*>(time_address())},
+        {0x1df,0x6b49a8,reinterpret_cast<void*>(time_address())},
+        {0x208,0x6b49a8,reinterpret_cast<void*>(time_address())} };
+    for(const auto& p:patches) { if(get<U>(slab+p.at)!=p.old) return false;put(slab+p.at,ptr(p.target)); }
+    if(slab[0x3d]!=0xe8 || 0x597010+0x42+get<U>(slab+0x3e)!=0x58ac30) return false;
+    put(slab+0x3e,ptr(reinterpret_cast<void*>(&audio_backend_pool_release_0058ac30))-ptr(slab+0x42));
+    return FlushInstructionCache(GetCurrentProcess(),slab,0x215)!=0;
+}
+// Call setup is harness code. EAX is intentionally ignored for both void ABIs.
+static __declspec(noinline) void invoke(U fn,U input) {
+    U before,after,ebx_after,esi_after,edi_after,ebp_before,ebp_after;
+    __asm {
+        mov before,esp
+        mov ebp_before,ebp
+        mov ebx,0x12345678
+        mov esi,0x76543210
+        mov edi,0x5a5aa5a5
+        mov eax,fn
+        push input
+        call eax
+        add esp,4
+        mov after,esp
+        mov ebx_after,ebx
+        mov esi_after,esi
+        mov edi_after,edi
+        mov ebp_after,ebp
+    }
+    if(before!=after || ebx_after!=0x12345678 || esi_after!=0x76543210 || edi_after!=0x5a5aa5a5 || ebp_before!=ebp_after) abi_ok=false;
+}
+static void load() {
+    work=initial;
+    memcpy(application_audio_device_state_006b48c0.backing.data(),work.physical,sizeof(work.physical));
+    memcpy(audio_backend_lock_cs_006b1800,work.cs,sizeof(work.cs));
+    audio_backend_voice_table_006b489c=work.voice_table;
+    traces=free_calls=0;
+}
+static void save(Scene& out) {
+    memcpy(work.physical,application_audio_device_state_006b48c0.backing.data(),sizeof(work.physical));
+    memcpy(work.cs,audio_backend_lock_cs_006b1800,sizeof(work.cs));
+    work.voice_table=audio_backend_voice_table_006b489c;
+    out=work;
+}
+static bool check(const char* label) {
+    load();invoke(ptr(slab)+(which ? 0x100u:0u),argument);save(original_result);
+    original_traces=traces;memcpy(trace_original,trace,traces*sizeof(Event));
+    load();invoke(which ? ptr(reinterpret_cast<void*>(&audio_backend_voice_finalize_00589c00)) : ptr(reinterpret_cast<void*>(&audio_backend_voice_release_00597010)),argument);save(cpp_result);
+    ++cases;
+    if(!abi_ok || original_traces!=traces || memcmp(trace_original,trace,traces*sizeof(Event)) || memcmp(&original_result,&cpp_result,sizeof(Scene))) {
+        printf("divergence %s which=%u arg=%08x mode=%u traces=%u/%u abi=%u case=%u\n",label,which,argument,mode,original_traces,traces,abi_ok,cases);
+        return false;
+    }
+    return true;
+}
+static void base() {
+    memset(&initial,0,sizeof(initial));
+    memset(initial.cs,0x5a,sizeof(initial.cs));
+    memset(initial.channels,0x55,sizeof(initial.channels));
+    memset(initial.nodes,0xa5,sizeof(initial.nodes));
+    for(U i=0;i<5;++i) put(initial.nodes[i],U{0});
+    put(initial.physical+0x10+0x140,ptr(work.channels[2]));
+    put(initial.physical+0x10+0xe4,std::int16_t{3});
+    put(initial.physical+0x10+0xe8,U{0x11223344});
+    initial.voice_table=ptr(work.voices[3]);
+    put(initial.descriptor+2,std::int16_t{0});
+    mode=which=argument=0;
+}
+static void channel_state(U slot,U encoded) {
+    auto* r=initial.channels[slot+2];
+    r[0x1e]=(encoded&1u)?0x80:0;
+    r[0xf]=static_cast<std::uint8_t>((encoded/2u)%3u);
+    put(r,(encoded/6u)%2u ? U{0xffffffff}:U{0});
+    r[0x1b]=static_cast<std::uint8_t>((encoded/12u)%2u);
+}
+static bool finalizers() {
+    for(U a=0;a<24;++a) for(U b=0;b<24;++b) for(U c=0;c<24;++c) {
+        base();which=1;channel_state(0,a);channel_state(1,b);channel_state(2,c);
+        initial.channels[1][0xf]=2;
+        for(U selected=0;selected<3;++selected) { argument=selected;if(!check("group-exhaustive")) return false; }
+    }
+    for(std::int16_t count:{std::int16_t{-32768},std::int16_t{-1},std::int16_t{0},std::int16_t{1},std::int16_t{2},std::int16_t{3}})
+        for(U selected:{0xffffffffu,0u,1u,2u}) for(U active:{0u,1u,2u,255u}) for(U group:{0u,1u,128u,255u}) {
+            base();which=1;argument=selected;put(initial.physical+0x10+0xe4,count);
+            for(U i=0;i<6;++i) { put(initial.channels[i],U{0});initial.channels[i][0x1e]=static_cast<std::uint8_t>(group);initial.channels[i][0xf]=static_cast<std::uint8_t>(active);initial.channels[i][0x1b]=1; }
+            if(!check("signed-count-sentinel-group-active")) return false;
+        }
+    // Selected channel aliases the timestamp's low byte; stores must precede
+    // loading the timestamp. Both table and all touched pointees remain local.
+    for(U grouped:{0u,1u}) {
+        base();which=1;auto* d=initial.physical+0x10;
+        put(d+0x140,ptr(application_audio_device_state_006b48c0.data()+0xd9));
+        put(d+0xe4,std::int16_t{0});d[0xf7]=static_cast<std::uint8_t>(grouped);
+        if(!check("timestamp-selected-alias")) return false;
+    }
+    // Selected slot1 and flagged slot0 share the same physical owner. Retiring
+    // slot0 clears the timestamp byte before the second timestamp load.
+    base();which=1;argument=1;auto* d=initial.physical+0x10;
+    put(d+0x140,ptr(application_audio_device_state_006b48c0.data()+0xd9));
+    put(d+0xe4,std::int16_t{2});put(d+0xe8,U{0x11223302});
+    put(d+0xd9,U{0});d[0xf7]=0x80;d[0xf4]=1;
+    put(d+0x149,U{0});d[0x158]=1;d[0x167]=0x80;d[0x164]=0;
+    if(!check("timestamp-second-alias")) return false;
+    return true;
+}
+static U node(U id,U voice_index) {
+    return id<4 ? ptr(work.nodes[id]) : ptr(work.voices[voice_index])+(id==4?0x2c:0x64);
+}
+static bool lists() {
+    // Every permutation of up to four distinct dynamic/embedded nodes.
+    for(std::int16_t signed_index:{std::int16_t{0},std::int16_t{-1},std::int16_t{-2},std::int16_t{2}})
+        for(U code=0;code<1555;++code) {
+            U n=code,ids[4],length=0,seen=0;bool valid=true;
+            while(n && length<4) { U id=(n-1)%6;n=(n-1)/6;if(seen&(1u<<id)) {valid=false;break;} seen|=1u<<id;ids[length++]=id; }
+            if(!valid || n) continue;
+            for(U behavior=0;behavior<=5;++behavior) {
+                base();mode=behavior;argument=ptr(work.descriptor);put(initial.descriptor+2,signed_index);
+                const U slot=static_cast<U>(3+signed_index);
+                put(initial.voices[slot]+0xc4,length ? node(ids[0],slot):U{0});
+                for(U i=0;i<length;++i) {
+                    const U address=node(ids[i],slot),next=i+1<length?node(ids[i+1],slot):0;
+                    const U off=address-ptr(&work);put(reinterpret_cast<std::uint8_t*>(&initial)+off,next);
+                }
+                if(!check("linked-cleanup")) return false;
+            }
+        }
+    return true;
+}
+int main() {
+    for(auto b:application_audio_device_state_006b48c0.backing) if(b) return 2;
+    for(U i=0;i<24;++i) if(audio_backend_lock_cs_006b1800[i]) return 2;
+    if(audio_backend_voice_table_006b489c || ptr(&audio_backend_channels_006b4a00)!=ptr(application_audio_device_state_006b48c0.data()+0x140) || ptr(&audio_backend_channel_count_006b49a4)!=ptr(application_audio_device_state_006b48c0.data()+0xe4)) return 2;
+    if(!init()) return 3;
+    if(!finalizers() || !lists()) return 1;
+    printf("voice_cleanup_original_x86_vs_cpp=PASS cases=%u abi=PASS\n",cases);
+    return 0;
+}
