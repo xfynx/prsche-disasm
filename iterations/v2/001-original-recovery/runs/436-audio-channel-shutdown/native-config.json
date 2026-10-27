@@ -1,0 +1,165 @@
+{
+  "run": 436,
+  "experiment": "local/experiments/v2-audio-shutdown-436",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_005659f0@",
+      "va": "005659f0",
+      "bytes": 223,
+      "sha256": "e93db79e95b1d7884e4b357f0c66aa819d5d8bddf904ba650a4275287f707ad1"
+    }
+  ],
+  "pass_marker": "audio_shutdown_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "inactive-result",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "return -10;",
+      "new": "return -8;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "validate-nonzero",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "application_audio_validate_channel_00590070(index) != 0",
+      "new": "application_audio_validate_channel_00590070(index) < 0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "recursive-count-source",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "child < state_word(0x18)",
+      "new": "child < state_word(0xe4)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "recursive-count-sign",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "child < state_word(0x18)",
+      "new": "child < static_cast<std::int16_t>(state_word(0x18))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "recursive-count-reload",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "for (std::int32_t child = 0; child < state_word(0x18); ++child)",
+      "new": "const auto frozen_count = state_word(0x18);\n        for (std::int32_t child = 0; child < frozen_count; ++child)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "recursive-return-ignored",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "(void)application_audio_stop_channel_005659f0(child);",
+      "new": "if (application_audio_stop_channel_005659f0(child) != 0) return -8;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "channel-count-sign",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "if (audio_backend_channel_count_006b49a4 > 0)",
+      "new": "if (static_cast<std::uint16_t>(audio_backend_channel_count_006b49a4) > 0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "signed-channel-group",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "read_at<std::int8_t>(table + offset + 0x0e)",
+      "new": "read_at<std::uint8_t>(table + offset + 0x0e)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "channel-table-reload",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "                table = audio_backend_channels_006b4a00;",
+      "new": "                table = table;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "channel-count-reload",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "} while (slot < audio_backend_channel_count_006b49a4);",
+      "new": "} while (slot < 3);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "header-unsigned-word",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "read_at<std::uint16_t>(captured_header + 6u)",
+      "new": "read_at<std::int16_t>(captured_header + 6u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "header-pointer-capture",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "const std::uint32_t header_word = read_at<std::uint16_t>(captured_header + 6u);",
+      "new": "const std::uint32_t header_word = read_at<std::uint16_t>(read_at<std::uint32_t>(state_dword(0x144) + group_offset) + 6u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "group-table-reload",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "const std::uint32_t group = state_dword(0x144) + group_offset;",
+      "new": "const std::uint32_t group = captured_table + group_offset;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "group-capture-after-lock",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "    audio_backend_lock_005896d0();\n    const std::uint32_t group_offset = static_cast<std::uint32_t>(index) * 12u;\n    const std::uint32_t captured_table = state_dword(0x144);\n    const std::uint32_t captured_header = read_at<std::uint32_t>(\n        captured_table + group_offset);",
+      "new": "    const std::uint32_t group_offset = static_cast<std::uint32_t>(index) * 12u;\n    const std::uint32_t captured_table = state_dword(0x144);\n    const std::uint32_t captured_header = read_at<std::uint32_t>(captured_table + group_offset);\n    audio_backend_lock_005896d0();",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "group-clear-word",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "std::memcpy(reinterpret_cast<void*>(group), &zero, sizeof(zero));",
+      "new": "(void)zero;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "group-clear-active",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "*reinterpret_cast<std::uint8_t*>(group + 8u) = 0;",
+      "new": "*reinterpret_cast<std::uint8_t*>(group + 9u) = 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "facade-delegation",
+      "source": "iterations/v2/001-original-recovery/runs/436-audio-channel-shutdown/audio_shutdown_436.cpp",
+      "old": "    (void)application_audio_stop_channel_005659f0(index);",
+      "new": "    (void)index;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ],
+  "timeout_seconds": 180
+}

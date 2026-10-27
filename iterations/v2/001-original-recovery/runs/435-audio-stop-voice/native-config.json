@@ -1,0 +1,175 @@
+{
+  "run": 435,
+  "experiment": "local/experiments/v2-audio-stop-435",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_voice_434.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_00565d60@",
+      "va": "00565d60",
+      "bytes": 106,
+      "sha256": "1f26e5eb36aa3eeaee315305f34e3a42c1b22211facc8a4819cf9641414dcc43"
+    },
+    {
+      "token": "@BODY_0058a8b0@",
+      "va": "0058a8b0",
+      "bytes": 88,
+      "sha256": "2d077122a5f36c27e4de4a216a7fbb5b07d59acf550ae6fb2fc08ab0db91f06c"
+    },
+    {
+      "token": "@BODY_005896d0@",
+      "va": "005896d0",
+      "bytes": 18,
+      "sha256": "9021e6ce3cdd9eb979bc2e8c1e58337ba0529f13beea79507209ed677a786339"
+    },
+    {
+      "token": "@BODY_005896f0@",
+      "va": "005896f0",
+      "bytes": 17,
+      "sha256": "9be3da08ee0c2cb0cbcfb754f7cbb6663fd3bab080b58cc21fa4a6c3d799db6c"
+    },
+    {
+      "token": "@BODY_0058e2f0@",
+      "va": "0058e2f0",
+      "bytes": 12,
+      "sha256": "190b028a580459671dd5968b047688a0b854bbea0439bb79d1f4d8adef13c410"
+    },
+    {
+      "token": "@BODY_0058e300@",
+      "va": "0058e300",
+      "bytes": 12,
+      "sha256": "d15f037561e5740cad63aff2f03fc207d39d331d26c0aa76c97af5df7122b27b"
+    },
+    {
+      "token": "@BODY_00589d20@",
+      "va": "00589d20",
+      "bytes": 79,
+      "sha256": "cff8c8233458475e404ed921665dbc29d6e6333d41dd9b538bfe7e6f1b2beb3e"
+    },
+    {
+      "token": "@BODY_00590340@",
+      "va": "00590340",
+      "bytes": 133,
+      "sha256": "c4f7df84adfcb347c39cf02fbe3c7024b8b81b8b8c2e6953cd8a3ac504aa8a12"
+    }
+  ],
+  "pass_marker": "audio_stop_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "inactive-error",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "return -10",
+      "new": "return -8",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "active-byte",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "[0xdc] == 0",
+      "new": "[0xdc] != 1",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "lookup-sign",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "if (channel >= 0)",
+      "new": "if (channel > 0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "slot-initial",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "slot = 0xffffffffu",
+      "new": "slot = 0u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "return-channel",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "return channel;",
+      "new": "return 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "voice-stride",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "voice_slot * 0xf8u",
+      "new": "voice_slot * 0u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "callback-offset",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "slot + 0x2c",
+      "new": "slot + 0x30",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "flag-reload",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "if ((slot[0] & 1u) != 0)",
+      "new": "if (false)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "bit-precedence",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "} else if ((slot[0] & 2u) != 0)",
+      "new": "} if ((slot[0] & 2u) != 0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "clear-tail",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "slot + 0xf4, &zero",
+      "new": "slot + 0xf0, &zero",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "release-offset",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "slot + 0x64",
+      "new": "slot + 0x60",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "final-reload",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "if ((slot[0] & 0x10u) != 0)",
+      "new": "if ((slot[0] & 0x10u) == 0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "voice-return",
+      "source": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "old": "    return 0;\n}",
+      "new": "    return 1;\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

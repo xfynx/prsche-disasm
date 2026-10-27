@@ -1,5 +1,23 @@
 # v2 / 001 - original source recovery plan
 
+Current437, 2026-10-27: frozen435/436 integrated; shared audit PASS. Three original
+bodies/417B, 27,850 native cases, 30 mutations, 571 pins and316 canonical providers.
+230 TUs/8 projects compile;185 names/192 references, no EXE. Three old names close;
+four actual children appear. Signed005659f0 and its void facade share one body;
+the facade adds no original-function count. Canonical state/434 children reused;
+only separate006b489c pointer storage added with full closure/loader-zero proof.
+Both workers finished; no active assignments. Run437 README owns commands/artifacts.
+Next: trace audio startup allocation0058aae0 and pool helpers0058aa60/0058ac30
+against the index and registry before defining the next coherent batch. This path
+serves create-device startup; do not prioritize symbol counts over execution.
+Remaining stop children00590070/00565990/00597010/00589c00 stay unresolved. Parent435
+positive return is source/index-inspected rather than separately native-tested;
+actual shutdown+stop composition, live endpoints, faults/concurrency remain open.
+Keep output to findings/failures/counts; no new general tool or repeated old proof.
+Existing403/411 PARTIAL domains and full startup/display/game acceptance stay open.
+
+Previous checkpoint follows.
+
 Current433,2026-10-27: frozen432/434 integrated andsharedauditPASS.15originalbodies
 740B;102108nativecases/28mutations/566pins;228TUs/8projects compile,184names191refs,
 noEXE. Sevenoldnamesclose/real00565d60 opens. Canonicalaudio state reused; no new

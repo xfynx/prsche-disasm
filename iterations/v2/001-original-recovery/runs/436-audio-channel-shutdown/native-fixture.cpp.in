@@ -1,0 +1,235 @@
+#include "audio_shutdown_436.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+using U = std::uint32_t;
+using I = std::int32_t;
+using Fn = I(__cdecl*)(I);
+using namespace porsche;
+
+struct Group { U header, opaque; std::uint8_t active, tail[3]; };
+static_assert(sizeof(Group) == 12);
+struct Scene {
+    std::uint8_t physical[0x18c], cs[24];
+    Group groups[2][512];
+    std::uint8_t channels[2][8][0x70];
+    std::uint8_t headers[2][512][12];
+};
+static Scene initial, work, output_o, output_c;
+struct Event { U tag, a, b, hash; };
+static Event trace[140000], trace_o[140000];
+static U trace_count, count_o, stop_calls, validate_calls, release_calls;
+static U mode, threshold;
+static U stable_hash;
+static I input, reject_value;
+static bool reject_all, facade, abi_ok = true;
+static std::uint8_t* slab;
+static U ptr(const void* p) { return reinterpret_cast<U>(p); }
+template<class T> static T get(const void* p) { T v; memcpy(&v,p,sizeof(v)); return v; }
+template<class T> static void put(void* p, T v) { memcpy(p,&v,sizeof(v)); }
+static void word(U off, std::uint16_t v) { put(application_audio_device_state_006b48c0.data()+off,v); }
+static void dword(U off, U v) { put(application_audio_device_state_006b48c0.data()+off,v); }
+static Group* group_base(U table) { return work.groups[table]+128; }
+static U hash() {
+    U h=2166136261u;
+    if (reject_all) h=stable_hash;
+    else for (U i=0;i<sizeof(work);++i) { h ^= reinterpret_cast<std::uint8_t*>(&work)[i]; h*=16777619u; }
+    for (U i=0;i<sizeof(application_audio_device_state_006b48c0);++i) {
+        h ^= application_audio_device_state_006b48c0.backing[i]; h*=16777619u;
+    }
+    return h;
+}
+static void rec(U tag, U a=0, U b=0) {
+    if (trace_count >= 140000) ExitProcess(91);
+    // Full state at every external call, including lock transitions and clears.
+    trace[trace_count++]={tag,a,b,hash()};
+}
+namespace porsche {
+void __stdcall platform_initialize_critical_section(void* p) { rec(1,ptr(p)); }
+void __stdcall platform_delete_critical_section(void* p) { rec(2,ptr(p)); }
+void __stdcall platform_enter_critical_section(void* p) {
+    rec(3,ptr(p));
+    if(mode==13) dword(0x144,ptr(group_base(1)));
+}
+void __stdcall platform_leave_critical_section(void* p) { rec(4,ptr(p)); }
+I __cdecl application_audio_validate_channel_00590070(I index) {
+    rec(0x590070,static_cast<U>(index)); ++validate_calls;
+    if (mode==10 && validate_calls==1) word(0x18,1);
+    if (mode==11 && validate_calls==1) word(0x18,3);
+    if (mode==12 && validate_calls==1) application_audio_device_state_006b48c0[0xdc]=0;
+    if (reject_all) return reject_value;
+    return 0;
+}
+I __cdecl audio_channel_stop_00565d60(U handle) {
+    rec(0x565d60,handle); ++stop_calls;
+    if (stop_calls==threshold) {
+        if (mode==1) audio_backend_channels_006b4a00=ptr(work.channels[1]);
+        if (mode==2) audio_backend_channel_count_006b49a4=1;
+        if (mode==3) audio_backend_channel_count_006b49a4=4;
+        if (mode==4) audio_backend_channel_count_006b49a4=-1;
+        if (mode==5) {
+            // Replace the first group pointer after capture; mutate the captured
+            // header's word, which must be read after the child call.
+            auto* old=group_base(0)+input;
+            put(reinterpret_cast<void*>(old->header+6u),std::uint16_t{0xfedc});
+            old->header=ptr(work.headers[1][128+input]);
+            dword(0x144,ptr(group_base(1)));
+        }
+    }
+    return static_cast<I>(0x80000004u); // Ignored signed failure.
+}
+I __cdecl application_audio_release_group_00565990(I index,U header_word) {
+    rec(0x565990,static_cast<U>(index),header_word); ++release_calls;
+    if (mode==6) dword(0x144,ptr(group_base(1)));
+    if (mode==7 && release_calls==1) word(0x18,1);
+    if (mode==8 && release_calls==1) word(0x18,3);
+    if (mode==9 && release_calls==1) application_audio_device_state_006b48c0[0xdc]=0;
+    return -999; // Ignored signed failure.
+}
+// Canonical owner dependencies, not providers in a production graph.
+I __cdecl application_audio_backend_initialize_0058a4f0() { ExitProcess(90); }
+void __cdecl application_audio_backend_apply_0058a690() { ExitProcess(90); }
+U __cdecl application_audio_backend_allocate_0058aae0(U) { ExitProcess(90); }
+I __cdecl application_audio_backend_start_device_0058fdb0() { ExitProcess(90); }
+void __cdecl application_audio_backend_stop_device_0058fe80() { ExitProcess(90); }
+void __cdecl application_audio_backend_finalize_0058e0e0() { ExitProcess(90); }
+}
+static bool init_slab() {
+    slab=static_cast<std::uint8_t*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+    if(!slab) return false;
+    static const std::uint8_t raw[]={ @BODY_005659f0@ };
+    memcpy(slab,raw,sizeof(raw));
+    struct Abs { U offset,va,state_offset; };
+    const Abs absolute[]={ {1,0x6b499c,0xdc},{0x21,0x6b48d8,0x18},{0x2e,0x6b48d8,0x18},
+        {0x61,0x6b4a04,0x144},{0x73,0x6b49a4,0xe4},{0x7e,0x6b4a00,0x140},
+        {0x98,0x6b4a00,0x140},{0xa2,0x6b49a4,0xe4},{0xc1,0x6b4a04,0x144} };
+    for (const auto& a:absolute) {
+        if(get<U>(slab+a.offset)!=a.va) return false;
+        put(slab+a.offset,ptr(application_audio_device_state_006b48c0.data()+a.state_offset));
+    }
+    struct Rel { U offset,va; const void* target; };
+    const Rel relative[]={ {0x28,0x5659f0,slab},
+        {0x45,0x590070,reinterpret_cast<const void*>(&application_audio_validate_channel_00590070)},
+        {0x5a,0x5896d0,reinterpret_cast<const void*>(&audio_backend_lock_005896d0)},
+        {0x92,0x565d60,reinterpret_cast<const void*>(&audio_channel_stop_00565d60)},
+        {0xbb,0x565990,reinterpret_cast<const void*>(&application_audio_release_group_00565990)},
+        {0xd4,0x5896f0,reinterpret_cast<const void*>(&audio_backend_unlock_005896f0)} };
+    for (const auto& r:relative) {
+        if(slab[r.offset]!=0xe8 || 0x5659f0+r.offset+5+get<U>(slab+r.offset+1)!=r.va) return false;
+        put(slab+r.offset+1,ptr(r.target)-ptr(slab+r.offset+5));
+    }
+    return FlushInstructionCache(GetCurrentProcess(),slab,sizeof(raw))!=0;
+}
+// Explicit cdecl call with preserved-register and stack checks. Setup/push/call
+// are harness code; the copied 223 bytes are the complete unmodified body.
+static __declspec(noinline) I invoke(Fn fn,I argument) {
+    U before,after,result_bx,result_si,result_di,bp_before,bp_after; I result;
+    __asm {
+        mov before,esp
+        mov bp_before,ebp
+        mov ebx,0x13579bdf
+        mov esi,0x2468ace0
+        mov edi,0x55aa33cc
+        mov eax,fn
+        push argument
+        call eax
+        add esp,4
+        mov result,eax
+        mov after,esp
+        mov result_bx,ebx
+        mov result_si,esi
+        mov result_di,edi
+        mov bp_after,ebp
+    }
+    if(before!=after || result_bx!=0x13579bdf || result_si!=0x2468ace0 || result_di!=0x55aa33cc || bp_before!=bp_after) abi_ok=false;
+    return result;
+}
+static I __cdecl facade_call(I index) { application_audio_shutdown_channels_005659f0(index); return 0x12345678; }
+static void load() {
+    work=initial;
+    stable_hash=2166136261u;
+    for (U i=0;i<sizeof(work);++i) { stable_hash ^= reinterpret_cast<std::uint8_t*>(&work)[i]; stable_hash*=16777619u; }
+    memcpy(application_audio_device_state_006b48c0.backing.data(),work.physical,sizeof(work.physical));
+    memcpy(audio_backend_lock_cs_006b1800,work.cs,sizeof(work.cs));
+    trace_count=stop_calls=validate_calls=release_calls=0;
+}
+static void save(Scene& out) {
+    memcpy(work.physical,application_audio_device_state_006b48c0.backing.data(),sizeof(work.physical));
+    memcpy(work.cs,audio_backend_lock_cs_006b1800,sizeof(work.cs));
+    out=work;
+}
+static void base() {
+    memset(&initial,0x5a,sizeof(initial));
+    for(U t=0;t<2;++t) for(U i=0;i<512;++i) {
+        initial.groups[t][i].header=ptr(work.headers[t][i]);
+        put(initial.headers[t][i]+6,static_cast<std::uint16_t>(i+t*0x8000));
+    }
+    for(U t=0;t<2;++t) for(U i=0;i<8;++i) {
+        put(initial.channels[t][i],0x81000000u+t*0x100u+i);
+        initial.channels[t][i][0xe]=2;
+        initial.channels[t][i][0xf]=0; // active byte is not consulted.
+    }
+    put(initial.physical+0x10+0x18,std::uint16_t{3});
+    put(initial.physical+0x10+0xe4,std::int16_t{3});
+    put(initial.physical+0x10+0x140,ptr(work.channels[0]));
+    put(initial.physical+0x10+0x144,ptr(group_base(0)));
+    initial.physical[0x10+0xdc]=1;
+    input=2; reject_all=false; reject_value=-8; facade=false; mode=0; threshold=1;
+}
+static U cases;
+static bool check(const char* name) {
+    load(); I ro=invoke(reinterpret_cast<Fn>(slab),input);
+    if(facade) ro=0x12345678;
+    save(output_o); count_o=trace_count; memcpy(trace_o,trace,trace_count*sizeof(Event));
+    load(); I rc=invoke(facade ? facade_call : application_audio_stop_channel_005659f0,input);
+    save(output_c);
+    ++cases;
+    if(!abi_ok || ro!=rc || count_o!=trace_count || memcmp(trace_o,trace,trace_count*sizeof(Event)) || memcmp(&output_o,&output_c,sizeof(Scene))) {
+        printf("divergence %s input=%d mode=%u original=%d cpp=%d traces=%u/%u abi=%u\n",name,input,mode,ro,rc,count_o,trace_count,abi_ok);
+        return false;
+    }
+    return true;
+}
+int main() {
+    // Observe production initialization before any synthetic reset.
+    for(auto b:application_audio_device_state_006b48c0.backing) if(b) return 2;
+    for(U i=0;i<24;++i) if(audio_backend_lock_cs_006b1800[i]) return 2;
+    if(ptr(&audio_backend_channel_count_006b49a4)!=ptr(application_audio_device_state_006b48c0.data()+0xe4) ||
+       ptr(&audio_backend_channels_006b4a00)!=ptr(application_audio_device_state_006b48c0.data()+0x140) ||
+       ptr(&audio_backend_lock_depth_006b499f)!=ptr(application_audio_device_state_006b48c0.data()+0xdf)) return 2;
+    if(!init_slab()) return 3;
+    for(U active: {0u,1u,0x80u,0xffu}) for(I arg: {-1,0,2,127,128,255,-2,-128}) {
+        base(); initial.physical[0x10+0xdc]=static_cast<std::uint8_t>(active);
+        input=arg; reject_all=true;
+        for(I reject: {-8,1,static_cast<I>(0x80000000u)}) { reject_value=reject; if(!check("gate")) return 1; }
+    }
+    for(std::int16_t channels: {std::int16_t{-32768},std::int16_t{-1},std::int16_t{0},std::int16_t{1},std::int16_t{3}})
+        for(U depth: {0u,1u,255u}) for(U f:{0u,1u}) {
+            base(); put(initial.physical+0x10+0xe4,channels); initial.physical[0x10+0xdf]=static_cast<std::uint8_t>(depth);
+            facade=f!=0; if(!check("count-depth-facade")) return 1;
+        }
+    for(I group: {-128,-2,0,2,127,128,255}) {
+        base(); input=group;
+        for(U i=0;i<8;++i) initial.channels[0][i][0xe]=static_cast<std::uint8_t>(group);
+        if(!check("signed-group-byte")) return 1;
+    }
+    for(U mutation=1;mutation<=6;++mutation) for(U fire:{1u,2u}) {
+        base(); mode=mutation; threshold=fire;
+        if(!check("child-state-change")) return 1;
+    }
+    base(); mode=13; if(!check("lock-before-capture")) return 1;
+    // No-match records must advance; count is checked after every record.
+    base(); initial.channels[0][0][0xe]=1; initial.channels[0][1][0xe]=1;
+    if(!check("skip-to-final")) return 1;
+    for(U mutation=7;mutation<=12;++mutation) {
+        base(); input=-1; mode=mutation; if(!check("recursive-state-change")) return 1;
+    }
+    for(std::uint16_t groups: {std::uint16_t{0},std::uint16_t{1},std::uint16_t{3},std::uint16_t{0x8000},std::uint16_t{0xffff}}) {
+        base(); input=-1; reject_all=true; put(initial.physical+0x10+0x18,groups);
+        if(!check("unsigned-group-count")) return 1;
+    }
+    base(); input=-1; if(!check("recursive-release-errors-ignored")) return 1;
+    base(); input=-1; facade=true; if(!check("recursive-facade")) return 1;
+    printf("audio_shutdown_original_x86_vs_cpp=PASS cases=%u abi=PASS\n",cases);
+    return 0;
+}

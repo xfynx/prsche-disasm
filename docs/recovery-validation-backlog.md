@@ -1,5 +1,15 @@
 # Отложенные проверки восстановления v2
 
+Run437: three audio stop/shutdown bodies417B integrated;27,850 native cases,
+30 mutations,571 pins PASS.230 TUs/185 names/192 refs,no EXE. Native435 composes
+raw434 children and native436 controls00565d60 independently; actual combined
+shutdown/stop execution remains unverified. Parent435 valid channel0 and negative
+returns tested; positive channel returns follow inspected original/source only.
+Four production children00590070/00565990/00597010/00589c00 remain unresolved;
+callbacks are controlled native cdecl transport. Keep live devices/locks, faults,
+invalid slabs and concurrency open. Next startup trace:0058aae0/pool helpers.
+Historical403/411 partial domains remain unchanged.
+
 Run433:15 modem/audio bodies740B integrated;102108 nativecases,28mutations,
 566pins PASS.228TUs/8projects compile;184names191refs,noEXE. Fouraudio views reuse
 the accepteddeviceblock; onlyCS24B andtwoTAPIcaches are newlyowned.00565d60 is a

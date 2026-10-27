@@ -1,0 +1,229 @@
+#include "audio_stop_435.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U = std::uint32_t;
+namespace porsche {
+std::int32_t __cdecl application_audio_backend_initialize_0058a4f0() { ExitProcess(90); }
+void __cdecl application_audio_backend_apply_0058a690() { ExitProcess(90); }
+std::uint32_t __cdecl application_audio_backend_allocate_0058aae0(std::uint32_t) { ExitProcess(90); }
+std::int32_t __cdecl application_audio_backend_start_device_0058fdb0() { ExitProcess(90); }
+void __cdecl application_audio_backend_stop_device_0058fe80() { ExitProcess(90); }
+void __cdecl application_audio_backend_finalize_0058e0e0() { ExitProcess(90); }
+}
+struct Scene {
+    unsigned char device[0x18c], cs[24]; U voice_table;
+    unsigned char voices[4*0xf8], alternate[4*0xf8];
+    unsigned char channels[4*0x70], channels_b[4*0x70];
+};
+static Scene state, initial, original, candidate;
+struct Event { U tag,arg,depth,flags,tail,table,count,active; };
+struct Trace { U count; Event events[64]; };
+static Trace trace, original_trace;
+static U callback_mode, release_mode, last_slot;
+static unsigned char* slab;
+static bool patch_ok = true;
+static U cases = 0;
+static U ptr(const void* p) { return reinterpret_cast<U>(p); }
+static U read32(const void* p) { U x; memcpy(&x,p,4); return x; }
+static void write32(void* p,U x) { memcpy(p,&x,4); }
+static void record(U tag,U arg) {
+    if(trace.count>=64) ExitProcess(91);
+    auto* v=reinterpret_cast<unsigned char*>(last_slot);
+    Event& e=trace.events[trace.count++];
+    e={tag,arg,porsche::audio_backend_lock_depth_006b499f,
+       v ? read32(v):0,v ? read32(v+0xf4):0,
+       porsche::audio_backend_voice_table_006b489c,
+       static_cast<U>(static_cast<std::int32_t>(porsche::audio_backend_channel_count_006b49a4)),
+       porsche::application_audio_device_state_006b48c0[0xdc]};
+}
+static void __cdecl callback(void* data) {
+    auto* slot=static_cast<unsigned char*>(data)-0x2c;
+    last_slot=ptr(slot); record(1,ptr(data));
+    switch(callback_mode) {
+    case 1: write32(slot,1); break;
+    case 2: write32(slot,2); break;
+    case 3: write32(slot,0x10); break;
+    case 4: write32(slot,0x12); break;
+    case 5: write32(slot,0); break;
+    case 6: porsche::audio_backend_voice_table_006b489c=ptr(state.alternate); break;
+    case 7: porsche::audio_backend_channel_count_006b49a4=1; break;
+    case 8: porsche::audio_backend_channels_006b4a00=ptr(state.channels_b); break;
+    case 9: porsche::application_audio_device_state_006b48c0[0xdc]=0; break;
+    }
+}
+namespace porsche {
+void __stdcall platform_initialize_critical_section(void*) { ExitProcess(92); }
+void __stdcall platform_delete_critical_section(void*) { ExitProcess(92); }
+void __stdcall platform_enter_critical_section(void* p) { record(2,ptr(p)); }
+void __stdcall platform_leave_critical_section(void* p) { record(3,ptr(p)); }
+void __cdecl audio_backend_voice_release_00597010(void* data) {
+    auto* slot=static_cast<unsigned char*>(data)-0x64;
+    last_slot=ptr(slot); record(4,ptr(data));
+    if(release_mode==1) slot[0]|=0x10;
+    if(release_mode==2) slot[0]&=static_cast<unsigned char>(~0x10u);
+    if(release_mode==3) audio_backend_voice_table_006b489c=ptr(state.alternate);
+}
+void __cdecl audio_backend_voice_finalize_00589c00(U index) {
+    record(5,index);
+    reinterpret_cast<unsigned char*>(last_slot)[0x20]^=0x77;
+}
+}
+static void* iat_enter=reinterpret_cast<void*>(&porsche::platform_enter_critical_section);
+static void* iat_leave=reinterpret_cast<void*>(&porsche::platform_leave_critical_section);
+enum : U { STOP=0,VOICE=0x100,LOCK=0x200,UNLOCK=0x240,ENTER=0x280,LEAVE=0x2c0,FIND=0x300,NEXT=0x400 };
+static void abs32(U body,U off,U expected,const void* target) {
+    auto* site=slab+body+off;
+    if(read32(site)!=expected) { patch_ok=false; return; }
+    write32(site,ptr(target));
+}
+static void rel32(U body,U off,U expected,const void* target) {
+    auto* site=slab+body+off;
+    if(site[0]!=0xe8 && site[0]!=0xe9) { patch_ok=false; return; }
+    const U original_va=(body==STOP?0x565d60:body==VOICE?0x58a8b0:body==LOCK?0x5896d0:0x5896f0);
+    if(original_va+off+5+read32(site+1)!=expected) { patch_ok=false; return; }
+    write32(site+1,ptr(target)-ptr(site+5));
+}
+static bool init() {
+    slab=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+    if(!slab) return false;
+    static const unsigned char b0[]={ @BODY_00565d60@ }; memcpy(slab+STOP,b0,sizeof(b0));
+    static const unsigned char b1[]={ @BODY_0058a8b0@ }; memcpy(slab+VOICE,b1,sizeof(b1));
+    static const unsigned char b2[]={ @BODY_005896d0@ }; memcpy(slab+LOCK,b2,sizeof(b2));
+    static const unsigned char b3[]={ @BODY_005896f0@ }; memcpy(slab+UNLOCK,b3,sizeof(b3));
+    static const unsigned char b4[]={ @BODY_0058e2f0@ }; memcpy(slab+ENTER,b4,sizeof(b4));
+    static const unsigned char b5[]={ @BODY_0058e300@ }; memcpy(slab+LEAVE,b5,sizeof(b5));
+    static const unsigned char b6[]={ @BODY_00589d20@ }; memcpy(slab+FIND,b6,sizeof(b6));
+    static const unsigned char b7[]={ @BODY_00590340@ }; memcpy(slab+NEXT,b7,sizeof(b7));
+    using namespace porsche;
+    abs32(STOP,2,0x6b499c,&application_audio_device_state_006b48c0[0xdc]);
+    rel32(STOP,0x12,0x5896d0,slab+LOCK); rel32(STOP,0x1c,0x589d20,slab+FIND);
+    rel32(STOP,0x38,0x590340,slab+NEXT); rel32(STOP,0x49,0x58a8b0,slab+VOICE);
+    rel32(STOP,0x54,0x590340,slab+NEXT); rel32(STOP,0x60,0x5896f0,slab+UNLOCK);
+    abs32(VOICE,3,0x6b489c,&audio_backend_voice_table_006b489c);
+    rel32(VOICE,0x3d,0x597010,reinterpret_cast<void*>(&audio_backend_voice_release_00597010));
+    rel32(VOICE,0x4b,0x589c00,reinterpret_cast<void*>(&audio_backend_voice_finalize_00589c00));
+    rel32(LOCK,0,0x58e2f0,slab+ENTER);
+    abs32(LOCK,6,0x6b499f,&audio_backend_lock_depth_006b499f); abs32(LOCK,13,0x6b499f,&audio_backend_lock_depth_006b499f);
+    abs32(UNLOCK,1,0x6b499f,&audio_backend_lock_depth_006b499f); abs32(UNLOCK,8,0x6b499f,&audio_backend_lock_depth_006b499f);
+    rel32(UNLOCK,12,0x58e300,slab+LEAVE);
+    abs32(ENTER,1,0x6b1800,audio_backend_lock_cs_006b1800); abs32(ENTER,7,0x5b2078,&iat_enter);
+    abs32(LEAVE,1,0x6b1800,audio_backend_lock_cs_006b1800); abs32(LEAVE,7,0x5b206c,&iat_leave);
+    // Exact checked absolute operands for the two unchanged Run434 raw children.
+    abs32(FIND,0x11,0x6b49a4,&audio_backend_channel_count_006b49a4);
+    abs32(FIND,0x33,0x6b4a00,&audio_backend_channels_006b4a00);
+    abs32(NEXT,7,0x6b4a00,&audio_backend_channels_006b4a00);
+    abs32(NEXT,0x2d,0x6b49a4,&audio_backend_channel_count_006b49a4);
+    return patch_ok;
+}
+using Fn=std::int32_t(__cdecl*)(U);
+// Probe actual cdecl stack cleanup and EBX/ESI/EDI/EBP preservation for each call.
+static std::int32_t invoke(Fn fn,U arg,U* abi) {
+    U saved_sp,saved_bp,result,fail=0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp,esp
+        mov saved_bp,ebp
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,10203040h
+        push arg
+        call fn
+        add esp,4
+        mov result,eax
+        cmp esp,saved_sp
+        jne bad
+        cmp ebp,saved_bp
+        jne bad
+        cmp ebx,13579bdfh
+        jne bad
+        cmp esi,2468ace0h
+        jne bad
+        cmp edi,10203040h
+        je done
+    bad:
+        mov fail,1
+    done:
+        mov esp,saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    *abi=fail; return static_cast<std::int32_t>(result);
+}
+static void load() {
+    state=initial;
+    memcpy(porsche::application_audio_device_state_006b48c0.backing.data(),state.device,sizeof(state.device));
+    memcpy(porsche::audio_backend_lock_cs_006b1800,state.cs,24);
+    porsche::audio_backend_voice_table_006b489c=state.voice_table;
+    memset(&trace,0,sizeof(trace)); last_slot=0;
+}
+static void save(Scene& out) {
+    memcpy(state.device,porsche::application_audio_device_state_006b48c0.backing.data(),sizeof(state.device));
+    memcpy(state.cs,porsche::audio_backend_lock_cs_006b1800,24);
+    state.voice_table=porsche::audio_backend_voice_table_006b489c; out=state;
+}
+static bool run(bool channel,U arg,U id) {
+    U a=0,b=0; load();
+    auto ro=invoke(reinterpret_cast<Fn>(slab+(channel?STOP:VOICE)),arg,&a); save(original); original_trace=trace;
+    load(); auto rc=invoke(channel?&porsche::audio_channel_stop_00565d60:&porsche::audio_backend_stop_voice_0058a8b0,arg,&b); save(candidate);
+    if(ro!=rc || a || b || memcmp(&original,&candidate,sizeof(Scene)) || memcmp(&original_trace,&trace,sizeof(trace))) {
+        printf("divergence case=%u channel=%u arg=%08x ret=%d/%d abi=%u/%u trace=%u/%u\n",id,channel,arg,ro,rc,a,b,original_trace.count,trace.count); return false;
+    }
+    ++cases; return true;
+}
+static void base(U flags,U depth) {
+    memset(&initial,0x5a,sizeof(initial));
+    initial.voice_table=ptr(state.voices);
+    initial.device[0x10+0xdc]=1; initial.device[0x10+0xdf]=static_cast<unsigned char>(depth);
+    initial.device[0x10+0xe4]=4; initial.device[0x10+0xe5]=0;
+    write32(initial.device+0x10+0x140,ptr(state.channels));
+    for(U i=0;i<4;++i) {
+        for(U alt=0;alt<2;++alt) {
+            auto* v=(alt?initial.alternate:initial.voices)+i*0xf8;
+            write32(v,flags); write32(v+0xc8,ptr(reinterpret_cast<void*>(&callback)));
+            auto* c=(alt?initial.channels_b:initial.channels)+i*0x70;
+            write32(c,0x100+i); c[0xf]=1; c[0x1e]=alt?0:7;
+        }
+    }
+}
+int main() {
+    using namespace porsche;
+    // Production initial state and physical bindings before any fixture reset.
+    if(audio_backend_voice_table_006b489c!=0) return 80;
+    for(auto x:application_audio_device_state_006b48c0.backing) if(x) return 81;
+    for(auto x:audio_backend_lock_cs_006b1800) if(x) return 82;
+    if(&audio_backend_lock_depth_006b499f!=&application_audio_device_state_006b48c0[0xdf] ||
+       &audio_backend_channel_count_006b49a4!=reinterpret_cast<std::int16_t*>(&application_audio_device_state_006b48c0[0xe4]) ||
+       &audio_backend_channels_006b4a00!=reinterpret_cast<U*>(&application_audio_device_state_006b48c0[0x140])) return 83;
+    if(!init()) { printf("patch failure\n"); return 84; }
+    U id=0;
+    // Complete low-byte flags space, callback writes, endpoint writes and depths.
+    for(U flags=0;flags<256;++flags) for(callback_mode=0;callback_mode<10;++callback_mode) for(release_mode=0;release_mode<4;++release_mode) {
+        base(flags,(flags+callback_mode)&255); if(!run(false,2,id++)) return 1;
+    }
+    // Wrapped stride: large original index maps to first slot; exact index reaches finalizer.
+    for(U arg: {0u,1u,3u,0x20000000u,0x80000000u}) {
+        callback_mode=0; release_mode=0; base(0x13,255); if(!run(false,arg,id++)) return 1;
+    }
+    // Parent composes real lookup/next/stop/lock children. Callback changes drive reloads.
+    for(U kind=0;kind<11;++kind) for(U flags=0;flags<32;++flags) for(callback_mode=0;callback_mode<10;++callback_mode) {
+        release_mode=flags%4; base(flags,kind?255:0); U arg=0x100;
+        if(kind==0) initial.device[0x10+0xdc]=0;
+        if(kind==1) arg=0x80000000;
+        if(kind==2) arg=0x200;
+        if(kind==3) initial.channels[0xf]=0;
+        if(kind==4) initial.channels[0x1e]=0;
+        if(kind==5) initial.channels[0x70+0xf]=2;
+        if(kind==6) write32(initial.channels+0x70,0x80000001u);
+        if(kind==7) initial.channels[0x70+0x1e]=3;
+        if(kind==8) { initial.device[0x10+0xe4]=0xff; initial.device[0x10+0xe5]=0xff; }
+        if(kind==9) { initial.channels[0xf]=2; initial.device[0x10+0xdc]=0xff; }
+        if(kind==10) { initial.device[0x10+0xe4]=0; initial.device[0x10+0xe5]=0x80; }
+        if(!run(true,arg,id++)) return 1;
+    }
+    printf("audio_stop_original_x86_vs_cpp=PASS cases=%u ABI=PASS\n",cases); return 0;
+}

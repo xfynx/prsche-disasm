@@ -31,8 +31,8 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run433](iterations/v2/001-original-recovery/runs/433-startup-modem-audio-integration/README.md)
-  integrates original modem configuration and canonical audio-state bindings.
+  [Run437](iterations/v2/001-original-recovery/runs/437-audio-stop-integration/README.md)
+  integrates original audio stopping and canonical shutdown caller bindings.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work. It remains unfinished, with

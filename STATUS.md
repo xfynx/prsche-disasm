@@ -4,17 +4,17 @@ Updated 2026-10-27. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run433](iterations/v2/001-original-recovery/runs/433-startup-modem-audio-integration/README.md)
-compiles 228 C++ translation units across 8 projects. The game link still has 184 unresolved
-names / 191 references. **There is no recovered playable C++ game executable yet.**
+[Run437](iterations/v2/001-original-recovery/runs/437-audio-stop-integration/README.md)
+compiles 230 C++ translation units across 8 projects. The game link still has 185 unresolved
+names / 192 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates fifteen original modem/audio bodies after 102,108 native
-cases/sequences, 28 detected mutations and a 566-pin audit. Audio views reuse the
-canonical state owner. These are batch results, not a completion percentage.
+The latest batch integrates three original audio stop/shutdown bodies after 27,850 native
+cases, 30 detected mutations and a 571-pin audit. Both existing shutdown caller contracts
+use one canonical body. These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
-Modem configuration 0055e340 is integrated in its tested domain. Audio stop00565d60,
-ABI005659f0 and real DLL/TAPI/device/allocator composition remain open.
+Audio stop00565d60/0058a8b0 and shutdown005659f0 are integrated in their tested domains.
+Four real children and actual DLL/TAPI/device/allocator composition remain open.
 Detailed evidence and the next work order live in the
 [iteration PLAN](iterations/v2/001-original-recovery/PLAN.md).
 Full startup, display, menus, careers and gameplay still need integration/acceptance.
