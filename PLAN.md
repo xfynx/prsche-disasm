@@ -20,8 +20,9 @@ bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
 Latest recovery intake: [Run440](iterations/v2/001-original-recovery/runs/440-audio-pool-cleanup-integration/README.md).
-Next is the combined original stop/voice/pool comparison, then audio initialization
-on the startup path. Remaining group validation/release stays explicitly unresolved.
+[Run441](iterations/v2/001-original-recovery/runs/441-audio-stop-composition/README.md)
+verifies the composed stop/voice/pool chain using that unchanged build. Next is
+audio initialization on the startup path; group validation/release stays unresolved.
 
 ## Recovery milestones
 

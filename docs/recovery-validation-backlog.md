@@ -1,5 +1,15 @@
 # Отложенные проверки восстановления v2
 
+Run441 closes435's positive parent return coverage and the independent cleanup/free
+composition hold within tested scenes:1,392 cases/19,752 snapshots,9 mutations,
+14 existing raw bodies against the same real C++ providers. Zero production changes;
+440 build reused and576-pin shared audit PASS. Embedded+64/index overlap is kept
+consistent; positivecount4, mapped sentinel and acyclic valid pool/list domains.
+Full005659f0 shutdown still awaits00590070/00565990; OS locks/voice callbacks remain
+controlled. Live startup/devices, faults/concurrency and arbitrary malformed memory
+remain open. Next parents0058a4f0/0058a690: preserve rollback, compaction aliases and
+capacity0 untouched bytes; prove006b4883..85 ownership. OSfailure locals stay opaque.
+
 Run440: five pool/voice-cleanup originals836B integrated;115,592 native sequences/
 cases,32 mutations,576 pins PASS.232 TUs/181 names/188 refs,no EXE; no new storage.
 Native439 still controls0058ac30 independently. Next combine original/C++ stop,

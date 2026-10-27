@@ -33,6 +33,8 @@ is not accepted as original behavior.
   measured build and its limitations.
   [Run440](iterations/v2/001-original-recovery/runs/440-audio-pool-cleanup-integration/README.md)
   integrates original audio pool allocation and voice cleanup.
+  [Run441](iterations/v2/001-original-recovery/runs/441-audio-stop-composition/README.md)
+  checks the combined original stop/cleanup/pool chain using the same build.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work. It remains unfinished, with

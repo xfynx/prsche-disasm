@@ -1,5 +1,27 @@
 # v2 / 001 - original source recovery plan
 
+Current441, 2026-10-27: composed original/C++ stop+cleanup+real pool proof PASS.
+1,392 cases/19,752 intermediate scenes,9 mutations,14 existing bodies/1,345 rawB;
+zero new bodies/state/production changes. Shared audit PASS with440's unchanged
+232 TUs/181 names/188 refs,576 pins. No rebuild or repeated old exhaustive proof.
+Positive parent returns1/2/3 and real435->439->438 cleanup/free composition now
+verified in valid bounded scenes. Registry links the14 existing owners to this
+additional proof. Full shutdown005659f0 and live startup are still unverified.
+Both workers finished; no active assignments.441 README owns exactcommands.
+Next coherent recovery:0058a4f0(411B,int32()) +0058a690(533B,void()),944B, on
+create-device startup path. Trace artifact local/reports/audio-init-next-20261027.json
+records original/index spans and verified caller ABI. Reuse canonical device state;
+prove ownership/zero init of summary bytes006b4883..85 before binding. Required
+domains:24-DWORD active rollback, capacity0 preservingcc/cd, unsigned descriptor
+clamps/255flag compaction aliases and callback ordering. Child boundaries0058e650
+(DirectSound/COM) and00597070(OS/CPU) need exact contracts; failure locals remain
+opaque, never silently zeroed. No next-batch implementation has started.
+Remaining00590070/00565990, full shutdown/startup/display/gameplay, malformed/cyclic
+or faulting memory, concurrency and403/411 PARTIAL domains stay open. Keep output
+to findings/failures/counts and reuse shared tools/manifests.
+
+Historical440 follows.
+
 Current440, 2026-10-27: frozen438/439 integrated; shared audit PASS. Five original
 bodies/836B,115,592 sequences/cases,32 mutations,576 pins and322 canonical exports.
 232 TUs/8 projects compile;181 names/188 references,no EXE. Four old names close;
