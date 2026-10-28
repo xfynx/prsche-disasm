@@ -1,0 +1,190 @@
+{
+  "run": 442,
+  "experiment": "local/experiments/v2-audio-initialization-442",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/442-audio-initialization/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_0058a4f0@",
+      "va": "0058a4f0",
+      "bytes": 411,
+      "sha256": "e6af235f7df8314d43d79edb55a42b96169c71601d4776ee0a6442419259191c"
+    },
+    {
+      "token": "@BODY_0058a690@",
+      "va": "0058a690",
+      "bytes": 533,
+      "sha256": "cbf75559698e0bd9ba14d7e9c758a05f3e43f64c59fd2faaf3b1d8eed84b10bb"
+    },
+    {
+      "token": "@BODY_00565680@",
+      "va": "00565680",
+      "bytes": 74,
+      "sha256": "9c7763342e5c0508e1c592ec921c1f9ee6f7516d531fa14831b53324984ddd86"
+    },
+    {
+      "token": "@BODY_005656d0@",
+      "va": "005656d0",
+      "bytes": 66,
+      "sha256": "eab051679d99d6f808f249ea4cd685c3aa3dc9716042b90c048ba64c96559102"
+    }
+  ],
+  "pass_marker": "audio_initialization_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "negative-result",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "if(result<0) return result;",
+      "new": "if(result!=0) return result;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "capacity-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "capacity>4 ? 4 : 2",
+      "new": "capacity>=4 ? 4 : 2",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "capacity-zero-preserve",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "if(capacity!=0)",
+      "new": "if(true)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "default-constant",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "word(0x72,0xeaaa);",
+      "new": "word(0x72,0xeaa9);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "initializer-callback-order",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "    const auto features=audio_backend_cpu_features_00597070();\n    byte(0xe3)=static_cast<std::uint8_t>(features);",
+      "new": "    byte(0xe3)=static_cast<std::uint8_t>(audio_backend_cpu_features_00597070());\n    (void)audio_backend_cpu_features_00597070();",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "rollback-size",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "offset<0x60",
+      "new": "offset<0x5c",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "rollback-source",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "data()+0x7c+offset",
+      "new": "data()+0x78+offset",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "unsigned-channel",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "if(channels<byte(0x04))",
+      "new": "if(static_cast<std::int8_t>(channels)<static_cast<std::int8_t>(byte(0x04)))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "unsigned-rate",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "if(rate<word(0x00))",
+      "new": "if(static_cast<std::int16_t>(rate)<static_cast<std::int16_t>(word(0x00)))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "sum-cap",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "if(total>0x100u)",
+      "new": "if(total>0x101u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "sum-correction",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "software-static_cast<std::uint8_t>(total)",
+      "new": "software-static_cast<std::uint8_t>(hardware)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "flag-high-bit",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "while(index<byte(0x27))",
+      "new": "while(static_cast<std::int32_t>(index)<static_cast<std::int8_t>(byte(0x27)))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "zero-delete",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "if(flags!=0) { ++index;continue; }",
+      "new": "if(true) { ++index;continue; }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "compaction-bound",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "shift<byte(0x27)",
+      "new": "shift+1u<byte(0x27)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "restart",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "        index=0;",
+      "new": "        ++index;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "summary-priority",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "else if((flags&2u)!=0)",
+      "new": "if((flags&2u)!=0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "period-upper",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "if(byte(0x21)>200) byte(0x21)=200;",
+      "new": "if(byte(0x21)>199) byte(0x21)=199;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "feature-callback-reload",
+      "source": "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+      "old": "if(feature) byte(0xe3)=static_cast<std::uint8_t>(byte(0xe3)|2u);",
+      "new": "if(feature) byte(0xe3)=2;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ],
+  "timeout_seconds": 180
+}

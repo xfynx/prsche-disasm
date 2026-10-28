@@ -1,24 +1,22 @@
 # Current project status
 
-Updated 2026-10-27. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-10-28. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run440](iterations/v2/001-original-recovery/runs/440-audio-pool-cleanup-integration/README.md)
-compiles 232 C++ translation units across 8 projects. The game link still has 181 unresolved
-names / 188 references. **There is no recovered playable C++ game executable yet.**
+[Run444](iterations/v2/001-original-recovery/runs/444-audio-initialization-integration/README.md)
+compiles 235 C++ translation units across 8 projects. The game link still has 180 unresolved
+names / 187 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates five original audio pool/cleanup bodies after 115,592 native
-sequences/cases, 32 detected mutations and a 576-pin audit. Existing state owners are reused.
+The latest batch integrates seven original initialization/DirectSound bodies, repairs an
+old descriptor alias-order defect and refreshes the stop/pool proof: 174,858 native cases,
+36 detected mutations and a 582-pin audit. State ownership and Windows imports are proved.
 These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
-The [Run441 composed proof](iterations/v2/001-original-recovery/runs/441-audio-stop-composition/README.md)
-passes 1,392 cases and 9 mutations using the unchanged Run440 build. Positive channel
-returns and real stop/cleanup/pool calls are verified in bounded native scenes.
-
-Audio pool allocation/release and voice cleanup are integrated in their tested domains.
-Audio initialization, group validation/release and actual platform/device startup remain open.
+The composed stop/cleanup/pool chain remains verified after the owner repair through
+[Run445](iterations/v2/001-original-recovery/runs/445-audio-owner-alias-regression/README.md).
+OS/CPU feature detection, group validation/release, live DirectSound and full startup remain open.
 Detailed evidence and the next work order live in the
 [iteration PLAN](iterations/v2/001-original-recovery/PLAN.md).
 Full startup, display, menus, careers and gameplay still need integration/acceptance.

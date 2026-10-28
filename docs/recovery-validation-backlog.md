@@ -1,5 +1,16 @@
 # Отложенные проверки восстановления v2
 
+Run444:7 originals1,580B integrated;174,858 cases/36 mutations/582pins PASS.
+235 TUs/180 names/187 refs,no EXE.442 raw caller aliases expose and verify the
+existing005656d0 read+74-before-store+78 repair;445 refreshes441's unchanged
+stop/pool fixture for the changed owner TU. Old proofs/failed attempts preserved.
+443 proves COM/IAT transport and actual SDK import binding, not live DirectSound.
+Successful caps/property APIs must write consumed fields; other caps bytes remain
+opaque.442 controls probe/CPU boundaries independently; actual parent+probe/live
+startup composition remains open.00597070 and group00590070/00565990 unresolved.
+Keep OS failure fields/inherited CPUID ECX explicit; suppression condition is
+PlatformID==1 && minorVersion==0.403/411 partial domains remain unchanged.
+
 Run441 closes435's positive parent return coverage and the independent cleanup/free
 composition hold within tested scenes:1,392 cases/19,752 snapshots,9 mutations,
 14 existing raw bodies against the same real C++ providers. Zero production changes;

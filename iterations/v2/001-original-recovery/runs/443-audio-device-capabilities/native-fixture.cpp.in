@@ -1,0 +1,239 @@
+#include "audio_capabilities_443.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;
+extern "C" void* __stdcall VirtualAlloc(void*,U,U,U);
+extern "C" void __stdcall ExitProcess(U);
+extern "C" void* __stdcall GetCurrentProcess();
+extern "C" I __stdcall FlushInstructionCache(void*,const void*,U);
+using namespace porsche;
+struct Object {U table,kind;};
+static Object objects[6];static U device_tables[2][7],buffer_table[3],property_table[6];
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){memcpy(p,&x,4);}
+static U object(U n){return ptr(&objects[n]);}
+static U id(U p){for(U i=0;i<6;++i)if(p==object(i))return i+1;return p?0xff:0;}
+struct State {U device,primary,property,temporary,hardware,available,output[4],releases[6];};
+struct Event {U tag,a,b,c;State state;U descriptor[9];unsigned char wave[18],guid[16];};
+struct Trace {U count,abi;Event events[64];I result;};
+static State initial,work;static Trace trace,original;
+static I create_hr,caps_hr,primary_hr,temp_hr,query_hr,support_hr;
+static U cap_flags,cap_max,support_mask,foreground,mode,write_failure,full_caps,which,query_argument,alias,cases,events;
+static unsigned char* slab;static bool patch_ok=true;
+static State snapshot(){
+    work.device=audio_ds_device_006ad760;work.primary=audio_ds_primary_006ad764;
+    work.property=audio_ds_property_006aefdc;work.temporary=audio_ds_temporary_006aefe0;
+    work.hardware=audio_ds_hardware_006ad778;work.available=static_cast<std::uint8_t>(audio_ds_property_available_006ad779);return work;
+}
+static Event& event(U tag,U a=0,U b=0,U c=0){
+    if(trace.count>=64)ExitProcess(91);Event& e=trace.events[trace.count++];memset(&e,0,sizeof(e));
+    e.tag=tag;e.a=a;e.b=b;e.c=c;e.state=snapshot();return e;
+}
+static U output_id(U* p){
+    if(p==&audio_ds_device_006ad760)return 1;if(p==&audio_ds_primary_006ad764)return 2;
+    if(p==&audio_ds_property_006aefdc)return 3;if(p==&audio_ds_temporary_006aefe0)return 4;
+    for(U i=0;i<4;++i)if(p==work.output+i)return 10+i;return 0xff;
+}
+extern "C" I __stdcall DirectSoundCreate(const void* guid,U* out,void* outer){
+    event(1,ptr(guid),output_id(out),ptr(outer));
+    if(create_hr==0 || (write_failure&1)) *out=object(0);
+    return create_hr;
+}
+extern "C" void* __stdcall GetForegroundWindow(){
+    event(2);if(mode==1)audio_ds_device_006ad760=object(1);return reinterpret_cast<void*>(foreground);
+}
+extern "C" void* __stdcall GetDesktopWindow(){event(3);return reinterpret_cast<void*>(0x12345678);}
+static I __stdcall cooperative_a(U self,U window,U level){event(4,id(self),window,level);if(mode==2)audio_ds_device_006ad760=object(1);return static_cast<I>(0x80000001);}
+static I __stdcall cooperative_b(U self,U window,U level){event(14,id(self),window,level);if(mode==2)audio_ds_device_006ad760=object(1);return 1;}
+static I get_caps(U self,void* caps,U method_tag){
+    event(method_tag,id(self),rd(caps));
+    // Only size is observed on input. Unwritten local bytes are opaque.
+    if(caps_hr==0){if(full_caps)memset(caps,0xa5,96);wr(static_cast<unsigned char*>(caps)+4,cap_flags);wr(static_cast<unsigned char*>(caps)+0x2c,cap_max);}
+    if(mode==3)audio_ds_device_006ad760=object(1);return caps_hr;
+}
+static I __stdcall caps_a(U self,void* caps){return get_caps(self,caps,5);}
+static I __stdcall caps_b(U self,void* caps){return get_caps(self,caps,15);}
+static I create_buffer(U self,const void* description,U* out,U outer,U method_tag){
+    const auto* d=static_cast<const U*>(description);const bool primary=d[1]==0x11;
+    Event& e=event(method_tag+(primary?0:1),id(self),output_id(out),outer);
+    memcpy(e.descriptor,d,36);e.descriptor[4]=0;
+    if(d[4])memcpy(e.wave,reinterpret_cast<const void*>(d[4]),18);
+    const I hr=primary?primary_hr:temp_hr;
+    if(hr==0 || (write_failure&2)) *out=object(primary?2:3);
+    if(mode==4)audio_ds_device_006ad760=object(1);return hr;
+}
+static I __stdcall create_a(U self,const void* d,U* out,U outer){return create_buffer(self,d,out,outer,6);}
+static I __stdcall create_b(U self,const void* d,U* out,U outer){return create_buffer(self,d,out,outer,16);}
+static I __stdcall query_interface(U self,const void* guid,U* out){
+    Event& e=event(8,id(self),output_id(out));memcpy(e.guid,guid,16);
+    if(query_hr==0 || (write_failure&4))*out=object(4);
+    if(mode==5)audio_ds_temporary_006aefe0=object(2);
+    if(mode==13)audio_ds_property_available_006ad779=-128;
+    return query_hr;
+}
+static I __stdcall query_support(U self,const void* guid,U property,U* out){
+    Event& e=event(9,id(self),property);memcpy(e.guid,guid,16);
+    if(support_hr==0)*out=support_mask; // Error paths never consume an unwritten local.
+    if(mode==6)audio_ds_property_available_006ad779=-128;
+    if(mode==7)audio_ds_property_006aefdc=object(5);
+    return support_hr;
+}
+static U __stdcall release(U self){
+    event(10,id(self));const U index=id(self);if(index==0 || index>6)ExitProcess(94);++work.releases[index-1];
+    if(mode==8 && (self==object(4)||self==object(5)))audio_ds_temporary_006aefe0=object(2);
+    if(mode==9 && (self==object(0)||self==object(1)))audio_ds_device_006ad760=object(1);
+    if(mode==10 && self==object(3))audio_ds_device_006ad760=object(1);
+    if(mode==11 && self==object(4))audio_ds_property_006aefdc=object(5);
+    if(mode==12 && (self==object(4)||self==object(5)))audio_ds_property_available_006ad779=-128;
+    return 0x80000001;
+}
+static void init_objects(){
+    device_tables[0][2]=ptr(reinterpret_cast<void*>(&release));device_tables[1][2]=device_tables[0][2];
+    device_tables[0][3]=ptr(reinterpret_cast<void*>(&create_a));device_tables[1][3]=ptr(reinterpret_cast<void*>(&create_b));
+    device_tables[0][4]=ptr(reinterpret_cast<void*>(&caps_a));device_tables[1][4]=ptr(reinterpret_cast<void*>(&caps_b));
+    device_tables[0][6]=ptr(reinterpret_cast<void*>(&cooperative_a));device_tables[1][6]=ptr(reinterpret_cast<void*>(&cooperative_b));
+    buffer_table[0]=ptr(reinterpret_cast<void*>(&query_interface));buffer_table[2]=ptr(reinterpret_cast<void*>(&release));
+    property_table[2]=ptr(reinterpret_cast<void*>(&release));property_table[5]=ptr(reinterpret_cast<void*>(&query_support));
+    for(U i=0;i<6;++i){objects[i].table=i<2?ptr(device_tables[i]):i<4?ptr(buffer_table):ptr(property_table);objects[i].kind=i+1;}
+}
+static void* iat_create=reinterpret_cast<void*>(&DirectSoundCreate);
+static void* iat_foreground=reinterpret_cast<void*>(&GetForegroundWindow);
+static void* iat_desktop=reinterpret_cast<void*>(&GetDesktopWindow);
+enum:U{PROBE=0,WINDOW=0x200,THUNK=0x240,PROPERTY=0x300,CLEANUP=0x500};
+static void absolute(U at,U bytes,U old,const void* target,U expected_count){
+    U count=0;for(U i=0;i+4<=bytes;++i)if(rd(slab+at+i)==old){wr(slab+at+i,ptr(target));++count;i+=3;}
+    if(count!=expected_count)patch_ok=false;
+}
+static void relative(U at,U off,U original_va,U expected_target,U target){
+    auto* p=slab+at+off;if(p[0]!=0xe8 || original_va+off+5+rd(p+1)!=expected_target){patch_ok=false;return;}wr(p+1,ptr(slab+target)-ptr(p+5));
+}
+static bool init(){
+    static const unsigned char expected_interface[]={ @GUID_INTERFACE@ };
+    static const unsigned char expected_set[]={ @GUID_SET@ };
+    if(memcmp(expected_interface,audio_property_interface_guid_005bfd40,16)||memcmp(expected_set,audio_property_set_guid_005c17d8,16))return false;
+    slab=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,0x3000,0x40));if(!slab)return false;
+    static const unsigned char p[]={ @BODY_0058e650@ };memcpy(slab+PROBE,p,sizeof(p));
+    static const unsigned char w[]={ @BODY_0058f860@ };memcpy(slab+WINDOW,w,sizeof(w));
+    static const unsigned char t[]={ @BODY_00597f70@ };memcpy(slab+THUNK,t,sizeof(t));
+    static const unsigned char q[]={ @BODY_0058ea90@ };memcpy(slab+PROPERTY,q,sizeof(q));
+    static const unsigned char c[]={ @BODY_0058eba0@ };memcpy(slab+CLEANUP,c,sizeof(c));
+    absolute(PROBE,302,0x6ad760,&audio_ds_device_006ad760,9);absolute(PROBE,302,0x6ad764,&audio_ds_primary_006ad764,1);
+    absolute(PROBE,302,0x6ad778,&audio_ds_hardware_006ad778,1);absolute(PROBE,302,0x6ad779,&audio_ds_property_available_006ad779,1);
+    absolute(WINDOW,17,0x5b2294,&iat_foreground,1);absolute(WINDOW,17,0x5b2274,&iat_desktop,1);absolute(THUNK,6,0x5b2038,&iat_create,1);
+    absolute(PROPERTY,258,0x6ad760,&audio_ds_device_006ad760,1);absolute(PROPERTY,258,0x6ad779,&audio_ds_property_available_006ad779,2);
+    absolute(PROPERTY,258,0x6aefdc,&audio_ds_property_006aefdc,2);absolute(PROPERTY,258,0x6aefe0,&audio_ds_temporary_006aefe0,4);
+    absolute(PROPERTY,258,0x5bfd40,audio_property_interface_guid_005bfd40,1);absolute(PROPERTY,258,0x5c17d8,audio_property_set_guid_005c17d8,1);
+    absolute(CLEANUP,53,0x6aefdc,&audio_ds_property_006aefdc,2);absolute(CLEANUP,53,0x6aefe0,&audio_ds_temporary_006aefe0,2);
+    absolute(CLEANUP,53,0x6ad779,&audio_ds_property_available_006ad779,1);
+    relative(PROBE,0x1b,0x58e650,0x597f70,THUNK);relative(PROBE,0x6f,0x58e650,0x58f860,WINDOW);
+    relative(PROBE,0xf6,0x58e650,0x58ea90,PROPERTY);relative(PROBE,0x107,0x58e650,0x58eba0,CLEANUP);
+    relative(PROPERTY,4,0x58ea90,0x58eba0,CLEANUP);relative(PROPERTY,0xf9,0x58ea90,0x58eba0,CLEANUP);
+    return patch_ok && FlushInstructionCache(GetCurrentProcess(),slab,4096);
+}
+// Synthetic cdecl0/1/2 setup; nested COM/IAT entries use actual stdcall prototypes.
+static U invoke(void* fn,U a,U b,U argc){
+    U before,saved_frame,result,fail=0;
+    __asm{
+        push ebx
+        push esi
+        push edi
+        mov before,esp
+        mov saved_frame,ebp
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,10203040h
+        cmp argc,2
+        jne maybe_one
+        push b
+    maybe_one:
+        cmp argc,0
+        je call_now
+        push a
+    call_now:
+        call fn
+        mov result,eax
+        mov ecx,argc
+        shl ecx,2
+        add esp,ecx
+        cmp esp,before
+        jne bad
+        cmp ebp,saved_frame
+        jne bad
+        cmp ebx,13579bdfh
+        jne bad
+        cmp esi,2468ace0h
+        jne bad
+        cmp edi,10203040h
+        je done
+    bad:
+        mov fail,1
+    done:
+        mov esp,before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    trace.abi|=fail;return result;
+}
+static void load(){
+    work=initial;memset(&trace,0,sizeof(trace));audio_ds_device_006ad760=work.device;audio_ds_primary_006ad764=work.primary;
+    audio_ds_property_006aefdc=work.property;audio_ds_temporary_006aefe0=work.temporary;
+    audio_ds_hardware_006ad778=static_cast<std::uint8_t>(work.hardware);audio_ds_property_available_006ad779=static_cast<std::int8_t>(work.available);
+}
+static void execute(bool cpp){
+    load();U* capacity=work.output;I* available=reinterpret_cast<I*>(work.output+1);
+    if(alias==1)available=reinterpret_cast<I*>(capacity);
+    if(alias==2)capacity=&audio_ds_device_006ad760;
+    if(alias==3)capacity=&audio_ds_property_006aefdc;
+    if(alias==4)available=reinterpret_cast<I*>(&audio_ds_device_006ad760);
+    if(alias==5)capacity=&audio_ds_primary_006ad764;
+    if(alias==6)available=reinterpret_cast<I*>(&audio_ds_property_006aefdc);
+    U result=0;
+    if(which==0)result=invoke(cpp?reinterpret_cast<void*>(&audio_probe_capabilities_0058e650):slab+PROBE,ptr(capacity),ptr(available),2);
+    if(which==1)invoke(cpp?reinterpret_cast<void*>(&audio_probe_property_0058ea90):slab+PROPERTY,query_argument,0,1);
+    if(which==2)invoke(cpp?reinterpret_cast<void*>(&audio_release_property_0058eba0):slab+CLEANUP,0,0,0);
+    if(which==3)result=invoke(cpp?reinterpret_cast<void*>(&audio_active_window_0058f860):slab+WINDOW,0,0,0);
+    event(20,result);trace.result=static_cast<I>(result);
+}
+static bool check(U family,U n){
+    execute(false);original=trace;execute(true);++cases;events+=trace.count;
+    if(trace.abi || original.abi || memcmp(&original,&trace,sizeof(trace))){
+        U i=0;while(i<trace.count&&i<original.count&&!memcmp(trace.events+i,original.events+i,sizeof(Event)))++i;
+        printf("divergence family=%u id=%u which=%u mode=%u alias=%u returns=%d/%d events=%u/%u first=%u ABI=%u/%u\n",family,n,which,mode,alias,original.result,trace.result,original.count,trace.count,i,original.abi,trace.abi);return false;
+    }return true;
+}
+static void base(){
+    memset(&initial,0,sizeof(initial));for(U& o:initial.output)o=0xcccccccc;
+    create_hr=caps_hr=primary_hr=temp_hr=query_hr=support_hr=0;cap_flags=0x20;cap_max=13;support_mask=3;
+    foreground=0x87654321;mode=write_failure=full_caps=which=alias=0;query_argument=1;
+}
+int main(){
+    if(audio_ds_device_006ad760||audio_ds_primary_006ad764||audio_ds_hardware_006ad778||audio_ds_property_available_006ad779||audio_ds_property_006aefdc||audio_ds_temporary_006aefe0)return 80;
+    init_objects();if(!init()){printf("patch failure\n");return 81;}U n=0;
+    const I hr_values[]={0,1,-1,static_cast<I>(0x80000000),static_cast<I>(0x8878000a),static_cast<I>(0x88780078)};
+    for(U stage=0;stage<6;++stage)for(I hr:hr_values)for(U flags:{0u,0x20u,0xffffffffu})for(U mask:{0u,1u,2u,3u}){
+        base();cap_flags=flags;support_mask=mask;write_failure=n&7;full_caps=n&1;foreground=(n&2)?0:0x87654321;
+        I* target[]={&create_hr,&caps_hr,&primary_hr,&temp_hr,&query_hr,&support_hr};*target[stage]=hr;
+        if(!check(0,n++))return 1;
+    }
+    for(U a=0;a<7;++a)for(U m=0;m<14;++m)for(U mask:{0u,1u,2u,3u,7u}){
+        if((a==4||a==6)&&(m==6||m==13))continue;
+        base();alias=a;mode=m;support_mask=(a==4||a==6)?0:mask;cap_max=a==2?object(0):a==3?object(4):a==5?object(2):13;
+        foreground=n&1?0:0x87654321;initial.hardware=0xff;initial.available=0x80;
+        if(!check(1,n++))return 1;
+    }
+    for(U q=0;q<2;++q)for(U stage=0;stage<3;++stage)for(I hr:{0,1,-1})for(U m=0;m<14;++m)for(U mask:{0u,1u,3u,0x80000003u}){
+        base();which=1;query_argument=q;mode=m;support_mask=mask;write_failure=n&7;
+        initial.device=object(0);initial.property=object(5);initial.temporary=object(2);initial.available=0x80;
+        I* target[]={&temp_hr,&query_hr,&support_hr};*target[stage]=hr;
+        if(!check(2,n++))return 1;
+    }
+    for(U pre=0;pre<4;++pre)for(U m=0;m<14;++m)for(U flag:{0u,1u,0x80u,0xffu}){
+        base();which=2;mode=m;initial.device=object(0);initial.property=(pre&1)?object(4):0;initial.temporary=(pre&2)?object(3):0;initial.available=flag;
+        if(!check(3,n++))return 1;
+    }
+    for(U fg:{0u,0x87654321u}){base();which=3;foreground=fg;if(!check(4,n++))return 1;}
+    printf("audio_capabilities_original_x86_vs_cpp=PASS cases=%u events=%u ABI=PASS\n",cases,events);return 0;
+}

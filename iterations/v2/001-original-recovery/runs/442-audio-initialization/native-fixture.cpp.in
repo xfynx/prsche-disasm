@@ -1,0 +1,178 @@
+#include "audio_initialization_442.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+using U=std::uint32_t;using I=std::int32_t;
+using namespace porsche;
+struct Scene { std::uint8_t physical[0x18c],summary[3],descriptor[0x17c];U initialized; };
+static Scene initial,work,original_result,cpp_result;
+struct Event { U tag,a,b;Scene state; };
+static Event events[8],original_events[8];
+static U event_count,original_count,which,argument_kind,callback_mode,capacity_value,flag_value,feature_value,cases;
+static I probe_result;
+static std::uint8_t* slab;
+static bool abi_ok=true;
+static U phase;
+static LONG WINAPI failed(EXCEPTION_POINTERS* exception) {
+    printf("native-fault code=%08lx eip=%08lx slab=%08x case=%u which=%u phase=%u events=%u\n",exception->ExceptionRecord->ExceptionCode,exception->ContextRecord->Eip,reinterpret_cast<U>(slab),cases,which,phase,event_count);
+    fflush(stdout);return EXCEPTION_CONTINUE_SEARCH;
+}
+static U ptr(const void* p) { return reinterpret_cast<U>(p); }
+template<class T> static T get(const void* p) { T value;memcpy(&value,p,sizeof(value));return value; }
+template<class T> static void put(void* p,T value) { memcpy(p,&value,sizeof(value)); }
+static void snapshot(Scene& output) {
+    output=work;
+    memcpy(output.physical,application_audio_device_state_006b48c0.backing.data(),sizeof(output.physical));
+    output.summary[0]=audio_backend_flag_summary_006b4883;
+    output.summary[1]=audio_backend_flag_summary_006b4884;
+    output.summary[2]=audio_backend_flag_summary_006b4885;
+    output.initialized=application_audio_descriptor_initialized_006a5c30;
+}
+static void record(U tag,U a=0,U b=0) {
+    if(event_count>=8) ExitProcess(91);
+    auto& event=events[event_count++];event.tag=tag;event.a=a;event.b=b;snapshot(event.state);
+}
+namespace porsche {
+I __cdecl audio_probe_capabilities_0058e650(U* capacity,I* flag) {
+    record(1,capacity==reinterpret_cast<U*>(flag),ptr(capacity)&3u);
+    if(callback_mode==1) { application_audio_device_state_006b48c0[0x0c]=0xa7;application_audio_device_state_006b48c0[0x0d]=0xc5;application_audio_device_state_006b48c0[0x74]=0x81;audio_backend_flag_summary_006b4884=0x75; }
+    *capacity=capacity_value;*flag=static_cast<I>(flag_value);
+    record(2,*capacity,static_cast<U>(*flag));return probe_result;
+}
+U __cdecl audio_backend_cpu_features_00597070() {
+    record(3);
+    if(callback_mode==2) { application_audio_device_state_006b48c0[0xe3]=0xa9;audio_backend_flag_summary_006b4883=0x65; }
+    if(callback_mode==3) { application_audio_device_state_006b48c0[0x27]=2;application_audio_device_state_006b48c0[0x28]=0;application_audio_device_state_006b48c0[0x22]=0; }
+    record(4,feature_value);return feature_value;
+}
+// Actual canonical owner is linked. These uncalled device effects fail closed.
+void __cdecl application_audio_backend_configure_0058fef0(U,U) { ExitProcess(90); }
+void __cdecl application_audio_backend_configure_0058aa90(U,U) { ExitProcess(90); }
+U __cdecl application_audio_backend_allocate_0058aae0(U) { ExitProcess(90); }
+void __cdecl application_audio_backend_start_0058e2d0() { ExitProcess(90); }
+I __cdecl application_audio_backend_start_device_0058fdb0() { ExitProcess(90); }
+void __cdecl application_audio_backend_stop_device_0058fe80() { ExitProcess(90); }
+void __cdecl application_audio_backend_stop_0058e2e0() { ExitProcess(90); }
+void __cdecl application_audio_backend_finalize_0058e0e0() { ExitProcess(90); }
+}
+enum:U { O_INIT=0,O_APPLY=0x200,O_QUERY=0x500,O_SET=0x600 };
+struct AbsPatch { U offset,expected; };
+struct RelPatch { U offset,expected,target; };
+#include "original_relocations_442.inc"
+static void* address(U va) {
+    if(va==0x6b4883) return &audio_backend_flag_summary_006b4883;
+    if(va==0x6b4884) return &audio_backend_flag_summary_006b4884;
+    if(va==0x6b4885) return &audio_backend_flag_summary_006b4885;
+    if(va==0x6a5c30) return &application_audio_descriptor_initialized_006a5c30;
+    if(va>=0x6b48b0 && va<0x6b4a3c) return application_audio_device_state_006b48c0.preceding_data()+(va-0x6b48b0);
+    return nullptr;
+}
+static bool init_slab() {
+    slab=static_cast<std::uint8_t*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));if(!slab) return false;
+    static const std::uint8_t a[]={ @BODY_0058a4f0@ };memcpy(slab+O_INIT,a,sizeof(a));
+    static const std::uint8_t b[]={ @BODY_0058a690@ };memcpy(slab+O_APPLY,b,sizeof(b));
+    static const std::uint8_t c[]={ @BODY_00565680@ };memcpy(slab+O_QUERY,c,sizeof(c));
+    static const std::uint8_t d[]={ @BODY_005656d0@ };memcpy(slab+O_SET,d,sizeof(d));
+    for(const auto& p:absolute_patches) { auto* target=address(p.expected);if(!target || get<U>(slab+p.offset)!=p.expected) return false;put(slab+p.offset,ptr(target)); }
+    for(const auto& p:relative_patches) {
+        if(slab[p.offset]!=0xe8 || p.expected!=get<U>(slab+p.offset+1)) return false;
+        U target=p.target==0x58e650 ? ptr(reinterpret_cast<void*>(&audio_probe_capabilities_0058e650)) : p.target==0x597070 ? ptr(reinterpret_cast<void*>(&audio_backend_cpu_features_00597070)) : p.target==0x58a4f0 ? ptr(slab+O_INIT) : p.target==0x58a690 ? ptr(slab+O_APPLY) : 0;
+        if(!target) return false;put(slab+p.offset+1,target-ptr(slab+p.offset+5));
+    }
+    return FlushInstructionCache(GetCurrentProcess(),slab,4096)!=0;
+}
+// Setup/call instructions are synthetic harness code. Void backend apply EAX is
+// ignored; the other three entries have their accepted used-result contracts.
+static __declspec(noinline) I invoke(U function,U argument,U one_argument) {
+    U before,after,bx_result,si_result,di_result,bp0,bp1;I result;
+    __asm {
+        mov before,esp
+        mov bp0,ebp
+        mov ebx,0x13579bdf
+        mov esi,0x2468ace0
+        mov edi,0x55aa33cc
+        cmp one_argument,0
+        je no_argument
+        push argument
+    no_argument:
+        mov eax,function
+        call eax
+        cmp one_argument,0
+        je no_cleanup
+        add esp,4
+    no_cleanup:
+        mov result,eax
+        mov after,esp
+        mov bx_result,ebx
+        mov si_result,esi
+        mov di_result,edi
+        mov bp1,ebp
+    }
+    if(before!=after || bx_result!=0x13579bdf || si_result!=0x2468ace0 || di_result!=0x55aa33cc || bp0!=bp1) abi_ok=false;
+    return result;
+}
+static void load() {
+    work=initial;memcpy(application_audio_device_state_006b48c0.backing.data(),work.physical,sizeof(work.physical));
+    audio_backend_flag_summary_006b4883=work.summary[0];audio_backend_flag_summary_006b4884=work.summary[1];audio_backend_flag_summary_006b4885=work.summary[2];
+    application_audio_descriptor_initialized_006a5c30=work.initialized;event_count=0;
+}
+static U argument() { return argument_kind==0 ? ptr(work.descriptor) : ptr(application_audio_device_state_006b48c0.data())+(argument_kind==1 ? 0:argument_kind==2 ? 4:argument_kind==3 ? 0x14:0x7c); }
+static bool check(const char* label) {
+    const U offsets[]={O_INIT,O_APPLY,O_QUERY,O_SET};
+    const U functions[]={ptr(reinterpret_cast<void*>(&application_audio_backend_initialize_0058a4f0)),ptr(reinterpret_cast<void*>(&application_audio_backend_apply_0058a690)),ptr(reinterpret_cast<void*>(&application_audio_query_config_00565680)),ptr(reinterpret_cast<void*>(&application_audio_apply_config_005656d0))};
+    load();phase=1;I original=invoke(ptr(slab+offsets[which]),argument(),which>=2);snapshot(original_result);original_count=event_count;memcpy(original_events,events,event_count*sizeof(Event));
+    load();phase=2;I cpp=invoke(functions[which],argument(),which>=2);snapshot(cpp_result);++cases;
+    if(!abi_ok || (which!=1 && original!=cpp) || original_count!=event_count || memcmp(original_events,events,event_count*sizeof(Event)) || memcmp(&original_result,&cpp_result,sizeof(Scene))) {
+        printf("divergence %s which=%u mode=%u alias=%u case=%u return=%d/%d events=%u/%u abi=%u\n",label,which,callback_mode,argument_kind,cases,original,cpp,original_count,event_count,abi_ok);
+        for(U i=0;i<sizeof(Scene);++i) if(reinterpret_cast<const std::uint8_t*>(&original_result)[i]!=reinterpret_cast<const std::uint8_t*>(&cpp_result)[i]) { printf("first-state-byte=%u original=%02x cpp=%02x\n",i,reinterpret_cast<const std::uint8_t*>(&original_result)[i],reinterpret_cast<const std::uint8_t*>(&cpp_result)[i]);break; }
+        return false;
+    }
+    return true;
+}
+static std::uint8_t* state() { return initial.physical+0x10; }
+static void base(U seed=1) {
+    memset(&initial,0,sizeof(initial));U rng=seed;
+    for(U i=0;i<sizeof(initial.physical);++i) { rng=rng*1664525u+1013904223u;initial.physical[i]=static_cast<std::uint8_t>(rng>>24); }
+    for(U i=0;i<sizeof(initial.descriptor);++i) initial.descriptor[i]=static_cast<std::uint8_t>(i*37u+seed);
+    initial.summary[0]=0xa7;initial.summary[1]=0xb8;initial.summary[2]=0xc9;
+    auto* s=state();s[0xdc]=0;put(s,U{0xbb802b11});s[4]=1;s[5]=4;s[6]=0x80;s[8]=5;s[9]=1;s[0x1c]=2;s[0x1d]=0x18;s[0x1f]=1;s[0x21]=10;s[0x22]=1;s[0x23]=1;s[0x24]=1;s[0x27]=1;s[0x28]=0x11;put(s+0x1a,std::uint16_t{0x5622});
+    probe_result=0;capacity_value=5;flag_value=1;feature_value=3;callback_mode=which=argument_kind=0;
+}
+int main() {
+    SetUnhandledExceptionFilter(failed);
+    for(auto b:application_audio_device_state_006b48c0.backing) if(b) return 2;
+    if(application_audio_descriptor_initialized_006a5c30 || audio_backend_flag_summary_006b4883 || audio_backend_flag_summary_006b4884 || audio_backend_flag_summary_006b4885) return 2;
+    if(!init_slab()) return 3;
+    for(U capacity=0;capacity<256;++capacity) for(U flag:{0u,1u,128u,255u}) for(U features:{0u,1u,2u,3u,0xffu,0xaabbcc00u}) {
+        base(capacity+flag+1);capacity_value=0xabcd0000u|capacity;flag_value=0xffffff00u|flag;feature_value=features;probe_result=static_cast<I>(capacity&1u);callback_mode=capacity%4u;
+        if(!check("initialize")) return 1;
+    }
+    for(I result:{-18,-10,-1,static_cast<I>(0x80000000u)}) for(U mode=0;mode<4;++mode) { base();probe_result=result;callback_mode=mode;if(!check("initialize-error")) return 1; }
+    for(U active:{1u,128u,255u}) { base();which=1;state()[0xdc]=static_cast<std::uint8_t>(active);if(!check("active-rollback")) return 1; }
+    for(U channel:{0u,1u,2u,4u,5u,128u,255u}) for(U limits:{0u,1u,2u,3u}) for(U alternate:{0u,1u}) for(U rate:{0u,0x2b10u,0x2b11u,0x5622u,0xbb80u,0xbb81u,0xffffu}) {
+        base();which=1;auto* s=state();s[0x1c]=static_cast<std::uint8_t>(channel);s[4]=limits==0?1:limits==1?0:limits==2?128:255;s[5]=limits==0?4:limits==3?0:255;s[0x24]=static_cast<std::uint8_t>(alternate);put(s+0x1a,static_cast<std::uint16_t>(rate));callback_mode=rate%4u;if(!check("unsigned-clamps")) return 1;
+    }
+    for(U hardware:{0u,1u,127u,128u,255u}) for(U maximum:{0u,128u,255u}) for(U capacity:{0u,4u,5u,255u}) for(U software:{0u,1u,4u,128u,255u}) for(U period:{0u,1u,199u,200u,201u,255u}) {
+        base();which=1;auto* s=state();s[0x1d]=static_cast<std::uint8_t>(hardware);s[6]=static_cast<std::uint8_t>(maximum);s[8]=static_cast<std::uint8_t>(capacity);s[0x1f]=static_cast<std::uint8_t>(software);s[0x21]=static_cast<std::uint8_t>(period);feature_value=period;callback_mode=period%4u;if(!check("sums-period-feature")) return 1;
+    }
+    for(U total:{255u,256u,257u,510u}) {
+        base();which=1;auto* s=state();const U hardware=total==510u?255u:128u;
+        s[6]=255;s[8]=255;s[0x1d]=static_cast<std::uint8_t>(hardware);s[0x1f]=static_cast<std::uint8_t>(total-hardware);
+        if(!check("sum-exact-boundaries")) return 1;
+    }
+    const U flags[]={0,1,2,0x10,0x11,0x12,0x13,0xff};
+    for(U soft:{0u,1u}) for(U length=0;length<=5;++length) {
+        U combinations=1;for(U i=0;i<length;++i) combinations*=8;
+        for(U code=0;code<combinations;++code) { base();which=1;auto* s=state();s[0x1f]=static_cast<std::uint8_t>(soft);s[0x27]=static_cast<std::uint8_t>(length);U n=code;for(U i=0;i<length;++i) {s[0x28+i]=static_cast<std::uint8_t>(flags[n%8]);n/=8;}s[0x22]=static_cast<std::uint8_t>(code&1u);if(!check("flag-compaction")) return 1; }
+    }
+    for(U length:{127u,128u,180u,187u,255u}) for(U pattern=0;pattern<6;++pattern) for(U soft:{0u,255u}) {
+        base();which=1;auto* s=state();s[8]=255;s[0x1f]=static_cast<std::uint8_t>(soft);s[0x27]=static_cast<std::uint8_t>(length);
+        for(U i=0;i<length;++i) s[0x28+i]=static_cast<std::uint8_t>(pattern==0?0:pattern==1?255:pattern==2?(i&1u?0:0x11):pattern==3?(i+1==length?0x12:0):pattern==4?(i%5u?0x13:0):i);
+        s[0xdc]=0;callback_mode=pattern%4u;feature_value=0xffffff02u;if(!check("canonical-array-aliases")) return 1;
+    }
+    for(U seed=1;seed<=64;++seed) for(U alias=0;alias<=4;++alias) for(U initialized:{0u,1u}) {
+        base(seed);which=2;argument_kind=alias;initial.initialized=initialized;capacity_value=seed%6u;callback_mode=seed%4u;probe_result=(seed%7u==0)?-10:0;if(!check("query-caller")) return 1;
+        base(seed);which=3;argument_kind=alias;state()[0xdc]=static_cast<std::uint8_t>(initialized);callback_mode=seed%4u;if(!check("apply-caller")) return 1;
+    }
+    printf("audio_initialization_original_x86_vs_cpp=PASS cases=%u abi=PASS\n",cases);return 0;
+}

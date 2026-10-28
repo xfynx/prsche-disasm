@@ -1,5 +1,27 @@
 # v2 / 001 - original source recovery plan
 
+Current444, 2026-10-28: seven original bodies/1,580B integrated from frozen442/443;
+existing005656d0 descriptor alias order repaired against005656e8/eb.445 reuses
+immutable441fixture to refresh the changed owner TU's stop/pool chain. Shared audit
+PASS:174,858 cases,36 mutations,582 pins,342 canonical exports.235 TUs/8 projects
+compile;180 names/187 refs,no EXE. Two old names close; real00597070 appears.
+Canonical device state reused;3 summary bytes and6 COM cells have loader-zero/full
+ownership proof. Raw32B GUIDs and actual Windows import-library binding are pinned.
+Build001 hit LNK1181 on an existing deeply nested DirectInput library; config001
+and receipts preserved. Short build root local/builds/v2/a444 fixes it;002 passed.
+No native proof was repeated for that path change. No active workers remain.
+444 README owns exact checks;442/443/445 inputs are frozen.403/411 remain PARTIAL.
+Next user queue: review PR26 https://github.com/xfynx/prsche-disasm/pull/26 including
+description/comments/diff, fix concrete blockers and merge if suitable. Do not
+start another recovery batch before completing that review.
+After PR26:00597070 OS/CPU features and0059a4d0/0059a4ed helpers, preserving opaque
+GetVersionExA failure fields and inherited ECX. Raw005970a0 suppression condition
+is PlatformID==1 && minorVersion==0. No guessed generic subleaf0/defaultmask.
+Actual parent+probe composition, group00590070/00565990, live devices/platform,
+full startup/display/gameplay, invalid memory and concurrency remain open.
+
+Historical441 follows.
+
 Current441, 2026-10-27: composed original/C++ stop+cleanup+real pool proof PASS.
 1,392 cases/19,752 intermediate scenes,9 mutations,14 existing bodies/1,345 rawB;
 zero new bodies/state/production changes. Shared audit PASS with440's unchanged

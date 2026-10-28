@@ -77,9 +77,10 @@ std::uint32_t __cdecl application_audio_apply_config_005656d0(
     std::memcpy(&dword, descriptor + 0x78, sizeof(dword));
     copy_dwords_forward(application_audio_device_state_006b48c0.data() + 0x14,
         descriptor + 0x14, kAudioStateCopyBytes);
+    std::uint32_t next_dword;
+    std::memcpy(&next_dword, descriptor + 0x74, sizeof(next_dword));
     write_u32(0x78, dword);
-    std::memcpy(&dword, descriptor + 0x74, sizeof(dword));
-    write_u32(0x74, dword);
+    write_u32(0x74, next_dword);
     application_audio_backend_apply_0058a690();
     std::memcpy(application_audio_device_state_006b48c0.data() + 0x7c,
         application_audio_device_state_006b48c0.data() + 0x14,
