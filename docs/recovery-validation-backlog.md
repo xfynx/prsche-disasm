@@ -1,5 +1,14 @@
 # Отложенные проверки восстановления v2
 
+Run447: three original OS/CPU bodies226B integrated;28,570 cases/12mutations,
+586pins PASS.237 TUs/179names186refs,noEXE. Original stack-backed opaque OSfields
+and inherited ECX remain explicit; helperbody bytes match/Od+/O2. GetVersionExA
+import identity is SDK-linked, not liveAPI acceptance. OtherCPUhardware/preCPUID,
+442parent+realCPUcomposition,invalidmemory/concurrency and fullstartup stayopen.
+Next trace00599100/005996d0/callbackconsumers forgroup00590070/release00565990,
+00590000,00590170,00590b50; preserve odd stack cells and signed/relativeoffsets.
+Unchanged444/445 proofs reused;403/411 PARTIAL boundaries unchanged.
+
 PR26: [intake review](research/pr26-integration-review-2026-10-29.md) separates
 recorded kernels from unproved composition. Before enabling the experimental
 feature by default, recover object hull/tree/order and all-participant ownership,

@@ -1,22 +1,22 @@
 # Current project status
 
-Updated 2026-10-29. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-10-30. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run444](iterations/v2/001-original-recovery/runs/444-audio-initialization-integration/README.md)
-compiles 235 C++ translation units across 8 projects. The game link still has 180 unresolved
-names / 187 references. **There is no recovered playable C++ game executable yet.**
+[Run447](iterations/v2/001-original-recovery/runs/447-cpu-features-integration/README.md)
+compiles 237 C++ translation units across 8 projects. The game link still has 179 unresolved
+names / 186 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates seven original initialization/DirectSound bodies, repairs an
-old descriptor alias-order defect and refreshes the stop/pool proof: 174,858 native cases,
-36 detected mutations and a 582-pin audit. State ownership and Windows imports are proved.
+The latest batch integrates three original OS/CPU bodies with opaque stack-state
+transport: 28,570 native cases, 12 detected mutations and a 586-pin audit. Both ISA
+helpers match original body bytes; Windows import identity and zero new storage are proved.
 These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through
 [Run445](iterations/v2/001-original-recovery/runs/445-audio-owner-alias-regression/README.md).
-OS/CPU feature detection, group validation/release, live DirectSound and full startup remain open.
+Other CPU hardware/live OS APIs, group validation/release, live DirectSound and full startup remain open.
 Detailed evidence and the next work order live in the
 [iteration PLAN](iterations/v2/001-original-recovery/PLAN.md).
 Full startup, display, menus, careers and gameplay still need integration/acceptance.

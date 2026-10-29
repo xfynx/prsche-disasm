@@ -1,5 +1,25 @@
 # v2 / 001 - original source recovery plan
 
+Current447,2026-10-30: frozen446 integrates3 originals/226B, zero new storage.
+Shared audit PASS:28,570 cases,90,720events,12mutations,586pins,347 canonical
+exports.237 C++TUs/8projects compile;179names186refs,noEXE. One old name closes;
+no new frontier. Both ISAhelpers match original body bytes at/Od+/O2. Opaque
+OSfailure/partial fields retain original stack backing; actual SDK import linked.
+REA003 supplies8 auditeddossiers (3CPU+5nextgroup);001spawnEPERM retained.
+002's CRLF config was caught at staging; exactconfig archived,003 uses finalLF.
+Build001 incomplete sandboxcompile retained;002 passes outside with process-local
+MSBuild node reuse disabled. Unchanged old nativeproof is reused. Registrylinks
+442 parents to446 provider; realparent+CPUcomposition stays open.447 README owns
+commands/artifacts. No activeworkers; secondworker hitmodelcapacity, roottraced.
+Next:group00590070,release00565990/00590000/00590170/00590b50 (519B navigation).
+Trace00599100/005996d0 andcallbackABI/consumers first. Reuse canonicaldevice state;
+preserve odd opaque stack cells,signedbounds,relativeoffsets,captures/reloads.
+REA447 has the five dossiers; local/reports/audio-group-next-20261029.json owns
+boundedtrace. No groupcode accepted. LiveAPIs/otherCPUs,parent/probecomposition,
+startup/display/gameplay,invalidmemory/concurrency and403/411 PARTIAL remain open.
+
+Historical444 follows.
+
 Current444, 2026-10-28: seven original bodies/1,580B integrated from frozen442/443;
 existing005656d0 descriptor alias order repaired against005656e8/eb.445 reuses
 immutable441fixture to refresh the changed owner TU's stop/pool chain. Shared audit
@@ -14,7 +34,7 @@ No native proof was repeated for that path change. No active workers remain.
 PR26 intake is documented in docs/research/pr26-integration-review-2026-10-29.md.
 Reusable recorders/prototype ports stay separate from C++ acceptance; damage
 writeback and default gating are repaired. No active worker assignments remain.
-Next:00597070 OS/CPU features and0059a4d0/0059a4ed helpers, preserving opaque
+Historical CPU scope completed by447:00597070 and0059a4d0/0059a4ed, preserving opaque
 GetVersionExA failure fields and inherited ECX. Raw005970a0 suppression condition
 is PlatformID==1 && minorVersion==0. No guessed generic subleaf0/defaultmask.
 Actual parent+probe composition, group00590070/00565990, live devices/platform,

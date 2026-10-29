@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run444](iterations/v2/001-original-recovery/runs/444-audio-initialization-integration/README.md).
-Initialization/DirectSound recovery and the descriptor alias repair are validated;
-the stop/pool chain is rechecked. [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
+Latest recovery intake: [Run447](iterations/v2/001-original-recovery/runs/447-cpu-features-integration/README.md).
+Original OS/CPU feature detection is integrated with its opaque failure-state transport.
+[PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next return to OS/CPU detection and the remaining startup dependencies.
+Next trace the audio-group release chain and remaining startup dependencies.
 
 ## Recovery milestones
 

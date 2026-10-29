@@ -31,8 +31,8 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run444](iterations/v2/001-original-recovery/runs/444-audio-initialization-integration/README.md)
-  integrates original initialization/DirectSound recovery and a proved descriptor alias fix.
+  [Run447](iterations/v2/001-original-recovery/runs/447-cpu-features-integration/README.md)
+  integrates original OS/CPU feature detection with verified ISA helpers and opaque OS state.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

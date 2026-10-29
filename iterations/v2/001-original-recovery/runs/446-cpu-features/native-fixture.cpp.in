@@ -1,0 +1,203 @@
+#include "cpu_features_446.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using namespace porsche;
+extern "C" void* __stdcall VirtualAlloc(void*,U,U,U);
+extern "C" I __stdcall VirtualProtect(void*,U,U,U*);
+extern "C" void* __stdcall GetCurrentProcess();
+extern "C" I __stdcall FlushInstructionCache(void*,const void*,U);
+extern "C" void __stdcall ExitProcess(U);
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){memcpy(p,&x,4);}
+static unsigned char* slab;static bool patch_ok=true;
+enum:U {MAIN=0,ID=0x200,QUERY=0x300};
+static U seed,os_platform,os_minor,os_write,os_result,support,max_basic,basic_edx,extended_edx;
+static U cases,real_cases,events;
+struct Event {U tag,a,b,c,data[37];};
+struct Trace {U count,abi,result;Event event[12];};
+static Trace trace,original;
+static Event& event(U tag,U a=0,U b=0,U c=0){
+    if(trace.count>=12)ExitProcess(91);Event& e=trace.event[trace.count++];memset(&e,0,sizeof(e));
+    e.tag=tag;e.a=a;e.b=b;e.c=c;return e;
+}
+extern "C" I __stdcall GetVersionExA(void* version){
+    Event& e=event(1,rd(version),os_write,os_result);memcpy(e.data,version,148);
+    // Assert actual size-only initialization before writing any fixture output.
+    if(e.data[0]!=148)trace.abi|=2;
+    for(U i=1;i<37;++i)if(e.data[i]!=seed)trace.abi|=4;
+    auto* b=static_cast<unsigned char*>(version);
+    if(os_write&1)wr(b+16,os_platform);
+    if(os_write&2)wr(b+8,os_minor);
+    if(os_write&4){wr(b+4,0x12345678);wr(b+12,0x87654321);memset(b+20,0x5a,128);}
+    if(os_write&8){b[16]=static_cast<unsigned char>(os_platform);b[8]=static_cast<unsigned char>(os_minor);}
+    return static_cast<I>(os_result);
+}
+static void relative(U off,U original_va,U target_va,U new_target){
+    auto* p=slab+off;if(p[0]!=0xe8 || original_va+off+5+rd(p+1)!=target_va)patch_ok=false;
+    wr(p+1,ptr(slab+new_target)-ptr(p+5));
+}
+static void* version_iat=reinterpret_cast<void*>(&GetVersionExA);
+static bool init(){
+    slab=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,0x3000,0x40));if(!slab)return false;
+    static const unsigned char m[]={ @BODY_00597070@ };memcpy(slab+MAIN,m,sizeof(m));
+    static const unsigned char i[]={ @BODY_0059a4d0@ };memcpy(slab+ID,i,sizeof(i));
+    static const unsigned char q[]={ @BODY_0059a4ed@ };memcpy(slab+QUERY,q,sizeof(q));
+    if(rd(slab+0x19)!=0x5b2150)patch_ok=false;wr(slab+0x19,ptr(&version_iat));
+    relative(0x34,0x597070,0x59a4d0,ID);relative(0x44,0x597070,0x59a4ed,QUERY);
+    relative(0x5a,0x597070,0x59a4ed,QUERY);relative(0x80,0x597070,0x59a4ed,QUERY);
+    return patch_ok && FlushInstructionCache(GetCurrentProcess(),slab,4096);
+}
+struct Registers {U eax,ebx,ecx,edx,esi,edi,flags,frame,stack;};
+static Registers regs;static U entry_ecx,entry_flags;static void* target;
+// Synthetic cdecl callsite: stack seed, register sentinels, and checked cleanup.
+static U invoke(void* fn,U argc=0,U output=0,U leaf=0){
+    target=fn;U before,saved_frame,old_flags;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before,esp
+        mov saved_frame,ebp
+        pushfd
+        pop old_flags
+        lea edi,[esp-400h]
+        mov ecx,100h
+        mov eax,seed
+        rep stosd
+        cmp argc,2
+        jne call_now
+        push leaf
+        push output
+    call_now:
+        mov eax,0a1234567h
+        mov ebx,13579bdfh
+        mov ecx,entry_ecx
+        mov edx,0d1234567h
+        mov esi,2468ace0h
+        mov edi,10203040h
+        push entry_flags
+        popfd
+        call target
+        mov regs.eax,eax
+        mov regs.ebx,ebx
+        mov regs.ecx,ecx
+        mov regs.edx,edx
+        mov regs.esi,esi
+        mov regs.edi,edi
+        pushfd
+        pop regs.flags
+        mov regs.frame,ebp
+        mov regs.stack,esp
+        push old_flags
+        popfd
+        mov esp,before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    if(regs.stack!=before-4*argc || regs.frame!=saved_frame || regs.ebx!=0x13579bdf || regs.esi!=0x2468ace0 || regs.edi!=0x10203040)trace.abi|=1;
+    return regs.eax;
+}
+static bool divergence(const char* family,U n){
+    printf("divergence family=%s case=%u count=%u/%u abi=%u/%u result=%x/%x\n",family,n,original.count,trace.count,original.abi,trace.abi,original.result,trace.result);return false;
+}
+static bool real_helpers(){
+    // Both ID bit starting values and status flags; exact flags restored.
+    for(U flags:{0x202u,0x246u,0x2d7u,0x200202u,0x200246u}){
+        entry_flags=flags;entry_ecx=0xdeadbeef;memset(&trace,0,sizeof(trace));
+        U a=invoke(slab+ID);Registers r=regs;
+        U b=invoke(reinterpret_cast<void*>(&cpu_id_toggle_0059a4d0));
+        if(a!=b || trace.abi || regs.ecx!=entry_ecx || regs.edx!=0xd1234567 || regs.flags!=r.flags || ((regs.flags^flags)&0x2008d5u))return divergence("real-id",flags);
+        ++cases;++real_cases;
+    }
+    for(U leaf:{0u,1u,7u,0x80000000u,0x80000001u,0xffffffffu})for(U ecx:{0u,1u,2u,0xabcdef01u}){
+        U a[6]={0x12345678,0,0,0,0,0x87654321},b[6];memcpy(b,a,sizeof(a));
+        entry_ecx=ecx;entry_flags=0x246;memset(&trace,0,sizeof(trace));
+        invoke(slab+QUERY,2,ptr(a+1),leaf);Registers r=regs;
+        invoke(reinterpret_cast<void*>(&cpu_query_0059a4ed),2,ptr(b+1),leaf);
+        if(trace.abi || memcmp(a,b,sizeof(a)) || regs.eax!=0xa1234567 || regs.ecx!=ecx || regs.edx!=0xd1234567 || regs.flags!=r.flags)return divergence("real-cpuid",leaf);
+        ++cases;++real_cases;
+    }
+    return true;
+}
+extern "C" void __cdecl controlled_id_event(){event(2,support);}
+__declspec(naked) static U controlled_id(){
+    __asm {
+        pushfd
+        pushad
+        call controlled_id_event
+        popad
+        popfd
+        mov eax,support
+        ret
+    }
+}
+extern "C" void __cdecl controlled_query(U* output,U leaf,U inherited){
+    Event& e=event(3,leaf,inherited==ptr(output)?1:0,0);memcpy(e.data,output,16);
+    if(inherited!=ptr(output))trace.abi|=8;
+    output[0]=leaf==0?max_basic:0x10203040;
+    output[1]=0x11223344;output[2]=0x55667788;
+    output[3]=leaf==1?basic_edx:(leaf==0x80000001u?extended_edx:0x99aabbcc);
+}
+__declspec(naked) static void controlled_cpu(){
+    __asm {
+        push ebp
+        mov ebp,esp
+        pushfd
+        pushad
+        push ecx
+        push dword ptr [ebp+0ch]
+        push dword ptr [ebp+8]
+        call controlled_query
+        add esp,0ch
+        popad
+        popfd
+        pop ebp
+        ret
+    }
+}
+static bool detour(void* location,const void* replacement){
+    U old;if(!VirtualProtect(location,5,0x40,&old))return false;
+    auto* p=static_cast<unsigned char*>(location);p[0]=0xe9;wr(p+1,ptr(replacement)-ptr(p+5));
+    U unused;return VirtualProtect(location,5,old,&unused) && FlushInstructionCache(GetCurrentProcess(),location,5);
+}
+static bool check(bool controlled,U n){
+    memset(&trace,0,sizeof(trace));entry_ecx=0xdeadbeef;entry_flags=0x246;
+    trace.result=invoke(slab+MAIN);original=trace;
+    memset(&trace,0,sizeof(trace));trace.result=invoke(reinterpret_cast<void*>(&audio_backend_cpu_features_00597070));
+    if(trace.abi || original.abi || memcmp(&original,&trace,sizeof(trace)))return divergence(controlled?"controlled":"real-main",n);
+    if(controlled){
+        U platform=seed,minor=seed;
+        if(os_write&1)platform=os_platform;if(os_write&2)minor=os_minor;
+        if(os_write&8){platform=(platform&0xffffff00u)|(os_platform&255u);minor=(minor&0xffffff00u)|(os_minor&255u);}
+        const bool query=support!=0 && max_basic>=1u;
+        U expected=1;if(query){if((basic_edx&0x02000000u) && !(platform==1 && minor==0))expected|=2;if(extended_edx&0x80000000u)expected|=4;}
+        U expected_calls=support?(max_basic>=1u?5u:3u):2u;
+        if(trace.result!=expected || trace.count!=expected_calls)return divergence("expected-mask-order",n);
+        if(support && trace.event[2].a!=0)return divergence("leaf0",n);
+        if(query && (trace.event[3].a!=1 || trace.event[4].a!=0x80000001u))return divergence("leaf-order",n);
+    }
+    events+=trace.count;++cases;if(!controlled)++real_cases;return true;
+}
+int main(){
+    if(!init()){printf("divergence patch-init\n");return 1;}
+    seed=0x11223344;if(!real_helpers())return 1;
+    U n=0;
+    for(U s:{0u,0xffffffffu,0x11223344u})for(U p:{0u,1u,2u,0xffffffffu})for(U m:{0u,1u,90u})for(U w:{0u,1u,2u,3u,7u,8u})for(U r:{0u,1u}){
+        seed=s;os_platform=p;os_minor=m;os_write=w;os_result=r;
+        if(!check(false,n++))return 1;
+    }
+    // Only fixture memory is redirected after real helper/composed tests.
+    if(!detour(slab+ID,reinterpret_cast<void*>(&controlled_id)) || !detour(slab+QUERY,reinterpret_cast<void*>(&controlled_cpu)) ||
+       !detour(reinterpret_cast<void*>(&cpu_id_toggle_0059a4d0),reinterpret_cast<void*>(&controlled_id)) ||
+       !detour(reinterpret_cast<void*>(&cpu_query_0059a4ed),reinterpret_cast<void*>(&controlled_cpu))){printf("divergence detour\n");return 1;}
+    for(U s:{0u,0xffffffffu,0x11223344u})for(U p:{0u,1u,2u,0xffffffffu})for(U m:{0u,1u,90u})for(U w:{0u,1u,2u,3u,7u,8u})for(U r:{0u,1u})
+    for(U id:{0u,0x200000u})for(U maximum:{0u,1u,0x80000000u,0xffffffffu})for(U bits=0;bits<4;++bits){
+        seed=s;os_platform=p;os_minor=m;os_write=w;os_result=r;support=id;max_basic=maximum;
+        basic_edx=(bits&1)?0x02000000u:0x01000000u;extended_edx=(bits&2)?0x80000000u:0x40000000u;
+        if(!check(true,n++))return 1;
+    }
+    printf("cpu_features_original_x86_vs_cpp=PASS cases=%u real_cases=%u events=%u\n",cases,real_cases,events);return 0;
+}
