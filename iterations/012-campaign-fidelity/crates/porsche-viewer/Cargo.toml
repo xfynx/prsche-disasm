@@ -3,6 +3,10 @@ name = "porsche-viewer"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+experimental-original-port = ["nfs-assets/experimental-original-port"]
+
 [lib]
 crate-type = ["rlib", "cdylib"]
 
@@ -13,6 +17,10 @@ nfs-game = { path = "../nfs-game" }
 wgpu = "=30.0.1"
 glam = "0.30"
 bytemuck = { version = "1.24", features = ["derive"] }
+
+[dev-dependencies]
+# Same version as wgpu's shader front end (shader_check.rs).
+naga = { version = "=30.0.1", features = ["wgsl-in"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 winit = "=0.30.13"

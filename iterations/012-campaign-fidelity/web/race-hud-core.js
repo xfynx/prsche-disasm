@@ -246,21 +246,53 @@ export const secondsToTicks = s => Math.trunc(s * 64);
 export const BOX_ALPHA_TOP = 63;
 export const BOX_ALPHA_BOTTOM = 255;
 
-// Damage ramp of HGraphicDamage [VA 0x421e00, 0x422470]: 10 colours, alpha 0xaa; undamaged
-// parts 0x55058228; a part's value v (0..1 of car+0x4e4..) picks ramp[trunc(v * 10)].
+// Damage ramp of HGraphicDamage [VA 0x421e00, 0x422470]: levels 1..10 (the table holds an 11th, equal
+// to the 10th); alpha 0xaa. Level 0 (zone damage below 10) is the undamaged colour 0x55058228.
 export const DAMAGE_RAMP = [0x058228, 0x02912d, 0x009b32, 0xffe100, 0xffcd05, 0xffb405, 0xffa005,
   0xdc6e05, 0xdc4605, 0xdc1905].map(c => (0xaa000000 | c) >>> 0);
 export const DAMAGE_UNDAMAGED = 0x55058228;
-export function damageColor(value) {
-  if (!(value > 0)) return DAMAGE_UNDAMAGED;
-  return DAMAGE_RAMP[Math.max(0, Math.min(DAMAGE_RAMP.length - 1, Math.trunc(value * 10)))];
+// Level of a zone value (car+0x4e4.., 0..100): ftol(zone * 10.0 [0x5b241c] * 0.01 [0x5b2bc0]) [VA 0x422470].
+export function damageLevel(zone) {
+  if (!(zone > 0)) return 0;
+  return Math.trunc(Math.fround(zone * 10) * 0.01);
 }
-// car.fsh parts (shape index, size, offset in the box + (5,4)) [VA 0x420a90..0x420b40, 0x420950].
+export function damageColor(zone) {
+  const level = damageLevel(zone);
+  if (level <= 0) return DAMAGE_UNDAMAGED;
+  return DAMAGE_RAMP[Math.min(level, DAMAGE_RAMP.length) - 1];
+}
+// car.fsh parts [VA 0x421e00 ctor, 0x420a90..0x420ae0 sizes, 0x420af0..0x420b40 offsets in the box + (5,4)
+// [VA 0x420950], 0x4229d0 placement, 0x422470 colours]. `shape` is the index in car.fsh (C1..C6),
+// `zones` the car+0x4e4 zones of the first copy and of the mirrored copy. The art holds one half of
+// the car: parts 0, 2, 3 are drawn a second time flipped vertically below the axis y = 27 (the outline
+// height [VA 0x420940]) at y' = y + (27 - y) * 2 - h - 1 [VA 0x422470, 0x423c70]; parts 1, 4, 5 are
+// symmetric and drawn once.
+export const DAMAGE_OUTLINE_SHAPE = 6;
+export const DAMAGE_OUTLINE_H = 27;
 export const DAMAGE_PARTS = [
-  { shape: 0, size: [52, 13], at: [2, 2] }, { shape: 1, size: [49, 44], at: [1, 5] },
-  { shape: 2, size: [41, 9], at: [54, 1] }, { shape: 3, size: [24, 14], at: [95, 4] },
-  { shape: 4, size: [9, 19], at: [110, 17] }, { shape: 5, size: [31, 35], at: [64, 9] },
+  { shape: 3, size: [52, 13], at: [2, 2], zones: [2, 0], mirror: true },
+  { shape: 0, size: [49, 44], at: [1, 5], zones: [1], mirror: false },
+  { shape: 4, size: [41, 9], at: [54, 1], zones: [3, 7], mirror: true },
+  { shape: 5, size: [24, 14], at: [95, 4], zones: [4, 6], mirror: true },
+  { shape: 2, size: [9, 19], at: [110, 17], zones: [5], mirror: false },
+  { shape: 1, size: [31, 35], at: [64, 9], zones: [8], mirror: false },
 ];
+// Top of the mirrored copy of a part, relative to the silhouette origin.
+export function mirrorY(part) {
+  return part.at[1] + (DAMAGE_OUTLINE_H - part.at[1]) * 2 - part.size[1] - 1;
+}
+// Draw list of the silhouette: {shape, x, y, w, h, flip, zone} relative to the silhouette origin.
+export function damageDraws() {
+  const out = [{ shape: DAMAGE_OUTLINE_SHAPE, x: 0, y: 0, flip: false, zone: -1 },
+    { shape: DAMAGE_OUTLINE_SHAPE, x: 0, y: DAMAGE_OUTLINE_H - 1, flip: true, zone: -1 }];
+  for (const p of DAMAGE_PARTS) {
+    out.push({ shape: p.shape, x: p.at[0], y: p.at[1], w: p.size[0], h: p.size[1], flip: false, zone: p.zones[0] });
+    if (p.mirror) {
+      out.push({ shape: p.shape, x: p.at[0], y: mirrorY(p), w: p.size[0], h: p.size[1], flip: true, zone: p.zones[1] });
+    }
+  }
+  return out;
+}
 
 // Map zoom Z (half width of the map box in metres) [VA 0x41e9c0]: MAPSCALE 0..4 -> s = 0, 0, 33,
 // 66, 100; Z = 185 + 4.15 s (radar mode MAP 3: 5 + 0.15 s); Z = 600 means the whole track
@@ -276,37 +308,17 @@ export function markerScale(map, whole) {
   return map === 3 ? 1 : whole ? 60 : 20;
 }
 
-// Outline resampling [VA 0x432230]: keep the first point, then a point each time the heading
-// has turned by total_turn * 0.005 since the last kept one, and the last point; <= 400 points.
-export function resampleOutline(points) {
-  const n = Math.floor(points.length / 2);
-  if (n < 3) return points.slice();
-  const heading = i => {
-    const j = Math.min(n - 1, i + 1);
-    const k = j === i ? i - 1 : i;
-    return Math.atan2(points[2 * j + 1] - points[2 * k + 1], points[2 * j] - points[2 * k]);
+// Track map from `viewer.get_course_map()` [VA 0x432230 built in the engine from the node graph]:
+// 4 header floats (bounding box centre x, z, extent, 1 for a circuit) then line segments
+// x0, z0, x1, z1. Segments never join two sections (the original draws a segment only between
+// consecutive outline points of one section [VA 0x433690]).
+export function parseCourseMap(raw) {
+  if (!raw || raw.length < 8) return { segs: [], bbox: null, closed: false };
+  return {
+    bbox: { cx: raw[0], cz: raw[1], ext: raw[2] },
+    closed: raw[3] !== 0,
+    segs: raw.slice(4),
   };
-  const turn = (a, b) => {
-    let d = b - a;
-    while (d > Math.PI) d -= 2 * Math.PI;
-    while (d < -Math.PI) d += 2 * Math.PI;
-    return Math.abs(d);
-  };
-  let total = 0;
-  for (let i = 1; i < n; i++) total += turn(heading(i - 1), heading(i));
-  const step = total * 0.005;
-  if (!(step > 0)) return [points[0], points[1], points[2 * (n - 1)], points[2 * (n - 1) + 1]];
-  const out = [points[0], points[1]];
-  let acc = 0;
-  for (let i = 1; i < n - 1 && out.length < 2 * 399; i++) {
-    acc += turn(heading(i - 1), heading(i));
-    if (acc >= step) {
-      out.push(points[2 * i], points[2 * i + 1]);
-      acc = 0;
-    }
-  }
-  out.push(points[2 * (n - 1)], points[2 * (n - 1) + 1]);
-  return out;
 }
 
 // Map view transform [VA 0x433440]: world (x, z) -> box pixels, centred on (cx, cz), scale
@@ -327,4 +339,116 @@ export function mapTransform(box, cx, cz, zoom, upYaw, mirror = false) {
     if (mirror) rx = -rx;
     return [ox + rx * scale, oy - rz * scale];
   };
+}
+
+// --- Countdown H321Go (docs/re/hud.md "Countdown") -------------------------------------------
+// HUD object vtable 0x5b27ec, ctor 0x417a60, draw 0x4184f0, digits 0x418670, wedge 0x418910.
+// Visible from scheduler step 0x100 to 0x1c0 (64 steps/s, same steps as the phrases "3", "2", "1").
+export const COUNTDOWN_FIRST_STEP = 0x100; // g_CountdownSteps 0x5b27d8..0x5b27e4
+export const COUNTDOWN_STAGE_STEPS = [0x100, 0x140, 0x180];
+export const COUNTDOWN_LAST_STEP = 0x1c0;
+// Zoom records 0x81 + 5k (0x417a60): [scale, ARGB]; k = 0..4 have scale 0 (not drawn).
+export const COUNTDOWN_ZOOM = [
+  [0, 0x80ffffff], [0, 0x80ffffff], [0, 0x80ffffff], [0, 0x80ffffff], [0, 0x80ffffff],
+  [8, 0x3fffffff], [7, 0x3fffffff], [6, 0x3fffffff], [5, 0x3fffffff],
+  [4, 0x80ffffff], [3, 0x80ffffff], [2, 0x80ffffff],
+  [1, 0xbfffffff], [1, 0xbfffffff], [1, 0x80ffffff], [1, 0x80ffffff],
+];
+export const COUNTDOWN_CIRCLE_FILL = 0x3ffab400; // 0x4184f0
+export const COUNTDOWN_CIRCLE_RING = 0x80fab400;
+export const COUNTDOWN_LINE = 0x80000000; // 0x419c50
+export const COUNTDOWN_WEDGE = 0x33000000; // 0x418910 -> 0x466100
+// Digit art per stage [pack, frame] from `FUN_00422df0(name, frame, ...)` in 0x417a60 (sizes DAT_005cc838..).
+export const COUNTDOWN_ART = [
+  { solid: ["321go", 1], outline: ["321go", 2] }, // 3sol, 3ol
+  { solid: ["321go", 0], outline: ["321go", 3] }, // 2sol, 2ol
+  { solid: ["321go2", 0], outline: ["321go2", 1] }, // 1sol, 1ol
+];
+
+// Stage (0..2), sweep tick k (0..15, 1/15 s) and the step within the second for scheduler step
+// `step`; null outside the countdown (0x4184f0).
+export function countdownState(step) {
+  if (step < COUNTDOWN_FIRST_STEP || step > COUNTDOWN_LAST_STEP) return null;
+  const stage = step >= COUNTDOWN_STAGE_STEPS[2] ? 2 : step >= COUNTDOWN_STAGE_STEPS[1] ? 1 : 0;
+  const n = step % 64;
+  const k = Math.trunc((n * 3 + 3) * 5 / 64);
+  return { stage, n, k };
+}
+
+// The 16 border points of the wedge fan, clockwise from the top centre (0x418910), for a W x H view.
+export function wedgePoints(W, H) {
+  const xs = [W / 2, 3 * W / 4, W, W, W, W, W, 3 * W / 4, W / 2, W / 4, 0, 0, 0, 0, 0, W / 4];
+  const ys = [0, 0, 0, H / 4, H / 2, 3 * H / 4, H, H, H, H, H, 3 * H / 4, H / 2, H / 4, 0, 0];
+  return xs.map((x, i) => [x, ys[i]]);
+}
+
+// Draw list of the countdown at `step` on a W x H view (HUD units = pixels, art 1:1).
+// `sizes(pack, frame)` -> [w, h] of the art. Items in draw order:
+//  { kind: "sprite", art: [pack, frame], x, y, w, h, color } | { kind: "line", x0, y0, x1, y1, color }
+//  | { kind: "wedge", tris: [[p0, p1, p2]...], color }
+export function countdownDraws(step, W, H, sizes) {
+  const s = countdownState(step);
+  if (!s) return null;
+  const { stage, k } = s;
+  const cx = Math.trunc(W / 2);
+  const cy = Math.trunc(H / 2);
+  const out = [];
+  // Scaled quad (0x418670): corners centre -/+ trunc(size * scale) / 2.
+  const zoomed = (art, w, h, color, scale) => {
+    const hw = Math.trunc(w * scale) >> 1;
+    const hh = Math.trunc(h * scale) >> 1;
+    out.push({ kind: "sprite", art, x: cx - hw, y: cy - hh, w: hw + hw, h: hh + hh, color });
+  };
+  // Unscaled art centred on the screen centre (outlines, rings) or in the 130 px box (solid digits, 0x417a60).
+  const centred = (art, w, h, color) => {
+    out.push({ kind: "sprite", art, x: cx - (w >> 1), y: cy - (h >> 1), w, h, color });
+  };
+  const boxed = (art, w, h, color) => {
+    const bx = Math.trunc((W - 0x82) / 2) + ((0x82 - w) >> 1);
+    const by = Math.trunc((H - 0x82) / 2) + ((0x82 - h) >> 1);
+    out.push({ kind: "sprite", art, x: bx, y: by, w, h, color });
+  };
+  // Backing disc and ring, 128 px (0x417a60: circlefull / circleoutline).
+  centred(["circlefull", 0], 128, 128, COUNTDOWN_CIRCLE_FILL);
+  centred(["circleoutline", 0], 128, 128, COUNTDOWN_CIRCLE_RING);
+  out.push({ kind: "line", x0: 0, y0: cy, x1: W, y1: cy, color: COUNTDOWN_LINE });
+  out.push({ kind: "line", x0: cx, y0: 0, x1: cx, y1: H, color: COUNTDOWN_LINE });
+  const art = COUNTDOWN_ART[stage];
+  const [zoom, zcolor] = COUNTDOWN_ZOOM[k];
+  if (zoom > 0) {
+    const [w, h] = sizes(...art.solid);
+    zoomed(art.solid, w, h, zcolor, zoom);
+  }
+  if (stage > 0 && k <= 4) { // the previous digit stays until the new one zooms in
+    const prev = COUNTDOWN_ART[stage - 1];
+    const [w, h] = sizes(...prev.solid);
+    boxed(prev.solid, w, h, 0x80ffffff);
+  }
+  {
+    const alpha = (k & 7) << 5; // (k << 0x1d) | 0xffffff: top 3 bits of the alpha byte
+    const [w, h] = sizes(...art.outline);
+    centred(art.outline, w, h, ((alpha << 24) | 0xffffff) >>> 0);
+  }
+  if (stage > 0) { // previous outline fades: alpha = (0x100 / k) << 24 (k = 0, 1 give 0)
+    const a = (k === 0 ? 0x100 : Math.trunc(256 / k)) & 0xff;
+    const prev = COUNTDOWN_ART[stage - 1];
+    const [w, h] = sizes(...prev.outline);
+    centred(prev.outline, w, h, ((a << 24) | 0xffffff) >>> 0);
+  }
+  const pts = wedgePoints(W, H);
+  const tris = [];
+  for (let i = 0; i <= k; i++) tris.push([[W / 2, H / 2], pts[i], pts[(i + 1) % 16]]);
+  out.push({ kind: "wedge", tris, color: COUNTDOWN_WEDGE });
+  return out;
+}
+
+// Colour of a car in the HUD (position list square, map marker): its paint colour
+// `res+0x218` = COLORCONFIG[0], key 0x149 = the body colour of the car's colour entry as
+// 0xAARRGGBB [VA 0x42b000, 0x433110 read it; 0x4eeda0 writes it, 0x4f4fa0 draws the entry].
+// `colours[i]` is the 0xRRGGBB of car i (player first); cars without one keep a fixed palette
+// (A213).
+export const FALLBACK_CAR_COLOURS = [0xf2f2f2, 0xe8281e, 0xf5c518, 0x2f6fe0, 0x2fb84a, 0xee8a1a, 0x9b59d6, 0x18b8c8];
+export function carHudColour(colours, index) {
+  const c = colours?.[index];
+  return c === undefined || c === null ? FALLBACK_CAR_COLOURS[index % FALLBACK_CAR_COLOURS.length] : c & 0xffffff;
 }

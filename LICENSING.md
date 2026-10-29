@@ -46,10 +46,12 @@ This notice does not replace any third-party copyright or license notice.
 ## Additional contributor attribution
 
 - **[paceholder](https://github.com/paceholder)** authored
-  [PR #25](https://github.com/xfynx/prsche-disasm/pull/25), including original-code
-  research recorders and the Rust vehicle, collision, AI, audio, camera and front-end
-  work. The PR was submitted with the repository's MIT license already present.
+  [PR #25](https://github.com/xfynx/prsche-disasm/pull/25) and
+  [PR #26](https://github.com/xfynx/prsche-disasm/pull/26), including original-code
+  research recorders and the Rust vehicle, collision, AI, audio, camera, track-object,
+  weather, rendering and front-end work. Both PRs were submitted with the repository's
+  MIT license already present.
   For rights held by the contributor, submissions follow the repository license
   under [GitHub Terms D.6](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service#6-contributions-under-repository-license).
-  This credits this submission; it records no separate blanket agreement for other
+  This credits these submissions; it records no separate blanket agreement for other
   work. The original-game and third-party exclusions above continue to apply.

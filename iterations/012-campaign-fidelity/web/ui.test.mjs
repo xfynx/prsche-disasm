@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { PauseMenu, drawPauseMenu, CODE as PAUSE_CODE_VALUES } from "./pause-menu.js";
 
 class Element {
   constructor() {
@@ -45,9 +46,10 @@ const window = new Element();
 const context = vm.createContext({
   document, window, console, setTimeout,
   HTMLInputElement: Input, HTMLTextAreaElement: Textarea, HTMLSelectElement: Select,
+  PauseMenu, drawPauseMenu, PAUSE_CODE: PAUSE_CODE_VALUES, // main.js imports of ./pause-menu.js
 });
 const source = readFileSync(new URL("main.js", import.meta.url), "utf8")
-  .replace(/^import .*;\r?\n/, "")
+  .replace(/^import .*;\r?\n/gm, "")
   .replace(/\bboot\(\);\s*$/, "");
 vm.runInContext(source + `\n globalThis.testApi = {
   setViewer: value => viewer = value,
@@ -73,6 +75,7 @@ context.testApi.setViewer({
   has_original_vehicle: () => true,
   cycle_car_view: () => { freeCamera = false; cameraIndex = (cameraIndex + 1) % 4; return cameraCycle[cameraIndex]; },
   get_camera_name: () => freeCamera ? "Free" : cameraCycle[cameraIndex],
+  get_weather_stats: () => new Float32Array([812, 0, 1, 0.003, 0.0125, 1, 0, 1, 1, 3, 8]),
   toggle_free_camera: () => freeCamera = !freeCamera,
   is_free_camera: () => freeCamera,
   is_original_vehicle: () => originalModel,
@@ -136,6 +139,8 @@ for (const part of ["L lights off", "C TailCam0",
   "V free cam off", "Shift+V side off", "B boxes off", "H HUD on", "R reset", "Shift+R restart", "Esc menu"]) {
   assert.ok(panel().includes(part), `panel shows "${part}": ${panel()}`);
 }
+assert.ok(panel().includes("wx n812 rain 0 snow 1.00 fog 12.5\u2030"), `weather readout: ${panel()}`);
+assert.ok(panel().includes("surf 1/1/3/8"), `wheel surfaces: ${panel()}`);
 for (const gone of ["O car", "K collisions", "M 6 DOF", "J AI"]) {
   assert.ok(!panel().includes(gone), `panel no longer lists "${gone}": ${panel()}`);
 }

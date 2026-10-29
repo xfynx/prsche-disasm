@@ -123,6 +123,9 @@ fn tile_selected(ini: &Ini, style: &StyleSelection, filter: &str) -> Result<bool
 /// A level names both the geometry arrays and the high nibble of `pr`.
 /// Select one level for the entire scene: mixing FE1 with racing-only tyre
 /// tread (levels 4/5) creates overlapping surfaces with unrelated UVs.
+/// `Base+0x44` geometry index of the cabrio top at rest (`CabrioUp*`, `CabrioDown*`).
+const ROOF_REST_GEOMETRY: u8 = 41;
+
 fn parked_levels(article: &Entry, style: &StyleSelection) -> Result<Vec<u16>, String> {
     if article.children.iter().any(|entry| entry.tag == "ef") {
         return Ok(vec![]);
@@ -131,14 +134,20 @@ fn parked_levels(article: &Entry, style: &StyleSelection) -> Result<Vec<u16>, St
     let info = bytes(&base.data, 68, 16)?;
     // TypeIndex is selected independently for each GeomIndex by the TPG style.
     // The high nibble of LevelIndex is a BIL_* bitset; BIL_DRIVER is 0x8.
-    if u32::from(info[1])
-        != style
-            .geometry
-            .get(&u32::from(info[0]))
-            .copied()
-            .unwrap_or(0)
-        || info[10] & 0x80 != 0
-    {
+    let wanted = style
+        .geometry
+        .get(&u32::from(info[0]))
+        .copied()
+        .unwrap_or(0);
+    // Geometry 41 holds the top at rest in pairs: type 2k-1 up, 2k down; the style lists one of
+    // them and both are loaded (`CabrioUp*` / `CabrioDown*`), the front end shows one by the
+    // state of the top.
+    let type_ok = if info[0] == ROOF_REST_GEOMETRY {
+        u32::from(info[1]).div_ceil(2) == wanted.div_ceil(2) && wanted != 0
+    } else {
+        u32::from(info[1]) == wanted
+    };
+    if !type_ok || info[10] & 0x80 != 0 {
         return Ok(vec![]);
     }
     let level_count = u32le(&base.data, 12)? as usize;
@@ -161,6 +170,52 @@ fn parked_levels(article: &Entry, style: &StyleSelection) -> Result<Vec<u16>, St
         levels.push(lod);
     }
     Ok(levels)
+}
+
+/// Layer parameter of an `mt` record that selects the texture slot of the car's
+/// sphere-map reflection (`R3DSpecularTextureLayer` 0x445520 reads one float:
+/// `< 0.05` slot 0, `< 0.95` slot 1, else slot 2 → `carcmn.fsh` SPC1/SPC2/SPC3).
+/// Record layout (scene loader 0x44a770): `+0x08` u16 texture count, u16 layer count;
+/// textures of 0x2c bytes at `+0x20`; then 16-byte layer headers `{type, offset, size, 0}`
+/// and the parameter blob. The float is the layer of type 7 (`CarExtEnv` and `CarWindow`
+/// both carry it; in the shipped cars the other slot floats of a record are equal to it).
+pub(crate) const ENV_SLOT_LAYER: u32 = 7;
+
+/// Texture slot of the reflection layer from an `mt` payload, `None` when it has none.
+pub(crate) fn material_env_slot(mt: &[u8]) -> Option<u8> {
+    let textures = usize::from(u16le(mt, 8).ok()?);
+    let layers = usize::from(u16le(mt, 10).ok()?);
+    let table = 0x20 + textures * 0x2c;
+    let blob = table + layers * 16;
+    (0..layers).find_map(|k| {
+        let header = table + k * 16;
+        if u32le(mt, header).ok()? != ENV_SLOT_LAYER || u32le(mt, header + 8).ok()? != 4 {
+            return None;
+        }
+        let value = f32le(mt, blob + u32le(mt, header + 4).ok()? as usize).ok()?;
+        Some(if value < 0.05 {
+            0
+        } else if value < 0.95 {
+            1
+        } else {
+            2
+        })
+    })
+}
+
+/// Sun and lens-flare records of `Render/flare.dat` and the sprite layout
+/// `Render/flarepos.dat` (`FlareDb_Load` 0x4522b0, `SunFlare_Init` 0x460780; the
+/// built-in layout when that file is absent). No `flare.dat`: no sun sprites.
+fn flare_data(files: &AssetFiles) -> Result<Option<nfs_formats::FlareData>, String> {
+    let Ok(data) = find(files, "flare.dat") else {
+        return Ok(None);
+    };
+    Ok(Some(nfs_formats::FlareData {
+        records: nfs_formats::parse_flare_dat(data)?,
+        positions: find(files, "flarepos.dat")
+            .map(nfs_formats::parse_flare_positions)
+            .unwrap_or(nfs_formats::flare::DEFAULT_FLARE_POSITIONS),
+    }))
 }
 
 /// Glare and shadow textures of `Render/common.fsh` (`R3DCar_DrawGlare` 0x43cdd0 and
@@ -502,6 +557,14 @@ fn frames_or_zero(declared: u8, meshes: &[InCarMesh]) -> u8 {
     declared.min(present as u8)
 }
 
+/// Wheel articles of the base geometry: domain 13 front / 14 rear with article class 10. The
+/// article id differs per body variant (77/78 stock, 106/107 `WheelFront1`/`WheelRear1`, 132
+/// `WheelRear2`: wide-body styles such as the 993 turbo, 901 RSR); the shadow articles of the same
+/// domains are class 11. Only the style-selected article reaches here, so pivot and meshes are unique.
+fn is_wheel_article(geometry: u8, class: u8, _id: u8) -> bool {
+    matches!(geometry, 13 | 14) && class == 10
+}
+
 fn to_scene_coordinates(v: [f32; 3]) -> [f32; 3] {
     [v[0], v[1], -v[2]]
 }
@@ -663,6 +726,13 @@ fn tpg_vec3(ini: &Ini, key: &str, default: [f32; 3]) -> [f32; 3] {
     out
 }
 
+/// Float key of the TPG `[header]` (`FUN_00523b20` with a default) [VA 0x441a10].
+fn tpg_f32(ini: &Ini, key: &str, default: f32) -> f32 {
+    val(ini, "header", key)
+        .and_then(|v| v.trim().parse::<f32>().ok())
+        .unwrap_or(default)
+}
+
 /// `Car_ReadTpgCameraKeys 0x441a10`: `drivercampos`/`drivercamrot` (defaults
 /// (-0.36, 0.4, -0.25) / 0), then `drivercamposstyleN`/`drivercamrotstyleN` override them.
 fn driver_camera(ini: &Ini, style: u32) -> DriverCamera {
@@ -700,15 +770,24 @@ pub fn load(files: &AssetFiles, car: &str, style_index: u32) -> Result<Scene, St
     let mut scene = Scene {
         meshes: Vec::new(),
         car_collision_box: crate::collision_box::car_collision_box(&crp).ok(),
+        car_body_points: crate::collision_box::body_points(&crp),
         car_driver_camera: Some(driver_camera(&ini, style_index)),
         car_wheels: Vec::new(),
         car_glares: car_glares(&crp, &style, scene_lod)?,
         car_in_car: Vec::new(),
+        car_anim_parts: Vec::new(),
+        car_roof_up: Vec::new(),
+        car_roof_down: Vec::new(),
         effect_textures: effect_textures(files)?,
-        particle_defs: match find(files, "carpart.dat") {
-            Ok(data) => crate::sparks::parse_particle_dat(data)?,
-            Err(_) => Vec::new(),
+        // One tag map as 0x455570: particle.dat, then carpart.dat replaces its tags.
+        particle_defs: {
+            let parse = |name: &str| match find(files, name) {
+                Ok(data) => crate::particles::parse_particle_dat(data),
+                Err(_) => Ok(Vec::new()),
+            };
+            crate::particles::merge_particle_defs(&parse("particle.dat")?, &parse("carpart.dat")?)
         },
+        particle_emitters: Vec::new(),
         textures: Vec::new(),
         materials: Vec::new(),
         bounds: [[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]],
@@ -721,6 +800,9 @@ pub fn load(files: &AssetFiles, car: &str, style_index: u32) -> Result<Scene, St
         )],
         prop_articles: Vec::new(),
         prop_instances: Vec::new(),
+        track_objects: Vec::new(),
+        smashables: Vec::new(),
+        smack_props: Vec::new(),
         scenario_start: None,
         scenario_end: None,
         scenario_name: None,
@@ -728,11 +810,18 @@ pub fn load(files: &AssetFiles, car: &str, style_index: u32) -> Result<Scene, St
         sky_texture: None,
         sky_layers: [None, None, None],
         sky_horizon: None,
+        sky_dome: None,
+        sky_map: None,
+        sky_map_b: None,
+        sky_layers_b: [None, None],
+        sky_weather: None,
         sun_position: None,
+        flare: flare_data(files)?,
         topology: None,
         road_surface: None,
         course: None,
         ai_track: None,
+        start_trigger: None,
     };
     let mut skipped = Vec::new();
     let mut selected = Vec::new();
@@ -783,6 +872,9 @@ pub fn load(files: &AssetFiles, car: &str, style_index: u32) -> Result<Scene, St
             missing.join(", ")
         ));
     }
+    // Tile filters see the driver types set after the style (`R3DCar_SelectStyle` 0x43ae50), so
+    // styles that list no GeomIndex 9 still select a suit/helmet tile.
+    let tile_style = with_driver(&style, DRIVER_INDEX);
     for f in 1..=filecount {
         let section = format!("file{f}.details");
         let page = num(&ini, &section, "tpage", 0)?;
@@ -806,7 +898,7 @@ pub fn load(files: &AssetFiles, car: &str, style_index: u32) -> Result<Scene, St
             if num(&ini, &filter, "frontend", 1)? == 0 || num(&ini, &filter, "racedecal", 0)? != 0 {
                 continue;
             }
-            if !tile_selected(&ini, &style, &filter)? {
+            if !tile_selected(&ini, &tile_style, &filter)? {
                 continue;
             }
             let rotate = num(&ini, &filter, "rotate", 0)? != 0;
@@ -866,6 +958,12 @@ pub fn load(files: &AssetFiles, car: &str, style_index: u32) -> Result<Scene, St
             double_sided,
             depth_bias: u32le(&e.data, 0x114)? as i32,
             prelit: false,
+            uv_scroll: None,
+            env_slot: if matches!(render.as_str(), "CarExtEnv" | "CarWindow") {
+                material_env_slot(&e.data)
+            } else {
+                None
+            },
         });
     }
     scene.car_in_car = in_car_parts(&crp, &style, &matmap)?;
@@ -955,11 +1053,85 @@ pub fn load(files: &AssetFiles, car: &str, style_index: u32) -> Result<Scene, St
                 scene.meshes.push(m);
             }
         }
+        // Top at rest: the closed (odd type) mesh stays in `meshes`, the open one is kept apart.
+        if info[0] == ROOF_REST_GEOMETRY && first_mesh < scene.meshes.len() {
+            if info[1] % 2 == 1 {
+                scene.car_roof_up.extend(first_mesh..scene.meshes.len());
+            } else {
+                scene.car_roof_down.extend(scene.meshes.drain(first_mesh..));
+            }
+        }
+        // Cabrio top (frame channel 1) and hood / trunk lid (transform channels 8, 9).
+        let is_top = info[9] == 1 && info[8] > 1;
+        if (is_top || matches!(info[7], 6..=9)) && first_mesh < scene.meshes.len() {
+            let mut frames: Vec<Vec<Mesh>> = Vec::new();
+            if is_top {
+                for f in 1..u16::from(info[8]) {
+                    let index = lod | (f << 4);
+                    let Some(vt_f) = a.find("vt", index) else {
+                        break;
+                    };
+                    let nm_f = a.find("nm", index).or(nm);
+                    let mut set = Vec::new();
+                    for pr in a
+                        .children
+                        .iter()
+                        .filter(|e| e.tag == "pr" && e.index >> 12 == lod)
+                    {
+                        let mut m = mesh(
+                            pr,
+                            vt_f,
+                            nm_f,
+                            uv,
+                            translation,
+                            &matmap,
+                            format!("{name}#{ai}/{} frame {f}", pr.index & 4095),
+                        )
+                        .map_err(|e| format!("{name} frame {f}: {e}"))?;
+                        if !m.indices.is_empty() {
+                            finish_scene_mesh(&mut m);
+                            set.push(m);
+                        }
+                    }
+                    frames.push(set);
+                }
+            }
+            let pivot = [
+                -translation[0] * 5.0,
+                translation[1] * 5.0,
+                translation[2] * 5.0,
+            ];
+            // Centroid of the closed part relative to the hinge, in body space [-x, y, z].
+            let (mut sum, mut n) = ([0.0f32; 3], 0.0f32);
+            for m in &scene.meshes[first_mesh..] {
+                for v in &m.vertices {
+                    sum[0] += -v.position[0] * 5.0;
+                    sum[1] += v.position[1] * 5.0;
+                    sum[2] += -v.position[2] * 5.0;
+                    n += 1.0;
+                }
+            }
+            let cz = if n > 0.0 { sum[2] / n - pivot[2] } else { 0.0 };
+            // Rotation by +t about x lifts a point at z < 0 of the hinge (y' = y cos t - z sin t).
+            scene.car_anim_parts.push(CarAnimPart {
+                channel: if is_top { 1 } else { info[7] },
+                pivot,
+                axis: u8::from(matches!(info[7], 6 | 7) && !is_top),
+                open_sign: if cz > 0.0 { -1.0 } else { 1.0 },
+                extent: match info[7] {
+                    _ if is_top => 1.0,
+                    6 | 7 => 0.15,
+                    8 => tpg_f32(&ini, "hoodextent", 0.15).abs(),
+                    _ => tpg_f32(&ini, "trunkextent", -0.15).abs(),
+                },
+                base_meshes: (first_mesh..scene.meshes.len()).collect(),
+                frames,
+            });
+        }
         // Base geometry domains 13/14 are the selected front/rear wheel articles.
         // Keep their source pivots and mesh membership instead of guessing axle
         // widths from unrelated SIM scalars or mesh-name substrings.
-        if matches!((info[0], info[2], info[3]), (13, 10, 77) | (14, 10, 78))
-            && first_mesh < scene.meshes.len()
+        if is_wheel_article(info[0], info[2], info[3]) && first_mesh < scene.meshes.len()
         {
             let center = [
                 -translation[0] * 5.0,
@@ -988,6 +1160,7 @@ pub fn load(files: &AssetFiles, car: &str, style_index: u32) -> Result<Scene, St
             });
         }
     }
+    fix_door_signs(&mut scene);
     if scene.meshes.is_empty() {
         return Err("no drawable meshes".into());
     }
@@ -1016,6 +1189,53 @@ pub fn load(files: &AssetFiles, car: &str, style_index: u32) -> Result<Scene, St
     ));
     scene.diagnostics.push("Exterior alpha0 is cutout, intermediate alpha selects test paint, alpha255 preserves artwork; full CLR decoding remains unverified. Signed mt+0x114 supplies material depth bias. No geometry placeholders.".into());
     Ok(scene)
+}
+
+/// Raw-scaled mesh (`mesh()`) to scene coordinates; missing normals from the triangles.
+fn finish_scene_mesh(m: &mut Mesh) {
+    for v in &mut m.vertices {
+        v.position = to_scene_coordinates(v.position);
+        v.normal = to_scene_coordinates(v.normal);
+    }
+    for tri in m.vertices.as_chunks_mut::<3>().0 {
+        if tri.iter().all(|vertex| vertex.normal == [0.; 3]) {
+            let normal = triangle_normal([tri[0].position, tri[1].position, tri[2].position]);
+            for vertex in tri {
+                vertex.normal = normal;
+            }
+        }
+    }
+}
+
+/// Doors swing outward: the sign of the rotation about the body y axis (`Ry(a)`: x' = x cos a +
+/// z sin a) follows the side of the door and the position of its mass relative to the hinge,
+/// taken from the largest part of the channel and used for all its parts (approximation A232).
+fn fix_door_signs(scene: &mut Scene) {
+    for channel in [6u8, 7] {
+        let main = scene
+            .car_anim_parts
+            .iter()
+            .filter(|p| p.channel == channel)
+            .max_by_key(|p| p.base_meshes.iter().map(|&i| scene.meshes[i].vertices.len()).sum::<usize>());
+        let Some(main) = main else { continue };
+        let (mut sx, mut sz, mut n) = (0.0f32, 0.0f32, 0.0f32);
+        for &i in &main.base_meshes {
+            for v in &scene.meshes[i].vertices {
+                sx += -v.position[0] * 5.0;
+                sz += -v.position[2] * 5.0;
+                n += 1.0;
+            }
+        }
+        if n == 0.0 {
+            continue;
+        }
+        let side = if sx / n >= 0.0 { 1.0 } else { -1.0 };
+        let toward_rear = sz / n - main.pivot[2];
+        let sign = if toward_rear >= 0.0 { side } else { -side };
+        for p in scene.car_anim_parts.iter_mut().filter(|p| p.channel == channel) {
+            p.open_sign = sign;
+        }
+    }
 }
 
 fn mesh(
@@ -1506,6 +1726,77 @@ mod tests {
         );
     }
     #[test]
+    fn wheel_article_rule_covers_wide_body_variants() {
+        assert!(is_wheel_article(13, 10, 77) && is_wheel_article(14, 10, 78));
+        assert!(is_wheel_article(13, 10, 106) && is_wheel_article(14, 10, 107));
+        assert!(is_wheel_article(14, 10, 132));
+        // shadows (class 11), wheel wells (domain 12) and other domains are not wheels
+        assert!(!is_wheel_article(13, 11, 186) && !is_wheel_article(12, 255, 23));
+        assert!(!is_wheel_article(15, 10, 77));
+    }
+
+    #[test]
+    fn local_993_turbo_style_has_wheel_articulation() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData/CarModel");
+        if !root.join("993.crp").exists() {
+            return;
+        }
+        let mut files = AssetFiles::new();
+        for name in ["993.crp", "993.tpg", "INTGLASS.FSH", "Shadow.fsh", "Cabrio.fsh"] {
+            if let Ok(bytes) = std::fs::read(root.join(name)) {
+                files.insert(name.into(), bytes);
+            }
+        }
+        // Quick Race '95 911 Turbo 3.6 uses TPG style 8 (turbocoupe) with WheelFront1/WheelRear1.
+        for style in [0, 8] {
+            let scene = load(&files, "993", style).unwrap();
+            assert_eq!(scene.car_wheels.len(), 4, "style {style}: {:?}", scene.diagnostics);
+            assert!(scene.car_wheels.iter().all(|w| !w.mesh_indices.is_empty()));
+        }
+    }
+
+    #[test]
+    fn local_every_car_style_has_wheel_articulation() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData/CarModel");
+        let Ok(dir) = std::fs::read_dir(&root) else {
+            return;
+        };
+        let mut bad = Vec::new();
+        for entry in dir.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()).map(str::to_lowercase).as_deref() != Some("crp") {
+                continue;
+            }
+            let car = path.file_stem().unwrap().to_string_lossy().to_string();
+            let Ok(tpg) = std::fs::read(path.with_extension("tpg")) else {
+                continue;
+            };
+            let mut files = AssetFiles::new();
+            files.insert(format!("{car}.crp"), std::fs::read(&path).unwrap());
+            files.insert(format!("{car}.tpg"), tpg.clone());
+            for name in ["INTGLASS.FSH", "Shadow.fsh", "Cabrio.fsh"] {
+                if let Ok(bytes) = std::fs::read(root.join(name)) {
+                    files.insert(name.into(), bytes);
+                }
+            }
+            let styles = nfs_formats::parse_ini(&tpg)
+                .ok()
+                .and_then(|ini| ini.get("header").and_then(|h| h.get("numstyles")).and_then(|v| v.parse::<u32>().ok()))
+                .unwrap_or(1);
+            for style in 0..styles.max(1) {
+                match load(&files, &car, style) {
+                    Ok(scene) if scene.car_wheels.len() == 4 => {}
+                    Ok(_) => bad.push(format!("{car} style {style}")),
+                    Err(_) => {}
+                }
+            }
+        }
+        assert!(bad.is_empty(), "no wheel articulation: {bad:?}");
+    }
+
+    #[test]
     fn local_boxster_wheel_pivots_drive_geometry_and_visual_centers() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../../local/game/GameData");
@@ -1610,6 +1901,47 @@ mod tests {
         assert_eq!(find("GlareMirror1").unwrap().pivot, 6, "follows the left door");
         // Each glare appears once per detail level; only the scene level is used.
         assert_eq!(scene.car_glares.iter().filter(|g| g.name == "GlareHeadLight").count(), 1);
+    }
+
+    #[test]
+    fn local_356a_hood_trunk_and_top_animation_parts() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../..")
+            .join("local/game/GameData/CarModel");
+        if !root.join("356a.crp").exists() {
+            return;
+        }
+        let mut files = AssetFiles::new();
+        for name in [
+            "356a.crp",
+            "356a.tpg",
+            "INTGLASS.FSH",
+            "Shadow.fsh",
+            "Cabrio.fsh",
+            "Suit.fsh",
+            "Head.fsh",
+        ] {
+            files.insert(name.into(), std::fs::read(root.join(name)).unwrap());
+        }
+        // Style 4 ('59 convertible) has a cabrio top: six morph frames, five beyond the base.
+        let scene = load(&files, "356a", 4).unwrap();
+        let top = scene.car_anim_parts.iter().find(|p| p.channel == 1).expect("cabrio top");
+        assert_eq!(top.frames.len(), 5);
+        assert!(top.frames.iter().all(|f| f.len() == top.base_meshes.len()));
+        let hood = scene.car_anim_parts.iter().find(|p| p.channel == 8).expect("hood");
+        assert!(scene.car_anim_parts.iter().any(|p| p.channel == 9), "trunk lid");
+        assert!(hood.open_sign.abs() == 1.0 && hood.frames.is_empty());
+        // Doors: channel 6 (left) and 7 (right) swing about y, to opposite sides of the car.
+        let door = |c: u8| scene.car_anim_parts.iter().find(|p| p.channel == c && p.axis == 1).expect("door");
+        let (l, r) = (door(6), door(7));
+        assert!(l.pivot[0] * r.pivot[0] < 0.0, "hinges on opposite sides: {:?} {:?}", l.pivot, r.pivot);
+        assert!(l.open_sign * r.open_sign < 0.0, "mirrored swing");
+        assert_eq!(l.extent, 0.15);
+        // The top moves: the last frame differs from the closed shape.
+        let m0 = &scene.meshes[top.base_meshes[0]];
+        let m5 = &top.frames[4][0];
+        assert_eq!(m0.vertices.len(), m5.vertices.len());
+        assert!(m0.vertices.iter().zip(&m5.vertices).any(|(a, b)| a.position != b.position));
     }
 
     #[test]
@@ -1724,6 +2056,52 @@ mod tests {
     }
 
     #[test]
+    fn env_slot_reads_the_type_7_layer_float() {
+        // One texture, three layers: render state (24 bytes), type 7, type 5.
+        let mut mt = vec![0u8; 0x20 + 0x2c];
+        mt[8..10].copy_from_slice(&1u16.to_le_bytes());
+        mt[10..12].copy_from_slice(&3u16.to_le_bytes());
+        for (t, off, size) in [(0x0eu32, 0u32, 24u32), (7, 24, 4), (5, 28, 12)] {
+            for v in [t, off, size, 0] {
+                mt.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+        let blob = mt.len();
+        mt.resize(blob + 40, 0);
+        for (value, slot) in [(0.0f32, 0u8), (0.5, 1), (1.0, 2)] {
+            mt[blob + 24..blob + 28].copy_from_slice(&value.to_le_bytes());
+            assert_eq!(material_env_slot(&mt), Some(slot));
+        }
+        // No type-7 layer: no reflection.
+        mt[0x20 + 0x2c + 16..0x20 + 0x2c + 20].copy_from_slice(&6u32.to_le_bytes());
+        assert_eq!(material_env_slot(&mt), None);
+    }
+
+    #[test]
+    fn local_356a_env_slots_cover_spc1_to_spc3() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../..")
+            .join("local/game/GameData/CarModel");
+        if !root.join("356a.crp").exists() {
+            return;
+        }
+        let mut files = AssetFiles::new();
+        for name in ["356a.crp", "356a.tpg", "INTGLASS.FSH", "Shadow.fsh", "Cabrio.fsh"] {
+            files.insert(name.into(), std::fs::read(root.join(name)).unwrap());
+        }
+        let scene = load(&files, "356a", 0).unwrap();
+        let mut seen = [false; 3];
+        for m in &scene.materials {
+            let env = m.name.ends_with(":CarExtEnv") || m.name.ends_with(":CarWindow");
+            assert_eq!(m.env_slot.is_some(), env, "{}", m.name);
+            if let Some(slot) = m.env_slot {
+                seen[usize::from(slot)] = true;
+            }
+        }
+        assert_eq!(seen, [true; 3]);
+    }
+
+    #[test]
     fn local_render_common_has_the_effect_textures() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../../local/game/GameData/Render/common.fsh");
@@ -1798,6 +2176,58 @@ mod tests {
                 println!("mesh {} center z: {:.3}", m.name, z);
             }
             assert!(scene.bounds.into_iter().flatten().all(f32::is_finite));
+        }
+    }
+
+    #[test]
+    fn driver_tiles_are_selected_even_when_the_style_lists_no_driver_geometry() {
+        let ini = nfs_formats::parse_ini(
+            b"[f.cas1]\ncount=1\ngeometry1=9\ntype1=2\n[f.cas2]\ncount=1\ngeometry1=9\ntype1=3\n",
+        )
+        .unwrap();
+        // A style such as the 993 "turbocoupe" lists no GeomIndex 9: the raw style selects none.
+        let style = StyleSelection::default();
+        assert!(!tile_selected(&ini, &style, "f.cas1").unwrap());
+        // With the driver types of `R3DCar_SelectStyle` (driver 0: body type 2) the tile is found.
+        let driven = with_driver(&style, DRIVER_INDEX);
+        assert!(tile_selected(&ini, &driven, "f.cas1").unwrap());
+        assert!(!tile_selected(&ini, &driven, "f.cas2").unwrap());
+    }
+
+    #[test]
+    fn local_driver_hands_are_textured_in_every_style() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../..")
+            .join("local/game/GameData/CarModel");
+        let Ok(dir) = std::fs::read_dir(&root) else {
+            return;
+        };
+        let mut files = AssetFiles::new();
+        for entry in dir {
+            let path = entry.unwrap().path();
+            let name = path.file_name().unwrap().to_string_lossy().to_string();
+            files.insert(name, std::fs::read(&path).unwrap());
+        }
+        for (car, styles) in [("993", 10u32), ("356a", 3)] {
+            for style in 0..styles {
+                let Ok(scene) = load(&files, car, style) else {
+                    continue;
+                };
+                for part in scene.car_in_car.iter().filter(|p| p.pass == InCarPass::Driver) {
+                    let mesh = &part.meshes[0].mesh;
+                    let page = &scene.textures[scene.materials[mesh.material].texture.unwrap()];
+                    let opaque = mesh
+                        .vertices
+                        .iter()
+                        .filter(|v| {
+                            let x = ((v.uv[0] * page.width as f32) as usize).min(page.width as usize - 1);
+                            let y = ((v.uv[1] * page.height as f32) as usize).min(page.height as usize - 1);
+                            page.rgba[(y * page.width as usize + x) * 4 + 3] != 0
+                        })
+                        .count();
+                    assert!(opaque > 0, "{car} style {style}: {} is untextured", part.name);
+                }
+            }
         }
     }
 }

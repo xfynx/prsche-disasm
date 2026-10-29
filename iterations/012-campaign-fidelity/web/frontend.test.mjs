@@ -102,6 +102,18 @@ test("quick race settings follow the original lists (VA 0x4f9790, 0x4fc0b0)", as
   assert.equal(q.accessor("GenericCar.Colour").color(), "rgb(8,34,89)");
   assert.equal(carColourCss(0x0000ffff), "rgb(255,0,0)");
   assert.equal(q.accessor("No.Such"), null);
+  // Car setup screen: automatic, aids off, roof up, damage on at creation.
+  const setup = { 560: "manual", 561: "automatic", 1500: "off", 1501: "on", 1509: "up", 1510: "down" };
+  const s2 = new QuickRaceSetup({ strings: setup, cars, tracks });
+  assert.deepEqual(["Car.Transmission", "Car.ABS", "Car.Traction", "Car.Roof", "Game.Damage"]
+    .map(n => s2.accessor(n).text()), ["automatic", "off", "off", "up", "on"]);
+  assert.deepEqual([s2.raceParams().manualBox, s2.raceParams().damage], [false, true]);
+  s2.accessor("Car.Transmission").step(1);   // wraps: automatic -> manual
+  s2.accessor("Game.Damage").select(0);
+  s2.accessor("Car.Roof").select(1);
+  assert.deepEqual([s2.raceParams().manualBox, s2.raceParams().damage], [true, false]);
+  s2.reset();                                // SETTYPEQUICKRACE keeps the setup choices
+  assert.equal(s2.accessor("Car.Transmission").text(), "manual");
   let p = q.raceParams();
   assert.deepEqual([p.track.internal_name, p.laps, p.reverse, p.mirror, p.opponents], ["monaco1", 2, false, false, 4]);
   q.accessor("Track1.Direction(SHORT)").select(3);
@@ -116,4 +128,171 @@ test("quick race settings follow the original lists (VA 0x4f9790, 0x4fc0b0)", as
   assert.equal(q.currentCar().short_name, "959");
   q.reset();
   assert.deepEqual([q.car, q.track, q.direction, q.lapsIndex, q.traffic], [0, 0, 0, 1, 0]);
+});
+
+test("location and quick race choices reach the race start (VA 0x4fc0b0, 0x4eb470, 0x4ecf00)", async () => {
+  const { QuickRaceSetup, raceStart, raceStartFromUrl, playerPaint, opponentPaints } =
+    await import("./fe-quickrace.js");
+  const strings = { 410: "forward", 411: "backward", 412: "forward/mirrored", 413: "backward/mirrored",
+    450: "beginner", 451: "advanced", 452: "expert" };
+  const tracks = [{ internal_name: "ALPS", name_string: 301, circuit: false, unlock: 0, difficulty: 1 },
+    { internal_name: "monaco1", name_string: 300, circuit: true, unlock: 0, difficulty: 1 }];
+  const cars = [{ display_name: "356", short_name: "356", colours: [[0x000000ff], [0x0000ffff]] }];
+  const q = new QuickRaceSetup({ strings, cars, tracks });
+  // The location screen: TRACK1INC steps the track, the combo lists set direction and traffic.
+  q.stepTrack(1);
+  q.accessor("Track1.Direction").select(3);
+  q.accessor("Track1.Traffic").select(2);
+  q.accessor("Track1.Laps").select(4);
+  q.accessor("Game.NumOpponents").select(7);
+  q.accessor("Game.Difficutly").select(2);
+  q.accessor("OpponentCar.Car").select(2);
+  const s = raceStart(q.raceParams());
+  assert.deepEqual([s.track, s.laps, s.reverse, s.mirror, s.traffic, s.opponents, s.opponentMode, s.difficulty],
+    ["monaco1", 5, true, true, 2, 7, 2, 2]);
+  assert.equal(s.circuit, true); // LINEAR_TRACK is its negation: the start rule of the engine
+  // Directions: 0 forward, 1 backward, 2 forward/mirrored, 3 backward/mirrored.
+  for (const [dir, reverse, mirror] of [[0, false, false], [1, true, false], [2, false, true], [3, true, true]]) {
+    q.accessor("Track1.Direction").select(dir);
+    const r = raceStart(q.raceParams());
+    assert.deepEqual([r.reverse, r.mirror], [reverse, mirror], `direction ${dir}`);
+  }
+  // Point-to-point tracks race one lap whatever the lap selector says.
+  q.stepTrack(-1);
+  assert.equal(raceStart(q.raceParams()).laps, 1);
+  // Debug URL.
+  const u = raceStartFromUrl(new URLSearchParams("race=alps&dir=1&opponents=9&difficulty=2&traffic=1&laps=4"));
+  assert.deepEqual([u.reverse, u.mirror, u.opponents, u.difficulty, u.traffic, u.laps], [true, false, 7, 2, 1, 4]);
+  const d = raceStartFromUrl(new URLSearchParams(""));
+  assert.deepEqual([d.reverse, d.mirror, d.opponents, d.difficulty, d.laps], [false, false, 3, 1, 3]);
+  // Paints: the chosen list entry (packed A,R,G,B bytes) and a random entry per opponent.
+  assert.deepEqual(playerPaint(cars[0], 1), [1, 0, 0, 1]);
+  assert.equal(playerPaint(cars[0], 5), null);
+  const picks = [1, 0, 1];
+  let i = 0;
+  assert.deepEqual(opponentPaints(cars[0], 3, () => picks[i++]), [[1, 0, 0, 1], [0, 0, 0, 1], [1, 0, 0, 1]]);
+  assert.deepEqual(opponentPaints({ colours: [] }, 3, () => 0), []);
+});
+
+// ---- track pictures and the Evolution event info (A220, A221) ----
+import { wallMap, smallMap, isBackward, isMirrored } from "./fe-trackmap.js";
+import { EventInfoSetup, money } from "./fe-tournament.js";
+import { wrapText } from "./frontend.js";
+
+const shape = (name, cx = 0, cy = 0) => ({ name, width: 16, height: 16, cx, cy, canvas: {} });
+
+test("wall tile: the F flag going backward, the S flag going forward, mirrored flips", () => {
+  const shapes = [shape("map"), shape("p1"), shape("p2"), shape("p3"), shape("p4"), shape("s", 213, 102), shape("f", 103, 3)];
+  const fwd = wallMap(shapes, 0);
+  assert.deepEqual([fwd.flag.shape.name, fwd.flag.x, fwd.flag.y, fwd.flipX], ["s", 213, 102, false]);
+  const back = wallMap(shapes, 1);
+  assert.deepEqual([back.flag.shape.name, back.flag.x, back.flag.y], ["f", 103, 3]);
+  assert.equal(wallMap(shapes, 2).flipX, true);
+  assert.equal(isBackward(3) && isMirrored(3) && !isBackward(2), true);
+  assert.equal(wallMap(null, 0), null);
+  assert.equal(wallMap([shape("a"), shape("b")], 0), null);
+});
+
+test("small map sits at its header centre, with the flag at its own", () => {
+  const shapes = [shape("coas", 184, 288), shape("s", 306, 355), shape("f", 226, 281)];
+  const m = smallMap(shapes, 0);
+  assert.deepEqual([m.x, m.y, m.flag.x, m.flag.y], [184, 288, 306, 355]);
+  // 911 Cup, first race reversed: the flag at F, the top end of the route (reference frame).
+  assert.deepEqual([smallMap(shapes, 1).flag.x, smallMap(shapes, 1).flag.y], [226, 281]);
+});
+
+test("event info accessors read the record like Tourn_DataAccessor", () => {
+  const strings = { 1: "911 Cup", 2: "911", 3: "A challenge", 4: "Any 911", 450: "beginner", 301: "Cote d'Azur", 302: "Pyrenees", 321: "COTE D'AZUR", 322: "PYRENEES" };
+  const events = [
+    { id: 23, era: 0x209, record_type: 0, short_string: 2, title_string: 1, desc_string: 3, restriction_string: 4,
+      entry_fee: 1000, prize_money: 12000, times_completed: 0, races: [{ track_id: 8, laps: 3, reverse: false }, { track_id: 4, laps: 3, reverse: true }] },
+    { id: 31, era: 0x209, record_type: 2, short_string: 9, races: [] },
+    { id: 2, era: 0x20a, record_type: 0, short_string: 9, races: [] },
+  ];
+  const tracks = [{ id: 8, name_string: 301, difficulty: 0, small_pack: "coastalSpSm" }, { id: 4, name_string: 302, difficulty: 1 }];
+  const setup = new EventInfoSetup({ events, tracks, strings });
+  assert.equal(setup.events.length, 1); // era list without the bonus race
+  const text = sel => setup.accessor(`Tournament.Tournament${sel ? `(${sel})` : ""}`).text();
+  assert.deepEqual(["ENTRYFEE", "PRIZEMONEY", "TIMESCOMPLETED", "CARRESTRICTION", "DIFFICULTY", "DESCRIPTION", "SHORT", ""].map(text),
+    ["1,000", "12,000", "0", "Any 911", "beginner", "A challenge", "911", "911 Cup"]);
+  assert.deepEqual(setup.locationNames(), ["COTE D'AZUR", "PYRENEES"]);
+  assert.equal(setup.direction(), 0);
+  assert.equal(setup.accessor("Track1.Track"), null);
+  assert.equal(money(1234567), "1,234,567");
+  assert.equal(money(0), "0");
+});
+
+test("description text wraps at spaces within the control width", () => {
+  const font = { glyphs: new Map([[32, { advance: 2 }], ...[..."abcdef"].map(ch => [ch.charCodeAt(0), { advance: 5 }])]) };
+  assert.deepEqual(wrapText(font, "abc def abc", 32), ["abc def", "abc"]);
+  assert.deepEqual(wrapText(font, "", 22), []);
+  assert.deepEqual(wrapText(font, "abcdef", 3), ["abcdef"]);
+});
+
+import { wallCycle, tileCount, formatRecordTime, WALL_IDLE_TICKS } from "./fe-trackmap.js";
+test("wall cycle: idle 512 ticks, turn 64 ticks, next tile, wraps over the 5 tiles", () => {
+  assert.deepEqual(wallCycle(0, 5), { from: 0, to: 1, turn: 0 });
+  assert.deepEqual(wallCycle(WALL_IDLE_TICKS - 1, 5), { from: 0, to: 1, turn: 0 });
+  assert.deepEqual(wallCycle(WALL_IDLE_TICKS + 32, 5), { from: 0, to: 1, turn: 0.5 });
+  assert.deepEqual(wallCycle(576, 5), { from: 1, to: 2, turn: 0 });
+  assert.equal(wallCycle(576 * 5, 5).from, 0);
+  assert.equal(tileCount(new Array(7)), 5);
+});
+test("record time is 1/64 s as mm:ss.cc", () => {
+  assert.equal(formatRecordTime(164 * 64), "02:44.00");
+  assert.equal(formatRecordTime(14848), "03:52.00");
+  assert.equal(formatRecordTime(4130), "01:04.53");
+  assert.equal(formatRecordTime(0), "");
+});
+
+import { splineCycle } from "./fe-trackmap.js";
+test("spline control: map index t>>8, fade in 32 ticks, fade out 32 ticks", () => {
+  assert.deepEqual(splineCycle(0, 3), { index: 0, alpha: 0 });
+  assert.deepEqual(splineCycle(16, 3), { index: 0, alpha: 128 });
+  assert.deepEqual(splineCycle(100, 3), { index: 0, alpha: 255 });
+  assert.deepEqual(splineCycle(255, 3), { index: 0, alpha: 7 });
+  assert.equal(splineCycle(256, 3).index, 1);
+  assert.equal(splineCycle(256 * 3, 3).index, 0);
+});
+
+test("car compare reads the five ratings of both cars (VA 0x4ca790, rec +0x324)", async () => {
+  const { QuickRaceSetup } = await import("./fe-quickrace.js");
+  const cars = [{ display_name: "'59 A", short_name: "A", year: 1959, group: 501, ratings: [30, 40, 56, 30, 41], colours: [] },
+    { display_name: "'72 B", short_name: "B", year: 1972, group: 503, ratings: [79, 65, 67, 51, 69], colours: [] }];
+  const q = new QuickRaceSetup({ strings: {}, cars, tracks: [] });
+  const v = name => q.accessor(`CarCompare.Data(${name})`).value();
+  assert.equal(v("0CarCompareCar1"), 30);
+  assert.equal(v("4CarCompareCar1"), 41);
+  q.accessor("GenericCar2.Car(SHORT)").select(1);
+  assert.equal(q.accessor("GenericCar2.Car(SHORT)").text(), "B", "header: the short name");
+  assert.deepEqual(q.accessor("GenericCar2.Car").rows(), [{ year: "'59", text: "A", index: 0 },
+    { sep: true, text: "" }, { year: "'72", text: "B", index: 1 }], "year | name, separator at a class change");
+  assert.equal(q.accessor("CarCompare.Data(2CarCompareCar2)").text(), "67");
+  assert.equal(v("2CarCompareCar1"), 56, "car 1 follows the car list, car 2 GenericCar2");
+});
+
+test("click zones of the garage car follow the room yaw (VA 0x4c0d10)", async () => {
+  const { carClickZone } = await import("./fe-car-click.js");
+  const rect = { left: 110, top: 230, right: 530, bottom: 410 };   // QuickRace.lay 3DCAR 420x180
+  // Top 5/16 of the control is the cabrio top, whatever the yaw.
+  assert.equal(carClickZone(300, 250, rect, 0.5, true), 0);
+  assert.equal(carClickZone(300, 250, rect, 0.5, false), 3, "no top channel: hood seen from the front");
+  assert.equal(carClickZone(300, 350, rect, 0.0, true), 4, "seen from behind: trunk");
+  assert.equal(carClickZone(300, 350, rect, 0.5, true), 3, "seen from the front: hood");
+  // Side views: sixths of the width are hood and trunk, the middle is a door.
+  assert.equal(carClickZone(120, 350, rect, 0.75, true), 3);
+  assert.equal(carClickZone(300, 350, rect, 0.75, true), 1);
+  assert.equal(carClickZone(520, 350, rect, 0.75, true), 4);
+  assert.equal(carClickZone(120, 350, rect, 0.25, true), 4);
+  assert.equal(carClickZone(300, 350, rect, 0.25, true), 2);
+  assert.equal(carClickZone(520, 350, rect, 0.25, true), 3);
+});
+
+test("part tweens follow the 128 Hz level formulas of 0x4c0520", async () => {
+  const { carPartMs, ZONE_CHANNEL } = await import("./fe-car-click.js");
+  assert.ok(Math.abs(carPartMs(1, true) - 2988) < 1, "top: level 2*ticks/3 reaches 255 at 382 ticks");
+  assert.ok(Math.abs(carPartMs(6, true) - 601.6) < 1, "door opens in 255*0.302 ticks");
+  assert.ok(Math.abs(carPartMs(7, false) - 775) < 1, "door closes in 255*0.389 ticks");
+  assert.equal(carPartMs(8, true), 1000);
+  assert.deepEqual(ZONE_CHANNEL, { 0: 1, 1: 6, 2: 7, 3: 8, 4: 9 });
 });

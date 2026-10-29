@@ -21,8 +21,9 @@ dependency work; recovery acceptance remains unchanged.
 
 Latest recovery intake: [Run444](iterations/v2/001-original-recovery/runs/444-audio-initialization-integration/README.md).
 Initialization/DirectSound recovery and the descriptor alias repair are validated;
-the stop/pool chain is rechecked. Next handle [PR #26](https://github.com/xfynx/prsche-disasm/pull/26),
-then return to OS/CPU detection and the remaining startup dependencies.
+the stop/pool chain is rechecked. [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
+adds reusable recorders and prototype ports, with unproved compositions gated off.
+Next return to OS/CPU detection and the remaining startup dependencies.
 
 ## Recovery milestones
 

@@ -14,8 +14,10 @@ use super::step::{scheduler_step, update_world_points, StepQueue};
 use crate::physics::original_contact::PreparedContactState;
 use crate::physics::original_lcg::OriginalLcg;
 use crate::physics::original_pair::{PairCar, PairGlobals};
+use crate::physics::original_track_objects::ObjectCar;
+use crate::physics::original_track_pass::{SmashEvent, TrackObjectWorld};
 use crate::physics::original_support_owner::OriginalSupportOwner;
-use crate::race::original_collision::collide_pass;
+use crate::race::original_collision::collide_pass_with;
 
 /// Which vehicle model drives the player car.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -60,14 +62,19 @@ impl StepClock {
 
 /// Input word `[0x5e9664]` from the engine's controls (`Input_PollControllers`
 /// `0x412e70` packing, `docs/re/vehicle.md` section 2): byte 0 bit 0
-/// handbrake, byte 1 steer (`(right − left)/2`, ±127, positive = right),
-/// byte 2 gas/2, byte 3 brake/2 (0..127). Pedals and steer are clamped to
-/// 0..1 and −1..1; a digital key gives full scale. No gear events (the box
-/// is automatic).
+/// handbrake, byte 1 steer `(right − left)/4` signed (positive = right),
+/// byte 2 gas/2 and byte 3 brake/2 (both clamped to 0x7e). Pedals and steer
+/// are clamped to 0..1 and −1..1 and scaled to the 0..255 axis a keyboard
+/// key reports (device type 3 "Key", getter `0x411c20`: 0xff while the
+/// scancode byte `0x5de028[sc]` is set), so a held key gives steer byte 63
+/// (`d90` = ±126), not 127, and gas/brake 126. Truncation is the C division.
+/// No horn bit, no gear events (the box is automatic). Verified against the
+/// original chain from key state to wheel angle (`original_vehicle_keyboard.rs`).
 pub fn input_word(gas: f32, brake: f32, steer: f32, handbrake: bool) -> u32 {
-    let byte = |v: f32| (v.clamp(0.0, 1.0) * 127.0).round() as u32;
-    let steer = ((steer.clamp(-1.0, 1.0) * 127.0).round() as i32 as i8) as u8 as u32;
-    handbrake as u32 | steer << 8 | byte(gas) << 16 | byte(brake) << 24
+    let axis = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as i32;
+    let pedal = |v: f32| ((axis(v) / 2).min(0x7e)) as u32;
+    let steer = (((steer.clamp(-1.0, 1.0) * 255.0).round() as i32) / 4) as i8 as u8 as u32;
+    handbrake as u32 | steer << 8 | pedal(gas) << 16 | pedal(brake) << 24
 }
 
 /// Collision view of the car (`Car_CollideTick` `0x498ff0` works on the car
@@ -105,19 +112,26 @@ pub fn pair_car(car: &OriginalCar, half_extents: [f32; 3]) -> PairCar {
         local_angular_d64: car.angular_ground_d64,
         field_dac: car.remote_dac,
         field_db0: car.start_db0,
+        contacts_418: car.wheels_off_418 as i16,
         damage_4e4: damage,
         ..PairCar::default()
     }
 }
 
 /// Writes a collision result back into the car (the fields the pair and
-/// barrier responses change).
+/// barrier responses change). `+0x418` (the pair contact counter, set to 1 by
+/// a hard hit of `Car_ApplyImpact`, read by the ground tick) and `+0xdb0`
+/// (cleared by a hard hit above 120) are the same fields as the car's
+/// `wheels_off_418` and `start_db0`.
 pub fn store_pair_car(car: &mut OriginalCar, pair: &PairCar) {
     car.position_330 = pair.position_330;
     car.velocity_33c = pair.velocity_33c;
     car.speed_35c = pair.speed_35c;
     car.angular_388 = pair.angular_388;
     car.angular_ground_d64 = pair.local_angular_d64;
+    car.wheels_off_418 = pair.contacts_418 as u16;
+    car.start_db0 = pair.field_db0;
+    car.damage_4e4[..9].copy_from_slice(&pair.damage_4e4);
 }
 
 /// Barrier-response state (`Car_CollideTrackEdges` `0x495020`) of the car
@@ -166,30 +180,113 @@ pub fn store_barrier_state(car: &mut OriginalCar, pair: &mut PairCar, s: &Prepar
     car.slip_ratio_dc0 = s.field_dc0;
 }
 
-/// One `Car_CollideTick` pass with the player first (`collide_pass`): the
-/// player's barrier response through `barrier` (return `false` for no
-/// contact), the other cars (`others`, kinematic AI, A6) without one. The
-/// pair response draws from the shared random generator.
+/// Track-object view of the car while its collision view is `pair`
+/// (`Car_CollideTrackObjects` `0x498de0`): body points `+0x1dc`, the wheel
+/// records' positions (`w+0x40`), the car-frame velocity and the ground frame
+/// come from the car.
+pub fn object_car(car: &OriginalCar, pair: &PairCar) -> ObjectCar {
+    ObjectCar {
+        pair: pair.clone(),
+        wheel_records_7f8: car.wheels.map(|w| w.point_40),
+        body_points_1dc: car.world_points_1dc.clone(),
+        local_velocity_d58: car.vel_ground_d58,
+        field_3a0: car.ground_up_3a0,
+        field_428: car.height_428,
+        code_464: 0,
+        ground_right_490: car.ground_490[0],
+        ground_forward_4a8: car.ground_490[2],
+    }
+}
+
+/// Writes a track-object response back: the collision view and the car fields
+/// the response changes (local velocity, wheel points, damage zones).
+pub fn store_object_car(car: &mut OriginalCar, pair: &mut PairCar, o: &ObjectCar) {
+    *pair = o.pair.clone();
+    car.vel_ground_d58 = o.local_velocity_d58;
+    for (w, p) in car.wheels.iter_mut().zip(o.wheel_records_7f8) {
+        w.point_40 = p;
+    }
+    car.damage_4e4[..9].copy_from_slice(&o.pair.damage_4e4);
+}
+
+/// A barrier response of `Car_CollideTrackEdges` 0x495020: the magnitude
+/// `0x494000` returned and the wall normal it used.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BarrierHit {
+    pub magnitude: f32,
+    pub normal: [f32; 3],
+}
+
+impl From<crate::surface::BarrierContact> for BarrierHit {
+    fn from(c: crate::surface::BarrierContact) -> Self {
+        Self {
+            magnitude: c.magnitude,
+            normal: c.normal,
+        }
+    }
+}
+
+/// The impact of a barrier response (`0x495020` after `0x494000`): above a
+/// magnitude of 20 it becomes the impact strength `+0x430` and goes to
+/// `Car_ImpactByDirection(car, wall normal, 1)`, i.e. `Car_ApplyImpact` mode 1
+/// (zone damage when `[0x657a2c]`, the zone spin, and from 80 the hard-hit
+/// kick `vel.y += s/24` with the 0.1 lift; ends with the `0x49bba0` clamp)
+/// [VA 0x49548f..0x4954d8].
+pub fn barrier_impact(pair: &mut PairCar, hit: BarrierHit, globals: &mut PairGlobals) {
+    if 20.0 < hit.magnitude {
+        pair.impact_430 = hit.magnitude;
+        crate::physics::original_pair::impact_by_direction(pair, hit.normal, 1, globals);
+    }
+}
+
+/// One `Car_CollideTick` pass with the player first (`collide_pass_with`): the
+/// player's barrier response through `barrier` (`None` for no contact), the
+/// other cars (`others`, kinematic AI, A6) without one. The pair response
+/// draws from the shared random generator.
 pub fn collide_player(
     car: &mut OriginalCar,
     half_extents: [f32; 3],
     others: &mut [PairCar],
     globals: &mut PairGlobals,
     lcg: &mut OriginalLcg,
-    mut barrier: impl FnMut(&mut PreparedContactState) -> bool,
+    barrier: impl FnMut(&mut PreparedContactState) -> Option<BarrierHit>,
+) -> usize {
+    collide_player_objects(car, half_extents, others, globals, lcg, None, barrier)
+}
+
+/// [`collide_player`] with the track-object pass (`Car_CollideTrackObjects`)
+/// after the player's edge pass; smashes that start go into the event list.
+pub fn collide_player_objects(
+    car: &mut OriginalCar,
+    half_extents: [f32; 3],
+    others: &mut [PairCar],
+    globals: &mut PairGlobals,
+    lcg: &mut OriginalLcg,
+    mut objects: Option<(&mut TrackObjectWorld, &mut Vec<SmashEvent>)>,
+    mut barrier: impl FnMut(&mut PreparedContactState) -> Option<BarrierHit>,
 ) -> usize {
     let mut cars = Vec::with_capacity(others.len() + 1);
     cars.push(pair_car(car, half_extents));
     cars.extend_from_slice(others);
     globals.rand_state_5d1028 = lcg.state_5d1028;
     globals.rand_mul_5d102c = lcg.multiplier_5d102c;
-    let pairs = collide_pass(&mut cars, globals, |index, pair| {
+    let pairs = collide_pass_with(&mut cars, globals, |index, pair, globals| {
         if index != 0 {
             return;
         }
         let mut state = barrier_state(car, pair);
-        if barrier(&mut state) {
+        if let Some(hit) = barrier(&mut state) {
             store_barrier_state(car, pair, &state);
+            barrier_impact(pair, hit, globals);
+        }
+        // `Car_CollideTrackObjects` follows the edge pass at every call site
+        // [VA 0x498ff0, 0x4980d0]. The player only (approximation A173).
+        if cfg!(feature = "experimental-original-port") {
+            if let Some((world, events)) = objects.as_mut() {
+                let mut o = object_car(car, pair);
+                world.pass(&mut o, globals, events);
+                store_object_car(car, pair, &o);
+            }
         }
     });
     lcg.state_5d1028 = globals.rand_state_5d1028;
@@ -225,6 +322,65 @@ pub struct OriginalVehicle {
     pub clock: StepClock,
     /// Collision box half extents (`+0x3a8`).
     pub half_extents: [f32; 3],
+    /// Front-end choices that reach the car (transmission, damage).
+    pub setup: CarSetup,
+}
+
+/// The front-end settings the car consumes in a Quick Race. `FE_WriteCarConfig 0x4eeda0` writes
+/// `.TRANSMISSION` (`res+0xc`, 1 = automatic) from the settings screen; ABS (`res+0x24`),
+/// traction control (`res+0x20`) and the roof key are forced off for game type 0, so they are
+/// not part of this. `damage` is the option DAMAGE `[0x657a2c]` (`Game.Damage`, key 0x20) that
+/// gates zone damage in `Car_ApplyImpact` and the flip event of `0x49bd40`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CarSetup {
+    pub manual_box: bool,
+    pub damage: bool,
+}
+
+impl Default for CarSetup {
+    /// No front end (recordings, tests): automatic box, damage gate off. A Quick Race passes
+    /// the screen's values (defaults: automatic, `Game.Damage` 1 [VA 0x4e5520]).
+    fn default() -> Self {
+        Self { manual_box: false, damage: false }
+    }
+}
+
+/// `Car_SetupBodyPoints` `0x49abc0` (from `Car_ResetBody` `0x49b510`): the
+/// body point list `+0x8c` (count `+0x32c`) is the render object's point list
+/// (`R3DCar+0xfc`, the CRP `BndP` points), bubble-sorted by y (ascending,
+/// swaps only on strictly lower); then the four lowest are put in quadrant
+/// order (−x,+z), (+x,+z), (−x,−z), (+x,−z) (a quadrant with no point gets
+/// the zero vector). Points 0..3 are the wheel ground points; the rest are
+/// used by the height of a tilted car (`0x49a900`) and its body contact
+/// (`0x496610`). Fewer than four points are returned unchanged.
+pub fn setup_body_points(points: &[[f32; 3]]) -> Vec<[f32; 3]> {
+    let mut p = points.to_vec();
+    let n = p.len();
+    if n < 4 {
+        return p;
+    }
+    for _ in 0..n {
+        for i in 0..n - 1 {
+            if p[i + 1][1] < p[i][1] {
+                p.swap(i, i + 1);
+            }
+        }
+    }
+    let mut q = [[0.0f32; 3]; 4];
+    for v in p.iter().take(4) {
+        let (x, z) = (v[0], v[2]);
+        if !(0.0 <= x) && !(z <= 0.0) {
+            q[0] = *v;
+        } else if !(x <= 0.0) && !(z <= 0.0) {
+            q[1] = *v;
+        } else if !(0.0 <= x) && !(0.0 <= z) {
+            q[2] = *v;
+        } else if 0.0 < x && z < 0.0 {
+            q[3] = *v;
+        }
+    }
+    p[..4].copy_from_slice(&q);
+    p
 }
 
 /// Model name (`res+0x2a8`, the AICarData `.ais` stem) for a `.sim` file
@@ -275,17 +431,45 @@ impl OriginalVehicle {
         half_extents: [f32; 3],
         wheel_points: [[f32; 3]; 4],
     ) -> Result<Self, String> {
+        Self::from_sim_with(raw_sim, model, half_extents, wheel_points, CarSetup::default())
+    }
+
+    /// [`Self::from_sim`] with the front-end settings: a manual box derives with `res+0xc = 0`
+    /// (drive factors x1.05, `Sim_DeriveFields 0x49cb50`).
+    pub fn from_sim_with(
+        raw_sim: &[u8],
+        model: &str,
+        half_extents: [f32; 3],
+        wheel_points: [[f32; 3]; 4],
+        setup: CarSetup,
+    ) -> Result<Self, String> {
         if raw_sim.len() < SIM_FILE_SIZE {
             return Err(format!(
                 "SIM is {} bytes, need {SIM_FILE_SIZE}",
                 raw_sim.len()
             ));
         }
-        let specs = derive(&raw_sim[..SIM_FILE_SIZE], &Tuning::quick_race(model));
+        let mut tuning = Tuning::quick_race(model);
+        tuning.flag_c = i32::from(!setup.manual_box);
+        let specs = derive(&raw_sim[..SIM_FILE_SIZE], &tuning);
         if !specs_usable(&specs) {
             return Err("SIM is not usable for the original model".into());
         }
-        Ok(Self::from_specs(specs, half_extents, wheel_points))
+        let mut v = Self::from_specs(specs, half_extents, wheel_points);
+        v.set_setup(setup);
+        Ok(v)
+    }
+
+    /// Applies the settings to the car globals (kept by resets, set again by [`Self::restart`]).
+    pub fn set_setup(&mut self, setup: CarSetup) {
+        self.setup = setup;
+        self.apply_setup();
+    }
+
+    fn apply_setup(&mut self) {
+        let g = &mut self.car.globals;
+        g.auto_box_658098 = i32::from(!self.setup.manual_box);
+        g.flip_events_657a2c = i32::from(self.setup.damage);
     }
 
     /// Car from derived carSpecs (see [`Self::from_sim`]).
@@ -302,6 +486,7 @@ impl OriginalVehicle {
             locator: Default::default(),
             clock: StepClock::default(),
             half_extents,
+            setup: CarSetup::default(),
         };
         v.car.body_points_8c = wheel_points.to_vec();
         v.restart();
@@ -311,8 +496,10 @@ impl OriginalVehicle {
     /// Back to the start state (the race start): a fresh car with the same
     /// specs and body points, at rest in neutral, the scheduler at
     /// [`COUNTDOWN_SCHED_STEP`] with the start counter at [`START_DB0`], so
-    /// the original gating holds the brake until the green light. The pose
-    /// is kept.
+    /// the original gating holds the brake until the green light, and the
+    /// random generator reset to the baseline image state. The experimental
+    /// feature opts into A202's installed seed through `Rand_Seed` `0x4a4780`.
+    /// The pose is kept.
     pub fn restart(&mut self) {
         let old = &self.car;
         let mut car = OriginalCar::new(old.specs.clone());
@@ -323,14 +510,20 @@ impl OriginalVehicle {
         car.res_14 = 1;
         car.start_db0 = START_DB0;
         car.globals.sched_step_606ac4 = COUNTDOWN_SCHED_STEP;
-        car.globals.auto_box_658098 = 1;
         // A race participant: `0x40f160` sets `+0x52c` bit 0 for the human and
         // the AI racers (res+8 bits 0/1), so `Car_BuildGroundFrame` builds the
         // full frame and `0x417190` gives `+0x78 = 0`.
         car.flags_52c = 1;
         update_world_points(&mut car);
         self.car = car;
-        self.lcg = OriginalLcg::default();
+        self.apply_setup();
+        // A202: the installed seed is not a recovered RAND_SEED option transport.
+        // Keep the previous consumer state until that input is available.
+        self.lcg = if cfg!(feature = "experimental-original-port") {
+            OriginalLcg::race_start()
+        } else {
+            OriginalLcg::default()
+        };
         self.ground = GroundAdapter::default();
         self.locator = Default::default();
         self.owners = Default::default();
@@ -440,6 +633,18 @@ impl OriginalVehicle {
         car.vel_ground_d58 = [d(velocity, r), d(velocity, n), d(velocity, f)];
     }
 
+    /// Replaces the body points with the car model's point list in the car
+    /// frame (relative to the box centre), ordered by [`setup_body_points`]
+    /// as `Car_ResetBody` does. Without at least four points the current
+    /// (wheel) points stay.
+    pub fn set_body_points(&mut self, points: &[[f32; 3]]) {
+        if points.len() < 4 {
+            return;
+        }
+        self.car.body_points_8c = setup_body_points(points);
+        update_world_points(&mut self.car);
+    }
+
     /// Selects a gear (`+0xd82`, 0 = R, 1 = N, 2 = 1st..) with no shift in
     /// progress, and the engine rpm (model switch).
     pub fn set_gear(&mut self, gear: i8, rpm: f32) {
@@ -539,10 +744,99 @@ mod tests {
 
     #[test]
     fn input_word_packs_full_scale_keys() {
-        assert_eq!(input_word(1.0, 0.0, 0.0, false), 127 << 16);
-        assert_eq!(input_word(0.0, 1.0, 0.0, true), 127 << 24 | 1);
-        assert_eq!(input_word(0.0, 0.0, 1.0, false), 127 << 8);
-        assert_eq!(input_word(0.0, 0.0, -1.0, false), 0x81 << 8);
+        // A key reports 255: steer 255/4 = 63, pedals 255/2 clamped to 0x7e.
+        assert_eq!(input_word(1.0, 0.0, 0.0, false), 126 << 16);
+        assert_eq!(input_word(0.0, 1.0, 0.0, true), 126 << 24 | 1);
+        assert_eq!(input_word(0.0, 0.0, 1.0, false), 63 << 8);
+        assert_eq!(input_word(0.0, 0.0, -1.0, false), 0xc1 << 8);
+    }
+
+    fn collision_car() -> OriginalCar {
+        let mut specs = CarSpecs::from_bytes(&[0u8; 0x1c4]);
+        specs.mass_40 = 128.0;
+        let mut car = OriginalCar::new(specs);
+        car.velocity_33c = [0.0, 0.0, 30.0];
+        car.speed_35c = 30.0;
+        car.height_424 = 0.2;
+        car.damage_4e4[9] = 17.0;
+        car
+    }
+
+    #[test]
+    fn barrier_damage_survives_collision_without_an_object_world() {
+        for damage_on in [false, true] {
+            let mut car = collision_car();
+            let mut globals = PairGlobals {
+                damage_on_657a2c: damage_on,
+                ..PairGlobals::default()
+            };
+            collide_player(
+                &mut car,
+                [0.9, 0.6, 2.1],
+                &mut [],
+                &mut globals,
+                &mut OriginalLcg::default(),
+                |_| Some(BarrierHit { magnitude: 40.0, normal: [0.0, 0.0, -1.0] }),
+            );
+            assert_eq!(car.damage_4e4[1] > 0.0, damage_on, "engine zone writeback");
+            assert_eq!(car.damage_4e4[9], 17.0, "the pair view does not own zone 9");
+        }
+    }
+
+    #[test]
+    fn pair_damage_survives_the_final_player_writeback() {
+        let mut car = collision_car();
+        let half = [0.9, 0.6, 2.1];
+        let mut other = pair_car(&car, half);
+        other.position_330 = [0.0, 0.0, 3.5];
+        other.velocity_33c = [0.0; 3];
+        other.speed_35c = 0.0;
+        let mut others = [other];
+        let mut globals = PairGlobals {
+            damage_on_657a2c: true,
+            ..PairGlobals::default()
+        };
+        let pairs = collide_player(
+            &mut car,
+            half,
+            &mut others,
+            &mut globals,
+            &mut OriginalLcg::default(),
+            |_| None,
+        );
+        assert_eq!(pairs, 1);
+        assert!(others[0].damage_4e4.iter().any(|&d| d > 0.0), "other car was hit");
+        assert!(car.damage_4e4[..9].iter().any(|&d| d > 0.0), "player damage persisted");
+        assert_eq!(car.damage_4e4[9], 17.0);
+    }
+
+    #[test]
+    fn restart_only_selects_the_installed_seed_with_the_experimental_feature() {
+        let car = collision_car();
+        let mut vehicle = OriginalVehicle::from_specs(car.specs, [0.9, 0.6, 2.1], [[0.0; 3]; 4]);
+        vehicle.lcg = OriginalLcg::seeded(12);
+        vehicle.restart();
+        let expected = if cfg!(feature = "experimental-original-port") {
+            OriginalLcg::race_start()
+        } else {
+            OriginalLcg::default()
+        };
+        assert_eq!(vehicle.lcg, expected);
+    }
+
+    #[test]
+    fn body_points_put_the_four_lowest_in_quadrant_order() {
+        let pts = [
+            [0.8, 1.0, 1.0],
+            [0.7, 0.0, -1.1],
+            [-0.7, 0.01, 0.9],
+            [-0.8, 0.5, -1.0],
+            [0.7, 0.0, 0.9],
+            [-0.7, 0.0, -1.1],
+        ];
+        let p = setup_body_points(&pts);
+        assert_eq!(&p[..4], &[[-0.7, 0.01, 0.9], [0.7, 0.0, 0.9], [-0.7, 0.0, -1.1], [0.7, 0.0, -1.1]]);
+        assert_eq!(&p[4..], &[[-0.8, 0.5, -1.0], [0.8, 1.0, 1.0]]);
     }
 
     #[test]

@@ -10,6 +10,10 @@ and [source validation](supplemental/open-unleashed-crossref-validation.json) pr
 14,868 pinned file/line/address references. This is external navigation, not original
 semantic proof; [usage and boundaries](../../docs/research/open-unleashed-usage-2026-10-25.md).
 
+PR #26: [intake and scoped address comparisons](../../docs/research/pr26-integration-review-2026-10-29.md)
+add keyboard, object and launch/barrier recorders. Read/inferred algorithms and
+gated experiments remain separate from accepted C++ recovery.
+
 PR #25: [original-function evidence map](pr25-evidence.json) links SIM/collision
 recorders and fixed-snapshot source addresses useful for C++ recovery. These are
 reviewed external Unicorn fixtures, not accepted game implementations; module hashes,

@@ -8,6 +8,12 @@ from pathlib import Path
 import re
 
 
+class ViewerServer(ThreadingHTTPServer):
+    # Track loading requests many independent resources together. Windows can
+    # refuse that burst with HTTPServer's default five pending connections.
+    request_queue_size = 64
+
+
 class Handler(SimpleHTTPRequestHandler):
     extensions_map = {
         **SimpleHTTPRequestHandler.extensions_map,
@@ -134,7 +140,7 @@ def main():
     if Handler.game_dir:
         print(f'Game resources: {Handler.game_dir} (read-only)', flush=True)
 
-    server = ThreadingHTTPServer(('127.0.0.1', args.port), partial(Handler, directory=str(site)))
+    server = ViewerServer(('127.0.0.1', args.port), partial(Handler, directory=str(site)))
     port = server.server_address[1]
     if args.ready_file:
         args.ready_file.parent.mkdir(parents=True, exist_ok=True)

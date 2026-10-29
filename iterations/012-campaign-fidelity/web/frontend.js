@@ -4,7 +4,10 @@ import {
   FE_WIDTH, FE_HEIGHT, backdropLayoutName, attrInt, attrPair, parseColor, cssColor,
   fitViewport, toLayoutPoint, inRect, transitionState, nextLevels, backLevels,
 } from "./fe-core.js";
-import { FeAssets } from "./fe-assets.js";
+import { FeAssets, makeCanvas } from "./fe-assets.js";
+import {
+  wallMap, smallMap, WALL_CENTER, WALL_SIZE, WALL_BEZEL, SCAN_PERIOD, WALL_TICKS_PER_SECOND, wallCycle, tileCount, splineCycle, SPLINE_YELLOW, SPLINE_WHITE,
+} from "./fe-trackmap.js";
 
 const TRANSITION_DELAY_MS = 3 * 1000 / 60;
 
@@ -15,6 +18,7 @@ export class FrontEnd {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.host = host;
+    this.topCtx = host.topCanvas?.getContext("2d") ?? null;
     this.assets = new FeAssets(host.api, host.readFile);
     this.levels = [];
     this.popups = [];
@@ -176,6 +180,11 @@ export class FrontEnd {
       this.canvas.width = width;
       this.canvas.height = height;
     }
+    const top = this.host.topCanvas;
+    if (top && (top.width !== width || top.height !== height)) {
+      top.width = width;
+      top.height = height;
+    }
     this.view = fitViewport(width, height);
   }
 
@@ -197,6 +206,89 @@ export class FrontEnd {
     return out;
   }
 
+  // TrackArt packs (`<track>Sp.fsh`, `<track>SpSm.fsh`) as shape lists; null while loading.
+  trackPack(file) {
+    if (!file) return null;
+    const key = file.toLowerCase();
+    if (!this.trackPacks) this.trackPacks = new Map();
+    if (!this.trackPacks.has(key)) {
+      this.trackPacks.set(key, null);
+      this.assets.pack(`${file}.fsh`, "FEData/TrackArt").then(pack => {
+        this.trackPacks.set(key, pack ?? []);
+        this.host.requestFrame?.();
+      });
+    }
+    return this.trackPacks.get(key);
+  }
+
+  // The ID_TRACK room's photo wall shows the track pictures [VA 0x4ea390, 0x4ea660, 0x4ea9b0]:
+  // tiles of `<track>Sp.fsh` in turn (map first, flags on the map only), turning after 512
+  // ticks. The 3D wall is not drawn (A101); the picture is drawn flat in a bezel centred in the
+  // porthole, the turn as a card flip, the scanlines scrolling (A220).
+  drawTrackWall(ctx, now) {
+    if (this.screen?.name !== "location") return;
+    const info = this.host.trackPicture?.(this.screen.name);
+    const pack = info && this.trackPack(info.sp);
+    const wall = pack && wallMap(pack, info.direction);
+    if (!wall) return;
+    const key = `${info.sp}|${info.direction}`;
+    if (this.wallKey !== key) { this.wallKey = key; this.wallStart = now; }
+    const ticks = (now - this.wallStart) * WALL_TICKS_PER_SECOND / 1000;
+    const { from, to, turn } = wallCycle(ticks, tileCount(pack));
+    const [cx, cy] = WALL_CENTER, [w, h] = WALL_SIZE;
+    const x = cx - w / 2, y = cy - h / 2, pad = WALL_BEZEL;
+    // Bezel: three nested bands, dark / grey / dark, as in the reference frame.
+    ctx.fillStyle = "#33414a"; ctx.fillRect(x - pad, y - pad, w + 2 * pad, h + 2 * pad);
+    ctx.fillStyle = "#7d8a91"; ctx.fillRect(x - pad + 2, y - pad + 2, w + 2 * pad - 4, h + 2 * pad - 4);
+    ctx.fillStyle = "#26323a"; ctx.fillRect(x - 3, y - 3, w + 6, h + 6);
+    ctx.fillStyle = "#000"; ctx.fillRect(x, y, w, h);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    const drawTile = (index, scaleX) => {
+      const tile = pack[index];
+      if (!tile?.canvas || scaleX === 0) return;
+      ctx.save();
+      ctx.translate(cx, y);
+      ctx.scale(scaleX * (wall.flipX ? -1 : 1), 1);
+      ctx.translate(-w / 2, 0);
+      ctx.scale(w / tile.width, h / tile.height);
+      ctx.drawImage(tile.canvas, 0, 0);
+      if (index === 0 && wall.flag) ctx.drawImage(wall.flag.shape.canvas, wall.flag.x, wall.flag.y);
+      ctx.restore();
+    };
+    if (turn <= 0) drawTile(from, 1);
+    else if (turn < 0.5) drawTile(from, Math.cos(turn * Math.PI));
+    else drawTile(to, -Math.cos(turn * Math.PI));
+    // Scanlines: black lines scrolling down one period per 128 ticks (material parameters 13/14
+    // advance with the clock / 128 [VA 0x4ea7a4]; the period and direction are guessed).
+    ctx.fillStyle = "rgba(0,0,0,0.85)";
+    const offset = ((ticks / 128) % 1) * SCAN_PERIOD;
+    for (let ly = y - SCAN_PERIOD + offset; ly < y + h; ly += SCAN_PERIOD) ctx.fillRect(x, Math.round(ly), w, 1);
+    ctx.restore();
+    this.host.requestFrame?.();
+  }
+
+  // Shape pixels multiplied by an [r, g, b] colour, alpha kept: the vertex colour of the
+  // original's draw call [VA 0x4d87c0]; black stays black (cached).
+  modulateShape(shape, rgb) {
+    const key = rgb.join(",");
+    shape.tints ??= new Map();
+    let out = shape.tints.get(key);
+    if (!out) {
+      out = makeCanvas(shape.width, shape.height);
+      const src = shape.canvas.getContext("2d").getImageData(0, 0, shape.width, shape.height);
+      const px = src.data;
+      for (let i = 0; i < px.length; i += 4) {
+        px[i] = (px[i] * rgb[0]) / 255;
+        px[i + 1] = (px[i + 1] * rgb[1]) / 255;
+        px[i + 2] = (px[i + 2] * rgb[2]) / 255;
+      }
+      out.getContext("2d").putImageData(src, 0, 0);
+      shape.tints.set(key, out);
+    }
+    return out;
+  }
+
   render(now = performance.now()) {
     if (!this.visible) return;
     if (this.loading) return this.renderLoading();
@@ -207,7 +299,12 @@ export class FrontEnd {
     ctx.setTransform(view.scale, 0, 0, view.scale, view.x, view.y);
     ctx.imageSmoothingEnabled = view.scale % 1 !== 0;
     const elapsed = now - (this.screen?.started ?? now) - TRANSITION_DELAY_MS;
+    let wallDrawn = false;
     for (const { layout, control } of this.layers()) {
+      if (!wallDrawn && layout === this.screen) {
+        wallDrawn = true;
+        if (this.host.experimentalOriginalPort) this.drawTrackWall(ctx, now);
+      }
       const draw = CONTROL_DRAW[control.type];
       if (!draw) continue;
       const fromScreen = layout === this.screen || this.popups?.includes(layout);
@@ -218,9 +315,16 @@ export class FrontEnd {
       draw(ctx, control, this, now);
       ctx.restore();
     }
-    // Open (or closing) drop-down lists on top.
+    // Open (or closing) drop-down lists on top, on their own canvas above the 3D cars.
+    const top = this.topCtx ?? ctx;
+    if (this.topCtx) {
+      top.setTransform(1, 0, 0, 1, 0, 0);
+      top.clearRect(0, 0, this.host.topCanvas.width, this.host.topCanvas.height);
+      top.setTransform(view.scale, 0, 0, view.scale, view.x, view.y);
+      top.imageSmoothingEnabled = view.scale % 1 !== 0;
+    }
     for (const { control } of this.layers()) {
-      if (control.list) drawComboList(ctx, control, this, now);
+      if (control.list) drawComboList(top, control, this, now);
     }
     if (elapsed < 600) this.host.requestFrame?.();
   }
@@ -258,10 +362,12 @@ export class FrontEnd {
       const L = comboList(c, this, performance.now());
       const inList = L && x >= L.x && x < L.x + L.w && y >= L.y && y < L.y + L.full;
       const row = inList ? L.scroll + Math.floor((y - L.y) / LIST_ROW_H) : -1;
-      if (type === "move") c.list.hoverRow = row < L.items.length ? row : -1;
+      const entry = L?.items[row];
+      const selectable = inList && row < L.items.length && !entry?.sep;
+      if (type === "move") c.list.hoverRow = selectable ? row : -1;
       if (type === "up") {
-        if (inList && row < L.items.length) {
-          L.acc?.select?.(row);
+        if (selectable) {
+          L.acc?.select?.(entry?.index ?? row);
           this.host.onChange?.(c.attrs.accessor, c);
           this.closeList();
         } else {
@@ -280,6 +386,7 @@ export class FrontEnd {
       this.pressed = hit;
     } else if (type === "up") {
       if (hit && hit === this.pressed) this.activate(hit, x);
+      else if (!hit && !this.pressed) this.host.onCarClick?.(x, y, this.screen);
       this.pressed = null;
     }
     this.canvas.style.cursor = hit ? "pointer" : "default";
@@ -453,7 +560,8 @@ function comboList(c, fe, now) {
   if (!st) return null;
   const g = comboGeometry(c, fe);
   const acc = fe.host.accessor?.(c.attrs.accessor);
-  const items = acc?.items?.() ?? [];
+  // Car lists give rows {year, text, index} with separator rows {sep, text} between classes.
+  const items = acc?.rows?.() ?? acc?.items?.() ?? [];
   const t = Math.min(1, Math.max(0, (now - st.opened) / LIST_OPEN_MS));
   const k = st.closing ? 1 - t : t;
   const full = Math.min(items.length * LIST_ROW_H, attrInt(c.attrs, "selectionboxmaxheight", 160));
@@ -545,16 +653,41 @@ function drawComboList(ctx, c, fe, now) {
   ctx.clip();
   const font = c.fonts["Univers8b.ffn"];
   const current = L.acc?.index?.() ?? -1;
+  const carRows = L.items.some(r => typeof r === "object");
+  const yearW = 26;
+  const textRight = L.x + L.w - (carRows && L.items.length * LIST_ROW_H > L.full ? 14 : 0);
+  if (carRows) {
+    // Year column: a darker strip left of the names (original car lists, A234).
+    ctx.fillStyle = "rgba(120,70,0,0.28)";
+    ctx.fillRect(L.x + 1, L.y, yearW, L.h);
+    ctx.fillStyle = "rgba(0,0,0,0.85)";
+    ctx.fillRect(L.x + 1 + yearW, L.y, 1, L.h);
+  }
   for (let i = L.scroll, row = 0; i < L.items.length; i++, row++) {
     const ry = L.y + row * LIST_ROW_H;
     if (ry > L.y + L.h) break;
+    const entry = L.items[i];
+    if (entry?.sep) {
+      // Class separator: a raised beige band with the class name centred.
+      const band = ctx.createLinearGradient(0, ry, 0, ry + LIST_ROW_H);
+      band.addColorStop(0, "#efe6c8");
+      band.addColorStop(1, "#a89c76");
+      ctx.fillStyle = band;
+      ctx.fillRect(L.x + 1, ry + 1, textRight - L.x - 1, LIST_ROW_H - 2);
+      ctx.fillStyle = "#000";
+      ctx.fillRect(L.x + 1, ry, textRight - L.x - 1, 1);
+      ctx.fillRect(L.x + 1, ry + LIST_ROW_H - 1, textRight - L.x - 1, 1);
+      const tw = textWidth(font, entry.text);
+      drawText(ctx, fe, font, entry.text, Math.floor((L.x + textRight) / 2 - tw / 2), ry + 1, parseColor("0xff000000"));
+      continue;
+    }
     const hovered = c.list && !c.list.closing && c.list.hoverRow === i;
     if (hovered) {
-      ctx.fillStyle = "rgba(188,0,0,1)";
-      ctx.fillRect(L.x + 1, ry, L.w - 2, LIST_ROW_H);
-    } else if (c.type === "COLORBOX" && i === current) {
-      ctx.fillStyle = "rgba(255,187,0,1)";
-      ctx.fillRect(L.x + 1, ry, L.w - 2, LIST_ROW_H);
+      ctx.fillStyle = "rgba(200,40,20,1)";
+      ctx.fillRect(L.x + 1, ry, textRight - L.x - 1, LIST_ROW_H);
+    } else if ((c.type === "COLORBOX" || carRows) && (entry?.index ?? i) === current) {
+      ctx.fillStyle = carRows ? "rgba(200,40,20,0.55)" : "rgba(255,187,0,1)";
+      ctx.fillRect(L.x + 1, ry, textRight - L.x - 1, LIST_ROW_H);
     }
     if (L.acc?.colorAt) {
       // ColorBox rows: colour swatches (row drawing vtbl +0x3c not read, A17).
@@ -562,18 +695,36 @@ function drawComboList(ctx, c, fe, now) {
       ctx.fillRect(L.x + 4, ry + 2, L.w - 8, LIST_ROW_H - 4);
       ctx.strokeStyle = "#000";
       ctx.strokeRect(L.x + 4.5, ry + 2.5, L.w - 9, LIST_ROW_H - 5);
+    } else if (typeof entry === "object") {
+      drawText(ctx, fe, font, entry.year, L.x + 4, ry + 1, parseColor(hovered ? "0xffffffff" : "0xffffe9a0"));
+      drawText(ctx, fe, font, entry.text, L.x + yearW + 5, ry + 1, parseColor(hovered ? "0xffffffff" : "0xff000000"));
     } else {
-      drawText(ctx, fe, font, L.items[i], L.x + 1 + 3, ry + 1, parseColor(hovered ? "0xffffffff" : "0xff000000"));
+      drawText(ctx, fe, font, entry, L.x + 1 + 3, ry + 1, parseColor(hovered ? "0xffffffff" : "0xff000000"));
     }
   }
   ctx.restore();
   if (L.items.length * LIST_ROW_H > L.full) {
-    // Scrollbar when clamped to 160 px [VA 0x4db530] (drawn simplified, A17).
+    // Scrollbar when clamped to 160 px [VA 0x4db530]: light track with arrow buttons and a thumb,
+    // drawn simplified (A17).
     const total = L.items.length * LIST_ROW_H;
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.fillRect(L.x + L.w - 6, L.y, 5, L.h);
-    ctx.fillStyle = "rgba(188,0,0,1)";
-    ctx.fillRect(L.x + L.w - 6, L.y + (L.scroll * LIST_ROW_H / total) * L.h, 5, Math.max(8, L.h * L.full / total));
+    const bx = L.x + L.w - 13, bw = 12, btn = 11;
+    ctx.fillStyle = "#c9dcf0";
+    ctx.fillRect(bx, L.y, bw, L.h);
+    ctx.fillStyle = "#e8b030";
+    ctx.fillRect(bx, L.y, bw, btn);
+    ctx.fillRect(bx, L.y + L.h - btn, bw, btn);
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.moveTo(bx + 6, L.y + 3); ctx.lineTo(bx + 9, L.y + 8); ctx.lineTo(bx + 3, L.y + 8); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(bx + 6, L.y + L.h - 3); ctx.lineTo(bx + 9, L.y + L.h - 8); ctx.lineTo(bx + 3, L.y + L.h - 8); ctx.fill();
+    const track = L.h - 2 * btn;
+    const thumbH = Math.max(8, track * L.full / total);
+    const thumbY = L.y + btn + (track - thumbH) * (L.scroll * LIST_ROW_H / Math.max(1, total - L.full));
+    ctx.fillStyle = "#f4c24a";
+    ctx.fillRect(bx + 1, thumbY, bw - 2, thumbH);
+    ctx.strokeStyle = "#000";
+    ctx.strokeRect(bx + 1.5, thumbY + 0.5, bw - 3, thumbH - 1);
   }
   ctx.strokeStyle = "#000";
   ctx.strokeRect(L.x + 0.5, L.y + 0.5, L.w - 1, L.h - 1);
@@ -591,24 +742,111 @@ function drawAccessorWatch(ctx, c, fe) {
   drawText(ctx, fe, font, text, x - Math.floor((w / 2) * align), y, parseColor(c.attrs.forecolor, 0xffffffff));
 }
 
+// Word-wrapped accessor text, centred on the control's width when align is 1 (Evolution event
+// description). Wrapping at spaces within `size`; line pitch = font line height.
+export function wrapText(font, text, maxWidth) {
+  const lines = [];
+  let line = "";
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && textWidth(font, next) > maxWidth) { lines.push(line); line = word; } else line = next;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function drawWordWrapWatch(ctx, c, fe) {
+  const [x, y] = attrPair(c.attrs, "pos");
+  const [w] = attrPair(c.attrs, "size", [200, 40]);
+  const font = c.fonts.own;
+  const text = fe.host.accessor?.(c.attrs.accessor)?.text?.() ?? "";
+  const align = attrInt(c.attrs, "align", 0);
+  const color = parseColor(c.attrs.forecolor, 0xffffffff);
+  wrapText(font, text, w).forEach((line, i) => {
+    const lw = textWidth(font, line);
+    const left = align === 1 ? x + Math.floor((w - lw) / 2) : align === 2 ? x + w - lw : x;
+    drawText(ctx, fe, font, line, left, y + i * (font?.lineHeight ?? 12), color);
+  });
+}
+
+// TrackSmall2dSpline (FETrackSmall2DSpline, class vtable 0x5b8128; update 0x4fcb40, draw
+// 0x4fcd80): per race of the event the `<track>SpSm.fsh` shapes 0 (map), 1 and 2 (flags) are
+// loaded; the map of the race at index t>>8 is drawn in yellow 0xffbb00 with a fading alpha, its
+// flag (shape 2 when the race is reversed, else 1) in white, and below the list of "-" and the
+// capital names at x 352/356, y 280 + 15 i, the current one yellow, the others white. The map
+// is the shape's pixels modulated by the colour (the black shadow stays black). The shape
+// positions are the header values (matches the reference); the bit that shifts the flag when
+// race +0x3a5 is set (mirror?) is not ported (A221).
+const LIST = { x: 352, nameX: 356, y: 280, pitch: 15 };
+function drawTrackSpline(ctx, c, fe, now) {
+  const info = fe.host.trackPicture?.(fe.screen?.name);
+  if (!info?.races?.length) return;
+  if (fe.splineKey !== info.key) { fe.splineKey = info.key; fe.splineStart = now; }
+  const ticks = (now - fe.splineStart) * WALL_TICKS_PER_SECOND / 1000;
+  const { index, alpha } = splineCycle(ticks, info.races.length);
+  const race = info.races[index];
+  const map = smallMap(fe.trackPack(race.sm), race.direction);
+  if (map) {
+    ctx.save();
+    ctx.globalAlpha *= alpha / 255;
+    ctx.drawImage(fe.modulateShape(map.map, SPLINE_YELLOW), map.x, map.y);
+    if (map.flag) ctx.drawImage(fe.modulateShape(map.flag.shape, SPLINE_WHITE), map.flag.x, map.flag.y);
+    ctx.restore();
+  }
+  const font = c.fonts["Univers8b.ffn"];
+  info.races.forEach((r, i) => {
+    const color = parseColor(i === index ? "0xffffbb00" : "0xffffffff");
+    const y = LIST.y + i * LIST.pitch;
+    drawText(ctx, fe, font, "-", LIST.x, y, color);
+    drawText(ctx, fe, font, r.name, LIST.nameX, y, color);
+  });
+  fe.host.requestFrame?.();
+}
+
+// GouraudIndicatorBar (`carcompare.lay`): the value of `CarCompare.Data(<othersource>)` as a bar
+// of `size` with the colours c0/c50/c100 as a gradient along the bar; `goingleft` grows it from
+// the right end. The scale (100 = full) and the gradient are guesses (A231); the control's
+// drawing function [FEGouraudIndicatorBar] is not decompiled.
+function drawGouraudIndicatorBar(ctx, c, fe) {
+  const a = c.attrs;
+  const acc = fe.host.accessor?.(`CarCompare.Data(${a.othersource})`);
+  if (!acc?.value) return;
+  const [x, y] = attrPair(a, "pos");
+  const [w, h] = attrPair(a, "size", [110, 6]);
+  const len = Math.round(Math.max(0, Math.min(100, acc.value())) / 100 * w);
+  if (len <= 0) return;
+  const left = attrInt(a, "goingleft", 0) === 1;
+  const x0 = left ? x + w - len : x;
+  // The gradient belongs to the whole bar (c0 at `pos.x`, c100 at the far end), the value clips it:
+  // original screenshot: the base end is light blue, the tip of a long bar orange (A231).
+  const grad = ctx.createLinearGradient(x, 0, x + w, 0);
+  grad.addColorStop(0, cssColor(parseColor(a.c0, 0xff0000ff)));
+  grad.addColorStop(0.5, cssColor(parseColor(a.c50, 0xff0000ff)));
+  grad.addColorStop(1, cssColor(parseColor(a.c100, 0xff0000ff)));
+  ctx.fillStyle = grad;
+  ctx.fillRect(x0, y, len, h);
+}
+
 // CarLogo: shapes 2*index and 2*index+1 of the car's logo pack side by side, centred
 // vertically in the control [VA 0x4c1660, 0x4c1b70]; the glint sweep is not drawn (A17).
 function drawCarLogo(ctx, c, fe) {
-  const logo = fe.host.carLogo?.(c.attrs.accessor);
+  const logo = fe.host.carLogo?.(c.attrs.accessor, c.attrs.othersource);
   const pack = logo && fe.logoPacks?.get(logo.pack.toLowerCase());
   if (!pack) {
     if (logo && !fe.logoPacks?.has(logo.pack.toLowerCase())) fe.loadLogoPack(logo.pack);
     return;
   }
   const [x, y] = attrPair(c.attrs, "pos");
-  const [, h] = attrPair(c.attrs, "size", [100, 60]);
   const a = pack[logo.shape];
   const b = pack[logo.shape + 1];
   if (!a) return;
   const total = a.width + (b && b.height > 1 ? b.width : 0);
   const align = attrInt(c.attrs, "align", 0);
   const left = x - (align === 1 ? total / 2 : align === 2 ? total : 0);
-  const top = y + Math.floor((h - a.height) / 2);
+  // Centre 4 px below `pos`: measured on the original Quick Race screenshot ("turbo" centre at
+  // y 429 for pos y 426; centring in the 100x60 box put it 26 px too low, under the bottom
+  // bar). The draw function 0x4c1b70 is not in the decompile (A233).
+  const top = y + 4 - Math.floor(a.height / 2);
   drawShape(ctx, a, left, top);
   if (b && b.height > 1) drawShape(ctx, b, left + a.width, top);
 }
@@ -665,6 +903,9 @@ function drawLabel(ctx, c, fe) {
 }
 
 function drawRectangle(ctx, c) {
+  // `size=` given but empty (carcompare.lay section 14): nothing is drawn in the original
+  // (reference screenshot), not the 50x50 template default (A234).
+  if (c.attrs.size === "") return;
   const [x, y] = attrPair(c.attrs, "pos");
   const [w, h] = attrPair(c.attrs, "size", [50, 50]);
   ctx.fillStyle = cssColor(parseColor(c.attrs.color, 0x8000ff00));
@@ -736,6 +977,7 @@ const CONTROL_DRAW = {
   COLORBOX: drawComboBox,
   ACCESSORWATCH: drawAccessorWatch,
   CARLOGO: drawCarLogo,
+  GOURAUDINDICATORBAR: drawGouraudIndicatorBar,
   EXTRACIRCLE: drawExtraCircle,
   GOURAUDBOX: drawGouraudBox,
   GLINTYLINE: drawGlintyLine,
@@ -744,6 +986,8 @@ const CONTROL_DRAW = {
   RECTANGLE: drawRectangle,
   BOTTOMBARBUTTON: drawBottomBarButton,
   MOVIECIRCLE: drawMovieCircle,
+  TRACKSMALL2DSPLINE: drawTrackSpline,
+  WORDWRAPACCESSORWATCH: drawWordWrapWatch,
 };
 
 const CONTROL_FONTS = {
@@ -751,6 +995,7 @@ const CONTROL_FONTS = {
   COMBOBOXSLIDER: ["UniversC11b.ffn", "UniversC11m.ffn", "Univers8b.ffn"],
   COLORBOX: ["UniversC11b.ffn", "UniversC11m.ffn", "Univers8b.ffn"],
   ACCESSORWATCH: ["Univers8b.ffn"],
+  TRACKSMALL2DSPLINE: ["Univers8b.ffn"],
   HEADER: ["Univers17b.ffn"],
   BOTTOMBARBUTTON: ["Univers11b.ffn"],
 };

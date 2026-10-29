@@ -75,6 +75,7 @@ pub fn run_cli(args: impl IntoIterator<Item = String>) -> Result<(), String> {
             "--seconds" => race.seconds = parse_f32(&mut iter, "--seconds")?,
             "--lights" => race.lights = true,
             "--orbit-yaw" => race.orbit_yaw = Some(parse_f32(&mut iter, "--orbit-yaw")?),
+            "--orbit-pitch" => race.orbit_pitch = Some(parse_f32(&mut iter, "--orbit-pitch")?),
             "--camera-cycles" => race.camera_cycles = parse_u32(&mut iter, "--camera-cycles")?,
             "--brake-last" => race.brake_last = parse_f32(&mut iter, "--brake-last")?,
             "--original-model" => race.original_model = true,
@@ -185,6 +186,8 @@ struct RaceShot {
     camera_cycles: u32,
     /// After the run, look at the car from an orbit camera at this yaw (radians).
     orbit_yaw: Option<f32>,
+    /// Orbit camera pitch (radians, default 0.45; negative looks up past the car).
+    orbit_pitch: Option<f32>,
     opponents: u32,
     /// Drive with the original vehicle model (key O).
     original_model: bool,
@@ -236,7 +239,7 @@ async fn render_race_screenshot(
     if let Some(yaw) = race.orbit_yaw {
         renderer.toggle_camera_mode();
         renderer.camera.yaw = yaw;
-        renderer.camera.pitch = 0.45;
+        renderer.camera.pitch = race.orbit_pitch.unwrap_or(0.45);
         renderer.camera.distance = 7.0;
     }
     let pixels = capture_pixels(&mut renderer, width, height)?;
@@ -253,7 +256,7 @@ async fn render_race_screenshot(
 }
 
 fn usage() -> String {
-    "Usage:\n  porsche-viewer\n  porsche-viewer inspect --game-dir <path> (--car <name> | --track <name>)\n  porsche-viewer view --game-dir <path> (--car <name> | --track <name>) [--screenshot out.png] [--paint-index 0..5 (car screenshot only)] [--yaw radians] [--pitch radians] [--width px] [--height px]\n  porsche-viewer view --game-dir <path> --track <name> --race-car <car> --screenshot out.png [--pedal -1..1] [--seconds s] [--brake-last s] [--lights] [--opponents 0|3] [--camera-cycles n] [--orbit-yaw radians] [--steer -1..1] [--original-model]".into()
+    "Usage:\n  porsche-viewer\n  porsche-viewer inspect --game-dir <path> (--car <name> | --track <name>)\n  porsche-viewer view --game-dir <path> (--car <name> | --track <name>) [--screenshot out.png] [--paint-index 0..5 (car screenshot only)] [--yaw radians] [--pitch radians] [--width px] [--height px]\n  porsche-viewer view --game-dir <path> --track <name> --race-car <car> --screenshot out.png [--pedal -1..1] [--seconds s] [--brake-last s] [--lights] [--opponents 0|3] [--camera-cycles n] [--orbit-yaw radians] [--orbit-pitch radians] [--steer -1..1] [--original-model]".into()
 }
 
 fn next_value(iter: &mut impl Iterator<Item = String>, name: &str) -> Result<String, String> {
@@ -417,6 +420,7 @@ mod gpu_diagnostics {
         .to_vec();
         let scene = Scene {
             car_collision_box: None,
+            car_body_points: Vec::new(),
             car_driver_camera: None,
             meshes: vec![Mesh {
                 name: "paint regression".into(),
@@ -455,6 +459,8 @@ mod gpu_diagnostics {
                 double_sided: true,
                 depth_bias: 0,
                 prelit: false,
+                uv_scroll: None,
+                env_slot: None,
             }],
             bounds: [[-1., -1., 0.], [1., 1., 0.]],
             diagnostics: vec![],
@@ -538,6 +544,7 @@ mod gpu_diagnostics {
         };
         let scene = Scene {
             car_collision_box: None,
+            car_body_points: Vec::new(),
             car_driver_camera: None,
             // Deliberately put the detail first: article order must not win.
             meshes: vec![mesh(1), mesh(0)],
@@ -566,6 +573,8 @@ mod gpu_diagnostics {
                     double_sided: true,
                     depth_bias: if i == 1 { -3 } else { 0 },
                     prelit: false,
+                    uv_scroll: None,
+                    env_slot: None,
                 })
                 .collect(),
             bounds: [[-1., -1., 0.], [1., 1., 0.]],
@@ -702,8 +711,10 @@ fn read_dir_recursive(
             let selected = extension.as_deref() == Some("fsh")
                 || (matches!(extension.as_deref(), Some("crp") | Some("tpg"))
                     && stem.eq_ignore_ascii_case(car))
-                // Car particle systems (sparks): Render/carpart.dat.
-                || (extension.as_deref() == Some("dat") && stem.eq_ignore_ascii_case("carpart"));
+                // Particle systems: Render/carpart.dat and Render/particle.dat (0x455570); sun and
+                // lens flare: Render/flare.dat, flarepos.dat.
+                || (extension.as_deref() == Some("dat")
+                    && ["carpart", "particle", "flare", "flarepos"].iter().any(|s| stem.eq_ignore_ascii_case(s)));
             if !selected {
                 continue;
             }
@@ -1005,7 +1016,8 @@ impl App {
             height: size.height.max(1),
             present_mode,
             alpha_mode,
-            view_formats: vec![],
+            // Non-sRGB view for the lens flare's gamma-space add (sun.rs).
+            view_formats: vec![format.remove_srgb_suffix()],
             desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
@@ -1743,7 +1755,8 @@ fn capture_pixels(renderer: &mut Renderer, width: u32, height: u32) -> Result<Ve
         dimension: wgpu::TextureDimension::D2,
         format,
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        view_formats: &[],
+        // Non-sRGB view for the lens flare's gamma-space add (sun.rs).
+        view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
     });
     let target_view = target.create_view(&Default::default());
     renderer.render(&target_view);

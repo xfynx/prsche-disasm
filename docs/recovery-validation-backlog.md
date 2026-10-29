@@ -1,5 +1,14 @@
 # Отложенные проверки восстановления v2
 
+PR26: [intake review](research/pr26-integration-review-2026-10-29.md) separates
+recorded kernels from unproved composition. Before enabling the experimental
+feature by default, recover object hull/tree/order and all-participant ownership,
+the live tilted-contact support normal, RAND_SEED input, AI support frame,
+particle blend/culling/initial seed, sky/sun mapping and FE camera/hinge/timing.
+Obtain the missing external A-notes or trace original consumers. Native visual,
+damage-on composed gameplay and full career acceptance remain open; prototype
+tests do not close C++ recovery milestones.
+
 Run444:7 originals1,580B integrated;174,858 cases/36 mutations/582pins PASS.
 235 TUs/180 names/187 refs,no EXE.442 raw caller aliases expose and verify the
 existing005656d0 read+74-before-store+78 repair;445 refreshes441's unchanged

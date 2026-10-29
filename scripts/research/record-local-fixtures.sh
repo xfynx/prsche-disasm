@@ -28,7 +28,7 @@ mkdir -p "$OUT"
 run() { echo "== $1"; "$PYTHON" "$R/$1" --game-dir "$GAME_DIR" "${@:2}"; }
 
 run replay-vehicle-sim.py --out "$OUT/vehicle-sim.tsv"
-for s in tyre engine controls step ground; do run "replay-vehicle-$s.py" --out-dir "$OUT"; done
+for s in tyre engine controls step ground keyboard; do run "replay-vehicle-$s.py" --out-dir "$OUT"; done
 run replay-camera.py --out-dir "$OUT"
 run replay-engine-audio.py --out-dir "$OUT"
 run replay-ai-track.py --out "$OUT/ai-track-graph.tsv"
@@ -39,12 +39,13 @@ run replay-ai-loop.py --out "$OUT/ai-loop.tsv"
 
 # Road support: dump the type-1 support polygons with the Rust loader, then record the original.
 # Needs a Rust toolchain (cargo) on PATH.
-SUPPORT_TRACKS="autobahn alps monaco1 canyon"
+SUPPORT_TRACKS="autobahn alps monaco1 canyon castle"
 mkdir -p "$ROOT/local/derived/support"
 echo "== support_dump"
 (cd "$ROOT/iterations/012-campaign-fidelity" && cargo run --release -q -p nfs-assets --example support_dump -- \
   "$GAME_DIR" "$ROOT/local/derived/support" $SUPPORT_TRACKS)
 run replay-road-support.py --polygons "$ROOT/local/derived/support" --out-dir "$OUT"
+run replay-car-launch.py --polygons "$ROOT/local/derived/support" --out-dir "$OUT"
 
 echo "wrote $(ls "$OUT" | wc -l | tr -d ' ') files to $OUT"
 if [ "${1:-}" = "--check" ]; then

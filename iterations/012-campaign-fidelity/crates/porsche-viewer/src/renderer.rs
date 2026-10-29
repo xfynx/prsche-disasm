@@ -330,6 +330,11 @@ impl Camera {
                 [u.x, u.y, u.z, 0.0]
             },
             specular: [0.0; 4],
+            fog: [0.0; 4],
+            forward: {
+                let f = (self.target() - eye).normalize_or(Vec3::NEG_Z);
+                [f.x, f.y, f.z, 0.0]
+            },
         }
     }
 }
@@ -348,9 +353,15 @@ struct CameraUniform {
     /// Camera right/up in world space (sphere map of the specular texture layer).
     view_right: [f32; 4],
     view_up: [f32; 4],
-    /// Specular highlight colour of slot 1 (`+0x388`: 0.8) and `w = 1` to enable the
-    /// specular layers (`R3DSpecularLayer`, `R3DSpecularTextureLayer`).
+    /// `w = 1` enables the sphere-map reflection layer (`R3DSpecularTextureLayer`
+    /// 0x445520) in a race; rgb unused. The per-vertex sun highlight
+    /// (`R3DSpecularLayer` 0x446e80, type 0x8105) is in no shipped render method.
     specular: [f32; 4],
+    /// World fog of the weather keys (`0x45d3b0`, `docs/re/weather.md`): sRGB colour and the
+    /// EXP density (0 = off).
+    fog: [f32; 4],
+    /// Camera forward in world space (fog depth).
+    forward: [f32; 4],
 }
 
 /// Car light state of `R3DCar_UpdateLighting` 0x43a560 for one track: slot 0
@@ -385,8 +396,7 @@ impl CarLighting {
     /// slot colours are multiplied by it, 0x43a560).
     fn apply(&self, uniform: &mut CameraUniform, road: [f32; 3]) {
         uniform.sun = [self.sun.x, self.sun.y, self.sun.z, 1.0];
-        // 0x43a560: slot 1 specular colour (1, .8, .8, .8); light colour (1, 1, 1).
-        uniform.specular = [0.8, 0.8, 0.8, 1.0];
+        uniform.specular = [0.0, 0.0, 0.0, 1.0];
         for slot in 0..2 {
             let [r, g, b] = self.ambient[slot];
             uniform.ambient[slot] = [r * road[0], g * road[1], b * road[2], 1.0];
@@ -414,7 +424,11 @@ pub(crate) struct GpuMesh {
 struct GpuMaterial {
     group: wgpu::BindGroup,
     color_buffer: wgpu::Buffer,
+    /// `LayerUVAnimate` mode 0 speed (`nfs_assets::uv_scroll_offset`).
+    uv_scroll: Option<i32>,
     paintable: bool,
+    /// Last value of the material uniform (prelit flag / light slot), kept when repainting.
+    tail: f32,
     alpha_mode: AlphaMode,
     alpha_cutoff: f32,
     double_sided: bool,
@@ -438,6 +452,8 @@ struct SkyState {
     texture_group: wgpu::BindGroup,
     /// Uniform with the horizon placement; only `view_projection` changes per frame.
     uniform: SkyUniform,
+    /// Drift of the two layers, UV per second (`sky_drift_velocity`).
+    drift: [f32; 4],
 }
 
 #[repr(C)]
@@ -513,7 +529,89 @@ fn fe_room_car_lift(box_center: Vec3, half: [f32; 3]) -> f32 {
     half[1] - box_center.y
 }
 
+/// Second car of the compare screen: its meshes and collision box (for the lift).
+struct CompareCar {
+    render: CarRenderState,
+    collision_box: Option<(Vec3, [f32; 3])>,
+}
+
+impl CarRenderState {
+    /// Meshes a plain draw shows.
+    fn visible(&self) -> Vec<usize> {
+        (0..self.meshes.len())
+            .filter(|i| !cfg!(feature = "experimental-original-port") || !self.hidden.contains(i))
+            .collect()
+    }
+}
+
+/// Moving part of the room car (`nfs_assets::CarAnimPart` on the GPU).
+struct CarAnimRender {
+    channel: u8,
+    axis: u8,
+    pivot: Vec3,
+    open_sign: f32,
+    extent: f32,
+    /// Indices into `CarRenderState::meshes` of the closed part (frame 0).
+    base: Vec<usize>,
+    /// Cabrio top: vertex frames 0.. per base mesh and the meshes the blend is written to.
+    morph: Option<CarMorph>,
+}
+
+/// Morph frames of the cabrio top (`[frame][mesh]` body-space vertices) and one dynamic mesh per
+/// base mesh; the drawn shape blends two neighbouring frames by the fractional channel value
+/// (`R3DCar_SetFrame` 0x4380d0 keeps floor and fraction).
+struct CarMorph {
+    frames: Vec<Vec<Vec<GpuVertex>>>,
+    dynamic: Vec<GpuMesh>,
+}
+
+/// Body-space vertices of a scene mesh (like the `set_car_model` loop).
+fn body_vertices(mesh: &nfs_assets::Mesh) -> Vec<GpuVertex> {
+    const CAR_SCALE: f32 = 5.0;
+    mesh.vertices
+        .iter()
+        .map(|v| GpuVertex {
+            position: [
+                -v.position[0] * CAR_SCALE,
+                v.position[1] * CAR_SCALE,
+                -v.position[2] * CAR_SCALE,
+            ],
+            normal: [-v.normal[0], v.normal[1], -v.normal[2]],
+            uv: v.uv,
+            color: v.color,
+        })
+        .collect()
+}
+
+/// GPU mesh whose vertex buffer can be rewritten each frame.
+fn dynamic_car_mesh(device: &wgpu::Device, mesh: &nfs_assets::Mesh) -> GpuMesh {
+    let vertices = body_vertices(mesh);
+    let center = vertices.iter().map(|v| Vec3::from(v.position)).sum::<Vec3>()
+        / vertices.len().max(1) as f32;
+    GpuMesh {
+        vertex: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(&mesh.name),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        }),
+        index: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(&mesh.name),
+            contents: bytemuck::cast_slice(&mesh.indices),
+            usage: wgpu::BufferUsages::INDEX,
+        }),
+        count: mesh.indices.len() as u32,
+        material: mesh.material,
+        center,
+    }
+}
+
 struct CarRenderState {
+    anim_parts: Vec<CarAnimRender>,
+    /// Closed top at rest (`CabrioUp*`, in `meshes`) and the open one (`CabrioDown*`).
+    roof_up: Vec<usize>,
+    roof_down: Vec<GpuMesh>,
+    /// Meshes no plain draw shows: the top's morph frame 0 when a rest mesh replaces it.
+    hidden: BTreeSet<usize>,
     meshes: Vec<GpuMesh>,
     materials: Vec<GpuMaterial>,
     chassis_mesh_indices: Vec<usize>,
@@ -531,6 +629,49 @@ struct CarWheelRender {
     radius: f32,
     mesh_indices: Vec<usize>,
 }
+
+/// Car, track and object shader (`car.wgsl`).
+pub(crate) const CAR_SHADER: &str = include_str!("car.wgsl");
+/// Sky dome mapping remains experimental; default retains the pre-PR26 A4 mapping.
+#[cfg(feature = "experimental-original-port")]
+pub(crate) const SKY_SHADER: &str = include_str!("sky.wgsl");
+#[cfg(not(feature = "experimental-original-port"))]
+pub(crate) const SKY_SHADER: &str = include_str!("sky-baseline.wgsl");
+/// Topology debug lines (colour per vertex, pulled slightly toward the camera).
+pub(crate) const TOPOLOGY_LINE_SHADER: &str = r#"
+struct Camera {
+    matrix: mat4x4<f32>,
+    eye: vec4<f32>,
+    model: mat4x4<f32>,
+};
+@group(0) @binding(0) var<uniform> camera: Camera;
+
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+    @location(1) color: vec4<f32>,
+};
+
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec4<f32>,
+};
+
+@vertex
+fn vs_main(in: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    var world_pos = camera.model * vec4<f32>(in.position, 1.0);
+    var clip_pos = camera.matrix * world_pos;
+    clip_pos.z = clip_pos.z - 0.0004 * clip_pos.w;
+    out.clip_position = clip_pos;
+    out.color = in.color;
+    return out;
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    return in.color;
+}
+"#;
 
 pub struct Renderer {
     pub device: wgpu::Device,
@@ -551,6 +692,9 @@ pub struct Renderer {
     pub topology: Option<TopologyRenderer>,
     pub show_topology: bool,
     pub show_collision_boxes: bool,
+    /// Car sphere-map reflection pass (`R3DSpecularTextureLayer` 0x445520). Off by default:
+    /// its blend mapping remains unproved (A71). Key Y or `?reflection=1` opts in.
+    pub car_reflection: bool,
     box_overlay: Option<BoxOverlay>,
     pub road_edges: Vec<nfs_assets::TopologyEdge>,
     pub road_surface: Option<nfs_assets::RoadSurface>,
@@ -561,6 +705,8 @@ pub struct Renderer {
     pub player_camera: nfs_assets::camera::PlayerCamera,
     /// Debug free camera (V): the eye stays, the view follows the car.
     pub free_camera: bool,
+    /// Debug: fixed eye and target (scene axes) instead of the car camera.
+    pub debug_look: Option<(Vec3, Vec3)>,
     /// Shift+V (debug, not original): the drive view swung about the car by this many degrees
     /// (0 off, +/-`SIDE_VIEW_DEG`) to see the wheels.
     pub side_view_deg: f32,
@@ -591,12 +737,30 @@ pub struct Renderer {
     original_ais: Option<Vec<u8>>,
     pub original_ai: Option<nfs_assets::race::original_ai::field::OriginalAiField>,
     collision_clock: nfs_assets::race::original_collision::CollisionClock,
+    /// Track collision objects (trees, pillars, crates) and their smash state.
+    track_world: Option<nfs_assets::physics::original_track_pass::TrackObjectWorld>,
+    smash_events: Vec<nfs_assets::physics::original_track_pass::SmashEvent>,
+    crate_smash: crate::crate_smash::CrateSmash,
+    smashables: Vec<nfs_assets::Smashable>,
+    smash_props: Vec<nfs_assets::PropArticle>,
+    smash_clock: f32,
+    /// Smackable objects (signs, cones, posts) as flag-0x80 object cars.
+    smack_world: nfs_assets::physics::original_smackable::SmackWorld,
+    smack_props: Vec<nfs_assets::SmackProp>,
+    smack_owners: [nfs_assets::physics::original_support_owner::OriginalSupportOwner; 4],
     pair_globals: nfs_assets::physics::original_pair::PairGlobals,
+    /// Car setup screen choices (transmission, damage) for the original vehicle.
+    car_setup: nfs_assets::physics::original_vehicle::CarSetup,
+    /// Pending gear event (SHIFTUP 2 / SHIFTDOWN 3) and the frames it is still held: the input
+    /// word is read on even steps only; the request is idempotent until the gear changes.
+    pending_shift: (u8, u8),
     /// Persistent body support owner (original car+8) for the barrier pass.
     body_support_owner: nfs_assets::physics::original_support_owner::OriginalSupportOwner,
     /// Original collision box of the loaded car: centre in race body space
     /// (before the chassis adapter offset) and half extents.
     car_collision_box: Option<(Vec3, [f32; 3])>,
+    /// Body points of the loaded car (CRP `BndP`) in race body space (`(-x, y, z)`).
+    car_body_points: Vec<Vec3>,
     pub race_session: Option<nfs_assets::RaceSession>,
     pub track_course: Option<nfs_assets::TrackCourse>,
     pub course_tracker: Option<nfs_assets::CourseProgressTracker>,
@@ -606,8 +770,16 @@ pub struct Renderer {
     ai_performance: Option<nfs_assets::AiPerformance>,
     /// Debug cap for AI speed (m/s), cycled with J: none, 30 km/h, parked.
     ai_speed_limit: Option<f32>,
+    /// Quick Race choices that reach the race (`docs/re/frontend.md` "Race start parameters").
+    pub race_options: RaceOptions,
+    /// Start line trigger of the loaded race direction (`Scene::start_trigger`).
+    start_trigger: Option<[f32; 3]>,
+    /// LINEAR_TRACK `[0x657494]` from the track record (`None`: from the course).
+    linear_track: Option<bool>,
     pub barrier_config: nfs_assets::BarrierCollisionConfig,
     pub is_wrong_way: bool,
+    /// In-race pause (`DAT_00606a90`): `update_car` runs no step. `re/pause.md`.
+    pub paused: bool,
     /// Track reset (R, `Car_ResetWatch 0x40f740`): its timers, the pending key event, the
     /// 32 Hz tick clock, and the number of resets done (debug).
     reset_watch: nfs_assets::race::reset::ResetWatch,
@@ -619,6 +791,17 @@ pub struct Renderer {
     pub fe_room: Option<crate::fe_room::RoomView>,
     /// Draw the loaded car in the front-end room (layouts with a 3D car control).
     pub fe_room_car: bool,
+    /// Body paint of the room car (the colour button's list entry); `None` keeps the model's.
+    pub fe_room_paint: Option<[f32; 4]>,
+    /// Car compare screen (`carcompare.lay`): the room car stands at spot 1 and the stashed
+    /// second car at spot 2 (`FECar3DControl` position types 1 and 2, A230).
+    pub fe_compare: bool,
+    /// Opening of the room car's top, hood and trunk lid (front-end clicks, A232).
+    pub fe_car_anim: crate::fe_room::CarAnim,
+    /// Wall clock of the tweens, set by the browser each frame.
+    pub fe_anim_ms: f64,
+    fe_compare2: Option<CompareCar>,
+    pub fe_compare_paint2: Option<[f32; 4]>,
     /// Front-end screen with an empty room (`ID_NONE`): draw nothing but the clear colour.
     pub fe_room_hidden: bool,
     /// Rendered source-model bounds adapter; original selected bounds getter
@@ -637,6 +820,12 @@ pub struct Renderer {
     pub stunt_detector: Option<nfs_game::factory_driver::StuntDetector>,
     /// Car glares and shadows (`docs/re/lighting.md`).
     effects: crate::effects::Effects,
+    /// Sun sprite and lens flare (`Sun_Draw` 0x460290, `Flare_Draw` 0x460460).
+    sun_flare: crate::sun::SunFlareGpu,
+    /// Sun point of the track's sky config (`Sky_SunPosition` 0x461090), scene axes.
+    sun_position: Option<Vec3>,
+    /// `Render/flare.dat` records of the loaded car scene.
+    flare: Option<nfs_formats::FlareData>,
     car_glares: Vec<nfs_assets::CarGlare>,
     /// Needle calibration of the car's `nfs5.car` record (`docs/re/cockpit.md`).
     cockpit_gauges: nfs_assets::cockpit::Gauges,
@@ -650,6 +839,25 @@ pub struct Renderer {
     car_lighting: Option<CarLighting>,
     /// Player's spark emitter (`R3DCarParticle` slot 4, `CSPK`), if carpart.dat loaded.
     spark_emitter: Option<nfs_assets::sparks::SparkEmitter>,
+    /// Track particle emitters, their manager on the 64 Hz clock, the record
+    /// map and the player's wheel emitters (`docs/re/particles.md`).
+    particle_emitters: Vec<nfs_assets::particles::TrackEmitter>,
+    particle_manager: nfs_assets::particles::ParticleManager,
+    /// Weather keys of `Sky/<track>.bin`, the weather at the camera's track node and that
+    /// node (`SkyManager_Draw` 0x45d4f0, `docs/re/weather.md`).
+    sky_weather: Option<nfs_formats::SkyWeather>,
+    pub weather: nfs_formats::Weather,
+    pub weather_node: i32,
+    /// Snow and rain boxes of the weather manager (0x458c90; `docs/re/weather.md`), their
+    /// 64 Hz clock and the generator 0x538040 they draw phases and gusts from.
+    precipitation: Vec<nfs_assets::precipitation::Precipitation>,
+    precipitation_filled: bool,
+    weather_clock: nfs_assets::particles::ParticleClock,
+    game_random: nfs_assets::precipitation::GameRandom,
+    particle_clock: nfs_assets::particles::ParticleClock,
+    particle_defs: Vec<nfs_assets::particles::ParticleDef>,
+    car_particles: Option<nfs_assets::particles::CarParticles>,
+    car_particle_clock: f32,
     /// Barrier contacts of the collide ticks since the last effects update.
     spark_contacts: Vec<SparkContact>,
     spark_clock: f32,
@@ -671,6 +879,22 @@ fn scenario_start_pose(start: nfs_assets::ScenarioStart) -> (Vec3, f32) {
     (Vec3::from(start.position), yaw)
 }
 
+/// Race options of the Quick Race front end, written like the original's `FE_WriteCarConfig`
+/// 0x4eb470/0x4ecf00 writes them as config keys.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RaceOptions {
+    /// `SKILL` `[0x6573f4]` = `Game.Difficutly` (0 beginner, 1 advanced, 2 expert).
+    pub difficulty: i32,
+    /// `MIRROR` `[0x65742c]`: the picture is mirrored and the steering swapped.
+    pub mirror: bool,
+    /// Skill values of each opponent (`res+0x154`, from the driver records), by grid slot.
+    pub opponent_skills: Vec<[f32; 8]>,
+    /// Body paint of the player's car and of each opponent (linear RGBA), by grid slot; the
+    /// front end picks them (`docs/re/frontend.md` "Opponent cars and colours").
+    pub player_paint: Option<[f32; 4]>,
+    pub opponent_paints: Vec<[f32; 4]>,
+}
+
 fn quick_race_grid(
     course: &nfs_assets::TrackCourse,
     laps: u32,
@@ -687,7 +911,8 @@ fn quick_race_grid(
         nfs_assets::AiProfile::veteran(),
         nfs_assets::AiProfile::novice(),
     ];
-    for (i, profile) in profiles.into_iter().take(opponents as usize).enumerate() {
+    for i in 0..opponents as usize {
+        let profile = profiles[i % profiles.len()].clone();
         let slot = i + 1;
         let opponent = nfs_assets::AiOpponent::new(
             slot,
@@ -1003,6 +1228,7 @@ impl Renderer {
                 material.alpha_cutoff,
                 if material.paintable { 1.0 } else { 0.0 },
                 if material.prelit { 1.0 } else { 0.0 },
+                0.0, 0.0, 0.0, 0.0, // anim: uv offset
             ];
             let color = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&material.name),
@@ -1030,7 +1256,9 @@ impl Renderer {
             materials.push(GpuMaterial {
                 group,
                 color_buffer: color,
+                uv_scroll: material.uv_scroll,
                 paintable: material.paintable,
+                tail: if material.prelit { 1.0 } else { 0.0 },
                 alpha_mode: material.alpha_mode,
                 alpha_cutoff: material.alpha_cutoff,
                 double_sided: material.double_sided,
@@ -1039,7 +1267,7 @@ impl Renderer {
         }
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("car shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("car.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(CAR_SHADER.into()),
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("car"),
@@ -1181,6 +1409,10 @@ impl Renderer {
                 &sky_tex.rgba,
                 &scene.sky_layers,
                 &scene.sky_horizon.unwrap_or_else(default_sky_horizon),
+                scene.sky_dome.as_ref(),
+                scene.sky_map.as_ref(),
+                &scene.sky_layers_b,
+                scene.sky_map_b.as_ref(),
             )
         });
 
@@ -1211,43 +1443,7 @@ impl Renderer {
                 });
                 let line_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
                     label: Some("topology line shader"),
-                    source: wgpu::ShaderSource::Wgsl(
-                        r#"
-struct Camera {
-    matrix: mat4x4<f32>,
-    eye: vec4<f32>,
-    model: mat4x4<f32>,
-};
-@group(0) @binding(0) var<uniform> camera: Camera;
-
-struct VertexInput {
-    @location(0) position: vec3<f32>,
-    @location(1) color: vec4<f32>,
-};
-
-struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
-    @location(0) color: vec4<f32>,
-};
-
-@vertex
-fn vs_main(in: VertexInput) -> VertexOutput {
-    var out: VertexOutput;
-    var world_pos = camera.model * vec4<f32>(in.position, 1.0);
-    var clip_pos = camera.matrix * world_pos;
-    clip_pos.z = clip_pos.z - 0.0004 * clip_pos.w;
-    out.clip_position = clip_pos;
-    out.color = in.color;
-    return out;
-}
-
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return in.color;
-}
-"#
-                        .into(),
-                    ),
+                    source: wgpu::ShaderSource::Wgsl(TOPOLOGY_LINE_SHADER.into()),
                 });
                 let line_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("topology line layout"),
@@ -1443,6 +1639,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                     0.0,
                     0.0,
                     0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
                 ];
                 let color_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("procedural car color"),
@@ -1470,7 +1670,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 car_materials.push(GpuMaterial {
                     group,
                     color_buffer: color_buf,
+                    uv_scroll: None,
                     paintable: color_idx == crate::car_mesh::MAT_BODY,
+                    tail: 0.0,
                     alpha_mode,
                     alpha_cutoff: 0.0,
                     double_sided: false,
@@ -1518,6 +1720,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 wheels: Vec::new(),
                 body_bounds: None,
                 in_car: Vec::new(),
+                anim_parts: Vec::new(),
+                roof_up: Vec::new(),
+                roof_down: Vec::new(),
+                hidden: BTreeSet::new(),
             });
         }
 
@@ -1608,7 +1814,33 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
 
         let effects = crate::effects::Effects::new(&device, format);
+        let sun_flare = crate::sun::SunFlareGpu::new(&device, format, effects.texture_layout());
+        let mut smash_definitions = vec![None; scene.track_objects.len()];
+        for s in &scene.smashables {
+            smash_definitions[s.object_index] = Some(s.definition.clone());
+        }
+        let track_world = (!scene.track_objects.is_empty()).then(|| {
+            nfs_assets::physics::original_track_pass::TrackObjectWorld::with_definitions(
+                scene.track_objects.clone(),
+                smash_definitions,
+            )
+        });
         Ok(Self {
+            track_world,
+            smash_events: Vec::new(),
+            crate_smash: crate::crate_smash::CrateSmash::new(scene.smashables.len()),
+            smashables: scene.smashables.clone(),
+            smash_props: scene.prop_articles.clone(),
+            smash_clock: 0.0,
+            smack_world: nfs_assets::physics::original_smackable::SmackWorld::new(
+                &scene
+                    .smack_props
+                    .iter()
+                    .map(|p| p.record.clone())
+                    .collect::<Vec<_>>(),
+            ),
+            smack_props: scene.smack_props.clone(),
+            smack_owners: Default::default(),
             device,
             queue,
             camera,
@@ -1627,6 +1859,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             topology: topology_renderer,
             show_topology: false,
             show_collision_boxes: false,
+            car_reflection: false,
             box_overlay: box_overlay_init,
             road_surface: scene.road_surface.clone(),
             road_edges,
@@ -1638,6 +1871,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 START_CYCLE_INDEX,
             ),
             free_camera: false,
+            debug_look: None,
             side_view_deg: 0.0,
             vehicle_contact_count: 0,
             sim_mode: true,
@@ -1654,16 +1888,23 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             original_ai: None,
             collision_clock: Default::default(),
             pair_globals: Default::default(),
+            car_setup: Default::default(),
+            pending_shift: (0, 0),
             body_support_owner: Default::default(),
             car_collision_box: None,
+            car_body_points: Vec::new(),
             race_session,
             track_course,
             course_tracker,
             ai_opponents,
             ai_performance: None,
             ai_speed_limit: None,
+            race_options: RaceOptions::default(),
+            start_trigger: scene.start_trigger,
+            linear_track: None,
             barrier_config: nfs_assets::BarrierCollisionConfig::default(),
             is_wrong_way: false,
+            paused: false,
             reset_watch: Default::default(),
             reset_request: false,
             reset_clock: 0.0,
@@ -1671,6 +1912,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             car_render,
             fe_room: None,
             fe_room_car: false,
+            fe_room_paint: None,
+            fe_compare: false,
+            fe_car_anim: crate::fe_room::CarAnim::CLOSED,
+            fe_anim_ms: 0.0,
+            fe_compare2: None,
+            fe_compare_paint2: None,
             fe_room_hidden: false,
             trigger_half_extents: None,
             scenario_props,
@@ -1685,6 +1932,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             mission_elapsed_time: 0.0,
             stunt_detector: None,
             effects,
+            sun_flare,
+            sun_position: scene.sun_position.map(Vec3::from),
+            flare: None,
             car_glares: Vec::new(),
             cockpit_gauges: Default::default(),
             player_lights: Default::default(),
@@ -1693,6 +1943,19 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             light_clock_s: 0.0,
             car_lighting: CarLighting::from_track(scene),
             spark_emitter: None,
+            particle_emitters: scene.particle_emitters.clone(),
+            particle_manager: Default::default(),
+            sky_weather: scene.sky_weather.clone(),
+            weather: Default::default(),
+            weather_node: 0,
+            precipitation: Vec::new(),
+            precipitation_filled: false,
+            weather_clock: Default::default(),
+            game_random: Default::default(),
+            particle_clock: Default::default(),
+            particle_defs: Vec::new(),
+            car_particles: None,
+            car_particle_clock: 0.0,
             camera_layout,
             specular_sampler,
             pipeline_factory,
@@ -1711,6 +1974,26 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             self.depth = depth_view(&self.device, width, height);
         }
     }
+    /// Writes the body paint of the car meshes (the `CarExt` materials).
+    fn paint_car(&self, car_render: &CarRenderState, color: [f32; 4]) {
+        for material in car_render.materials.iter().filter(|m| m.paintable) {
+            self.queue.write_buffer(
+                &material.color_buffer,
+                0,
+                bytemuck::cast_slice(&[
+                    color[0],
+                    color[1],
+                    color[2],
+                    color[3],
+                    alpha_mode_code(material.alpha_mode),
+                    material.alpha_cutoff,
+                    1.0,
+                    material.tail,
+                ]),
+            );
+        }
+    }
+
     fn draw_car_meshes(
         &self,
         target: &wgpu::TextureView,
@@ -1935,6 +2218,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         if self.width == 0 || self.height == 0 {
             return;
         }
+        // `LayerUVAnimate` mode 0 (waterfalls, rivers, sea): V offset from the clock [VA 0x448cc0].
+        let seconds = animation_seconds();
+        for material in &self.materials {
+            if let Some(speed) = material.uv_scroll {
+                let v = nfs_assets::uv_scroll_offset(speed, seconds);
+                self.queue.write_buffer(&material.color_buffer, 32, bytemuck::cast_slice(&[0.0f32, v, 0.0, 0.0]));
+            }
+        }
         // Front-end room: fixed original camera, the room model turns [VA 0x4e9ff0].
         let mut static_model = Mat4::IDENTITY;
         if let Some(room) = &self.fe_room {
@@ -1942,7 +2233,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             self.camera.drive_pos = room.eye();
             self.camera.drive_target = room.target();
             self.camera.drive_up = Vec3::Y;
-            self.camera.drive_hfov = Some(room.room.horizontal_fov_deg);
+            self.camera.drive_hfov = Some(if cfg!(feature = "experimental-original-port") && self.fe_compare {
+                crate::fe_room::COMPARE_HFOV_DEG
+            } else {
+                room.room.horizontal_fov_deg
+            });
             self.camera.drive_near = 0.1;
             static_model = room.room_matrix();
         }
@@ -1957,10 +2252,32 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             let sky_vp = self.camera.sky_view_projection(self.width, self.height);
             let mut sky_uniform = sky.uniform;
             sky_uniform.view_projection = sky_vp.to_cols_array_2d();
+            let t = animation_seconds();
+            sky_uniform.drift = sky.drift.map(|v| ((f64::from(v) * t).rem_euclid(1.0)) as f32);
+            let f = (self.camera.target() - self.camera.eye()).normalize_or(Vec3::NEG_Z);
+            sky_uniform.forward = [f.x, f.y, f.z, 0.0];
+            let w = &self.weather;
+            sky_uniform.blend = [w.region_b, 0.0, 0.0, 0.0];
+            if w.sky_fog_density > 0.0 {
+                let [r, g, b] = argb_unit(w.sky_fog_color);
+                sky_uniform.fog = [r, g, b, w.sky_fog_density];
+            }
+            if let (Some(sw), Some(t)) = (&self.sky_weather, &self.original_ai_track) {
+                // 0x459950: the record of the sky detail level (highest present); 0x459a70.
+                let rec = sw.clear_record(3);
+                let rgb = if rec.use_fog_color {
+                    argb_unit(sw.sky_fog_color_forced(self.weather_node, t.nodes.nodes.len() as i32))
+                } else {
+                    let b = w.region_b;
+                    [0, 1, 2].map(|k| ((1.0 - b) * rec.color_a[k] + b * rec.color_b[k]).round() / 255.0)
+                };
+                sky_uniform.clear = [rgb[0], rgb[1], rgb[2], 1.0];
+            }
             self.queue
                 .write_buffer(&sky.camera_buffer, 0, bytemuck::bytes_of(&sky_uniform));
         }
 
+        let sun_shown = self.prepare_sun();
         let mut encoder = self.device.create_command_encoder(&Default::default());
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -1970,11 +2287,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.022,
-                            g: 0.030,
-                            b: 0.044,
-                            a: 1.0,
+                        load: wgpu::LoadOp::Clear(if cfg!(feature = "experimental-original-port") && self.fe_compare {
+                            wgpu::Color::TRANSPARENT
+                        } else {
+                            wgpu::Color {
+                                r: 0.022,
+                                g: 0.030,
+                                b: 0.044,
+                                a: 1.0,
+                            }
                         }),
                         store: wgpu::StoreOp::Store,
                     },
@@ -1998,6 +2319,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 pass.set_vertex_buffer(0, sky.vertex_buffer.slice(..));
                 pass.set_index_buffer(sky.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 pass.draw_indexed(0..sky.index_count, 0, 0..1);
+            }
+            // 1b. The sun sprite belongs to the sky pass (`SkyManager_Draw` 0x45d4f0
+            // calls `Sun_Draw` 0x460290 between the sky layers).
+            if sun_shown {
+                self.sun_flare.draw_sun(&mut pass, &self.effects);
             }
 
             // 2. Draw static geometry (identity model matrix)
@@ -2042,8 +2368,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         self.queue.submit([encoder.finish()]);
 
         // 3. Draw prop instances (one encoder per instance to update model matrix)
-        if !self.prop_draws.is_empty() {
-            for prop_draw in &self.prop_draws {
+        let crate_draws: Vec<PropDraw> = self
+            .crate_smash
+            .draws(self.smash_clock, &self.smashables, &self.smash_props)
+            .into_iter()
+            .map(|d| PropDraw {
+                model: d.model,
+                mesh_range: d.mesh_range,
+            })
+            .chain(self.smack_draws())
+            .collect();
+        if !self.prop_draws.is_empty() || !crate_draws.is_empty() {
+            for prop_draw in self.prop_draws.iter().chain(crate_draws.iter()) {
                 let mut uniform = self.scene_uniform();
                 uniform.model = prop_draw.model.to_cols_array_2d();
                 self.queue
@@ -2107,21 +2443,153 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             &self.car_render,
             self.fe_room_car && !self.fe_room_hidden,
         ) {
-            let all_meshes: Vec<usize> = (0..car_render.meshes.len()).collect();
-            self.draw_car_meshes(
-                target,
-                "front-end room car",
-                car_render,
-                room.car_matrix({
+            if let Some(paint) = self.fe_room_paint {
+                self.paint_car(car_render, paint);
+            }
+            // The new FE part composition includes inferred hinges (A232).
+            // Keep the previous complete static car until that composition is opted into.
+            if !cfg!(feature = "experimental-original-port") {
+                let all_meshes = car_render.visible();
+                self.draw_car_meshes(
+                    target,
+                    "front-end room car",
+                    car_render,
+                    room.car_matrix({
+                        let (center, half) = self.collision_box_or_fallback();
+                        fe_room_car_lift(center, half)
+                    }),
+                    &all_meshes,
+                );
+            } else {
+                let moving: BTreeSet<usize> = car_render
+                    .anim_parts
+                    .iter()
+                    .flat_map(|p| p.base.iter().copied())
+                    .collect();
+                let roof_open = self.fe_car_anim.roof.value(self.fe_anim_ms);
+                let fixed: Vec<usize> = (0..car_render.meshes.len())
+                    .filter(|i| {
+                        !moving.contains(i)
+                            && !car_render.hidden.contains(i)
+                            && !(car_render.roof_up.contains(i) && roof_open > 0.0)
+                    })
+                    .collect();
+                let car_matrix = room.car_matrix({
                     let (center, half) = self.collision_box_or_fallback();
                     fe_room_car_lift(center, half)
-                }),
-                &all_meshes,
-            );
+                });
+                self.draw_car_meshes(target, "front-end room car", car_render, car_matrix, &fixed);
+                for part in &car_render.anim_parts {
+                    let open = self
+                        .fe_car_anim
+                        .tween(part.channel)
+                        .map_or(0.0, |t| t.value(self.fe_anim_ms));
+                    if let (1, Some(morph)) = (part.channel, &part.morph) {
+                        // Cabrio top: the frame channel runs 0..max over the opening; the shape blends
+                        // frames floor and floor + 1 by the fraction.
+                        let max = (morph.frames.len() - 1) as f32;
+                        let pos = open.clamp(0.0, 1.0) * max;
+                        if pos <= 0.0 {
+                            // Closed: the rest mesh is in `fixed`; without one frame 0 is drawn.
+                            if car_render.roof_up.is_empty() {
+                                self.draw_car_meshes(target, "room car top", car_render, car_matrix, &part.base);
+                            }
+                        } else if pos >= max && !car_render.roof_down.is_empty() {
+                            let all: Vec<usize> = (0..car_render.roof_down.len()).collect();
+                            self.draw_gpu_meshes(
+                                target,
+                                "room car top down",
+                                &car_render.roof_down,
+                                &car_render.materials,
+                                car_matrix,
+                                &all,
+                            );
+                        } else {
+                            let f0 = (pos.floor() as usize).min(morph.frames.len() - 1);
+                            let f1 = (f0 + 1).min(morph.frames.len() - 1);
+                            let t = pos - f0 as f32;
+                            for (mi, dynamic) in morph.dynamic.iter().enumerate() {
+                                let (a, b) = (&morph.frames[f0][mi], &morph.frames[f1][mi]);
+                                let blended: Vec<GpuVertex> = a
+                                    .iter()
+                                    .zip(b)
+                                    .map(|(p, q)| GpuVertex {
+                                        position: Vec3::from(p.position)
+                                            .lerp(Vec3::from(q.position), t)
+                                            .to_array(),
+                                        normal: Vec3::from(p.normal)
+                                            .lerp(Vec3::from(q.normal), t)
+                                            .to_array(),
+                                        uv: p.uv,
+                                        color: p.color,
+                                    })
+                                    .collect();
+                                self.queue.write_buffer(&dynamic.vertex, 0, bytemuck::cast_slice(&blended));
+                            }
+                            let all: Vec<usize> = (0..morph.dynamic.len()).collect();
+                            self.draw_gpu_meshes(
+                                target,
+                                "room car top blend",
+                                &morph.dynamic,
+                                &car_render.materials,
+                                car_matrix,
+                                &all,
+                            );
+                        }
+                    } else {
+                        // Hood / trunk lid (about the body x axis) and doors (about y) through the hinge.
+                        let angle = part.open_sign * part.extent * open * std::f32::consts::TAU;
+                        let turn = if part.axis == 1 {
+                            Mat4::from_rotation_y(angle)
+                        } else {
+                            Mat4::from_rotation_x(angle)
+                        };
+                        let hinge = Mat4::from_translation(part.pivot) * turn * Mat4::from_translation(-part.pivot);
+                        self.draw_car_meshes(target, "room car lid", car_render, car_matrix * hinge, &part.base);
+                    }
+                }
+            }
+        }
+        // 3.4b. Car compare screen: two cars at the fixed compare spots, no room.
+        if let (Some(room), Some(car1), Some(car2), true) = (
+            &self.fe_room,
+            &self.car_render,
+            &self.fe_compare2,
+            cfg!(feature = "experimental-original-port") && self.fe_compare,
+        ) {
+            let lift = |b: Option<(Vec3, [f32; 3])>| {
+                let (center, half) = b.unwrap_or((Vec3::ZERO, FALLBACK_HALF_EXTENTS));
+                fe_room_car_lift(center, half)
+            };
+            let spots = [
+                (crate::fe_room::COMPARE_SPOT_1, car1, self.car_collision_box, self.fe_room_paint),
+                (
+                    crate::fe_room::COMPARE_SPOT_2,
+                    &car2.render,
+                    car2.collision_box,
+                    self.fe_compare_paint2,
+                ),
+            ];
+            for (spot, render, collision_box, paint) in spots {
+                if let Some(paint) = paint {
+                    self.paint_car(render, paint);
+                }
+                let all_meshes: Vec<usize> = render.visible();
+                self.draw_car_meshes(
+                    target,
+                    "compare car",
+                    render,
+                    room.compare_car_matrix(spot, lift(collision_box)),
+                    &all_meshes,
+                );
+            }
         }
 
         // 3.5. Draw car on track (if present)
         if let (Some(car), Some(car_render), None) = (&self.car, &self.car_render, &self.fe_room) {
+            if let Some(paint) = self.race_options.player_paint {
+                self.paint_car(car_render, paint);
+            }
             // The bumper view looks out from inside the body: like the
             // original BumperCam, the player's own car isn't drawn.
             let bumper_view = self.camera.mode == CameraMode::Drive
@@ -2188,7 +2656,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                     );
                 }
             } else {
-                let all_meshes: Vec<usize> = (0..car_render.meshes.len()).collect();
+                let all_meshes: Vec<usize> = car_render.visible();
                 self.draw_car_meshes(
                     target,
                     "arcade car",
@@ -2199,7 +2667,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             }
 
             // Draw AI opponent vehicles on track with the same visible model.
-            for ai in &self.ai_opponents {
+            for (slot, ai) in self.ai_opponents.iter().enumerate() {
+                // Each opponent's own paint; the player's goes back after the loop.
+                if let Some(paint) = self.race_options.opponent_paints.get(slot) {
+                    self.paint_car(car_render, *paint);
+                }
                 // Approximation: AI cars are kinematic; tilt follows the road
                 // surface, not the original vehicle model.
                 let model_matrix = Mat4::from_translation(Vec3::from(ai.position))
@@ -2234,6 +2706,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 }
             }
 
+            if let Some(paint) = self.race_options.player_paint {
+                self.paint_car(car_render, paint);
+            }
+
             // Restore identity model for remaining passes
             self.queue.write_buffer(
                 &self.camera_buffer,
@@ -2244,6 +2720,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         // 3.6 Car shadows and light glares.
         self.draw_car_effects(target);
+
+        // 3.7 Lens flare over the frame (`Flare_Draw` 0x460460 after the scene).
+        if sun_shown {
+            self.sun_flare
+                .draw_flare(&self.device, &self.queue, target, &self.depth, &self.effects);
+        }
 
         // 3b. Collision box wireframes (debug)
         self.draw_collision_boxes(target);
@@ -2284,6 +2766,32 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             }
             self.queue.submit([encoder.finish()]);
         }
+    }
+
+    /// Sun and flare sprites of this frame (`Sun_Draw` 0x460290, `Flare_Draw`
+    /// 0x460460); false when there is no sun on screen. Needs the track's sky (sun
+    /// point) and the car scene's `flare.dat` and `common.fsh`.
+    fn prepare_sun(&mut self) -> bool {
+        // A270: the recovered sprite geometry does not yet prove GPU blending.
+        if !cfg!(feature = "experimental-original-port") {
+            return false;
+        }
+        let (Some(sun), Some(flare)) = (self.sun_position, &self.flare) else {
+            return false;
+        };
+        if self.sky.is_none() || self.fe_room.is_some() || !crate::sun::sun_shown(sun) {
+            return false;
+        }
+        let (w, h) = (self.width as f32, self.height as f32);
+        let vp = self.camera.sky_view_projection(self.width, self.height);
+        let Some(px) = crate::sun::sun_screen(sun, vp, w, h) else {
+            return false;
+        };
+        let sun_sprites = crate::sun::sun_sprites(flare, px, w, h);
+        let flare_sprites = crate::sun::flare_sprites(flare, px, w, h);
+        self.sun_flare
+            .prepare(&self.device, &self.queue, w, h, px, &sun_sprites, &flare_sprites);
+        true
     }
 
     /// Car shadows (`R3DCar_DrawShadow` 0x43b820) and light glares
@@ -2350,6 +2858,27 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 &camera,
             );
         }
+        // A250/A252: request visibility and driver blend mapping remain experimental.
+        if cfg!(feature = "experimental-original-port") {
+            for system in self
+                .particle_manager
+                .drawn()
+                .chain(self.car_particles.iter().flat_map(|c| c.drawn()))
+            {
+                push_particles(
+                    &mut shadows,
+                    &mut glares,
+                    system,
+                    nfs_assets::physics::original_adapter::from_original,
+                    &camera,
+                );
+            }
+            // Snow and rain last (0x459020 after the particles), camera space to world.
+            let pose = self.precipitation_pose();
+            for system in &self.precipitation {
+                push_precipitation(&mut glares, system, &pose, &camera);
+            }
+        }
         let view_projection = self.camera.view_projection(self.width, self.height);
         self.effects.draw(
             &self.device,
@@ -2365,6 +2894,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     pub fn toggle_collision_boxes(&mut self) -> bool {
         self.show_collision_boxes = !self.show_collision_boxes;
         self.show_collision_boxes
+    }
+
+    /// Turn the car sphere-map reflection on or off; returns the new state.
+    pub fn set_car_reflection(&mut self, on: bool) -> bool {
+        self.car_reflection = on;
+        on
     }
 
     /// Current pair cars (player first) and the chassis box, if a sim car is loaded.
@@ -2704,7 +3239,33 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
     }
 
+    /// Pauses or resumes the race: while paused no scheduler step runs (the original gates
+    /// `Sched_Step` on `DAT_00606a90`, `re/pause.md` section 3). The session phase follows.
+    pub fn set_paused(&mut self, paused: bool) {
+        if self.paused == paused {
+            return;
+        }
+        self.paused = paused;
+        if let Some(session) = self.race_session.as_mut() {
+            if paused {
+                session.pause();
+            } else {
+                session.resume();
+            }
+        }
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.paused
+    }
+
     pub fn update_car(&mut self, dt: f32, mut throttle: f32, steer: f32, handbrake: bool) {
+        if self.paused {
+            return;
+        }
+        // MIRROR `[0x65742c]` mirrors the steering input (`docs/re/vehicle.md`); the page
+        // flips the picture.
+        let steer = if self.race_options.mirror { -steer } else { steer };
         let previous_contacts = self.vehicle_contact_proxies();
         let original = self.original_active();
         let edges = &self.road_edges;
@@ -2799,6 +3360,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         self.update_lights(dt, player_light_inputs);
         self.update_sparks(dt);
+        self.update_weather(dt);
+        self.update_particles(dt);
 
         // Advance opponents before resolving all vehicle pairs. Collision response
         // is applied back to their controller, rather than discarded next frame.
@@ -2828,6 +3391,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             self.run_original_collision(dt);
         } else {
             self.resolve_vehicle_contacts(&previous_contacts);
+        }
+        self.smash_clock += dt;
+        self.process_smash_events();
+        self.advance_smackables(dt);
+        // Track-object contacts are `0x5xxxx` codes: the original's contact effects
+        // make no sparks for them (`docs/re/contact-effects.md`), only a sound
+        // (not wired); the hit list is dropped.
+        if let Some(world) = self.track_world.as_mut() {
+            world.hits.clear();
         }
         if let (true, Some(sim)) = (self.sim_mode, &self.sim_car) {
             player_pos = sim.body.position.to_array();
@@ -2953,8 +3525,85 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let mut uniform = self.camera.uniform(self.width, self.height);
         if let Some(lighting) = &self.car_lighting {
             lighting.apply(&mut uniform, [1.0; 3]);
+            uniform.specular[3] = if self.car_reflection { 1.0 } else { 0.0 };
         }
+        self.apply_fog(&mut uniform);
         uniform
+    }
+
+    /// `SkyManager_Draw` 0x45d4f0: the camera's track node (`TrackNodes_Locate` 0x481400 from
+    /// the last node) selects the weather of `Sky/<track>.bin` (`docs/re/weather.md`).
+    fn update_weather(&mut self, dt: f32) {
+        use nfs_assets::precipitation::{Precipitation, RAIN, SNOW};
+        let (Some(w), Some(t)) = (&self.sky_weather, &self.original_ai_track) else {
+            return;
+        };
+        let n = t.nodes.nodes.len() as i32;
+        if n == 0 {
+            return;
+        }
+        let eye = nfs_assets::physics::original_adapter::to_original(self.camera.eye());
+        self.weather_node = t.nodes.locate(eye, self.weather_node.clamp(0, n - 1));
+        self.weather = w.at(self.weather_node, n);
+        // A280: the viewer's precipitation initialization uses an unproved seed.
+        // Weather lookup and fog remain available independently of precipitation.
+        if !cfg!(feature = "experimental-original-port") {
+            return;
+        }
+        // 0x459020: snow takes the snow key (0x45cfd0), rain the rain key (0x45d000).
+        if self.precipitation.is_empty() {
+            let g = &mut self.game_random;
+            self.precipitation = vec![Precipitation::new(SNOW, g), Precipitation::new(RAIN, g)];
+        }
+        let intensities = [self.weather.snow, self.weather.rain];
+        let pose = self.precipitation_pose();
+        let random = &mut self.particle_manager.random;
+        if !self.precipitation_filled {
+            // 0x459260 at render init.
+            self.precipitation_filled = true;
+            for (s, i) in self.precipitation.iter_mut().zip(intensities) {
+                s.fill(i, random, &mut self.game_random);
+            }
+        }
+        let ticks = self.weather_clock.advance(dt);
+        for (s, i) in self.precipitation.iter_mut().zip(intensities) {
+            s.update(ticks, i, pose, random, &mut self.game_random);
+        }
+    }
+
+    /// The camera's world-to-camera rows (right, up, forward) and eye in original axes.
+    fn precipitation_pose(&self) -> nfs_assets::precipitation::CameraPose {
+        use nfs_assets::physics::original_adapter::to_original;
+        let f = crate::effects::CameraFrame::look(self.camera.eye(), self.camera.target());
+        nfs_assets::precipitation::CameraPose {
+            rows: [to_original(f.right), to_original(f.up), to_original(f.forward)],
+            eye: to_original(f.eye),
+        }
+    }
+
+    /// Debug: track node centre and forward in scene axes (6 floats), empty without nodes.
+    pub fn node_pose(&self, node: usize) -> Vec<f32> {
+        use nfs_assets::physics::original_adapter::from_original;
+        let Some(n) = self.original_ai_track.as_ref().and_then(|t| t.nodes.nodes.get(node)) else {
+            return Vec::new();
+        };
+        let (p, f) = (from_original(n.pos_04), from_original(n.forward_1c));
+        vec![p.x, p.y, p.z, f.x, f.y, f.z]
+    }
+
+    /// Debug: live snow and rain particles.
+    pub fn precipitation_stats(&self) -> [f32; 2] {
+        let live = |i: usize| self.precipitation.get(i).map_or(0.0, |s| s.live() as f32);
+        [live(0), live(1)]
+    }
+
+    /// World fog after the sky (`0x45d3b0`): EXP table fog, density = key³, colour of the keys.
+    fn apply_fog(&self, uniform: &mut CameraUniform) {
+        let w = &self.weather;
+        if w.world_fog_density > 0.0 {
+            let [r, g, b] = argb_unit(w.world_fog_color);
+            uniform.fog = [r, g, b, w.world_fog_density];
+        }
     }
 
     /// Camera uniform for a car at `model`, lit with the road colour under it.
@@ -2968,8 +3617,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 .map(crate::shade_sample::desaturate)
                 .unwrap_or([1.0; 3]);
             lighting.apply(&mut uniform, road);
+            uniform.specular[3] = if self.car_reflection { 1.0 } else { 0.0 };
         }
         uniform.model = model.to_cols_array_2d();
+        self.apply_fog(&mut uniform);
         uniform
     }
 
@@ -3024,16 +3675,125 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
     }
 
+    /// Track emitters (0x4689c0 tick, then the requests of the drawn
+    /// articles, 0x450d10) and the player's wheel emitters (0x43ef80, 32 Hz).
+    fn update_particles(&mut self, dt: f32) {
+        if !cfg!(feature = "experimental-original-port") {
+            return;
+        }
+        use nfs_assets::particles::*;
+        use nfs_assets::physics::original_adapter::from_original;
+        for _ in 0..self.particle_clock.advance(dt) {
+            self.particle_manager.tick();
+        }
+        let view_projection = self.camera.view_projection(self.width, self.height);
+        let eye = self.camera.eye();
+        for (key, e) in self.particle_emitters.iter().enumerate() {
+            let Some(def) = self.particle_defs.iter().find(|d| d.tag == e.tag) else {
+                continue;
+            };
+            let p = from_original(e.frame.position);
+            let distance_sq = p.distance_squared(eye);
+            // Approximation A250: requested when inside the view frustum
+            // (margin: jitter + 30) and within PARTICLE_REQUEST_RANGE.
+            if distance_sq > PARTICLE_REQUEST_RANGE * PARTICLE_REQUEST_RANGE {
+                continue;
+            }
+            let margin = def.emit[0].max(def.emit[2]) + 30.0;
+            let clip = view_projection * p.extend(1.0);
+            let slack = clip.w.abs() + margin * 2.0;
+            if clip.w < -margin || clip.x.abs() > slack || clip.y.abs() > slack {
+                continue;
+            }
+            self.particle_manager.request(key, def, e.frame, distance_sq);
+        }
+        if !self.original_active() {
+            return;
+        }
+        let (Some(car_particles), Some(v)) = (&mut self.car_particles, self.original_vehicle.as_ref()) else {
+            return;
+        };
+        let car = &v.car;
+        let mut input = CarParticleInput {
+            velocity: car.velocity_33c,
+            forward: car.axes_364[2],
+            speed: car.vel_fwd_d60(),
+            // Rain key of the camera node above 0.1 (0x45d000); `0x6197aa` is the driver's
+            // capability flag (0x44eb98), set on hardware renderers.
+            raining: self.weather.raining(),
+            rain_spray: true,
+            distance_sq: from_original(car.position_330).distance_squared(eye),
+            ..Default::default()
+        };
+        for (w, src) in input.wheels.iter_mut().zip(&car.wheels) {
+            *w = WheelParticleInput {
+                contact: src.point_40,
+                surface: (src.tyre.surface_8c & 0xf) as u32,
+                skid: src.tyre.skid_b8,
+            };
+        }
+        car_particles.update(&input);
+        self.car_particle_clock += dt.max(0.0);
+        let step = 1.0 / nfs_assets::sparks::PARTICLE_HZ;
+        while self.car_particle_clock >= step {
+            self.car_particle_clock -= step;
+            car_particles.tick(self.particle_manager.far, &mut self.particle_manager.random);
+        }
+    }
+
+    /// Debug: drawn track systems, their live particles, emitters, car particles.
+    pub fn particle_stats(&self) -> [f32; 5] {
+        let drawn: Vec<_> = self.particle_manager.drawn().collect();
+        [
+            drawn.len() as f32,
+            drawn.iter().map(|s| s.particles.len()).sum::<usize>() as f32,
+            self.particle_emitters.len() as f32,
+            self.car_particles
+                .as_ref()
+                .map_or(0, |c| c.drawn().map(|s| s.particles.len()).sum::<usize>()) as f32,
+            // Bit i: car system i active (SMRT×4, CSPK, WTSP×2, RDDT×4).
+            self.car_particles.as_ref().map_or(-1.0, |c| {
+                c.systems.iter().enumerate().filter(|(_, s)| s.active).map(|(i, _)| 1u32 << i).sum::<u32>() as f32
+            }),
+        ]
+    }
+
+    /// Debug: camera track node, rain, snow, sky fog density, world fog density, sky-map
+    /// blend, lightning, then the surface nibble (`polygon flags & 0xf`, the `g_GripTable`
+    /// row) under the four wheels of the original car (−1 without it).
+    pub fn weather_stats(&self) -> [f32; 11] {
+        let w = &self.weather;
+        let mut out = [
+            self.weather_node as f32,
+            w.rain,
+            w.snow,
+            w.sky_fog_density,
+            w.world_fog_density,
+            w.region_b,
+            w.lightning,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+        ];
+        if let Some(v) = self.original_vehicle.as_ref().filter(|_| self.original_active()) {
+            for (o, wheel) in out[7..].iter_mut().zip(&v.car.wheels) {
+                *o = (wheel.tyre.surface_8c & 0xf) as f32;
+            }
+        }
+        out
+    }
+
     /// Debug: live sparks, bursts so far, strongest barrier contact strength.
     pub fn spark_stats(&self) -> [f32; 6] {
         let first = self
             .spark_emitter
             .as_ref()
-            .and_then(|e| e.sparks.first())
+            .and_then(|e| e.sparks().first())
             .map(|s| nfs_assets::physics::original_adapter::from_original(s.position))
             .unwrap_or(Vec3::ZERO);
         [
-            self.spark_emitter.as_ref().map_or(0, |e| e.sparks.len()) as f32,
+            self.spark_emitter.as_ref().map_or(0, |e| e.sparks().len()) as f32,
             self.spark_bursts as f32,
             self.max_barrier_impact,
             first.x,
@@ -3048,17 +3808,87 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         self.light_switch
     }
 
+    /// Debug: the last solid track object the player hit ("name [tag] size at x,y,z").
+    pub fn object_hit_report(&self) -> String {
+        let Some(world) = &self.track_world else {
+            return String::new();
+        };
+        let Some(o) = world.last_hit.and_then(|i| world.objects().get(i)) else {
+            return String::new();
+        };
+        let size = [0, 1, 2].map(|i| o.bounds_max[i] - o.bounds_min[i]);
+        let c = o.centre();
+        format!(
+            "{} [{}] {:.1}x{:.1}x{:.1} at {:.0},{:.0},{:.0}",
+            o.name,
+            String::from_utf8_lossy(&o.tag.to_le_bytes()).trim_end_matches('\0'),
+            size[0], size[1], size[2], c[0], c[1], c[2]
+        )
+    }
+
+    /// Debug (headless checks): smackable objects as `[count, awake, hit, smashed crates]`.
+    pub fn smack_stats(&self) -> [f32; 4] {
+        let b = &self.smack_world.bodies;
+        [
+            b.len() as f32,
+            b.iter().filter(|x| !x.asleep).count() as f32,
+            b.iter().filter(|x| x.car.pair.active_7c).count() as f32,
+            self.track_world.as_ref().map_or(0.0, |w| {
+                (0..w.objects().len())
+                    .filter(|&i| w.state(i) == nfs_assets::physics::original_track_smash::SmashState::Smashed)
+                    .count() as f32
+            }),
+        ]
+    }
+
+    /// Debug: place the car at `pos` heading `yaw` (radians) and restart the original model.
+    pub fn debug_start(&mut self, pos: [f32; 3], yaw: f32) -> f32 {
+        let mut car_pos = Vec3::from(pos);
+        let hit = self
+            .road_surface
+            .as_ref()
+            .and_then(|s| s.query(car_pos.x, car_pos.z, car_pos.y, 200.0, 400.0));
+        if let Some(hit) = &hit {
+            car_pos.y = hit.height;
+        }
+        if let Some(car) = &mut self.car {
+            car.set_pose(car_pos, yaw);
+        }
+        if let Some(sim) = &mut self.sim_car {
+            sim.reset(car_pos + Vec3::Y * sim.resting_height(), yaw);
+        }
+        self.restart_original_vehicle();
+        hit.map_or(-1000.0, |h| h.height)
+    }
+
     pub fn reset_car(&mut self) {
         self.player_camera.restart();
         self.proto_view = None;
         self.body_support_owner = Default::default();
         self.collision_clock = Default::default();
         self.vehicle_contact_count = 0;
+        // Smashed objects come back [VA 0x476170].
+        if let Some(world) = &mut self.track_world {
+            world.reset();
+        }
+        self.crate_smash.reset();
+        let records: Vec<_> = self.smack_props.iter().map(|p| p.record.clone()).collect();
+        self.smack_world.reset(&records);
         self.reset_scenario_props();
         if let Some(course) = &self.track_course {
             let (pos, _, yaw) = nfs_assets::calculate_grid_slot(0, course);
             let mut car_pos = Vec3::from(pos);
             let mut car_yaw = yaw;
+            // The original start: the player's grid slot on the node graph at the start line.
+            if !self.is_mission_mode {
+                let racers = 1 + self.ai_opponents.len() as i32;
+                if let Some(slot) = self.start_slot(racers, racers) {
+                    let p = nfs_assets::physics::original_adapter::from_original(slot.position);
+                    let f = nfs_assets::physics::original_adapter::from_original(slot.forward);
+                    car_pos = p;
+                    car_yaw = (-f.x).atan2(-f.z);
+                }
+            }
             let scenario_start = self.scenario_start.filter(|_| self.is_mission_mode);
             if let Some(start) = scenario_start {
                 let (position, heading) = scenario_start_pose(start);
@@ -3103,6 +3933,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                     }
                     h
                 });
+            let road_up = hit.as_ref().map(|h| Vec3::from(h.normal));
             if let Some(hit) = hit {
                 car_pos.y = hit.height;
             }
@@ -3112,7 +3943,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 self.camera.drive_target = car.camera_target;
             }
             if let Some(sim) = &mut self.sim_car {
-                sim.reset(car_pos + Vec3::Y * sim.resting_height(), car_yaw);
+                // `Car_PlaceOnNode` 0x49b090: the frame is the road's (up = the support plane
+                // normal, forward along the heading), so a start on a slope is level with it.
+                let up = road_up.filter(|u| u.y > 0.05).unwrap_or(Vec3::Y);
+                sim.reset(car_pos + up * sim.resting_height(), car_yaw);
+                sim.body.orientation =
+                    Quat::from_mat3(&nfs_assets::race::ai::tilted_basis(car_yaw, up)).normalize();
             }
             if let Some(progress) = &mut self.mission_progress {
                 progress.reset(car_pos.to_array());
@@ -3461,6 +4297,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     pub fn get_race_phase(&self) -> u32 {
+        if self.paused {
+            return 3;
+        }
         if self.is_mission_mode {
             return if self.mission_timed_out || self.get_mission_goal_reached() {
                 4
@@ -3538,6 +4377,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     pub fn restart_race(&mut self) {
+        self.set_paused(false);
         self.reset_car();
         if self.is_mission_mode {
             self.mission_elapsed_time = 0.0;
@@ -3551,11 +4391,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     /// Start a standalone race on the loaded course with the selected grid size.
     pub fn configure_quick_race(&mut self, laps: u32, opponents: u32) -> Result<(), String> {
-        if !matches!(laps, 1 | 3 | 5) {
-            return Err("Quick Race laps must be 1, 3, or 5".into());
+        if !(1..=8).contains(&laps) {
+            return Err("Quick Race laps must be 1 to 8".into());
         }
-        if !matches!(opponents, 0 | 3) {
-            return Err("Quick Race opponents must be 0 or 3".into());
+        if opponents > 7 {
+            return Err("Quick Race opponents must be 0 to 7".into());
         }
         let course = self
             .track_course
@@ -3565,6 +4405,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             return Err("Quick Race track course has no starting grid".into());
         }
         let (session, ai) = quick_race_grid(course, laps, opponents);
+        self.paused = false;
         self.race_session = Some(session);
         self.ai_opponents = ai;
         for ai in &mut self.ai_opponents {
@@ -3808,6 +4649,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         if self.camera.mode != CameraMode::Drive {
             return;
         }
+        if let Some((eye, target)) = self.debug_look {
+            self.camera.use_world_view();
+            self.camera.drive_fov = 60.0;
+            self.camera.drive_pos = eye;
+            self.camera.drive_target = target;
+            return;
+        }
         if self.free_camera {
             self.camera.use_world_view();
             self.camera.drive_fov = 55.0;
@@ -3973,12 +4821,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     /// Original race HUD telemetry: `[speed_ec4 m/s, engine_rpm, gear_raw, redline_rpm,
-    /// damage x8]`. `speed_ec4` is the original car+0xec4 (VA 0x40eec0):
+    /// damage x9]`. `speed_ec4` is the original car+0xec4 (VA 0x40eec0):
     /// `max(|vx|,|vz|) + 0.25*min(|vx|,|vz|)` of the world velocity. `gear_raw` is the
-    /// car+0xd82 encoding (0 R, 1 N, 2.. 1st..). Damage is car+0x4e4..0x504 (VA 0x422470)
+    /// car+0xd82 encoding (0 R, 1 N, 2.. 1st..). Damage is car+0x4e4..0x504, 9 zones (VA 0x422470)
     /// for the original model, zeros otherwise.
     pub fn get_hud_telemetry(&self) -> Vec<f32> {
-        let mut damage = [0.0f32; 8];
+        let mut damage = [0.0f32; 9];
         let (vx, vz, gear_raw);
         if let Some(v) = self
             .original_vehicle
@@ -3988,7 +4836,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             vx = v.car.velocity_33c[0];
             vz = v.car.velocity_33c[2];
             gear_raw = v.car.gear_d82 as f32;
-            damage.copy_from_slice(&v.car.damage_4e4[..8]);
+            damage.copy_from_slice(&v.car.damage_4e4[..9]);
         } else if let (true, Some(sim)) = (self.sim_mode, &self.sim_car) {
             vx = sim.body.linear_velocity.x;
             vz = sim.body.linear_velocity.z;
@@ -4051,19 +4899,47 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         format!("[{}]", items.join(","))
     }
 
-    /// Track course polyline as x,z pairs in world units. This is the racing line (the
-    /// `.lsp` spline), not the original SimD node centre line (`HTrackMap_BuildOutline`
-    /// 0x432230).
-    pub fn get_course_outline(&self) -> Vec<f32> {
-        self.track_course
-            .as_ref()
-            .map(|c| {
-                c.waypoints
-                    .iter()
-                    .flat_map(|w| [w.position[0], w.position[2]])
-                    .collect()
-            })
-            .unwrap_or_default()
+    /// HUD track map: 4 header floats (bounding box centre x, z, extent, 1 for a
+    /// circuit) then line segments `x0, z0, x1, z1` in engine world units. Built from the
+    /// node graph as `HTrackMap_BuildOutline` 0x432230 builds it (one polyline per
+    /// section plus junction connectors); without a node graph (A87) the `.lsp`
+    /// racing line of the course, one polyline.
+    pub fn get_course_map(&self) -> Vec<f32> {
+        use nfs_assets::race::track_map::TrackMap;
+        if let Some(t) = self.original_ai_track.as_ref() {
+            let n = &t.nodes.nodes;
+            if n.len() >= 2 {
+                let m = TrackMap::build(&t.nodes);
+                let (a, b) = (n[0].pos_04, n[n.len() - 1].pos_04);
+                let closed = ((a[0] - b[0]).powi(2) + (a[2] - b[2]).powi(2)).sqrt() < 100.0;
+                // Node coordinates are the original's; the engine world has z negated
+                // (`from_original`), like the car markers.
+                let mut out = vec![m.centre[0] as f32, -(m.centre[1] as f32), m.extent, closed as u8 as f32];
+                out.extend(m.segments().iter().flat_map(|s| [s[0], -s[1], s[2], -s[3]]));
+                return out;
+            }
+        }
+        let Some(c) = self.track_course.as_ref() else {
+            return Vec::new();
+        };
+        let pts: Vec<[f32; 2]> = c.waypoints.iter().map(|w| [w.position[0], w.position[2]]).collect();
+        if pts.len() < 3 {
+            return Vec::new();
+        }
+        let (mut x0, mut x1, mut z0, mut z1) = (f32::MAX, f32::MIN, f32::MAX, f32::MIN);
+        for p in &pts {
+            x0 = x0.min(p[0]);
+            x1 = x1.max(p[0]);
+            z0 = z0.min(p[1]);
+            z1 = z1.max(p[1]);
+        }
+        let (a, b) = (pts[0], pts[pts.len() - 1]);
+        let closed = ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt() < 100.0;
+        let mut out = vec![(x0 + x1) / 2.0, (z0 + z1) / 2.0, (x1 - x0).max(z1 - z0), closed as u8 as f32];
+        for w in pts.windows(2) {
+            out.extend([w[0][0], w[0][1], w[1][0], w[1][1]]);
+        }
+        out
     }
 
     /// Car markers, 8 floats per car, player first then AI:
@@ -4294,12 +5170,37 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     /// Original collision passes due this frame (32 Hz), on the player car
     /// and the AI cars. See nfs_assets::race::original_collision.
+    /// Starts the crate animations of the smashes the last collision passes found.
+    fn process_smash_events(&mut self) {
+        // A172: the baked smash animation's rate and placement are still inferred.
+        if !cfg!(feature = "experimental-original-port") {
+            self.smash_events.clear();
+            return;
+        }
+        for event in std::mem::take(&mut self.smash_events) {
+            if let Some(i) = self
+                .smashables
+                .iter()
+                .position(|s| s.object_index == event.object_index)
+            {
+                self.crate_smash.smash(
+                    i,
+                    self.smash_clock,
+                    event.speed,
+                    &self.smashables,
+                    &self.smash_props,
+                );
+            }
+        }
+    }
+
     fn run_original_collision(&mut self, dt: f32) {
         use nfs_assets::physics::original_adapter::apply_pair_car_to_sim;
         use nfs_assets::race::original_collision::{
-            apply_barrier_state, apply_pair_car_to_ai, barrier_state, collide_pass,
+            apply_barrier_state, apply_pair_car_to_ai, barrier_state,
         };
         let passes = self.collision_clock.advance(dt);
+        let wheel_points_for_objects = self.original_wheel_points();
         let (Some(sim), Some((center, half))) = (self.sim_car.as_mut(), self.car_collision_box)
         else {
             return;
@@ -4313,28 +5214,54 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             .road_surface
             .as_ref()
             .filter(|s| s.uses_original_support());
+        let wheel_points = wheel_points_for_objects;
         for _ in 0..passes {
             let mut cars =
                 build_collision_pair_cars(sim, &self.ai_opponents, center, adapter, half);
+            let n_cars = cars.len();
+            let awake = if cfg!(feature = "experimental-original-port") {
+                self.smack_world.awake()
+            } else {
+                Vec::new()
+            };
+            cars.extend(
+                awake
+                    .iter()
+                    .map(|&i| self.smack_world.bodies[i].car.pair.clone()),
+            );
             let before = cars.clone();
             let owner = &mut self.body_support_owner;
             let contacts = &mut self.spark_contacts;
-            collide_pass(&mut cars, &mut self.pair_globals, |index, car| {
-                // AI cars are kinematic and follow the course: no barrier pass
-                // (approximation A6).
-                let (0, Some(surface)) = (index, surface) else {
+            let mut world = self.track_world.as_mut()
+                .filter(|_| cfg!(feature = "experimental-original-port"));
+            let events = &mut self.smash_events;
+            nfs_assets::race::original_collision::collide_pass_with(&mut cars, &mut self.pair_globals, |index, car, globals| {
+                // AI cars are kinematic and follow the course: no barrier or
+                // object pass (approximations A6, A173). The object pass
+                // follows the edge pass [VA 0x498ff0].
+                if index != 0 {
                     return;
-                };
-                let mut state = barrier_state(car);
-                if let Ok(Some(hit)) =
-                    surface.original_barrier_contact(&mut state, car.extents_3a8, owner)
-                {
-                    apply_barrier_state(car, &state);
-                    contacts.push(SparkContact {
-                        impact: hit.magnitude,
-                        point: hit.point,
-                        velocity: state.velocity_33c,
-                    });
+                }
+                if let Some(surface) = surface {
+                    let mut state = barrier_state(car);
+                    if let Ok(Some(hit)) =
+                        surface.original_barrier_contact(&mut state, car.extents_3a8, owner)
+                    {
+                        apply_barrier_state(car, &state);
+                        contacts.push(SparkContact {
+                            impact: hit.magnitude,
+                            point: hit.point,
+                            velocity: state.velocity_33c,
+                        });
+                    }
+                }
+                if let Some(world) = world.as_deref_mut() {
+                    let mut o = nfs_assets::physics::original_track_pass::object_car_from_pair(
+                        car,
+                        &wheel_points,
+                    );
+                    world.pass(&mut o, globals, events);
+                    *car = o.pair;
                 }
             });
             if cars[0] != before[0] {
@@ -4346,7 +5273,76 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             for (i, ai) in self.ai_opponents.iter_mut().enumerate() {
                 apply_pair_car_to_ai(ai, &before[i + 1], &cars[i + 1]);
             }
+            for (k, &i) in awake.iter().enumerate() {
+                let body = &mut self.smack_world.bodies[i];
+                body.car.pair = cars[n_cars + k].clone();
+                body.update_world_points();
+            }
         }
+    }
+
+    /// Runs the smackable objects' own steps and returns nothing; the
+    /// pair collisions with them happen in the collision passes.
+    fn advance_smackables(&mut self, dt: f32) {
+        if !cfg!(feature = "experimental-original-port") {
+            return;
+        }
+        use nfs_assets::physics::original_adapter::to_original;
+        if self.smack_world.bodies.is_empty() {
+            return;
+        }
+        let mut cars: Vec<[f32; 3]> = Vec::new();
+        if let Some(v) = self.original_vehicle.as_ref().filter(|_| self.original_active()) {
+            cars.push(v.car.position_330);
+        } else if let Some(sim) = &self.sim_car {
+            cars.push(to_original(sim.body.position));
+        }
+        cars.extend(
+            self.ai_opponents
+                .iter()
+                .map(|a| to_original(Vec3::from(a.position))),
+        );
+        let surface = self.road_surface.as_ref();
+        let owners = &mut self.smack_owners;
+        let mut ground = |p: [f32; 3]| {
+            surface.and_then(|surface| {
+                use nfs_assets::physics::original_vehicle::ground::{GroundQuery, RoadGround};
+                RoadGround { surface, owners }.wheel_ground(0, p)
+            })
+        };
+        self.smack_world
+            .advance(dt, &cars, &mut ground, &mut self.pair_globals);
+    }
+
+    /// Draw calls of the smackable objects at their poses.
+    fn smack_draws(&self) -> Vec<PropDraw> {
+        use glam::{Mat3, Mat4};
+        let flip = Mat4::from_scale(Vec3::new(1.0, 1.0, -1.0));
+        self.smack_props
+            .iter()
+            .zip(&self.smack_world.bodies)
+            .map(|(prop, body)| {
+                let cols = |a: [[f32; 3]; 3]| {
+                    Mat3::from_cols(Vec3::from(a[0]), Vec3::from(a[1]), Vec3::from(a[2]))
+                };
+                let home = cols(prop.record.axes);
+                let pair = &body.car.pair;
+                let now = cols([pair.axis_r_364, pair.axis_u_370, pair.axis_f_37c]);
+                let model = if body.moved || pair.position_330 != prop.record.position {
+                    let rot = Mat4::from_mat3(now * home.transpose());
+                    flip * Mat4::from_translation(Vec3::from(pair.position_330))
+                        * rot
+                        * Mat4::from_translation(-Vec3::from(prop.record.position))
+                        * flip
+                } else {
+                    Mat4::IDENTITY
+                };
+                PropDraw {
+                    model,
+                    mesh_range: prop.meshes.clone(),
+                }
+            })
+            .collect()
     }
 
     /// Whether the original vehicle model drives the player car now (6 DOF driving, `O`
@@ -4385,6 +5381,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         points
     }
 
+    /// The car model's body points (CRP `BndP`, `Car_ReadTpgCameraKeys` 0x441a10) relative
+    /// to the collision box centre in the original car axes (R, U, F), with the same
+    /// mapping as [`Self::original_wheel_points`]. Empty without a model.
+    fn original_body_points(&self) -> Vec<[f32; 3]> {
+        let (center, _) = self.collision_box_or_fallback();
+        self.car_body_points
+            .iter()
+            .map(|&q| {
+                let p = q - center;
+                [p.x, p.y, -p.z]
+            })
+            .collect()
+    }
+
     /// Rebuilds the original car from the loaded `.sim` and the drawn car (box, wheels).
     fn rebuild_original_vehicle(&mut self) {
         use nfs_assets::physics::original_vehicle::OriginalVehicle;
@@ -4393,8 +5403,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             return;
         };
         let (_, half) = self.collision_box_or_fallback();
-        self.original_vehicle =
-            OriginalVehicle::from_sim(bytes, model, half, self.original_wheel_points()).ok();
+        self.original_vehicle = OriginalVehicle::from_sim_with(
+            bytes,
+            model,
+            half,
+            self.original_wheel_points(),
+            self.car_setup,
+        )
+        .ok();
+        let body = self.original_body_points();
+        if let Some(v) = &mut self.original_vehicle {
+            v.set_body_points(&body);
+        }
         self.sync_original_from_sim(false);
     }
 
@@ -4483,6 +5503,85 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         car.speed_35c * 3.6
     }
 
+    /// Car setup screen: manual box (`.TRANSMISSION` 0) and the damage option (`Game.Damage`,
+    /// `[0x657a2c]`, which also gates the zone damage of collisions). Applied to the original
+    /// car at once; the manual box changes the derived drive factors, so the car is rebuilt.
+    /// Difficulty, mirror and the opponents' driver skills of the next race (call before
+    /// `configure_quick_race`). `skills` is 8 values per opponent.
+    pub fn set_race_options(
+        &mut self,
+        difficulty: i32,
+        mirror: bool,
+        skills: &[f32],
+        player_paint: &[f32],
+        opponent_paints: &[f32],
+    ) {
+        let rgba = |c: &[f32]| -> [f32; 4] { c.try_into().unwrap() };
+        self.race_options = RaceOptions {
+            difficulty: difficulty.clamp(0, 2),
+            mirror,
+            opponent_skills: skills
+                .chunks_exact(8)
+                .map(|c| c.try_into().unwrap())
+                .collect(),
+            player_paint: (player_paint.len() == 4).then(|| rgba(player_paint)),
+            opponent_paints: opponent_paints.chunks_exact(4).map(rgba).collect(),
+        };
+        self.rebuild_original_ai();
+    }
+
+    /// Whether the track record marks the track as point to point (LINEAR_TRACK).
+    pub fn set_linear_track(&mut self, linear: bool) {
+        self.linear_track = Some(linear);
+    }
+
+    /// Original start placement of grid value `grid` (the player has `racers`, the last
+    /// opponent 1) on the node graph (`race::original_ai::start`); `None` without a node graph.
+    pub fn start_slot(
+        &self,
+        grid: i32,
+        racers: i32,
+    ) -> Option<nfs_assets::race::original_ai::start::StartSlot> {
+        use nfs_assets::race::original_ai::start;
+        let track = self.original_ai_track.as_ref()?;
+        let nodes = &track.nodes;
+        if nodes.nodes.len() < 2 {
+            return None;
+        }
+        let linear = self
+            .linear_track
+            .unwrap_or_else(|| !self.track_course.as_ref().is_some_and(|c| c.is_circuit));
+        let node = match self.start_trigger {
+            Some(t) => start::start_node(nodes, t),
+            // `FUN_00410730`: no start trigger: node 1, 50 on a long point-to-point track.
+            None if linear && nodes.lap_nodes_04 > 99 => 50,
+            None => 1,
+        };
+        Some(start::slot(nodes, node, track.reverse, linear, racers, grid))
+    }
+
+    pub fn set_car_setup(&mut self, manual_box: bool, damage: bool) {
+        use nfs_assets::physics::original_vehicle::CarSetup;
+        let setup = CarSetup { manual_box, damage };
+        let rebuild = setup.manual_box != self.car_setup.manual_box;
+        self.car_setup = setup;
+        self.pair_globals.damage_on_657a2c = damage;
+        if rebuild && self.original_sim.is_some() {
+            self.rebuild_original_vehicle();
+        } else if let Some(v) = &mut self.original_vehicle {
+            v.set_setup(setup);
+        }
+    }
+
+    /// Gear event for the manual box: +1 SHIFTUP, -1 SHIFTDOWN (`Input_GearRequest 0x413890`).
+    pub fn shift_gear(&mut self, direction: i32) {
+        use nfs_assets::physics::original_vehicle::controls::{EVENT_SHIFT_DOWN, EVENT_SHIFT_UP};
+        if self.car_setup.manual_box && direction != 0 {
+            let code = if direction > 0 { EVENT_SHIFT_UP } else { EVENT_SHIFT_DOWN };
+            self.pending_shift = (code, 2);
+        }
+    }
+
     /// Race (re)start of the original car at the 6 DOF body's spawn pose.
     fn restart_original_vehicle(&mut self) {
         self.drawn_states = None;
@@ -4528,12 +5627,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         use nfs_assets::physics::original_lcg::OriginalLcg;
         use nfs_assets::physics::original_vehicle::{
             OriginalCar, OriginalVehicle, RoadGround, StepQueue,
-            driver::{camera_car, collide_player},
+            driver::camera_car,
             input_word, scheduler_step,
         };
         use nfs_assets::race::original_collision::{apply_pair_car_to_ai, pair_car_from_ai_original};
         let (center, half) = self.collision_box_or_fallback();
-        let word = input_word(throttle.max(0.0), (-throttle).max(0.0), steer, handbrake);
+        let mut word = input_word(throttle.max(0.0), (-throttle).max(0.0), steer, handbrake);
+        if self.pending_shift.1 > 0 {
+            word |= u32::from(self.pending_shift.0) << 3;
+            self.pending_shift.1 -= 1;
+        }
         if self.original_ai.is_some() {
             // Player and original AI cars in the original order (original_ai_view).
             self.run_original_field(dt, word);
@@ -4553,6 +5656,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             locator,
             clock,
             half_extents,
+            ..
         } = v;
 
         struct Queue<'a> {
@@ -4569,6 +5673,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             camera: &'a mut nfs_assets::camera::PlayerCamera,
             /// Barrier contacts of the player per collide tick (sparks).
             contacts: &'a mut Vec<SparkContact>,
+            /// Track objects and the smashes that start (`Car_CollideTrackObjects`).
+            world: Option<&'a mut nfs_assets::physics::original_track_pass::TrackObjectWorld>,
+            smack: &'a mut nfs_assets::physics::original_smackable::SmackWorld,
+            events: &'a mut Vec<nfs_assets::physics::original_track_pass::SmashEvent>,
         }
         impl StepQueue for Queue<'_> {
             fn track_locate(&mut self, car: &mut OriginalCar) {
@@ -4610,12 +5718,21 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                     .iter()
                     .map(|a| pair_car_from_ai_original(a, self.ai_box.0, self.ai_box.1))
                     .collect();
+                // Awake smackable objects are cars in the pair test.
+                let n_ai = ai.len();
+                let awake = if cfg!(feature = "experimental-original-port") {
+                    self.smack.awake()
+                } else {
+                    Vec::new()
+                };
+                ai.extend(awake.iter().map(|&i| self.smack.bodies[i].car.pair.clone()));
                 let before = ai.clone();
                 let barrier = self.surface.filter(|s| s.uses_original_support());
                 let (half, owner) = (self.half, &mut self.locator.owner);
                 let contacts = &mut *self.contacts;
-                collide_player(car, half, &mut ai, self.pair_globals, lcg, |state| {
-                    let Some(s) = barrier else { return false };
+                let objects = self.world.as_deref_mut().map(|w| (w, &mut *self.events));
+                nfs_assets::physics::original_vehicle::driver::collide_player_objects(car, half, &mut ai, self.pair_globals, lcg, objects, |state| {
+                    let s = barrier?;
                     match s.original_barrier_contact(state, half, owner) {
                         Ok(Some(hit)) => {
                             contacts.push(SparkContact {
@@ -4623,13 +5740,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                                 point: hit.point,
                                 velocity: state.velocity_33c,
                             });
-                            true
+                            Some(hit.into())
                         }
-                        _ => false,
+                        _ => None,
                     }
                 });
                 for (a, (b, c)) in self.ai.iter_mut().zip(before.iter().zip(&ai)) {
                     apply_pair_car_to_ai(a, b, c);
+                }
+                for (k, &i) in awake.iter().enumerate() {
+                    let body = &mut self.smack.bodies[i];
+                    body.car.pair = ai[n_ai + k].clone();
+                    body.update_world_points();
                 }
             }
             fn camera(&mut self, car: &OriginalCar) {
@@ -4652,6 +5774,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             half: *half_extents,
             camera: &mut self.player_camera,
             contacts: &mut self.spark_contacts,
+            world: self.track_world.as_mut()
+                .filter(|_| cfg!(feature = "experimental-original-port")),
+            smack: &mut self.smack_world,
+            events: &mut self.smash_events,
         };
         // Starts the camera (end of the race intro) on the first call; no steps.
         queue.camera.advance(
@@ -4810,6 +5936,24 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     /// Load genuine Porsche car model geometry, textures, and simulation profile onto the track.
+    /// The loaded car has a moving part of this channel (1 top, 8 hood, 9 trunk lid).
+    pub fn car_render_has_part(&self, channel: u8) -> Option<bool> {
+        self.car_render
+            .as_ref()
+            .map(|c| c.anim_parts.iter().any(|p| p.channel == channel))
+    }
+
+    /// Moves the car loaded last (`set_car_model`) to the compare screen's second spot.
+    pub fn stash_compare_car(&mut self) {
+        if !cfg!(feature = "experimental-original-port") {
+            return;
+        }
+        self.fe_compare2 = self.car_render.take().map(|render| CompareCar {
+            render,
+            collision_box: self.car_collision_box,
+        });
+    }
+
     pub fn set_car_model(&mut self, scene: &Scene, car_name: &str) -> Result<(), String> {
         // The car loader divides raw geometry by five; driving rendering below
         // restores it. This adapter uses that same visible body's dimensions.
@@ -4883,14 +6027,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 material.alpha_cutoff,
                 if material.paintable { 1.0 } else { 0.0 },
                 // Light slot 1 for the interior (approximation A23: by render method).
-                // 3 = exterior with the env/specular layers (render method `CarExtEnv`).
-                if material.name.ends_with(":CarInt") {
+                // 3 + k = reflection layer with texture slot k (`CarExtEnv`, `CarWindow`).
+                if let Some(slot) = material.env_slot {
+                    3.0 + f32::from(slot)
+                } else if material.name.ends_with(":CarInt") {
                     2.0
-                } else if material.name.ends_with(":CarExtEnv") {
-                    3.0
                 } else {
                     0.0
                 },
+                0.0,
+                0.0,
+                0.0,
+                0.0,
             ];
             let color = self
                 .device
@@ -4920,7 +6068,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             car_materials.push(GpuMaterial {
                 group,
                 color_buffer: color,
+                uv_scroll: material.uv_scroll,
                 paintable: material.paintable,
+                tail: material_uniform[7],
                 alpha_mode: material.alpha_mode,
                 alpha_cutoff: material.alpha_cutoff,
                 double_sided: material.double_sided,
@@ -5026,15 +6176,81 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             .iter()
             .flat_map(|wheel| wheel.mesh_indices.iter().copied())
             .collect();
-        let chassis_mesh_indices = (0..car_meshes.len())
+        let chassis_mesh_indices: Vec<usize> = (0..car_meshes.len())
             .filter(|mesh_index| !wheel_mesh_indices.contains(mesh_index))
             .collect();
 
+        let anim_parts: Vec<CarAnimRender> = scene
+            .car_anim_parts
+            .iter()
+            .map(|part| CarAnimRender {
+                channel: part.channel,
+                axis: part.axis,
+                pivot: Vec3::from(part.pivot),
+                open_sign: part.open_sign,
+                extent: part.extent,
+                base: part
+                    .base_meshes
+                    .iter()
+                    .filter_map(|&i| mesh_index_map.get(i).and_then(|v| *v))
+                    .collect(),
+                morph: (!part.frames.is_empty()).then(|| {
+                    let base: Vec<Vec<GpuVertex>> = part
+                        .base_meshes
+                        .iter()
+                        .map(|&i| body_vertices(&scene.meshes[i]))
+                        .collect();
+                    let mut frames = vec![base];
+                    frames.extend(
+                        part.frames
+                            .iter()
+                            .map(|set| set.iter().map(body_vertices).collect::<Vec<_>>()),
+                    );
+                    CarMorph {
+                        dynamic: part
+                            .base_meshes
+                            .iter()
+                            .map(|&i| dynamic_car_mesh(&self.device, &scene.meshes[i]))
+                            .collect(),
+                        frames,
+                    }
+                }),
+            })
+            .collect();
+        let roof_up: Vec<usize> = scene
+            .car_roof_up
+            .iter()
+            .filter_map(|&i| mesh_index_map.get(i).and_then(|v| *v))
+            .collect();
+        let roof_down: Vec<GpuMesh> = scene
+            .car_roof_down
+            .iter()
+            .map(|m| dynamic_car_mesh(&self.device, m))
+            .collect();
+        // With a closed top at rest the morph's frame 0 would be a second copy of it.
+        let hidden: BTreeSet<usize> = if !cfg!(feature = "experimental-original-port") || roof_up.is_empty() {
+            BTreeSet::new()
+        } else {
+            anim_parts
+                .iter()
+                .filter(|p| p.channel == 1)
+                .flat_map(|p| p.base.iter().copied())
+                .collect()
+        };
+        let chassis_mesh_indices: Vec<usize> = chassis_mesh_indices
+            .into_iter()
+            .filter(|i| !hidden.contains(i))
+            .collect();
         // Race meshes map raw CRP (x, y, z) to body (-x, y, z), see CAR_SCALE above.
         self.player_camera = nfs_assets::camera::PlayerCamera::new(
             scene.car_driver_camera.unwrap_or_default(),
             self.player_camera.cycle_index,
         );
+        self.car_body_points = scene
+            .car_body_points
+            .iter()
+            .map(|p| Vec3::new(-p[0], p[1], p[2]))
+            .collect();
         self.car_collision_box = scene.car_collision_box.map(|b| {
             (
                 Vec3::new(-b.center[0], b.center[1], b.center[2]),
@@ -5060,17 +6276,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 && (body_max - body_min).min_element() > 0.0)
                 .then_some([body_min, body_max]),
             in_car: crate::in_car::build(&self.device, &scene.car_in_car),
+            anim_parts,
+            roof_up,
+            roof_down,
+            hidden,
         });
 
         self.car_glares = scene.car_glares.clone();
-        // Specular map slot 1 (SPC2) of `Car_Load` 0x441a10; approximation A71.
-        if let Some(t) = scene
-            .effect_textures
-            .iter()
-            .find(|t| t.name == SPECULAR_MAP)
-            .filter(|t| t.rgba.len() as u64 == u64::from(t.width) * u64::from(t.height) * 4)
-        {
-            let view = upload_texture(&self.device, &self.queue, t.width, t.height, &t.rgba);
+        self.flare = scene.flare.clone();
+        // Reflection texture slots SPC1..SPC3 of `Car_Load` 0x441a10, side by side.
+        if let Some((width, height, rgba)) = specular_atlas(&scene.effect_textures) {
+            let view = upload_texture(&self.device, &self.queue, width, height, &rgba);
             self.camera_group = camera_bind_group(
                 &self.device,
                 &self.camera_layout,
@@ -5084,6 +6300,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             .iter()
             .find(|d| &d.tag == b"CSPK")
             .map(|d| nfs_assets::sparks::SparkEmitter::new(*d));
+        self.particle_defs = scene.particle_defs.clone();
+        self.car_particles = nfs_assets::particles::CarParticles::new(
+            &scene.particle_defs,
+            nfs_assets::particles::DETAIL_FULL,
+        );
         self.effects
             .set_textures(&self.device, &self.queue, &scene.effect_textures);
 
@@ -5340,6 +6561,22 @@ pub fn sample_road_elevation_from_edges(
     }
 }
 
+/// Wall clock for the texture animations (the original uses its 128 Hz game timer, which does
+/// not stop in menus either).
+fn animation_seconds() -> f64 {
+    #[cfg(target_arch = "wasm32")]
+    {
+        js_sys::Date::now() / 1000.0
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0)
+    }
+}
+
 fn alpha_mode_code(mode: AlphaMode) -> f32 {
     match mode {
         AlphaMode::Opaque => 0.0,
@@ -5350,6 +6587,10 @@ fn alpha_mode_code(mode: AlphaMode) -> f32 {
 
 /// A barrier contact of one collide pass: strength (`+0x430`), point (`+0x440`)
 /// and car velocity (`+0x33c`), original space.
+/// Approximation A250: track emitters further than this from the eye are
+/// not requested (the original requests the emitters of drawn articles).
+const PARTICLE_REQUEST_RANGE: f32 = 1500.0;
+
 #[derive(Clone, Copy, Debug)]
 struct SparkContact {
     impact: f32,
@@ -5395,8 +6636,30 @@ fn depth_bias_state(bias: i32) -> wgpu::DepthBiasState {
 }
 const Z_BIAS_UNIT: i32 = 256;
 
-/// Car specular sphere map: `carcmn.fsh` SPC2, slot 1 of 0x441a10 (A71).
-const SPECULAR_MAP: &str = "SPC2";
+/// Reflection texture slots 0..2 of `Car_Load` 0x441a10 in a race (`carcmn.fsh`).
+const SPECULAR_MAPS: [&str; 3] = ["SPC1", "SPC2", "SPC3"];
+
+/// The three reflection textures side by side (slot k in the k-th third), so a
+/// material picks its slot by `u` (`car.wgsl`). `None` unless all three are present
+/// with the same size.
+fn specular_atlas(textures: &[nfs_assets::Texture]) -> Option<(u32, u32, Vec<u8>)> {
+    let maps = SPECULAR_MAPS.map(|name| textures.iter().find(|t| t.name == name));
+    let first = maps[0]?;
+    let (w, h) = (first.width, first.height);
+    let row = w as usize * 4;
+    let mut rgba = vec![0u8; row * 3 * h as usize];
+    for (k, map) in maps.iter().enumerate() {
+        let map = (*map)?;
+        if map.width != w || map.height != h || map.rgba.len() != row * h as usize {
+            return None;
+        }
+        for y in 0..h as usize {
+            let dst = y * row * 3 + k * row;
+            rgba[dst..dst + row].copy_from_slice(&map.rgba[y * row..(y + 1) * row]);
+        }
+    }
+    Some((w * 3, h, rgba))
+}
 
 fn camera_bind_group(
     device: &wgpu::Device,
@@ -5564,10 +6827,16 @@ fn depth_view(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureVi
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            // Sampled by the lens flare for the sun's visibility.
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         })
         .create_view(&Default::default())
+}
+
+/// ARGB to sRGB-encoded unit RGB.
+fn argb_unit(c: u32) -> [f32; 3] {
+    [(c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff].map(|v| v as f32 / 255.0)
 }
 
 // --- Sky dome ---
@@ -5585,6 +6854,47 @@ struct SkyUniform {
     /// `hzcl` colours of the ring vertices, upper and lower edge, indexed by segment.
     top_colors: [[f32; 4]; 16],
     bottom_colors: [[f32; 4]; 16],
+    /// Sky-map dome (`FUN_00460f40`): angle (turns), size, curvature, height.
+    dome: [f32; 4],
+    /// Dome scale, dome present (1/0), layer 0 `1/x scale`, `1/y scale` (0 = no layer).
+    dome2: [f32; 4],
+    /// Layer 1 `1/x scale`, `1/y scale` (0 = no layer), 0, 0.
+    dome3: [f32; 4],
+    /// Texture offsets of the two layers (u0, v0, u1, v1), wind drift (A194).
+    drift: [f32; 4],
+    /// Sky fog of the weather keys (`0x45d2e0`): sRGB colour, EXP density (0 = off).
+    fog: [f32; 4],
+    /// Camera forward in scene axes (fog depth).
+    forward: [f32; 4],
+    /// Clear colour (`0x459a70`): sRGB, `w = 1` when known.
+    clear: [f32; 4],
+    /// Region B `1/x`, `1/y` scales of layers 0 and 1 (0 = no region B map).
+    dome_b: [f32; 4],
+    /// Sky-map blend A → B of the weather keys (`0x45a350`; texels `0x45e160`, scales
+    /// `0x45f0a0`), 0, 0, 0.
+    blend: [f32; 4],
+}
+
+/// Wind drift of the sky-map layers in UV per second: `FUN_0045f1b0` stores
+/// `(sin, cos)(-direction / 360 turns) * speed * 0.00025` and `FUN_0045ed40` adds it times the
+/// elapsed ticks to the layer offset, wrapped to 0..1, which `FUN_0045ec40` adds to every vertex
+/// UV `index / scale`. The engine spreads the texture over 15 cells (A195), so the offset is
+/// divided by 15 too to keep the original speed over the dome; 128 ticks/s is a Hypothesis
+/// (A194).
+fn sky_drift_velocity(map: Option<&nfs_formats::SkyMapBlock>) -> [f32; 4] {
+    if !cfg!(feature = "experimental-original-port") {
+        return [0.0; 4];
+    }
+    let mut v = [0.0; 4];
+    if let Some(m) = map {
+        for k in 0..2 {
+            let turns = -m.wind_direction[k] / 360.0 * std::f32::consts::TAU;
+            let step = m.wind_speed[k] * 0.00025 * 128.0 / 15.0;
+            v[2 * k] = turns.sin() * step;
+            v[2 * k + 1] = turns.cos() * step;
+        }
+    }
+    v
 }
 
 impl SkyUniform {
@@ -5594,6 +6904,11 @@ impl SkyUniform {
         view_projection: Mat4,
         horizon: &nfs_formats::SkyHorizon,
         hzcl: Option<&nfs_assets::SkyTexture>,
+        dome: Option<&nfs_formats::SkyDome>,
+        map: Option<&nfs_formats::SkyMapBlock>,
+        layers: [bool; 2],
+        map_b: Option<&nfs_formats::SkyMapBlock>,
+        layers_b: [bool; 2],
     ) -> Self {
         let pixel = |column: usize, row: usize| -> [f32; 4] {
             let Some(t) = hzcl.filter(|t| t.width == 16 && t.height >= 2 && t.rgba.len() >= 16 * 2 * 4)
@@ -5612,6 +6927,23 @@ impl SkyUniform {
             // Vertex k carries column start + k; the shader interpolates to vertex k + 1.
             u.top_colors[k] = pixel(horizon.start as usize + k, 0);
             u.bottom_colors[k] = pixel(horizon.start as usize + k, 1);
+        }
+        if let Some(d) = dome {
+            // Without the txt the layers repeat once per cell.
+            let inv = |scale: f32| if scale > 0.0 { 1.0 / scale } else { 0.0 };
+            let (x, y) = map.map_or(([1.0; 3], [1.0; 3]), |m| (m.x_scale, m.y_scale));
+            let on = |k: usize| if layers[k] { (inv(x[k]), inv(y[k])) } else { (0.0, 0.0) };
+            let (l0, l1) = (on(0), on(1));
+            u.dome = [d.angle, d.size, d.curvature, d.height];
+            u.dome2 = [d.scale, 1.0, l0.0, l0.1];
+            u.dome3 = [l1.0, l1.1, 0.0, 0.0];
+            if let Some(b) = map_b {
+                let on_b = |k: usize| {
+                    if layers[k] && layers_b[k] { (inv(b.x_scale[k]), inv(b.y_scale[k])) } else { (0.0, 0.0) }
+                };
+                let (b0, b1) = (on_b(0), on_b(1));
+                u.dome_b = [b0.0, b0.1, b1.0, b1.1];
+            }
         }
         u
     }
@@ -5682,10 +7014,14 @@ fn create_sky_state(
     tex_rgba: &[u8],
     layers: &[Option<nfs_assets::SkyTexture>; 3],
     horizon: &nfs_formats::SkyHorizon,
+    dome: Option<&nfs_formats::SkyDome>,
+    map: Option<&nfs_formats::SkyMapBlock>,
+    layers_b: &[Option<nfs_assets::SkyTexture>; 2],
+    map_b: Option<&nfs_formats::SkyMapBlock>,
 ) -> SkyState {
     let sky_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("sky shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("sky.wgsl").into()),
+        source: wgpu::ShaderSource::Wgsl(SKY_SHADER.into()),
     });
 
     let sky_camera_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -5724,6 +7060,8 @@ fn create_sky_state(
             sky_layer_entry(2),
             sky_layer_entry(3),
             sky_layer_entry(4),
+            sky_layer_entry(6),
+            sky_layer_entry(7),
             wgpu::BindGroupLayoutEntry {
                 binding: 5,
                 visibility: wgpu::ShaderStages::FRAGMENT,
@@ -5779,7 +7117,16 @@ fn create_sky_state(
     });
 
     let vp = camera.view_projection(width, height);
-    let sky_uniform = SkyUniform::new(vp, horizon, layers[2].as_ref());
+    let sky_uniform = SkyUniform::new(
+        vp,
+        horizon,
+        layers[2].as_ref(),
+        dome,
+        map,
+        [layers[0].is_some(), layers[1].is_some()],
+        map_b,
+        [layers_b[0].is_some(), layers_b[1].is_some()],
+    );
     let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("sky camera"),
         contents: bytemuck::bytes_of(&sky_uniform),
@@ -5809,10 +7156,22 @@ fn create_sky_state(
         .iter()
         .zip(fallbacks)
         .map(|(layer, fallback)| match layer {
+            // Mipmapped: the dome squeezes the 16x16 maps towards the horizon, and
+            // unfiltered minification there shimmered into moving stripes.
             Some(t) if t.rgba.len() as u64 == u64::from(t.width) * u64::from(t.height) * 4 => {
-                upload_texture(device, queue, t.width, t.height, &t.rgba)
+                upload_texture_mipmapped(device, queue, t.width, t.height, &t.rgba)
             }
             _ => upload_texture(device, queue, 1, 1, &fallback),
+        })
+        .collect();
+    // Region B maps; without one the region A view stands in (its scale is 0 then).
+    let layer_b_views: Vec<wgpu::TextureView> = layers_b
+        .iter()
+        .map(|layer| match layer {
+            Some(t) if t.rgba.len() as u64 == u64::from(t.width) * u64::from(t.height) * 4 => {
+                upload_texture_mipmapped(device, queue, t.width, t.height, &t.rgba)
+            }
+            _ => upload_texture(device, queue, 1, 1, &[0; 4]),
         })
         .collect();
     let layer_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -5821,6 +7180,7 @@ fn create_sky_state(
         address_mode_v: wgpu::AddressMode::Repeat,
         mag_filter: wgpu::FilterMode::Linear,
         min_filter: wgpu::FilterMode::Linear,
+        mipmap_filter: wgpu::MipmapFilterMode::Linear,
         ..Default::default()
     });
     let texture_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -5851,6 +7211,14 @@ fn create_sky_state(
                 binding: 5,
                 resource: wgpu::BindingResource::Sampler(&layer_sampler),
             },
+            wgpu::BindGroupEntry {
+                binding: 6,
+                resource: wgpu::BindingResource::TextureView(&layer_b_views[0]),
+            },
+            wgpu::BindGroupEntry {
+                binding: 7,
+                resource: wgpu::BindingResource::TextureView(&layer_b_views[1]),
+            },
         ],
     });
 
@@ -5876,6 +7244,7 @@ fn create_sky_state(
         camera_group,
         texture_group,
         uniform: sky_uniform,
+        drift: sky_drift_velocity(map),
     }
 }
 
@@ -5950,6 +7319,9 @@ mod sim_loading_tests {
         assert_eq!(session.lap_tracker.total_laps, 3);
         assert_eq!(session.participants.len(), 1);
         assert!(ai.is_empty());
+        let (session, ai) = quick_race_grid(&course, 8, 7);
+        assert_eq!(session.lap_tracker.total_laps, 8);
+        assert_eq!((session.participants.len(), ai.len()), (8, 7));
         course.is_circuit = false;
         let (session, _) = quick_race_grid(&course, 5, 0);
         assert_eq!(session.lap_tracker.total_laps, 1);
@@ -5986,6 +7358,25 @@ mod sky_tests {
         let turned = drive_camera(Vec3::new(510.0, 3.0, -200.0)).sky_view();
         let east = turned.transform_vector3(Vec3::X);
         assert!(east.z < -0.99, "{east:?}");
+    }
+
+    #[test]
+    fn specular_atlas_puts_slot_k_in_the_kth_third() {
+        let map = |name: &str, value: u8| nfs_assets::Texture {
+            name: name.into(),
+            width: 2,
+            height: 2,
+            rgba: vec![value; 16],
+        };
+        let textures = [map("SPC3", 30), map("SPC1", 10), map("SPC2", 20)];
+        let (w, h, rgba) = specular_atlas(&textures).unwrap();
+        assert_eq!((w, h), (6, 2));
+        for y in 0..2 {
+            for x in 0..6 {
+                assert_eq!(rgba[(y * 6 + x) * 4], [10, 20, 30][x / 2]);
+            }
+        }
+        assert!(specular_atlas(&textures[..2]).is_none());
     }
 }
 

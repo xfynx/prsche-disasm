@@ -1,4 +1,6 @@
-import init, { create_viewer, EngineAudio, TyreAudio, MusicTrack, MusicDirector, RaceAnnouncer, engine_bank_for_sim, shell_profile_new, shell_profile_buy_356, shell_apply_event_result, shell_get_first_evolution_event, shell_get_first_factory_event, shell_get_dealership_catalog, parse_car_catalogue_json, shell_get_used_cars, shell_get_parts_catalog, shell_get_tournament_cups, shell_buy_car, shell_sell_car, shell_buy_part, shell_repair_car, shell_get_factory_missions, shell_complete_factory_mission, fe_parse_layout, fe_decode_fsh, fe_parse_font, fe_parse_strings, fe_track_catalog_json, fe_quick_race_cars_json } from "./package/viewer_impl.js";
+import init, { create_viewer, EngineAudio, TyreAudio, MusicTrack, MusicDirector, RaceAnnouncer, engine_bank_for_sim, shell_profile_new, shell_profile_buy_356, shell_apply_event_result, shell_get_first_evolution_event, shell_get_first_factory_event, shell_get_dealership_catalog, parse_car_catalogue_json, shell_get_used_cars, shell_get_parts_catalog, shell_get_tournament_cups, shell_buy_car, shell_sell_car, shell_buy_part, shell_repair_car, shell_get_factory_missions, shell_complete_factory_mission, fe_parse_layout, fe_decode_fsh, fe_parse_font, fe_parse_strings, fe_track_catalog_json, fe_event_infos_json, fe_quick_race_cars_json, fe_pick_opponents_json } from "./package/viewer_impl.js";
+import { carClickZone, carPartMs, ZONE_CHANNEL } from "./fe-car-click.js";
+import { PauseMenu, drawPauseMenu, CODE as PAUSE_CODE } from "./pause-menu.js";
 
 // A lap finish or elapsed time alone cannot award a Factory mission.
 function factoryGoalSatisfied(driver, elapsed, timeLimit) {
@@ -29,12 +31,12 @@ const KNOWN_TRACKS = [
   { id: "skidpad", name: "Skidpad (Полигон)" },
   { id: "alps", name: "Alps (Альпы)" },
   { id: "autobahn", name: "Autobahn (Автобан)" },
-  { id: "canyon", name: "Canyon (Каньон)" },
-  { id: "castle", name: "Schwarzwald (Замок)" },
+  { id: "canyon", name: "Corsica (Корсика)" },
+  { id: "castle", name: "Auvergne (Овернь)" },
   { id: "coastal", name: "Côte d'Azur (Лазурный берег)" },
   { id: "farmland", name: "Normandie (Нормандия)" },
   { id: "foothills", name: "Pyrenees (Пиренеи)" },
-  { id: "forest", name: "Black Forest (Шварцвальд)" },
+  { id: "forest", name: "Schwarzwald (Шварцвальд)" },
   { id: "industrial", name: "Zone Industrielle (Промзона)" },
   { id: "monaco1", name: "Monte Carlo 1 (Монте-Карло 1)" },
   { id: "monaco2", name: "Monte Carlo 2 (Монте-Карло 2)" },
@@ -89,6 +91,7 @@ function cycleCarCamera() {
 }
 const paintButton = document.querySelector("#paintButton");
 const hudCanvas = document.querySelector("#hudCanvas");
+const pauseCanvas = document.querySelector("#pauseCanvas");
 const loadButton = document.querySelector("#loadButton");
 const resetButton = document.querySelector("#resetButton");
 const statusLine = document.querySelector("#status");
@@ -765,10 +768,11 @@ class GameAudio {
     if (!this.helpers || !viewer) return;
     if (!this.speechLoading) this.loadSpeech();
     const a = this.announcer;
+    const prevPhase = this.events.phase;
     const ev = this.events.update({ phase, lap: viewer.get_current_lap(), best: viewer.get_best_lap_time() });
     if (ev.start) a?.reset();
-    if (a && phase === 1) {
-      const step = this.helpers.countdownStep(remaining);
+    const step = this.helpers.announcerStep(phase, prevPhase, remaining);
+    if (a && step !== null) {
       const p = a.countdown(step);
       if (p >= 0) this.record("speech-request", { phrase: p, step });
     }
@@ -1843,6 +1847,7 @@ if (briefingStartBtn) {
       const simName = activeCareerEvent.is_factory
         ? activeCareerEvent.mission_obj?.car_sim || activeCareerEvent.car_sim
         : currentProfile?.garage?.[selectedIdx]?.sim_name;
+      viewer.set_car_setup?.(false, true); // not a Quick Race: automatic box, damage on
       await loadRaceCar(targetCar, simName);
     } catch (error) {
       setStatus(`Заезд не начат: ${error instanceof Error ? error.message : String(error)}`);
@@ -1908,6 +1913,93 @@ if (raceContinueBtn) {
   });
 }
 
+// Original in-race pause (docs/re/pause.md, web/pause-menu.js): the race clock and the scheduler stop
+// (viewer.set_paused), music stops through the phase 3 event (Audio_Pause 0x4ab150).
+const pauseMenu = new PauseMenu();
+let pauseText = null; // { drawText, textWidth } of frontend.js, loaded with the HUD
+
+function pauseLive() {
+  if (!viewer || frontEnd?.visible || !viewer.is_drive_mode?.() || !viewer.has_car?.()) return false;
+  const phase = viewer.get_race_phase?.() ?? 0;
+  return phase === 1 || phase === 2;
+}
+
+function pauseSync() {
+  if (!pauseCanvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const W = Math.max(1, Math.round(rect.width));
+  const H = Math.max(1, Math.round(rect.height));
+  const dpr = window.devicePixelRatio || 1;
+  if (pauseCanvas.width !== Math.round(W * dpr) || pauseCanvas.height !== Math.round(H * dpr)) {
+    pauseCanvas.width = Math.round(W * dpr);
+    pauseCanvas.height = Math.round(H * dpr);
+  }
+  pauseCanvas.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
+  pauseMenu.resize(W, H);
+}
+
+function pauseDraw() {
+  if (!pauseCanvas) return;
+  pauseCanvas.hidden = !pauseMenu.isOpen;
+  if (!pauseMenu.isOpen) return;
+  pauseSync();
+  pauseMenu.strings = raceHud?.strings ?? {};
+  drawPauseMenu(pauseCanvas.getContext("2d"), pauseMenu, {
+    fe: raceHud?.fe, fonts: raceHud?.fonts ?? {}, ...(pauseText ?? {}),
+  });
+}
+
+function openPause(frozen = false) {
+  if (!frozen && !pauseLive()) return false;
+  viewer.set_paused(true);
+  pauseMenu.open();
+  clearNavigation();
+  ensureRaceHud().then(() => import("./frontend.js")).then(fe => {
+    pauseText = { drawText: fe.drawText, textWidth: fe.textWidth };
+    pauseDraw();
+  }).catch(() => {});
+  pauseDraw();
+  queueFrame();
+  return true;
+}
+
+function closePause() {
+  pauseMenu.close();
+  pauseDraw();
+}
+
+// Menu codes of PauseMenu_Handle 0x42a6a0 / ExitMenu_Handle 0x421b70 and the loop reaction of 0x4152e0.
+function pauseCode(code) {
+  if (code === null || code === undefined) { pauseDraw(); return; }
+  switch (code) {
+    case PAUSE_CODE.CONTINUE: // Audio_Resume, unpause
+      closePause();
+      viewer.set_paused(false);
+      break;
+    case PAUSE_CODE.RACE_AGAIN: // restart from the grid (A153)
+      closePause();
+      viewer.restart_race();
+      if (raceResultsModal) raceResultsModal.hidden = true;
+      eventFinishedHandled = false;
+      break;
+    case PAUSE_CODE.EXIT_WINDOWS: // A153: acts as exit to game menu
+    case PAUSE_CODE.EXIT_GAME_MENU: // leave the race loop to the front end; the world stays frozen
+      closePause();
+      activeCareerEvent = null;
+      setMenuVisible(true);
+      break;
+    default: // quit... / cancel switch the menu, nothing else happens
+      pauseDraw();
+  }
+  queueFrame();
+}
+
+if (pauseCanvas) {
+  const local = e => { const r = pauseCanvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  pauseCanvas.addEventListener("pointermove", e => { pauseMenu.pointerMove(...local(e)); pauseDraw(); });
+  pauseCanvas.addEventListener("pointerdown", e => { e.preventDefault(); pauseCode(pauseMenu.click(...local(e))); });
+}
+
 function setMenuVisible(visible) {
   menuVisible = visible;
   // The original front end replaces the web shell's menu when it is active.
@@ -1917,6 +2009,7 @@ function setMenuVisible(visible) {
     syncFrontEndClasses();
   }
   document.body.classList.toggle("menu-hidden", !visible);
+  if (!visible && viewer?.is_paused?.() && !pauseMenu.isOpen) openPause(true);
   menuButton.setAttribute("aria-expanded", String(visible));
   clearNavigation();
   if (visible) menuButton.focus();
@@ -1940,6 +2033,9 @@ detailsButton.addEventListener("click", () => {
 });
 
 let viewer = null;
+// Car sphere-map reflection (approximation A71): off by default, Y or ?reflection=1 opts in.
+let carReflection = typeof location !== "undefined" && typeof URLSearchParams !== "undefined"
+  && new URLSearchParams(location.search).get("reflection") === "1";
 let selectedFiles = [];
 let localGameAvailable = false;
 let localGameFiles = [];
@@ -2157,7 +2253,7 @@ if (resetSourceButton) {
   });
 }
 
-function findTrackFilesFromCatalog(target, specificScn = null) {
+function findTrackFilesFromCatalog(target, specificScn = null, reverse = false) {
   const matching = [];
   const targetLower = target.toLowerCase();
   const scnTarget = specificScn ? specificScn.toLowerCase() : null;
@@ -2168,7 +2264,7 @@ function findTrackFilesFromCatalog(target, specificScn = null) {
     const stem = basename.replace(/\.[^.]+$/, "");
     const ext = basename.split(".").pop();
 
-    if (fullPath.includes("/sky/") && (ext === "fsh" || ext === "bin") && stem === targetLower) {
+    if (fullPath.includes("/sky/") && (ext === "fsh" || ext === "bin" || ext === "txt") && stem === targetLower) {
       matching.push(relPath);
       continue;
     }
@@ -2176,6 +2272,11 @@ function findTrackFilesFromCatalog(target, specificScn = null) {
     if (fullPath.includes("/fedata/") || fullPath.includes("/trackart/") || fullPath.includes("/cardata/")) continue;
 
     if (ext === "scn") {
+      // The start scene of the race direction (FUN_0046d600): the start line trigger.
+      if (basename === `${targetLower}_${reverse ? "b" : "f"}start.scn`) {
+        matching.push(relPath);
+        continue;
+      }
       if (basename.includes("audio") || basename.includes("camera") || basename.includes("start")) {
         continue;
       }
@@ -2201,6 +2302,7 @@ function findTrackFilesFromCatalog(target, specificScn = null) {
         `${targetLower}.jnc`,
         "animdefs.txt",
         `${targetLower}0.lsp`,
+        `${targetLower}1.lsp`,
         `${targetLower}.lsp`,
       ].includes(basename)
     ) {
@@ -2233,7 +2335,10 @@ function findCarFilesFromCatalog(target) {
     if (
       fullPath.endsWith("/render/common.fsh") ||
       fullPath.endsWith("/render/particle.fsh") ||
-      fullPath.endsWith("/render/carpart.dat")
+      fullPath.endsWith("/render/carpart.dat") ||
+      fullPath.endsWith("/render/particle.dat") ||
+      fullPath.endsWith("/render/flare.dat") ||
+      fullPath.endsWith("/render/flarepos.dat")
     ) {
       matching.push(relPath);
       continue;
@@ -2352,7 +2457,7 @@ async function loadRaceCar(model, simName, bank = "", gauges = null, style = 0) 
   if (useCustomFiles && selectedFiles.length > 0) {
     const selected = selectedFiles.filter(file => {
       const basename = selectedName(file).split(/[\\/]/).pop().toLowerCase();
-      return [`${target}.crp`, `${target}.tpg`, `${target}.clr`, 'carpart.dat'].includes(basename) || basename.endsWith('.fsh');
+      return [`${target}.crp`, `${target}.tpg`, `${target}.clr`, 'carpart.dat', 'particle.dat'].includes(basename) || basename.endsWith('.fsh');
     });
     files = { names: selected.map(selectedName), bytes: await Promise.all(selected.map(async file => new Uint8Array(await file.arrayBuffer()))) };
   } else {
@@ -2466,6 +2571,10 @@ function buildQuickRaceCars(records, installedModels, resources) {
       sim_name: record.sim_name,
       bank: record.bank,
       gauges: record.gauges,
+      colours: record.colours,
+      ratings: record.ratings,
+      group: record.group,
+      year: record.year,
       style: record.style ?? 0,
     });
   }
@@ -2529,8 +2638,49 @@ quickRaceStartBtn.addEventListener('click', async () => {
   await launchQuickRace({ car, track, laps, opponents, fromDialog: true });
 });
 
+// nfs5.trk record +0x6e == 1: a circuit (LINEAR_TRACK 0x1d is its negation).
+async function trackIsCircuit(track) {
+  const bytes = await readGamePath("FEData/Data/nfs5.trk");
+  const records = bytes ? JSON.parse(fe_track_catalog_json(bytes)) : [];
+  return Boolean(records.find(r => r.internal_name.toLowerCase() === track.toLowerCase())?.circuit);
+}
+
+// Race choices of the running race, for the debug state and the loading screen.
+let lastRaceStart = null;
+
+// Difficulty (SKILL), mirror and the opponents drawn from nfs5.per for the level (FUN_004e3160);
+// each opponent car gets its driver's skill values. The page flips the picture for MIRROR.
+async function setRaceOptions({ difficulty, mirror, opponents, car = null, colour = null }) {
+  const { playerPaint, opponentPaints } = await import("./fe-quickrace.js");
+  const per = await readGamePath("FEData/Data/nfs5.per");
+  let skills = [];
+  if (per && opponents > 0) {
+    const seed = (Math.random() * 0x7fffffff) >>> 0;
+    const drivers = JSON.parse(fe_pick_opponents_json(per, opponents, difficulty, seed));
+    skills = drivers.flatMap(d => d.skill);
+    lastRaceDrivers = drivers;
+  }
+  // Colours: the chosen one for the player (null keeps the default paint), a random list entry
+  // per opponent (OpponentCar apply 0x4f4fa0).
+  const own = colour === null ? null : playerPaint(car, colour);
+  const paints = opponentPaints(car, opponents, () => Math.floor(Math.random() * 0x7fff)).flat();
+  const rgb24 = c => (Math.round(c[0] * 255) << 16) | (Math.round(c[1] * 255) << 8) | Math.round(c[2] * 255);
+  raceCarColours = [own ? rgb24(own) : 0xffffff, ...Array.from({ length: paints.length / 4 }, (_, i) => rgb24(paints.slice(i * 4, i * 4 + 4)))];
+  viewer.set_race_options(difficulty, mirror, new Float32Array(skills), new Float32Array(own ?? []),
+    new Float32Array(paints));
+  canvas.classList.toggle("mirror", Boolean(mirror));
+}
+let lastRaceDrivers = [];
+// 0xRRGGBB paint of each car, player first: the HUD list square and map marker use it.
+let raceCarColours = null;
+
 // Load and start a Quick Race (web dialog or the original front end's PLAYGAME).
-async function launchQuickRace({ car, track, laps, opponents, fromDialog = false }) {
+// manualBox / damage: the car setup screen's transmission and Game.Damage [VA 0x4eeda0, 0x4e5520];
+// defaults are the Quick Race ones (automatic box, damage on).
+// reverse / mirror / difficulty / traffic: Track1.Direction, Game.Difficutly, Track1.Traffic
+// (docs/re/frontend.md "Race start parameters"). Traffic cars are not raced yet (A100).
+async function launchQuickRace({ car, track, laps, opponents, manualBox = false, damage = true, fromDialog = false,
+  reverse = false, mirror = false, difficulty = 1, traffic = 0, colour = null, circuit = null }) {
   quickRaceStartBtn.disabled = true;
   quickRaceCancelBtn.disabled = true;
   quickRaceStatus.textContent = 'Загрузка заезда…';
@@ -2542,16 +2692,20 @@ async function launchQuickRace({ car, track, laps, opponents, fromDialog = false
     if (frontEnd) {
       // Race loading screen: era0tr.fsh outside Evolution plus the track picture [VA 0x4a4a70].
       quickRaceModal.hidden = true;
-      await frontEnd.showLoading({ pack: "era0tr.fsh", track });
+      await frontEnd.showLoading({ pack: "era0tr.fsh", track, reverse });
       syncFrontEndClasses();
     }
     modeSelect.value = 'track';
     updateOptions();
     targetSelect.value = track;
-    if (!await loadTarget()) throw new Error(statusLine.textContent);
+    if (!await loadTarget(null, reverse)) throw new Error(statusLine.textContent);
+    viewer.set_car_setup?.(manualBox, damage);
     await loadRaceCar(car.model_name, car.sim_name, car.bank || "", car.gauges || null, car.style || 0);
     if (!viewer.is_sim_mode()) viewer.toggle_sim_mode();
+    await setRaceOptions({ difficulty, mirror, opponents, car, colour });
+    viewer.set_linear_track?.(!(circuit ?? await trackIsCircuit(track)));
     viewer.configure_quick_race(laps, opponents);
+    lastRaceStart = { reverse, mirror, difficulty, traffic, opponents };
     if (!viewer.is_drive_mode()) viewer.toggle_camera_mode();
     quickRaceModal.hidden = true;
     setMenuVisible(false);
@@ -2570,7 +2724,7 @@ async function launchQuickRace({ car, track, laps, opponents, fromDialog = false
   }
 }
 
-async function loadTarget(specificScn = null) {
+async function loadTarget(specificScn = null, reverse = false) {
   if (!viewer) {
     setStatus("WebGPU еще не готов.");
     return false;
@@ -2604,7 +2758,7 @@ async function loadTarget(specificScn = null) {
           const stem = basename.replace(/\.[^.]+$/, "");
           const ext = basename.split(".").pop();
 
-          if (fullPath.includes("/sky/") && (ext === "fsh" || ext === "bin") && stem === target) {
+          if (fullPath.includes("/sky/") && (ext === "fsh" || ext === "bin" || ext === "txt") && stem === target) {
             names.push(selectedName(file));
             bytes.push(new Uint8Array(await file.arrayBuffer()));
             continue;
@@ -2613,6 +2767,11 @@ async function loadTarget(specificScn = null) {
           if (fullPath.includes("/fedata/") || fullPath.includes("/trackart/") || fullPath.includes("/cardata/")) continue;
 
           if (ext === "scn") {
+            if (basename === `${target}_${reverse ? "b" : "f"}start.scn`) {
+              names.push(selectedName(file));
+              bytes.push(new Uint8Array(await file.arrayBuffer()));
+              continue;
+            }
             if (basename.includes("audio") || basename.includes("camera") || basename.includes("start")) {
               continue;
             }
@@ -2640,6 +2799,7 @@ async function loadTarget(specificScn = null) {
               `${target}.jnc`,
               "animdefs.txt",
               `${target}0.lsp`,
+              `${target}1.lsp`,
               `${target}.lsp`,
             ].includes(basename)
           ) {
@@ -2651,7 +2811,7 @@ async function loadTarget(specificScn = null) {
         for (const file of customFiles) {
           const basename = selectedName(file).split(/[\\/]/).pop().toLowerCase();
           if (
-            ![`${target}.crp`, `${target}.tpg`, `${target}.clr`, "carpart.dat"].includes(basename) &&
+            ![`${target}.crp`, `${target}.tpg`, `${target}.clr`, "carpart.dat", "particle.dat"].includes(basename) &&
             !basename.endsWith(".fsh")
           ) {
             continue;
@@ -2662,7 +2822,7 @@ async function loadTarget(specificScn = null) {
       }
     } else {
       const paths = isTrack
-        ? findTrackFilesFromCatalog(target, specificScn)
+        ? findTrackFilesFromCatalog(target, specificScn, reverse)
         : findCarFilesFromCatalog(target);
 
       if (paths.length === 0) {
@@ -2681,7 +2841,8 @@ async function loadTarget(specificScn = null) {
     }
 
     if (isTrack) {
-      const text = viewer.load_track(names, bytes, target);
+      const text = viewer.load_track_direction(names, bytes, target, Boolean(reverse));
+      canvas.classList.remove("mirror");
       viewer.set_show_topology(topologyCheckbox.checked);
       summary.textContent = text;
       const hasTopo = viewer.has_topology();
@@ -2696,7 +2857,7 @@ async function loadTarget(specificScn = null) {
           if (isCustom) {
             for (const file of customFiles) {
               const basename = selectedName(file).split(/[\\/]/).pop().toLowerCase();
-              if (![`${carModel}.crp`, `${carModel}.tpg`, `${carModel}.clr`, "carpart.dat"].includes(basename) && !basename.endsWith(".fsh")) {
+              if (![`${carModel}.crp`, `${carModel}.tpg`, `${carModel}.clr`, "carpart.dat", "particle.dat"].includes(basename) && !basename.endsWith(".fsh")) {
                 continue;
               }
               carNames.push(selectedName(file));
@@ -2896,7 +3057,17 @@ function onKeyDown(event) {
       if (!quickRaceCancelBtn.disabled) quickRaceModal.hidden = true;
       return;
     }
+    if (pauseMenu.isOpen) { pauseCode(pauseMenu.key("Escape")); return; }
+    if (!menuVisible && openPause()) return;
     setMenuVisible(!menuVisible);
+    return;
+  }
+  if (pauseMenu.isOpen) {
+    if (["ArrowUp", "ArrowDown", "Enter", "NumpadEnter"].includes(event.code)) {
+      event.preventDefault();
+      pauseCode(pauseMenu.key(event.code) ?? undefined);
+      pauseDraw();
+    }
     return;
   }
   if (!quickRaceModal.hidden) return;
@@ -2911,6 +3082,12 @@ function onKeyDown(event) {
     debugPanelVisible = !debugPanelVisible;
     try { localStorage.setItem("nfs5.debugPanel", debugPanelVisible ? "1" : "0"); } catch {}
     updateDebugPanel();
+    return;
+  }
+
+  // Manual box (car setup screen): X shifts up, Z down (SHIFTUP/SHIFTDOWN events, A131).
+  if ((event.code === "KeyX" || event.code === "KeyZ") && !event.repeat && viewer?.is_drive_mode?.()) {
+    viewer.shift_gear?.(event.code === "KeyX" ? 1 : -1);
     return;
   }
 
@@ -2960,6 +3137,14 @@ function onKeyDown(event) {
               : "Режим прогона включён (F). WASD: полёт вдоль границ, Мышь: обзор, Shift: ускорение.")
           : "Орбитальная камера."
       );
+      queueFrame();
+    }
+    return;
+  }
+  if (event.code === "KeyY" && !event.repeat) {
+    if (viewer) {
+      carReflection = viewer.set_car_reflection(!carReflection);
+      setStatus(carReflection ? "Car reflection: on (Y)" : "Car reflection: off (Y)");
       queueFrame();
     }
     return;
@@ -3073,7 +3258,7 @@ function drawRaceHud(dt) {
     raceHud.setCarRecord(raceHud.carRecords, raceHudCarIndex);
   }
   try {
-    raceHud.draw(viewer, { dt, lights: lightsOn });
+    raceHud.draw(viewer, { dt, lights: lightsOn, carColours: raceCarColours });
   } catch (error) {
     console.error("race HUD draw failed", error);
   }
@@ -3096,6 +3281,16 @@ function updateNavigation(dt) {
   if (!viewer) return;
 
   const isDriveCar = viewer.is_drive_mode() && viewer.has_car();
+  if (isDriveCar && viewer.is_paused?.()) {
+    // Paused: nothing steps; Audio_Pause sets the effect voices to volume 0 (re/audio.md) and the
+    // phase 3 event stops the music director (re/music.md).
+    engineSound.deactivate();
+    tyreSound.deactivate();
+    gameAudio.frame(viewer.get_race_phase(), 0);
+    if (countdownBanner) countdownBanner.hidden = true;
+    queueFrame();
+    return;
+  }
   if (isDriveCar) {
     let throttle = 0;
     if (activeKeys.has("KeyW") || activeKeys.has("ArrowUp")) throttle += 1.0;
@@ -3161,8 +3356,9 @@ function updateNavigation(dt) {
     }
     drawRaceHud(dt);
 
-    // Countdown Banner
-    if (countdownBanner) {
+    // Countdown Banner (fallback only: the original H321Go is drawn by race-hud.js once the HUD is ready)
+    if (countdownBanner && raceHud?.ready && raceHud.gauges) countdownBanner.hidden = true;
+    else if (countdownBanner) {
       if (phase === 1) {
         // The original start lasts 7 s; "3, 2, 1" come in its last 3 s (Sched_Step 0x414ff0).
         const remaining = viewer.get_countdown_remaining();
@@ -3382,6 +3578,7 @@ function resizeCanvas() {
 
 function animate(now = 0) {
   resizeCanvas();
+  if (pauseMenu.isOpen) pauseDraw();
   applyPendingCamera();
   if (frontEnd?.visible) {
     frontEnd.render(now);
@@ -3419,6 +3616,7 @@ async function boot() {
     await init();
     resizeCanvas();
     viewer = await create_viewer(canvas);
+    viewer.set_car_reflection?.(carReflection);
     setStatus("WebGPU готов.");
     animate();
 
@@ -3461,10 +3659,14 @@ function applyPendingCamera() {
 }
 let debugError = null;
 window.__nfs = {
+  get raceStart() { return lastRaceStart; },
+  get raceDrivers() { return lastRaceDrivers; },
   quickRace() { return frontEndSetup ? { cars: frontEndSetup.cars.length, tracks: frontEndSetup.tracks.map(t => t.internal_name) } : null; },
   get ready() { return debugReady && !debugPendingCamera; },
   get error() { return debugError; },
   get viewer() { return viewer; },
+  get hud() { return raceHud; },
+  get frontEnd() { return frontEnd; },
   state() {
     if (!viewer) return { ready: false, error: debugError };
     const pose = viewer.get_car_pose?.() ?? [];
@@ -3500,6 +3702,8 @@ window.__nfs = {
       cameraEye: Array.from(cameraEye),
       status: statusLine.textContent,
       sparks: Array.from(viewer.get_spark_stats?.() ?? []),
+      weather: Array.from(viewer.get_weather_stats?.() ?? []),
+      precipitation: Array.from(viewer.get_precipitation_stats?.() ?? []),
       ai: JSON.parse(viewer.original_ai_state?.() ?? "null"),
     };
   },
@@ -3517,10 +3721,19 @@ async function autostartRace(params) {
     targetSelect.value = track;
     clearNavigation();
     activeCareerEvent = null;
-    if (!await loadTarget()) throw new Error(statusLine.textContent);
+    // ?dir=0..3 (forward, backward, forward/mirrored, backward/mirrored), ?difficulty=0..2,
+    // ?opponents=0..7, ?traffic=0..3 stand in for the location and quick race screens.
+    const { raceStartFromUrl } = await import("./fe-quickrace.js");
+    const start = raceStartFromUrl(params);
+    if (!await loadTarget(null, start.reverse)) throw new Error(statusLine.textContent);
+    // ?manual=1 / ?damage=0 stand in for the car setup screen.
+    viewer.set_car_setup?.(params.get("manual") === "1", params.get("damage") !== "0");
     await loadRaceCar(car.model_name, car.sim_name, car.bank || "", car.gauges || null, car.style || 0);
     if (!viewer.is_sim_mode()) viewer.toggle_sim_mode();
-    viewer.configure_quick_race(Number(params.get("laps") || 3), Number(params.get("opponents") ?? 3));
+    await setRaceOptions({ ...start, car, colour: params.has("colour") ? Number(params.get("colour")) : null });
+    viewer.set_linear_track?.(!await trackIsCircuit(track));
+    viewer.configure_quick_race(start.laps, start.opponents);
+    lastRaceStart = start;
     if (!viewer.is_drive_mode()) viewer.toggle_camera_mode();
     setMenuVisible(false);
     syncTourButton();
@@ -3541,6 +3754,17 @@ async function autostartRace(params) {
 
 // Debug panel: the state of every debug key, top centre of the drive view (not part of the
 // original HUD). Refreshed every frame and after each key press.
+// Weather at the camera's track node and the surface nibble under each wheel (FL FR RL RR; the
+// g_GripTable row, docs/re/weather.md): "wx n<node> rain snow fog" and "surf a/b/c/d".
+function weatherReadout() {
+  const w = viewer.get_weather_stats?.();
+  if (!w || w.length < 11) return [];
+  const f = (v) => (v > 0 ? v.toFixed(2) : "0");
+  const items = [`wx n${w[0]} rain ${f(w[1])} snow ${f(w[2])} fog ${(w[4] * 1000).toFixed(1)}\u2030`];
+  if (w[7] >= 0) items.push(`surf ${Array.from(w.slice(7, 11)).join("/")}`);
+  return items;
+}
+
 let debugPanelShown = null;
 let debugPanelText = null;
 function updateDebugPanel() {
@@ -3561,7 +3785,10 @@ function updateDebugPanel() {
     `V free cam ${onOff(viewer.is_free_camera?.())}`,
     `Shift+V side ${side === 0 ? "off" : `${side > 0 ? "R" : "L"} ${Math.abs(Math.round(side))}\u00b0`}`,
     `B boxes ${onOff(viewer.is_collision_boxes?.())}`,
+    `Y reflection ${onOff(carReflection)}`,
     `H HUD ${onOff(hudVisible)}`,
+    `hit: ${viewer.object_hit_report?.() || "-"}`,
+    ...weatherReadout(),
     "R reset", "Shift+R restart", "Esc menu", "` panel",
   ];
   const text = items.map((item) => item.replace(/ /g, "\u00a0")).join(" \u00b7 ");
@@ -3612,9 +3839,12 @@ function cheatAllCars() {
     return v === "allcars";
   }
 }
+let raceStart = null;
+let eventInfoSetup = null;
 async function buildFrontEndSetup(strings) {
   const all = cheatAllCars();
-  const { QuickRaceSetup, quickRaceTracks } = await import("./fe-quickrace.js");
+  const { QuickRaceSetup, quickRaceTracks, raceStart: rs } = await import("./fe-quickrace.js");
+  raceStart = rs;
   const records = await loadCarCatalogueRecords();
   quickRaceCars = buildQuickRaceCars(records, availableCars, localGameFiles);
   const carBytes = await readGamePath("FEData/Data/nfs5.car");
@@ -3625,13 +3855,20 @@ async function buildFrontEndSetup(strings) {
     .map(i => {
       const installed = quickRaceCars.find(c => c.index === i);
       const r = byIndex.get(i);
-      return installed && r ? { ...installed, short_name: r.short_name, colours: r.colours,
+      return installed && r ? { ...installed, short_name: r.short_name, colours: r.colours, ratings: r.ratings, group: r.group, year: r.year,
         logo_pack: r.logo_pack, logo_shape: r.logo_shape } : null;
     })
     .filter(Boolean);
   const trackBytes = await readGamePath("FEData/Data/nfs5.trk");
-  const tracks = trackBytes ? quickRaceTracks(JSON.parse(fe_track_catalog_json(trackBytes)), availableTracks, all) : [];
+  const allTracks = trackBytes ? JSON.parse(fe_track_catalog_json(trackBytes)) : [];
+  const tracks = quickRaceTracks(allTracks, availableTracks, all);
   frontEndSetup = new QuickRaceSetup({ strings, cars, tracks });
+  // Evolution event info (tournament.lay): nfs5.trn records over the whole track table.
+  const trnBytes = await readGamePath("FEData/Data/nfs5.trn");
+  const { EventInfoSetup } = await import("./fe-tournament.js");
+  eventInfoSetup = trnBytes
+    ? new EventInfoSetup({ events: JSON.parse(fe_event_infos_json(trnBytes)), tracks: allTracks, strings })
+    : null;
 }
 
 async function frontEndPlayGame() {
@@ -3640,10 +3877,68 @@ async function frontEndPlayGame() {
     setStatus("Quick Race: no installed car or track");
     return;
   }
-  // Direction, traffic and opponent car mode are chosen but not raced yet, and the race
-  // supports 0 or 3 opponents only (A100).
-  const opponents = p.opponents > 0 ? 3 : 0;
-  await launchQuickRace({ car: p.car, track: p.track.internal_name.toLowerCase(), laps: p.laps, opponents });
+  // Direction, mirror, difficulty and 0..7 opponents are raced; traffic and the opponent car
+  // mode are chosen but not raced yet (A100).
+  const start = raceStart(p);
+  await launchQuickRace(start);
+}
+
+// Click on the garage car [VA 0x4c0eb0]: the zone (roof, doors, hood, trunk) follows the yaw of
+// the room; the top, doors, hood and trunk lid move (A232). A second click on an open door sits
+// the player in the car in the original (zoom, `0x4c7d70`), which is not ported: it closes the door.
+// Our yaw is half a turn off the original's value (the car shows its rear at 0.5 here, the zone
+// function expects the front at 0.5), so the zone follows what is on screen (A232).
+function frontEndCarClick(x, y, screen) {
+  if (!viewer?.experimental_original_port_enabled?.()) return;
+  const control = screen?.controls.find(c => c.type === "3DCAR" && Number(c.attrs.positiontype || 0) === 0);
+  if (!control || !viewer?.has_room?.() || !viewer.room_car_has_part) return;
+  const [px, py] = (control.attrs.pos || "0,0").split(",").map(Number);
+  const [w, h] = (control.attrs.size || "0,0").split(",").map(Number);
+  if (x < px || y < py || x >= px + w || y >= py + h) return;
+  const hasTop = viewer.room_car_has_part(1);
+  const zone = carClickZone(x, y, { left: px, top: py, right: px + w, bottom: py + h },
+    (viewer.room_yaw_turns() + 0.5) % 1, hasTop);
+  const channel = ZONE_CHANNEL[zone];
+  if (!channel || !viewer.room_car_has_part(channel)) return;
+  const open = viewer.room_car_anim_target(channel) > 0.5 ? 0 : 1;
+  viewer.set_room_car_anim(channel, open, carPartMs(channel, open === 1));
+  if (channel === 1 && frontEndSetup) frontEndSetup.roof = open;
+  queueFrame();
+}
+
+// Top of the garage car from the Car.Roof setting (0 up, 1 down).
+function applyRoofSetting(ms) {
+  if (!viewer?.experimental_original_port_enabled?.()) return;
+  if (frontEndSetup && viewer?.room_car_has_part?.(1)) {
+    viewer.set_room_car_anim(1, frontEndSetup.roof ? 1 : 0, ms);
+  }
+}
+
+// Car compare (`carcompare.lay`): two 3DCAR controls, position types 1 and 2: the Quick Race
+// car on the left, GenericCar2's car on the right, each in the first colour of its list for
+// the right one and the chosen colour for the left one (A230).
+async function loadFrontEndCompare() {
+  if (!viewer?.experimental_original_port_enabled?.()) return;
+  if (!frontEndSetup || !viewer.has_room?.()) return;
+  const cars3d = frontEnd?.screen?.controls.filter(c => c.type === "3DCAR") ?? [];
+  if (cars3d.length < 2) return;
+  const { playerPaint } = await import("./fe-quickrace.js");
+  const load = async car => {
+    const files = await fetchGameFiles(findCarFilesFromCatalog(car.model_name.toLowerCase()));
+    viewer.set_car_model(files.names, files.bytes, car.model_name.toLowerCase(), car.style || 0);
+  };
+  const left = frontEndSetup.currentCar();
+  const right = frontEndSetup.compareCar();
+  if (!left || !right) return;
+  await load(right);
+  viewer.stash_compare_car(new Float32Array(playerPaint(right, 0) || []));
+  await load(left);
+  frontEndCar = `${left.model_name}:${left.style || 0}`;
+  viewer.set_room_paint(new Float32Array(playerPaint(left, frontEndSetup.colour) || []));
+  viewer.show_compare_cars(true);
+  // Cars above the 2D backdrop (transparent canvas on top of the front-end canvas, A230).
+  document.body.classList.add("fe-compare");
+  queueFrame();
 }
 
 // room= of the shown layout; a 3DCAR control adds the selected car [VA 0x4bfdc0].
@@ -3653,7 +3948,12 @@ async function loadFrontEndRoom(room, carAccessor) {
   try {
     // Rooms without a drawn model (ID_NONE, ID_TESTROOM, ID_TRACK, ...) show an empty scene.
     viewer.hide_room?.(!model);
-    if (!model) return;
+    viewer.show_compare_cars?.(false);
+    document.body.classList.remove("fe-compare");
+    if (!model) {
+      await loadFrontEndCompare();
+      return;
+    }
     if (frontEndRoom !== id || !viewer.has_room()) {
       const names = [`FEData/Models/${model}.crp`, `FEData/Models/${model}.tpg`];
       const bytes = await Promise.all(names.map(readGamePath));
@@ -3671,7 +3971,11 @@ async function loadFrontEndRoom(room, carAccessor) {
         const files = await fetchGameFiles(findCarFilesFromCatalog(car.model_name.toLowerCase()));
         viewer.set_room_car(files.names, files.bytes, car.model_name.toLowerCase(), car.style || 0);
         frontEndCar = carKey;
+        applyRoofSetting(0);
       }
+      // The colour button's list entry paints the body, as in the race (A127).
+      const { playerPaint } = await import("./fe-quickrace.js");
+      viewer.set_room_paint?.(new Float32Array((car && playerPaint(car, frontEndSetup?.colour ?? 0)) || []));
       viewer.show_room_car(Boolean(car));
     } else {
       viewer.show_room_car(false);
@@ -3714,27 +4018,44 @@ async function startFrontEnd() {
   try {
     const { FrontEnd } = await import("./frontend.js");
     frontEnd = new FrontEnd(feCanvas, {
+      experimentalOriginalPort: viewer.experimental_original_port_enabled(),
+      topCanvas: document.querySelector("#feTopCanvas"),
       api: { fe_parse_layout, fe_decode_fsh, fe_parse_font, fe_parse_strings },
       readFile: readGamePath,
       onRoom: loadFrontEndRoom,
       onAction: frontEndAction,
-      accessor: name => frontEndSetup?.accessor(name) ?? null,
+      accessor: name => frontEndSetup?.accessor(name) ?? eventInfoSetup?.accessor(name) ?? null,
+      // Track pictures of TrackArt: the location screen's wall tile and the event panel's map.
+      trackPicture: screen => {
+        if (screen === "location") {
+          const t = frontEndSetup?.currentTrack();
+          return t ? { sp: t.photo_pack, sm: t.small_pack, direction: frontEndSetup.direction } : null;
+        }
+        if (screen === "tournament" && eventInfoSetup?.current()) {
+          return { key: eventInfoSetup.index, races: eventInfoSetup.raceViews() };
+        }
+        return null;
+      },
       // FECallBackList update [VA 0x50cc30]: ID_MERGEDLISTCOLOR when 0x4f4df0 is true,
       // ID_MERGEDLISTCARSETUP otherwise. Hypothesis: 0x4f4df0 = "the car is not owned";
       // Quick Race offers only unowned (catalogue) cars here, so colour shows, car setup not.
       controlVisible: name => name !== "ID_MERGEDLISTCARSETUP",
-      carLogo: () => {
-        const car = frontEndSetup?.currentCar();
+      carLogo: (accessor, other) => {
+        // Car compare: the right logo follows GenericCar2, the left one is `CarCompare1`.
+        const car = /^GenericCar2\./i.test(accessor || "") ? frontEndSetup?.compareCar() : frontEndSetup?.currentCar();
         return car?.logo_pack ? { pack: car.logo_pack, shape: car.logo_shape } : null;
       },
       onChange: name => {
         // A new car (or colour) is shown in the garage at once.
-        if (/^(zMergedList|GenericCar)\./.test(name || "") && frontEnd.screen?.controls.some(c => c.type === "3DCAR")) {
+        if (/^(zMergedList|GenericCar2?)\./.test(name || "") && frontEnd.screen?.controls.some(c => c.type === "3DCAR")) {
           loadFrontEndRoom(frontEnd.screen.screenAttrs.room, "zMergedList.Car");
         }
+        // Car.Roof (settings pop-up) moves the top of a cabrio in the garage [VA 0x4c0990].
+        if (name === "Car.Roof") applyRoofSetting(carPartMs(1, true));
         queueFrame();
       },
       career: () => false,
+      onCarClick: frontEndCarClick,
       requestFrame: queueFrame,
     });
     await frontEnd.init();
@@ -3752,6 +4073,10 @@ async function startFrontEnd() {
       return;
     }
     await frontEnd.start("gamesetup");
+    // Visual check: ?fescreen=location|tournament opens that layout over the main menu
+    // (the Evolution flow does not lead to tournament.lay yet).
+    const direct = new URLSearchParams(location.search).get("fescreen");
+    if (direct) await frontEnd.goto(direct);
     menuVisible = true;
     syncFrontEndClasses();
     setStatus("Original front end (?shell=web: web shell)");

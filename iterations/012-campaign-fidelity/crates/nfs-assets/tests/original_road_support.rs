@@ -15,8 +15,10 @@
 //!   integration on every step. The Autobahn run goes down the ramp the
 //!   user reported.
 //!
-//! The port builds the same polygons (polygon-only tree, as the recorder)
-//! and must match every value bit for bit. Needs `local/game` and the local fixtures (skipped
+//! The port builds the same polygons (polygon-only tree, as the recorder;
+//! with the EDG edges after them for the barrier runs) and must match every
+//! finite value bit for bit. Textual heading NaNs carry no sign/payload bits.
+//! Needs `local/game` and the local fixtures (skipped
 //! otherwise).
 //!
 //! Spec: track-support "The support owner picks the polygon as the
@@ -45,7 +47,7 @@ use nfs_assets::physics::original_support_loader::assemble_initial_track_support
 use nfs_assets::physics::original_support_owner::OriginalSupportOwner;
 use nfs_assets::physics::original_support_tree::SupportTree;
 use nfs_assets::physics::original_vehicle::{
-    ground_contact_tick, scheduler_step, track_locate, BodyLocator, OriginalCar, RoadGround,
+    scheduler_step, track_locate, BodyLocator, OriginalCar, RoadGround,
     StepQueue,
 };
 use nfs_assets::race::original_ai::track::{sim_chunks, TrackNodes};
@@ -55,33 +57,88 @@ static QUERY: Fixture = Fixture::new("support-query.tsv");
 static LOOP_RUNS: Fixture = Fixture::new("support-loop-runs.tsv");
 static LOOP_BODY: Fixture = Fixture::new("support-loop-body.tsv");
 static LOOP_DYN: Fixture = Fixture::new("support-loop-dyn.tsv");
+static LAUNCH_RUNS: Fixture = Fixture::new("car-launch-runs.tsv");
+static LAUNCH_BODY: Fixture = Fixture::new("car-launch-body.tsv");
+static LAUNCH_DYN: Fixture = Fixture::new("car-launch-dyn.tsv");
+static BARRIER_RUNS: Fixture = Fixture::new("car-barrier-runs.tsv");
+static BARRIER_BODY: Fixture = Fixture::new("car-barrier-body.tsv");
+static BARRIER_DYN: Fixture = Fixture::new("car-barrier-dyn.tsv");
 
 fn game() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../../local/game/GameData/Track")
 }
 
+/// An explicitly selected fixture directory is an acceptance run, not an optional checkout.
+fn require_selected_recordings(fixtures: &[&Fixture]) {
+    if std::env::var_os("NFS_LOCAL_FIXTURES").is_some() {
+        for fixture in fixtures {
+            assert!(
+                fixture.available(),
+                "required recording {} is missing or unreadable in {}",
+                fixture.name(),
+                local_fixtures::dir().display()
+            );
+        }
+    }
+}
+
 struct Track {
     surface: RoadSurface,
     nodes: TrackNodes,
+    /// The scene has the EDG edges (barrier runs).
+    edges: bool,
 }
 
 impl Track {
     fn load(name: &str) -> Option<Self> {
+        Self::load_with(name, false)
+    }
+
+    /// With `edges`, the track's EDG objects follow the polygons in the tree
+    /// (the retained scene of `0x488090`), as the barrier recorder builds it.
+    fn load_with(name: &str, edges: bool) -> Option<Self> {
         let dir = game();
-        let raw = std::fs::read(dir.join(format!("{name}.crp"))).ok()?;
-        let crp = nfs_formats::track::parse_track_crp(&raw).ok()?;
-        let anim = nfs_formats::animdefs::parse_animdefs(
-            &std::fs::read_to_string(dir.join("animdefs.txt")).ok()?,
-        )
-        .ok()?;
-        let load = assemble_initial_track_support(&crp, &anim).ok()?;
+        if !dir.exists() {
+            assert!(
+                std::env::var_os("NFS_LOCAL_FIXTURES").is_none(),
+                "recording acceptance requires game assets at {}",
+                dir.display()
+            );
+            return None;
+        }
+        assert!(dir.is_dir(), "game track path is not a directory: {}", dir.display());
+        let path = dir.join(format!("{name}.crp"));
+        let raw = std::fs::read(&path)
+            .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        let crp = nfs_formats::track::parse_track_crp(&raw)
+            .unwrap_or_else(|error| panic!("{}: {error:?}", path.display()));
+        let anim_path = dir.join("animdefs.txt");
+        let anim_text = std::fs::read_to_string(&anim_path)
+            .unwrap_or_else(|error| panic!("{}: {error}", anim_path.display()));
+        let anim = nfs_formats::animdefs::parse_animdefs(&anim_text)
+            .unwrap_or_else(|error| panic!("{}: {error:?}", anim_path.display()));
+        let load = assemble_initial_track_support(&crp, &anim)
+            .unwrap_or_else(|error| panic!("{} support: {error:?}", path.display()));
         let names = vec![String::new(); crp.articles.len()];
-        let surface = RoadSurface::from_original_support(load, &names).ok()?;
-        let unpacked = nfs_formats::decompress(&raw).ok()?;
-        let (nodes, sections) = sim_chunks(&unpacked)?;
+        let objects = if edges {
+            let edg_path = dir.join(format!("{name}.edg"));
+            let edg = std::fs::read(&edg_path)
+                .unwrap_or_else(|error| panic!("{}: {error}", edg_path.display()));
+            nfs_assets::physics::original_scene_objects::load_raw_edg_objects(&edg)
+                .unwrap_or_else(|error| panic!("{}: {error:?}", edg_path.display()))
+        } else {
+            vec![]
+        };
+        let surface = RoadSurface::from_original_scene_support(load, &names, objects)
+            .unwrap_or_else(|error| panic!("{} surface: {error:?}", path.display()));
+        let unpacked = nfs_formats::decompress(&raw)
+            .unwrap_or_else(|error| panic!("{}: {error:?}", path.display()));
+        let (nodes, sections) = sim_chunks(&unpacked)
+            .unwrap_or_else(|| panic!("{}: missing or invalid simulation chunks", path.display()));
         Some(Self {
             surface,
             nodes: TrackNodes::build(nodes, &sections, None),
+            edges,
         })
     }
 
@@ -91,10 +148,14 @@ impl Track {
 }
 
 fn tracks(names: impl IntoIterator<Item = String>) -> Option<HashMap<String, Track>> {
+    tracks_with(names, false)
+}
+
+fn tracks_with(names: impl IntoIterator<Item = String>, edges: bool) -> Option<HashMap<String, Track>> {
     let mut out = HashMap::new();
     for n in names {
         if !out.contains_key(&n) {
-            out.insert(n.clone(), Track::load(&n)?);
+            out.insert(n.clone(), Track::load_with(&n, edges)?);
         }
     }
     Some(out)
@@ -136,14 +197,43 @@ fn owner_values(tree: &SupportTree, o: &OriginalSupportOwner, prefix: &str) -> V
     out
 }
 
+fn same_road_value(got: &V, r: &Row, k: &str) -> bool {
+    // The wall_90 original asin emits NaN. The recorder writes the literal
+    // "NaN", losing its sign/payload; do not require Rust's parsed NaN bits.
+    // Keep every other field, including all finite heading values, bit-exact.
+    same(got, r, k)
+        || (k == "heading_414"
+            && r.s(k) == "NaN"
+            && matches!(got, V::F(bits) if f32::from_bits(*bits).is_nan()))
+}
+
+#[test]
+fn only_textual_heading_nan_lacks_payload_information() {
+    let row = Row(HashMap::from([
+        ("heading_414", "NaN"),
+        ("other", "NaN"),
+        ("finite", "0"),
+    ]));
+    assert!(same_road_value(&f(f32::from_bits(0xffc0_0000)), &row, "heading_414"));
+    assert!(!same_road_value(&f(0.0), &row, "heading_414"));
+    assert!(!same_road_value(&f(f32::INFINITY), &row, "heading_414"));
+    assert!(!same_road_value(&f(f32::from_bits(0xffc0_0000)), &row, "other"));
+    assert!(!same_road_value(&f(-0.0), &row, "finite"));
+    assert!(!same_road_value(&f(f32::from_bits(1)), &row, "finite"));
+}
+
 fn check(what: &str, got: Vec<(String, V)>, r: &Row) {
-    for (k, v) in got {
-        assert!(same(&v, r, &k), "{what}: {k} = {v:?}, original {}", r.s(&k));
-    }
+    let bad: Vec<String> = got
+        .iter()
+        .filter(|(k, v)| !same_road_value(v, r, k))
+        .map(|(k, v)| format!("{k} = {v:?}, original {}", r.s(k)))
+        .collect();
+    assert!(bad.is_empty(), "{what}: {}", bad.join("; "));
 }
 
 #[test]
 fn owner_queries_match_the_original_on_real_tracks() {
+    require_selected_recordings(&[&QUERY]);
     skip_without_local_fixtures!(QUERY);
     let q = rows(&QUERY);
     let Some(tracks) = tracks(q.iter().map(|r| r.s("track").to_string())) else {
@@ -228,6 +318,7 @@ struct Queue<'a> {
     track: &'a Track,
     locator: BodyLocator,
     owners: [OriginalSupportOwner; 4],
+    tilt_contact: bool,
 }
 
 impl StepQueue for Queue<'_> {
@@ -242,14 +333,35 @@ impl StepQueue for Queue<'_> {
         );
     }
     fn ground(&mut self, car: &mut OriginalCar, lcg: &mut OriginalLcg) {
-        ground_contact_tick(
+        nfs_assets::physics::original_vehicle::ground::ground_contact_tick_with_tilt_contact(
             car,
             &mut RoadGround {
                 surface: &self.track.surface,
                 owners: &mut self.owners,
             },
             lcg,
+            self.tilt_contact,
         );
+    }
+    /// Barrier runs: `Car_CollideTrackEdges` 0x495020 on a copy of the body
+    /// owner car+8 (the original copies it to the stack).
+    fn collide(&mut self, car: &mut OriginalCar, _lcg: &mut OriginalLcg) {
+        if !self.track.edges {
+            return;
+        }
+        use nfs_assets::physics::original_vehicle::driver::{
+            barrier_impact, barrier_state, pair_car, store_barrier_state, store_pair_car,
+        };
+        let half = car.half_extents_3a8;
+        let mut pair = pair_car(car, half);
+        let mut state = barrier_state(car, &pair);
+        let mut owner = self.locator.owner.clone();
+        if let Ok(Some(hit)) = self.track.surface.original_barrier_contact(&mut state, half, &mut owner) {
+            store_barrier_state(car, &mut pair, &state);
+            let mut globals = nfs_assets::physics::original_pair::PairGlobals::default();
+            barrier_impact(&mut pair, hit.into(), &mut globals);
+            store_pair_car(car, &pair);
+        }
     }
 }
 
@@ -259,7 +371,19 @@ fn initial(run: &Row) -> (OriginalCar, OriginalLcg, BodyLocator) {
     let mut car = OriginalCar::new(specs.clone());
     car.res_14 = 1;
     car.body_points_8c = BODY_POINTS.to_vec();
+    // The car-launch recorder lists the body points `+0x8c` it used (f32 bits).
+    if let Some(bp) = run.0.get("body_points") {
+        let v: Vec<f32> = bp
+            .split(',')
+            .map(|h| f32::from_bits(u32::from_str_radix(h, 16).unwrap()))
+            .collect();
+        car.body_points_8c = v.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
+    }
     set_ground(&mut car, run, "init_");
+    if run.0.contains_key("body_points") {
+        // The ground row holds only 8 world points; 0x49ae30 gives them all.
+        nfs_assets::physics::original_vehicle::step::update_world_points(&mut car);
+    }
     set_inputs(&mut car, run, "init_");
     let gear = run.i("gear0") as i8;
     car.gear_d82 = gear;
@@ -278,11 +402,47 @@ fn initial(run: &Row) -> (OriginalCar, OriginalLcg, BodyLocator) {
 
 #[test]
 fn closed_loops_on_real_tracks_match_the_original() {
+    require_selected_recordings(&[&LOOP_RUNS, &LOOP_BODY, &LOOP_DYN, &fixture::CARS]);
     skip_without_local_fixtures!(LOOP_RUNS, LOOP_BODY, LOOP_DYN, fixture::CARS);
-    let runs = rows(&LOOP_RUNS);
-    let body = rows(&LOOP_BODY);
-    let dyn_rows = rows(&LOOP_DYN);
-    let Some(tracks) = tracks(runs.iter().map(|r| r.s("track").to_string())) else {
+    closed_loops(&LOOP_RUNS, &LOOP_BODY, &LOOP_DYN);
+}
+
+/// The Auvergne border hills (change fix-car-launch,
+/// `scripts/research/replay-car-launch.py`): the car turned 45 degrees into
+/// the verge at 50 and 80 km/h with the steering word 0. On the steep hill
+/// the tilted car reaches the body-point contact `0x496610` with the body
+/// polygon plane; the port runs the same steps bit for bit.
+#[test]
+fn border_hill_drives_match_the_original() {
+    require_selected_recordings(&[&LAUNCH_RUNS, &LAUNCH_BODY, &LAUNCH_DYN, &fixture::CARS]);
+    skip_without_local_fixtures!(LAUNCH_RUNS, LAUNCH_BODY, LAUNCH_DYN, fixture::CARS);
+    closed_loops_with(&LAUNCH_RUNS, &LAUNCH_BODY, &LAUNCH_DYN, false, true);
+}
+
+/// The border hill drives with the barrier pass `Car_CollideTrackEdges`
+/// 0x495020 on the track's EDG edges (`replay-car-launch.py`, barrier set).
+#[test]
+fn border_hill_drives_with_the_barrier_match_the_original() {
+    require_selected_recordings(&[&BARRIER_RUNS, &BARRIER_BODY, &BARRIER_DYN, &fixture::CARS]);
+    skip_without_local_fixtures!(BARRIER_RUNS, BARRIER_BODY, BARRIER_DYN, fixture::CARS);
+    closed_loops_with(&BARRIER_RUNS, &BARRIER_BODY, &BARRIER_DYN, true, true);
+}
+
+fn closed_loops(runs: &str, body: &str, dyn_rows: &str) {
+    closed_loops_with(runs, body, dyn_rows, false, false)
+}
+
+fn closed_loops_with(runs: &str, body: &str, dyn_rows: &str, edges: bool, tilt_contact: bool) {
+    let runs = rows(runs);
+    assert!(!runs.is_empty(), "required run recording contains no runs");
+    let body = rows(body);
+    let dyn_rows = rows(dyn_rows);
+    let Some(tracks) = tracks_with(runs.iter().map(|r| r.s("track").to_string()), edges) else {
+        assert!(
+            std::env::var_os("NFS_LOCAL_FIXTURES").is_none(),
+            "recording acceptance requires game assets at {}",
+            game().display()
+        );
         eprintln!("skipped: no local/game");
         return;
     };
@@ -297,6 +457,7 @@ fn closed_loops_on_real_tracks_match_the_original() {
             track,
             locator,
             owners: Default::default(),
+            tilt_contact,
         };
         let steps = run.i("steps") as usize;
         assert_eq!(b.len(), steps, "{name}");
@@ -308,7 +469,8 @@ fn closed_loops_on_real_tracks_match_the_original() {
                 0
             };
             if even {
-                // The 32 Hz rows are taken right after the ground tick.
+                // The 32 Hz rows are taken right after the ground tick (and
+                // the barrier pass of the barrier runs).
                 struct Until<'a, 'b>(&'a mut Queue<'b>, Option<OriginalCar>);
                 impl StepQueue for Until<'_, '_> {
                     fn track_locate(&mut self, car: &mut OriginalCar) {
@@ -316,6 +478,9 @@ fn closed_loops_on_real_tracks_match_the_original() {
                     }
                     fn ground(&mut self, car: &mut OriginalCar, lcg: &mut OriginalLcg) {
                         self.0.ground(car, lcg);
+                    }
+                    fn collide(&mut self, car: &mut OriginalCar, lcg: &mut OriginalLcg) {
+                        self.0.collide(car, lcg);
                         self.1 = Some(car.clone());
                     }
                 }
@@ -356,6 +521,7 @@ fn closed_loops_on_real_tracks_match_the_original() {
 /// in `closed_loops_on_real_tracks_match_the_original`), not a query fault.
 #[test]
 fn autobahn_ramp_bumps_follow_the_support_polygons() {
+    require_selected_recordings(&[&LOOP_DYN]);
     skip_without_local_fixtures!(LOOP_DYN);
     let rows_ = rows(&LOOP_DYN);
     let ramp: Vec<&Row> = rows_
@@ -412,6 +578,7 @@ fn autobahn_ramp_bumps_follow_the_support_polygons() {
 /// centre with support under it, surface 1 and the node's frame.
 #[test]
 fn reset_places_the_car_on_a_supported_node() {
+    require_selected_recordings(&[&fixture::CARS]);
     skip_without_local_fixtures!(fixture::CARS);
     use nfs_assets::physics::original_vehicle::locate::{place_on_node, reset_node};
     let Some(track) = Track::load("autobahn") else {
@@ -442,4 +609,41 @@ fn reset_places_the_car_on_a_supported_node() {
             "alternate plane from the body polygon"
         );
     }
+}
+
+/// `Car_SetupBodyPoints` 0x49abc0 ran in the recorder on the 356 A's CRP
+/// `BndP` points (`R3DCar+0xfc`, y minus the half height); the port's
+/// `setup_body_points` gives the same list, bit for bit.
+#[test]
+fn body_points_are_ordered_as_the_original() {
+    require_selected_recordings(&[&BARRIER_RUNS]);
+    skip_without_local_fixtures!(BARRIER_RUNS);
+    use nfs_assets::physics::original_vehicle::driver::setup_body_points;
+    if !game().exists() && std::env::var_os("NFS_LOCAL_FIXTURES").is_none() {
+        eprintln!("skipped: no local/game");
+        return;
+    }
+    let path = game().join("../CarModel/356a.crp");
+    let raw = std::fs::read(&path)
+        .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    let crp = nfs_formats::parse_crp(&raw).unwrap();
+    let pts = nfs_assets::collision_box::body_points(&crp);
+    let runs = rows(&BARRIER_RUNS);
+    let mut checked = 0;
+    for run in runs.iter().filter(|r| r.s("car") == "356A") {
+        // The recorder's half height (`+0x3ac`) is the run's `init_half_3a8_1`.
+        let h = run.f("init_half_3a8_1");
+        let mapped: Vec<[f32; 3]> = pts
+            .iter()
+            .map(|p| [p[0], (p[1] as f64 - h as f64) as f32, p[2]])
+            .collect();
+        let mine: Vec<String> = setup_body_points(&mapped)
+            .iter()
+            .flatten()
+            .map(|v| format!("{:08x}", v.to_bits()))
+            .collect();
+        assert_eq!(mine.join(","), run.s("body_points"), "{}", run.s("run"));
+        checked += 1;
+    }
+    assert!(checked > 0);
 }

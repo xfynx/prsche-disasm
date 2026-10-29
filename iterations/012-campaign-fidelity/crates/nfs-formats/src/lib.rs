@@ -217,7 +217,7 @@ pub use sim::{parse_ais, parse_sim, AisCar, SimCar, AIS_FILE_SIZE, SIM_FILE_SIZE
 
 pub mod career;
 pub use career::{
-    parse_car_catalog, parse_factory_missions, parse_save, parse_track_catalog, track_catalog_json,
+    event_infos_json, parse_car_catalog, parse_event_infos, parse_factory_missions, EventInfo, EventRace, parse_save, parse_track_catalog, track_catalog_json,
     CarCatalogEntry, TrackCatalogEntry,
     FactoryMissionTemplate, SaveFile, SaveSection, CAR_CATALOG_REC_SIZE, FACTORY_MISSION_COUNT,
     FACTORY_MISSION_REC_SIZE, TRACK_CATALOG_COUNT, TRACK_CATALOG_REC_SIZE,
@@ -252,7 +252,12 @@ pub mod ffn;
 pub use ffn::{parse_ffn, Font, Glyph};
 
 pub mod sky;
-pub use sky::{parse_sky_horizon, parse_sky_sun, HorizonHit, SkyHorizon, SkySun, HORIZON_RADIUS, HORIZON_SEGMENTS};
+pub use sky::{parse_sky_dome, parse_sky_horizon, parse_sky_sun, parse_sky_txt, SkyDome, SkyMapBlock, SKY_DOME_CELLS, HorizonHit, SkyHorizon, SkySun, HORIZON_RADIUS, HORIZON_SEGMENTS};
+
+pub mod weather;
+pub use weather::{parse_sky_weather, SkyClear, SkyWeather, Weather, WeatherKey};
+pub mod flare;
+pub use flare::{parse_flare_dat, parse_flare_positions, FlareData, FlareRecord};
 
 pub mod viv;
 pub use viv::{parse_viv, viv_file, VivEntry, VIV_MAGIC};

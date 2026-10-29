@@ -6,6 +6,8 @@ pub mod camera;
 pub mod cockpit;
 pub mod collision_box;
 pub mod lights;
+pub mod particles;
+pub mod precipitation;
 pub mod sparks;
 pub mod physics;
 pub mod race;
@@ -162,6 +164,22 @@ pub struct Material {
     pub depth_bias: i32,
     /// Shaded by its vertex colours only (prelit track geometry), not by the car lights.
     pub prelit: bool,
+    /// `LayerUVAnimate` mode 0: the texture V scrolls by `frac(t * speed * 0.0001)`, `t` in
+    /// 128 Hz ticks, `speed` signed (`FUN_00448cc0`, `docs/re/water.md` section 4).
+    pub uv_scroll: Option<i32>,
+    /// Texture slot (0..2) of the car's sphere-map reflection layer
+    /// (`R3DSpecularTextureLayer` 0x445520), for materials whose render method has one
+    /// (`CarExtEnv`, `CarWindow`); `None` otherwise.
+    pub env_slot: Option<u8>,
+}
+
+/// Game timer rate of `TIMER_init(0x80)` [VA 0x4a5410, 0x565030].
+pub const GAME_TIMER_HZ: f64 = 128.0;
+
+/// V offset of a `LayerUVAnimate` mode-0 material after `seconds` [VA 0x448cc0].
+pub fn uv_scroll_offset(speed: i32, seconds: f64) -> f32 {
+    let x = seconds * GAME_TIMER_HZ * f64::from(speed) * 0.0001;
+    (x - x.floor()) as f32
 }
 
 /// A library prop template extracted from the track CRP (articles with `Base & 0x8000`).
@@ -171,6 +189,40 @@ pub struct PropArticle {
     pub fourcc: u32,
     /// Range of mesh indices in `Scene::meshes` belonging to this prop.
     pub mesh_range: std::ops::Range<usize>,
+    /// Baked keyframes of the article's `Anqt` entry (original coordinates),
+    /// empty when the article has none. Used by smashed crates.
+    pub frames: Vec<PropFrame>,
+}
+
+/// One 52-byte `Anqt` frame: quaternion (x, y, z, w) and position in the
+/// original coordinates (`docs/re/track-objects.md` section 6).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PropFrame {
+    pub rotation: [f32; 4],
+    pub position: [f32; 3],
+}
+
+/// A smackable article (sign, cone, post, bin): a flag-0x80 object car in the
+/// original (`physics::original_smackable`). Its meshes are kept out of the
+/// static scene; the renderer draws them at the car's pose.
+#[derive(Debug, Clone)]
+pub struct SmackProp {
+    pub record: physics::original_smackable::SmackRecord,
+    /// Meshes in `Scene::meshes` (vertices in scene coordinates at the start pose).
+    pub meshes: std::ops::Range<usize>,
+}
+
+/// A placed article that a car can smash (a definition with pieces, such as
+/// `BBOX`): its intact meshes are kept out of the static scene.
+#[derive(Debug, Clone)]
+pub struct Smashable {
+    /// Index into `Scene::track_objects` (collision object of the same article).
+    pub object_index: usize,
+    pub definition: nfs_formats::animdefs::AnimDefinition,
+    /// Intact meshes in `Scene::meshes` (vertices already in scene coordinates).
+    pub intact_meshes: std::ops::Range<usize>,
+    /// The article's `tr` matrix (row vectors, original coordinates).
+    pub placement: [f32; 16],
 }
 
 /// A placed prop instance from a `.scn` scenario file.
@@ -224,11 +276,38 @@ pub struct TrackTopology {
     pub spline: Option<nfs_formats::LineSplinePath>,
 }
 
+/// A part of the exterior that the front end moves: the cabrio top (frame channel 1, morph
+/// frames `vt` index `lod | frame << 4`), the hood (transform channel 8) or the trunk lid (9)
+/// [VA 0x438440, 0x43c830; `docs/re/frontend.md` "Clicking the car"].
+#[derive(Debug, Clone)]
+pub struct CarAnimPart {
+    /// 1 = cabrio top frame channel, 6/7 = left/right door, 8 = hood, 9 = trunk lid (the `Base+0x44` bytes 9 / 7).
+    pub channel: u8,
+    /// Hinge: the article's `tr` translation in driving body coordinates ([-x, y, z] raw).
+    pub pivot: [f32; 3],
+    /// Rotation axis of the opening: 0 = body x (hood, trunk lid), 1 = body y (doors).
+    pub axis: u8,
+    /// +1 / -1: the sign of the rotation that lifts the lid / swings the door outward
+    /// (approximation A232: the original hinge direction is not read).
+    pub open_sign: f32,
+    /// Opening angle in turns: TPG `hoodextent` (default 0.15) / `trunkextent` (default -0.15),
+    /// magnitude; 0.15 for the doors (`0x4c0520`: level 255 * 0.000588); 1.0 for the cabrio top
+    /// (whole frame range).
+    pub extent: f32,
+    /// Indices into `Scene::meshes` of frame 0 / the closed part.
+    pub base_meshes: Vec<usize>,
+    /// Frames 1.. of a morphing part (cabrio top), one mesh per base mesh, scene coordinates.
+    pub frames: Vec<Vec<Mesh>>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Scene {
     pub meshes: Vec<Mesh>,
     /// Original collision box (CRP level 5) of a car scene; `None` for tracks.
     pub car_collision_box: Option<collision_box::CarCollisionBox>,
+    /// Body points of a car scene (`BndP`, raw CRP coordinates,
+    /// [`collision_box::body_points`]); empty for tracks.
+    pub car_body_points: Vec<[f32; 3]>,
     /// Cockpit camera from the car `.tpg` (`drivercampos[styleN]`/`drivercamrot[styleN]`,
     /// defaults applied); `None` for tracks and synthetic scenes.
     pub car_driver_camera: Option<camera::DriverCamera>,
@@ -237,11 +316,19 @@ pub struct Scene {
     pub car_glares: Vec<CarGlare>,
     /// Parts of the in-car view (BumperCam2) of a car scene; empty for tracks.
     pub car_in_car: Vec<InCarPart>,
+    /// Hood, trunk lid and cabrio top of a car scene (front-end clicks).
+    pub car_anim_parts: Vec<CarAnimPart>,
+    /// Cabrio top at rest, closed: indices of the `CabrioUp*` meshes (geometry 41, odd types) in
+    /// `meshes`; the matching `CabrioDown*` meshes (even types) are kept out of `meshes`.
+    pub car_roof_up: Vec<usize>,
+    pub car_roof_down: Vec<Mesh>,
     /// Car effect textures from `GameData/Render/common.fsh`, named by their
     /// FSH entry (`CARG`, `SPIK`, `GLNT`, `SHAD`, ...); empty if the file is absent.
     pub effect_textures: Vec<Texture>,
     /// Car particle systems of `GameData/Render/carpart.dat` (sparks, smoke, dirt).
     pub particle_defs: Vec<sparks::ParticleDef>,
+    /// Track particle emitters (`ef` type 3 of static articles, `docs/re/particles.md`).
+    pub particle_emitters: Vec<particles::TrackEmitter>,
     pub textures: Vec<Texture>,
     pub materials: Vec<Material>,
     pub bounds: [[f32; 3]; 2],
@@ -250,6 +337,12 @@ pub struct Scene {
     pub prop_articles: Vec<PropArticle>,
     /// Placed prop instances from `.scn` scenario files.
     pub prop_instances: Vec<PropInstance>,
+    /// Collision objects (cylinders and boxes) of the track, original coordinates.
+    pub track_objects: Vec<physics::original_track_object_build::TrackObject>,
+    /// Smashable crates, `Smashable::object_index` into `track_objects`.
+    pub smashables: Vec<Smashable>,
+    /// Smackable objects (signs, cones, posts).
+    pub smack_props: Vec<SmackProp>,
     /// Scenario Start trigger center and direction, when a selected `.scn` supplies one.
     /// The original vehicle staging offset has not been recovered.
     pub scenario_start: Option<ScenarioStart>,
@@ -266,9 +359,23 @@ pub struct Scene {
     pub sky_layers: [Option<SkyTexture>; 3],
     /// Placement of the horizon panorama from `Sky/<track>.bin` (`SkyHorizon_Build` 0x459d30).
     pub sky_horizon: Option<nfs_formats::SkyHorizon>,
+    /// Dome of the sky-map layers (`Sky/<track>.bin`, `docs/re/sky.md`).
+    pub sky_dome: Option<nfs_formats::SkyDome>,
+    /// Layer table of the `HIGH` block of `Sky/<track>.txt` (maps are `sky_layers[0..2]`).
+    pub sky_map: Option<nfs_formats::SkyMapBlock>,
+    /// Region B of the same block (`st1b`/`sc1b` in Alps): maps and scales the sky blends to
+    /// by the node keys of `Sky/<track>.bin` (`docs/re/weather.md`).
+    pub sky_map_b: Option<nfs_formats::SkyMapBlock>,
+    /// Region B sky map and cloud map images (`sky_layers[0..2]` are region A).
+    pub sky_layers_b: [Option<SkyTexture>; 2],
+    /// Weather keys of `Sky/<track>.bin` (fog, rain, snow, sky blend per track node).
+    pub sky_weather: Option<nfs_formats::SkyWeather>,
     /// Sun position of `Sky/<track>.bin` in scene coordinates (`Sky_SunPosition`
     /// 0x461090); its direction lights the cars.
     pub sun_position: Option<[f32; 3]>,
+    /// Sun sprite and lens flare records of `Render/flare.dat` and `flarepos.dat`
+    /// (`SunFlare_Init` 0x460780), loaded with a car.
+    pub flare: Option<nfs_formats::FlareData>,
     /// Track topology (boundaries, junctions, map), if available.
     pub topology: Option<TrackTopology>,
     /// CPU-only support grid constructed from static road candidate geometry.
@@ -280,25 +387,36 @@ pub struct Scene {
     /// The original AI's track node graph and racing line (`SimD`/`SimT`,
     /// `.jnc`, `<track>0.lsp`), if available.
     pub ai_track: Option<race::original_ai::field::OriginalAiTrack>,
+    /// Start line of the race direction: the type-2 trigger of `<track>_FStart.scn` /
+    /// `_BStart.scn` (`race::original_ai::start`), original coordinates.
+    pub start_trigger: Option<[f32; 3]>,
 }
 
 impl Default for Scene {
     fn default() -> Self {
         Self {
             car_collision_box: None,
+            car_body_points: Vec::new(),
             car_driver_camera: None,
             meshes: Vec::new(),
             car_wheels: Vec::new(),
             car_glares: Vec::new(),
             car_in_car: Vec::new(),
+            car_anim_parts: Vec::new(),
+            car_roof_up: Vec::new(),
+            car_roof_down: Vec::new(),
             effect_textures: Vec::new(),
             particle_defs: Vec::new(),
+            particle_emitters: Vec::new(),
             textures: Vec::new(),
             materials: Vec::new(),
             bounds: [[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]],
             diagnostics: Vec::new(),
             prop_articles: Vec::new(),
             prop_instances: Vec::new(),
+            track_objects: Vec::new(),
+            smashables: Vec::new(),
+            smack_props: Vec::new(),
             scenario_start: None,
             scenario_end: None,
             scenario_name: None,
@@ -306,11 +424,18 @@ impl Default for Scene {
             sky_texture: None,
             sky_layers: [None, None, None],
             sky_horizon: None,
+            sky_dome: None,
+            sky_map: None,
+            sky_map_b: None,
+            sky_layers_b: [None, None],
+            sky_weather: None,
             sun_position: None,
+            flare: None,
             topology: None,
             road_surface: None,
             course: None,
             ai_track: None,
+            start_trigger: None,
         }
     }
 }
@@ -358,5 +483,25 @@ pub fn load_track(files: &AssetFiles, track: &str) -> Result<Scene, String> {
     track_loader::load(files, track).map_err(|e| format!("{track}: {e}"))
 }
 
+/// `load_track` for a race direction (`reverse`: the backward race, `docs/re/frontend.md`).
+pub fn load_track_direction(files: &AssetFiles, track: &str, reverse: bool) -> Result<Scene, String> {
+    track_loader::load_direction(files, track, reverse).map_err(|e| format!("{track}: {e}"))
+}
+
 mod loader;
 pub mod track_loader;
+
+#[cfg(test)]
+mod uv_tests {
+    use super::*;
+
+    #[test]
+    fn uv_scroll_wraps_and_follows_the_sign() {
+        // 128 ticks/s * 70 * 0.0001 = 0.896 per second.
+        assert!((uv_scroll_offset(70, 1.0) - 0.896).abs() < 1e-6);
+        assert!((uv_scroll_offset(70, 2.0) - 0.792).abs() < 1e-6);
+        // Negative speed wraps into 0..1 the other way.
+        assert!((uv_scroll_offset(-70, 1.0) - 0.104).abs() < 1e-6);
+        assert_eq!(uv_scroll_offset(0, 5.0), 0.0);
+    }
+}

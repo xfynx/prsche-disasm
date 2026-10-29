@@ -13,10 +13,13 @@ struct Camera {
     view_right: vec4<f32>,
     view_up: vec4<f32>,
     specular: vec4<f32>,
+    // World fog (0x45d3b0, docs/re/weather.md): sRGB colour, EXP density (0 = off).
+    fog: vec4<f32>,
+    forward: vec4<f32>,
 };
 @group(0) @binding(1) var specular_map: texture_2d<f32>;
 @group(0) @binding(2) var specular_sampler: sampler;
-struct Material { color: vec4<f32>, params: vec4<f32> };
+struct Material { color: vec4<f32>, params: vec4<f32>, anim: vec4<f32> };
 @group(0) @binding(0) var<uniform> camera: Camera;
 @group(1) @binding(0) var color_texture: texture_2d<f32>;
 @group(1) @binding(1) var color_sampler: sampler;
@@ -27,13 +30,17 @@ struct Output {
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
     @location(3) color: vec4<f32>,
-    // Per-vertex specular term of R3DSpecularLayer (Gouraud, as the original).
-    @location(4) specular: f32,
+    // Sphere-map coordinates of R3DSpecularTextureLayer 0x445520, per vertex as the
+    // original writes them into the vertex UVs (interpolated across the polygon).
+    @location(4) sphere: vec2<f32>,
 };
 // sRGB-encoded vertex colour to linear: modulating in linear space by the
 // linearised colour equals the original's modulation of gamma-space values.
 fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
     return select(pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4)), c / 12.92, c <= vec3<f32>(0.04045));
+}
+fn linear_to_srgb(c: vec3<f32>) -> vec3<f32> {
+    return select(1.055 * pow(c, vec3<f32>(1.0 / 2.4)) - vec3<f32>(0.055), c * 12.92, c <= vec3<f32>(0.0031308));
 }
 @vertex fn vs_main(@location(0) position: vec3<f32>, @location(1) normal: vec3<f32>, @location(2) uv: vec2<f32>, @location(3) color: vec4<f32>) -> Output {
     var out: Output;
@@ -44,14 +51,34 @@ fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
     out.normal = normalize(normal_mat * normal);
     out.uv = uv;
     out.color = color;
-    // R3DSpecularLayer 0x446e80: (reflect(sun, n) · view)^8 per vertex.
-    let to_eye = normalize(camera.eye.xyz - world_pos.xyz);
-    let r = 2.0 * dot(out.normal, camera.sun.xyz) * out.normal - camera.sun.xyz;
-    out.specular = pow(max(dot(r, to_eye), 0.0), 8.0);
+    // R3DSpecularTextureLayer 0x445520: view-space normal (y up, as the original
+    // projection 0x5391b0 flips y for the screen), uv = 0.5 + n.xy · 0.5 / sqrt(1 + |n.z|),
+    // texture v down, so normals facing up read the lower half of SPC2/SPC3.
+    let nx = dot(out.normal, camera.view_right.xyz);
+    let ny = dot(out.normal, camera.view_up.xyz);
+    let nz = dot(out.normal, normalize(cross(camera.view_up.xyz, camera.view_right.xyz)));
+    let k = 0.5 / sqrt(1.0 + abs(nz));
+    out.sphere = vec2<f32>(0.5 + nx * k, 0.5 + ny * k);
     return out;
 }
+// D3D table fog EXP (driver dx7z.dll: THRASH state 0x15 = 4 -> FOGTABLEMODE EXP): the
+// framebuffer (gamma) colour moves to the fog colour by 1 - exp(-density * depth); depth is
+// the view-space z (Hypothesis: the driver's w-based fog).
+fn apply_fog(c: vec4<f32>, position: vec3<f32>) -> vec4<f32> {
+    if camera.fog.w <= 0.0 {
+        return c;
+    }
+    let depth = max(dot(position - camera.eye.xyz, camera.forward.xyz), 0.0);
+    let f = exp(-camera.fog.w * depth);
+    let rgb = mix(camera.fog.rgb, linear_to_srgb(clamp(c.rgb, vec3<f32>(0.0), vec3<f32>(1.0))), f);
+    return vec4<f32>(srgb_to_linear(rgb), c.a);
+}
 @fragment fn fs_main(in: Output, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
-    let texel = textureSample(color_texture, color_sampler, in.uv);
+    return apply_fog(shade(in, front), in.position);
+}
+fn shade(in: Output, front: bool) -> vec4<f32> {
+    // anim.xy: UV offset of LayerUVAnimate mode 0 (0x448cc0).
+    let texel = textureSample(color_texture, color_sampler, in.uv + material.anim.xy);
     // Exterior alpha encodes paint regions, not opacity. Alpha 255 is fixed
     // artwork (lamps/chrome), 0 is unpainted background; intermediate values
     // select paint regions. Full CLR palette decoding is separate work.
@@ -79,16 +106,16 @@ fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
         let lit = camera.ambient[slot].rgb + camera.diffuse[slot].rgb * max(dot(normal, camera.sun.xyz), 0.0);
         var rgb = base.rgb * srgb_to_linear(min(lit, vec3<f32>(1.0)));
         if material.params.w > 2.5 && camera.specular.w > 0.5 {
-            // R3DSpecularLayer 0x446e80: per-vertex term times the slot colour, added.
-            let s = in.specular;
-            // R3DSpecularTextureLayer 0x445520: sphere map of the view-space normal,
-            // uv = 0.5 + n.xy · 0.5 / sqrt(1 + |n.z|); added by its alpha (A71).
-            let nx = dot(normal, camera.view_right.xyz);
-            let ny = dot(normal, camera.view_up.xyz);
-            let nz = dot(normal, normalize(cross(camera.view_up.xyz, camera.view_right.xyz)));
-            let k = 0.5 / sqrt(1.0 + abs(nz));
-            let spc = textureSample(specular_map, specular_sampler, vec2<f32>(0.5 + nx * k, 0.5 - ny * k));
-            rgb = rgb + srgb_to_linear(min(camera.specular.rgb * s, vec3<f32>(1.0))) + spc.rgb * spc.a;
+            // Texture slot k = params.w − 3 (layer parameter of the material). The pass's
+            // render state has blend field 0, as the car shadow (which must be an alpha
+            // blend), not 1 as the additive glares: the map is alpha-blended over the paint,
+            // on gamma-encoded values like the original frame buffer (A71: the THRASH blend
+            // mapping itself is not read).
+            let slot = clamp(round(material.params.w - 3.0), 0.0, 2.0);
+            let texel = 0.5 / f32(textureDimensions(specular_map).y);
+            let u = (slot + clamp(in.sphere.x, texel, 1.0 - texel)) / 3.0;
+            let spc = textureSample(specular_map, specular_sampler, vec2<f32>(u, in.sphere.y));
+            rgb = srgb_to_linear(mix(linear_to_srgb(rgb), linear_to_srgb(spc.rgb), spc.a));
         }
         return vec4<f32>(rgb, out_alpha);
     }

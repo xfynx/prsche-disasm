@@ -61,6 +61,32 @@ fn assemble_boundary_lines(edges: &[TopologyEdge]) -> Vec<TopologyLine> {
     lines
 }
 
+/// `ef` entries of type 3 of the static (non-object) articles.
+fn particle_emitters(
+    crp: &nfs_formats::TrackCrp,
+    object_articles: &std::collections::BTreeSet<usize>,
+) -> Vec<crate::particles::TrackEmitter> {
+    let mut out = Vec::new();
+    for (ai, a) in crp.articles.iter().enumerate() {
+        // Library articles (Base bit 0x8000) are templates, not placed.
+        let library = a
+            .children
+            .iter()
+            .find(|c| c.tag == "Base")
+            .and_then(|b| b.data.get(0..4))
+            .is_some_and(|w| u32::from_le_bytes(w.try_into().unwrap()) & 0x8000 != 0);
+        if library || object_articles.contains(&ai) {
+            continue;
+        }
+        for c in a.children.iter().filter(|c| c.tag == "ef") {
+            if let Some(e) = crate::particles::parse_ef_emitter(&c.data, ai) {
+                out.push(e);
+            }
+        }
+    }
+    out
+}
+
 fn find<'a>(files: &'a AssetFiles, name: &str) -> Result<&'a [u8], String> {
     let name = name.to_ascii_lowercase();
     let suffix = format!("/{name}");
@@ -119,7 +145,69 @@ pub fn to_scene_coordinates(v: [f32; 3]) -> [f32; 3] {
     [v[0], v[1], -v[2]]
 }
 
+/// `Anqt` frames of a library article: 52 bytes each, quaternion (x, y, z, w),
+/// position, four floats and two words (`docs/re/track-objects.md` section 6).
+fn anqt_frames(article: &nfs_formats::Entry) -> Vec<PropFrame> {
+    let Some(anqt) = article.children.iter().find(|c| c.tag == "Anqt") else {
+        return Vec::new();
+    };
+    anqt.data
+        .chunks_exact(52)
+        .map(|f| {
+            let g = |i: usize| f32::from_le_bytes(f[i * 4..i * 4 + 4].try_into().unwrap());
+            PropFrame {
+                rotation: [g(0), g(1), g(2), g(3)],
+                position: [g(4), g(5), g(6)],
+            }
+        })
+        .collect()
+}
+
+/// Scroll speed of a `UVAnimate` material: the first layer of the `mt` record whose parameters
+/// have mode 0 (`LayerUVAnimate::Apply` 0x448cc0). The record is `0x20` bytes of header, then
+/// `ntex` texture entries of `0x2c`, then `nlayers` headers `{type, offset, size, _}` of 16
+/// bytes, then the parameter blob (loader 0x44a770). Modes 1 (zero steps in every shipped
+/// track) and 2 (sway, shadows) are not animated (A191).
+fn uv_animate_speed(mt: &[u8]) -> Option<i32> {
+    let counts = u32le(mt, 8).ok()?;
+    let (ntex, nlayers) = ((counts & 0xffff) as usize, (counts >> 16) as usize);
+    let headers = 0x20 + ntex * 0x2c;
+    let blob = headers + nlayers * 16;
+    for i in 0..nlayers {
+        let h = headers + i * 16;
+        let (ty, off, size) = (u32le(mt, h).ok()?, u32le(mt, h + 4).ok()? as usize, u32le(mt, h + 8).ok()?);
+        if !(4..=6).contains(&ty) || size < 8 {
+            continue;
+        }
+        let p = blob + off;
+        if u32le(mt, p).ok()? == 0 {
+            return Some(u32le(mt, p + 4).ok()? as i32).filter(|s| *s != 0);
+        }
+    }
+    None
+}
+
+/// Preserve the pre-PR26 render-method classification. Alpha distribution alone does
+/// not prove the original method registry's blend state (`FUN_0044a770`, A190).
+fn track_alpha_mode(render_method: &str, rgba: &[u8]) -> AlphaMode {
+    if !rgba.as_chunks::<4>().0.iter().any(|p| p[3] < 255) {
+        AlphaMode::Opaque
+    } else if render_method == "Transparency" {
+        AlphaMode::Blend
+    } else {
+        AlphaMode::Mask
+    }
+}
+
 pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
+    load_direction(files, track, false)
+}
+
+/// Loads a track for a race direction. `reverse` is the original's `REVERSE` option
+/// `[0x657430]`: the AI graph uses `<track>1.lsp` (`<dir><track><REVERSE>.lsp`, `docs/re/ai.md`),
+/// with the node graph walked backwards, and the course (start, laps, finish) runs against the
+/// racing-line point order.
+pub fn load_direction(files: &AssetFiles, track: &str, reverse: bool) -> Result<Scene, String> {
     if track.is_empty()
         || !track
             .bytes()
@@ -144,12 +232,17 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
     let mut scene = Scene {
         meshes: Vec::new(),
         car_collision_box: None,
+        car_body_points: Vec::new(),
         car_driver_camera: None,
         car_wheels: Vec::new(),
         car_glares: Vec::new(),
         car_in_car: Vec::new(),
+        car_anim_parts: Vec::new(),
+        car_roof_up: Vec::new(),
+        car_roof_down: Vec::new(),
         effect_textures: Vec::new(),
         particle_defs: Vec::new(),
+        particle_emitters: Vec::new(),
         textures: Vec::new(),
         materials: Vec::new(),
         bounds: [[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]],
@@ -162,6 +255,9 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         )],
         prop_articles: Vec::new(),
         prop_instances: Vec::new(),
+        track_objects: Vec::new(),
+        smashables: Vec::new(),
+        smack_props: Vec::new(),
         scenario_start: None,
         scenario_end: None,
         scenario_name: None,
@@ -169,11 +265,18 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         sky_texture: None,
         sky_layers: [None, None, None],
         sky_horizon: None,
+        sky_dome: None,
+        sky_map: None,
+        sky_map_b: None,
+        sky_layers_b: [None, None],
+        sky_weather: None,
         sun_position: None,
+        flare: None,
         topology: None,
         road_surface: None,
         course: None,
         ai_track: None,
+        start_trigger: None,
     };
 
     let mut tex_map = BTreeMap::new();
@@ -209,25 +312,9 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         };
 
         let texture = tex_map.get(&tex_name).copied();
-        let alpha_mode = if let Some(t_idx) = texture {
-            let has_transparency = scene.textures[t_idx]
-                .rgba
-                .as_chunks::<4>()
-                .0
-                .iter()
-                .any(|p| p[3] < 255);
-            if has_transparency {
-                if render_method == "Transparency" {
-                    AlphaMode::Blend
-                } else {
-                    AlphaMode::Mask
-                }
-            } else {
-                AlphaMode::Opaque
-            }
-        } else {
-            AlphaMode::Opaque
-        };
+        let alpha_mode = texture.map_or(AlphaMode::Opaque, |t_idx| {
+            track_alpha_mode(&render_method, &scene.textures[t_idx].rgba)
+        });
 
         let double_sided = render_method != "Opaque";
         let depth_bias = if e.data.len() >= 0x118 {
@@ -248,13 +335,49 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
             depth_bias,
             // Track geometry carries prelit `df` vertex colours (approximation A22).
             prelit: true,
+            uv_scroll: uv_animate_speed(&e.data),
+            env_slot: None,
         });
     }
 
+    let anim = nfs_formats::animdefs::parse_animdefs(&String::from_utf8_lossy(find(
+        files,
+        "animdefs.txt",
+    )?))?;
+    // Collision objects (cylinders, boxes) with their smash definitions. Articles of
+    // a smashable object (a definition with pieces) keep their meshes out of the
+    // static scene so that the renderer can hide them.
+    let track_objects = physics::original_track_object_build::build_initial_track_objects(&crp, &anim)?;
+    let smash_article: BTreeMap<usize, usize> = track_objects
+        .iter()
+        .enumerate()
+        .filter(|(_, o)| {
+            anim.find_tag_or_first(o.tag)
+                .is_some_and(|d| d.tiers.iter().any(|t| !t.pieces.is_empty()))
+        })
+        .map(|(i, o)| (o.article_index, i))
+        .collect();
+    let mut smash_meshes: BTreeMap<usize, Vec<Mesh>> = BTreeMap::new();
+    // Smackable articles (signs, cones, posts) run as object cars in the original.
+    let smack_records = physics::original_smackable::build_initial_smack_records(&crp, &anim)?;
+    let smack_article: BTreeMap<usize, usize> = smack_records
+        .iter()
+        .enumerate()
+        .map(|(i, r)| (r.article_index, i))
+        .collect();
+    let mut smack_meshes: BTreeMap<usize, Vec<Mesh>> = BTreeMap::new();
+    // Particle emitters of static articles (0x450de0 → 0x450d10). Objects use
+    // the object path 0x450980 (not ported).
+    let object_articles: std::collections::BTreeSet<usize> = track_objects
+        .iter()
+        .map(|o| o.article_index)
+        .chain(smack_records.iter().map(|r| r.article_index))
+        .collect();
+    scene.particle_emitters = particle_emitters(&crp, &object_articles);
     let mut raw_meshes = Vec::new();
     let mut single_sided = std::collections::BTreeSet::new();
     // Rendering and source collision resources are assembled separately.
-    let mut prop_templates: Vec<(u32, Vec<Mesh>)> = Vec::new();
+    let mut prop_templates: Vec<(u32, Vec<Mesh>, Vec<PropFrame>)> = Vec::new();
     let mut total_tris = 0;
     for (ai, a) in crp.articles.iter().enumerate() {
         let article_name = a
@@ -312,7 +435,7 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                     }
                 }
                 if !prop_meshes.is_empty() {
-                    prop_templates.push((fourcc, prop_meshes));
+                    prop_templates.push((fourcc, prop_meshes, anqt_frames(a)));
                 }
             }
             continue;
@@ -383,7 +506,13 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                         scene.bounds[1][k] = scene.bounds[1][k].max(v.position[k]);
                     }
                 }
-                raw_meshes.push(m);
+                if smash_article.contains_key(&ai) {
+                    smash_meshes.entry(ai).or_default().push(m);
+                } else if smack_article.contains_key(&ai) {
+                    smack_meshes.entry(ai).or_default().push(m);
+                } else {
+                    raw_meshes.push(m);
+                }
             }
         }
         // Signs carry a front and a back plate: two coplanar primitives with opposite
@@ -408,10 +537,6 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
         single_sided.len()
     ));
 
-    let anim = nfs_formats::animdefs::parse_animdefs(&String::from_utf8_lossy(find(
-        files,
-        "animdefs.txt",
-    )?))?;
     let support = physics::original_support_loader::assemble_initial_track_support(&crp, &anim)?;
     let skipped_special = support.skipped_special_articles;
     let skipped_disabled = support.skipped_disabled_articles;
@@ -476,7 +601,7 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
     ));
 
     // Append prop template meshes to scene.meshes after static geometry
-    for (fourcc, meshes) in prop_templates {
+    for (fourcc, meshes, frames) in prop_templates {
         let prop_mesh_start = scene.meshes.len();
         scene.meshes.extend(meshes);
         let prop_mesh_end = scene.meshes.len();
@@ -484,8 +609,51 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
             scene.prop_articles.push(PropArticle {
                 fourcc,
                 mesh_range: prop_mesh_start..prop_mesh_end,
+                frames,
             });
         }
+    }
+    // Smashable crates: intact meshes after the prop templates (the renderer draws
+    // them as hideable instances).
+    for (&article_index, &object_index) in &smash_article {
+        let Some(meshes) = smash_meshes.remove(&article_index) else {
+            continue;
+        };
+        let start = scene.meshes.len();
+        scene.meshes.extend(meshes);
+        let object = &track_objects[object_index];
+        let Some(definition) = anim.find_tag_or_first(object.tag).cloned() else {
+            continue;
+        };
+        let tr = crp.articles[article_index]
+            .children
+            .iter()
+            .find(|c| c.tag == "tr" && c.index == 0)
+            .filter(|t| t.data.len() >= 64);
+        let mut placement = [0.0f32; 16];
+        for (k, v) in placement.iter_mut().enumerate() {
+            *v = tr
+                .and_then(|t| f32le(&t.data, k * 4).ok())
+                .unwrap_or(if k % 5 == 0 { 1.0 } else { 0.0 });
+        }
+        scene.smashables.push(Smashable {
+            object_index,
+            definition,
+            intact_meshes: start..scene.meshes.len(),
+            placement,
+        });
+    }
+    scene.track_objects = track_objects;
+    for (&article_index, &record_index) in &smack_article {
+        let Some(meshes) = smack_meshes.remove(&article_index) else {
+            continue;
+        };
+        let start = scene.meshes.len();
+        scene.meshes.extend(meshes);
+        scene.smack_props.push(SmackProp {
+            record: smack_records[record_index].clone(),
+            meshes: start..scene.meshes.len(),
+        });
     }
 
     // --- Prop instancing from .scn files ---
@@ -654,10 +822,35 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
             Ok(sun) => scene.sun_position = Some(to_scene_coordinates(sun.position())),
             Err(e) => scene.diagnostics.push(format!("Sky {key}: {e}")),
         }
+        match nfs_formats::parse_sky_dome(data) {
+            Ok(dome) => scene.sky_dome = Some(dome),
+            Err(e) => scene.diagnostics.push(format!("Sky {key}: dome {e}")),
+        }
         match nfs_formats::parse_sky_horizon(data) {
             Ok(horizon) => scene.sky_horizon = Some(horizon),
             Err(e) => scene.diagnostics.push(format!("Sky {key}: horizon {e}")),
         }
+        match nfs_formats::parse_sky_weather(data) {
+            Ok(weather) => scene.sky_weather = Some(weather),
+            Err(e) => scene.diagnostics.push(format!("Sky {key}: weather {e}")),
+        }
+    }
+
+    // --- Sky layer table Sky/<track>.txt (HIGH block, region A) ---
+    let sky_txt = files.iter().find(|(k, _)| {
+        let low = k.replace('\\', "/").to_ascii_lowercase();
+        (low.contains("/sky/") || low.starts_with("sky/"))
+            && !low.contains("sky new")
+            && low.rsplit('/').next() == Some(&format!("{}.txt", track.to_ascii_lowercase()))
+    });
+    if let Some((_, data)) = sky_txt {
+        let blocks = nfs_formats::parse_sky_txt(&String::from_utf8_lossy(data));
+        scene.sky_map = blocks
+            .iter()
+            .find(|b| b.capability == "HIGH")
+            .or(blocks.first())
+            .cloned();
+        scene.sky_map_b = scene.sky_map.as_ref().and_then(|b| b.region_b.as_deref().cloned());
     }
 
     // --- Sky texture loading ---
@@ -686,15 +879,37 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                 Ok(sky_images) => {
                     // Region A sky map and cloud map (`st1a`, `sc1a` in Sky/<track>.txt)
                     // and the horizon haze strip.
-                    for (slot, prefix) in ["st", "sc", "hzcl"].iter().enumerate() {
-                        scene.sky_layers[slot] = sky_images
+                    // Layer maps are named by the txt (Coastal: `sm1b`); without it the
+                    // first `st`/`sc` images stand in (approximation A4).
+                    let by_name = |name: &str| {
+                        sky_images
                             .iter()
-                            .find(|img| img.name.starts_with(prefix))
-                            .map(|img| SkyTexture {
-                                width: img.width,
-                                height: img.height,
-                                rgba: img.rgba.clone(),
-                            });
+                            .find(|img| img.name.eq_ignore_ascii_case(name))
+                    };
+                    let pick = |slot: usize, prefix: &str| {
+                        match scene.sky_map.as_ref().map(|b| b.maps[slot].as_str()) {
+                            Some(name) if name.eq_ignore_ascii_case("none") => None,
+                            Some(name) => by_name(name),
+                            None => sky_images.iter().find(|img| img.name.starts_with(prefix)),
+                        }
+                    };
+                    let tex = |img: &nfs_formats::Image| SkyTexture {
+                        width: img.width,
+                        height: img.height,
+                        rgba: img.rgba.clone(),
+                    };
+                    scene.sky_layers[0] = pick(0, "st").map(tex);
+                    scene.sky_layers[1] = pick(1, "sc").map(tex);
+                    scene.sky_layers[2] = by_name("hzcl").map(tex);
+                    // Region B maps (`FUN_0045b5a0` loads both regions per layer).
+                    for slot in 0..2 {
+                        scene.sky_layers_b[slot] = scene
+                            .sky_map_b
+                            .as_ref()
+                            .map(|b| b.maps[slot].as_str())
+                            .filter(|n| !n.eq_ignore_ascii_case("none"))
+                            .and_then(by_name)
+                            .map(tex);
                     }
                     // Look for the horizon panorama texture ("horz")
                     if let Some(horz) = sky_images.iter().find(|img| img.name == "horz") {
@@ -728,12 +943,14 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
     let jnc_key = format!("{track}.jnc");
     let map_key = format!("{track}.map");
     let lsp0_key = format!("{track}0.lsp");
+    let lsp_dir_key = format!("{track}{}.lsp", reverse as u8);
     let lsp_key = format!("{track}.lsp");
 
     let edg_data = find(files, &edg_key).ok();
     let jnc_data = find(files, &jnc_key).ok();
     let map_data = find(files, &map_key).ok();
-    let lsp_data = find(files, &lsp0_key)
+    let lsp_data = find(files, &lsp_dir_key)
+        .or_else(|_| find(files, &lsp0_key))
         .or_else(|_| find(files, &lsp_key))
         .ok();
 
@@ -809,8 +1026,14 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
                         let gap = ((p_first.x - p_last.x).powi(2) + (p_first.z - p_last.z).powi(2))
                             .sqrt();
                         let is_circuit = gap < 60.0;
+                        // A backward race runs the racing line against its point order.
+                        let ordered: Vec<_> = if reverse {
+                            lsp.points.iter().rev().cloned().collect()
+                        } else {
+                            lsp.points.clone()
+                        };
                         if let Ok(course) =
-                            TrackCourse::from_spline_points(&lsp.points, is_circuit, |x, z| {
+                            TrackCourse::from_spline_points(&ordered, is_circuit, |x, z| {
                                 scene
                                     .road_surface
                                     .as_ref()
@@ -842,10 +1065,81 @@ pub fn load(files: &AssetFiles, track: &str) -> Result<Scene, String> {
 
         scene.topology = Some(topology);
         // The original AI: node graph from the CRP and the forward racing line.
-        if let Ok(lsp0) = find(files, &lsp0_key) {
+        if let Ok(lsp) = find(files, &lsp_dir_key).or_else(|_| find(files, &lsp0_key)) {
             scene.ai_track = crate::race::original_ai::field::OriginalAiTrack::from_files(
-                track, false, crp_data, jnc_data, lsp0,
+                track, reverse, crp_data, jnc_data, lsp,
             );
+        }
+    }
+
+    // The start scene of the direction (`FUN_0046d600`): the start line trigger.
+    let start_key = format!("{track}_{}start.scn", if reverse { 'b' } else { 'f' });
+    if let Ok(bytes) = find(files, &start_key) {
+        use crate::race::original_ai::start;
+        let text = String::from_utf8_lossy(bytes);
+        scene.start_trigger = start::start_trigger(&text);
+        // A point-to-point race runs from the start line to the finish line along the road:
+        // the course follows the node graph between the two triggers (the `.lsp` order is
+        // the file order of the sections, not the road, and runs on past the finish).
+        if let (Some(ai), Some(s), Some(f)) = (&scene.ai_track, scene.start_trigger, start::finish_trigger(&text)) {
+            let nodes = &ai.nodes;
+            let (sn, fnode) = (start::start_node(nodes, s), start::start_node(nodes, f));
+            if let Some(route) = start::route(nodes, sn, fnode, reverse).filter(|r| r.len() >= 3) {
+                let points: Vec<_> = route
+                    .iter()
+                    .map(|&n| {
+                        let p = nodes.nodes[n as usize].pos_04;
+                        nfs_formats::SplinePoint { x: p[0], z: p[2] }
+                    })
+                    .collect();
+                let surface = scene.road_surface.as_ref();
+                if let Ok(course) = TrackCourse::from_spline_points(&points, false, |x, z| {
+                    surface
+                        .and_then(|s| s.query(x, z, 0.0, 500.0, 500.0))
+                        .map(|h| h.height)
+                        .unwrap_or(0.0)
+                }) {
+                    scene.diagnostics.push(format!(
+                        "Course from the start line to the finish along the nodes: {} nodes, {:.1} m",
+                        route.len(),
+                        course.total_length
+                    ));
+                    scene.course = Some(course);
+                }
+            }
+        }
+    }
+
+    // No start triggers (circuits): the course is one lap along the node graph from the start
+    // node, in the race direction (the `.lsp` order of the sections is not the road).
+    if scene.start_trigger.is_none() {
+        use crate::race::original_ai::start;
+        if let Some(ai) = &scene.ai_track {
+            let nodes = &ai.nodes;
+            let first = start::circuit_first(nodes, reverse);
+            if let Some(route) = start::lap_route(nodes, first, reverse).filter(|r| r.len() >= 100) {
+                let points: Vec<_> = route
+                    .iter()
+                    .map(|&n| {
+                        let p = nodes.nodes[n as usize].pos_04;
+                        nfs_formats::SplinePoint { x: p[0], z: p[2] }
+                    })
+                    .collect();
+                let surface = scene.road_surface.as_ref();
+                if let Ok(course) = TrackCourse::from_spline_points(&points, true, |x, z| {
+                    surface
+                        .and_then(|s| s.query(x, z, 0.0, 500.0, 500.0))
+                        .map(|h| h.height)
+                        .unwrap_or(0.0)
+                }) {
+                    scene.diagnostics.push(format!(
+                        "Course: one lap along the nodes, {} nodes, {:.1} m",
+                        route.len(),
+                        course.total_length
+                    ));
+                    scene.course = Some(course);
+                }
+            }
         }
     }
 
@@ -1089,6 +1383,156 @@ fn parse_mesh(
 mod tests {
     use super::*;
 
+    /// `mt` record of one texture and the given layers `(type, params)`.
+    fn mt_record(layers: &[(u32, Vec<u32>)]) -> Vec<u8> {
+        let mut w = vec![0u32; 8];
+        w[2] = 1 | ((layers.len() as u32) << 16);
+        w.extend(std::iter::repeat_n(0, 11)); // one 0x2c texture entry
+        let mut off = 0u32;
+        for (ty, p) in layers {
+            w.extend([*ty, off, p.len() as u32 * 4, 0]);
+            off += p.len() as u32 * 4;
+        }
+        for (_, p) in layers {
+            w.extend(p);
+        }
+        w.iter().flat_map(|x| x.to_le_bytes()).collect()
+    }
+
+    #[test]
+    fn uv_animate_speed_reads_the_mode_0_layer() {
+        // Plain UVAnimate: one layer {mode 0, speed 70}.
+        let plain = mt_record(&[(5, vec![0, 70, 0, 0, 0])]);
+        assert_eq!(uv_animate_speed(&plain), Some(70));
+        // Negative speed scrolls the other way.
+        let rev = mt_record(&[(5, vec![0, (-110i32) as u32, 0, 0, 0])]);
+        assert_eq!(uv_animate_speed(&rev), Some(-110));
+        // FA_UVAnim: mode 0 layer first, colour layer second.
+        let fa = mt_record(&[(5, vec![0, 70, 0, 0, 0]), (1, vec![0xff00_46ff])]);
+        assert_eq!(uv_animate_speed(&fa), Some(70));
+        // Mode 1 / 2 and non-UV layers are not scrolled.
+        assert_eq!(uv_animate_speed(&mt_record(&[(5, vec![1, 20, 4, 0, 0])])), None);
+        assert_eq!(uv_animate_speed(&mt_record(&[(4, vec![2, 10, 0, 0, 0])])), None);
+        assert_eq!(uv_animate_speed(&mt_record(&[(1, vec![0xffff_ffff])])), None);
+        assert_eq!(uv_animate_speed(&[0; 16]), None);
+    }
+
+    #[test]
+    fn local_canyon_waterfalls_scroll() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData/Track");
+        let (Ok(crp), Ok(fsh), Ok(anim)) = (
+            std::fs::read(root.join("canyon.crp")),
+            std::fs::read(root.join("canyon.fsh")),
+            std::fs::read(root.join("animdefs.txt")),
+        ) else {
+            return;
+        };
+        let mut files = AssetFiles::new();
+        files.insert("canyon.crp".into(), crp);
+        files.insert("canyon.fsh".into(), fsh);
+        files.insert("animdefs.txt".into(), anim);
+        let scene = load(&files, "canyon").unwrap();
+        let speed = |tex: &str| {
+            scene
+                .materials
+                .iter()
+                .find(|m| m.texture.is_some_and(|t| scene.textures[t].name == tex))
+                .and_then(|m| m.uv_scroll)
+        };
+        assert_eq!(speed("wfw2"), Some(70));
+        assert_eq!(speed("wfw4"), Some(110));
+        assert_eq!(speed("ch07"), None);
+    }
+
+    #[test]
+    fn local_castle_and_forest_waterfalls_scroll_with_source_render_method() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData/Track");
+        for (track, expected) in [
+            ("castle", vec![("wfw1", -110), ("wfw2", 70), ("wfw2", -70), ("wfw4", 110)]),
+            ("forest", vec![("wfw2", 60), ("wfw4", 100)]),
+        ] {
+            let (Ok(crp), Ok(fsh), Ok(anim)) = (
+                std::fs::read(root.join(format!("{track}.crp"))),
+                std::fs::read(root.join(format!("{track}.fsh"))),
+                std::fs::read(root.join("animdefs.txt")),
+            ) else {
+                return;
+            };
+            let mut files = AssetFiles::new();
+            files.insert(format!("{track}.crp"), crp);
+            files.insert(format!("{track}.fsh"), fsh);
+            files.insert("animdefs.txt".into(), anim);
+            let scene = load(&files, track).unwrap();
+            for (tex, speed) in expected {
+                let m = scene
+                    .materials
+                    .iter()
+                    .find(|m| {
+                        m.uv_scroll == Some(speed)
+                            && m.texture.is_some_and(|t| scene.textures[t].name == tex)
+                    })
+                    .unwrap_or_else(|| panic!("{track} {tex} {speed}"));
+                let expected_alpha = if m.name.ends_with(":Transparency") {
+                    AlphaMode::Blend
+                } else {
+                    AlphaMode::Mask
+                };
+                assert_eq!(m.alpha_mode, expected_alpha, "{track} {tex} {}", m.name);
+            }
+        }
+    }
+
+    #[test]
+    fn local_coastal_sea_surfaces_keep_source_render_method() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData/Track");
+        let (Ok(crp), Ok(fsh), Ok(anim)) = (
+            std::fs::read(root.join("coastal.crp")),
+            std::fs::read(root.join("coastal.fsh")),
+            std::fs::read(root.join("animdefs.txt")),
+        ) else {
+            return;
+        };
+        let mut files = AssetFiles::new();
+        files.insert("coastal.crp".into(), crp);
+        files.insert("coastal.fsh".into(), fsh);
+        files.insert("animdefs.txt".into(), anim);
+        let scene = load(&files, "coastal").unwrap();
+        for tex in ["wtr3", "wtr4", "seaf", "seag", "seah"] {
+            let mat = scene
+                .materials
+                .iter()
+                .find(|m| m.texture.is_some_and(|t| scene.textures[t].name == tex))
+                .unwrap_or_else(|| panic!("no material for {tex}"));
+            let expected_alpha = if mat.name.ends_with(":Transparency") {
+                AlphaMode::Blend
+            } else {
+                AlphaMode::Mask
+            };
+            assert_eq!(mat.alpha_mode, expected_alpha, "{tex} {}", mat.name);
+        }
+        // Cut-out foliage stays masked.
+        let fol = scene
+            .materials
+            .iter()
+            .find(|m| m.texture.is_some_and(|t| scene.textures[t].name == "ch07"))
+            .unwrap();
+        assert_eq!(fol.alpha_mode, AlphaMode::Mask);
+    }
+
+    #[test]
+    fn partial_alpha_does_not_invent_a_blend_render_method() {
+        let sea = [200, 170, 180, 95].repeat(64);
+        assert_eq!(track_alpha_mode("Opaque", &sea), AlphaMode::Mask);
+        assert_eq!(track_alpha_mode("Water", &sea), AlphaMode::Mask);
+        assert_eq!(track_alpha_mode("Transparency", &sea), AlphaMode::Blend);
+        let opaque = [10, 90, 20, 255].repeat(64);
+        assert_eq!(track_alpha_mode("Transparency", &opaque), AlphaMode::Opaque);
+        assert_eq!(track_alpha_mode("Opaque", &[]), AlphaMode::Opaque);
+    }
+
     #[test]
     fn reverse_twin_quads_are_detected() {
         let quad = |idx: Vec<u32>| Mesh {
@@ -1111,6 +1555,22 @@ mod tests {
         assert_eq!(c, [0x4b as f32 / 255.0, 0x6b as f32 / 255.0, 0x99 as f32 / 255.0, 1.0]);
         // Brake glare colour word 0xffff0000 (bytes 00 00 ff ff) is red.
         assert_eq!(df_rgba(&[0, 0, 0xff, 0xff]), [1.0, 0.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn local_canyon_waterfall_emitters() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData/Track/canyon.crp");
+        let Ok(data) = std::fs::read(path) else {
+            return;
+        };
+        let crp = parse_track_crp(&data).unwrap();
+        let e = particle_emitters(&crp, &Default::default());
+        let tags: Vec<&[u8; 4]> = e.iter().map(|e| &e.tag).collect();
+        assert_eq!(tags.iter().filter(|t| t.starts_with(b"WF0")).count(), 8, "{tags:?}");
+        let base = e.iter().find(|e| &e.tag == b"WF06").unwrap();
+        assert!((base.frame.position[0] + 3243.372).abs() < 0.01);
+        assert!(base.frame.axis_b[1] > 0.9, "the base mist rises");
     }
 
     #[test]
@@ -1397,6 +1857,46 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn local_backward_race_uses_lsp1_and_reversed_course() {
+        // Local game data (skipped without it): alps, a point-to-point track.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../local/game/GameData/Track");
+        let read = |n: &str| std::fs::read(root.join(n)).ok();
+        let (Some(crp), Some(fsh), Some(anim), Some(l0), Some(l1)) = (
+            read("alps.crp"),
+            read("alps.fsh"),
+            read("animdefs.txt"),
+            read("racer/work/alps0.lsp"),
+            read("racer/work/alps1.lsp"),
+        ) else {
+            eprintln!("skipped: no local game data");
+            return;
+        };
+        let mut files = AssetFiles::new();
+        files.insert("alps.crp".into(), crp);
+        files.insert("alps.fsh".into(), fsh);
+        files.insert("animdefs.txt".into(), anim);
+        files.insert("alps0.lsp".into(), l0);
+        files.insert("alps1.lsp".into(), l1);
+        if let Some(j) = read("alps.jnc") {
+            files.insert("alps.jnc".into(), j);
+        }
+        let fwd = load_direction(&files, "alps", false).unwrap();
+        let bwd = load_direction(&files, "alps", true).unwrap();
+        let (cf, cb) = (fwd.course.unwrap(), bwd.course.unwrap());
+        assert!(!cf.is_circuit);
+        // The backward course starts where the forward one ends and runs the other way.
+        let last = cf.waypoints.last().unwrap().position;
+        let first = cb.waypoints[0].position;
+        assert!((last[0] - first[0]).abs() < 1e-3 && (last[2] - first[2]).abs() < 1e-3);
+        assert!(cf.waypoints[0].forward[2] * cb.waypoints[0].forward[2] < 0.0);
+        // The AI graph: the direction's racing line and REVERSE.
+        let (af, ab) = (fwd.ai_track.unwrap(), bwd.ai_track.unwrap());
+        assert!(!af.reverse && ab.reverse);
+        assert_ne!(af.line, ab.line, "alps1.lsp differs from alps0.lsp");
     }
 
     #[test]

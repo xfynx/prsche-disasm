@@ -1,6 +1,6 @@
 # Current project status
 
-Updated 2026-10-28. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-10-29. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
@@ -40,6 +40,11 @@ prototype, with collision-unit and FFN metric corrections and author attribution
 Its [intake review](docs/research/pr25-integration-review-2026-10-26.md) records the
 build/test/browser evidence and unsupported speech-archive boundary. Its recorders
 are available for C++ recovery; the C++ checkpoint above is unchanged.
+
+[PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md) adds recorded
+keyboard, object and launch/barrier evidence, repairs damage writeback and keeps
+unproved new compositions behind an experimental feature. It updates the Rust
+prototype and research tools; the C++ checkpoint above is unchanged.
 
 [Xerj source review](docs/research/xerj-evaluation-2026-10-26.md) is complete.
 A bounded local retrieval trial could measure its value; no performance gain or

@@ -21,6 +21,12 @@ pub struct BrowserViewer {
     renderer: Option<Renderer>,
     /// `Date.now()` when the front-end room appeared; the room yaw follows wall time.
     room_started_ms: f64,
+    /// The canvas can be composited with premultiplied alpha (the compare screen's cars).
+    premultiplied_ok: bool,
+    default_alpha: wgpu::CompositeAlphaMode,
+    /// Car reflection opt-in (key Y, `?reflection=1`), kept across scene loads: each load
+    /// makes a new renderer.
+    car_reflection: bool,
 }
 
 #[wasm_bindgen]
@@ -60,10 +66,19 @@ pub async fn create_viewer(canvas: HtmlCanvasElement) -> Result<BrowserViewer, J
         alpha_mode: caps.alpha_modes[0],
         // WebGPU canvases offer only non-sRGB formats (bgra8unorm); render through an
         // sRGB view so the shaders' linear output is encoded as on native targets.
-        view_formats: if format.is_srgb() { vec![] } else { vec![format.add_srgb_suffix()] },
+        // The other encoding is also allowed: the lens flare adds in gamma space (sun.rs).
+        view_formats: if format.is_srgb() {
+            vec![format.remove_srgb_suffix()]
+        } else {
+            vec![format.add_srgb_suffix()]
+        },
         desired_maximum_frame_latency: 2,
     };
     surface.configure(&device, &config);
+    // WebGPU canvases always accept `premultiplied`, although the wgpu capability list only
+    // names the default mode.
+    let premultiplied_ok = true;
+    let default_alpha = config.alpha_mode;
 
     Ok(BrowserViewer {
         surface,
@@ -72,11 +87,19 @@ pub async fn create_viewer(canvas: HtmlCanvasElement) -> Result<BrowserViewer, J
         queue,
         renderer: None,
         room_started_ms: 0.0,
+        premultiplied_ok,
+        default_alpha,
+        car_reflection: false,
     })
 }
 
 #[wasm_bindgen]
 impl BrowserViewer {
+    /// Whether the build enables the unproved original-port composition experiments.
+    pub fn experimental_original_port_enabled(&self) -> bool {
+        cfg!(feature = "experimental-original-port")
+    }
+
     pub fn load(&mut self, names: Array, bytes: Array, car: String) -> Result<String, JsValue> {
         let scene = files_from_js(names, bytes)
             .and_then(|files| load_car(&files, &car))
@@ -92,6 +115,21 @@ impl BrowserViewer {
     ) -> Result<String, JsValue> {
         let scene = files_from_js(names, bytes)
             .and_then(|files| load_track(&files, &track))
+            .map_err(|e| JsValue::from_str(&e))?;
+        self.set_scene(scene)
+    }
+
+    /// `load_track` for a race direction: `reverse` runs the track backwards (`<track>1.lsp`, the
+    /// AI node graph walked backwards, the course from the other end).
+    pub fn load_track_direction(
+        &mut self,
+        names: Array,
+        bytes: Array,
+        track: String,
+        reverse: bool,
+    ) -> Result<String, JsValue> {
+        let scene = files_from_js(names, bytes)
+            .and_then(|files| nfs_assets::load_track_direction(&files, &track, reverse))
             .map_err(|e| JsValue::from_str(&e))?;
         self.set_scene(scene)
     }
@@ -153,8 +191,89 @@ impl BrowserViewer {
         self.set_car_model(names, bytes, car, style)?;
         if let Some(renderer) = &mut self.renderer {
             renderer.fe_room_car = true;
+            renderer.fe_car_anim = crate::fe_room::CarAnim::CLOSED;
         }
         Ok(())
+    }
+
+    /// Moves a part of the room car to `target` (0 closed .. 1 open) over `duration_ms`:
+    /// channel 1 cabrio top, 8 hood, 9 trunk lid.
+    pub fn set_room_car_anim(&mut self, channel: u32, target: f32, duration_ms: f64) {
+        if !cfg!(feature = "experimental-original-port") {
+            return;
+        }
+        if let Some(renderer) = &mut self.renderer {
+            let now = js_sys::Date::now();
+            if let Some(t) = renderer.fe_car_anim.tween_mut(channel as u8) {
+                t.retarget(now, target.clamp(0.0, 1.0), duration_ms);
+            }
+        }
+    }
+
+    /// Target of a part's tween (see `set_room_car_anim`).
+    pub fn room_car_anim_target(&self, channel: u32) -> f32 {
+        self.renderer
+            .as_ref()
+            .and_then(|r| r.fe_car_anim.tween(channel as u8).map(|t| t.target()))
+            .unwrap_or(0.0)
+    }
+
+    /// The room car has this moving part (1 cabrio top, 8 hood, 9 trunk lid).
+    pub fn room_car_has_part(&self, channel: u32) -> bool {
+        if !cfg!(feature = "experimental-original-port") {
+            return false;
+        }
+        self.renderer
+            .as_ref()
+            .and_then(|r| r.car_render_has_part(channel as u8))
+            .unwrap_or(false)
+    }
+
+    /// Room yaw in turns (0..1), for the click zones of the car.
+    pub fn room_yaw_turns(&self) -> f32 {
+        self.renderer
+            .as_ref()
+            .and_then(|r| r.fe_room.as_ref().map(|room| room.yaw_turns()))
+            .unwrap_or(0.0)
+    }
+
+    /// Body paint of the room car, RGBA (4 floats); an empty array keeps the model's paint.
+    pub fn set_room_paint(&mut self, rgba: &[f32]) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.fe_room_paint = <[f32; 4]>::try_from(rgba).ok();
+        }
+    }
+
+    /// Compare screen: keep the car loaded last as the second car (spot 2).
+    pub fn stash_compare_car(&mut self, paint: &[f32]) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.stash_compare_car();
+            renderer.fe_compare_paint2 = <[f32; 4]>::try_from(paint).ok();
+        }
+    }
+
+    /// Draws the room car (spot 1) and the stashed car (spot 2) on the compare screen.
+    pub fn show_compare_cars(&mut self, show: bool) {
+        let Some(renderer) = &mut self.renderer else {
+            return;
+        };
+        // A230: the compare camera and pose still use screenshot-fitted values.
+        renderer.fe_compare = cfg!(feature = "experimental-original-port")
+            && show && renderer.fe_room.is_some() && self.premultiplied_ok;
+        // The cars are composited over the page's 2D backdrop: transparent canvas while shown.
+        let alpha = if renderer.fe_compare {
+            wgpu::CompositeAlphaMode::PreMultiplied
+        } else {
+            self.default_alpha
+        };
+        if self.config.alpha_mode != alpha {
+            self.config.alpha_mode = alpha;
+            self.surface.configure(&self.device, &self.config);
+        }
+    }
+
+    pub fn premultiplied_alpha(&self) -> bool {
+        self.premultiplied_ok
     }
 
     pub fn show_room_car(&mut self, show: bool) {
@@ -318,6 +437,41 @@ impl BrowserViewer {
         }
     }
 
+    /// Pause menu: freezes or resumes the race clock and scheduler.
+    pub fn set_paused(&mut self, paused: bool) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.set_paused(paused);
+        }
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.renderer.as_ref().map(|r| r.is_paused()).unwrap_or(false)
+    }
+
+    /// Debug panel: the last solid object hit ("name [tag] size at x,y,z"), empty before a hit.
+    pub fn object_hit_report(&self) -> String {
+        self.renderer
+            .as_ref()
+            .map(|r| r.object_hit_report())
+            .unwrap_or_default()
+    }
+
+    /// Debug (tools/browser-shot.mjs): `[smackables, awake, hit, smashed crates]`.
+    pub fn smack_stats(&self) -> Vec<f32> {
+        self.renderer
+            .as_ref()
+            .map(|r| r.smack_stats().to_vec())
+            .unwrap_or_default()
+    }
+
+    /// Debug (tools/browser-shot.mjs): places the car here.
+    pub fn debug_start(&mut self, x: f32, y: f32, z: f32, yaw: f32) -> f32 {
+        match &mut self.renderer {
+            Some(renderer) => renderer.debug_start([x, y, z], yaw),
+            None => -1000.0,
+        }
+    }
+
     pub fn reset_car(&mut self) {
         if let Some(renderer) = &mut self.renderer {
             renderer.reset_car();
@@ -367,6 +521,34 @@ impl BrowserViewer {
             .as_mut()
             .map(|r| r.cycle_side_view())
             .unwrap_or(0.0)
+    }
+
+    /// Debug: look from `eye` at `target` (scene axes); 6 zeros clear it.
+    pub fn debug_look(&mut self, ex: f32, ey: f32, ez: f32, tx: f32, ty: f32, tz: f32) {
+        if let Some(r) = &mut self.renderer {
+            let (eye, target) = (glam::Vec3::new(ex, ey, ez), glam::Vec3::new(tx, ty, tz));
+            r.debug_look = (eye != target).then_some((eye, target));
+        }
+    }
+
+    /// Debug: drawn track particle systems, their particles, emitters, car particles.
+    pub fn get_particle_stats(&self) -> Vec<f32> {
+        self.renderer.as_ref().map(|r| r.particle_stats().to_vec()).unwrap_or_default()
+    }
+
+    /// Debug: camera node, rain, snow, sky fog, world fog, sky blend, lightning, wheel surfaces.
+    pub fn get_weather_stats(&self) -> Vec<f32> {
+        self.renderer.as_ref().map(|r| r.weather_stats().to_vec()).unwrap_or_default()
+    }
+
+    /// Debug: live snow and rain particles.
+    pub fn get_precipitation_stats(&self) -> Vec<f32> {
+        self.renderer.as_ref().map(|r| r.precipitation_stats().to_vec()).unwrap_or_default()
+    }
+
+    /// Debug: centre and forward of a track node (scene axes), for `debug_look`.
+    pub fn debug_node_pose(&self, node: u32) -> Vec<f32> {
+        self.renderer.as_ref().map(|r| r.node_pose(node as usize)).unwrap_or_default()
     }
 
     /// V key (debug): toggles the free camera; returns whether it is on.
@@ -556,7 +738,7 @@ impl BrowserViewer {
             .unwrap_or(0.0)
     }
 
-    /// Original race HUD telemetry `[speed_ec4 m/s, rpm, gear_raw, redline, damage x8]`
+    /// Original race HUD telemetry `[speed_ec4 m/s, rpm, gear_raw, redline, damage x9]`
     /// (car+0xec4 VA 0x40eec0, car+0xd82, car+0xee0, car+0x4e4 VA 0x422470).
     pub fn get_hud_telemetry(&self) -> Vec<f32> {
         self.renderer
@@ -573,12 +755,13 @@ impl BrowserViewer {
             .unwrap_or_else(|| "[]".to_string())
     }
 
-    /// Course racing line as x,z pairs (not the original SimD node centre line,
-    /// `HTrackMap_BuildOutline` 0x432230).
-    pub fn get_course_outline(&self) -> Vec<f32> {
+    /// HUD track map (`HTrackMap_BuildOutline` 0x432230): 4 header floats
+    /// (bounding box centre x, z, extent, 1 if the course is a circuit) then line
+    /// segments `x0, z0, x1, z1`.
+    pub fn get_course_map(&self) -> Vec<f32> {
         self.renderer
             .as_ref()
-            .map(|r| r.get_course_outline())
+            .map(|r| r.get_course_map())
             .unwrap_or_default()
     }
 
@@ -650,6 +833,15 @@ impl BrowserViewer {
         self.renderer
             .as_ref()
             .is_some_and(|r| r.original_vehicle.is_some())
+    }
+
+    /// Car sphere-map reflection pass on or off (off by default, A71). Returns the new state.
+    pub fn set_car_reflection(&mut self, on: bool) -> bool {
+        self.car_reflection = on;
+        if let Some(r) = self.renderer.as_mut() {
+            r.set_car_reflection(on);
+        }
+        on
     }
 
     /// Show or hide the collision-box wireframes. Returns the new state.
@@ -796,6 +988,44 @@ impl BrowserViewer {
             .map_err(|e| JsValue::from_str(&e))
     }
 
+    /// LINEAR_TRACK of the track record (`nfs5.trk +0x6e != 1`): point to point; call before
+    /// `configure_quick_race`.
+    pub fn set_linear_track(&mut self, linear: bool) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.set_linear_track(linear);
+        }
+    }
+
+    /// Quick Race difficulty (`SKILL`), mirror, the opponents' skill values (8 per opponent,
+    /// from `fe_pick_opponents_json`) and the body paints (RGBA; empty player paint = unchanged,
+    /// 4 per opponent); call before `configure_quick_race`.
+    pub fn set_race_options(
+        &mut self,
+        difficulty: i32,
+        mirror: bool,
+        skills: Vec<f32>,
+        player_paint: Vec<f32>,
+        opponent_paints: Vec<f32>,
+    ) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.set_race_options(difficulty, mirror, &skills, &player_paint, &opponent_paints);
+        }
+    }
+
+    /// Car setup screen choices: manual transmission and damage on (see `Renderer::set_car_setup`).
+    pub fn set_car_setup(&mut self, manual_box: bool, damage: bool) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.set_car_setup(manual_box, damage);
+        }
+    }
+
+    /// Manual box gear event: +1 up, -1 down.
+    pub fn shift_gear(&mut self, direction: i32) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.shift_gear(direction);
+        }
+    }
+
     pub fn configure_mission(&mut self, is_factory: bool, time_limit: f32, has_opponent: bool) {
         if let Some(renderer) = &mut self.renderer {
             renderer.configure_mission(is_factory, time_limit, has_opponent);
@@ -887,6 +1117,7 @@ impl BrowserViewer {
         let Some(renderer) = &mut self.renderer else {
             return Ok(());
         };
+        renderer.fe_anim_ms = js_sys::Date::now();
         if let Some(room) = &mut renderer.fe_room {
             room.seconds = (js_sys::Date::now() - self.room_started_ms).max(0.0) / 1000.0;
         }
@@ -932,6 +1163,9 @@ impl BrowserViewer {
         )
         .map_err(|e| JsValue::from_str(&e))?;
         self.renderer = Some(renderer);
+        if let Some(r) = self.renderer.as_mut() {
+            r.set_car_reflection(self.car_reflection);
+        }
         Ok(summary)
     }
 }

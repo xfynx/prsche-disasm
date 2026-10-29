@@ -29,7 +29,7 @@ GAME_DIR=/path/to/game PYTHON=.venv/bin/python \
   scripts/research/record-local-fixtures.sh --check
 ```
 
-This writes 33 TSV files (about 35 MB) to the gitignored `local/fixtures/` and takes
+This writes 37 TSV files (about 35 MB) to the gitignored `local/fixtures/` and takes
 several minutes. With `--check` the script then compares every file with
 `scripts/research/local-fixtures.sha256`, the hashes of the data the tests were verified
 with. A mismatch means a different game build, modified game files or a changed
@@ -49,6 +49,8 @@ All recorders are in `scripts/research/`. The tests are in `crates/nfs-assets/te
 | `vehicle-controls-*.tsv` | `replay-vehicle-controls.py` | driver controls | `.sim` files | `original_vehicle_controls.rs` |
 | `vehicle-step-*.tsv` | `replay-vehicle-step.py` | planar step in `Sched_Step` 0x414ff0 order | `.sim` files | `vehicle_step.rs`, `original_vehicle_driver.rs` |
 | `vehicle-ground-*.tsv` | `replay-vehicle-ground.py` | `Car_GroundContactTick` 0x49bd40, `Car_WheelGroundAndAttitude` 0x499a70 | `.sim` files | `vehicle_ground.rs` |
+| `vehicle-keyboard-*.tsv` | `replay-vehicle-keyboard.py` | keyboard chain: 128 Hz timer 0x4a45d0 → `Input_PollControllers` 0x412e70 → input queue 0x415e80/0x415ef0 → `Car_ReadInputs` 0x4991e0 → planar step | `.sim` files | `original_vehicle_keyboard.rs` |
+| `car-launch-*.tsv`, `car-barrier-*.tsv` | `replay-car-launch.py` | tilted-car contact 0x496610, hard-landing reset 0x493dd0, body points 0x49abc0 (0x441a10), barrier pass 0x495020 and `Car_ImpactByDirection` mode 1 / `Car_ApplyImpact` 0x494500 on the real road polygons | `.sim` of the 993 C4 and the 356 A, the car model's `BndP` points, the assembled road support of castle and alps (`local/derived/support`) | `original_road_support.rs` (`border_hill_drives_match_the_original`, `..._with_the_barrier_...`, `body_points_are_ordered_as_the_original`) |
 | `camera-*.tsv` | `replay-camera.py` | chase, heli, bumper and cockpit cameras (0x461a30–0x464bf0) | `GameData/CarModel/*.tpg` | `original_camera.rs` |
 | `engine-audio-*.tsv` | `replay-engine-audio.py` | `EngineAudio_PushState` 0x4ac780, `EngineAudio_Mix` 0x4ac290 | engine banks in `GameData/Sounds` | `original_engine_audio.rs` |
 | `ai-track-graph.tsv`, `ai-track-query.tsv` | `replay-ai-track.py`, `replay-ai-query.py` | track node graph (`TrackNodes_Build` 0x480140, `.jnc` loader 0x481080) and queries | `GameData/Track/*.crp`, `*.jnc` | `original_ai_track.rs` |
@@ -66,3 +68,13 @@ A recorder that reads game files writes to `local/fixtures/`. Add it to
 `record-local-fixtures.sh`, put its hash in `local-fixtures.sha256` and its name in
 `.gitignore`. Load it in tests with `tests/support/local_fixtures.rs` and
 `skip_without_local_fixtures!`.
+
+## Recordings that stay in the repository
+
+`crates/nfs-assets/tests/fixtures/track-objects.tsv` is recorded by `scripts/research/replay-track-objects.py`
+(`--game-dir` points at the game directory; it reads `nfs5.exe`, SHA-256 in `docs/binary-identity` of the
+research notes: `c318af393d4c2b7071a820ca3d69e956bbd94769b6e5c2e3e49f498ecbc94906`). Its inputs are synthetic
+cars and objects only, so the output is committed like the car-pair recordings (780 rows: `Car_ObjectNearTest`
+0x498280, the cylinder response 0x498aa0 with 0x498380, the box response 0x498690 with 0x486d70, 0x496610 and
+0x495f30; test `original_track_objects.rs`). The comparison tolerance is 2e-6 relative; input 0x558 is ignored
+and 0x434 is compared as a boolean. The `Car_ObjectDynamicsTick` 0x4a1030 recording is also synthetic.

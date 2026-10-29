@@ -116,6 +116,13 @@ pub fn fe_track_catalog_json(bytes: Uint8Array) -> Result<String, JsValue> {
     Ok(nfs_formats::track_catalog_json(&t))
 }
 
+/// The Evolution event records of `nfs5.trn` as the event info screen reads them, as JSON.
+#[wasm_bindgen]
+pub fn fe_event_infos_json(bytes: Uint8Array) -> Result<String, JsValue> {
+    let e = nfs_formats::parse_event_infos(&bytes.to_vec()).map_err(|e| JsValue::from_str(&e))?;
+    Ok(nfs_formats::event_infos_json(&e))
+}
+
 /// Record indices of the original Quick Race car list from `nfs5.car`, as a JSON array.
 #[wasm_bindgen]
 pub fn fe_quick_race_cars_json(bytes: Uint8Array, cheat_all: Option<bool>) -> Result<String, JsValue> {
@@ -125,4 +132,32 @@ pub fn fe_quick_race_cars_json(bytes: Uint8Array, cheat_all: Option<bool>) -> Re
     } else {
         nfs_formats::quick_race_json(&c)
     })
+}
+
+/// The opponents of a Quick Race: `count` distinct drivers of `Game.Difficutly` `level` from
+/// `nfs5.per`, as a JSON array `[{id, name_string, skill: [8 floats]}]` (`FUN_004e3160`).
+/// `seed` drives the draw (the original seeds `rand()` with the time).
+#[wasm_bindgen]
+pub fn fe_pick_opponents_json(bytes: Uint8Array, count: u32, level: i32, seed: u32) -> String {
+    use nfs_assets::race::original_ai::roster::{parse_personalities, pick_opponents};
+    let drivers = parse_personalities(&bytes.to_vec());
+    // MSVC `rand()`.
+    let mut state = seed;
+    let picked = pick_opponents(&drivers, count as usize, Some(level as i16), || {
+        state = state.wrapping_mul(214013).wrapping_add(2531011);
+        (state >> 16) & 0x7fff
+    });
+    let items: Vec<String> = picked
+        .iter()
+        .map(|d| {
+            let skill: Vec<String> = d.skill_154.iter().map(|v| format!("{v}")).collect();
+            format!(
+                "{{\"id\":{},\"name_string\":{},\"skill\":[{}]}}",
+                d.id,
+                d.name_string,
+                skill.join(",")
+            )
+        })
+        .collect();
+    format!("[{}]", items.join(","))
 }

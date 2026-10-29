@@ -3,8 +3,8 @@
 import {
   parseHudFiles, selectConfig, SLOT, carGauges, gaugePacks, NEEDLE_SIZES, speedoUnits, tachUnits,
   needleAngle, dialCentre, accentColor, gearText, formatTicks, secondsToTicks,
-  BOX_ALPHA_TOP, BOX_ALPHA_BOTTOM, DAMAGE_PARTS, damageColor, mapZoom, markerScale,
-  resampleOutline, mapTransform,
+  BOX_ALPHA_TOP, BOX_ALPHA_BOTTOM, damageDraws, damageColor, mapZoom, markerScale, carHudColour,
+  parseCourseMap, mapTransform, countdownDraws, COUNTDOWN_LAST_STEP,
 } from "./race-hud-core.js";
 import { FeAssets, makeCanvas } from "./fe-assets.js";
 import { drawText, textWidth } from "./frontend.js";
@@ -12,8 +12,6 @@ import { drawText, textWidth } from "./frontend.js";
 const DASH = "GameData/DashHud";
 const CAR_RECORD = 0x670;
 const PHASE_RACING = 2;
-// Approximation: fixed per-car colours (original: paint colour res+0x218).
-const PALETTE = ["#f2f2f2", "#e8281e", "#f5c518", "#2f6fe0", "#2fb84a", "#ee8a1a", "#9b59d6", "#18b8c8"];
 
 const argb = n => ({ a: (n >>> 24) & 255, r: (n >>> 16) & 255, g: (n >>> 8) & 255, b: n & 255 });
 const rgbaCss = n => { const c = argb(n); return `rgba(${c.r},${c.g},${c.b},${(c.a / 255).toFixed(3)})`; };
@@ -39,7 +37,7 @@ export class RaceHud {
     this.raceTime = 0;
     this.lastPhase = 0;
     this.tinted = new Map();
-    this.outline = { raw: null, pts: null, at: -1e9, closed: false };
+    this.outline = { segs: null, at: -1e9, closed: false, bbox: null };
     this.standings = { at: -1e9, rows: [] };
     this.last = { speedUnits: 0, tachUnits: 0, gear: "" };
     this.nightPacks = null;
@@ -56,7 +54,7 @@ export class RaceHud {
       this.fonts[key] = await this.assets.font(file, DASH);
     }
     const names = ["circletach", "speedK", "speedKN", "speedM", "speedMN", "needle", "needleN",
-      "needle2", "needle2N", "tach", "tachN", "car", "radar"];
+      "needle2", "needle2N", "tach", "tachN", "car", "radar", "321go", "321go2", "circlefull", "circleoutline"];
     await Promise.all(names.map(async n => { this.packs[n] = await this.assets.pack(`${n}.fsh`, DASH); }));
     this.ready = true;
   }
@@ -110,7 +108,8 @@ export class RaceHud {
   }
 
   // Per-frame entry. `viewer`: wasm viewer; `dt` seconds; `lights` day/night packs.
-  draw(viewer, { dt = 0, lights = false } = {}) {
+  draw(viewer, { dt = 0, lights = false, carColours = null } = {}) {
+    this.carColours = carColours;
     if (!this.ready || !this.gauges) { this.clear(); return; }
     this.syncSize();
     const cfg = this.config;
@@ -119,7 +118,9 @@ export class RaceHud {
     const [W, H] = this.size;
     ctx.clearRect(0, 0, W, H);
     const tel = viewer.get_hud_telemetry();
-    if (!tel || tel.length < 12) return;
+    if (!tel || tel.length < 13) return;
+    // Test hook: `__nfs.hud.debugDamage = [z0..z8]` replaces the car's zone damage in the panel.
+    if (this.debugDamage) for (let i = 0; i < 9; i++) tel[4 + i] = this.debugDamage[i] ?? 0;
     const phase = viewer.get_race_phase();
     if (phase === PHASE_RACING) this.raceTime += dt;
     else if (phase < PHASE_RACING) this.raceTime = 0;
@@ -157,6 +158,52 @@ export class RaceHud {
     if (o.opponentList !== 0 && rows.length) this.positionList(listBox, S[4], rows, st);
     if (o.damageDisplay === 1) this.damage(S[5], st);
     if (o.map !== 0) this.map(S[SLOT.MAP], st, o);
+    this.countdown(viewer, phase, W, H);
+  }
+
+  // Start countdown H321Go (0x4184f0), visible from step 0x100 to 0x1c0 of the 7 s start.
+  countdown(viewer, phase, W, H) {
+    this.last.countdown = null;
+    let step = this.debugCountdownStep ?? null; // test hook: __nfs.hud.debugCountdownStep = 0x100..0x1c0
+    if (step === null && phase === 1) step = Math.floor((COUNTDOWN_LAST_STEP / 64 - viewer.get_countdown_remaining()) * 64);
+    if (step === null) return;
+    const sizes = (pack, frame) => {
+      const sh = this.packs[pack]?.[frame];
+      return [sh?.width ?? 0, sh?.height ?? 0];
+    };
+    const draws = countdownDraws(step, W, H, sizes);
+    if (!draws) return;
+    this.last.countdown = { step, items: draws.length };
+    const { ctx } = this;
+    for (const d of draws) {
+      const a = (d.color >>> 24) / 255;
+      if (d.kind === "sprite") {
+        const sh = this.packs[d.art[0]]?.[d.art[1]];
+        if (!sh?.canvas || a <= 0) continue;
+        const tinted = (d.color & 0xffffff) === 0xffffff ? sh.canvas : this.tint(sh, d.color & 0xffffff);
+        ctx.globalAlpha = a;
+        ctx.drawImage(tinted, d.x, d.y, d.w, d.h);
+        ctx.globalAlpha = 1;
+      } else if (d.kind === "line") {
+        ctx.strokeStyle = rgbaCss(d.color);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const h = d.y0 === d.y1;
+        ctx.moveTo(h ? d.x0 : d.x0 + 0.5, h ? d.y0 + 0.5 : d.y0);
+        ctx.lineTo(h ? d.x1 : d.x1 + 0.5, h ? d.y1 + 0.5 : d.y1);
+        ctx.stroke();
+      } else if (d.kind === "wedge") {
+        ctx.fillStyle = rgbaCss(d.color);
+        ctx.beginPath();
+        for (const [p0, p1, p2] of d.tris) {
+          ctx.moveTo(p0[0], p0[1]);
+          ctx.lineTo(p1[0], p1[1]);
+          ctx.lineTo(p2[0], p2[1]);
+          ctx.closePath();
+        }
+        ctx.fill();
+      }
+    }
   }
 
   panel(b) {
@@ -237,7 +284,7 @@ export class RaceHud {
     const { ctx } = this;
     rows.forEach((r, i) => {
       const y = row.y + st.padY + row.h * i;
-      ctx.fillStyle = PALETTE[r.slot % PALETTE.length];
+      ctx.fillStyle = rgbCss(carHudColour(this.carColours, r.slot));
       ctx.fillRect(row.x + st.padX, y + Math.trunc((row.h - sh) / 2), sw, sh);
       const ty = y + Math.trunc((row.h - (small?.lineHeight ?? 12)) / 2);
       this.text(small, r.name, row.x + st.padX + sw + 4, ty, st.listGrey);
@@ -263,16 +310,28 @@ export class RaceHud {
     const pack = this.packs.car;
     const ox = b.x + this.config.hud1.getInt32(0x104, true);
     const oy = b.y + this.config.hud1.getInt32(0x108, true);
-    const outline = pack?.[6];
-    if (outline?.canvas) ctx.drawImage(outline.canvas, ox, oy);
-    DAMAGE_PARTS.forEach((p, i) => {
-      const shape = pack?.[p.shape];
-      if (!shape?.canvas) return;
-      const color = damageColor(st.tel[4 + i]);
-      ctx.globalAlpha = ((color >>> 24) & 255) / 255;
-      ctx.drawImage(this.tint(shape, color), ox + p.at[0], oy + p.at[1]);
+    for (const d of damageDraws()) {
+      const shape = pack?.[d.shape];
+      if (!shape?.canvas) continue;
+      const w = d.w ?? shape.width;
+      const h = d.h ?? shape.height;
+      let img = shape.canvas;
+      if (d.zone >= 0) {
+        const color = damageColor(st.tel[4 + d.zone]);
+        ctx.globalAlpha = ((color >>> 24) & 255) / 255;
+        img = this.tint(shape, color);
+      }
+      if (d.flip) {
+        ctx.save();
+        ctx.translate(ox + d.x, oy + d.y + h);
+        ctx.scale(1, -1);
+        ctx.drawImage(img, 0, 0, w, h);
+        ctx.restore();
+      } else {
+        ctx.drawImage(img, ox + d.x, oy + d.y, w, h);
+      }
       ctx.globalAlpha = 1;
-    });
+    }
     const bx = b.x + 5;
     const bw = b.w - 10;
     const by = b.y + 72;
@@ -291,19 +350,12 @@ export class RaceHud {
 
   getOutline(viewer) {
     const now = performance.now();
-    if (now - this.outline.at > 2000 || !this.outline.pts) {
-      const raw = Array.from(viewer.get_course_outline());
+    if (now - this.outline.at > 2000 || !this.outline.segs) {
+      const raw = Array.from(viewer.get_course_map());
       this.outline.at = now;
-      const sig = raw.length ? `${raw.length}|${raw[0]}|${raw[1]}|${raw[raw.length - 2]}` : "";
+      const sig = raw.length ? `${raw.length}|${raw[0]}|${raw[1]}|${raw[2]}|${raw[raw.length - 2]}` : "";
       if (sig !== this.outline.sig) {
-        this.outline.sig = sig;
-        this.outline.pts = raw.length >= 6 ? resampleOutline(raw) : [];
-        const n = raw.length;
-        this.outline.closed = n >= 6 && Math.hypot(raw[0] - raw[n - 2], raw[1] - raw[n - 1]) < 100;
-        // Bounding box for the whole-track view.
-        let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
-        for (let i = 0; i < n; i += 2) { x0 = Math.min(x0, raw[i]); x1 = Math.max(x1, raw[i]); z0 = Math.min(z0, raw[i + 1]); z1 = Math.max(z1, raw[i + 1]); }
-        this.outline.bbox = { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, ext: Math.max(x1 - x0, z1 - z0) };
+        this.outline = { ...parseCourseMap(raw), sig, at: now };
       }
     }
     return this.outline;
@@ -340,15 +392,16 @@ export class RaceHud {
     const mirror = true;
     const tf = mapTransform(b, cx, cz, Z, up, mirror);
     const scale = b.w / 2 / Z;
-    const pts = outline.pts;
-    if (pts && pts.length >= 4) {
+    const segs = outline.segs;
+    if (segs && segs.length >= 4) {
       ctx.strokeStyle = "#fff";
       ctx.beginPath();
-      for (let i = 0; i < pts.length; i += 2) {
-        const [x, y] = tf(pts[i], pts[i + 1]);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      for (let i = 0; i + 3 < segs.length; i += 4) {
+        const [x0, y0] = tf(segs[i], segs[i + 1]);
+        const [x1, y1] = tf(segs[i + 2], segs[i + 3]);
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
       }
-      if (outline.closed) ctx.closePath();
       ctx.stroke();
     }
     const car = this.packs.radar?.[0];
@@ -360,7 +413,7 @@ export class RaceHud {
       const w = Math.max(2, 2 * m[4] * k * scale);
       const l = Math.max(3, 2 * m[5] * k * scale);
       if (!car?.canvas) continue;
-      const color = i === 0 ? 0xffffff : parseInt(PALETTE[i % PALETTE.length].slice(1), 16);
+      const color = carHudColour(this.carColours, i);
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(mirror ? -rel : rel);

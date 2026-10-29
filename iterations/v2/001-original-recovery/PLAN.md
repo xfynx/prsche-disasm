@@ -11,10 +11,10 @@ Build001 hit LNK1181 on an existing deeply nested DirectInput library; config001
 and receipts preserved. Short build root local/builds/v2/a444 fixes it;002 passed.
 No native proof was repeated for that path change. No active workers remain.
 444 README owns exact checks;442/443/445 inputs are frozen.403/411 remain PARTIAL.
-Next user queue: review PR26 https://github.com/xfynx/prsche-disasm/pull/26 including
-description/comments/diff, fix concrete blockers and merge if suitable. Do not
-start another recovery batch before completing that review.
-After PR26:00597070 OS/CPU features and0059a4d0/0059a4ed helpers, preserving opaque
+PR26 intake is documented in docs/research/pr26-integration-review-2026-10-29.md.
+Reusable recorders/prototype ports stay separate from C++ acceptance; damage
+writeback and default gating are repaired. No active worker assignments remain.
+Next:00597070 OS/CPU features and0059a4d0/0059a4ed helpers, preserving opaque
 GetVersionExA failure fields and inherited ECX. Raw005970a0 suppression condition
 is PlatformID==1 && minorVersion==0. No guessed generic subleaf0/defaultmask.
 Actual parent+probe composition, group00590070/00565990, live devices/platform,

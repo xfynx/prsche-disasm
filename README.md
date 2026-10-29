@@ -35,8 +35,10 @@ is not accepted as original behavior.
   integrates original initialization/DirectSound recovery and a proved descriptor alias fix.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
-  recorders and vehicle, AI, audio and interface work. It remains unfinished, with
-  explicit fidelity limits. Snapshots 001?011 are preserved.
+  recorders and vehicle, AI, audio and interface work.
+  [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md) extends the
+  evidence and fixes integration defects; unproved compositions require an opt-in.
+  The prototype remains unfinished. Snapshots 001?011 are preserved.
 
 The plan after a functional recovered baseline is an architecture map of the game,
 followed by the Rust native/web port. There is no completion-date estimate.

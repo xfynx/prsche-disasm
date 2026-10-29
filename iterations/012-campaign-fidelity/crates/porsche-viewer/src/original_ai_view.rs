@@ -19,6 +19,11 @@ struct Queue<'a> {
     body_owner: &'a mut OriginalSupportOwner,
     camera: &'a mut nfs_assets::camera::PlayerCamera,
     half: [f32; 3],
+    /// Track objects and smackable object cars of the scene.
+    world: Option<&'a mut nfs_assets::physics::original_track_pass::TrackObjectWorld>,
+    smack: &'a mut nfs_assets::physics::original_smackable::SmackWorld,
+    events: &'a mut Vec<nfs_assets::physics::original_track_pass::SmashEvent>,
+    awake: Vec<usize>,
 }
 
 impl FieldQueue for Queue<'_> {
@@ -49,15 +54,51 @@ impl FieldQueue for Queue<'_> {
         state: &mut PreparedContactState,
         half: [f32; 3],
         owner: Option<&mut OriginalSupportOwner>,
-    ) -> bool {
-        let Some(surface) = self.surface.filter(|s| s.uses_original_support()) else {
-            return false;
-        };
+    ) -> Option<nfs_assets::physics::original_vehicle::driver::BarrierHit> {
+        let surface = self.surface.filter(|s| s.uses_original_support())?;
         let owner = match owner {
             Some(o) => o,
             None => &mut *self.body_owner,
         };
-        matches!(surface.original_barrier_response(state, half, owner), Ok(Some(_)))
+        surface
+            .original_barrier_contact(state, half, owner)
+            .ok()
+            .flatten()
+            .map(Into::into)
+    }
+
+    fn objects(
+        &mut self,
+        index: usize,
+        car: &mut OriginalCar,
+        pair: &mut nfs_assets::physics::original_pair::PairCar,
+        globals: &mut nfs_assets::physics::original_pair::PairGlobals,
+    ) {
+        use nfs_assets::physics::original_vehicle::driver::{object_car, store_object_car};
+        if index != 0 {
+            return;
+        }
+        if let Some(world) = self.world.as_deref_mut() {
+            let mut o = object_car(car, pair);
+            world.pass(&mut o, globals, self.events);
+            store_object_car(car, pair, &o);
+        }
+    }
+
+    fn smack_cars(&mut self) -> Vec<nfs_assets::physics::original_pair::PairCar> {
+        self.awake = self.smack.awake();
+        self.awake
+            .iter()
+            .map(|&i| self.smack.bodies[i].car.pair.clone())
+            .collect()
+    }
+
+    fn store_smack_cars(&mut self, cars: &[nfs_assets::physics::original_pair::PairCar]) {
+        for (&i, pair) in self.awake.iter().zip(cars) {
+            let body = &mut self.smack.bodies[i];
+            body.car.pair = pair.clone();
+            body.update_world_points();
+        }
     }
 
     fn camera(&mut self, player: &OriginalCar) {
@@ -110,12 +151,26 @@ impl Renderer {
         let mut template = player.clone();
         let mut s140 = template.car.specs.field_140;
         let mut field = OriginalAiField::new(track.clone(), ais, model, &mut s140);
+        // `Game.Difficutly` -> SKILL `[0x6573f4]` (FE_WriteCarConfig 0x4eb470, key 0x12).
+        field.options.skill_6573f4 = self.race_options.difficulty;
         template.car.specs.field_140 = s140;
         // Grid on the node graph ahead of the player (A44): upstream's grid behind the
         // player has no road on point-to-point tracks (alps starts at node 0).
         let start = field.track.nodes.locate(player.car.position_330, 0);
+        let racers = 1 + self.ai_opponents.len() as i32;
         for slot in 0..self.ai_opponents.len() {
-            let (centre, axes) = field.grid_slot(start, slot);
+            // A211: the new frame uses node up instead of the body support normal.
+            let placement = if cfg!(feature = "experimental-original-port") {
+                self.start_slot(racers - 1 - slot as i32, racers)
+            } else {
+                None
+            };
+            let (centre, axes) = match placement {
+                Some(s) => {
+                    (s.position, nfs_assets::race::original_ai::start::frame_axes(s.up, s.forward))
+                }
+                None => field.grid_slot(start, slot),
+            };
             let mut owners: [OriginalSupportOwner; 4] = Default::default();
             match self.road_surface.as_ref() {
                 Some(surface) => field.spawn(
@@ -138,6 +193,9 @@ impl Renderer {
                 ),
             }
             if let Some(c) = field.cars.last_mut() {
+                if let Some(skill) = self.race_options.opponent_skills.get(slot) {
+                    c.skill_154 = *skill;
+                }
                 c.vehicle.owners = owners;
             }
         }
@@ -160,6 +218,10 @@ impl Renderer {
             body_owner: &mut self.body_support_owner,
             camera: &mut self.player_camera,
             half: player.half_extents,
+            world: self.track_world.as_mut(),
+            smack: &mut self.smack_world,
+            events: &mut self.smash_events,
+            awake: Vec::new(),
         };
         queue.camera.advance(
             0.0,
@@ -212,15 +274,22 @@ impl Renderer {
             .map(|c| {
                 let k = &c.vehicle.car;
                 format!(
-                    r#"{{"node":{},"laps":{},"pos":[{:.2},{:.2},{:.2}],"up":{:.2},"h":{:.2},"v":{:.2},"gear":{},"gas":{},"brake":{},"steer":{},"target":{:.1},"db0":{}}}"#,
+                    r#"{{"node":{},"laps":{},"pos":[{:.2},{:.2},{:.2}],"up":{:.2},"h":{:.2},"v":{:.2},"gear":{},"gas":{},"brake":{},"steer":{},"target":{:.1},"db0":{},"skill":{:?},"bup":[{:.3},{:.3},{:.3}]}}"#,
                     c.ai.locator_08.node_00, c.laps, k.position_330[0], k.position_330[1],
                     k.position_330[2], k.ground_up_3a0, k.height_424, k.vel_ground_d58[2],
                     k.gear_d82, k.gas_eff_d7f, k.brake_eff_d80, k.steer_d94, c.ai.target_eb8,
-                    k.start_db0
+                    k.start_db0, c.skill_154, k.axes_364[1][0], k.axes_364[1][1], k.axes_364[1][2]
                 )
             })
             .collect();
-        format!(r#"{{"running":{},"cars":[{}]}}"#, field.running, cars.join(","))
+        format!(
+            r#"{{"running":{},"reverse":{},"skill":{},"mirror":{},"cars":[{}]}}"#,
+            field.running,
+            field.track.reverse,
+            field.options.skill_6573f4,
+            self.race_options.mirror,
+            cars.join(",")
+        )
     }
 
     /// Copies each AI car's pose, speed and controls into its `AiOpponent`.
