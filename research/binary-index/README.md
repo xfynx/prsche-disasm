@@ -1,5 +1,10 @@
 # Индекс оригинальных бинарников
 
+Run460: [omitted audio thread worker](supplemental/audio-thread-460.jsonl) records
+0058f880..0058f8d6 (87B), raw SHA, complete CFG/RET4 and the original thread-start
+reference. Main generated indexes remain unchanged. [Run459 acceptance](../../iterations/v2/001-original-recovery/runs/459-audio-release-thread-integration/README.md)
+includes bounded native proof; live threading and callback producers remain open.
+
 Run411: [modem callback original index](../../iterations/v2/001-original-recovery/runs/411-modem-callback/original-index.json)
 records omitted0055df80 through completeRET24, original629B, dispatch tables and
 four related bodies. [Run413](../../iterations/v2/001-original-recovery/runs/413-modem-completion-integration/README.md)

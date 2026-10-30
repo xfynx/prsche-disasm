@@ -1,0 +1,168 @@
+#include "audio_filter_kernel_461.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using namespace porsche;
+extern float _DAT_005b24a8;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){memcpy(p,&x,4);}
+alignas(16) static unsigned char object[28],upstream[28],samples[128];
+alignas(16) static unsigned char floating[512];
+static U registers[8],saved_flags;
+struct State {unsigned char object[28],upstream[28],samples[128];};
+struct Fpu {unsigned short control,status;unsigned char tag;unsigned char padding[3];unsigned char values[80];};
+struct Event {U self,count,input,output,mode;State state;Fpu fpu;};
+struct Trace {U count,abi,result,gpr[8],flags;Event events[2];State state;Fpu fpu;};
+static Trace trace,original;
+static unsigned char* slab;static bool patch_ok=true,cpp_side;
+static U cases,event_total,which,count_value,factor,initial_value,input_value,coefficient,depth,precision,rounding,alias,mode,upstream_on;
+static I upstream_result;
+enum:U{CTOR=0,SETTER=0x100,CB_SLOT=0x200,KERNEL=0x300};
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s cases=%u which=%u\n",why,cases,which);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault code=%08lx eip=%08lx slab=%08x cases=%u which=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,ptr(slab),cases,which,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+static U pointer_id(U value){if(value==ptr(slab+CB_SLOT)||value==ptr(reinterpret_cast<void*>(&audio_filter_callback_0059a0f0)))return 0x59a0f0;if(value==ptr(slab+KERNEL)||value==ptr(reinterpret_cast<void*>(&audio_filter_kernel_0059c170)))return 0x59c170;return value;}
+static void snapshot(State& s){memcpy(s.object,object,28);memcpy(s.upstream,upstream,28);memcpy(s.samples,samples,128);for(unsigned char* p:{s.object,s.upstream}){wr(p+4,pointer_id(rd(p+4)));wr(p+24,pointer_id(rd(p+24)));}}
+static void fpu(Fpu& f){
+    __asm fxsave floating
+    f.control=static_cast<unsigned short>(rd(floating));f.status=static_cast<unsigned short>(rd(floating+2));f.tag=floating[4];
+    memset(f.padding,0,3);for(U i=0;i<8;++i)memcpy(f.values+i*10,floating+32+i*16,10);
+    // x87 instruction/data addresses differ between raw slab and C++ code;
+    // compare CW/SW/tag and all eight exact80-bit register payloads instead.
+}
+static I __cdecl upstream_call(U self,U count,U input,U output,I signed_mode){
+    require(trace.count<2,"events");auto& e=trace.events[trace.count++];e.self=self;e.count=count;e.input=input;e.output=output;e.mode=static_cast<U>(signed_mode);snapshot(e.state);fpu(e.fpu);
+    if(mode==1){wr(object+12,0x3eaaaaab);wr(object+16,0x3f000001);wr(object+20,0x3e800001);wr(samples+16,0x3f800001);}
+    if(mode==2){wr(object+24,cpp_side?ptr(reinterpret_cast<void*>(&audio_filter_kernel_0059c170)):ptr(slab+KERNEL));wr(object,0);}
+    return upstream_result;
+}
+static void absolute(U at,U size,U old,const void* target,U expected){U n=0;for(U i=0;i+4<=size;++i)if(rd(slab+at+i)==old){wr(slab+at+i,ptr(target));++n;i+=3;}if(n!=expected){printf("patch %x %x %u/%u\n",at,old,n,expected);patch_ok=false;}}
+static bool init(){slab=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,0x3000,0x40));if(!slab)return false;
+    static const unsigned char a[]={ @BODY_0059a170@ };memcpy(slab+CTOR,a,sizeof(a));
+    static const unsigned char b[]={ @BODY_0059a150@ };memcpy(slab+SETTER,b,sizeof(b));
+    static const unsigned char c[]={ @BODY_0059a0f0@ };memcpy(slab+CB_SLOT,c,sizeof(c));
+    static const unsigned char d[]={ @BODY_0059c170@ };memcpy(slab+KERNEL,d,sizeof(d));
+    absolute(CTOR,26,0x59a0f0,slab+CB_SLOT,1);absolute(CTOR,26,0x59c170,slab+KERNEL,1);absolute(SETTER,25,0x5b24a8,&_DAT_005b24a8,1);
+    return patch_ok&&FlushInstructionCache(GetCurrentProcess(),slab,4096);
+}
+static void seed(){
+    unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));
+    __asm {
+        fninit
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        ffree st(0)
+        ffree st(1)
+        ffree st(2)
+        ffree st(3)
+        ffree st(4)
+        ffree st(5)
+        ffree st(6)
+        ffree st(7)
+        fldcw control
+    }
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+// Synthetic cdecl callsite; preserve the original callee's raw x87 stack and
+// observe every GPR before fixture comparisons or C++ code can alter it.
+static U invoke(void* fn,U a,U b,U c,U d,U argc){U saved_sp,saved_frame,fail=0;__asm{
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    cmp argc,4
+    jb less4
+    push d
+less4:cmp argc,3
+    jb less3
+    push c
+less3:cmp argc,2
+    jb less2
+    push b
+less2:push a
+    xor eax,eax
+    mov eax,11223344h
+    mov ebx,13579bdfh
+    mov ecx,2468ace0h
+    mov edx,10203040h
+    mov esi,55667788h
+    mov edi,99aabbcch
+    call fn
+    mov registers[0],eax
+    mov registers[4],ebx
+    mov registers[8],ecx
+    mov registers[12],edx
+    mov registers[16],esi
+    mov registers[20],edi
+    mov registers[24],ebp
+    mov registers[28],esp
+    pushfd
+    pop saved_flags
+    mov ecx,argc
+    shl ecx,2
+    add esp,ecx
+    cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,55667788h
+    jne bad
+    cmp edi,99aabbcch
+    je done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }trace.abi|=fail;return registers[0];
+}
+static void load(){memset(&trace,0,sizeof(trace));memset(object,0xa5,28);memset(upstream,0x5a,28);
+    for(U i=0;i<32;++i)wr(samples+i*4,input_value^(i&1?0x80000000:0));
+    wr(object,upstream_on?ptr(upstream):0);wr(upstream,0);wr(upstream+4,ptr(reinterpret_cast<void*>(&upstream_call)));
+    const unsigned short signed_mode=static_cast<unsigned short>(factor);memcpy(object+10,&signed_mode,2);
+    wr(object+12,initial_value);wr(object+16,coefficient);wr(object+20,factor);
+    wr(object+24,cpp_side?ptr(reinterpret_cast<void*>(&audio_filter_kernel_0059c170)):ptr(slab+KERNEL));seed();
+}
+static void execute(bool cpp){cpp_side=cpp;load();void* fn=nullptr;U a=ptr(object),b=factor,c=0,d=0,argc=2;
+    if(which==0){fn=cpp?reinterpret_cast<void*>(&audio_release_filter_initialize_0059a170):slab+CTOR;argc=1;}
+    if(which==1)fn=cpp?reinterpret_cast<void*>(&audio_release_filter_set_0059a150):slab+SETTER;
+    if(which==2){fn=cpp?reinterpret_cast<void*>(&audio_filter_kernel_0059c170):slab+KERNEL;a=ptr(object+12);b=count_value;c=ptr(samples+16);argc=3;}
+    if(which==3){fn=cpp?reinterpret_cast<void*>(&audio_filter_callback_0059a0f0):slab+CB_SLOT;b=count_value;c=ptr(samples+16);d=ptr(samples+16+alias*4);argc=4;}
+    if(which==4){
+        invoke(cpp?reinterpret_cast<void*>(&audio_release_filter_initialize_0059a170):slab+CTOR,a,0,0,0,1);
+        require(rd(object+4)==(cpp?ptr(reinterpret_cast<void*>(&audio_filter_callback_0059a0f0)):ptr(slab+CB_SLOT)),"callback identity");
+        require(rd(object+24)==(cpp?ptr(reinterpret_cast<void*>(&audio_filter_kernel_0059c170)):ptr(slab+KERNEL)),"kernel identity");
+        invoke(cpp?reinterpret_cast<void*>(&audio_release_filter_set_0059a150):slab+SETTER,a,factor,0,0,2);
+        fn=reinterpret_cast<void*>(rd(object+4));b=count_value;c=ptr(samples+16);d=ptr(samples+16+alias*4);argc=4;
+    }
+    U result=invoke(fn,a,b,c,d,argc);trace.result=(which==3||which==4)?result:0;snapshot(trace.state);fpu(trace.fpu);
+    if(which==1||which==2){memcpy(trace.gpr,registers,6*4);trace.flags=saved_flags&0xcd5;}
+    // ESP/EBP are checked above, not compared as host invocation-frame values.
+    if(which==0){require(rd(object+4)==(cpp?ptr(reinterpret_cast<void*>(&audio_filter_callback_0059a0f0)):ptr(slab+CB_SLOT)),"constructor callback identity");require(rd(object+24)==(cpp?ptr(reinterpret_cast<void*>(&audio_filter_kernel_0059c170)):ptr(slab+KERNEL)),"constructor kernel identity");}
+}
+static bool check(){execute(false);original=trace;execute(true);++cases;event_total+=trace.count;
+    if(trace.abi||original.abi||memcmp(&trace,&original,sizeof(trace))){U off=0;while(off<sizeof(trace)&&reinterpret_cast<unsigned char*>(&trace)[off]==reinterpret_cast<unsigned char*>(&original)[off])++off;printf("divergence case=%u which=%u count=%08x factor=%08x initial=%08x input=%08x coef=%08x depth=%u PC=%u RC=%u alias=%u upstream=%u return=%08x mode=%u offset=%u ABI=%u/%u SW=%04x/%04x CW=%04x/%04x\n",cases,which,count_value,factor,initial_value,input_value,coefficient,depth,precision,rounding,alias,upstream_on,static_cast<U>(upstream_result),mode,off,original.abi,trace.abi,original.fpu.status,trace.fpu.status,original.fpu.control,trace.fpu.control);return false;}return true;}
+static void base(){which=2;count_value=4;factor=0x3eaaaaab;initial_value=0x3f000001;input_value=0x3f800001;coefficient=0x3f2aaaab;depth=0;precision=3;rounding=0;alias=0;mode=upstream_on=0;upstream_result=1;}
+int main(int argc,char**argv){SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);AddVectoredExceptionHandler(1,fault);
+    if(argc!=2||rd(&_DAT_005b24a8)!=0x3f800000){puts("canonical_initial_data=FAIL");return 2;}
+    if(!init()){puts("oracle_patch=FAIL");return 3;}
+    base();which=0;if(!check())return 1;
+    const U classes[]={0,0x80000000,1,0x80000001,0x00800000,0x3eaaaaab,0x3f800001,0x7f7fffff,0x7f800000,0xff800000,0x7fc12345,0x7f812345};
+    for(U w:{1u,2u,4u})for(U bits:classes)for(U rc:{0u,1u,2u,3u}){base();which=w;factor=bits;input_value=bits;rounding=rc;if(!check())return 1;}
+    for(U pc:{0u,2u,3u})for(U rc:{0u,1u,2u,3u})for(U d:{0u,1u,4u,6u}){base();precision=pc;rounding=rc;depth=d;count_value=8;if(!check())return 1;}
+    for(U n:{0u,1u,2u,4u,0x40000000u,0x80000000u,0xffffffffu}){base();count_value=n;if(!check())return 1;}
+    for(U w:{3u,4u})for(U a:{0u,1u,2u})for(I r:{-2147483647,-1,0,1,4})for(U m:{0u,1u,2u}){base();which=w;alias=a;upstream_on=1;upstream_result=r;mode=m;if(!check())return 1;}
+    for(U bits:{0x8000u,0xffffu,0u,0x7fffu}){base();which=3;factor=bits;upstream_on=1;if(!check())return 1;}
+    __asm fninit
+    printf("audio_filter_kernel_original_x86_vs_cpp=PASS cases=%u events=%u ABI=PASS x87_stack_status_precision=PASS callback_identity=PASS\n",cases,event_total);return 0;
+}

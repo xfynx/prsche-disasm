@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run456](iterations/v2/001-original-recovery/runs/456-audio-lifecycle-integration/README.md).
-Audio lifecycle, bounded group composition and startup Windows bindings are integrated.
+Latest recovery intake: [Run459](iterations/v2/001-original-recovery/runs/459-audio-release-thread-integration/README.md).
+Original release, omitted thread worker and exact x87 filter are integrated.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next integrate the release/worker chain and original filter kernel.
+Next recover DS initialization, thread mixing and verified probe/startup helpers.
 
 ## Recovery milestones
 

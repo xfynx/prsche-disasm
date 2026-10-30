@@ -1,0 +1,172 @@
+#include "audio_thread_worker_460.hpp"
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+extern "C" AudioThreadSleep460 expected_sleep_cell;
+#pragma comment(linker,"/alternatename:_expected_sleep_cell=__imp__Sleep@4")
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){memcpy(p,&x,4);}
+static U cases,events,mode,limit,initial_requested,initial_running,initial_delay,before_on,after_on,argument;
+static U iterations,sleeps,before_calls,after_calls;static AudioThreadSleep460 real_sleep;
+static B* slab;static bool patches=true;
+static void require(bool ok,const char* what){if(!ok){printf("divergence %s case=%u mode=%u\n",what,cases,mode);fflush(stdout);ExitProcess(1);}}
+struct State{U requested,running,before,after,sleep_cell,iterations,sleeps,before_calls,after_calls;B device[0x18c];};
+struct Event{U tag,arg;State state;};
+struct Trace{U count,abi,result;Event events[32];State final;};static Trace trace,expected;
+static void state(State& s){
+ s.requested=audio_thread_requested_006b4881;s.running=audio_thread_running_006b4880;s.before=audio_thread_before_006b4a3c;s.after=audio_thread_after_006b4a40;s.sleep_cell=ptr(reinterpret_cast<void*>(audio_thread_sleep_005b220c));
+ s.iterations=iterations;s.sleeps=sleeps;s.before_calls=before_calls;s.after_calls=after_calls;memcpy(s.device,application_audio_device_state_006b48c0.backing.data(),sizeof s.device);
+}
+static void event(U tag,U arg=0){require(trace.count<32,"event-bound");auto& e=trace.events[trace.count++];e.tag=tag;e.arg=arg;state(e.state);}
+static void set_sleep(AudioThreadSleep460 function){
+ DWORD old=0,discard=0;require(VirtualProtect(&expected_sleep_cell,4,PAGE_READWRITE,&old)!=0,"IAT-unprotect");expected_sleep_cell=function;require(VirtualProtect(&expected_sleep_cell,4,old,&discard)!=0,"IAT-restore-protection");require(audio_thread_sleep_005b220c==function,"IAT-alias-after-write");
+}
+static void __stdcall sleep_b(U delay);
+static void __stdcall sleep_a(U delay){event(6,delay);++sleeps;if(mode==12&&sleeps==1)set_sleep(sleep_b);if(sleeps>=limit)audio_thread_requested_006b4881=0;}
+static void __stdcall sleep_b(U delay){event(7,delay);++sleeps;if(sleeps>=limit)audio_thread_requested_006b4881=0;}
+static void __cdecl before_b();static void __cdecl after_b();
+static void __cdecl before_a(){
+ event(1);++before_calls;
+ if(mode==2&&before_calls==1){audio_thread_before_006b4a3c=ptr(reinterpret_cast<void*>(&before_b));audio_thread_after_006b4a40=ptr(reinterpret_cast<void*>(&after_b));application_audio_device_state_006b48c0[0x21]=0x80;}
+ if(mode==5)audio_thread_requested_006b4881=0;
+ if(mode==9)set_sleep(sleep_b);
+ if(mode==13)audio_thread_after_006b4a40=0;
+ if(mode==15)audio_thread_running_006b4880=0xff;
+ if(mode==17)audio_thread_requested_006b4881=0;
+}
+static void __cdecl before_b(){event(2);++before_calls;}
+static void __cdecl after_a(){
+ event(4);++after_calls;
+ if(mode==4&&after_calls==1){audio_thread_before_006b4a3c=ptr(reinterpret_cast<void*>(&before_b));audio_thread_after_006b4a40=0;}
+ if(mode==7)audio_thread_requested_006b4881=0;
+ if(mode==11)set_sleep(sleep_b);
+ if(mode==16)application_audio_device_state_006b48c0[0x21]=0xff;
+}
+static void __cdecl after_b(){event(5);++after_calls;}
+namespace porsche {
+void __cdecl audio_thread_mix_0058f8e0(){
+ event(3);++iterations;
+ if(mode==3&&iterations==1){audio_thread_before_006b4a3c=0;audio_thread_after_006b4a40=ptr(reinterpret_cast<void*>(&after_b));}
+ if(mode==6)audio_thread_requested_006b4881=0;
+ if(mode==10)set_sleep(sleep_b);
+ if(mode==14)audio_thread_after_006b4a40=ptr(reinterpret_cast<void*>(&after_b));
+ if(mode==15)audio_thread_running_006b4880=0;
+ if(mode==17)audio_thread_requested_006b4881=0x80;
+}
+// Reused owner TUs keep their genuine storage and providers. All unexecuted
+// dependencies below fail closed; no thread is started and no mixer invented.
+I __cdecl audio_device_initialize_ds_0058ebe0(){ExitProcess(93);return 0;}
+I __cdecl audio_device_release_ds_0058f1f0(){ExitProcess(93);return 0;}
+void* __stdcall platform_create_thread(void*,U,ThreadBootstrap,void*,U,U*){ExitProcess(93);return nullptr;}
+U __stdcall platform_thread_priority(void*,I){ExitProcess(93);return 0;}
+void __stdcall audio_platform_sleep_455(U){ExitProcess(93);}
+void __cdecl exit_registry_lock_api_005a4ba4(U){ExitProcess(93);}
+void __cdecl exit_registry_unlock_api_005a4c05(U){ExitProcess(93);}
+U __cdecl exit_registry_allocation_size_005a8161(const void*){ExitProcess(93);return 0;}
+void* __cdecl exit_registry_reallocate_005a8029(void*,U){ExitProcess(93);return nullptr;}
+void* __cdecl exit_registry_malloc_005a3be5(U){ExitProcess(93);return nullptr;}
+void __cdecl exit_registry_fatal_005a2e22(U){ExitProcess(93);}
+I __cdecl application_audio_probe_measure_00565890(){ExitProcess(93);return 0;}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(93);}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(93);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(93);}
+void __stdcall platform_enter_critical_section(void*){ExitProcess(93);}
+void __stdcall platform_leave_critical_section(void*){ExitProcess(93);}
+I __cdecl audio_backend_find_channel_00589d20(U){ExitProcess(93);return 0;}
+U __cdecl audio_backend_next_voice_00590340(I,U*){ExitProcess(93);return 0;}
+void __cdecl audio_backend_voice_release_00597010(void*){ExitProcess(93);}
+void __cdecl audio_backend_voice_finalize_00589c00(U){ExitProcess(93);}
+U __cdecl audio_backend_cpu_features_00597070(){ExitProcess(93);return 0;}
+I __stdcall audio_direct_sound_create_00597f70(const void*,U*,void*){ExitProcess(93);return 0;}
+void* __stdcall audio_platform_foreground_window(){ExitProcess(93);return nullptr;}
+void* __stdcall audio_platform_desktop_window(){ExitProcess(93);return nullptr;}
+}
+static void absolute(U old,const void* target,U wanted){U n=0;for(U off=0;off+4<=87;++off)if(rd(slab+off)==old){wr(slab+off,ptr(target));++n;off+=3;}if(n!=wanted)patches=false;}
+static bool init(){
+ slab=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));if(!slab)return false;
+ static const B bytes[]={ @BODY_0058f880@ };memcpy(slab,bytes,sizeof bytes);
+ absolute(0x6b4881,const_cast<const B*>(&audio_thread_requested_006b4881),2);absolute(0x6b4880,const_cast<const B*>(&audio_thread_running_006b4880),2);
+ absolute(0x6b4a3c,const_cast<const U*>(&audio_thread_before_006b4a3c),1);absolute(0x6b4a40,const_cast<const U*>(&audio_thread_after_006b4a40),1);
+ absolute(0x5b220c,&expected_sleep_cell,1);absolute(0x6b48e1,application_audio_device_state_006b48c0.data()+0x21,1);
+ if(slab[0x1b]!=0xe8 || 0x58f880+0x1b+5+rd(slab+0x1c)!=0x58f8e0)patches=false;
+ wr(slab+0x1c,ptr(reinterpret_cast<void*>(&audio_thread_mix_0058f8e0))-ptr(slab+0x20));
+ return patches&&FlushInstructionCache(GetCurrentProcess(),slab,4096);
+}
+// Synthetic stdcall1 callsite. Original both paths pop the one pointer arg.
+static U invoke(void* fn){U saved_esp,saved_frame,result,fail=0;
+ __asm{
+  push ebx
+  push esi
+  push edi
+  mov saved_esp,esp
+  mov saved_frame,ebp
+  mov ebx,13579bdfh
+  mov esi,2468ace0h
+  mov edi,10203040h
+  push argument
+  call fn
+  mov result,eax
+  cmp esp,saved_esp
+  jne bad
+  cmp ebp,saved_frame
+  jne bad
+  cmp ebx,13579bdfh
+  jne bad
+  cmp esi,2468ace0h
+  jne bad
+  cmp edi,10203040h
+  je done
+ bad:
+  mov fail,1
+ done:
+  mov esp,saved_esp
+  pop edi
+  pop esi
+  pop ebx
+ }
+ trace.abi|=fail;return result;
+}
+static bool rawdata(const char* path){
+ FILE* f=nullptr;if(fopen_s(&f,path,"rb")||!f)return false;fseek(f,0,SEEK_END);long length=ftell(f);rewind(f);static B pe[8*1024*1024];if(length>sizeof pe){fclose(f);return false;}if(fread(pe,1,length,f)!=static_cast<size_t>(length)){fclose(f);return false;}fclose(f);
+ U nt=rd(pe+0x3c),base=rd(pe+nt+52),sections=pe[nt+6]|U(pe[nt+7])<<8,opt=pe[nt+20]|U(pe[nt+21])<<8;
+ auto at=[&](U va)->B*{for(U i=0;i<sections;++i){B* s=pe+nt+24+opt+i*40;U d=va-base-rd(s+12);if(d<rd(s+16))return pe+rd(s+20)+d;}return nullptr;};
+ for(U j=0;j<4;++j){U va=j==0?0x6b4a3c:j==1?0x6b4880:j==2?0x6b4881:0x6b48b0,size=j==0?8:j==3?0x18c:1;bool found=false;
+  for(U i=0;i<sections;++i){B* s=pe+nt+24+opt+i*40;U delta=va-base-rd(s+12),vs=rd(s+8),rawsize=rd(s+16);if(delta>=vs||size>vs-delta)continue;found=true;for(U k=0;k<size;++k){B original=delta+k<rawsize?pe[rd(s+20)+delta+k]:0;B native=j==0?static_cast<B>((k<4?audio_thread_before_006b4a3c:audio_thread_after_006b4a40)>>(8*(k&3))):j==1?audio_thread_running_006b4880:j==2?audio_thread_requested_006b4881:application_audio_device_state_006b48c0.backing[k];if(original!=native)return false;}}
+  if(!found)return false;
+ }
+ U reloc=rd(pe+nt+24+96+5*8),rsize=rd(pe+nt+24+100+5*8);B* r=at(base+reloc);if(!r)return false;
+ for(U off=0;off<rsize;){U page=rd(r+off),n=rd(r+off+4);if(n<8||off+n>rsize)return false;for(U k=8;k<n;k+=2){U e=r[off+k]|U(r[off+k+1])<<8;if((e>>12)==3){U va=base+page+(e&4095);if(va<0x6b4a44&&va+4>0x6b4a3c)return false;}}off+=n;}
+ return true;
+}
+static void base(){mode=0;limit=3;initial_requested=1;initial_running=1;initial_delay=7;before_on=after_on=1;argument=0xdeadbeef;}
+static void execute(bool cpp){
+ require(audio_thread_sleep_005b220c==real_sleep,"IAT-restored-before-hook");set_sleep(sleep_a);
+ memset(&trace,0,sizeof trace);iterations=sleeps=before_calls=after_calls=0;
+ audio_thread_requested_006b4881=static_cast<B>(initial_requested);audio_thread_running_006b4880=static_cast<B>(initial_running);
+ audio_thread_before_006b4a3c=before_on?ptr(reinterpret_cast<void*>(&before_a)):0;audio_thread_after_006b4a40=after_on?ptr(reinterpret_cast<void*>(&after_a)):0;
+ for(U i=0;i<0x18c;++i)application_audio_device_state_006b48c0.backing[i]=static_cast<B>(i*17+0x5a);application_audio_device_state_006b48c0[0x21]=static_cast<B>(initial_delay);
+ trace.result=invoke(cpp?reinterpret_cast<void*>(&audio_thread_worker_0058f880):slab);state(trace.final);set_sleep(real_sleep);
+}
+static bool check(const char* family){execute(false);expected=trace;execute(true);
+ if(trace.abi||expected.abi||memcmp(&trace,&expected,sizeof trace)){printf("divergence family=%s case=%u mode=%u events=%u/%u result=%x/%x ABI=%u/%u\n",family,cases,mode,trace.count,expected.count,trace.result,expected.result,trace.abi,expected.abi);return false;}
+ ++cases;events+=trace.count;return true;
+}
+int main(int argc,char** argv){
+ require(argc==2&&rawdata(argv[1]),"production-raw-initial-state");
+ require(ptr(&audio_thread_sleep_005b220c)==ptr(&expected_sleep_cell),"real-IAT-cell-alias");real_sleep=expected_sleep_cell;
+ require(ptr(reinterpret_cast<void*>(real_sleep))==ptr(reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA("kernel32.dll"),"Sleep"))),"real-SDK-Sleep-before-hook");
+ require(ptr(const_cast<const U*>(&audio_thread_after_006b4a40))-ptr(const_cast<const U*>(&audio_thread_before_006b4a3c))==4,"physical-callback-layout");require(init(),"raw-body-patches");
+ base();initial_requested=0;if(!check("initial-idle"))return 1;
+ for(U requested:{1u,0x80u,0xffu}){base();initial_requested=requested;initial_running=0xff;if(!check("nonzero-request"))return 1;}
+ for(U delay:{0u,1u,127u,128u,255u}){base();initial_delay=delay;before_on=after_on=0;if(!check("unsigned-byte-delay"))return 1;}
+ base();before_on=0;if(!check("only-after"))return 1;base();after_on=0;if(!check("only-before"))return 1;
+ for(U m=2;m<=17;++m){base();mode=m;if(m==14)after_on=0;if(!check("callback-mixer-IAT-effects"))return 1;}
+ base();limit=1;argument=0;if(!check("ignored-null-argument"))return 1;
+ base();initial_running=0;if(!check("running-is-not-loop-predicate"))return 1;
+ require(audio_thread_sleep_005b220c==real_sleep&&expected_sleep_cell==real_sleep,"real-IAT-restored-final");
+ printf("audio_thread_worker_original_x86_vs_cpp=PASS cases=%u events=%u ABI=PASS raw_initial_state=PASS cached_real_IAT=PASS\n",cases,events);return 0;
+}

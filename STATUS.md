@@ -4,13 +4,13 @@ Updated 2026-10-31. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run456](iterations/v2/001-original-recovery/runs/456-audio-lifecycle-integration/README.md)
-compiles 244 C++ translation units across 8 projects. The game link still has 167 unresolved
-names / 173 references. **There is no recovered playable C++ game executable yet.**
+[Run459](iterations/v2/001-original-recovery/runs/459-audio-release-thread-integration/README.md)
+compiles 247 C++ translation units across 8 projects. The game link still has 166 unresolved
+names / 172 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates five original lifecycle bodies, nine Windows bindings
-and bounded group/decoder/removal composition: 1,158 native cases, 39 detected
-mutations and a 600-pin audit. Callback address identity and SDK imports are proved.
+The latest batch integrates eight original release/worker/filter bodies:
+2,644 native cases, 40 detected mutations and a 607-pin audit. The x87 kernel
+matches original bytes; cached Sleep identity and physical state aliases are proved.
 These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 

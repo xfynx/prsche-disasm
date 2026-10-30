@@ -1,6 +1,15 @@
 # Отложенные проверки восстановления v2
 
-Run456: five new lifecycle bodies448B, nine SDK adapters and bounded454 composition
+Run459:8originals604B,2644cases/40mutations/607pins PASS;247TUs/166names172refs,noEXE.
+Raw87Bworker supplement, cachedactualSleepcell,140B physicallyaliased release state,
+8Bcallbacks and x87extendedST0/kernel/CW/SW/tag validated. Kernel50B exact; setter25B
+aftercanonicalrelocation. Full458+461 composition and actualcallbackproducer/upstream
+remain open; standalonecontrolledproof is unchanged. NextDSinit/mixer/preparehelpers.
+Probe004a66b0 signednegative tabledomain remains unproved: old131's128B prefix/guard
+does not establish fulltransport. Preserve explicitmissingbehavior; trace virtualmode
+producer beforeparentacceptance. Live threads/DS/wholegame and403/411 PARTIAL unchanged.
+
+Historical456: five new lifecycle bodies448B, nine SDK adapters and bounded454 composition
 accepted;1158cases/39mutations/600pins PASS.244TUs/167names173refs,noEXE.
 454 closes seeded full-record/scratch and three direct frozen-TU scenarios; direct
 opaque bytes, real subscribers/436 parent and unbounded domains stay open.

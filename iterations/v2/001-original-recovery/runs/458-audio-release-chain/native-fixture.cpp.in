@@ -1,0 +1,248 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_release_chain_458.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;
+using namespace porsche;
+extern float _DAT_005b24a8;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;std::memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){std::memcpy(p,&x,4);}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s\n",why);std::fflush(stdout);ExitProcess(1);}}
+namespace porsche {
+I __cdecl application_audio_backend_initialize_0058a4f0(){ExitProcess(90);}
+void __cdecl application_audio_backend_apply_0058a690(){ExitProcess(90);}
+I __cdecl application_audio_backend_start_device_0058fdb0(){ExitProcess(90);}
+void __cdecl application_audio_backend_stop_device_0058fe80(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+I __cdecl audio_channel_stop_00565d60(U){ExitProcess(90);}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_enter_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_leave_critical_section(void*){ExitProcess(90);}
+I __stdcall audio_direct_sound_create_00597f70(const void*,U*,void*){ExitProcess(90);}
+void* __stdcall audio_platform_foreground_window(){ExitProcess(90);}
+void* __stdcall audio_platform_desktop_window(){ExitProcess(90);}
+}
+struct Scene {
+    AudioReleaseStorage458 release;U format;
+    U device,primary,property,temporary,hardware,available;
+    unsigned char canonical[0x18c],cs[24],arena[0x1800];
+};
+static Scene state,initial;
+struct Event {U tag,a,b;Scene scene;unsigned short status;};
+struct Trace {U count,abi,result;unsigned short status;Event events[20];};
+static Trace trace,expected;
+static U cases,event_count,mode,which,factor_bits,return_word,active_count;
+struct Object {U table,id;};
+static Object objects[3];static U methods[3];
+static U object(U index){return ptr(&objects[index]);}
+static Scene snapshot(){
+    state.release=audio_release_storage_006b174c;state.format=audio_release_format_006b16a4;
+    state.device=audio_ds_device_006ad760;state.primary=audio_ds_primary_006ad764;
+    state.property=audio_ds_property_006aefdc;state.temporary=audio_ds_temporary_006aefe0;
+    state.hardware=audio_ds_hardware_006ad778;state.available=static_cast<unsigned char>(audio_ds_property_available_006ad779);
+    std::memcpy(state.canonical,application_audio_device_state_006b48c0.backing.data(),0x18c);
+    std::memcpy(state.cs,audio_backend_lock_cs_006b1800,24);return state;
+}
+static Event& event(U tag,U a=0,U b=0){
+    require(trace.count<20,"event capacity");Event& e=trace.events[trace.count++];std::memset(&e,0,sizeof(e));
+    e.tag=tag;e.a=a;e.b=b;e.scene=snapshot();unsigned short status;__asm fnstsw status
+    e.status=status;return e;
+}
+static U __stdcall release_com(U self){
+    U id=0;for(U i=0;i<3;++i)if(self==object(i))id=i+1;require(id!=0,"COM self");
+    event(10,id);
+    if(mode==1&&self==object(0))audio_ds_device_006ad760=object(1);
+    if(mode==2&&self==object(2))audio_ds_device_006ad760=object(1);
+    if(mode==3&&self==object(0))audio_ds_temporary_006aefe0=object(2);
+    if(mode==4&&self==object(0))audio_release_channel_count_006b16a5=static_cast<unsigned char>(4-active_count);
+    return return_word;
+}
+namespace porsche {
+// Controlled original children, not implementations or production providers.
+void __cdecl audio_release_filter_initialize_0059a170(U address){
+    event(11,address);
+    require(address>=ptr(state.arena)&&address+28<=ptr(state.arena)+sizeof(state.arena),"constructor writable domain");
+    std::memset(reinterpret_cast<void*>(address),0x5a,28);
+    if(mode==5)audio_release_storage_006b174c.filter[0]=ptr(state.arena+0x1400);
+}
+void __cdecl audio_release_filter_set_0059a150(U address,U bits){
+    event(12,address,bits);
+    require(address>=ptr(state.arena)&&address+28<=ptr(state.arena)+sizeof(state.arena),"setter writable domain");
+    wr(reinterpret_cast<void*>(address+0x10),bits^0x12345678);wr(reinterpret_cast<void*>(address+0x14),bits);
+    if(mode==6)audio_release_channel_count_006b16a5=1;
+}
+}
+enum:U{OUTER=0,MIXER=0x100,FILTER=0x200,PROPERTY=0x400,FREE=0x500,ALLOC=0x600,CLAMP=0x800};
+static unsigned char* slab;
+static bool patch_ok=true;
+static void absolute(U start,U bytes,U old,const void* target,U expected_count){
+    U count=0;for(U n=0;n+4<=bytes;++n)if(rd(slab+start+n)==old){wr(slab+start+n,ptr(target));++count;n+=3;}
+    if(count!=expected_count)patch_ok=false;
+}
+static void call(U start,U offset,U original_va,U old,const void* target){
+    auto* p=slab+start+offset;
+    if(p[0]!=0xe8||original_va+offset+5+rd(p+1)!=old){patch_ok=false;return;}
+    wr(p+1,ptr(target)-ptr(p+5));
+}
+static bool init(){
+    static const unsigned char scalar[]={ @SCALAR_ONE@ };
+    require(std::memcmp(scalar,&_DAT_005b24a8,4)==0,"canonical raw scalar");
+    slab=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE));require(slab!=nullptr,"slab allocation");
+    static const unsigned char a[]={ @BODY_0058f1f0@ };std::memcpy(slab+OUTER,a,sizeof(a));
+    static const unsigned char b[]={ @BODY_005983b0@ };std::memcpy(slab+MIXER,b,sizeof(b));
+    static const unsigned char c[]={ @BODY_00598020@ };std::memcpy(slab+FILTER,c,sizeof(c));
+    static const unsigned char d[]={ @BODY_0058eba0@ };std::memcpy(slab+PROPERTY,d,sizeof(d));
+    static const unsigned char e[]={ @BODY_0058ac30@ };std::memcpy(slab+FREE,e,sizeof(e));
+    static const unsigned char f[]={ @BODY_0058aae0@ };std::memcpy(slab+ALLOC,f,sizeof(f));
+    static const unsigned char g[]={ @BODY_0058aa60@ };std::memcpy(slab+CLAMP,g,sizeof(g));
+    absolute(OUTER,38,0x6ad760,&audio_ds_device_006ad760,2);
+    absolute(MIXER,163,0x6b177c,&audio_release_storage_006b174c.optional,2);
+    absolute(MIXER,163,0x6b17d0,&audio_release_storage_006b174c.table,2);
+    absolute(MIXER,163,0x6b174c,audio_release_storage_006b174c.raw,1);
+    absolute(MIXER,163,0x6b1754,audio_release_storage_006b174c.aligned,1);
+    absolute(MIXER,163,0x6b16a5,&audio_release_channel_count_006b16a5,2);
+    absolute(MIXER,163,0x6b175c,audio_release_storage_006b174c.channel_raw,1);
+    absolute(FILTER,122,0x6b16a5,&audio_release_channel_count_006b16a5,2);
+    absolute(FILTER,122,0x6b1790,audio_release_storage_006b174c.filter,1);
+    absolute(FILTER,122,0x5b24a8,&_DAT_005b24a8,1);
+    absolute(PROPERTY,53,0x6aefdc,&audio_ds_property_006aefdc,2);
+    absolute(PROPERTY,53,0x6aefe0,&audio_ds_temporary_006aefe0,2);
+    absolute(PROPERTY,53,0x6ad779,&audio_ds_property_available_006ad779,1);
+    absolute(FREE,103,0x6b4a18,&audio_backend_pool_006b4a18,1);
+    absolute(ALLOC,335,0x6b4a18,&audio_backend_pool_006b4a18,4);
+    absolute(CLAMP,38,0x6b4a18,&audio_backend_pool_006b4a18,1);
+    call(OUTER,0,0x58f1f0,0x58eba0,slab+PROPERTY);call(OUTER,0x1e,0x58f1f0,0x5983b0,slab+MIXER);
+    for(U off:{0xau,0x26u,0x46u,0x76u})call(MIXER,off,0x5983b0,0x58ac30,slab+FREE);
+    call(MIXER,0x98,0x5983b0,0x598020,slab+FILTER);
+    call(FILTER,0x30,0x598020,0x58aae0,slab+ALLOC);
+    call(FILTER,0x38,0x598020,0x59a170,reinterpret_cast<void*>(&audio_release_filter_initialize_0059a170));
+    call(FILTER,0x4a,0x598020,0x59a150,reinterpret_cast<void*>(&audio_release_filter_set_0059a150));
+    call(FILTER,0x59,0x598020,0x58ac30,slab+FREE);
+    for(U off:{0x33u,0x89u,0xccu})call(ALLOC,off,0x58aae0,0x58aa60,slab+CLAMP);
+    methods[2]=ptr(reinterpret_cast<void*>(&release_com));
+    for(U i=0;i<3;++i){objects[i].table=ptr(methods);objects[i].id=i;}
+    return patch_ok&&FlushInstructionCache(GetCurrentProcess(),slab,4096);
+}
+// Synthetic cdecl0/1 call carrier; original bodies and real COM stdcall execute.
+static U invoke(void* fn,U arg,U argc){
+    U before,frame,result,fail=0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before,esp
+        mov frame,ebp
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,10203040h
+        cmp argc,0
+        je invoke_now
+        push arg
+    invoke_now:
+        call fn
+        mov result,eax
+        mov ecx,argc
+        shl ecx,2
+        add esp,ecx
+        cmp esp,before
+        jne bad
+        cmp ebp,frame
+        jne bad
+        cmp ebx,13579bdfh
+        jne bad
+        cmp esi,2468ace0h
+        jne bad
+        cmp edi,10203040h
+        je done
+    bad:
+        mov fail,1
+    done:
+        mov esp,before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    trace.abi|=fail;return result;
+}
+static void load(){
+    state=initial;audio_release_storage_006b174c=state.release;audio_release_format_006b16a4=state.format;
+    audio_ds_device_006ad760=state.device;audio_ds_primary_006ad764=state.primary;
+    audio_ds_property_006aefdc=state.property;audio_ds_temporary_006aefe0=state.temporary;
+    audio_ds_hardware_006ad778=static_cast<unsigned char>(state.hardware);audio_ds_property_available_006ad779=static_cast<signed char>(state.available);
+    std::memcpy(application_audio_device_state_006b48c0.backing.data(),state.canonical,0x18c);
+    std::memcpy(audio_backend_lock_cs_006b1800,state.cs,24);std::memset(&trace,0,sizeof(trace));
+    __asm fninit
+}
+static void execute(bool cpp){
+    load();void* fn=nullptr;
+    if(which==0)fn=cpp?reinterpret_cast<void*>(&audio_device_release_ds_0058f1f0):slab+OUTER;
+    if(which==1)fn=cpp?reinterpret_cast<void*>(&audio_release_mixer_005983b0):slab+MIXER;
+    if(which==2)fn=cpp?reinterpret_cast<void*>(&audio_release_filters_00598020):slab+FILTER;
+    U result=invoke(fn,factor_bits,which==2?1:0);trace.result=which==0?result:0;
+    event(20,trace.result);unsigned short status;__asm fnstsw status
+    trace.status=status;
+}
+static void check(U family,U id){
+    execute(false);expected=trace;execute(true);
+    if(trace.abi||expected.abi||std::memcmp(&trace,&expected,sizeof(trace))!=0){
+        std::printf("divergence family=%u id=%u mode=%u which=%u factor=%08x count=%u events=%u/%u ABI=%u/%u status=%x/%x\n",family,id,mode,which,factor_bits,active_count,trace.count,expected.count,trace.abi,expected.abi,trace.status,expected.status);std::fflush(stdout);ExitProcess(1);
+    }
+    ++cases;event_count+=trace.count;
+}
+static void base(U count,U mask,U com){
+    std::memset(&initial,0,sizeof(initial));initial.format=0xa5c3007e|(count<<8);
+    std::memset(initial.arena,0xa5,sizeof(initial.arena));std::memset(initial.release.opaque_006b17a0,0x6d,48);
+    active_count=count;mode=0;return_word=0x80000001;which=0;factor_bits=0x40000000;
+    load();wr(state.arena+0x114,0);application_audio_backend_configure_0058aa90(ptr(state.arena+0x100),0x1000);
+    auto alloc=[](){U p=application_audio_backend_allocate_0058aae0(32);require(p!=0,"fixture pool allocation");return p;};
+    auto selected=[&](U bit){U p=alloc();return (mask&(1u<<(bit&3)))?p:0u;};
+    audio_release_storage_006b174c.optional=selected(0);audio_release_storage_006b174c.table=selected(1);
+    for(U i=0;i<2;++i){audio_release_storage_006b174c.raw[i]=selected(i+2);audio_release_storage_006b174c.aligned[i]=0x12340000+i;}
+    for(U i=0;i<4;++i){
+        audio_release_storage_006b174c.channel_raw[i]=selected(i+1);audio_release_storage_006b174c.filter[i]=selected(i+2);
+        audio_release_storage_006b174c.channel_aligned[i]=0x56780000+i;audio_release_storage_006b174c.channel_word[i]=0x9abc0000+i;
+    }
+    audio_ds_property_006aefdc=(com&1)?object(0):0;audio_ds_temporary_006aefe0=(com&2)?object(1):0;audio_ds_device_006ad760=(com&4)?object(2):0;
+    audio_ds_primary_006ad764=0x87654321;audio_ds_hardware_006ad778=0x73;audio_ds_property_available_006ad779=-128;
+    initial=snapshot();
+}
+static void zero_fill(const char* path){
+    FILE* f=nullptr;require(fopen_s(&f,path,"rb")==0&&f,"original PE open");
+    IMAGE_DOS_HEADER dos;require(std::fread(&dos,sizeof(dos),1,f)==1,"DOS header");std::fseek(f,dos.e_lfanew,SEEK_SET);
+    IMAGE_NT_HEADERS32 nt;require(std::fread(&nt,sizeof(nt),1,f)==1,"NT header");bool format=false,storage=false;
+    for(U i=0;i<nt.FileHeader.NumberOfSections;++i){IMAGE_SECTION_HEADER s;require(std::fread(&s,sizeof(s),1,f)==1,"section header");U va=nt.OptionalHeader.ImageBase+s.VirtualAddress;
+        if(0x6b16a4>=va+s.SizeOfRawData&&0x6b16a8<=va+s.Misc.VirtualSize)format=true;
+        if(0x6b174c>=va+s.SizeOfRawData&&0x6b17d4<=va+s.Misc.VirtualSize)storage=true;
+    }
+    std::fclose(f);require(format&&storage,"raw PE virtual zero-fill provenance");
+}
+int main(int argc,char** argv){
+    require(argc==2,"original PE argument");zero_fill(argv[1]);
+    static const AudioReleaseStorage458 zero{};require(std::memcmp(&zero,&audio_release_storage_006b174c,sizeof(zero))==0,"production storage initial zero");
+    require(audio_release_format_006b16a4==0&&audio_release_channel_count_006b16a5==0,"production format initial zero");
+    require(ptr(&audio_release_channel_count_006b16a5)==ptr(&audio_release_format_006b16a4)+1,"count byte/dword identity");
+    require(audio_ds_device_006ad760==0&&audio_ds_property_006aefdc==0&&audio_ds_temporary_006aefe0==0,"canonical DS initial zero");
+    require(audio_backend_pool_006b4a18==0&&ptr(&audio_backend_pool_006b4a18)==ptr(application_audio_device_state_006b48c0.data()+0x158),"canonical pool identity");
+    require(init(),"raw body relocation");U id=0;
+    // Actual cleanup path: original outer/property/mixer/filter/free composition.
+    for(U count=0;count<=4;++count)for(U mask=0;mask<16;++mask)for(U com=0;com<8;++com){base(count,mask,com);check(0,id++);}
+    // COM return bits ignored, reentrant canonical changes and count reloads.
+    for(U count=0;count<=4;++count)for(U mutation=1;mutation<=4;++mutation)for(U ret:{0u,1u,0xffffffffu,0x80000000u}){
+        base(count,15,7);mode=mutation;return_word=ret;check(1,id++);
+    }
+    // Full filter body: real pool allocation/free; explicit typed original children.
+    for(U count=0;count<=4;++count)for(U mask:{0u,5u,10u,15u})
+    for(U bits:{0u,0x80000000u,0xbf800000u,0x3f000000u,0x3f7fffffu,0x3f800000u,0x3f800001u,0x40000000u,0x7f800000u,0xff800000u,0x7fc00000u,0x7fa00001u,0xffc12345u}){
+        base(count,mask,0);which=2;factor_bits=bits;check(2,id++);
+    }
+    for(U mutation:{5u,6u})for(U mask:{0u,15u}){base(4,mask,0);which=2;factor_bits=0x3f000000;mode=mutation;check(3,id++);}
+    // Repeated cleanup and nonzero slots absent from the pool retain original failure behavior.
+    for(U count=0;count<=4;++count){base(count,15,0);which=1;check(4,id++);initial=snapshot();check(4,id++);
+        base(count,15,0);initial.release.optional=ptr(state.arena+0x1700);which=1;check(5,id++);}
+    require(VirtualFree(slab,0,MEM_RELEASE)!=0,"slab release");
+    std::printf("audio_release_chain_original_x86_vs_cpp=PASS cases=%u events=%u ABI=PASS x87=PASS\n",cases,event_count);return 0;
+}

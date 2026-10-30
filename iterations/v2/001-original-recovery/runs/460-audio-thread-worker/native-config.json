@@ -1,0 +1,136 @@
+{
+  "run": 460,
+  "experiment": "local/experiments/v2-audio-thread-worker-460",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+    "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/audio_capabilities_443.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/exit_registry.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/460-audio-thread-worker",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_0058f880@",
+      "va": "0058f880",
+      "bytes": 87,
+      "sha256": "c55ea06820926fff8c7354727ca4b7e43f641f43944908e1b23ca5ee5720ddd4"
+    }
+  ],
+  "headers": [
+    "research/binary-index/supplemental/audio-thread-460.jsonl",
+    "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/original-evidence.json",
+    "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/ownership.json"
+  ],
+  "pass_marker": "audio_thread_worker_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "initial-running-predicate",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "if(audio_thread_requested_006b4881!=0)",
+      "new": "if(audio_thread_running_006b4880!=0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "cached-Sleep-IAT",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "const auto sleep=audio_thread_sleep_005b220c;",
+      "new": "const auto& sleep=audio_thread_sleep_005b220c;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "before-cached",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "        do {\n            const auto before=audio_thread_before_006b4a3c;",
+      "new": "        const auto before=audio_thread_before_006b4a3c;\n        do {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "after-early-capture",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "            audio_thread_mix_0058f8e0();\n            const auto after=audio_thread_after_006b4a40;",
+      "new": "            const auto after=audio_thread_after_006b4a40;\n            audio_thread_mix_0058f8e0();",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "skip-mixer",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "            audio_thread_mix_0058f8e0();",
+      "new": "            /* dropped original mixer effects */",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "after-before-mixer",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "            audio_thread_mix_0058f8e0();\n            const auto after=audio_thread_after_006b4a40;\n            if(after!=0)reinterpret_cast<void(__cdecl*)()>(after)();",
+      "new": "            const auto after=audio_thread_after_006b4a40;\n            if(after!=0)reinterpret_cast<void(__cdecl*)()>(after)();\n            audio_thread_mix_0058f8e0();",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "delay-signed",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "static_cast<std::uint32_t>(application_audio_device_state_006b48c0[0x21])",
+      "new": "static_cast<std::uint32_t>(static_cast<std::int8_t>(application_audio_device_state_006b48c0[0x21]))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "delay-wrong-offset",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "application_audio_device_state_006b48c0[0x21]",
+      "new": "application_audio_device_state_006b48c0[0x20]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "loop-running-predicate",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "} while(audio_thread_requested_006b4881!=0);",
+      "new": "} while(audio_thread_running_006b4880!=0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "running-not-cleared",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "audio_thread_running_006b4880=0;",
+      "new": "audio_thread_running_006b4880=1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "return-not-zero",
+      "source": "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+      "old": "    return 0;",
+      "new": "    return 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

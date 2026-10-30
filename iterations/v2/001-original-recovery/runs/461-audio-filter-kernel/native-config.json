@@ -1,0 +1,151 @@
+{
+  "run": 461,
+  "experiment": "local/experiments/v2-audio-filter-kernel-461",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+    "iterations/v2/001-original-recovery/runs/221-readonly-scalar-storage/original_scalars.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_0059a170@",
+      "va": "0059a170",
+      "bytes": 26,
+      "sha256": "a3777081e9ef31b214312b378c6a47e8798c8bed5ef416b51e49de78e8489132"
+    },
+    {
+      "token": "@BODY_0059a150@",
+      "va": "0059a150",
+      "bytes": 25,
+      "sha256": "d331d57e4153cb4ed176c2db30b67cb317ca32ff6fb524c180bcfee63093894c"
+    },
+    {
+      "token": "@BODY_0059a0f0@",
+      "va": "0059a0f0",
+      "bytes": 93,
+      "sha256": "611d416e03ed64843cff9ab6eba5524f2b643ba8debf96fc1ff6c1bf5271699a"
+    },
+    {
+      "token": "@BODY_0059c170@",
+      "va": "0059c170",
+      "bytes": 50,
+      "sha256": "d4fee93032a15d0cf746525bf84d1a35f85da446e223412cb6c29b2d25f651d9"
+    }
+  ],
+  "pass_marker": "audio_filter_kernel_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "ctor-state",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "write(object+0x0cu,0);",
+      "new": "write(object+0x0cu,1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "ctor-callback",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "write(object+4u,reinterpret_cast<U>(&audio_filter_callback_0059a0f0));",
+      "new": "write(object+4u,reinterpret_cast<U>(&audio_filter_kernel_0059c170));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "setter-subtract",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "fsub dword ptr [esp+8]",
+      "new": "fadd dword ptr [esp+8]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "setter-swap-fields",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "fstp dword ptr [eax+14h]",
+      "new": "fstp dword ptr [eax+10h]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "upstream-zero",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "if(result<=0)",
+      "new": "if(result<0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "upstream-sign",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "std::int16_t mode;",
+      "new": "std::uint16_t mode;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "copy-forward",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "write(output+offset,read(input+offset))",
+      "new": "write(output+offset,read(input+bytes-4u-offset))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "return-original-count",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "return static_cast<std::int32_t>(count);",
+      "new": "return static_cast<std::int32_t>(count+1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "kernel-feedback",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "fmul dword ptr [edi+4]",
+      "new": "fmul dword ptr [edi+8]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "kernel-input",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "fmul dword ptr [ecx+esi]",
+      "new": "fadd dword ptr [ecx+esi]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "kernel-retain-extended",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "fst dword ptr [ecx+esi]",
+      "new": "fstp dword ptr [ecx+esi]\n        fld dword ptr [ecx+esi]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "kernel-count-step",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "add ecx,4",
+      "new": "add ecx,8",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "kernel-final-state",
+      "source": "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+      "old": "fstp dword ptr [edi]",
+      "new": "fstp dword ptr [edi+4]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

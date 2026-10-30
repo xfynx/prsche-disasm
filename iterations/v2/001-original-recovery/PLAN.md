@@ -1,12 +1,27 @@
 # v2 / 001 - original source recovery plan
 
-Active459,2026-10-31: frozen458 release (3 originals/323B) and460 omitted worker
-(1 original/87B) await one shared integration. startup_win32_bindings_457 owns458;
-audio_chain_454 owns460; both finished. audio_device_lifecycle_455 owns461 filter
-kernel (4 originals/194B), matching458 child ABI and preserving x87 extended state;
-include it in459 if ready before the shared build, otherwise next462. Coordinator
-owns459 REA7dossiers (458three+461four), omitted460 supplemental evidence, common
-build/registry/docs. No passed packet grows. Reuse456 accepted inputs/proof.
+Active465,2026-10-31: startup_win32_bindings_457 owns462 DSinit0058ebe0(1551B)
+plus canonical sharedDSstate in separate CPP/header; audio_chain_454 owns463 mixer
+wrapper0058f8e0+0058f8f0(723B), reusing462state. Explicit original DSchildren remain
+unresolved; no expansion into guessed helper implementations. audio_device_lifecycle_455
+owns464 six probe/prepare/wait/clock/callback helpers156B;398Bparent remains navigation
+only until actual virtualmode/table domain is proved. Existing131's cropped128B table
+window/guard is not a full original transport. Coordinator owns465 batchedREA,
+shared integration/registry/docs. No new accepted body beyond459 yet.
+
+Current459,2026-10-31: frozen458/460/461 integrate8 originals604B; registry644.
+Shared audit PASS:2644cases/40mutations,607pins/404canonical exports;247TUs/8projects,
+166names172refs,noEXE. DSrelease/worker close; realmixer0058f8e0 appears. Original
+worker87B supplement covers omittedentry beforeimplementation.148B new physical
+state proven; canonicalflags/device/locks/scalar reused. SleepIATcachedidentity,
+physical aliases, x87CW/SW/tag/80bitregisters andforwardoverlap checked. Kernel50B
+exact atbothoptimizations; setter25B aftercanonicalrelocation. SevenREA dossiers
+share104.5s session; nativeproofs reused; one sharedbuild/audit.459README owns
+commands/boundaries. Actual458+461 composition and callbackproducers, lifecycle/
+436parent/live threads/fullstartup/display/gameplay/faults/concurrency remain open;
+403/411PARTIAL unchanged. No acceptedrun inputs or originals changed.
+
+Historical456 follows.
 
 Current456,2026-10-31: frozen454/455/457 accepted. Five new lifecycle originals/448B,
 nine Win32 adapters(0original algorithm/storage count),12existing-body composition.

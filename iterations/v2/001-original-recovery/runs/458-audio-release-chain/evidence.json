@@ -1,0 +1,136 @@
+{
+  "status": "PASS",
+  "original_functions_added": 3,
+  "original_body_bytes": 323,
+  "original_storage_bytes_added": 140,
+  "source": "iterations/v2/001-original-recovery/runs/458-audio-release-chain/audio_release_chain_458.cpp",
+  "header": "iterations/v2/001-original-recovery/runs/458-audio-release-chain/audio_release_chain_458.hpp",
+  "functions": [
+    {
+      "entry_va": "0058f1f0",
+      "bytes": 38,
+      "name": "audio_device_release_ds_0058f1f0",
+      "abi": "cdecl0 -> int32 fixed0",
+      "recovered_dependencies": [
+        "0058eba0",
+        "005983b0"
+      ],
+      "unrecovered_dependencies": [],
+      "sha256": "d8d1cd1e0464b23f6c014508f494722bdc9e80482ecb64aadc512a393206ef0d"
+    },
+    {
+      "entry_va": "005983b0",
+      "bytes": 163,
+      "name": "audio_release_mixer_005983b0",
+      "abi": "cdecl0; caller ignores EAX",
+      "recovered_dependencies": [
+        "0058ac30",
+        "00598020"
+      ],
+      "unrecovered_dependencies": [],
+      "sha256": "22dec8495b076b8b327c106791737377f0b85ebde2ff8513a8e7115592605373"
+    },
+    {
+      "entry_va": "00598020",
+      "bytes": 122,
+      "name": "audio_release_filters_00598020",
+      "abi": "cdecl1 raw32 float stack word; caller ignores EAX",
+      "recovered_dependencies": [
+        "0058aae0",
+        "0058ac30"
+      ],
+      "unrecovered_dependencies": [
+        "0059a170",
+        "0059a150"
+      ],
+      "sha256": "bcf1b9f6632d6927d3aba16830e180e0b59a03ad593164b80a1e910ab7479fe8"
+    }
+  ],
+  "data_ownership": [
+    {
+      "symbol": "audio_release_format_006b16a4",
+      "va": "006b16a4",
+      "bytes": 4,
+      "initial": "original PE loader-zero",
+      "alias": "audio_release_channel_count_006b16a5 refers to byte1; reference pointer is host infrastructure, not new original state"
+    },
+    {
+      "symbol": "audio_release_storage_006b174c",
+      "va": "006b174c",
+      "bytes": 136,
+      "end_exclusive": "006b17d4",
+      "initial": "original PE loader-zero",
+      "layout": "raw[2],aligned[2],channel_raw[4],channel_aligned[4],optional,channel_word[4],filter[4],opaque48,table",
+      "canonical_exclusion": "does not overlap Run434 lock006b1800 or Run455 buffers006b4888"
+    }
+  ],
+  "canonical_reuse": {
+    "audio_release_property_0058eba0": "Run443",
+    "audio_ds_device_006ad760": "Run443",
+    "audio_backend_pool_release_0058ac30": "Run438",
+    "application_audio_backend_allocate_0058aae0": "Run438",
+    "audio_backend_pool_006b4a18": "Run434 view of canonical application_audio_device_state_006b48c0",
+    "_DAT_005b24a8": "Run221 original scalar1.0"
+  },
+  "new_unresolved_original_children": {
+    "?audio_release_filter_initialize_0059a170@porsche@@YAXI@Z": "cdecl1 object; original constructor26B, not recovered here",
+    "?audio_release_filter_set_0059a150@porsche@@YAXII@Z": "cdecl2 object/raw32float; original setter25B, not recovered here"
+  },
+  "native_config": "iterations/v2/001-original-recovery/runs/458-audio-release-chain/native-config.json",
+  "native_receipt": "local/experiments/v2-audio-release-chain-458/002/receipt.json",
+  "native_receipt_sha256": "102535dc6047166da4d19d03288e626c07ab9e8936f9c31f87e064d5deee044f",
+  "native_cases": 1998,
+  "cases_per_variant": 999,
+  "native_events": 5508,
+  "mutations": 16,
+  "native_input_pins": 279,
+  "new_original_bytes": 323,
+  "accepted_original_bytes_reused": 529,
+  "raw_scalar_bytes": 4,
+  "total_raw_input_bytes": 856,
+  "proof_domains": [
+    "Channel count0..4; 1..4 follows accepted Run442 initialized/applied upstream min/max contract, with zero also accepted for cleanup. No invented production clamp.",
+    "Real438 pool configure/allocate/free plus new outer/mixer/filter bodies and accepted443 property cleanup; complete bounded arena/metadata and global-state snapshots.",
+    "COM stdcall Release self/order, ignored return bits, reentrant device/temporary/count changes, canonical reloads and clearing.",
+    "Below1 and unordered paths use explicit controlled constructor/setter endpoints, preserving child arguments, constructor reload, post-constructor zero and live count reload.",
+    "Direct x87 FLD/FCOMP/FNSTSW C0 branch and full status comparison for +/-zero,negative,below/equal/above1,infinities,qNaN,sNaN.",
+    "Synthetic call carrier checks ESP,EBP,EBX,ESI,EDI; original body bytes/relocations are verified before patching.",
+    "Raw original section headers establish zero-fill for both new spans; fixture asserts production initial zeros, exact byte/dword count alias and canonical pool identity before resets."
+  ],
+  "mutations_detected": [
+    "property-cleanup",
+    "device-clear",
+    "outer-return",
+    "free-address",
+    "slot-clear",
+    "two-raw-buffers",
+    "cleanup-filter-factor",
+    "x87-C0",
+    "unordered-NaN",
+    "filter-allocation-size",
+    "constructor-call",
+    "constructor-reload",
+    "post-constructor-zero",
+    "setter-bits",
+    "count-reload",
+    "count-alias"
+  ],
+  "known_boundaries": [
+    "0059a170/0059a150 are unresolved original production functions; fixture controls are not production stubs. Their algorithm/callback closure is deferred.",
+    "Count above4, malformed/unwritable filter objects, allocation-failure fault behavior and live COM/platform devices are not newly accepted domains.",
+    "No source/global-state ownership outside the two new spans; old accepted runs and local/game are unchanged.",
+    "No REA or game build performed here; coordinator owns Run459 shared REA/integration/registry.",
+    "Native proof does not establish full startup,audio playback or historical fidelity."
+  ],
+  "attempt_history": {
+    "001": "Both main variants passed; constructor-reload mutation itself dereferenced null and terminated before differential marker. Preserved unchanged.",
+    "002": "Only constructor-reload control changed to capture safely before child; same production and fixture sources, all main cases and16controls passed."
+  },
+  "metadata_pins": {
+    "navigation.json": "4d16a359fdf13cc7feb8c10de9489a7a12f65d8e6f842dd0c00352ad9af98011",
+    "ownership-navigation.json": "904adb095401a1ad6d86726cbabae35acd9762f4065fcf156d087d8bf45f20ec",
+    "producer-navigation.json": "d072a2ecf3b4073adb94843fbff24c5a446c9bd58d132f73ed5b69d4d5db3584",
+    "state-navigation.json": "6405b7dcd373fb02ee9003b0028249cc4f0689487729bbf8d0fec92fd8987962",
+    "coff.json": "966b430ea3600101ff8bca0e14e243083cd88319e5fbd23ccf4b3ba672e76887"
+  }
+}
