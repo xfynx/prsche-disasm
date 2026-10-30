@@ -1,6 +1,16 @@
 # Отложенные проверки восстановления v2
 
-Run450: five original audio-group bodies519B and two IAT bindings integrated;
+Run453: seven original decoder/removal bodies1743B integrated;500cases/22mutations/
+595pins PASS.241TUs/175names182refs,noEXE. Three-body decoder and four-body removal
+each compose actual originals; whole448+451+452 group execution remains open.
+Next compare that actual outer/lower chain against original bytes, then subscribers
+and436 shutdown parent. Reuse453 gamebuild if production unchanged. Exact8B default
+transport and loaderzero map/6144B table are proved. First-large token retained-state
+coverage catches opaque-zero mutation; mapped129append does not prove safety in
+the caller's164B record. LiveDS/OS, malformed/faulting memory/concurrency and full
+startup/display/gameplay remain open;403/411 PARTIAL unchanged.
+
+Historical450: five original audio-group bodies519B and two IAT bindings integrated;
 29,166 cases/20 mutations/590pins PASS.239TUs/177names184refs,noEXE. Actual outer
 group composition is verified;00599100/005996d0 and callback subscribers remain
 controlled. Next recover decoder/token/big-endian reader and lookup/erase/DSslot

@@ -1,0 +1,181 @@
+#include "audio_record_resources_452.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using namespace porsche;
+extern "C" void* __stdcall VirtualAlloc(void*,U,U,U);
+extern "C" void __stdcall ExitProcess(U);
+extern "C" void* __stdcall GetCurrentProcess();
+extern "C" I __stdcall FlushInstructionCache(void*,const void*,U);
+// Fail-closed unused dependencies of the actual canonical443 state owner.
+namespace porsche {
+I __stdcall audio_direct_sound_create_00597f70(const void*,U*,void*){ExitProcess(92);return 0;}
+void* __stdcall audio_platform_foreground_window(){ExitProcess(93);return nullptr;}
+void* __stdcall audio_platform_desktop_window(){ExitProcess(94);return nullptr;}
+}
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U value;memcpy(&value,p,4);return value;}
+static void wr(void* p,U value){memcpy(p,&value,4);}
+static U maps[2][65535*2],saved_maps[2][65535*2];
+static unsigned char record[164],scratch[2048];
+static U object[2][2],vtable[3];
+struct Event {U self,key,handle,flag,object,map,count,device;};
+struct Trace {U abi,result,event_count,device,map,count;Event events[2];unsigned char slots[0x1800],record[164],scratch[2048];};
+static Trace trace,original;
+static U which,count_value,key_value,hit,handle,mode,device_on,null_map,cases,event_total;
+static unsigned char* slab;static bool patch_ok=true;
+static U physical(){return (handle*24u)/24u;}
+static U __stdcall release(U self){
+    if(trace.event_count>=2)ExitProcess(95);
+    auto& e=trace.events[trace.event_count++];
+    const U row=physical()*24u;
+    e={self,maps[0][hit*2],maps[0][hit*2+1],rd(audio_resource_slots_006ad7b8+row),rd(audio_resource_slots_006ad7b8+row+4),audio_resource_map_006b48a4,audio_resource_map_count_006b48a0,audio_ds_device_006ad760};
+    if(mode==1){
+        wr(audio_resource_slots_006ad7b8+row,0xabcdef01);
+        wr(audio_resource_slots_006ad7b8+row+4,ptr(object[1]));
+        maps[0][hit*2+1]=255;
+    }
+    if(mode==2){
+        audio_resource_map_006b48a4=ptr(maps[1]);audio_resource_map_count_006b48a0=0x43210001;
+        audio_ds_device_006ad760=0;wr(record+0xa0,0x76543210);
+        maps[0][hit*2]=0xdeadbeef;maps[1][0]=0xfedcba98;
+        wr(audio_resource_slots_006ad7b8+row,0x12345678);
+        wr(audio_resource_slots_006ad7b8+row+4,ptr(object[1]));
+    }
+    return 0x87654321;
+}
+enum:U{REMOVE=0,FIND=0x100,ERASE=0x200,RELEASE=0x300};
+static void absolute(U at,U size,U old,const void* target,U expected){
+    U count=0;for(U i=0;i+4<=size;++i)if(rd(slab+at+i)==old){wr(slab+at+i,ptr(target));++count;i+=3;}
+    if(count!=expected)patch_ok=false;
+}
+static void relative(U at,U off,U va,U child,U target){
+    auto* p=slab+at+off;if(p[0]!=0xe8||va+off+5+rd(p+1)!=child){patch_ok=false;return;}
+    wr(p+1,ptr(slab+target)-ptr(p+5));
+}
+static bool initial_data(const char* pe_path){
+    // Read original virtual bytes from its file-backed prefix or loader-zero tail.
+    FILE* f=fopen(pe_path,"rb");if(!f)return false;
+    fseek(f,0,SEEK_END);const long bytes=ftell(f);rewind(f);
+    auto* pe=new unsigned char[bytes];if(fread(pe,1,bytes,f)!=static_cast<size_t>(bytes)){fclose(f);return false;}fclose(f);
+    const U nt=rd(pe+0x3c),base=rd(pe+nt+52),sections=pe[nt+6]|U(pe[nt+7])<<8;
+    const U optional=pe[nt+20]|U(pe[nt+21])<<8;
+    const U va[]={0x6b48a0,0x6b48a4,0x6ad7b8};const U sizes[]={4,4,0x1800};
+    const unsigned char* native[]={reinterpret_cast<const unsigned char*>(&audio_resource_map_count_006b48a0),reinterpret_cast<const unsigned char*>(&audio_resource_map_006b48a4),audio_resource_slots_006ad7b8};
+    bool ok=true;
+    for(U j=0;j<3;++j){bool found=false;for(U i=0;i<sections;++i){
+        const auto* s=pe+nt+24+optional+i*40;const U rva=rd(s+12),vs=rd(s+8),rawsize=rd(s+16),raw=rd(s+20);
+        const U delta=va[j]-base-rva;if(delta>=vs||sizes[j]>vs-delta)continue;found=true;
+        for(U k=0;k<sizes[j];++k){const unsigned char original_byte=delta+k<rawsize?pe[raw+delta+k]:0;if(native[j][k]!=original_byte)ok=false;}
+    }if(!found)ok=false;}
+    delete[] pe;return ok;
+}
+static bool init(){
+    vtable[2]=ptr(reinterpret_cast<void*>(&release));for(U i=0;i<2;++i){object[i][0]=ptr(vtable);object[i][1]=i;}
+    slab=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,0x3000,0x40));if(!slab)return false;
+    static const unsigned char r[]={ @BODY_005996d0@ };memcpy(slab+REMOVE,r,sizeof(r));
+    static const unsigned char f[]={ @BODY_0058f820@ };memcpy(slab+FIND,f,sizeof(f));
+    static const unsigned char e[]={ @BODY_0058f7e0@ };memcpy(slab+ERASE,e,sizeof(e));
+    static const unsigned char s[]={ @BODY_0058f290@ };memcpy(slab+RELEASE,s,sizeof(s));
+    for(U at:{FIND,ERASE}){absolute(at,at==FIND?57:55,0x6b48a0,&audio_resource_map_count_006b48a0,1);absolute(at,at==FIND?57:55,0x6b48a4,&audio_resource_map_006b48a4,1);}
+    absolute(RELEASE,43,0x6ad7b8,audio_resource_slots_006ad7b8,1);absolute(RELEASE,43,0x6ad760,&audio_ds_device_006ad760,1);
+    relative(REMOVE,0xd,0x5996d0,0x58f820,FIND);relative(REMOVE,0x21,0x5996d0,0x58f7e0,ERASE);relative(REMOVE,0x27,0x5996d0,0x58f290,RELEASE);
+    return patch_ok&&FlushInstructionCache(GetCurrentProcess(),slab,4096);
+}
+// Synthetic cdecl1/2 callsite; the original callee retains rawC3 ABI.
+static U invoke(void* fn,U a,U b,U argc){
+    U before,saved_frame,result,fail=0;
+    __asm{
+        push ebx
+        push esi
+        push edi
+        mov before,esp
+        mov saved_frame,ebp
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,10203040h
+        cmp argc,2
+        jne one
+        push b
+    one:
+        push a
+        call fn
+        mov result,eax
+        mov ecx,argc
+        shl ecx,2
+        add esp,ecx
+        cmp esp,before
+        jne bad
+        cmp ebp,saved_frame
+        jne bad
+        cmp ebx,13579bdfh
+        jne bad
+        cmp esi,2468ace0h
+        jne bad
+        cmp edi,10203040h
+        je done
+    bad:
+        mov fail,1
+    done:
+        mov esp,before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    trace.abi|=fail;return result;
+}
+static void load(){
+    memset(&trace,0,sizeof(trace));
+    for(U i=0;i<65535;++i){maps[0][i*2]=0x10000000+i;maps[0][i*2+1]=i*3+7;maps[1][i*2]=0xa0000000+i;maps[1][i*2+1]=0xb0000000+i;}
+    if(hit!=65535){maps[0][hit*2]=key_value;maps[0][hit*2+1]=handle;}
+    if(mode==3&&hit+1<(count_value&65535)){maps[0][(hit+1)*2]=key_value;maps[0][(hit+1)*2+1]=255;}
+    for(U i=0;i<0x1800;++i)audio_resource_slots_006ad7b8[i]=static_cast<unsigned char>(i*13+7);
+    const U row=physical()*24u;wr(audio_resource_slots_006ad7b8+row,0x11223344);wr(audio_resource_slots_006ad7b8+row+4,device_on?ptr(object[0]):0);
+    memset(record,0xa5,sizeof(record));wr(record+0xa0,key_value);memset(scratch,0x6c,sizeof(scratch));
+    audio_ds_device_006ad760=device_on?0x98765432:0;
+    audio_resource_map_count_006b48a0=count_value;audio_resource_map_006b48a4=null_map?0:ptr(maps[0]);
+}
+static void execute(bool cpp){
+    load();void* fn=nullptr;U arg=key_value,argc=1;
+    if(which==0){fn=cpp?reinterpret_cast<void*>(&audio_resource_find_0058f820):slab+FIND;}
+    if(which==1){fn=cpp?reinterpret_cast<void*>(&audio_resource_erase_0058f7e0):slab+ERASE;}
+    if(which==2){fn=cpp?reinterpret_cast<void*>(&audio_resource_release_slot_0058f290):slab+RELEASE;arg=handle;}
+    if(which==3){fn=cpp?reinterpret_cast<void*>(&audio_record_remove_005996d0):slab+REMOVE;arg=ptr(record);}
+    if(which==4){fn=cpp?reinterpret_cast<void*>(&audio_group_process_005996d0):slab+REMOVE;arg=ptr(record);argc=2;}
+    trace.result=invoke(fn,arg,ptr(scratch),argc);if(which==4)trace.result=0;
+    trace.device=audio_ds_device_006ad760;trace.map=audio_resource_map_006b48a4;trace.count=audio_resource_map_count_006b48a0;
+    memcpy(trace.slots,audio_resource_slots_006ad7b8,sizeof(trace.slots));memcpy(trace.record,record,sizeof(record));memcpy(trace.scratch,scratch,sizeof(scratch));
+}
+static bool check(){
+    execute(false);original=trace;memcpy(saved_maps,maps,sizeof(maps));execute(true);++cases;event_total+=trace.event_count;
+    if(trace.abi||original.abi||memcmp(&trace,&original,sizeof(trace))||memcmp(saved_maps,maps,sizeof(maps))){
+        printf("divergence case=%u which=%u count=%08x key=%08x hit=%u handle=%08x mode=%u device=%u null=%u returns=%08x/%08x events=%u/%u ABI=%u/%u\n",cases,which,count_value,key_value,hit,handle,mode,device_on,null_map,original.result,trace.result,original.event_count,trace.event_count,original.abi,trace.abi);return false;
+    }return true;
+}
+static void base(){which=0;count_value=4;key_value=0x87654321;hit=2;handle=1;mode=device_on=null_map=0;}
+int main(int argc,char** argv){
+    if(argc!=2||!initial_data(argv[1])||audio_ds_device_006ad760!=0){puts("production_initial_state=FAIL");return 2;}
+    if(!init()){puts("oracle_patch=FAIL");return 3;}
+    // Branch cases: zero/high/count boundaries, first/last/duplicate/missing, null lookup.
+    for(U w:{0u,1u,3u,4u}){
+        for(U c:{0u,0x12340000u,1u,4u,256u,32768u,65535u,0xffff0004u}){
+            base();which=w;count_value=c;hit=(c&65535)?(c&65535)-1:65535;if(!check())return 1;
+        }
+        base();which=w;hit=0;mode=3;if(!check())return 1;
+        base();which=w;hit=65535;if(!check())return 1;
+        base();which=w;key_value=0;hit=0;mode=3;if(!check())return 1;
+        base();which=w;handle=0;if(!check())return 1;
+    }
+    for(U w:{0u,3u,4u}){base();which=w;null_map=1;count_value=0xffff0004;if(!check())return 1;}
+    base();which=1;null_map=1;count_value=0xffff0000;if(!check())return 1;
+    // Slot0 is readable and no index guard is invented; huge unsigned index aliases row1.
+    for(U h:{0u,1u,255u,0x20000001u})for(U d:{0u,1u}){
+        base();which=2;handle=h;device_on=d;if(!check())return 1;
+    }
+    // Actual four-body composition, with COM observing erase-before-call and clear-after-call.
+    for(U w:{2u,3u,4u})for(U m:{1u,2u}){
+        base();which=w;mode=m;device_on=1;handle=255;if(!check())return 1;
+    }
+    base();which=3;mode=3;device_on=1;if(!check())return 1;
+    printf("audio_record_resources_original_x86_vs_cpp=PASS cases=%u events=%u ABI=PASS production_initial_state=PASS full_map_slot_writes=PASS\n",cases,event_total);return 0;
+}

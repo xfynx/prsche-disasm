@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run450](iterations/v2/001-original-recovery/runs/450-startup-dependencies-integration/README.md).
-Original audio groups and resource-path Windows import cells are integrated.
+Latest recovery intake: [Run453](iterations/v2/001-original-recovery/runs/453-audio-record-integration/README.md).
+Original audio record decoding and resource removal are integrated.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next recover the lower audio decoder/resource-removal chain and its canonical state.
+Next verify the composed group/decoder/removal chain, then continue startup dependencies.
 
 ## Recovery milestones
 

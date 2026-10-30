@@ -1,0 +1,137 @@
+#include "audio_record_decoder_451.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+template<class T> static T get(const void* p){T x;memcpy(&x,p,sizeof x);return x;}
+template<class T> static void put(void* p,T x){memcpy(p,&x,sizeof x);}
+static B *slab;static U seed=0xa5a5a5a5,abi=0,cases=0,steps=0;
+static bool patches=true;
+static B work[8192],initial[8192],expected[8192];
+static void relative(U offset,U original,U expectedva,const void* to){
+ B* p=slab+offset;if(p[0]!=0xe8 || original+5+get<U>(p+1)!=expectedva)patches=false;put<U>(p+1,ptr(to)-ptr(p+5));
+}
+static bool init(){
+ slab=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));if(!slab)return false;
+ static const B decoder[]={ @BODY_00599100@ };memcpy(slab,decoder,sizeof decoder);
+ static const B token[]={ @BODY_00599760@ };memcpy(slab+0x600,token,sizeof token);
+ static const B integer[]={ @BODY_0059bd90@ };memcpy(slab+0x700,integer,sizeof integer);
+ if(get<U>(slab+0xe7)!=0x5e3498)return false;
+ put<U>(slab+0xe7,ptr(audio_record_default_005e3498));
+ relative(0x1a2,0x5992a2,0x599760,slab+0x600);relative(0x295,0x599395,0x599760,slab+0x600);
+ relative(0x659,0x5997b9,0x59bd90,slab+0x700);relative(0x67d,0x5997dd,0x59bd90,slab+0x700);
+ return patches && FlushInstructionCache(GetCurrentProcess(),slab,4096);
+}
+static bool rawdata(const char* file){
+ FILE* f=nullptr;if(fopen_s(&f,file,"rb")||!f)return false;fseek(f,0,SEEK_END);long size=ftell(f);rewind(f);static B image[8*1024*1024];if(size>sizeof image){fclose(f);return false;}fread(image,1,size,f);fclose(f);
+ const U pe=get<U>(image+0x3c);const auto count=get<std::uint16_t>(image+pe+6);const U opt=get<std::uint16_t>(image+pe+20);const U base=get<U>(image+pe+52);
+ auto at=[&](U va)->B*{for(U i=0;i<count;++i){B* s=image+pe+24+opt+i*40;const U rva=get<U>(s+12),n=get<U>(s+16);if(va-base>=rva && va-base-rva<n)return image+get<U>(s+20)+va-base-rva;}return nullptr;};
+ B* bytes=at(0x5e3498);static const B raw[8]={0xff,0xff,0xff,0x7f,0x7f,0,0,0};
+ if(!bytes || memcmp(bytes,raw,8) || memcmp(bytes,audio_record_default_005e3498,8))return false;
+ // The exact immutable8B pair has no image-base relocation in its extent.
+ const U reloc=get<U>(image+pe+24+96+5*8),rsize=get<U>(image+pe+24+100+5*8);
+ B* r=at(base+reloc);for(U off=0;off<rsize;){U page=get<U>(r+off),n=get<U>(r+off+4);if(n<8 || off+n>rsize)return false;for(U k=8;k<n;k+=2){U e=get<std::uint16_t>(r+off+k);if((e>>12)==3){U va=base+page+(e&4095);if(va<0x5e34a0 && va+4>0x5e3498)return false;}}off+=n;}
+ return true;
+}
+static U invoke(void* fn,U a,U b,U c,U argc){
+    U before,frame,result,fail=0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before,esp
+        mov frame,ebp
+        lea edi,[esp-1000h]
+        mov ecx,400h
+        mov eax,seed
+        rep stosd
+        cmp argc,3
+        jne two
+        push c
+    two:
+        cmp argc,2
+        jb one
+        push b
+    one:
+        cmp argc,1
+        jb call_now
+        push a
+    call_now:
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,10203040h
+        call fn
+        mov result,eax
+        mov ecx,argc
+        shl ecx,2
+        add esp,ecx
+        cmp esp,before
+        jne bad
+        cmp ebp,frame
+        jne bad
+        cmp ebx,13579bdfh
+        jne bad
+        cmp esi,2468ace0h
+        jne bad
+        cmp edi,10203040h
+        je done
+    bad:
+        mov fail,1
+    done:
+        mov esp,before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi|=fail;return result;
+}
+
+static void reset(){for(U n=0;n<sizeof(initial);++n)initial[n]=static_cast<B>(n*37+0x5a);}
+static bool compare(const char* family,U result,U wanted){
+ if(abi || result!=wanted || memcmp(work,expected,sizeof work)){
+  printf("divergence family=%s case=%u steps=%u abi=%u result=%08x/%08x\n",family,cases,steps,abi,result,wanted);
+  for(U i=0;i<sizeof work;++i)if(work[i]!=expected[i]){printf("byte=%x got=%02x want=%02x\n",i,work[i],expected[i]);break;}return false;
+ }++cases;return true;
+}
+static bool integer_case(U n){
+ memcpy(work,initial,sizeof work);abi=0;U r=invoke(slab+0x700,ptr(work+4096),n,0,2);memcpy(expected,work,sizeof work);
+ memcpy(work,initial,sizeof work);U v=invoke(reinterpret_cast<void*>(&audio_integer_read_0059bd90),ptr(work+4096),n,0,2);return compare("integer",v,r);
+}
+static bool token_case(U state=128){
+ memcpy(work,initial,sizeof work);abi=0;U r=invoke(slab+0x600,ptr(work+state),0,0,1);memcpy(expected,work,sizeof work);
+ memcpy(work,initial,sizeof work);U v=invoke(reinterpret_cast<void*>(&audio_token_read_00599760),ptr(work+state),0,0,1);++steps;return compare("token-state",v,r);
+}
+static U streamend;
+static void stream(std::initializer_list<B> bytes){streamend=4096;for(B b:bytes)initial[streamend++]=b;}
+static void token(U id,U length,U value=0){initial[streamend++]=static_cast<B>(id);initial[streamend++]=static_cast<B>(length);for(U k=0;k<length;++k)initial[streamend++]=static_cast<B>(value>>(8*((length-1-k)&3)));}
+static bool decoder_case(U cursoroff=0xaa8,U calls=1){
+ // record at+a00 has512B valid padding on both sides for signed callback slots.
+ put<U>(initial+cursoroff,ptr(work+4096));
+ memcpy(work,initial,sizeof work);abi=0;
+ U results[4];B scenes[4][8192];
+ for(U k=0;k<calls;++k){results[k]=invoke(slab,ptr(work+cursoroff),ptr(work+0xa00),0,2);memcpy(scenes[k],work,sizeof work);}
+ memcpy(work,initial,sizeof work);
+ for(U k=0;k<calls;++k){U v=invoke(reinterpret_cast<void*>(&audio_group_decode_00599100),ptr(work+cursoroff),ptr(work+0xa00),0,2);memcpy(expected,scenes[k],sizeof work);++steps;if(!compare("decoder-continuation",v,results[k]))return false;}
+ return true;
+}
+int main(int argc,char** argv){
+ if(argc!=2 || !rawdata(argv[1]) || !init()){printf("divergence original-data-transport\n");return 1;}
+ for(U n:{0u,1u,2u,3u,4u,5u,8u,16u})for(U pattern:{0u,0x7fu,0x80u,0xffu}){reset();memset(initial+4096,static_cast<int>(pattern),32);if(!integer_case(n))return 1;}
+ for(U n:{1u,2u,3u,4u}){reset();memset(initial+4096,0,16);initial[4096]=0x80;if(!integer_case(n))return 1;}
+ for(U id:{0xfcu,0xfdu,0xfeu,0xffu}){reset();stream({static_cast<B>(id),0xff});put<U>(initial+128,ptr(work+4096));if(!token_case())return 1;}
+ for(U n=0;n<=8;++n){reset();stream({0xfc,0xfc});token(0x12,n,0x89abcdef);put<U>(initial+128,ptr(work+4096));if(!token_case())return 1;}
+ for(U n:{0u,1u,2u,3u,4u,5u,8u,0x80000000u,0xffffffffu}){reset();stream({0x12,0xff,static_cast<B>(n>>24),static_cast<B>(n>>16),static_cast<B>(n>>8),static_cast<B>(n)});for(U i=0;i<8;++i)initial[streamend++]=static_cast<B>(0x89+i);put<U>(initial+128,ptr(work+4096));if(!token_case())return 1;}
+ for(U target:{136u,140u,144u}){reset();initial[target]=0x12;initial[target+1]=1;initial[target+2]=0x80;put<U>(initial+128,ptr(work+target));if(!token_case())return 1;}
+ for(U id=0;id<0xa3;++id){if(id>=0x26 && id<0x7f)continue;reset();stream({});token(id,1,0x80+id);initial[streamend++]=0xff;if(!decoder_case())return 1;}
+ for(U s:{0u,0xa5a5a5a5u,0xdeadbeefu}){seed=s;reset();stream({0xfc,0xfc,0xfd,0xff});if(!decoder_case())return 1;}
+ for(U opaque:{0u,0xa5a5a5a5u,0xdeadbeefu})for(U n:{5u,8u}){seed=opaque;reset();stream({});token(1,n,0x11223344);initial[streamend++]=0xff;if(!decoder_case())return 1;}
+ seed=0xa5a5a5a5;
+ for(U flags:{0u,1u,2u,0x80u,0x40u,0xc3u,0x20u}){reset();stream({});token(0xa1,1,flags);initial[streamend++]=0xfe;token(0x92,1,7);token(0xa1,1,flags);initial[streamend++]=0xfe;initial[streamend++]=0xff;if(!decoder_case(0xaa8,3))return 1;}
+ for(U n:{0u,1u,4u,5u,127u,128u,129u}){reset();stream({});for(U k=0;k<n;++k)token(0x14,1,k);for(U id=0x98;id<=0x9b;++id)token(id,id-0x97,0x89abcdef);initial[streamend++]=0xfe;if(!decoder_case())return 1;}
+ for(U off:{0xa00u,0xa20u,0xaa0u,0xaa8u}){reset();stream({});token(1,2,0xabcd);token(0x19,8,0xdeadbeef);token(0x12,3,0x800001);initial[streamend++]=0xff;if(!decoder_case(off))return 1;}
+ // Decoder large-payload retention, relative field sums and direct integer0..4.
+ for(U length:{0u,1u,2u,3u,4u,5u,8u}){reset();stream({});token(1,0);token(0x19,length,0x87654321);initial[streamend++]=0xff;if(!decoder_case())return 1;}
+ printf("audio_record_decoder_original_x86_vs_cpp=PASS cases=%u intermediate_steps=%u\n",cases,steps);return 0;
+}

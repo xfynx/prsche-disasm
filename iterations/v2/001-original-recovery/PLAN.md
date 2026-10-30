@@ -1,5 +1,24 @@
 # v2 / 001 - original source recovery plan
 
+Current453,2026-10-30: frozen451/452 integrate seven originals/1743B. Shared audit
+PASS:500 native cases,22 mutations,595pins,368 canonical exports;241 C++TUs/8projects,
+175names182refs,noEXE. Both448 children close; no new names. Registry631 entries.
+Decoder's0x464 backing/164B record retain opaque cells. Exact default005e3498 is
+8B {7fffffff,127}; raw guard caught a misaligned hex reading before semantic proof.
+New mapcount/pointer and6144B slot table have rawloaderzero/ownership proof;443
+DSdevice reused. Both workers (Solhigh) finished; no active assignments.
+One111s REA session supplies7 dossiers; accepted native proof reused at integration.
+Configure001 failed while generating the deep import library;002 includes unchanged
+450 foundation here to avoid another binary-path level. Freshbuild001 and shared
+audit pass with identical source closure+2 TUs.453 README owns exact commands;
+451/452 proofs and failed-attempt inputs are frozen. No old runs changed.
+Next concrete check: real448+451+452 outer-group composition, then subscribers/436
+parent; reuse453 gamebuild when production unchanged. Existing403/411 PARTIAL,
+malformed/faulting memory/concurrency/live platform/fullstartup/display/gameplay
+remain open. Later recovery should follow actual startup dependencies, not counts.
+
+Historical450 follows.
+
 Current450,2026-10-30: frozen448 groups (five originals/519B) and449 resource
 IAT bindings (zero new original bodies/storage) integrated. Shared audit PASS:
 29,166 cases,20 mutations,590 pins,355 canonical exports;239 C++TUs/8projects,

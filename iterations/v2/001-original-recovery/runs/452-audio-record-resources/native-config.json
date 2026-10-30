@@ -1,0 +1,124 @@
+{
+  "run": 452,
+  "experiment": "local/experiments/v2-audio-record-resources-452",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/audio_capabilities_443.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_005996d0@",
+      "va": "005996d0",
+      "bytes": 55,
+      "sha256": "39927e0f1a108299f52f8cbd785ef3dc2f4168cdf1c05837fecf2a4980517a08"
+    },
+    {
+      "token": "@BODY_0058f820@",
+      "va": "0058f820",
+      "bytes": 57,
+      "sha256": "105eb247aeb002a7ddd131243ed61ac68f95f332513e445c442d0c1a530f1d21"
+    },
+    {
+      "token": "@BODY_0058f7e0@",
+      "va": "0058f7e0",
+      "bytes": 55,
+      "sha256": "a534d472b8a15901d72847cbb8088b219980e74221bd05a06ef08a267e3843bc"
+    },
+    {
+      "token": "@BODY_0058f290@",
+      "va": "0058f290",
+      "bytes": 43,
+      "sha256": "2b66ee30350a8aaaacdb3cb7b53957ba42599602b18a60dbc8a2aafca0a2917e"
+    }
+  ],
+  "pass_marker": "audio_record_resources_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "map-count-low15",
+      "source": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+      "old": "const U count=audio_resource_map_count_006b48a0&0xffffu;\n    for(U index",
+      "new": "const U count=audio_resource_map_count_006b48a0&0x7fffu;\n    for(U index",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "map-first-match",
+      "source": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+      "old": "if(read(row)==key)return row;",
+      "new": "if(read(row)==key && index!=0)return row;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "map-stride",
+      "source": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+      "old": "const U row=base+index*8u;",
+      "new": "const U row=base+index*4u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "erase-count-low15",
+      "source": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+      "old": "const U count=audio_resource_map_count_006b48a0&0xffffu;\n    const U base",
+      "new": "const U count=audio_resource_map_count_006b48a0&0x7fffu;\n    const U base",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "erase-key-only",
+      "source": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+      "old": "write(base+index*8u,0);",
+      "new": "write(base+index*8u+4u,0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "slot-invented-guard",
+      "source": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+      "old": "    const U row=reinterpret_cast<U>(audio_resource_slots_006ad7b8)+slot*24u;",
+      "new": "    if(slot==0 || slot>=256)return 0;\n    const U row=reinterpret_cast<U>(audio_resource_slots_006ad7b8)+slot*24u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "slot-clear-before-call",
+      "source": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+      "old": "    if(audio_ds_device_006ad760!=0){",
+      "new": "    write(row,0);\n    if(audio_ds_device_006ad760!=0){",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "slot-clear-object",
+      "source": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+      "old": "    write(row,0);\n    return 0;",
+      "new": "    write(row+4,0);\n    return 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "remove-zero-handle",
+      "source": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+      "old": "if(handle!=0){",
+      "new": "if(true){",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "remove-order",
+      "source": "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+      "old": "            audio_resource_erase_0058f7e0(key);\n            return audio_resource_release_slot_0058f290(handle);",
+      "new": "            const auto result=audio_resource_release_slot_0058f290(handle);\n            audio_resource_erase_0058f7e0(key);\n            return result;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ],
+  "timeout_seconds": 60
+}

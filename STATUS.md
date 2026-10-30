@@ -4,20 +4,20 @@ Updated 2026-10-30. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run450](iterations/v2/001-original-recovery/runs/450-startup-dependencies-integration/README.md)
-compiles 239 C++ translation units across 8 projects. The game link still has 177 unresolved
-names / 184 references. **There is no recovered playable C++ game executable yet.**
+[Run453](iterations/v2/001-original-recovery/runs/453-audio-record-integration/README.md)
+compiles 241 C++ translation units across 8 projects. The game link still has 175 unresolved
+names / 182 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates five original audio-group bodies and two resource-path
-IAT bindings: 29,166 native cases, 20 detected mutations and a 590-pin audit. Canonical
-device state is reused; resource bindings resolve to actual Windows import cells.
+The latest batch integrates seven original decoder/resource-removal bodies:
+500 native cases, 22 detected mutations and a 595-pin audit. Original default data
+and map/slot ownership are proved; the canonical DirectSound device is reused.
 These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through
 [Run445](iterations/v2/001-original-recovery/runs/445-audio-owner-alias-regression/README.md).
-Lower audio decoder/resource removal, real subscribers, parent composition, live APIs
-and full startup remain open.
+Combined outer-group/decoder/removal execution, real subscribers, parent composition,
+live APIs and full startup remain open.
 Detailed evidence and the next work order live in the
 [iteration PLAN](iterations/v2/001-original-recovery/PLAN.md).
 Full startup, display, menus, careers and gameplay still need integration/acceptance.
