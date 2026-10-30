@@ -1,0 +1,40 @@
+{
+  "status": "PASS",
+  "original_functions_added": 0,
+  "original_storage_added": 0,
+  "bindings": [
+    {
+      "path": "Porsche.exe",
+      "dll": "KERNEL32.dll",
+      "symbol": "GetDriveTypeA",
+      "iat_rva": "0x1b2060"
+    },
+    {
+      "path": "Porsche.exe",
+      "dll": "KERNEL32.dll",
+      "symbol": "GetModuleFileNameA",
+      "iat_rva": "0x1b2064"
+    }
+  ],
+  "native_config": "iterations/v2/001-original-recovery/runs/449-resource-path-iat/native-config.json",
+  "native_receipt": "local/experiments/v2-resource-path-iat-449/002/receipt.json",
+  "native_cases": 48,
+  "mutations": 3,
+  "original_callsite_bytes": 14,
+  "aliases": {
+    "?resource_module_filename_005b2064@porsche@@3P6GIPAXPADI@ZA": "__imp__GetModuleFileNameA@12",
+    "?resource_drive_type_005b2060@porsche@@3P6GIPBD@ZA": "__imp__GetDriveTypeA@4"
+  },
+  "guarantees": [
+    "C++ data symbols resolve to the actual loader IAT cells; address and value identity checked before API calls",
+    "Original module call and drive load/call bytes execute against real host API; synthetic PUSH/RET carriers explicitly marked",
+    "Return values,LastError,full buffers and canaries agree with typed cell and direct SDK calls",
+    "Mutants selecting W APIs or code instead of cell are rejected before mismatched calls",
+    "Directive-bearing object is retained through explicit infrastructure anchor; no dynamic C++ initializer or new game provider"
+  ],
+  "boundaries": [
+    "No new original body; resource_paths parent remains its existing bounded recovery",
+    "Host transport does not establish old-Windows filesystem behavior or complete startup",
+    "NOENTRY import DLL is linked,not executed"
+  ]
+}

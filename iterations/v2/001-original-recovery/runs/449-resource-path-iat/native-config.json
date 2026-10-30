@@ -1,0 +1,63 @@
+{
+  "run": 449,
+  "experiment": "local/experiments/v2-resource-path-iat-449",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/449-resource-path-iat/resource_iat_449.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/449-resource-path-iat/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "original_bodies": [
+    {
+      "token": "@MODULE_CALL@",
+      "va": "0059d670",
+      "bytes": 6,
+      "sha256": "42d7a680ba85978ad193d75703d26491ebe1cf4e0a3e9d25765166e43fd8416f",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@DRIVE_LOAD@",
+      "va": "0059d6c9",
+      "bytes": 6,
+      "sha256": "d7b2bd84f9981aedb4a85e0ea4eb8d0985102ccfe90327079fb429093628e71e",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@DRIVE_CALL@",
+      "va": "0059d6f3",
+      "bytes": 2,
+      "sha256": "a256936c6ba02d618ab811fde050a4b00c5e40e1e05c04a0c45e19779dd2c2b9",
+      "kind": "original-callsite-only-not-new-body"
+    }
+  ],
+  "pass_marker": "resource_iat_original_transport=PASS",
+  "mutations": [
+    {
+      "name": "module-unicode",
+      "source": "iterations/v2/001-original-recovery/runs/449-resource-path-iat/resource_iat_449.cpp",
+      "old": "ZA=__imp__GetModuleFileNameA@12",
+      "new": "ZA=__imp__GetModuleFileNameW@12",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    },
+    {
+      "name": "drive-unicode",
+      "source": "iterations/v2/001-original-recovery/runs/449-resource-path-iat/resource_iat_449.cpp",
+      "old": "ZA=__imp__GetDriveTypeA@4",
+      "new": "ZA=__imp__GetDriveTypeW@4",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    },
+    {
+      "name": "code-not-cell",
+      "source": "iterations/v2/001-original-recovery/runs/449-resource-path-iat/resource_iat_449.cpp",
+      "old": "ZA=__imp__GetModuleFileNameA@12",
+      "new": "ZA=_GetModuleFileNameA@12",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    }
+  ]
+}

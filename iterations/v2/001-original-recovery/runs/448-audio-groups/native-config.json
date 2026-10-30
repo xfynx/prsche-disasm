@@ -1,0 +1,187 @@
+{
+  "run": 448,
+  "experiment": "local/experiments/v2-audio-groups-448",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/448-audio-groups/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/448-audio-groups",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_00590070@",
+      "va": "00590070",
+      "bytes": 58,
+      "sha256": "a437fb46ea899e864cd94fd82e833b6142eb8cb9b2851dba2cf710d996c1d6dc"
+    },
+    {
+      "token": "@BODY_00565990@",
+      "va": "00565990",
+      "bytes": 93,
+      "sha256": "97aa3ead427a47fd58bf830f3c7e8e8b909d92e6827aed7711b39115ba40aca1"
+    },
+    {
+      "token": "@BODY_00590000@",
+      "va": "00590000",
+      "bytes": 110,
+      "sha256": "31ce66a9583623c1bce3ccb33466c2750be6fd154276c5c078a52cefa548f79d"
+    },
+    {
+      "token": "@BODY_00590170@",
+      "va": "00590170",
+      "bytes": 63,
+      "sha256": "5af581c769e7b9093821d2a77848fc6f17db36e360de5a1ed53bd34abde85c71"
+    },
+    {
+      "token": "@BODY_00590b50@",
+      "va": "00590b50",
+      "bytes": 195,
+      "sha256": "317cbb9c0393651cdd88eb5c56e7e1ef0136247121bad9d06fc0cb434e880591"
+    }
+  ],
+  "pass_marker": "audio_groups_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "validator-busy",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "!=0 ? -18 : 0",
+      "new": "!=0 ? -8 : 0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "validator-count-sign",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "static_cast<I>(state_word(0x18)&0xffffu)",
+      "new": "static_cast<I>(static_cast<std::int16_t>(state_word(0x18)&0xffffu))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "selector-negative-guard",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "if(item>=static_cast<I>(get<std::uint16_t>(header+6)))",
+      "new": "if(item<0 || item>=static_cast<I>(get<std::uint16_t>(header+6)))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "selector-count-sign",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "static_cast<I>(get<std::uint16_t>(header+6))",
+      "new": "static_cast<I>(get<std::int16_t>(header+6))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "selector-relative-base",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "return relative ? slot+relative : 0;",
+      "new": "return relative ? header+relative : 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "release-count-bound",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "for(I item=0;item<count;++item)",
+      "new": "for(I item=0;item<count+1;++item)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scratch-even-stride",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "        add eax,8\n        dec ecx",
+      "new": "        add eax,4\n        dec ecx",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scratch-opaque-zero",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "        mov dword ptr [eax],0ffffffffh",
+      "new": "        mov dword ptr [eax],0ffffffffh\n        mov dword ptr [eax+4],0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "header-recapture",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "const U slot=header+static_cast<U>(item)*4u+(get<std::uint8_t>(header+4)==4?0x14u:0x0cu);\n        put(slot,0);",
+      "new": "const U current=get<U>(group_at(group));\n        const U slot=current+static_cast<U>(item)*4u+(get<std::uint8_t>(current+4)==4?0x14u:0x0cu);\n        put(slot,0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "table-flag-capture",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "    audio_group_release_resources_00590b50(resource,scratch);\n    if(get<std::uint8_t>(group_at(group)+10)!=0)",
+      "new": "    const auto flag=get<std::uint8_t>(group_at(group)+10);\n    audio_group_release_resources_00590b50(resource,scratch);\n    if(flag!=0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "resource-prefix",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "get<std::uint8_t>(item+3)&2u",
+      "new": "get<std::uint8_t>(item+3)&1u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "continuation-sign",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "}while(more!=0);",
+      "new": "}while(more>0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "callback-count-sign",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "I callbacks=static_cast<std::int8_t>(application_audio_device_state_006b48c0[0xe2]);",
+      "new": "I callbacks=application_audio_device_state_006b48c0[0xe2];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "callback-no-reload",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "                    callbacks=static_cast<std::int8_t>(application_audio_device_state_006b48c0[0xe2]);",
+      "new": "                    callbacks=callbacks;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "reverse-array",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "record)+0x34u+",
+      "new": "record)+0x30u+",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "payload-kind",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "            payload[0]=2;",
+      "new": "            payload[0]=1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "decoded-backing-offset",
+      "source": "iterations/v2/001-original-recovery/runs/448-audio-groups/audio_groups_448.cpp",
+      "old": "lea eax,[esp+24h]",
+      "new": "lea eax,[esp+20h]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ],
+  "timeout_seconds": 240
+}

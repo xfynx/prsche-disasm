@@ -1,6 +1,16 @@
 # Отложенные проверки восстановления v2
 
-Run447: three original OS/CPU bodies226B integrated;28,570 cases/12mutations,
+Run450: five original audio-group bodies519B and two IAT bindings integrated;
+29,166 cases/20 mutations/590pins PASS.239TUs/177names184refs,noEXE. Actual outer
+group composition is verified;00599100/005996d0 and callback subscribers remain
+controlled. Next recover decoder/token/big-endian reader and lookup/erase/DSslot
+release with canonical ownership/default-pointer proof; then exercise real lower
+composition and the436 shutdown parent. Signed counts/mapped indices and opaque
+stack backing are preserved, not sanitized. Host IAT cell/API identity is verified;
+historical OS/resource-algorithm/fullstartup, faulting memory/concurrency remain open.
+Existing403/411 PARTIAL boundaries unchanged.450 README owns exact checks.
+
+Historical447: three original OS/CPU bodies226B integrated;28,570 cases/12mutations,
 586pins PASS.237 TUs/179names186refs,noEXE. Original stack-backed opaque OSfields
 and inherited ECX remain explicit; helperbody bytes match/Od+/O2. GetVersionExA
 import identity is SDK-linked, not liveAPI acceptance. OtherCPUhardware/preCPUID,

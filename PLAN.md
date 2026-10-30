@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run447](iterations/v2/001-original-recovery/runs/447-cpu-features-integration/README.md).
-Original OS/CPU feature detection is integrated with its opaque failure-state transport.
+Latest recovery intake: [Run450](iterations/v2/001-original-recovery/runs/450-startup-dependencies-integration/README.md).
+Original audio groups and resource-path Windows import cells are integrated.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next trace the audio-group release chain and remaining startup dependencies.
+Next recover the lower audio decoder/resource-removal chain and its canonical state.
 
 ## Recovery milestones
 

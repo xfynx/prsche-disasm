@@ -1,0 +1,79 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "porsche/resource_paths.hpp"
+#include <cstdio>
+#include <cstring>
+using U=std::uint32_t;
+using namespace porsche;
+extern "C" void __cdecl resource_path_iat_449_anchor();
+extern "C" ResourceModuleFilename expected_module_cell;
+extern "C" ResourceDriveType expected_drive_cell;
+#pragma comment(linker, "/alternatename:_expected_module_cell=__imp__GetModuleFileNameA@12")
+#pragma comment(linker, "/alternatename:_expected_drive_cell=__imp__GetDriveTypeA@4")
+#pragma comment(linker, "/include:__imp__GetModuleFileNameW@12")
+#pragma comment(linker, "/include:__imp__GetDriveTypeW@4")
+#pragma comment(linker, "/include:_GetModuleFileNameA@12")
+static U cases;
+static void require(bool condition,const char* what) {
+    if(!condition){std::printf("binding divergence %s cases=%u\n",what,cases);std::fflush(stdout);ExitProcess(1);}
+}
+static U address(const void* p){return reinterpret_cast<U>(p);}
+static void put(void* p,U value){std::memcpy(p,&value,4);}
+static U word(const void* p){U value;std::memcpy(&value,p,4);return value;}
+static unsigned char* executable;
+// All PUSH and RET instructions below are synthetic harness setup. The CALL
+// instruction itself comes from the original resource-path consumer.
+static U raw_call(const unsigned char* call,U iat, U a,U b,U c,unsigned argc){
+    unsigned char* p=executable;
+    const U args[]={a,b,c};
+    for(unsigned n=argc;n;--n){*p++=0x68;put(p,args[n-1]);p+=4;}
+    std::memcpy(p,call,6);require(p[0]==0xff&&p[1]==0x15,"original IAT call opcode");
+    put(p+2,iat);p+=6;*p++=0xc3;
+    require(FlushInstructionCache(GetCurrentProcess(),executable,64)!=0,"instruction cache");
+    SetLastError(0x449);
+    return reinterpret_cast<U(__cdecl*)()>(executable)();
+}
+static U raw_drive(const unsigned char* load,const unsigned char* call,U root){
+    unsigned char* p=executable;*p++=0x55; // synthetic EBP preservation
+    std::memcpy(p,load,6);require(p[0]==0x8b&&p[1]==0x2d,"original cached IAT load");
+    put(p+2,address(&expected_drive_cell));p+=6;
+    *p++=0x68;put(p,root);p+=4; // synthetic argument setup
+    std::memcpy(p,call,2);require(p[0]==0xff&&p[1]==0xd5,"original call EBP");p+=2;
+    *p++=0x5d;*p++=0xc3;
+    require(FlushInstructionCache(GetCurrentProcess(),executable,64)!=0,"drive instruction cache");
+    SetLastError(0x449);return reinterpret_cast<U(__cdecl*)()>(executable)();
+}
+int main(){
+    resource_path_iat_449_anchor();
+    static_assert(sizeof(void*)==4,"x86 transport");
+    static const unsigned char module_call[]={ @MODULE_CALL@ };
+    static const unsigned char drive_load[]={ @DRIVE_LOAD@ };
+    static const unsigned char drive_call[]={ @DRIVE_CALL@ };
+    require(word(module_call+2)==0x5b2064&&word(drive_load+2)==0x5b2060,"indexed import operands");
+    require(address(&resource_module_filename_005b2064)==address(&expected_module_cell),"module cell identity");
+    require(address(&resource_drive_type_005b2060)==address(&expected_drive_cell),"drive cell identity");
+    require(reinterpret_cast<U>(resource_module_filename_005b2064)==reinterpret_cast<U>(GetProcAddress(GetModuleHandleA("kernel32.dll"),"GetModuleFileNameA")),"module API address");
+    require(reinterpret_cast<U>(resource_drive_type_005b2060)==reinterpret_cast<U>(GetProcAddress(GetModuleHandleA("kernel32.dll"),"GetDriveTypeA")),"drive API address");
+    executable=static_cast<unsigned char*>(VirtualAlloc(nullptr,64,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+    require(executable!=nullptr,"carrier allocation");
+    void* modules[]={nullptr,GetModuleHandleA(nullptr),GetModuleHandleA("kernel32.dll")};
+    U capacities[]={0,1,2,16,260,520};
+    for(void* module:modules)for(U capacity:capacities){
+        unsigned char original[1040],candidate[1040],direct[1040];
+        std::memset(original,0xa5,sizeof(original));std::memset(candidate,0xa5,sizeof(candidate));std::memset(direct,0xa5,sizeof(direct));
+        SetLastError(0x449);U ro=raw_call(module_call,address(&expected_module_cell),address(module),address(original+8),capacity,3);U eo=GetLastError();
+        SetLastError(0x449);U rc=resource_module_filename_005b2064(module,reinterpret_cast<char*>(candidate+8),capacity);U ec=GetLastError();
+        SetLastError(0x449);U rd=GetModuleFileNameA(static_cast<HMODULE>(module),reinterpret_cast<char*>(direct+8),capacity);U ed=GetLastError();
+        require(ro==rc&&rc==rd&&eo==ec&&ec==ed,"module result/error");
+        require(std::memcmp(original,candidate,sizeof(original))==0&&std::memcmp(candidate,direct,sizeof(candidate))==0,"module buffer/canaries");++cases;
+    }
+    const char* roots[]={nullptr,"","C:\\","D:\\","Z:\\","?not-a-drive"};
+    for(const char* root:roots){
+        SetLastError(0x449);U ro=raw_drive(drive_load,drive_call,address(root));U eo=GetLastError();
+        SetLastError(0x449);U rc=resource_drive_type_005b2060(root);U ec=GetLastError();
+        SetLastError(0x449);U rd=GetDriveTypeA(root);U ed=GetLastError();
+        require(ro==rc&&rc==rd&&eo==ec&&ec==ed,"drive result/error");++cases;
+    }
+    require(VirtualFree(executable,0,MEM_RELEASE)!=0,"carrier release");
+    std::printf("resource_iat_original_transport=PASS cases=%u\n",cases);return 0;
+}

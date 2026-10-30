@@ -1,5 +1,25 @@
 # v2 / 001 - original source recovery plan
 
+Current450,2026-10-30: frozen448 groups (five originals/519B) and449 resource
+IAT bindings (zero new original bodies/storage) integrated. Shared audit PASS:
+29,166 cases,20 mutations,590 pins,355 canonical exports;239 C++TUs/8projects,
+177names184refs,noEXE. Registry624 entries. Four old names close; two real lower
+children appear. Unchanged447 REA003 and accepted native proof reused; one shared
+audit. Build001 compiled all sources but hit a long DirectInput library path;
+450 short-path copy keeps identical bytes/old370 unchanged. Configure/build002
+pass with finalLF inputs and process-local MSBuild node reuse disabled.450 README
+owns commands/artifacts. Workers finished; no active implementation assignment.
+Next bounded batch:00599100/00599760/0059bd90 decoder and005996d0 plus
+0058f820/0058f7e0/0058f290 removal (7 bodies/1743B navigation). Prove ownership of
+006b48a0/48a4,256x24B table006ad7b8 and default pointer005e3498; reuse443 device.
+Navigation: local/reports/audio-next-batch-450.json and frontier-speed-audit-
+20261030.json. Group scratch is0x800=2048B; odd words remain opaque. Native groups
+retain controlled lower bodies/subscribers. Real436 parent composition, live
+platform/full startup/display/gameplay, invalid memory/concurrency and403/411
+PARTIAL domains remain open. Freeze passed packets; later work is a new batch.
+
+Historical447 follows.
+
 Current447,2026-10-30: frozen446 integrates3 originals/226B, zero new storage.
 Shared audit PASS:28,570 cases,90,720events,12mutations,586pins,347 canonical
 exports.237 C++TUs/8projects compile;179names186refs,noEXE. One old name closes;
