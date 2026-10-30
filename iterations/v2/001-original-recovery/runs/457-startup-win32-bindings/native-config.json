@@ -1,0 +1,175 @@
+{
+  "run": 457,
+  "experiment": "local/experiments/v2-startup-win32-bindings-457",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+    "iterations/v2/001-original-recovery/source/platform/win32_window.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/platform_audio_443.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities"
+  ],
+  "extra_libraries": [
+    "user32.lib",
+    "gdi32.lib",
+    "dsound.lib"
+  ],
+  "original_bodies": [
+    {
+      "token": "@FIND_CALL@",
+      "va": "00565637",
+      "bytes": 6,
+      "sha256": "ea65e8a76758eb64cac775a9f3e580ac214563297de841a33a807b7c3f1cf206",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@SHOW_CALL@",
+      "va": "00565646",
+      "bytes": 6,
+      "sha256": "385e0d87b5e3af7fffd1e1e2793909c658f85806cad7801f78151a9d6f519163",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@FOREGROUND_CALL@",
+      "va": "0056564d",
+      "bytes": 6,
+      "sha256": "a67eb1a4b96b4f4f0b1f4a80eeb15596c7b82f7dde754fc6936d85884b33db8e",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@DESKTOP_CALL@",
+      "va": "0046784f",
+      "bytes": 6,
+      "sha256": "2116cbea362d5048d74a1c59f0d8550a6a809f7649f636c211910630b9fb4e22",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@DC_CALL@",
+      "va": "00467858",
+      "bytes": 6,
+      "sha256": "ccc59fa53ce0bd10f4c11d9622433fe5fb5eb8883227ce7a83adc409b2475161",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@CAPS_CALL@",
+      "va": "00467863",
+      "bytes": 6,
+      "sha256": "6b1976e673fab12cdfd057fcf464c261b84375cd767451a8113d7c5b640eebcb",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@RELEASE_CALL@",
+      "va": "0046786d",
+      "bytes": 6,
+      "sha256": "24adac6188f810742df97b29356ef14ed698377b45b658b8f3791e52ce73d4af",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@MESSAGE_LOAD@",
+      "va": "00467873",
+      "bytes": 6,
+      "sha256": "7d9c0bda1daadf5df2ae0861fc52f7055eca2c876fd9b4e83b7e2f1dc3a0ce63",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@MESSAGE_CALL@",
+      "va": "004678a3",
+      "bytes": 2,
+      "sha256": "7592d0fabc9e647414da30e303ba239e1b6047b0a3d102ac1f3a7223f131eac1",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@CURSOR_LOAD@",
+      "va": "004680a5",
+      "bytes": 6,
+      "sha256": "319a4f90b51b774143f006a2bac04033586a650fd837ec84608040bdc44b315b",
+      "kind": "original-callsite-only-not-new-body"
+    },
+    {
+      "token": "@CURSOR_CALL@",
+      "va": "004680b0",
+      "bytes": 2,
+      "sha256": "dbbb9d94ac78020db261961edf777d7c842eb70ae1a35a6301b9bf261c1d6e76",
+      "kind": "original-callsite-only-not-new-body"
+    }
+  ],
+  "pass_marker": "startup_win32_bindings_original_transport=PASS",
+  "mutations": [
+    {
+      "name": "find-argument-order",
+      "source": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+      "old": "::FindWindowA(cls,title)",
+      "new": "::FindWindowA(title,cls)",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    },
+    {
+      "name": "show-command",
+      "source": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+      "old": "::ShowWindow(static_cast<HWND>(window),command)",
+      "new": "::ShowWindow(static_cast<HWND>(window),command ^ 1)",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    },
+    {
+      "name": "foreground-handle",
+      "source": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+      "old": "::SetForegroundWindow(static_cast<HWND>(window))",
+      "new": "::SetForegroundWindow(reinterpret_cast<HWND>(reinterpret_cast<std::uint32_t>(window) ^ 1))",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    },
+    {
+      "name": "desktop-return",
+      "source": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+      "old": "reinterpret_cast<std::uint32_t>(audio_platform_desktop_window())",
+      "new": "(reinterpret_cast<std::uint32_t>(audio_platform_desktop_window()) ^ 1)",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    },
+    {
+      "name": "dc-handle",
+      "source": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+      "old": "::GetWindowDC(reinterpret_cast<HWND>(window))",
+      "new": "::GetWindowDC(reinterpret_cast<HWND>(window ^ 1))",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    },
+    {
+      "name": "caps-index",
+      "source": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+      "old": "::GetDeviceCaps(reinterpret_cast<HDC>(dc),index)",
+      "new": "::GetDeviceCaps(reinterpret_cast<HDC>(dc),index ^ 1)",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    },
+    {
+      "name": "release-arguments",
+      "source": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+      "old": "::ReleaseDC(reinterpret_cast<HWND>(window),reinterpret_cast<HDC>(dc))",
+      "new": "::ReleaseDC(reinterpret_cast<HWND>(dc),reinterpret_cast<HDC>(window))",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    },
+    {
+      "name": "message-flags",
+      "source": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+      "old": "::MessageBoxA(reinterpret_cast<HWND>(window),text,title,flags)",
+      "new": "::MessageBoxA(reinterpret_cast<HWND>(window),text,title,flags ^ 1)",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    },
+    {
+      "name": "cursor-argument",
+      "source": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+      "old": "window_show_cursor(show)",
+      "new": "window_show_cursor(show ^ 1)",
+      "expected_exit": 1,
+      "failure_marker": "binding divergence"
+    }
+  ]
+}

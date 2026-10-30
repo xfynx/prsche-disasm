@@ -1,0 +1,125 @@
+{
+  "status": "PASS",
+  "original_functions_added": 0,
+  "original_storage_added": 0,
+  "adapter_count": 9,
+  "source": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/startup_win32_bindings_457.cpp",
+  "bindings": [
+    {
+      "name": "application_instance_find_window",
+      "sdk": "FindWindowA",
+      "original_iat_va": "005b22a0",
+      "original_callsite": "00565637",
+      "abi_and_used_return": "cdecl2 -> SDK stdcall2; HWND bits retained and used by original zero test",
+      "canonical_reuse": "none"
+    },
+    {
+      "name": "application_instance_show_window",
+      "sdk": "ShowWindow",
+      "original_iat_va": "005b22a8",
+      "original_callsite": "00565646",
+      "abi_and_used_return": "cdecl2 -> SDK stdcall2; original passes SW_RESTORE=9; BOOL return ignored by parent",
+      "canonical_reuse": "none"
+    },
+    {
+      "name": "application_instance_set_foreground_window",
+      "sdk": "SetForegroundWindow",
+      "original_iat_va": "005b2300",
+      "original_callsite": "0056564d",
+      "abi_and_used_return": "cdecl1 -> SDK stdcall1; BOOL return ignored by parent",
+      "canonical_reuse": "none"
+    },
+    {
+      "name": "render_get_desktop_005b2274",
+      "sdk": "GetDesktopWindow",
+      "original_iat_va": "005b2274",
+      "original_callsite": "0046784f",
+      "abi_and_used_return": "cdecl0 -> accepted stdcall0; HWND bits retained for DC/release",
+      "canonical_reuse": "audio_platform_desktop_window"
+    },
+    {
+      "name": "render_get_window_dc_005b226c",
+      "sdk": "GetWindowDC",
+      "original_iat_va": "005b226c",
+      "original_callsite": "00467858",
+      "abi_and_used_return": "cdecl1 -> SDK stdcall1; HWND/HDC raw32 pointer transport",
+      "canonical_reuse": "none"
+    },
+    {
+      "name": "render_get_device_caps_005b2044",
+      "sdk": "GetDeviceCaps",
+      "original_iat_va": "005b2044",
+      "original_callsite": "00467863",
+      "abi_and_used_return": "cdecl2 -> SDK stdcall2; original index12 BITSPIXEL; signed int result saved in EBX and compared with8",
+      "canonical_reuse": "none"
+    },
+    {
+      "name": "render_release_dc_005b2268",
+      "sdk": "ReleaseDC",
+      "original_iat_va": "005b2268",
+      "original_callsite": "0046786d",
+      "abi_and_used_return": "cdecl2 -> SDK stdcall2; original ignores int return; C++ boundary remains void",
+      "canonical_reuse": "none"
+    },
+    {
+      "name": "render_message_box_005b2270",
+      "sdk": "MessageBoxA",
+      "original_iat_va": "005b2270",
+      "original_callsite": "004678a3/0046794f",
+      "abi_and_used_return": "cdecl4 -> SDK stdcall4 through cached EDI; both original callsites ignore int return; boundary remains void",
+      "canonical_reuse": "none"
+    },
+    {
+      "name": "render_window_show_cursor",
+      "sdk": "ShowCursor",
+      "original_iat_va": "005b2278",
+      "original_callsite": "004680b0/004680ba",
+      "abi_and_used_return": "stdcall1 -> accepted stdcall1; signed int return drives original repeat while >=0",
+      "canonical_reuse": "window_show_cursor"
+    }
+  ],
+  "native_config": "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings/native-config.json",
+  "native_receipt": "local/experiments/v2-startup-win32-bindings-457/001/receipt.json",
+  "native_receipt_sha256": "f224afd1ad347a6f93f66435372cb842c06a3b72a5dfe4123086baadabb1c67d",
+  "native_cases": 432,
+  "cases_per_variant": 216,
+  "variants": [
+    "/Od",
+    "/O2"
+  ],
+  "mutations": 9,
+  "original_callsite_bytes": 58,
+  "original_callsite_bytes_are_new_original_bodies": false,
+  "live_side_effect_api_calls": 0,
+  "coff_defined_names": [
+    "?application_instance_find_window@porsche@@YAPAXPBD0@Z",
+    "?application_instance_set_foreground_window@porsche@@YAHPAX@Z",
+    "?application_instance_show_window@porsche@@YAHPAXH@Z",
+    "?render_get_desktop_005b2274@porsche@@YAIXZ",
+    "?render_get_device_caps_005b2044@porsche@@YAHIH@Z",
+    "?render_get_window_dc_005b226c@porsche@@YAII@Z",
+    "?render_message_box_005b2270@porsche@@YAXIPBD0I@Z",
+    "?render_release_dc_005b2268@porsche@@YAXII@Z",
+    "?render_window_show_cursor@porsche@@YGHH@Z"
+  ],
+  "canonical_dependencies": {
+    "?audio_platform_desktop_window@porsche@@YGPAXXZ": "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/platform_audio_443.cpp",
+    "?window_show_cursor@porsche@@YGHH@Z": "iterations/v2/001-original-recovery/source/platform/win32_window.cpp"
+  },
+  "guarantees": [
+    "Nine raw original PE imports match indexed names, DLLs and IAT RVAs; parent context bytes checked against raw PE",
+    "Complete Run453 source manifest plus source_delta searched; no duplicate production definitions or original storage",
+    "Own test EXE import-directory cell identity and GetProcAddress target checked before any hook; all SDK cells restored and checked on successful exit",
+    "Original indexed direct CALL and cached MOV/CALL execute in explicitly synthetic carrier against controlled stdcall endpoints",
+    "Argument words, endpoint identity/count, incoming/outgoing LastError, stack balance and all used return bits agree across original instruction and adapters",
+    "Ignored ReleaseDC/MessageBoxA returns remain ignored; all other adapters preserve full32 return bits including negative signed values",
+    "One mutation per adapter detects wrong arguments or return transport without invoking live dialogs/window activation/cursor APIs",
+    "Separate unexecuted NOENTRY DLL links same production/canonical objects and has exactly nine SDK imports"
+  ],
+  "boundaries": [
+    "No original function recovery count or state added; adapters are modern Win32 ABI infrastructure",
+    "No full original parent is executed by this packet; accepted parent algorithms and proof remain unchanged",
+    "Controlled IAT endpoints establish bounded transport only; live desktop caps/dialog/focus/cursor semantics, display/startup and historical Windows fidelity are unverified",
+    "No game build or game acceptance is owned by this run; Run456 owns shared integration"
+  ]
+}

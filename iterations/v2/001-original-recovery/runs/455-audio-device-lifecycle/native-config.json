@@ -1,0 +1,223 @@
+{
+  "run": 455,
+  "experiment": "local/experiments/v2-audio-device-lifecycle-455",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/audio_capabilities_443.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/exit_registry.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_0058fdb0_MAIN@",
+      "va": "0058fdb0",
+      "bytes": 193,
+      "sha256": "41f9b30b911aab9fff1dac93927eae045728794930da5d7410b0f3467aac0c4f"
+    },
+    {
+      "token": "@BODY_0058f560_TAIL@",
+      "va": "0058f560",
+      "bytes": 50,
+      "sha256": "d97af7b6d8ed9feb7d6c238cde774f2da9044dc104b7cf15bcde24a73c2bf1ef"
+    },
+    {
+      "token": "@BODY_0058fe80@",
+      "va": "0058fe80",
+      "bytes": 106,
+      "sha256": "1fef451d7b37e7465c2bf21b896bb0dba0b361faf6c9efd382c9d7ed96d4ac1a"
+    },
+    {
+      "token": "@BODY_0058e4a0@",
+      "va": "0058e4a0",
+      "bytes": 48,
+      "sha256": "10a491308374d649fe837fbb38546c1ee05dce342992088afba704b5e1e67cb8"
+    },
+    {
+      "token": "@BODY_0058e4d0@",
+      "va": "0058e4d0",
+      "bytes": 38,
+      "sha256": "ece01aaae02b34ecfec82367d0306b627fe57d35c7c64f61f4bc99423b9e3f85"
+    },
+    {
+      "token": "@BODY_0058f5a0@",
+      "va": "0058f5a0",
+      "bytes": 13,
+      "sha256": "d9508e8f4f459a3ff6132421ba2404e7c00439280c4f1e18008fb9c6c3bf8e2e"
+    }
+  ],
+  "pass_marker": "audio_device_lifecycle_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "count-high-word",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "std::memcpy(&audio_resource_map_count_006b48a0,&count,2);",
+      "new": "audio_resource_map_count_006b48a0=count;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "descriptor-bit",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "[0x28+index]&1u",
+      "new": "[0x28+index]&2u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "map-zero-count",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "    const auto descriptors=",
+      "new": "    audio_resource_map_006b48a4=0;\n    const auto descriptors=",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "align-base",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "auto aligned=address+8u;",
+      "new": "auto aligned=address;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "align-step",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "[index]+4u;",
+      "new": "[index]+12u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "register-once",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "if(audio_device_exit_registered_006b4882==0)",
+      "new": "if(true)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "registered-on-failure",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "audio_device_exit_registered_006b4882=1;",
+      "new": "audio_device_exit_registered_006b4882=0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "negative-ds-result",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "if(result>=0)",
+      "new": "if(result>0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "thread-priority",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "platform_thread_priority(handle,15)",
+      "new": "platform_thread_priority(handle,0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "thread-running-before-create",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "audio_thread_running_006b4880=1;",
+      "new": "audio_thread_running_006b4880=0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wait-no-loop",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "} while(audio_thread_running_006b4880!=0);",
+      "new": "} while(false);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stop-skip-lower",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "(void)audio_device_stop_lower_0058f5a0();",
+      "new": "",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stop-buffer-guard",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "if(address!=0) (void)audio_backend_pool_release_0058ac30(address);",
+      "new": "if(address==0) (void)audio_backend_pool_release_0058ac30(address);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stop-clear-map",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "    const auto map=audio_resource_map_006b48a4;",
+      "new": "    audio_resource_map_006b48a4=0;\n    const auto map=audio_resource_map_006b48a4;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "voice-stride",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "    const auto bytes=static_cast<std::uint32_t>(static_cast<std::int32_t>(audio_backend_channel_count_006b49a4))*248u;",
+      "new": "    const auto bytes=static_cast<std::uint32_t>(static_cast<std::int32_t>(audio_backend_channel_count_006b49a4))*244u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "signed-channel-count",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "    const auto bytes=static_cast<std::uint32_t>(static_cast<std::int32_t>(audio_backend_channel_count_006b49a4))*248u;",
+      "new": "    const auto bytes=static_cast<std::uint32_t>(static_cast<std::uint16_t>(audio_backend_channel_count_006b49a4))*248u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wait-request-clear",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "    audio_thread_requested_006b4881=0;",
+      "new": "    audio_thread_requested_006b4881=1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stop-callback-tag",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "(callback)(0xa0,0)",
+      "new": "(callback)(0,0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "lower-result",
+      "source": "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+      "old": "    return 0;",
+      "new": "    return 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

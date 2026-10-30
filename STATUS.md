@@ -1,23 +1,23 @@
 # Current project status
 
-Updated 2026-10-30. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-10-31. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run453](iterations/v2/001-original-recovery/runs/453-audio-record-integration/README.md)
-compiles 241 C++ translation units across 8 projects. The game link still has 175 unresolved
-names / 182 references. **There is no recovered playable C++ game executable yet.**
+[Run456](iterations/v2/001-original-recovery/runs/456-audio-lifecycle-integration/README.md)
+compiles 244 C++ translation units across 8 projects. The game link still has 167 unresolved
+names / 173 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates seven original decoder/resource-removal bodies:
-500 native cases, 22 detected mutations and a 595-pin audit. Original default data
-and map/slot ownership are proved; the canonical DirectSound device is reused.
+The latest batch integrates five original lifecycle bodies, nine Windows bindings
+and bounded group/decoder/removal composition: 1,158 native cases, 39 detected
+mutations and a 600-pin audit. Callback address identity and SDK imports are proved.
 These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through
 [Run445](iterations/v2/001-original-recovery/runs/445-audio-owner-alias-regression/README.md).
-Combined outer-group/decoder/removal execution, real subscribers, parent composition,
-live APIs and full startup remain open.
+Outer-group/decoder/removal execution passes bounded seeded and direct scenarios.
+Real subscribers, broader parent composition, live APIs and full startup remain open.
 Detailed evidence and the next work order live in the
 [iteration PLAN](iterations/v2/001-original-recovery/PLAN.md).
 Full startup, display, menus, careers and gameplay still need integration/acceptance.

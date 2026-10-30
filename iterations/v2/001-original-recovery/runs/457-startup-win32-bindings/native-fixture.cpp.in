@@ -1,0 +1,146 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "porsche/application_instance.hpp"
+#include "porsche/render_display.hpp"
+#include "porsche/render_window.hpp"
+#include <cstdio>
+#include <cstring>
+using U=std::uint32_t;
+using namespace porsche;
+extern "C" void* find_cell;
+extern "C" void* show_cell;
+extern "C" void* foreground_cell;
+extern "C" void* desktop_cell;
+extern "C" void* dc_cell;
+extern "C" void* caps_cell;
+extern "C" void* release_cell;
+extern "C" void* message_cell;
+extern "C" void* cursor_cell;
+#pragma comment(linker,"/alternatename:_find_cell=__imp__FindWindowA@8")
+#pragma comment(linker,"/alternatename:_show_cell=__imp__ShowWindow@8")
+#pragma comment(linker,"/alternatename:_foreground_cell=__imp__SetForegroundWindow@4")
+#pragma comment(linker,"/alternatename:_desktop_cell=__imp__GetDesktopWindow@0")
+#pragma comment(linker,"/alternatename:_dc_cell=__imp__GetWindowDC@4")
+#pragma comment(linker,"/alternatename:_caps_cell=__imp__GetDeviceCaps@8")
+#pragma comment(linker,"/alternatename:_release_cell=__imp__ReleaseDC@8")
+#pragma comment(linker,"/alternatename:_message_cell=__imp__MessageBoxA@16")
+#pragma comment(linker,"/alternatename:_cursor_cell=__imp__ShowCursor@4")
+static U cases,chosen_return;
+static unsigned char* executable;
+struct Trace {U id,count,args[4],last_error;};
+static Trace trace;
+static void require(bool ok,const char* why) {
+    if(!ok){std::printf("binding divergence %s cases=%u\n",why,cases);std::fflush(stdout);ExitProcess(1);}
+}
+static U address(const void* p){return reinterpret_cast<U>(p);}
+static void put(void* p,U v){std::memcpy(p,&v,4);}
+static U word(const void* p){U v;std::memcpy(&v,p,4);return v;}
+static U endpoint(U id,U a=0,U b=0,U c=0,U d=0) {
+    ++trace.count;trace.id=id;trace.args[0]=a;trace.args[1]=b;trace.args[2]=c;trace.args[3]=d;
+    trace.last_error=GetLastError();SetLastError(0x45700000+id);return chosen_return;
+}
+static HWND WINAPI fake_find(LPCSTR a,LPCSTR b){return reinterpret_cast<HWND>(endpoint(0,address(a),address(b)));}
+static BOOL WINAPI fake_show(HWND a,int b){return endpoint(1,address(a),static_cast<U>(b));}
+static BOOL WINAPI fake_foreground(HWND a){return endpoint(2,address(a));}
+static HWND WINAPI fake_desktop(){return reinterpret_cast<HWND>(endpoint(3));}
+static HDC WINAPI fake_dc(HWND a){return reinterpret_cast<HDC>(endpoint(4,address(a)));}
+static int WINAPI fake_caps(HDC a,int b){return endpoint(5,address(a),static_cast<U>(b));}
+static int WINAPI fake_release(HWND a,HDC b){return endpoint(6,address(a),address(b));}
+static int WINAPI fake_message(HWND a,LPCSTR b,LPCSTR c,UINT d){return endpoint(7,address(a),address(b),address(c),d);}
+static int WINAPI fake_cursor(BOOL a){return endpoint(8,static_cast<U>(a));}
+struct Binding {const char* dll;const char* name;void** cell;void* fake;U iat,argc;const unsigned char* call;const unsigned char* load;};
+// Read this test EXE's loader directory, rather than trusting symbol spelling.
+static void** imported_cell(const char* dll,const char* name) {
+    auto* base=reinterpret_cast<unsigned char*>(GetModuleHandleA(nullptr));
+    auto* dos=reinterpret_cast<IMAGE_DOS_HEADER*>(base);
+    auto* nt=reinterpret_cast<IMAGE_NT_HEADERS32*>(base+dos->e_lfanew);
+    auto* entry=reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(base+nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+    for(;entry->Name;++entry)if(_stricmp(reinterpret_cast<char*>(base+entry->Name),dll)==0){
+        auto* names=reinterpret_cast<IMAGE_THUNK_DATA32*>(base+entry->OriginalFirstThunk);
+        auto* cells=reinterpret_cast<void**>(base+entry->FirstThunk);
+        for(U n=0;names[n].u1.AddressOfData;++n)if(!IMAGE_SNAP_BY_ORDINAL32(names[n].u1.Ordinal)){
+            auto* imported=reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(base+names[n].u1.AddressOfData);
+            if(std::strcmp(reinterpret_cast<const char*>(imported->Name),name)==0)return cells+n;
+        }
+    }
+    return nullptr;
+}
+static void write_cell(void** cell,void* value){DWORD old,restored;require(VirtualProtect(cell,4,PAGE_READWRITE,&old)!=0,"IAT writable");*cell=value;require(VirtualProtect(cell,4,old,&restored)!=0,"IAT protection restored");}
+// All register saves, PUSH arguments, operand relocation, POP and RET here are
+// synthetic carriers. Only indexed CALL and cached IAT MOV bytes are original.
+static U original(const Binding& b,const U* args) {
+    unsigned char* p=executable;
+    if(b.load){*p++=(b.call[1]==0xd7)?0x57:0x56;std::memcpy(p,b.load,6);put(p+2,address(b.cell));p+=6;}
+    for(U n=b.argc;n;--n){*p++=0x68;put(p,args[n-1]);p+=4;}
+    if(b.load){std::memcpy(p,b.call,2);p+=2;*p++=(b.call[1]==0xd7)?0x5f:0x5e;}
+    else {std::memcpy(p,b.call,6);put(p+2,address(b.cell));p+=6;}
+    *p++=0xc3;require(FlushInstructionCache(GetCurrentProcess(),executable,128)!=0,"carrier instruction cache");
+    return reinterpret_cast<U(__cdecl*)()>(executable)();
+}
+static U candidate(U id,const U* a) {
+    switch(id){
+    case 0:return address(application_instance_find_window(reinterpret_cast<const char*>(a[0]),reinterpret_cast<const char*>(a[1])));
+    case 1:return application_instance_show_window(reinterpret_cast<void*>(a[0]),static_cast<int>(a[1]));
+    case 2:return application_instance_set_foreground_window(reinterpret_cast<void*>(a[0]));
+    case 3:return render_get_desktop_005b2274();
+    case 4:return render_get_window_dc_005b226c(a[0]);
+    case 5:return render_get_device_caps_005b2044(a[0],static_cast<int>(a[1]));
+    case 6:render_release_dc_005b2268(a[0],a[1]);return 0;
+    case 7:render_message_box_005b2270(a[0],reinterpret_cast<const char*>(a[1]),reinterpret_cast<const char*>(a[2]),a[3]);return 0;
+    case 8:return render_window_show_cursor(static_cast<int>(a[0]));
+    default:require(false,"unknown binding");return 0;
+    }
+}
+int main(){
+    static_assert(sizeof(void*)==4,"original x86 ABI");
+    static const unsigned char find_call[]={ @FIND_CALL@ };
+    static const unsigned char show_call[]={ @SHOW_CALL@ };
+    static const unsigned char foreground_call[]={ @FOREGROUND_CALL@ };
+    static const unsigned char desktop_call[]={ @DESKTOP_CALL@ };
+    static const unsigned char dc_call[]={ @DC_CALL@ };
+    static const unsigned char caps_call[]={ @CAPS_CALL@ };
+    static const unsigned char release_call[]={ @RELEASE_CALL@ };
+    static const unsigned char message_load[]={ @MESSAGE_LOAD@ };
+    static const unsigned char message_call[]={ @MESSAGE_CALL@ };
+    static const unsigned char cursor_load[]={ @CURSOR_LOAD@ };
+    static const unsigned char cursor_call[]={ @CURSOR_CALL@ };
+    Binding bindings[]={
+        {"user32.dll","FindWindowA",&find_cell,reinterpret_cast<void*>(fake_find),0x5b22a0,2,find_call,nullptr},
+        {"user32.dll","ShowWindow",&show_cell,reinterpret_cast<void*>(fake_show),0x5b22a8,2,show_call,nullptr},
+        {"user32.dll","SetForegroundWindow",&foreground_cell,reinterpret_cast<void*>(fake_foreground),0x5b2300,1,foreground_call,nullptr},
+        {"user32.dll","GetDesktopWindow",&desktop_cell,reinterpret_cast<void*>(fake_desktop),0x5b2274,0,desktop_call,nullptr},
+        {"user32.dll","GetWindowDC",&dc_cell,reinterpret_cast<void*>(fake_dc),0x5b226c,1,dc_call,nullptr},
+        {"gdi32.dll","GetDeviceCaps",&caps_cell,reinterpret_cast<void*>(fake_caps),0x5b2044,2,caps_call,nullptr},
+        {"user32.dll","ReleaseDC",&release_cell,reinterpret_cast<void*>(fake_release),0x5b2268,2,release_call,nullptr},
+        {"user32.dll","MessageBoxA",&message_cell,reinterpret_cast<void*>(fake_message),0x5b2270,4,message_call,message_load},
+        {"user32.dll","ShowCursor",&cursor_cell,reinterpret_cast<void*>(fake_cursor),0x5b2278,1,cursor_call,cursor_load}};
+    void* saved[9];
+    for(U id=0;id<9;++id){auto& b=bindings[id];
+        require(imported_cell(b.dll,b.name)==b.cell,"actual import cell identity");
+        require(*b.cell==reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA(b.dll),b.name)),"actual loaded SDK target");
+        require(word((b.load?b.load:b.call)+2)==b.iat,"original IAT operand");
+        require(b.load?(b.load[0]==0x8b&&b.call[0]==0xff):(b.call[0]==0xff&&b.call[1]==0x15),"original instruction opcode");
+        saved[id]=*b.cell;
+    }
+    executable=static_cast<unsigned char*>(VirtualAlloc(nullptr,128,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE));require(executable!=nullptr,"carrier allocation");
+    for(U id=0;id<9;++id)write_cell(bindings[id].cell,bindings[id].fake);
+    static const U returns[]={0,1,0xffffffff,0x80000000,0x7fffffff,0x12345678};
+    static const U vectors[][4]={{0,0,0,0},{0x12345678,9,12,0x51030},{0xffffffff,0x80000000,0x7fffffff,0xffffffff},{0x98765432,0x11223344,0x55667788,0xdeadbeef}};
+    for(U id=0;id<9;++id)for(U result:returns)for(const auto& args:vectors){
+        chosen_return=result;trace={};SetLastError(0x457);
+        U before,after;__asm mov before,esp
+        U ro=original(bindings[id],args);__asm mov after,esp
+        require(before==after,"original stdcall stack balance");Trace expected=trace;U eo=GetLastError();
+        require(expected.count==1&&expected.id==id&&expected.last_error==0x457,"original controlled endpoint");
+        for(U n=0;n<4;++n)require(expected.args[n]==(n<bindings[id].argc?args[n]:0),"original arguments");
+        trace={};SetLastError(0x457);__asm mov before,esp
+        U rc=candidate(id,args);__asm mov after,esp
+        require(before==after,"adapter cdecl/stdcall stack balance");
+        require(std::memcmp(&trace,&expected,sizeof(trace))==0&&GetLastError()==eo,"arguments/call order/LastError");
+        if(id!=6&&id!=7)require(ro==rc,"used return bits");++cases;
+    }
+    for(U id=0;id<9;++id)write_cell(bindings[id].cell,saved[id]);
+    for(U id=0;id<9;++id)require(*bindings[id].cell==saved[id]&&*bindings[id].cell==reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA(bindings[id].dll),bindings[id].name)),"restored SDK import");
+    require(VirtualFree(executable,0,MEM_RELEASE)!=0,"carrier release");
+    std::printf("startup_win32_bindings_original_transport=PASS cases=%u live_side_effect_calls=0\n",cases);return 0;
+}

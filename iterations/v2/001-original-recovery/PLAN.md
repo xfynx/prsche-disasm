@@ -1,5 +1,31 @@
 # v2 / 001 - original source recovery plan
 
+Active459,2026-10-31: frozen458 release (3 originals/323B) and460 omitted worker
+(1 original/87B) await one shared integration. startup_win32_bindings_457 owns458;
+audio_chain_454 owns460; both finished. audio_device_lifecycle_455 owns461 filter
+kernel (4 originals/194B), matching458 child ABI and preserving x87 extended state;
+include it in459 if ready before the shared build, otherwise next462. Coordinator
+owns459 REA7dossiers (458three+461four), omitted460 supplemental evidence, common
+build/registry/docs. No passed packet grows. Reuse456 accepted inputs/proof.
+
+Current456,2026-10-31: frozen454/455/457 accepted. Five new lifecycle originals/448B,
+nine Win32 adapters(0original algorithm/storage count),12existing-body composition.
+Shared audit PASS:1158cases/39mutations,600pins,390canonical exports;244TUs/8projects,
+167names173refs,noEXE. Registry636 entries.11oldnamesclose/3real DS/workerchildren
+appear.454 has66cases/1036scenes, including3direct frozen-TU scenes pervariant;
+full opaque state only in explicit seeded instrumented inputs.455 actualpool/zero/
+exitregistry chain and same-address callback alias proved;457 SDKidentity/ownIAT
+transport and exactimports proved without live UI calls. Sleep actualgameobject
+is6B JMP/IAT; compiler weakmarker explicit, no original state. One109sREA session,
+one freshbuild, one sharedaudit.456 README owns exactcommands/bounds.
+Next actual dependencies: release0058f1f0/005983b0/00598020, worker0058f880 and
+filter0059a170/0059a150/0059a0f0/0059c170; normal channelcount<=4 comes from accepted
+442producer/clamp, no new guards. LargeDSinit0058ebe0, mixer0058f8e0, realcallbacks/
+436parent/fullstartup/display/gameplay, faults/concurrency and403/411 PARTIAL remain
+open.453/450/447 proof retained; originals and accepted run inputs unchanged.
+
+Historical453 follows.
+
 Current453,2026-10-30: frozen451/452 integrate seven originals/1743B. Shared audit
 PASS:500 native cases,22 mutations,595pins,368 canonical exports;241 C++TUs/8projects,
 175names182refs,noEXE. Both448 children close; no new names. Registry631 entries.

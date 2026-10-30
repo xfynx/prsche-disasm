@@ -1,0 +1,451 @@
+{
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "image_base": "0x400000",
+  "queries": [
+    "FindWindowA",
+    "GetDesktopWindow",
+    "GetDeviceCaps",
+    "GetWindowDC",
+    "MessageBoxA",
+    "ReleaseDC",
+    "SetForegroundWindow",
+    "ShowCursor",
+    "ShowWindow"
+  ],
+  "index_path": "research/binary-index/static/imports.jsonl",
+  "raw_imports_match_index": true,
+  "imports": [
+    {
+      "dll": "USER32.dll",
+      "symbol": "ReleaseDC",
+      "iat_rva": "0x1b2268"
+    },
+    {
+      "dll": "USER32.dll",
+      "symbol": "GetWindowDC",
+      "iat_rva": "0x1b226c"
+    },
+    {
+      "dll": "USER32.dll",
+      "symbol": "MessageBoxA",
+      "iat_rva": "0x1b2270"
+    },
+    {
+      "dll": "USER32.dll",
+      "symbol": "GetDesktopWindow",
+      "iat_rva": "0x1b2274"
+    },
+    {
+      "dll": "USER32.dll",
+      "symbol": "ShowCursor",
+      "iat_rva": "0x1b2278"
+    },
+    {
+      "dll": "USER32.dll",
+      "symbol": "FindWindowA",
+      "iat_rva": "0x1b22a0"
+    },
+    {
+      "dll": "USER32.dll",
+      "symbol": "ShowWindow",
+      "iat_rva": "0x1b22a8"
+    },
+    {
+      "dll": "USER32.dll",
+      "symbol": "SetForegroundWindow",
+      "iat_rva": "0x1b2300"
+    },
+    {
+      "dll": "GDI32.dll",
+      "symbol": "GetDeviceCaps",
+      "iat_rva": "0x1b2044"
+    }
+  ],
+  "instructions_match_raw_pe": true,
+  "instructions": [
+    {
+      "va": "00565637",
+      "bytes": "ff15a0225b00",
+      "asm": "CALL dword ptr [0x005b22a0]"
+    },
+    {
+      "va": "00565646",
+      "bytes": "ff15a8225b00",
+      "asm": "CALL dword ptr [0x005b22a8]"
+    },
+    {
+      "va": "0056564d",
+      "bytes": "ff1500235b00",
+      "asm": "CALL dword ptr [0x005b2300]"
+    },
+    {
+      "va": "0046784f",
+      "bytes": "ff1574225b00",
+      "asm": "CALL dword ptr [0x005b2274]"
+    },
+    {
+      "va": "00467858",
+      "bytes": "ff156c225b00",
+      "asm": "CALL dword ptr [0x005b226c]"
+    },
+    {
+      "va": "00467863",
+      "bytes": "ff1544205b00",
+      "asm": "CALL dword ptr [0x005b2044]"
+    },
+    {
+      "va": "0046786d",
+      "bytes": "ff1568225b00",
+      "asm": "CALL dword ptr [0x005b2268]"
+    },
+    {
+      "va": "00467873",
+      "bytes": "8b3d70225b00",
+      "asm": "MOV EDI,dword ptr [0x005b2270]"
+    },
+    {
+      "va": "004678a3",
+      "bytes": "ffd7",
+      "asm": "CALL EDI"
+    },
+    {
+      "va": "004680a5",
+      "bytes": "8b3578225b00",
+      "asm": "MOV ESI,dword ptr [0x005b2278]"
+    },
+    {
+      "va": "004680b0",
+      "bytes": "ffd6",
+      "asm": "CALL ESI"
+    }
+  ],
+  "parent_contexts": [
+    {
+      "label": "instance",
+      "start": "0056562d",
+      "end_exclusive": "00565658",
+      "instructions": [
+        {
+          "va": "0056562d",
+          "bytes": "8b0da8e56900",
+          "asm": "MOV ECX,dword ptr [0x0069e5a8]"
+        },
+        {
+          "va": "00565633",
+          "bytes": "56",
+          "asm": "PUSH ESI"
+        },
+        {
+          "va": "00565634",
+          "bytes": "51",
+          "asm": "PUSH ECX"
+        },
+        {
+          "va": "00565635",
+          "bytes": "6a00",
+          "asm": "PUSH 0x0"
+        },
+        {
+          "va": "00565637",
+          "bytes": "ff15a0225b00",
+          "asm": "CALL dword ptr [0x005b22a0]"
+        },
+        {
+          "va": "0056563d",
+          "bytes": "8bf0",
+          "asm": "MOV ESI,EAX"
+        },
+        {
+          "va": "0056563f",
+          "bytes": "85f6",
+          "asm": "TEST ESI,ESI"
+        },
+        {
+          "va": "00565641",
+          "bytes": "7410",
+          "asm": "JZ 0x00565653"
+        },
+        {
+          "va": "00565643",
+          "bytes": "6a09",
+          "asm": "PUSH 0x9"
+        },
+        {
+          "va": "00565645",
+          "bytes": "56",
+          "asm": "PUSH ESI"
+        },
+        {
+          "va": "00565646",
+          "bytes": "ff15a8225b00",
+          "asm": "CALL dword ptr [0x005b22a8]"
+        },
+        {
+          "va": "0056564c",
+          "bytes": "56",
+          "asm": "PUSH ESI"
+        },
+        {
+          "va": "0056564d",
+          "bytes": "ff1500235b00",
+          "asm": "CALL dword ptr [0x005b2300]"
+        },
+        {
+          "va": "00565653",
+          "bytes": "a1bcf95d00",
+          "asm": "MOV EAX,[0x005df9bc]"
+        }
+      ],
+      "role": "raw-PE-verified context evidence only; not executed as a full parent"
+    },
+    {
+      "label": "display-depth",
+      "start": "0046784f",
+      "end_exclusive": "0046787e",
+      "instructions": [
+        {
+          "va": "0046784f",
+          "bytes": "ff1574225b00",
+          "asm": "CALL dword ptr [0x005b2274]"
+        },
+        {
+          "va": "00467855",
+          "bytes": "8bf8",
+          "asm": "MOV EDI,EAX"
+        },
+        {
+          "va": "00467857",
+          "bytes": "57",
+          "asm": "PUSH EDI"
+        },
+        {
+          "va": "00467858",
+          "bytes": "ff156c225b00",
+          "asm": "CALL dword ptr [0x005b226c]"
+        },
+        {
+          "va": "0046785e",
+          "bytes": "8be8",
+          "asm": "MOV EBP,EAX"
+        },
+        {
+          "va": "00467860",
+          "bytes": "6a0c",
+          "asm": "PUSH 0xc"
+        },
+        {
+          "va": "00467862",
+          "bytes": "55",
+          "asm": "PUSH EBP"
+        },
+        {
+          "va": "00467863",
+          "bytes": "ff1544205b00",
+          "asm": "CALL dword ptr [0x005b2044]"
+        },
+        {
+          "va": "00467869",
+          "bytes": "55",
+          "asm": "PUSH EBP"
+        },
+        {
+          "va": "0046786a",
+          "bytes": "57",
+          "asm": "PUSH EDI"
+        },
+        {
+          "va": "0046786b",
+          "bytes": "8bd8",
+          "asm": "MOV EBX,EAX"
+        },
+        {
+          "va": "0046786d",
+          "bytes": "ff1568225b00",
+          "asm": "CALL dword ptr [0x005b2268]"
+        },
+        {
+          "va": "00467873",
+          "bytes": "8b3d70225b00",
+          "asm": "MOV EDI,dword ptr [0x005b2270]"
+        },
+        {
+          "va": "00467879",
+          "bytes": "83fb08",
+          "asm": "CMP EBX,0x8"
+        },
+        {
+          "va": "0046787c",
+          "bytes": "7d2e",
+          "asm": "JGE 0x004678ac"
+        }
+      ],
+      "role": "raw-PE-verified context evidence only; not executed as a full parent"
+    },
+    {
+      "label": "display-depth-dialog",
+      "start": "00467891",
+      "end_exclusive": "004678aa",
+      "instructions": [
+        {
+          "va": "00467891",
+          "bytes": "8d542434",
+          "asm": "LEA EDX,[ESP + 0x34]"
+        },
+        {
+          "va": "00467895",
+          "bytes": "33db",
+          "asm": "XOR EBX,EBX"
+        },
+        {
+          "va": "00467897",
+          "bytes": "6830100500",
+          "asm": "PUSH 0x51030"
+        },
+        {
+          "va": "0046789c",
+          "bytes": "68a4f85c00",
+          "asm": "PUSH 0x5cf8a4"
+        },
+        {
+          "va": "004678a1",
+          "bytes": "52",
+          "asm": "PUSH EDX"
+        },
+        {
+          "va": "004678a2",
+          "bytes": "53",
+          "asm": "PUSH EBX"
+        },
+        {
+          "va": "004678a3",
+          "bytes": "ffd7",
+          "asm": "CALL EDI"
+        },
+        {
+          "va": "004678a5",
+          "bytes": "e8c6fa0e00",
+          "asm": "CALL 0x00557370"
+        }
+      ],
+      "role": "raw-PE-verified context evidence only; not executed as a full parent"
+    },
+    {
+      "label": "display-driver-dialog",
+      "start": "00467943",
+      "end_exclusive": "00467958",
+      "instructions": [
+        {
+          "va": "00467943",
+          "bytes": "53",
+          "asm": "PUSH EBX"
+        },
+        {
+          "va": "00467944",
+          "bytes": "68b4f75c00",
+          "asm": "PUSH 0x5cf7b4"
+        },
+        {
+          "va": "00467949",
+          "bytes": "6874f85c00",
+          "asm": "PUSH 0x5cf874"
+        },
+        {
+          "va": "0046794e",
+          "bytes": "53",
+          "asm": "PUSH EBX"
+        },
+        {
+          "va": "0046794f",
+          "bytes": "ffd7",
+          "asm": "CALL EDI"
+        },
+        {
+          "va": "00467951",
+          "bytes": "6a01",
+          "asm": "PUSH 0x1"
+        },
+        {
+          "va": "00467953",
+          "bytes": "e816ab1300",
+          "asm": "CALL 0x005a246e"
+        }
+      ],
+      "role": "raw-PE-verified context evidence only; not executed as a full parent"
+    },
+    {
+      "label": "cursor-loop",
+      "start": "004680a5",
+      "end_exclusive": "004680c0",
+      "instructions": [
+        {
+          "va": "004680a5",
+          "bytes": "8b3578225b00",
+          "asm": "MOV ESI,dword ptr [0x005b2278]"
+        },
+        {
+          "va": "004680ab",
+          "bytes": "83c41c",
+          "asm": "ADD ESP,0x1c"
+        },
+        {
+          "va": "004680ae",
+          "bytes": "6a00",
+          "asm": "PUSH 0x0"
+        },
+        {
+          "va": "004680b0",
+          "bytes": "ffd6",
+          "asm": "CALL ESI"
+        },
+        {
+          "va": "004680b2",
+          "bytes": "5f",
+          "asm": "POP EDI"
+        },
+        {
+          "va": "004680b3",
+          "bytes": "5b",
+          "asm": "POP EBX"
+        },
+        {
+          "va": "004680b4",
+          "bytes": "85c0",
+          "asm": "TEST EAX,EAX"
+        },
+        {
+          "va": "004680b6",
+          "bytes": "7c08",
+          "asm": "JL 0x004680c0"
+        },
+        {
+          "va": "004680b8",
+          "bytes": "6a00",
+          "asm": "PUSH 0x0"
+        },
+        {
+          "va": "004680ba",
+          "bytes": "ffd6",
+          "asm": "CALL ESI"
+        },
+        {
+          "va": "004680bc",
+          "bytes": "85c0",
+          "asm": "TEST EAX,EAX"
+        },
+        {
+          "va": "004680be",
+          "bytes": "7df8",
+          "asm": "JGE 0x004680b8"
+        }
+      ],
+      "role": "raw-PE-verified context evidence only; not executed as a full parent"
+    }
+  ],
+  "producer": "Existing index-binaries.py parse_pe, existing verify-v2-native-batch.py pe_at, indexed disassembly; no new REA or general runner",
+  "evidence_inputs_sha256": {
+    "scripts/research/index-binaries.py": "f662e7274a854fcafad2cc12a5c6baba427bacc0a82d668167f3458f878ad141",
+    "research/binary-index/static/imports.jsonl": "4a3f10cfd9631d677a6f1ed17761adcc0dc00131a2069028cbb13d52acff71f8",
+    "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm": "80a788a52be53feaeabb6321ea48990fd92151b86ba7ca87efaec6932e0e4502"
+  }
+}

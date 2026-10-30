@@ -1,6 +1,16 @@
 # Отложенные проверки восстановления v2
 
-Run453: seven original decoder/removal bodies1743B integrated;500cases/22mutations/
+Run456: five new lifecycle bodies448B, nine SDK adapters and bounded454 composition
+accepted;1158cases/39mutations/600pins PASS.244TUs/167names173refs,noEXE.
+454 closes seeded full-record/scratch and three direct frozen-TU scenarios; direct
+opaque bytes, real subscribers/436 parent and unbounded domains stay open.
+455 reuses actualpool/zero/registry, proves same-address callback; realDSinit/release/
+worker remain unresolved.457 ownIAT transport/SDKidentity runs no live UI calls.
+Sleep actualgameobject/DLL imports proved. Next458release/460worker/461x87filter;
+count<=4 is accepted442upstream domain, not a new runtimeguard. Live threads/APIs,
+fullstartup/display/gameplay/faults/concurrency and403/411 PARTIAL remain open.
+
+Historical453: seven original decoder/removal bodies1743B integrated;500cases/22mutations/
 595pins PASS.241TUs/175names182refs,noEXE. Three-body decoder and four-body removal
 each compose actual originals; whole448+451+452 group execution remains open.
 Next compare that actual outer/lower chain against original bytes, then subscribers

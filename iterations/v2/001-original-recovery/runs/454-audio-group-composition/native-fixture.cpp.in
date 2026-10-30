@@ -1,0 +1,288 @@
+#include "../448-audio-groups/audio_groups_448.hpp"
+#include "../451-audio-record-decoder/audio_record_decoder_451.hpp"
+#include "../452-audio-record-resources/audio_record_resources_452.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+template<class T> static T get(const void* p){T x;memcpy(&x,p,sizeof x);return x;}
+template<class T> static void put(void* p,T x){memcpy(p,&x,sizeof x);}
+struct Group{U header,opaque;B busy,pad,clear,pad2;};static_assert(sizeof(Group)==12);
+struct World{Group groups[2][4];alignas(4) B headers[2][4][1024];U maps[2][32];};
+static World initial,work,original_world;
+struct State{U map,count,device;B physical[0x18c],slots[0x1800],record[164];U scratch[512];};
+struct Event{U tag,a,b,c;State state;};
+struct Trace{U count,abi,result;Event events[64];State final;};
+static Trace trace,expected;static B* slab;static bool patch_ok=true,cpp_side;
+static U mode,seed=0xa5a5a5a5,cases,scenes,subscribers,coms,decodes,removes,mask;
+static U kind,prefix,outer_count,record_count,subscriber_count,device_on,zero_handle,missing_map,missing_key,continuation,clear_flag,missing_item;
+static U first_large;
+static U stream_ends[4][4],stream_keys[4][4],segment_count[4],stream_item,segment,active_key,active_delta;
+static bool direct_mode=false;
+namespace porsche {I __cdecl composition_validate_454(I);I __cdecl composition_group_454(I,U);}
+static B* active_record;static U* active_scratch;static U* active_cursor;
+static B last_record[164];static U last_scratch[512];
+static U object[2][2],vtable[3];
+enum:U{VALIDATE=0,GROUP=0x100,ITEM=0x200,SELECT=0x300,RESOURCES=0x400,DECODER=0x600,TOKEN=0xc00,INTEGER=0xd00,REMOVE=0xe00,FIND=0xf00,ERASE=0x1000,RELEASE=0x1100};
+static void state(U off,U x){put(application_audio_device_state_006b48c0.data()+off,x);}
+static U header(U table=0,U group=1){return ptr(work.headers[table][group]);}
+static void snapshot(State& s){
+ s.map=audio_resource_map_006b48a4;s.count=audio_resource_map_count_006b48a0;s.device=audio_ds_device_006ad760;
+ memcpy(s.physical,application_audio_device_state_006b48c0.backing.data(),sizeof s.physical);
+ memcpy(s.slots,audio_resource_slots_006ad7b8,sizeof s.slots);
+ if(active_record&&!direct_mode)memcpy(s.record,active_record,sizeof s.record);else memset(s.record,0,sizeof s.record);
+ if(active_scratch&&!direct_mode)memcpy(s.scratch,active_scratch,sizeof s.scratch);else memset(s.scratch,0,sizeof s.scratch);
+}
+static Event& event(U tag,U a=0,U b=0,U c=0){
+ if(trace.count>=64)ExitProcess(81);auto& e=trace.events[trace.count++];e.tag=tag;e.a=a;e.b=b;e.c=c;snapshot(e.state);return e;
+}
+// Shared synthetic callsite, reused from451/448: exactly2048B scratch stays in
+//448's real frame; seed covers opaque cells, checks cdecl/nonvolatile ABI.
+static U invoke(void* fn,U a,U b,U c,U argc){
+ U before,frame,result,fail=0;
+ __asm{
+  push ebx
+  push esi
+  push edi
+  mov before,esp
+  mov frame,ebp
+  lea edi,[esp-1800h]
+  mov ecx,600h
+  mov eax,seed
+  rep stosd
+  cmp argc,3
+  jne two
+  push c
+ two:
+  cmp argc,2
+  jb one
+  push b
+ one:
+  cmp argc,1
+  jb call_now
+  push a
+ call_now:
+  mov ebx,13579bdfh
+  mov esi,2468ace0h
+  mov edi,10203040h
+  call fn
+  mov result,eax
+  mov ecx,argc
+  shl ecx,2
+  add esp,ecx
+  cmp esp,before
+  jne bad
+  cmp ebp,frame
+  jne bad
+  cmp ebx,13579bdfh
+  jne bad
+  cmp esi,2468ace0h
+  jne bad
+  cmp edi,10203040h
+  je done
+ bad:
+  mov fail,1
+ done:
+  mov esp,before
+  pop edi
+  pop esi
+  pop ebx
+ }
+ trace.abi|=fail;return result;
+}
+static U __stdcall release(U self){
+ if(direct_mode){for(U i=1;i<=3;++i)if(get<U>(audio_resource_slots_006ad7b8+i*24)==0x11220000u+i){stream_item=i-1;break;}}
+ ++coms;const U handle=zero_handle?0:stream_item+1;
+ auto& e=event(4,self,get<U>(audio_resource_slots_006ad7b8+24*handle),work.maps[0][stream_item*8]);
+ // The erased key and still-live flag must be visible at the COM boundary.
+ if(!direct_mode&&(e.c!=0 || e.b!=(segment>1?0:0x11220000u+handle)))trace.abi|=0x100;
+ if(mode==1){put(audio_resource_slots_006ad7b8+24*handle,0xabcdef01u);put(audio_resource_slots_006ad7b8+24*handle+4,ptr(object[1]));}
+ if(mode==2){audio_resource_map_006b48a4=ptr(work.maps[1]);audio_resource_map_count_006b48a0=0xcafe0004;audio_ds_device_006ad760=0;}
+ return 0x87654321;
+}
+static void __cdecl callback_second(U* p);
+static void __cdecl callback(U* payload){
+ if(direct_mode)active_record=reinterpret_cast<B*>(payload)+20;
+ ++subscribers;event(6,payload[0],payload[1],payload[2]);
+ if(ptr(active_record)-ptr(payload)!=20 || (mode!=11&&payload[0]!=2))trace.abi|=0x200;
+ const U index=active_record[0x17];
+ if(mode!=10&&(index>=record_count || payload[1]!=get<U>(active_record+0x34+index*4) || payload[2]!=get<U>(active_record+0x44+index*4)))trace.abi|=0x400;
+ if(mode==3 && subscribers==1)state(0x144,ptr(work.groups[1]));
+ if(mode==4 && subscribers==1)work.groups[0][1].header=header(1);
+ if(mode==5 && subscribers==1)work.headers[0][1][4]=4;
+ if(mode==6 && subscribers==1)work.groups[0][1].clear=0;
+ if(mode==7 && subscribers==1)application_audio_device_state_006b48c0[0xe2]=0;
+ if(mode==8 && subscribers==1)application_audio_device_state_006b48c0[0xe2]=3;
+ if(mode==9 && subscribers==1)state(0x124,ptr(reinterpret_cast<void*>(&callback_second)));
+ if(mode==10 && subscribers==1)active_record[0x17]=0;
+ if(mode==11 && subscribers==1)payload[0]=0x12345678;
+ if(!direct_mode){memcpy(last_record,active_record,sizeof last_record);memcpy(last_scratch,active_scratch,sizeof last_scratch);}
+}
+static void __cdecl callback_second(U* p){event(7);callback(p);}
+static I __cdecl original_integer(const void* p,U n){mask|=1u<<7;return reinterpret_cast<I(__cdecl*)(const void*,U)>(slab+INTEGER)(p,n);}
+static I __cdecl original_token(void* p){mask|=(1u<<6)|(1u<<5);return reinterpret_cast<I(__cdecl*)(void*)>(slab+TOKEN)(p);}
+static U __cdecl original_find(U k){mask|=(1u<<9)|(1u<<8);return reinterpret_cast<U(__cdecl*)(U)>(slab+FIND)(k);}
+static U __cdecl original_erase(U k){mask|=1u<<10;return reinterpret_cast<U(__cdecl*)(U)>(slab+ERASE)(k);}
+static I __cdecl original_slot(U k){mask|=1u<<11;return reinterpret_cast<I(__cdecl*)(U)>(slab+RELEASE)(k);}
+static U __cdecl original_select(U h,I i){mask|=1u<<3;return reinterpret_cast<U(__cdecl*)(U,I)>(slab+SELECT)(h,i);}
+static I __cdecl original_resources(U h,U* s){mask|=1u<<4;active_scratch=s;return reinterpret_cast<I(__cdecl*)(U,U*)>(slab+RESOURCES)(h,s);}
+static I __cdecl original_item(I g,I i,U* s){mask|=1u<<2;return reinterpret_cast<I(__cdecl*)(I,I,U*)>(slab+ITEM)(g,i,s);}
+namespace porsche {
+I __cdecl composition_decode_454(U* cursor,void* record){
+ active_record=static_cast<B*>(record);active_cursor=cursor;
+ if(ptr(cursor)-ptr(record)!=0xa8){puts("divergence cursor-record-layout");fflush(stdout);ExitProcess(1);}
+ active_scratch=reinterpret_cast<U*>(get<U>(active_record+0xac));
+ // Synthetic, explicit record input at each new resource. Continuations retain
+ // every record byte, including opaque fields and callback side effects.
+ bool first=false;
+ for(U i=0;i<3;++i)for(U table=0;table<2;++table){U delta=header(table)-header();if(*cursor==stream_keys[i][0]+delta){stream_item=i;segment=0;active_delta=delta;first=true;}}
+ if(first){for(U i=0;i<164;i+=4)put(active_record+i,seed);}
+ active_key=*cursor;
+ if(!active_scratch){trace.abi|=4;return 0;}
+ for(U i=0;i<512;++i)if(active_scratch[i]!=(i%2?seed:0xffffffffu))trace.abi|=8;
+ event(1,*cursor,segment,stream_item);++decodes;
+ I more=static_cast<I>(invoke(cpp_side?reinterpret_cast<void*>(&audio_group_decode_00599100):slab+DECODER,ptr(cursor),ptr(record),0,2));
+ if(!cpp_side)mask|=1u<<5;
+ event(2,*cursor,static_cast<U>(more),get<U>(active_record+0xa0));
+ if(*cursor!=stream_ends[stream_item][segment]+active_delta || get<U>(active_record+0xa0)!=active_key)trace.abi|=16;
+ if(get<U>(active_record+0x28)!=ptr(audio_record_default_005e3498))trace.abi|=32;
+ ++segment;return more;
+}
+void __cdecl composition_process_454(void* record,U* scratch){
+ active_scratch=scratch;active_record=static_cast<B*>(record);event(3,get<U>(active_record+0xa0));++removes;
+ if(cpp_side)audio_group_process_005996d0(record,scratch);
+ else {mask|=1u<<8;reinterpret_cast<I(__cdecl*)(void*)>(slab+REMOVE)(record);}
+ event(5,get<U>(active_record+0xa0));
+ memcpy(last_record,active_record,sizeof last_record);memcpy(last_scratch,active_scratch,sizeof last_scratch);
+}
+I __cdecl composition_decode_wrong_record_454(U* cursor,void* record){return composition_decode_454(cursor,static_cast<B*>(record)+4);}
+void __cdecl composition_process_skip_454(void* record,U* scratch){active_record=static_cast<B*>(record);active_scratch=scratch;event(3);event(5);}
+// Fail-closed unreachable dependencies of canonical state owners.
+I __cdecl application_audio_backend_initialize_0058a4f0(){ExitProcess(90);}
+void __cdecl application_audio_backend_apply_0058a690(){ExitProcess(90);}
+U __cdecl application_audio_backend_allocate_0058aae0(U){ExitProcess(90);}
+void __cdecl application_audio_backend_configure_0058fef0(U,U){ExitProcess(90);}
+void __cdecl application_audio_backend_configure_0058aa90(U,U){ExitProcess(90);}
+void __cdecl application_audio_backend_start_0058e2d0(){ExitProcess(90);}
+I __cdecl application_audio_backend_start_device_0058fdb0(){ExitProcess(90);}
+void __cdecl application_audio_backend_stop_device_0058fe80(){ExitProcess(90);}
+void __cdecl application_audio_backend_stop_0058e2e0(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+I __stdcall audio_direct_sound_create_00597f70(const void*,U*,void*){ExitProcess(92);return 0;}
+void* __stdcall audio_platform_foreground_window(){ExitProcess(93);return nullptr;}
+void* __stdcall audio_platform_desktop_window(){ExitProcess(94);return nullptr;}
+}
+static void absolute(U at,U bytes,U old,const void* to,U expected_count){
+ U n=0;for(U i=0;i+4<=bytes;++i)if(get<U>(slab+at+i)==old){put(slab+at+i,ptr(to));++n;i+=3;}if(n!=expected_count)patch_ok=false;
+}
+static void relative(U at,U off,U va,U child,const void* to){
+ B* p=slab+at+off;if(p[0]!=0xe8 || va+off+5+get<U>(p+1)!=child)patch_ok=false;put(p+1,ptr(to)-ptr(p+5));
+}
+static bool init(){
+ slab=static_cast<B*>(VirtualAlloc(nullptr,8192,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));if(!slab)return false;
+ static const B a[]={ @BODY_00590070@ };memcpy(slab+VALIDATE,a,sizeof a);
+ static const B b[]={ @BODY_00565990@ };memcpy(slab+GROUP,b,sizeof b);
+ static const B c[]={ @BODY_00590000@ };memcpy(slab+ITEM,c,sizeof c);
+ static const B d[]={ @BODY_00590170@ };memcpy(slab+SELECT,d,sizeof d);
+ static const B e[]={ @BODY_00590b50@ };memcpy(slab+RESOURCES,e,sizeof e);
+ static const B f[]={ @BODY_00599100@ };memcpy(slab+DECODER,f,sizeof f);
+ static const B g[]={ @BODY_00599760@ };memcpy(slab+TOKEN,g,sizeof g);
+ static const B h[]={ @BODY_0059bd90@ };memcpy(slab+INTEGER,h,sizeof h);
+ static const B j[]={ @BODY_005996d0@ };memcpy(slab+REMOVE,j,sizeof j);
+ static const B k[]={ @BODY_0058f820@ };memcpy(slab+FIND,k,sizeof k);
+ static const B l[]={ @BODY_0058f7e0@ };memcpy(slab+ERASE,l,sizeof l);
+ static const B m[]={ @BODY_0058f290@ };memcpy(slab+RELEASE,m,sizeof m);
+ absolute(VALIDATE,58,0x6b48d8,application_audio_device_state_006b48c0.data()+0x18,1);absolute(VALIDATE,58,0x6b4a04,application_audio_device_state_006b48c0.data()+0x144,1);
+ absolute(ITEM,110,0x6b4a04,application_audio_device_state_006b48c0.data()+0x144,2);
+ absolute(RESOURCES,195,0x6b49a2,application_audio_device_state_006b48c0.data()+0xe2,2);absolute(RESOURCES,195,0x6b49e0,application_audio_device_state_006b48c0.data()+0x120,1);
+ absolute(DECODER,1287,0x5e3498,audio_record_default_005e3498,1);
+ relative(GROUP,0x39,0x565990,0x590000,reinterpret_cast<void*>(&original_item));
+ relative(ITEM,0x1b,0x590000,0x590170,reinterpret_cast<void*>(&original_select));relative(ITEM,0x36,0x590000,0x590b50,reinterpret_cast<void*>(&original_resources));
+ relative(RESOURCES,0x36,0x590b50,0x599100,reinterpret_cast<void*>(&composition_decode_454));relative(RESOURCES,0x4a,0x590b50,0x5996d0,reinterpret_cast<void*>(&composition_process_454));
+ relative(DECODER,0x1a2,0x599100,0x599760,reinterpret_cast<void*>(&original_token));relative(DECODER,0x295,0x599100,0x599760,reinterpret_cast<void*>(&original_token));
+ relative(TOKEN,0x59,0x599760,0x59bd90,reinterpret_cast<void*>(&original_integer));relative(TOKEN,0x7d,0x599760,0x59bd90,reinterpret_cast<void*>(&original_integer));
+ for(U at:{FIND,ERASE}){absolute(at,at==FIND?57:55,0x6b48a0,&audio_resource_map_count_006b48a0,1);absolute(at,at==FIND?57:55,0x6b48a4,&audio_resource_map_006b48a4,1);}
+ absolute(RELEASE,43,0x6ad7b8,audio_resource_slots_006ad7b8,1);absolute(RELEASE,43,0x6ad760,&audio_ds_device_006ad760,1);
+ relative(REMOVE,0xd,0x5996d0,0x58f820,reinterpret_cast<void*>(&original_find));relative(REMOVE,0x21,0x5996d0,0x58f7e0,reinterpret_cast<void*>(&original_erase));relative(REMOVE,0x27,0x5996d0,0x58f290,reinterpret_cast<void*>(&original_slot));
+ vtable[2]=ptr(reinterpret_cast<void*>(&release));for(U i=0;i<2;++i){object[i][0]=ptr(vtable);object[i][1]=i;}
+ return patch_ok&&FlushInstructionCache(GetCurrentProcess(),slab,8192);
+}
+static bool rawdata(const char* file){
+ FILE* f=nullptr;if(fopen_s(&f,file,"rb")||!f)return false;fseek(f,0,SEEK_END);long size=ftell(f);rewind(f);static B image[8*1024*1024];if(size>sizeof image){fclose(f);return false;}fread(image,1,size,f);fclose(f);
+ const U pe=get<U>(image+0x3c),count=get<std::uint16_t>(image+pe+6),opt=get<std::uint16_t>(image+pe+20),base=get<U>(image+pe+52);
+ auto at=[&](U va)->B*{for(U i=0;i<count;++i){B* s=image+pe+24+opt+i*40;U rva=get<U>(s+12),n=get<U>(s+16);if(va-base>=rva&&va-base-rva<n)return image+get<U>(s+20)+va-base-rva;}return nullptr;};
+ B* bytes=at(0x5e3498);const B raw[8]={255,255,255,127,127,0,0,0};if(!bytes||memcmp(bytes,raw,8)||memcmp(bytes,audio_record_default_005e3498,8))return false;
+ const U vas[]={0x6b48a0,0x6b48a4,0x6ad7b8,0x6b48b0,0x6ad760};const U lengths[]={4,4,0x1800,0x18c,4};const B* native[]={reinterpret_cast<B*>(&audio_resource_map_count_006b48a0),reinterpret_cast<B*>(&audio_resource_map_006b48a4),audio_resource_slots_006ad7b8,application_audio_device_state_006b48c0.backing.data(),reinterpret_cast<B*>(&audio_ds_device_006ad760)};
+ for(U j=0;j<5;++j){bool found=false;for(U i=0;i<count;++i){B* s=image+pe+24+opt+i*40;U delta=vas[j]-base-get<U>(s+12),vs=get<U>(s+8),rawsize=get<U>(s+16),rawpos=get<U>(s+20);if(delta>=vs||lengths[j]>vs-delta)continue;found=true;for(U k=0;k<lengths[j];++k)if(native[j][k]!=(delta+k<rawsize?image[rawpos+delta+k]:0))return false;}if(!found)return false;}
+ // Relocation exclusion before pointer transport, reused from451.
+ U reloc=get<U>(image+pe+24+96+5*8),rsize=get<U>(image+pe+24+100+5*8);B* r=at(base+reloc);if(!r)return false;
+ for(U off=0;off<rsize;){U page=get<U>(r+off),n=get<U>(r+off+4);if(n<8||off+n>rsize)return false;for(U k=8;k<n;k+=2){U entry=get<std::uint16_t>(r+off+k);if((entry>>12)==3){U va=base+page+(entry&4095);if(va<0x5e34a0&&va+4>0x5e3498)return false;}}off+=n;}
+ return true;
+}
+static void token(B* bytes,U& end,U id,U length,U value){bytes[end++]=static_cast<B>(id);bytes[end++]=static_cast<B>(length);for(U k=0;k<length;++k)bytes[end++]=static_cast<B>(value>>(8*((length-k-1)&3)));}
+static void base(){mode=kind=prefix=continuation=zero_handle=missing_map=missing_key=missing_item=first_large=0;outer_count=2;record_count=subscriber_count=2;device_on=clear_flag=1;seed=0xa5a5a5a5;}
+static void setup(){
+ memset(&initial,0x5a,sizeof initial);memset(stream_ends,0,sizeof stream_ends);memset(stream_keys,0,sizeof stream_keys);
+ for(U t=0;t<2;++t)for(U g=0;g<4;++g){initial.groups[t][g]={header(t,g),0xabcdef01,0,0,static_cast<B>(clear_flag),0};auto* h=initial.headers[t][g];memset(h,0,1024);h[4]=static_cast<B>(kind);put(h+6,std::uint16_t{3});
+  for(U i=0;i<3;++i){U resource=128+i*256,slot=(kind==4?0x14u:0xcu)+i*4;put(h+slot,resource-slot);h[resource+3]=static_cast<B>(prefix?2:0);U end=resource+(prefix?8:4);segment_count[i]=continuation?3:1;
+   for(U segment_id=0;segment_id<segment_count[i];++segment_id){if(t==0&&g==1)stream_keys[i][segment_id]=ptr(work.headers[t][g]+end);
+    token(h,end,1,first_large?5:1,0x80+i);token(h,end,0x12,3,0x800001);token(h,end,0xa1,1,0xc3);
+    for(U j=0;j<record_count;++j)token(h,end,0x14,j+1,0x1234+j);
+    for(U id=0x98;id<=0x9b;++id)token(h,end,id,id-0x97,0x89abcdef);
+    if(segment_id+1<segment_count[i])h[end++]=0xfe;else h[end++]=0xff;
+    if(t==0&&g==1)stream_ends[i][segment_id]=ptr(work.headers[t][g]+end-(segment_id+1==segment_count[i]?1:0));
+   }
+  }
+ }
+ if(missing_item)put(initial.headers[0][1]+(kind==4?0x14:0xc)+4,0u);
+ for(U m=0;m<2;++m)for(U row=0;row<16;++row){initial.maps[m][row*2]=0xb0000000u+row;initial.maps[m][row*2+1]=0;}
+ for(U i=0;i<3;++i)for(U s=0;s<segment_count[i];++s){U row=i*4+s;initial.maps[0][row*2]=missing_key?0xf0000000u+row:stream_keys[i][s];initial.maps[0][row*2+1]=zero_handle?0:i+1;}
+ // First match wins, including duplicate record keys, with the second row kept.
+ if(!missing_key){initial.maps[0][30]=stream_keys[0][0];initial.maps[0][31]=255;}
+}
+static void execute(bool cpp,U validate){
+ cpp_side=cpp;work=initial;memset(&trace,0,sizeof trace);memset(last_record,0,sizeof last_record);memset(last_scratch,0,sizeof last_scratch);subscribers=coms=decodes=removes=mask=0;active_record=nullptr;active_cursor=nullptr;active_scratch=nullptr;active_key=0;stream_item=segment=0;
+ for(U i=0;i<0x18c;++i)application_audio_device_state_006b48c0.backing[i]=0x5a;
+ state(0x18,0xabcd0004);state(0x144,ptr(work.groups[0]));application_audio_device_state_006b48c0[0xe2]=static_cast<B>(subscriber_count);
+ for(U i=0;i<4;++i)state(0x120+i*4,ptr(reinterpret_cast<void*>(&callback)));
+ audio_resource_map_006b48a4=missing_map?0:ptr(work.maps[0]);audio_resource_map_count_006b48a0=0xfedc0010;audio_ds_device_006ad760=device_on?0x98765432:0;
+ for(U i=0;i<0x1800;++i)audio_resource_slots_006ad7b8[i]=static_cast<B>(i*13+7);
+ for(U i=0;i<256;++i){put(audio_resource_slots_006ad7b8+i*24,0x11220000u+i);put(audio_resource_slots_006ad7b8+i*24+4,ptr(object[0]));}
+ // Direct mode calls the frozen448 TU, real451/452 and raw original bodies,
+ // with no decoder/process interposition or synthetic record input.
+ put(slab+RESOURCES+0x37,ptr(direct_mode?slab+DECODER:reinterpret_cast<B*>(&composition_decode_454))-ptr(slab+RESOURCES+0x3b));
+ put(slab+RESOURCES+0x4b,ptr(direct_mode?slab+REMOVE:reinterpret_cast<B*>(&composition_process_454))-ptr(slab+RESOURCES+0x4f));
+ FlushInstructionCache(GetCurrentProcess(),slab,8192);
+ if(validate){mask=1;trace.result=invoke(cpp?reinterpret_cast<void*>(&composition_validate_454):slab+VALIDATE,validate==2?0xffffffffu:1,0,0,1);}
+ else{mask=2;trace.result=invoke(cpp?(direct_mode?reinterpret_cast<void*>(&application_audio_release_group_00565990):reinterpret_cast<void*>(&composition_group_454)):slab+GROUP,1,outer_count,0,2);}
+ active_record=nullptr;active_scratch=nullptr;snapshot(trace.final);memcpy(trace.final.record,last_record,sizeof last_record);memcpy(trace.final.scratch,last_scratch,sizeof last_scratch);
+}
+static bool check(const char* family,U validate=0){
+ setup();execute(false,validate);expected=trace;original_world=work;U executed=mask,ds=decodes,rm=removes,cb=subscribers,cm=coms;execute(true,validate);
+ bool bad=trace.abi||expected.abi||memcmp(&trace,&expected,sizeof trace)||memcmp(&work,&original_world,sizeof work);
+ if(bad){printf("divergence family=%s case=%u mode=%u events=%u/%u ABI=%x/%x decodes=%u/%u callbacks=%u/%u\n",family,cases,mode,trace.count,expected.count,trace.abi,expected.abi,decodes,ds,subscribers,cb);const B* a=reinterpret_cast<const B*>(&trace);const B* b=reinterpret_cast<const B*>(&expected);for(U i=0;i<sizeof trace;++i)if(a[i]!=b[i]){printf("trace_byte=%x got=%02x want=%02x event=%u\n",i,a[i],b[i],i>12?(i-12)/sizeof(Event):0);break;}return false;}
+ printf("case=%u family=%s mode=%u original_subset=%03x decode=%u remove=%u subscriber=%u com=%u scenes=%u\n",cases,family,mode,executed,ds,rm,cb,cm,trace.count);++cases;scenes+=trace.count;return true;
+}
+int main(int argc,char** argv){
+ if(argc!=2||!rawdata(argv[1])||!init()){puts("divergence original-raw-data-or-patches");return 1;}
+ base();if(!check("validate-valid",1))return 1;base();if(!check("validate-negative",2))return 1;
+ base();outer_count=0;if(!check("outer-zero"))return 1;base();outer_count=0x80000000;if(!check("outer-signed-negative"))return 1;
+ base();if(!check("outer-full"))return 1;
+ for(U m=1;m<=11;++m){base();mode=m;if(!check("observer-change"))return 1;}
+ base();kind=4;prefix=1;continuation=1;if(!check("kind4-prefix8-multiFE"))return 1;
+ base();continuation=1;record_count=4;outer_count=1;if(!check("bounded-four-multiFE"))return 1;
+ base();record_count=0;if(!check("no-token14"))return 1;
+ for(U c:{0u,0x80u,0xffu}){base();subscriber_count=c;if(!check("signed-subscribers"))return 1;}
+ base();device_on=0;if(!check("no-device"))return 1;base();zero_handle=1;if(!check("zero-handle"))return 1;
+ base();missing_map=1;if(!check("null-map"))return 1;base();missing_key=1;if(!check("missing-key"))return 1;
+ base();clear_flag=0;if(!check("retain-relative-slot"))return 1;base();missing_item=1;outer_count=3;if(!check("missing-middle-item"))return 1;
+ base();seed=0xdeadbeef;if(!check("opaque-seed"))return 1;
+ base();first_large=1;seed=0xdeadbeef;continuation=1;outer_count=1;if(!check("opaque-first-large-multiFE"))return 1;
+ direct_mode=true;
+ base();if(!check("direct-frozen-TUs"))return 1;
+ base();kind=4;prefix=1;continuation=1;record_count=4;outer_count=1;if(!check("direct-multiFE"))return 1;
+ base();device_on=0;subscriber_count=0;if(!check("direct-no-observers"))return 1;
+ printf("audio_group_composition_original_x86_vs_cpp=PASS cases=%u intermediate_scenes=%u full_record_map_slot_scratch=PASS original_raw_data=PASS\n",cases,scenes);return 0;
+}

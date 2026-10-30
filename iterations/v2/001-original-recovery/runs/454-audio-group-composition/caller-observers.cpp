@@ -1,0 +1,12 @@
+// Harness-only symbol interposition at two external Run448 boundaries.
+// Included production source is frozen; all five bodies remain its real C++.
+#define audio_group_decode_00599100 composition_decode_454
+#define audio_group_process_005996d0 composition_process_454
+#define application_audio_validate_channel_00590070 composition_validate_454
+#define application_audio_release_group_00565990 composition_group_454
+#define audio_group_release_item_00590000 composition_item_454
+#define audio_group_select_00590170 composition_select_454
+#define audio_group_release_resources_00590b50 composition_resources_454
+#define audio_group_release_core_448 composition_release_core_454
+#define audio_group_resources_core_448 composition_resources_core_454
+#include "../448-audio-groups/audio_groups_448.cpp"

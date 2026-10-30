@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run453](iterations/v2/001-original-recovery/runs/453-audio-record-integration/README.md).
-Original audio record decoding and resource removal are integrated.
+Latest recovery intake: [Run456](iterations/v2/001-original-recovery/runs/456-audio-lifecycle-integration/README.md).
+Audio lifecycle, bounded group composition and startup Windows bindings are integrated.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next verify the composed group/decoder/removal chain, then continue startup dependencies.
+Next integrate the release/worker chain and original filter kernel.
 
 ## Recovery milestones
 
