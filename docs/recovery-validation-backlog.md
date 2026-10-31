@@ -1,6 +1,14 @@
 # Отложенные проверки восстановления v2
 
-Run465:9originals2430B,716cases/45mutations/616pins PASS;251TUs/170names176refs,noEXE.
+Run467:2originals422B,244cases/16mutations/619pins PASS;252TUs/168names174refs,noEXE.
+Actual435stop and461filter compose in defined466scenes; fullworker/mixer/lifecycle
+stillopen. Capturedrecordcells, per-callquery/data reloads, currentbuffers/table/
+count and signedwrap request-minus256 are verified; no requestlimit/guard added.
+Finitecontrolledcallbacks do notestablish actualproducers/concurrency/live audio.
+Nextvector597f80+quartertable59b630 needrawextent/ownership/writability and exact
+x87intermediate proof. EarlierDS/probequalitydomain/403/411 boundaries unchanged.
+
+Historical465:9originals2430B,716cases/45mutations/616pins PASS;251TUs/170names176refs,noEXE.
 DSinit/mixerclose;6real lower algorithms appear. Originalconfig+6branch corrected;
 propertyQI NULLfault and unusedY x87effects preserved. Config+7 is opaque at child
 boundary: trace format6b16a4 highbyte consumers before fullinit/workercomposition.

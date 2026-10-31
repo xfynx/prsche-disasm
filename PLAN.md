@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run465](iterations/v2/001-original-recovery/runs/465-audio-device-mix-integration/README.md).
-Original DS initialization, mixing and six verified startup helpers are integrated.
+Latest recovery intake: [Run467](iterations/v2/001-original-recovery/runs/467-audio-mixer-control-integration/README.md).
+Original mixer counter feedback and voice-effect control are integrated.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next recover their lower config, property, vector and sample-processing dependencies.
+Next recover lower config, property, fixed-vector and sample-processing dependencies.
 
 ## Recovery milestones
 

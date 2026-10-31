@@ -1,5 +1,19 @@
 # v2 / 001 - original source recovery plan
 
+Current467,2026-10-31: frozen466 adds2 original mixer-control bodies422B,0storage;
+registry655. SharedauditPASS244cases/16mutations/619pins/426canonical exports;
+252TUs/8projects,168names174refs,noEXE. Both old463childrenclose; no newnames.
+Native001firstattempt passes withactual435stop/461filter, signed32wrap counters,
+request-minus256 loop, capturedrecordcells and callback/table/count/bufferreloads.
+Reuse465REA002/no newdossiers, one build/audit.467README ownscommands/bounds.
+No activeworkers (quota); coordinatorcontinuesoriginaldependencies. Next scoped
+lookup:597f80 vector146B+59b630 quarter-table90B,236B closedgraph. Prove raw257-word
+quarterwave extent/writability andscalar5b253c/5b2624 owners beforecode; useexact
+x87 intermediates, never regenerate table withtrigonometry. OtherDS/mix children,
+probequalitydomain and priorcomposition/live/fault/concurrencybacklog stayopen.
+
+Historical465 follows.
+
 Current465,2026-10-31: frozen462/463/464 accepted,9originals2430B; registry653.
 Shared audit PASS:716cases/45mutations/616pins/424canonical exports;251TUs/8projects,
 170names176refs,noEXE. DSinit/mixerclose;6realchildrenappear. One sharedbuild and

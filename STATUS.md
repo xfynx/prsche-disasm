@@ -4,13 +4,13 @@ Updated 2026-10-31. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run465](iterations/v2/001-original-recovery/runs/465-audio-device-mix-integration/README.md)
-compiles 251 C++ translation units across 8 projects. The game link still has 170 unresolved
-names / 176 references. **There is no recovered playable C++ game executable yet.**
+[Run467](iterations/v2/001-original-recovery/runs/467-audio-mixer-control-integration/README.md)
+compiles 252 C++ translation units across 8 projects. The game link still has 168 unresolved
+names / 174 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates nine original initializer/mixer/startup helper bodies:
-716 native cases, 45 detected mutations and a 616-pin audit. Two dependencies close
-and six real lower algorithms appear; the frontier can grow as code is recovered.
+The latest batch integrates two original mixer-control bodies: 244 native cases,
+16 detected mutations and a 619-pin audit. Two dependencies close with no new names;
+canonical state and accepted stop/filter providers are reused.
 These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 

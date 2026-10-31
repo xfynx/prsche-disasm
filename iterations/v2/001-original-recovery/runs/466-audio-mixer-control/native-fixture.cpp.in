@@ -1,0 +1,159 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_mixer_control_466.hpp"
+#include "../461-audio-filter-kernel/audio_filter_kernel_461.hpp"
+#include "porsche/exit_registry.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(U p){U x;std::memcpy(&x,reinterpret_cast<void*>(p),4);return x;}
+static void write(U p,U x){std::memcpy(reinterpret_cast<void*>(p),&x,4);}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s\n",why);std::fflush(stdout);ExitProcess(1);}}
+namespace porsche {
+// Dead dependencies of unchanged accepted owners are not fixture substitutes
+// for any production function exercised by this packet.
+void* __stdcall platform_create_thread(void*,U,ThreadBootstrap,void*,U,U*){ExitProcess(90);}
+U __stdcall platform_thread_priority(void*,I){ExitProcess(90);}
+void __stdcall audio_platform_sleep_455(U){ExitProcess(90);}
+void __cdecl audio_thread_mix_0058f8e0(){ExitProcess(90);}
+void __cdecl exit_registry_lock_api_005a4ba4(U){ExitProcess(90);}
+void __cdecl exit_registry_unlock_api_005a4c05(U){ExitProcess(90);}
+U __cdecl exit_registry_allocation_size_005a8161(const void*){ExitProcess(90);}
+void* __cdecl exit_registry_reallocate_005a8029(void*,U){ExitProcess(90);}
+void* __cdecl exit_registry_malloc_005a3be5(U){ExitProcess(90);}
+void __cdecl exit_registry_fatal_005a2e22(U){ExitProcess(90);}
+I __cdecl application_audio_probe_measure_00565890(){ExitProcess(90);}
+I __cdecl audio_device_initialize_ds_0058ebe0(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_enter_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_leave_critical_section(void*){ExitProcess(90);}
+I __cdecl audio_backend_find_channel_00589d20(U){ExitProcess(90);}
+U __cdecl audio_backend_next_voice_00590340(I,U*){ExitProcess(90);}
+U __cdecl audio_backend_cpu_features_00597070(){ExitProcess(90);}
+}
+extern "C" I __stdcall DirectSoundCreate(const void*,U*,void*){ExitProcess(90);}
+#pragma comment(linker,"/alternatename:_GetForegroundWindow@0=_unused_foreground_466@0")
+#pragma comment(linker,"/alternatename:_GetDesktopWindow@0=_unused_desktop_466@0")
+extern "C" void* __stdcall unused_foreground_466(){ExitProcess(90);}
+extern "C" void* __stdcall unused_desktop_466(){ExitProcess(90);}
+enum:U{SLOTS=32,STRIDE=248,MAX_EVENTS=192};
+alignas(16) static B voices[2][SLOTS][STRIDE];
+static U outputs[2][8],effects[2][8],query_calls[2*SLOTS];
+static U mode,current_key,global_calls,first_request,initial_start,real_filter;
+static I process_result;
+struct State {
+    B device[0x18c],voices[2][SLOTS][STRIDE];U stream[15],buffers[4],physical_buffers[4];
+    U output[2][8],effects[2][8],queries[2*SLOTS],table,key,calls;
+};
+struct Event{U tag,args[6];State state;};
+struct Trace{U count,abi;unsigned short status;Event events[MAX_EVENTS];State final;};
+static Trace trace,expected;static U cases,events_total;
+static void snapshot(State& s){
+    std::memcpy(s.device,application_audio_device_state_006b48c0.backing.data(),sizeof(s.device));
+    std::memcpy(s.voices,voices,sizeof(voices));std::memcpy(s.stream,audio_ds_stream_006ad77c.raw,sizeof(s.stream));std::memcpy(s.buffers,audio_ds_buffers_006ad768,16);
+    std::memcpy(s.physical_buffers,&audio_device_buffers_006b4888,16);std::memcpy(s.output,outputs,sizeof(outputs));std::memcpy(s.effects,effects,sizeof(effects));std::memcpy(s.queries,query_calls,sizeof(query_calls));
+    s.table=audio_backend_voice_table_006b489c;s.key=current_key;s.calls=global_calls;
+}
+static void event(U tag,U a=0,U b=0,U c=0,U d=0,U e=0,U f=0){
+    require(trace.count<MAX_EVENTS,"event bound");auto& x=trace.events[trace.count++];x.tag=tag;const U args[]={a,b,c,d,e,f};std::memcpy(x.args,args,sizeof(args));snapshot(x.state);
+}
+static U voice_key(U record){for(U a=0;a<2;++a)for(U b=0;b<SLOTS;++b)if(record==ptr(voices[a][b]))return a*SLOTS+b;require(false,"record pointer");return 0;}
+static I __cdecl query_alt(U key){require(key<2*SLOTS,"alternate key");current_key=key;++query_calls[key];event(2,key);return 0;}
+static I __cdecl query(U key){
+    require(key<2*SLOTS,"query key");current_key=key;const U occurrence=query_calls[key]++;++global_calls;event(1,key,occurrence);
+    if(mode==1){audio_device_aligned_buffers_006b4890[0]=ptr(outputs[1]);audio_device_aligned_buffers_006b4890[1]=ptr(outputs[0]);}
+    if(mode==2){U slot=ptr(voices[key/SLOTS][key%SLOTS]);write(slot+0xec,ptr(reinterpret_cast<void*>(&query_alt)));write(slot+0xc4,ptr(effects[1]));write(slot+0xbc,(key+1)%(2*SLOTS));}
+    if(mode==4)audio_backend_channel_count_006b49a4=static_cast<std::int16_t>(initial_start);
+    return static_cast<I>(occurrence==0?first_request:0);
+}
+static I __cdecl process(U self,I count,U input,U output,U sign){
+    require(self==ptr(effects[0])||self==ptr(effects[1]),"processor object");event(3,self,static_cast<U>(count),input,output,sign,current_key);
+    if(mode==3)audio_backend_voice_table_006b489c=ptr(voices[1]);
+    return process_result;
+}
+static void __cdecl stopped(void* pointer){
+    const U key=voice_key(ptr(pointer)-0x2c);event(4,key,ptr(pointer));
+    if(mode==5){audio_backend_voice_table_006b489c=ptr(voices[1]);voices[key/SLOTS][key%SLOTS][0]=1;}
+}
+static unsigned char* refresh_code;static unsigned char* voices_code;static bool patched=true;
+static void absolute(B* code,U size,U old,const void* target,U wanted){U count=0;for(U n=0;n+4<=size;++n)if(read(ptr(code+n))==old){write(ptr(code+n),ptr(target));++count;n+=3;}if(count!=wanted)patched=false;}
+static void init(){
+    static const B refresh[]={ @BODY_REFRESH@ },voice[]={ @BODY_VOICES@ };
+    refresh_code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));voices_code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(refresh_code&&voices_code,"raw allocation");
+    std::memcpy(refresh_code,refresh,sizeof(refresh));std::memcpy(voices_code,voice,sizeof(voice));
+    absolute(refresh_code,209,0x6ad77c,audio_ds_stream_006ad77c.raw,3);absolute(refresh_code,209,0x6ad780,audio_ds_stream_006ad77c.raw+1,3);
+    absolute(refresh_code,209,0x6ad7b4,audio_ds_stream_006ad77c.raw+14,1);absolute(refresh_code,209,0x6ad7a4,audio_ds_stream_006ad77c.raw+10,3);
+    absolute(refresh_code,209,0x6ad7a0,audio_ds_stream_006ad77c.raw+9,3);absolute(refresh_code,209,0x6ad790,audio_ds_stream_006ad77c.raw+5,5);absolute(refresh_code,209,0x6ad794,audio_ds_stream_006ad77c.raw+6,1);
+    absolute(voices_code,213,0x6b49a4,&audio_backend_channel_count_006b49a4,2);absolute(voices_code,213,0x6b48dd,application_audio_device_state_006b48c0.data()+0x1d,1);
+    absolute(voices_code,213,0x6b489c,&audio_backend_voice_table_006b489c,2);absolute(voices_code,213,0x6b4890,audio_device_aligned_buffers_006b4890,1);absolute(voices_code,213,0x6b4894,audio_device_aligned_buffers_006b4890+1,1);
+    require(voices_code[0xa2]==0xe8&&0x58f6c0u+0xa7u+read(ptr(voices_code+0xa3))==0x58a8b0,"raw stop call");write(ptr(voices_code+0xa3),ptr(reinterpret_cast<void*>(&audio_backend_stop_voice_0058a8b0))-ptr(voices_code+0xa7));
+    require(patched&&FlushInstructionCache(GetCurrentProcess(),refresh_code,4096)&&FlushInstructionCache(GetCurrentProcess(),voices_code,4096),"raw patches");
+}
+// Synthetic cdecl0 carrier; compare ESP and all ABI-preserved registers.
+static U invoke(void* fn){U before,frame,fail=0;__asm{
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }return fail;}
+static void load(U start,I total){
+    std::memset(&trace,0,sizeof(trace));std::memset(application_audio_device_state_006b48c0.backing.data(),0,0x18c);std::memset(voices,0,sizeof(voices));std::memset(query_calls,0,sizeof(query_calls));std::memset(effects,0,sizeof(effects));
+    std::memset(outputs,0,sizeof(outputs));outputs[0][0]=0x3f800000;outputs[0][1]=0x40000000;outputs[0][2]=0x40400000;
+    for(U a=0;a<2;++a){effects[a][1]=ptr(reinterpret_cast<void*>(&process));for(U b=0;b<SLOTS;++b){U slot=ptr(voices[a][b]);voices[a][b][0]=1;write(slot+0xbc,a*SLOTS+b);write(slot+0xc4,ptr(effects[0]));write(slot+0xc8,ptr(reinterpret_cast<void*>(&stopped)));write(slot+0xec,ptr(reinterpret_cast<void*>(&query)));write(slot+0xf4,0xabcdef01);}}
+    audio_device_raw_buffers_006b4888[0]=0x11223344;audio_device_raw_buffers_006b4888[1]=0x55667788;audio_device_aligned_buffers_006b4890[0]=ptr(outputs[0]);audio_device_aligned_buffers_006b4890[1]=ptr(outputs[1]);
+    audio_backend_voice_table_006b489c=ptr(voices[0]);audio_backend_channel_count_006b49a4=static_cast<std::int16_t>(total);application_audio_device_state_006b48c0[0x1d]=static_cast<B>(start);current_key=global_calls=0;
+    __asm fninit
+    if(real_filter){audio_release_filter_initialize_0059a170(ptr(effects[0]));audio_release_filter_set_0059a150(ptr(effects[0]),0x3f000000);}
+}
+static void compare(U family,U id){
+    if(trace.abi||expected.abi||std::memcmp(&trace,&expected,sizeof(trace))!=0){const B* a=reinterpret_cast<B*>(&trace);const B* b=reinterpret_cast<B*>(&expected);U n=0;while(n<sizeof(trace)&&a[n]==b[n])++n;std::printf("divergence family=%u id=%u mode=%u offset=%u values=%02x/%02x events=%u/%u ABI=%u/%u\n",family,id,mode,n,n<sizeof(trace)?a[n]:0,n<sizeof(trace)?b[n]:0,trace.count,expected.count,trace.abi,expected.abi);std::fflush(stdout);ExitProcess(1);}++cases;events_total+=trace.count;
+}
+static void voice_case(U id,U start,I total){
+    initial_start=start;load(start,total);trace.abi=invoke(voices_code);snapshot(trace.final);__asm fnstsw trace.status
+    expected=trace;load(start,total);trace.abi=invoke(reinterpret_cast<void*>(&audio_thread_mix_voices_0058f6c0));snapshot(trace.final);__asm fnstsw trace.status
+    compare(1,id);
+}
+struct Refresh{U produced,consumed,ring,margin,cap,minimum,stable;};
+static void refresh_case(U id,const Refresh& p){
+    for(U side=0;side<2;++side){load(0,0);for(U& x:audio_ds_stream_006ad77c.raw)x=0xa5a5a5a5;
+        auto& s=audio_ds_stream_006ad77c.raw;s[0]=p.produced;s[1]=p.consumed;s[14]=p.ring;s[5]=p.margin;s[6]=p.cap;s[9]=p.minimum;s[10]=p.stable;
+        trace.abi=invoke(side?reinterpret_cast<void*>(&audio_thread_mix_refresh_0058fcd0):refresh_code);snapshot(trace.final);__asm fnstsw trace.status
+        if(side==0)expected=trace;
+    }compare(0,id);
+}
+int main(){
+    SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);for(U x:audio_ds_stream_006ad77c.raw)require(x==0,"canonical stream default");require(audio_backend_voice_table_006b489c==0,"canonical voice-table default");require(audio_device_aligned_buffers_006b4890[0]==0&&audio_device_aligned_buffers_006b4890[1]==0,"canonical buffer defaults");require(ptr(audio_device_aligned_buffers_006b4890)==ptr(&audio_device_buffers_006b4888)+8,"physical buffer view");init();U id=0;
+    mode=real_filter=0;first_request=1;process_result=0;
+    const Refresh rows[]={{0,1,64,32,128,64,4},{1,2,64,3,128,64,4},{1,2,64,3,0xffffffff,64,4},{0x11000000,0x11000000,64,32,128,64,0},{0x11000001,1,64,32,128,64,0},{0x11000001,0x10000002,64,32,128,64,4},{64,0,64,32,128,64,2999},{65,0,64,32,128,64,2999},{63,0,64,32,128,64,2999}};
+    for(const auto& r:rows)refresh_case(id++,r);
+    for(U stable:{0u,2998u,2999u,3000u,3009u,0x7fffffffu,0xffffffffu})for(U minimum:{0u,16u,17u,0x80000000u})refresh_case(id++,{32,0,64,32,128,minimum,stable});
+    for(U start:{0u,1u,3u,8u,16u,255u})for(I total:{-32768,-1,0,1,4,10,18})voice_case(id++,start,total);
+    for(U request:{0u,1u,255u,256u,257u,512u,0x80000000u,0x800000ffu,0x7fffffffu})for(I result:{-1,0,1}){first_request=request;process_result=result;voice_case(id++,0,3);}
+    for(U m=1;m<=5;++m)for(I result:{-1,0,1}){mode=m;first_request=512;process_result=result;voice_case(id++,0,3);}
+    mode=0;real_filter=1;first_request=3;process_result=0;voice_case(id++,0,1);real_filter=0;
+    require(VirtualFree(refresh_code,0,MEM_RELEASE)&&VirtualFree(voices_code,0,MEM_RELEASE),"raw cleanup");std::printf("audio_mixer_control_original_x86_vs_cpp=PASS cases=%u events=%u actual_stop_filter=PASS ABI=PASS\n",cases,events_total);return 0;
+}
