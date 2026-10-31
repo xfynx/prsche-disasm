@@ -1,5 +1,18 @@
 # v2 / 001 - original source recovery plan
 
+Current470,2026-10-31: frozen468 adds2originals236B plus exactwritable257WORDtable
+514B/readonlyscalars8B,522B total; registry657. SharedauditPASS12948cases/14mutations/
+623pins/431exports;253TUs/8projects,167names173refs,noEXE. Lookup/vector closedgraph,
+allphaseindices/highprefixes and x87PC/RC/depth/register/alias/order checked; first
+native001 passed. 469 caches117dossiers in116.064s, sharedREAauditPASS/repeated0;
+reuse465/469 navigation before newqueries. No activeworkers(quota). Nextinspect
+cached598230mixerconfig/58e780property and currentstateowners; then boundednative
+proof and sharedintegration. Full462consumer/audio composition and priorDS/probe
+quality/fault/concurrency/live/startup/display/gameplay/403/411 boundaries stayopen.
+470README ownscommands and measuredacceptance. No acceptednativeinputs changed.
+
+Historical467 follows.
+
 Current467,2026-10-31: frozen466 adds2 original mixer-control bodies422B,0storage;
 registry655. SharedauditPASS244cases/16mutations/619pins/426canonical exports;
 252TUs/8projects,168names174refs,noEXE. Both old463childrenclose; no newnames.

@@ -1,0 +1,120 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_fixed_vector_468.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;std::memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){std::memcpy(p,&x,4);}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s cases=%u\n",why,0u);std::fflush(stdout);ExitProcess(1);}}
+alignas(16) static B floating[512];
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+struct Trace{U result,abi,output[8];std::uint16_t table[257];Fpu fpu;};
+static Trace actual,original;static U cases,vector_cases,phase_cases;
+static B* sine_code;static B* vector_code;static U patched;
+static const B raw_quarter[]={ @QUARTER@ },raw_scale[]={ @SCALE@ },raw_y[]={ @YSCALE@ };
+static U depth=0,precision=3,rounding=0;
+static void fpu(Fpu& f){
+    __asm fxsave floating
+    f.control=static_cast<unsigned short>(rd(floating));f.status=static_cast<unsigned short>(rd(floating+2));f.tag=floating[4];std::memset(f.padding,0,3);
+    for(U i=0;i<8;++i)std::memcpy(f.values+i*10,floating+32+i*16,10);
+}
+static void seed(){
+    unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));
+    __asm {
+        fninit
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        ffree st(0)
+        ffree st(1)
+        ffree st(2)
+        ffree st(3)
+        ffree st(4)
+        ffree st(5)
+        ffree st(6)
+        ffree st(7)
+        fldcw control
+    }
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+// Synthetic cdecl1/3 carriers. Argument slots and volatile GPRs are not return
+// contracts; output data, EAX for the lookup, x87 and preserved ABI are checked.
+static U invoke(void* fn,U heading,U elevation,U output,U argc,U& result){U saved_sp,saved_frame,fail=0,value;__asm {
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    cmp argc,3
+    jne one
+    push output
+    push elevation
+one:push heading
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov value,eax
+    mov eax,argc
+    lea esp,[esp+eax*4]
+    cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }result=value;return fail;}
+static void absolute(B* p,U size,U old,const void* target,U expected){U found=0;for(U n=0;n+4<=size;++n)if(rd(p+n)==old){wr(p+n,ptr(target));++found;n+=3;}require(found==expected,"original absolute patch");patched+=found;}
+static void init(){
+    static const B a[]={ @BODY_SINE@ },b[]={ @BODY_VECTOR@ };
+    require(std::memcmp(raw_quarter,audio_sine_quarter_005e3924,514)==0,"raw quarter table before reset");require(std::memcmp(raw_scale,&_DAT_005b253c,4)==0&&std::memcmp(raw_y,&_DAT_005b2624,4)==0,"raw scalar bits before reset");
+    sine_code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));vector_code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(sine_code&&vector_code,"raw slab allocation");std::memcpy(sine_code,a,90);std::memcpy(vector_code,b,146);
+    absolute(sine_code,90,0x5e3924,audio_sine_quarter_005e3924,2);absolute(sine_code,90,0x5e3b24,audio_sine_quarter_005e3924+256,2);
+    absolute(vector_code,146,0x5b253c,&_DAT_005b253c,2);absolute(vector_code,146,0x5b2624,&_DAT_005b2624,1);
+    for(U offset:{0x1eu,0x2eu,0x38u,0x71u}){B* p=vector_code+offset;require(p[0]==0xe8&&0x597f80u+offset+5+rd(p+1)==0x59b630,"raw lookup call");wr(p+1,ptr(sine_code)-ptr(p+5));}
+    require(FlushInstructionCache(GetCurrentProcess(),sine_code,4096)&&FlushInstructionCache(GetCurrentProcess(),vector_code,4096),"raw instruction cache");
+}
+static void execute(bool cpp,U heading,U elevation,U argc,U alias){
+    std::memset(&actual,0,sizeof(actual));std::memcpy(audio_sine_quarter_005e3924,raw_quarter,514);for(U& x:actual.output)x=0xa5a5a5a5;
+    U output=alias?ptr(audio_sine_quarter_005e3924)+alias:ptr(actual.output+2);seed();U value;
+    void* fn=argc==1?(cpp?reinterpret_cast<void*>(&audio_fixed_sine_0059b630):sine_code):(cpp?reinterpret_cast<void*>(&audio_ds_spatial_vector_00597f80):vector_code);
+    actual.abi=invoke(fn,heading,elevation,output,argc,value);actual.result=argc==1?value:0;fpu(actual.fpu);std::memcpy(actual.table,audio_sine_quarter_005e3924,514);
+}
+static void check(U heading,U elevation,U argc,U alias=0){
+    execute(false,heading,elevation,argc,alias);original=actual;execute(true,heading,elevation,argc,alias);
+    if(actual.abi||original.abi||std::memcmp(&actual,&original,sizeof(actual))!=0){
+        const B* a=reinterpret_cast<const B*>(&actual);const B* b=reinterpret_cast<const B*>(&original);U n=0;while(n<sizeof(actual)&&a[n]==b[n])++n;
+        std::printf("divergence case=%u args=%08x/%08x argc=%u alias=%u pc=%u rc=%u depth=%u offset=%u values=%02x/%02x result=%x/%x ABI=%u/%u CW=%x/%x SW=%x/%x\n",cases,heading,elevation,argc,alias,precision,rounding,depth,n,n<sizeof(actual)?a[n]:0,n<sizeof(actual)?b[n]:0,actual.result,original.result,actual.abi,original.abi,actual.fpu.control,original.fpu.control,actual.fpu.status,original.fpu.status);std::fflush(stdout);ExitProcess(1);
+    }++cases;if(argc==1)++phase_cases;else ++vector_cases;
+}
+int main(){
+    SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);init();
+    for(U phase=0;phase<1024;++phase)for(U prefix:{0u,0xfffffc00u})check(phase|prefix,0,1);
+    for(U direction=0;direction<1024;++direction)for(U pitch:{0u,7u,256u,513u})check(direction*64u+63u,pitch*64u+31u,3);
+    for(U pc:{0u,2u,3u})for(U rc=0;rc<4;++rc)for(U d:{0u,1u,6u}){
+        precision=pc;rounding=rc;depth=d;
+        for(U a:{0u,1u,63u,64u,0x3fffu,0x4000u,0x7fffffffu,0x80000000u,0xffffffffu})check(a,a^0x12345678u,3);
+    }
+    precision=3;rounding=0;depth=0;
+    // Byte offsets500/502 remain inside514B. First X/Y writes can alter the
+    // table entry used by the fourth lookup; preserve the original ordering.
+    for(U offset:{500u,502u})for(U a:{192u,256u,0xffffffffu})check(a,448u,3,offset);
+    require(VirtualFree(sine_code,0,MEM_RELEASE)&&VirtualFree(vector_code,0,MEM_RELEASE),"raw cleanup");std::printf("audio_fixed_vector_original_x86_vs_cpp=PASS cases=%u phases=%u vectors=%u x87=PASS table_alias=PASS ABI=PASS\n",cases,phase_cases,vector_cases);return 0;
+}

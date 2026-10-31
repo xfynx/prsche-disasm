@@ -1,5 +1,14 @@
 # Отложенные проверки восстановления v2
 
+Run470:2originals236B/522B data,12948cases/14mutations/623pins PASS;253TUs/
+167names173refs,noEXE. Exactwritablequartertable/scalars, x87 intermediates and
+lastlookup afteroutputwrites are verified, includingtablealiases; full462consumer
+composition, unknownindirectwriters/unmappedpointers/liveaudio remainopen.469REA
+cache117dossiers is navigationonly. NextlowerDSconfig/property/sample rendering;
+prior qualitydomain/fault/concurrency/startup/display/gameplay/403/411 unchanged.
+
+Historical467 follows.
+
 Run467:2originals422B,244cases/16mutations/619pins PASS;252TUs/168names174refs,noEXE.
 Actual435stop and461filter compose in defined466scenes; fullworker/mixer/lifecycle
 stillopen. Capturedrecordcells, per-callquery/data reloads, currentbuffers/table/

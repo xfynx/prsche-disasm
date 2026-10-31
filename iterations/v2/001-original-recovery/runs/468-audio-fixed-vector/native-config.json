@@ -1,0 +1,171 @@
+{
+  "run": 468,
+  "experiment": "local/experiments/v2-audio-fixed-vector-468",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/original-evidence.json",
+    "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/quarter-values.inc",
+    "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "00597f80",
+      "bytes": 146,
+      "sha256": "c3f8ec68cdba2516371292595e190fec986f2532cf3035ae868a750392d0ba6f",
+      "token": "@BODY_VECTOR@",
+      "kind": "new-original-body"
+    },
+    {
+      "va": "0059b630",
+      "bytes": 90,
+      "sha256": "6680b1c3facd5089ca9a32333f740870b7bbdb11a8948415bd6ee26a87d77ab9",
+      "token": "@BODY_SINE@",
+      "kind": "new-original-body"
+    },
+    {
+      "va": "005e3924",
+      "bytes": 514,
+      "sha256": "170872cf8422219d802c4de78cf7a87e02e00c8d007a8a149e7deaf8b500c913",
+      "token": "@QUARTER@",
+      "kind": "raw-original-data"
+    },
+    {
+      "va": "005b253c",
+      "bytes": 4,
+      "sha256": "54e347282ecf0fd46f002970fa012534725e0bf3b2ad2f4ca0efc0134d7e1d28",
+      "token": "@SCALE@",
+      "kind": "raw-original-data"
+    },
+    {
+      "va": "005b2624",
+      "bytes": 4,
+      "sha256": "c68830a25204a09f8e77aada6bc5807f607cccaaa0ebb2a7122d317584478a8b",
+      "token": "@YSCALE@",
+      "kind": "raw-original-data"
+    }
+  ],
+  "pass_marker": "audio_fixed_vector_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "phase-index",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "phase&255u",
+      "new": "phase&127u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "quadrant",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "(phase>>8)&3u",
+      "new": "(phase>>9)&3u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "mirror",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "if(quadrant==1)return audio_sine_quarter_005e3924[256u-index];",
+      "new": "if(quadrant==1)return audio_sine_quarter_005e3924[255u-index];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "negative-third",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "if(quadrant==2)return -static_cast<std::int32_t>",
+      "new": "if(quadrant==2)return +static_cast<std::int32_t>",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "word-unsigned",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "if(quadrant==0)return audio_sine_quarter_005e3924[index];",
+      "new": "if(quadrant==0)return static_cast<std::int16_t>(audio_sine_quarter_005e3924[index]);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "elevation-inverse",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "1024u-(static_cast<U>",
+      "new": "1024u+(static_cast<U>",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "heading-shift",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "static_cast<I>(heading)>>6",
+      "new": "static_cast<I>(heading)>>7",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "pitch-quadrature",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "audio_fixed_sine_0059b630(inverse+256u)",
+      "new": "audio_fixed_sine_0059b630(inverse+255u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "heading-quadrature",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "audio_fixed_sine_0059b630(direction+256u)",
+      "new": "audio_fixed_sine_0059b630(direction+255u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scale",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "1.0f/65536.0f",
+      "new": "1.0f/32768.0f",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "y-scale",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "float _DAT_005b2624=-1.0f",
+      "new": "float _DAT_005b2624=1.0f",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "y-axis",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "fild pitch_sine",
+      "new": "fild pitch_cosine",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "z-scale",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "fild heading_cosine\n        fmul pitch_single",
+      "new": "fild heading_cosine\n        fmul dword ptr [_DAT_005b2624]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "lookup-order",
+      "source": "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+      "old": "    float pitch_single;\n    __asm {\n        fild pitch_cosine\n        fstp pitch_single\n        fild heading_sine\n        fmul pitch_single\n        fmul dword ptr [_DAT_005b253c]\n        mov eax,output\n        fstp dword ptr [eax]\n        fild pitch_sine\n        fmul dword ptr [_DAT_005b2624]\n        fstp dword ptr [eax+4]\n    }\n    // The last lookup follows the first two output writes in the original.\n    // Preserve this order even if output aliases the writable quarter table.\n    const I heading_cosine=audio_fixed_sine_0059b630(direction+256u);\n",
+      "new": "    const I heading_cosine=audio_fixed_sine_0059b630(direction+256u);\n    float pitch_single;\n    __asm {\n        fild pitch_cosine\n        fstp pitch_single\n        fild heading_sine\n        fmul pitch_single\n        fmul dword ptr [_DAT_005b253c]\n        mov eax,output\n        fstp dword ptr [eax]\n        fild pitch_sine\n        fmul dword ptr [_DAT_005b2624]\n        fstp dword ptr [eax+4]\n    }\n    // The last lookup follows the first two output writes in the original.\n    // Preserve this order even if output aliases the writable quarter table.\n",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
