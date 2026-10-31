@@ -1,5 +1,10 @@
 # Индекс оригинальных бинарников
 
+Run464: [omitted audio scheduler/no-op callbacks](supplemental/audio-probe-464.jsonl)
+records00565930 (8B) and00565940 (1B), raw SHA/instructions/ABI and index gaps.
+[Run465](../../iterations/v2/001-original-recovery/runs/465-audio-device-mix-integration/README.md)
+accepts bounded native semantics; no-op RET0 encoding is not original C3 identity.
+
 Run460: [omitted audio thread worker](supplemental/audio-thread-460.jsonl) records
 0058f880..0058f8d6 (87B), raw SHA, complete CFG/RET4 and the original thread-start
 reference. Main generated indexes remain unchanged. [Run459 acceptance](../../iterations/v2/001-original-recovery/runs/459-audio-release-thread-integration/README.md)

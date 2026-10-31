@@ -1,13 +1,26 @@
 # v2 / 001 - original source recovery plan
 
-Active465,2026-10-31: startup_win32_bindings_457 owns462 DSinit0058ebe0(1551B)
-plus canonical sharedDSstate in separate CPP/header; audio_chain_454 owns463 mixer
-wrapper0058f8e0+0058f8f0(723B), reusing462state. Explicit original DSchildren remain
-unresolved; no expansion into guessed helper implementations. audio_device_lifecycle_455
-owns464 six probe/prepare/wait/clock/callback helpers156B;398Bparent remains navigation
-only until actual virtualmode/table domain is proved. Existing131's cropped128B table
-window/guard is not a full original transport. Coordinator owns465 batchedREA,
-shared integration/registry/docs. No new accepted body beyond459 yet.
+Current465,2026-10-31: frozen462/463/464 accepted,9originals2430B; registry653.
+Shared audit PASS:716cases/45mutations/616pins/424canonical exports;251TUs/8projects,
+170names176refs,noEXE. DSinit/mixerclose;6realchildrenappear. One sharedbuild and
+14dossier REA002(108s);001 interruptedno receipt/no liveprocess. Agents hitquota;
+coordinator verified frozen463/464 inputs, fixed462config+6 rawbranch and accepted
+native003. SharedDSstate93B/readonly40B/lazy4B have rawownership; aliasesreused.
+Native463002 retains0x2c opaque frame;464003 preserves callback identities, same
+networkwaitaddress and signedreloads; RET0 != C3 bytes but GPR/flags/ESP equivalent.
+Auditor exactoriginal_probe_sources exception handlesrealgameprobe basename;
+fixtures remainforbidden,2positive/5negative guardchecks and459regressionPASS.
+465README ownscommands/receipts/bounds. No activeworkers; coordinatorcontinues.
+Next originals:598230mixerconfig/58e780property/597f80vector and58fcd0refresh/
+58fbc0render/58f6c0voiceeffects; reuse465REA dossiers. Trace whetheropaqueconfig+7
+(format highbyte) becomesmaterial beforefullinit/mix/workercomposition. Probe398B
+004a66b0 staysdeferred: Audio.Quality getter004bc4b0 canreturn-1 viaflag+1d orraw
+field+18; provewriters/instancechain (constructor004bc1f0,setter004bc240) before
+usingtablebounds. Nevercopy131croppedprefixguard. Full458+461/parentcompositions,
+actualcallbacks/DS/threads/scheduler/startup/display/gameplay/faults/concurrency and
+403/411PARTIAL remain open. Originals and passedpacket nativeinputs unchanged.
+
+Historical459 follows.
 
 Current459,2026-10-31: frozen458/460/461 integrate8 originals604B; registry644.
 Shared audit PASS:2644cases/40mutations,607pins/404canonical exports;247TUs/8projects,

@@ -1,0 +1,178 @@
+{
+  "run": 464,
+  "experiment": "local/experiments/v2-audio-probe-startup-464",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/clock_worker.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_runtime.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_scheduler.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_support.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/shared_runtime_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/464-audio-probe-startup",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/original-evidence.json",
+    "research/binary-index/supplemental/audio-probe-464.jsonl"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_00565950@",
+      "va": "00565950",
+      "bytes": 59,
+      "sha256": "68d2bb4ef65fa266534558e1b784676c882e6f64723796e12f7ee16f384a8461"
+    },
+    {
+      "token": "@BODY_0053c380@",
+      "va": "0053c380",
+      "bytes": 44,
+      "sha256": "897e4672536ce4f2b4f6405f230f336cd7842c786b96cd85efbddfe4a118b3d8"
+    },
+    {
+      "token": "@BODY_0053c2e0@",
+      "va": "0053c2e0",
+      "bytes": 6,
+      "sha256": "a5f9cbd8ac962633d54f46320d7d66eeb06fc1a504f216015a7734f80ba7d7cc"
+    },
+    {
+      "token": "@BODY_00565930@",
+      "va": "00565930",
+      "bytes": 8,
+      "sha256": "bd6fa9e2518a739ec354787f74379010cc0705ff0295c8681ea27d35aeae9417"
+    },
+    {
+      "token": "@BODY_00565940@",
+      "va": "00565940",
+      "bytes": 1,
+      "sha256": "ae3f4619b0413d70d3004b9131c3752153074e45725be13b9a148978895e359e"
+    },
+    {
+      "token": "@BODY_0058ffd0@",
+      "va": "0058ffd0",
+      "bytes": 38,
+      "sha256": "41cbd00913a975eb7f63ddfe27df45ab961df6025b93f0a769537c98b32af3d4"
+    }
+  ],
+  "pass_marker": "audio_probe_helpers_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "lazy-once",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "if(registered==0)",
+      "new": "if(registered!=0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "lazy-state",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "audio_prepare_registered_006a5c34=1;",
+      "new": "audio_prepare_registered_006a5c34=0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "focus-pointer",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "field(0x74,reinterpret_cast<U>(&window_worker_focus_00573980));",
+      "new": "field(0x74,reinterpret_cast<U>(&audio_probe_noop_00565940));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "registration-delay",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "audio_probe_scheduler_callback_00565930,0,1",
+      "new": "audio_probe_scheduler_callback_00565930,1,0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "clock-value",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "return clock_worker_iterations_006b7c7c;",
+      "new": "return clock_worker_iterations_006b7c7c+1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wait-target",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "audio_probe_clock_0053c2e0()+static_cast<U>(interval)",
+      "new": "audio_probe_clock_0053c2e0()-static_cast<U>(interval)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wait-signed-wrap",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "static_cast<std::int32_t>(now-target)<0",
+      "new": "now<target",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wait-scheduler-arg",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "timed_callbacks_005366e0(0)",
+      "new": "timed_callbacks_005366e0(1)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scheduler-return",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "    return 0;",
+      "new": "    return 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "noop-register-state",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "    __asm ret",
+      "new": "    __asm { xor eax,eax\n        ret }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "callbacks-signed-count",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "static_cast<std::int8_t>(application_audio_device_state_006b48c0[0xe1])",
+      "new": "static_cast<std::uint8_t>(application_audio_device_state_006b48c0[0xe1])",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "callbacks-first-zero",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "if(callback_count()<=0) return;",
+      "new": "if(callback_count()<0) return;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "callbacks-reload",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "    } while(index<callback_count());",
+      "new": "    } while(index<2);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "callback-stride",
+      "source": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+      "old": "static_cast<U>(index)*4u",
+      "new": "static_cast<U>(index)*8u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

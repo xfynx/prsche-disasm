@@ -1,0 +1,148 @@
+{
+  "run": 463,
+  "experiment": "local/experiments/v2-audio-thread-mix-463",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+    "iterations/v2/001-original-recovery/runs/462-audio-directsound-initialize/audio_directsound_state_462.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp",
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/audio_capabilities_443.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/463-audio-thread-mix",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_0058f8e0@",
+      "va": "0058f8e0",
+      "bytes": 15,
+      "sha256": "d206efad3d0ac8c3442090fbbd27056d37c1c616e3c09002199a1e07c822c469",
+      "kind": "new-original-body"
+    },
+    {
+      "token": "@BODY_0058f8f0@",
+      "va": "0058f8f0",
+      "bytes": 708,
+      "sha256": "d3ab5c297824ed6de5a695712f3f1c7d6c87748ba246205d76f860b1c1c267e2",
+      "kind": "new-original-body"
+    }
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/original-evidence.json",
+    "iterations/v2/001-original-recovery/runs/462-audio-directsound-initialize/ownership-navigation.json"
+  ],
+  "pass_marker": "audio_thread_mix_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "tail-leave",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "        jmp audio_backend_leave_0058e300",
+      "new": "        ret",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "signed-stuck-guard",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "static_cast<I>(audio_ds_mix_guard_006aeff4)>100",
+      "new": "audio_ds_mix_guard_006aeff4>100u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "status-HRESULT-invented-check",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "(void)method<Status>(object,0x24)(object,reinterpret_cast<U*>(frame+0x1c));",
+      "new": "if(method<Status>(object,0x24)(object,reinterpret_cast<U*>(frame+0x1c))!=0)return;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "position-positive-HRESULT",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "object,nullptr,&audio_ds_stream_006ad77c.raw[2])!=0",
+      "new": "object,nullptr,&audio_ds_stream_006ad77c.raw[2])<0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "position-align8",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "position&=0x00fffff0u",
+      "new": "position&=0x00fffff8u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "opaque-frame-clear",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "    if(audio_ds_device_006ad760==0)return;",
+      "new": "    std::memset(frame+0x10,0,0x2c);\n    if(audio_ds_device_006ad760==0)return;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "frame-offset",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "        mov eax,esp",
+      "new": "        lea eax,[esp+4]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "cursor-reload",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "                    if(index!=0)cursor=audio_ds_stream_006ad77c.raw[4];",
+      "new": "                    /* incorrectly retain first-lane cursor */",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "lock-channel-reload",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "                    channel_word=channels();\n                }\n            }else{\n                object=audio_ds_buffers_006ad768[0];\n                (void)method<Lock>",
+      "new": "                    /* incorrectly retain lock lane count */\n                }\n            }else{\n                object=audio_ds_buffers_006ad768[0];\n                (void)method<Lock>",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "unlock-mode-capture",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "            audio_thread_mix_render_0058fbc0(reinterpret_cast<U*>(frame+0x2c),count);\n            using Unlock=I(__stdcall*)(U,U,U,U,U);\n            if(application_audio_device_state_006b48c0[0x24]!=0){",
+      "new": "            const auto split=application_audio_device_state_006b48c0[0x24];\n            audio_thread_mix_render_0058fbc0(reinterpret_cast<U*>(frame+0x2c),count);\n            using Unlock=I(__stdcall*)(U,U,U,U,U);\n            if(split!=0){",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "refresh-wiring",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "        audio_thread_mix_refresh_0058fcd0();",
+      "new": "        /* missing original refresh effects */",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "final-cursor",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "audio_ds_stream_006ad77c.raw[4]=get<U>(frame+0x14);",
+      "new": "audio_ds_stream_006ad77c.raw[4]=position;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "lock-HRESULT-invented-check",
+      "source": "iterations/v2/001-original-recovery/runs/463-audio-thread-mix/audio_thread_mix_463.cpp",
+      "old": "(void)method<Lock>(object,0x2c)(object,cursor*2u,count*2u,reinterpret_cast<U*>(frame+0x2c+index*4),reinterpret_cast<U*>(frame+0x20),nullptr,nullptr,0);",
+      "new": "if(method<Lock>(object,0x2c)(object,cursor*2u,count*2u,reinterpret_cast<U*>(frame+0x2c+index*4),reinterpret_cast<U*>(frame+0x20),nullptr,nullptr,0)!=0)return;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

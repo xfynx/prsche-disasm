@@ -1,0 +1,172 @@
+#include "audio_probe_startup_464.hpp"
+#include "porsche/shared_runtime_globals.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using namespace porsche;
+namespace porsche {
+// Fail-closed, unexecuted dependencies of the reused owner translation units.
+I __cdecl application_audio_backend_initialize_0058a4f0(){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_apply_0058a690(){ExitProcess(90);}
+void __cdecl application_audio_backend_configure_0058fef0(U,U){ExitProcess(90);}
+void __cdecl application_audio_backend_configure_0058aa90(U,U){ExitProcess(90);}
+U __cdecl application_audio_backend_allocate_0058aae0(U){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_start_0058e2d0(){ExitProcess(90);}
+I __cdecl application_audio_backend_start_device_0058fdb0(){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_stop_device_0058fe80(){ExitProcess(90);}
+void __cdecl application_audio_backend_stop_0058e2e0(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+void* __cdecl file_auto_event_0055fb20(){ExitProcess(90);return nullptr;}
+void* __cdecl file_worker_wait_0055fb90(void*){ExitProcess(90);return nullptr;}
+U __cdecl file_close_event_0055fc10(void*){ExitProcess(90);return 0;}
+U __stdcall platform_get_tick_count(){ExitProcess(90);return 0;}
+I __stdcall window_get_system_metrics(I){ExitProcess(90);return 0;}
+U __stdcall window_adjust_rect(WindowRect*,U,I,U){ExitProcess(90);return 0;}
+void* __stdcall window_create_ex(U,const char*,const char*,U,I,I,I,I,void*,void*,void*,void*){ExitProcess(90);return nullptr;}
+void* __stdcall window_set_cursor(void*){ExitProcess(90);return nullptr;}
+I __stdcall window_show_cursor(I){ExitProcess(90);return 0;}
+void __cdecl window_channel_005739b0(U,U){ExitProcess(90);}
+U __stdcall window_support_send_notify_message_a(void*,U,U,I){ExitProcess(90);return 0;}
+U __stdcall window_support_post_message_a(void*,U,U,I){ExitProcess(90);return 0;}
+U __stdcall window_support_get_last_error(){ExitProcess(90);return 0;}
+// Only dead owner-function references use these fixture-only link leaves.
+// They are absent from the recovered-helper paths and all production inputs.
+U timer_rate_005deb48=0;
+static U unused_running=0;static void* unused_hwnd=nullptr;
+U& window_running_006b7c14=unused_running;void*& window_hwnd_006b7bf8=unused_hwnd;
+}
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){memcpy(p,&x,4);}
+enum:U{PREP=0,WAIT=0x100,CLOCK=0x200,SCHED=0x300,NOOP=0x400,CALLS=0x500};
+static unsigned char* slab;static bool patch_ok=true,cpp_side;
+static U which,lazy,count_value,mode,layout,depth,clock_value,step_value,cases,event_total;
+static I interval;
+struct Scene {unsigned char device[0x18c];U clock,current,last,lazy,depth,file,line,opaque;TimedCallbackSlot slots[16];};
+struct Event {U tag,a;Scene state;};
+struct Trace {U count,abi,result,gpr[6],flags;Event events[40];Scene final;};
+static Trace trace,original;static U registers[6],saved_flags;
+static void require(bool okay,const char* why){if(!okay){printf("divergence %s cases=%u which=%u\n",why,cases,which);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault code=%08lx eip=%08lx slab=%08x cases=%u which=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,ptr(slab),cases,which,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+static U pointer_id(U value){if(value==ptr(slab+SCHED)||value==ptr(reinterpret_cast<void*>(&audio_probe_scheduler_callback_00565930)))return 0x565930;if(value==ptr(slab+NOOP)||value==ptr(reinterpret_cast<void*>(&audio_probe_noop_00565940)))return 0x565940;return value;}
+static void snapshot(Scene& s){memcpy(s.device,application_audio_device_state_006b48c0.backing.data(),0x18c);wr(s.device+0x10+0x78,pointer_id(rd(s.device+0x10+0x78)));s.clock=clock_worker_iterations_006b7c7c;s.current=current_tick_006b7c40;s.last=last_callback_tick_0069de24;s.lazy=audio_prepare_registered_006a5c34;s.depth=window_scheduler_depth_0069de20;s.file=class_error_file_005deb74;s.line=class_error_line_005deb78;s.opaque=window_support_opaque_value_006a64a0;memcpy(s.slots,timed_callbacks_0069dd20,sizeof(s.slots));for(auto& slot:s.slots)slot.callback=reinterpret_cast<TimedCallback>(pointer_id(ptr(reinterpret_cast<void*>(slot.callback))));}
+static void event(U tag,U arg=0){require(trace.count<40,"events");auto& e=trace.events[trace.count++];e.tag=tag;e.a=arg;snapshot(e.state);}
+namespace porsche {void __cdecl window_scheduler_diagnostic_00565340(const char* message){event(90,ptr(message));}}
+static U __cdecl idle(U,U){event(99);return 0x12345678;}
+static U __cdecl advance(U a,U elapsed){event(80,a);require(a==0,"scheduler argument");clock_worker_iterations_006b7c7c+=step_value;++current_tick_006b7c40;return 0x87654321;}
+static void callback(U id){event(10+id);if(mode==1)application_audio_device_state_006b48c0[0xe1]=0;if(mode==2){application_audio_device_state_006b48c0[0xe1]=3;}
+    if(mode==3)application_audio_device_state_006b48c0[0xe1]=static_cast<unsigned char>(trace.count==1?0x80:0);if(mode==4)application_audio_device_state_006b48c0[0xe1]=static_cast<unsigned char>(trace.count==1?2:1);
+    if(which==6){clock_worker_iterations_006b7c7c+=step_value;++current_tick_006b7c40;}
+}
+static void __cdecl cb0(){callback(0);}static void __cdecl cb1(){callback(1);}static void __cdecl cb2(){callback(2);}
+static void absolute(U at,U size,U old,const void* target,U expected){U n=0;for(U i=0;i+4<=size;++i)if(rd(slab+at+i)==old){wr(slab+at+i,ptr(target));++n;i+=3;}if(n!=expected){printf("patch %x %x %u/%u\n",at,old,n,expected);patch_ok=false;}}
+static void relative(U at,U off,U va,U child,const void* target){auto* p=slab+at+off;if(p[0]!=0xe8||va+off+5+rd(p+1)!=child){printf("relative %x %x\n",at,off);patch_ok=false;return;}wr(p+1,ptr(target)-ptr(p+5));}
+static bool init(){slab=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,0x3000,0x40));if(!slab)return false;
+    static const unsigned char a[]={ @BODY_00565950@ };memcpy(slab+PREP,a,sizeof(a));
+    static const unsigned char b[]={ @BODY_0053c380@ };memcpy(slab+WAIT,b,sizeof(b));
+    static const unsigned char c[]={ @BODY_0053c2e0@ };memcpy(slab+CLOCK,c,sizeof(c));
+    static const unsigned char d[]={ @BODY_00565930@ };memcpy(slab+SCHED,d,sizeof(d));
+    static const unsigned char e[]={ @BODY_00565940@ };memcpy(slab+NOOP,e,sizeof(e));
+    static const unsigned char f[]={ @BODY_0058ffd0@ };memcpy(slab+CALLS,f,sizeof(f));
+    auto* device=application_audio_device_state_006b48c0.data();absolute(PREP,59,0x6a5c34,&audio_prepare_registered_006a5c34,2);absolute(PREP,59,0x6b4934,device+0x74,1);absolute(PREP,59,0x6b4938,device+0x78,1);
+    absolute(PREP,59,0x573980,reinterpret_cast<void*>(&window_worker_focus_00573980),1);absolute(PREP,59,0x565940,slab+NOOP,1);absolute(PREP,59,0x565930,slab+SCHED,1);
+    relative(PREP,0x26,0x565950,0x5365e0,reinterpret_cast<void*>(&window_scheduler_register_005365e0));
+    absolute(CLOCK,6,0x6b7c7c,&clock_worker_iterations_006b7c7c,1);
+    for(U off:{1u,0xeu,0x21u})relative(WAIT,off,0x53c380,0x53c2e0,slab+CLOCK);relative(WAIT,0x19,0x53c380,0x5366e0,reinterpret_cast<void*>(&timed_callbacks_005366e0));
+    relative(SCHED,0,0x565930,0x58ffd0,slab+CALLS);
+    absolute(CALLS,38,0x6b49a1,device+0xe1,2);absolute(CALLS,38,0x6b49c8,device+0x108,1);
+    return patch_ok&&FlushInstructionCache(GetCurrentProcess(),slab,4096);
+}
+// Synthetic cdecl callsite; no-op additionally preserves all incoming GPR/flags.
+static U invoke(void* fn,U a,U b,U argc){U saved_sp,saved_frame,fail=0;__asm{
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    cmp argc,2
+    jb less2
+    push b
+less2:cmp argc,1
+    jb less1
+    push a
+less1:xor eax,eax
+    mov eax,11223344h
+    mov ebx,13579bdfh
+    mov ecx,2468ace0h
+    mov edx,10203040h
+    mov esi,55667788h
+    mov edi,99aabbcch
+    call fn
+    mov registers[0],eax
+    mov registers[4],ebx
+    mov registers[8],ecx
+    mov registers[12],edx
+    mov registers[16],esi
+    mov registers[20],edi
+    pushfd
+    pop saved_flags
+    mov ecx,argc
+    shl ecx,2
+    add esp,ecx
+    cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,55667788h
+    jne bad
+    cmp edi,99aabbcch
+    je done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }trace.abi|=fail;return registers[0];
+}
+static void load(){memset(&trace,0,sizeof(trace));memset(application_audio_device_state_006b48c0.backing.data(),0x5a,0x18c);memset(timed_callbacks_0069dd20,0,sizeof(timed_callbacks_0069dd20));
+    audio_prepare_registered_006a5c34=lazy;window_scheduler_depth_0069de20=depth;clock_worker_iterations_006b7c7c=clock_value;current_tick_006b7c40=1;last_callback_tick_0069de24=0;class_error_file_005deb74=0;class_error_line_005deb78=0;window_support_opaque_value_006a64a0=0x76543210;
+    application_audio_device_state_006b48c0[0xe1]=static_cast<unsigned char>(count_value);for(U i=0;i<29;++i)wr(application_audio_device_state_006b48c0.data()+0x108+i*4,ptr(reinterpret_cast<void*>(i%3==0?cb0:i%3==1?cb1:cb2)));
+    if(layout==1){for(U i=0;i<16;++i)timed_callbacks_0069dd20[i]={idle,0,2,0};}
+    if(layout==2){auto fn=cpp_side?audio_probe_scheduler_callback_00565930:reinterpret_cast<TimedCallback>(slab+SCHED);timed_callbacks_0069dd20[2]={fn,3,4,1};timed_callbacks_0069dd20[7]={fn,5,6,1};}
+    if(which==1||which==7)timed_callbacks_0069dd20[0]={advance,0,0,0};
+}
+static void execute(bool cpp){cpp_side=cpp;load();void* fn=nullptr;U a=static_cast<U>(interval),b=0x76543210,argc=0;
+    if(which==0)fn=cpp?reinterpret_cast<void*>(&application_audio_prepare_00565950):slab+PREP;
+    if(which==1){fn=cpp?reinterpret_cast<void*>(&application_audio_wait_0053c380):slab+WAIT;argc=1;}
+    if(which==2)fn=cpp?reinterpret_cast<void*>(&audio_probe_clock_0053c2e0):slab+CLOCK;
+    if(which==3){fn=cpp?reinterpret_cast<void*>(&audio_probe_scheduler_callback_00565930):slab+SCHED;argc=2;}
+    if(which==4)fn=cpp?reinterpret_cast<void*>(&audio_probe_noop_00565940):slab+NOOP;
+    if(which==5)fn=cpp?reinterpret_cast<void*>(&audio_probe_callbacks_0058ffd0):slab+CALLS;
+    if(which==7){fn=cpp?reinterpret_cast<void*>(&network_lifecycle_wait_0053c380):slab+WAIT;argc=1;}
+    if(which==6){
+        invoke(cpp?reinterpret_cast<void*>(&application_audio_prepare_00565950):slab+PREP,0,0,0);
+        require(rd(application_audio_device_state_006b48c0.data()+0x74)==ptr(reinterpret_cast<void*>(&window_worker_focus_00573980)),"focus callback identity");
+        require(rd(application_audio_device_state_006b48c0.data()+0x78)==(cpp?ptr(reinterpret_cast<void*>(&audio_probe_noop_00565940)):ptr(slab+NOOP)),"noop callback identity");
+        current_tick_006b7c40=2;last_callback_tick_0069de24=1;application_audio_device_state_006b48c0[0xe1]=1;
+        fn=cpp?reinterpret_cast<void*>(&application_audio_wait_0053c380):slab+WAIT;argc=1;
+    }
+    U result=invoke(fn,a,b,argc);trace.result=(which==2||which==3||which==4)?result:0;
+    if(which==0){invoke(fn,a,b,argc);require(rd(application_audio_device_state_006b48c0.data()+0x74)==ptr(reinterpret_cast<void*>(&window_worker_focus_00573980)),"prepare canonical focus pointer");require(rd(application_audio_device_state_006b48c0.data()+0x78)==(cpp?ptr(reinterpret_cast<void*>(&audio_probe_noop_00565940)):ptr(slab+NOOP)),"prepare noop pointer");}
+    if(which==4){memcpy(trace.gpr,registers,sizeof(registers));trace.flags=saved_flags&0xcd5;}
+    snapshot(trace.final);
+}
+static bool check(){execute(false);original=trace;execute(true);++cases;event_total+=trace.count;if(trace.abi||original.abi||memcmp(&trace,&original,sizeof(trace))){U off=0;while(off<sizeof(trace)&&reinterpret_cast<unsigned char*>(&trace)[off]==reinterpret_cast<unsigned char*>(&original)[off])++off;printf("divergence case=%u which=%u lazy=%08x count=%u mode=%u layout=%u depth=%u clock=%08x step=%08x interval=%08x events=%u/%u ABI=%u/%u offset=%u\n",cases,which,lazy,count_value,mode,layout,depth,clock_value,step_value,static_cast<U>(interval),original.count,trace.count,original.abi,trace.abi,off);return false;}return true;}
+static void base(){which=0;lazy=0;count_value=2;mode=0;layout=depth=0;clock_value=0x12345678;step_value=1;interval=3;}
+int main(int argc,char**argv){SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);AddVectoredExceptionHandler(1,fault);
+    if(argc!=2||audio_prepare_registered_006a5c34!=0){puts("production_initial_state=FAIL");return 2;}
+    require(ptr(reinterpret_cast<void*>(&network_lifecycle_wait_0053c380))==ptr(reinterpret_cast<void*>(&application_audio_wait_0053c380)),"networkwait canonical address");
+    if(!init()){puts("oracle_patch=FAIL");return 3;}
+    for(U l:{0u,1u,0xffffffffu})for(U shape:{0u,1u,2u})for(U d:{0u,1u,15u}){base();lazy=l;layout=shape;depth=d;if(!check())return 1;}
+    for(U w:{3u,5u})for(U count:{0u,1u,2u,4u,29u,128u,255u})for(U m:{1u,0u,2u,3u,4u}){base();which=w;count_value=count;mode=m;if(!check())return 1;}
+    for(U n:{127u}){base();which=5;count_value=n;mode=1;if(!check())return 1;}
+    for(U w:{1u,7u})for(U clock:{0u,0x7fffffffu,0xfffffff0u})for(I n:{-2147483647,-1,0,1,3,16,0x7fffffff}){base();which=w;clock_value=clock;interval=n;step_value=static_cast<U>(n)>16u?0x7fffffffu:3u;if(!check())return 1;}
+    base();which=1;interval=static_cast<I>(0x80000000u);step_value=0x40000000;if(!check())return 1;
+    for(U clock:{0u,0x7fffffffu,0xffffffffu}){base();which=2;clock_value=clock;if(!check())return 1;}
+    base();which=4;if(!check())return 1;
+    for(I n:{0,1,3,16}){base();which=6;interval=n;step_value=3;if(!check())return 1;}
+    printf("audio_probe_helpers_original_x86_vs_cpp=PASS cases=%u events=%u ABI=PASS same_callback_identity=PASS noop_register_flags=PASS actual_scheduler_clock=PASS\n",cases,event_total);return 0;
+}

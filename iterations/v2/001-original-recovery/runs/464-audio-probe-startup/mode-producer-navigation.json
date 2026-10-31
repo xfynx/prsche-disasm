@@ -1,0 +1,60 @@
+{
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "status": "navigation only; no parent/domain acceptance",
+  "parts": {
+    "004e4820": {
+      "bytes": 192,
+      "raw_hex": "518b0d28b9650085c90f84c1000000e8dcebfeff83f8010f84b300000056576a0068b8745d0068a8d65c006a0068549d5d00e85932fdff83c40450e8ebca0b0083c4148bf06a0068b8745d0068a8d65c006a0068449d5d00e83332fdff83c40450e8c5ca0b008bf88b0683c4148bceff50288b1785c00f95c1884c24088bcfff522868000400006800000400508b442414506a00e84721fcff8b4c24246a0068c8d65c0068a8d65c006a0051e87aca0b0083c42885c05f5e74168b108bc8ff52",
+      "sha256": "bd07f71a2ac50a3511be27cb994d0386148dfac6af57c1beb06fafd518b93b15"
+    },
+    "004e4b97": {
+      "bytes": 32,
+      "raw_hex": "6a006820484e006a0068086c5b006a3568449d5d008bc8e8cd6afdffeb0233c0",
+      "sha256": "c5cd5ffb754c74d15969f55a58b0de206f722455fc00fd48ab0e824ec3f4546b"
+    },
+    "004bc4b0": {
+      "bytes": 15,
+      "raw_hex": "8a411d84c0740483c8ffc38b4118c3",
+      "sha256": "09516de88b07b4f5e7a5f528ce0cf2b471d0ca1293392da40584102ec4fb9a3b"
+    },
+    "004bc240": {
+      "bytes": 194,
+      "raw_hex": "81ec18020000568bf157c744240c000000008b06ff50248b8c242402000048894424083bc18d4424087c078d8424240200008338007d048d44240c8b168b388bceff522485c0751d8b068bceff504484c074128b168bceff52405f5e81c418020000c204008b4610c6461d0085c0897e18740656ffd083c4048bcee8b0bcffff84c074338b168d442410894424088d442408508bceff52048b4424088d4c24103bc174138d542410c7000000000052e85c12fdff83c4045f5e81c418020000c20400",
+      "sha256": "f5cec9736fc140ba79b2e19090f35fa68250fb7a8e7a5171a31ee2e0dc0d329e"
+    },
+    "004bc310": {
+      "bytes": 24,
+      "raw_hex": "8b4424048b51183bd08941147c07c7411800000000c20400",
+      "sha256": "978e8b6cf14f9b27d6d0f934c680a089e5107e92e2c31532fa820cdb48a1be6b"
+    },
+    "004bb6e0": {
+      "bytes": 13,
+      "raw_hex": "8b44240450e8560b0000c20400",
+      "sha256": "d0882dad0642a8a4ff583d53b24909d534ca65d04f986cc84f1f26a681f83d02"
+    },
+    "005b5188": {
+      "bytes": 80,
+      "raw_hex": "d0575c0030255000d0c34b009049510030c34b00e0c44b0000c54b00c0c44b0060c44b0080c44b00a0c44b00b0c44b00e0b64b0050b74b0070b74b00f0c44b0050c34b0010c64b0020c64b0030c64b00",
+      "sha256": "e34ae331ff88830aedec0d92909094a8393fb479fabd40897eca198197cee1a6"
+    },
+    "005b6c08": {
+      "bytes": 28,
+      "raw_hex": "e0050000df050000de050000dc05000000000000dc050000dd050000",
+      "sha256": "4d7625ea291136d7d1b27ce82aac725bcfe3ffbb9167d43dceade528a27c24e9"
+    }
+  },
+  "raw_names": {
+    "005d9d44": "Audio.Quality",
+    "005d9d54": "Audio.Mode",
+    "005d74c0": ".?AVFELocalizedTextAccessor@@"
+  },
+  "findings": [
+    "004e4863 ESI gets Audio.Mode,004e4886 EDI gets Audio.Quality; both RTTI-cast toFELocalizedTextAccessor",
+    "Audio.Quality constructor004e4b97..4bae calls004bb680 with terminated localizedID table005b6c08 [5e0,5df,5de,5dc,0], fourchoices",
+    "005b518c vtable+28=004bc4b0; flag+1d nonzero returns-1, otherwise rawDWORD+18",
+    "vtable+2c=004bb6e0->004bc240 clamps signed requested into0..count-1, clearsflag+1d, stores+18; constructor004bc1f0 starts+18=0/+1d=0",
+    "004bc310 updatescount+14 and zerosvalue+18 onlywhen signed value>=count; doesnotbyitselfproveallwriters"
+  ],
+  "next_step": "Trace all value+18 andflag+1d writers for this exact Audio.Quality instance, resource/constructor andcastidentity, then bound getter outputs and actual004a6a00 consumer. Do not infer allsignedinputs0..2 or replace originaltableaddressing with guard."
+}

@@ -130,6 +130,17 @@ def audit_native(cfg, cache, sha):
     return result
 
 
+def audit_game_source_names(sources, original_probe_sources=()):
+    # Original game audio probes are legitimate recovered code. Exceptions must
+    # name exact compiler inputs; fixture inputs remain forbidden unconditionally.
+    allowed = set(original_probe_sources)
+    assert len(allowed) == len(original_probe_sources), 'duplicate original probe source'
+    assert allowed <= set(sources), 'original probe is not a compiler input'
+    assert all('probe' in Path(p).name.lower() for p in allowed)
+    assert not any('fixture' in p.lower() for p in sources)
+    assert not any('probe' in Path(p).name.lower() and p not in allowed for p in sources)
+
+
 def audit(config_path):
     reader = ManifestReader(ROOT)
     cache = reader.cache
@@ -163,7 +174,7 @@ def audit(config_path):
     assert current['source_count'] == len(sources)
     assert collections.Counter(Path(p).name for p in current['project_paths']) == collections.Counter(
         Path(p).name for p in baseline['project_paths'])
-    assert not any('fixture' in p.lower() or 'probe' in Path(p).name.lower() for p in sources)
+    audit_game_source_names(sources, cfg.get('original_probe_sources', ()))
     assert sha(ROOT / current['receipt']) == current['receipt_sha256']
     receipt = load(ROOT / current['receipt'])
     assert sha(ROOT / receipt['log']) == receipt['log_sha256']
@@ -219,6 +230,8 @@ def audit(config_path):
         result['native_receipt_sha256'] = native_proofs[0]['receipt_sha256']
     if platform:
         result['platform_import_thunks'] = platform
+    if cfg.get('original_probe_sources'):
+        result['original_probe_sources'] = sorted(cfg['original_probe_sources'])
     return result
 
 

@@ -1,6 +1,17 @@
 # Отложенные проверки восстановления v2
 
-Run459:8originals604B,2644cases/40mutations/607pins PASS;247TUs/166names172refs,noEXE.
+Run465:9originals2430B,716cases/45mutations/616pins PASS;251TUs/170names176refs,noEXE.
+DSinit/mixerclose;6real lower algorithms appear. Originalconfig+6branch corrected;
+propertyQI NULLfault and unusedY x87effects preserved. Config+7 is opaque at child
+boundary: trace format6b16a4 highbyte consumers before fullinit/workercomposition.
+Mixer0x2c locals/ignoredHRESULT outputs remainopaque, dividefault domains untested.
+Six startuphelpers pass with actualscheduler/clock/focus; live scheduler/clock
+concurrency and fullcallbacks remainopen. Probe398Bparent stilldeferred; next trace
+FELocalizedTextAccessor value/flagwriters (004bc1f0/004bc240/004bc4b0), exact
+Audio.Quality instance and mode domain; do notcopy131128Bprefixguard. ActualDS,
+fullstartup/display/gameplay and403/411 PARTIAL unchanged.465README ownscommands.
+
+Historical459:8originals604B,2644cases/40mutations/607pins PASS;247TUs/166names172refs,noEXE.
 Raw87Bworker supplement, cachedactualSleepcell,140B physicallyaliased release state,
 8Bcallbacks and x87extendedST0/kernel/CW/SW/tag validated. Kernel50B exact; setter25B
 aftercanonicalrelocation. Full458+461 composition and actualcallbackproducer/upstream
