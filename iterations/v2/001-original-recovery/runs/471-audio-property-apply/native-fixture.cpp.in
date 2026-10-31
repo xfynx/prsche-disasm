@@ -1,0 +1,140 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_property_apply_471.hpp"
+#include "../443-audio-device-capabilities/audio_capabilities_443.hpp"
+#include "../462-audio-directsound-initialize/audio_directsound_state_462.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;std::memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){std::memcpy(p,&x,4);}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s\n",why);std::fflush(stdout);ExitProcess(1);}}
+namespace porsche {
+// Unexecuted dependencies of the real443 owner; never providers in the game.
+I __cdecl application_audio_backend_initialize_0058a4f0(){ExitProcess(90);}
+void __cdecl application_audio_backend_apply_0058a690(){ExitProcess(90);}
+void __cdecl application_audio_backend_configure_0058fef0(U,U){ExitProcess(90);}
+void __cdecl application_audio_backend_configure_0058aa90(U,U){ExitProcess(90);}
+U __cdecl application_audio_backend_allocate_0058aae0(U){ExitProcess(90);}
+void __cdecl application_audio_backend_start_0058e2d0(){ExitProcess(90);}
+I __cdecl application_audio_backend_start_device_0058fdb0(){ExitProcess(90);}
+void __cdecl application_audio_backend_stop_device_0058fe80(){ExitProcess(90);}
+void __cdecl application_audio_backend_stop_0058e2e0(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+I __cdecl application_audio_probe_measure_00565890(){ExitProcess(90);}
+
+I __stdcall audio_direct_sound_create_00597f70(const void*,U*,void*){ExitProcess(90);}
+void* __stdcall audio_platform_foreground_window(){ExitProcess(90);}
+void* __stdcall audio_platform_desktop_window(){ExitProcess(90);}
+}
+alignas(16) static B floating[512];
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+static U depth=0,precision=3,rounding=0;
+static void fpu(Fpu& f){
+    __asm fxsave floating
+    f.control=static_cast<unsigned short>(rd(floating));f.status=static_cast<unsigned short>(rd(floating+2));f.tag=floating[4];std::memset(f.padding,0,3);
+    for(U i=0;i<8;++i)std::memcpy(f.values+i*10,floating+32+i*16,10);
+}
+static void seed(){
+    unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));
+    __asm {
+        fninit
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        ffree st(0)
+        ffree st(1)
+        ffree st(2)
+        ffree st(3)
+        ffree st(4)
+        ffree st(5)
+        ffree st(6)
+        ffree st(7)
+        fldcw control
+    }
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+static U invoke(void* fn,U heading,U elevation,U output,U argc,U& result){U saved_sp,saved_frame,fail=0,value;__asm {
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    cmp argc,3
+    jne one
+    push output
+    push elevation
+one:push heading
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov value,eax
+    mov eax,argc
+    lea esp,[esp+eax*4]
+    cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }result=value;return fail;}
+
+struct Event{U object,method,property,instance,instance_bytes,data_bytes,data,settings[3],available;Fpu fpu;};
+struct Trace{U result,abi,count,object,available,settings[3];Event events[4];Fpu fpu;};
+static Trace actual,original;static U cases,total_events,flags,fail_at,hresult,objects[2],tables[2][8];static B* raw_code;
+static const B raw_guid[]={ @PROPERTY_GUID@ },raw_three[]={ @SCALE_THREE@ },raw_four[]={ @SCALE_FOUR@ };
+static U object_id(U object){for(U i=0;i<2;++i)if(object==ptr(objects+i))return i;require(false,"unknown COM object");return 99;}
+static I callback(U method,U object,const void* guid,U property,U instance,U instance_bytes,const void* data,U data_bytes){
+    require(actual.count<4&&data_bytes==4,"property event extent");require(guid==audio_property_set_guid_005c17d8&&std::memcmp(guid,raw_guid,16)==0,"canonical raw GUID");
+    Event& e=actual.events[actual.count++];e.object=object_id(object);e.method=method;e.property=property;e.instance=instance;e.instance_bytes=instance_bytes;e.data_bytes=data_bytes;e.data=rd(data);std::memcpy(e.settings,audio_ds_property_settings_006aefe4,12);e.available=static_cast<B>(audio_ds_property_available_006ad779);fpu(e.fpu);
+    if(flags&1)audio_ds_property_006aefdc=ptr(objects+(1-e.object));
+    if(flags&2)objects[0]=objects[1]=ptr(tables[actual.count&1]);
+    if(flags&4){for(U i=0;i<3;++i)audio_ds_property_settings_006aefe4[i]=0xface0000+actual.count*16+i;audio_ds_property_available_006ad779=0;wr(const_cast<void*>(data),0xdecafbad);}
+    return actual.count==fail_at?static_cast<I>(hresult):0;
+}
+static I __stdcall method0(U o,const void* g,U p,U i,U n,const void* d,U z){return callback(0,o,g,p,i,n,d,z);}
+static I __stdcall method1(U o,const void* g,U p,U i,U n,const void* d,U z){return callback(1,o,g,p,i,n,d,z);}
+static void absolute(U old,const void* target,U expected){U count=0;for(U n=0;n+4<=776;++n)if(rd(raw_code+n)==old){wr(raw_code+n,ptr(target));++count;n+=3;}require(count==expected,"original relocation count");}
+static void init(){
+    require(audio_ds_property_006aefdc==0&&audio_ds_property_available_006ad779==0,"production property initial state");for(U x:audio_ds_property_settings_006aefe4)require(x==0,"production settings initial state");
+    require(std::memcmp(raw_guid,audio_property_set_guid_005c17d8,16)==0&&std::memcmp(raw_three,&audio_property_scale_005c16a0,4)==0&&std::memcmp(raw_four,&audio_property_scale_005c169c,4)==0,"raw original constants before reset");
+    static const B bytes[]={ @BODY_PROPERTY@ };raw_code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(raw_code!=nullptr,"raw code allocation");std::memcpy(raw_code,bytes,776);
+    absolute(0x6ad779,&audio_ds_property_available_006ad779,1);absolute(0x6aefe4,audio_ds_property_settings_006aefe4,1);absolute(0x6aefe8,audio_ds_property_settings_006aefe4+1,1);absolute(0x6aefec,audio_ds_property_settings_006aefe4+2,1);
+    absolute(0x6aefdc,&audio_ds_property_006aefdc,4);absolute(0x5c17d8,audio_property_set_guid_005c17d8,4);absolute(0x5c16a0,&audio_property_scale_005c16a0,1);absolute(0x5c169c,&audio_property_scale_005c169c,1);
+    require(FlushInstructionCache(GetCurrentProcess(),raw_code,4096)!=0,"raw cache");
+}
+static void execute(bool cpp,U mode,U p3,U p4,U available){
+    std::memset(&actual,0,sizeof(actual));std::memset(tables,0,sizeof(tables));tables[0][4]=ptr(reinterpret_cast<void*>(&method0));tables[1][4]=ptr(reinterpret_cast<void*>(&method1));objects[0]=objects[1]=ptr(tables[0]);audio_ds_property_006aefdc=ptr(objects);audio_ds_property_available_006ad779=static_cast<std::int8_t>(available);for(U i=0;i<3;++i)audio_ds_property_settings_006aefe4[i]=0xa5a5a5a5;
+    seed();actual.abi=invoke(cpp?reinterpret_cast<void*>(&audio_ds_apply_property_0058e780):raw_code,mode,p3,p4,3,actual.result);fpu(actual.fpu);actual.object=object_id(audio_ds_property_006aefdc);actual.available=static_cast<B>(audio_ds_property_available_006ad779);std::memcpy(actual.settings,audio_ds_property_settings_006aefe4,12);
+}
+static void check(U mode,U p3,U p4,U available){
+    execute(false,mode,p3,p4,available);original=actual;execute(true,mode,p3,p4,available);
+    if(actual.abi||original.abi||std::memcmp(&actual,&original,sizeof(actual))!=0){const B* a=reinterpret_cast<const B*>(&actual);const B* b=reinterpret_cast<const B*>(&original);U n=0;while(n<sizeof(actual)&&a[n]==b[n])++n;
+        std::printf("divergence case=%u mode=%08x p3=%08x p4=%08x available=%u flags=%u fail=%u hr=%08x pc=%u rc=%u depth=%u offset=%u bytes=%02x/%02x calls=%u/%u ret=%x/%x\n",cases,mode,p3,p4,available,flags,fail_at,hresult,precision,rounding,depth,n,n<sizeof(actual)?a[n]:0,n<sizeof(actual)?b[n]:0,actual.count,original.count,actual.result,original.result);std::fflush(stdout);ExitProcess(1);
+    }++cases;total_events+=actual.count;
+}
+int main(){
+    SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);init();flags=0;fail_at=0;hresult=0;
+    for(I mode=-3;mode<=130;++mode)for(U available:{0u,1u,255u})for(U p:{0u,1u,0xffffffffu,0x80000000u,0x7fffffffu})check(static_cast<U>(mode),p,p,available);
+    for(U mode:{0u,1u,2u,10u,99u,100u,120u,121u,0x80000000u,0x7fffffffu,0xffffffffu})for(U failure=0;failure<=4;++failure)for(U hr:{1u,0xffffffffu,0x80004005u})for(U f=0;f<8;++f){fail_at=failure;hresult=hr;flags=f;check(mode,0x80000000,0x7fffffff,1);}
+    fail_at=0;flags=7;
+    for(U pc:{0u,2u,3u})for(U rc=0;rc<4;++rc)for(U d:{0u,1u,6u})for(U p:{0u,1u,0xffffffffu,0x80000000u,0x7fffffffu,0x01000001u,0xfeffffffu}){precision=pc;rounding=rc;depth=d;check(3,p,p^0x12345678,255);}
+    require(VirtualFree(raw_code,0,MEM_RELEASE)!=0,"raw cleanup");std::printf("audio_property_apply_original_x86_vs_cpp=PASS cases=%u events=%u x87=PASS COM_reload=PASS HRESULT=PASS ABI=PASS\n",cases,total_events);return 0;
+}

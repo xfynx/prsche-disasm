@@ -4,13 +4,13 @@ Updated 2026-10-31. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run470](iterations/v2/001-original-recovery/runs/470-audio-fixed-vector-integration/README.md)
-compiles 253 C++ translation units across 8 projects. The game link still has 167 unresolved
-names / 173 references. **There is no recovered playable C++ game executable yet.**
+[Run472](iterations/v2/001-original-recovery/runs/472-audio-property-integration/README.md)
+compiles 254 C++ translation units across 8 projects. The game link still has 166 unresolved
+names / 172 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates two original vector/lookup bodies and exact original data:
-12,948 native cases,14 detected mutations and a623-pin audit. One dependency closes
-without new names. Run469 caches117 frontier dossiers for reuse in later batches.
+The latest batch integrates original property application and exact scalar data:
+7,164 native cases,15 detected mutations and a626-pin audit. One dependency closes
+without new names. The117-dossier REA cache remains available for later batches.
 These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 

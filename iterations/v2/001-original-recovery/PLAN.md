@@ -1,5 +1,19 @@
 # v2 / 001 - original source recovery plan
 
+Current472,2026-10-31: frozen471 adds1original776B and8readonlyscalarbytes;
+registry658. SharedauditPASS7164cases/18440events/15mutations/626pins/434exports;
+254TUs/8projects,166names172refs,noEXE. Canonical443property/GUID/availability and
+462settings reused. Allmodebranches/signedrange/HRESULTstop, object/vtablereload,
+capturedargs and exact33800001scale/x87state proven. Native003PASS;001/002fixture
+linkfail inputs preserved, no algorithmdivergence. 472README ownscommands/bounds.
+No activeworkers(quota). Nextinspect originalsample renderer58fbc0 andchildren,
+and config598230 pointerproviders before implementation; reuse465/469REA cache.
+Configgraph has7unregistered directhelpers pluscallbackaddress targets, so prove
+ABI/ownership before typedbindings. Full462consumer/actualCOM/platforms/null/fault/
+concurrency/startup/display/gameplay/403/411 stayopen; originals/passedinputs frozen.
+
+Historical470 follows.
+
 Current470,2026-10-31: frozen468 adds2originals236B plus exactwritable257WORDtable
 514B/readonlyscalars8B,522B total; registry657. SharedauditPASS12948cases/14mutations/
 623pins/431exports;253TUs/8projects,167names173refs,noEXE. Lookup/vector closedgraph,

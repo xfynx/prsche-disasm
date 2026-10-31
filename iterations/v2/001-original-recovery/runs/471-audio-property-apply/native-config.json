@@ -1,0 +1,170 @@
+{
+  "run": 471,
+  "experiment": "local/experiments/v2-audio-property-apply-471",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/audio_capabilities_443.cpp",
+    "iterations/v2/001-original-recovery/runs/462-audio-directsound-initialize/audio_directsound_state_462.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/471-audio-property-apply",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/471-audio-property-apply/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0058e780",
+      "bytes": 776,
+      "token": "@BODY_PROPERTY@",
+      "sha256": "7bf332b8bd4fd4cc9121741d3f06c90e214fa8f14080629ce11bffa635f686e4"
+    },
+    {
+      "va": "005c169c",
+      "bytes": 4,
+      "token": "@SCALE_FOUR@",
+      "sha256": "b1ca6ce2b86383766b524d086b6f30353fcb1a31cde8378f6da3a9ee5453dd5f"
+    },
+    {
+      "va": "005c16a0",
+      "bytes": 4,
+      "token": "@SCALE_THREE@",
+      "sha256": "982e774d323c74cdf4b56bfa8342579deab955f7bd8a1111240302fada056d44"
+    },
+    {
+      "va": "005c17d8",
+      "bytes": 16,
+      "token": "@PROPERTY_GUID@",
+      "sha256": "53a738391c78e97bfd7f1b605a79004a4465bcb1ebc9d34f45f472010346ab81"
+    }
+  ],
+  "pass_marker": "audio_property_apply_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "availability",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "if(available==0)",
+      "new": "if(available<=0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "mode-disable",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "if(mode==0 || mode==1)",
+      "new": "if(mode==0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "preset-map",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "case 76:preset=25",
+      "new": "case 76:preset=24",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "range-low",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "static_cast<I>(mode)>=100",
+      "new": "static_cast<I>(mode)>100",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "range-high",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "static_cast<I>(mode)<=120",
+      "new": "static_cast<I>(mode)<120",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "raw-scale-bit",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "0x33800001u",
+      "new": "0x33800000u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scale-three",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "0x36c80000u",
+      "new": "0x36c80001u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "settings-arg",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "audio_ds_property_settings_006aefe4[1]=parameter3",
+      "new": "audio_ds_property_settings_006aefe4[1]=parameter4",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "property-one",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "audio_ds_property_006aefdc,1,&preset",
+      "new": "audio_ds_property_006aefdc,2,&preset",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "property-two",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "audio_ds_property_006aefdc,2,&mix",
+      "new": "audio_ds_property_006aefdc,1,&mix",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "HRESULT-positive",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "if(set_property(audio_ds_property_006aefdc,1,&preset)!=0)",
+      "new": "if(set_property(audio_ds_property_006aefdc,1,&preset)<0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "optional-three",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "if(parameter3!=0xffffffffu)",
+      "new": "if(parameter3!=0u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "optional-four",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "if(parameter4!=0xffffffffu)",
+      "new": "if(parameter4!=0u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "captured-args",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "const I signed3=static_cast<I>(parameter3)",
+      "new": "const I signed3=static_cast<I>(audio_ds_property_settings_006aefe4[1])",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "object-reload",
+      "source": "iterations/v2/001-original-recovery/runs/471-audio-property-apply/audio_property_apply_471.cpp",
+      "old": "    if(set_property(audio_ds_property_006aefdc,1,&preset)!=0)return -1;\n    if(set_property(audio_ds_property_006aefdc,2,&mix)!=0)",
+      "new": "    const U property_before=audio_ds_property_006aefdc;\n    if(set_property(audio_ds_property_006aefdc,1,&preset)!=0)return -1;\n    if(set_property(property_before,2,&mix)!=0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

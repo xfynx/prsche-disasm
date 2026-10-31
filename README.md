@@ -31,8 +31,8 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run470](iterations/v2/001-original-recovery/runs/470-audio-fixed-vector-integration/README.md)
-  integrates exact fixed-vector/quarter-table recovery and reuses cached REA evidence.
+  [Run472](iterations/v2/001-original-recovery/runs/472-audio-property-integration/README.md)
+  integrates original property application and reuses cached REA evidence.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

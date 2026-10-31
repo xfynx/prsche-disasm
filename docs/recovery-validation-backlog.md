@@ -1,5 +1,13 @@
 # Отложенные проверки восстановления v2
 
+Run472:originalproperty776B/8Bscalars,7164cases/18440events/15mutations/626pins PASS;
+254TUs/166names172refs,noEXE. Canonicalowners and mode/HRESULT/object/vtablereload/
+capturedargs/exactscale/x87 verified. ControlledCOM only: actualdriver/full462
+composition/null/unmapped/unmaskedFPfault/concurrency/livegame remainopen. Next
+sample-renderer/config dependencies; prior403/411/probequalitydomain unchanged.
+
+Historical470 follows.
+
 Run470:2originals236B/522B data,12948cases/14mutations/623pins PASS;253TUs/
 167names173refs,noEXE. Exactwritablequartertable/scalars, x87 intermediates and
 lastlookup afteroutputwrites are verified, includingtablealiases; full462consumer
