@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run472](iterations/v2/001-original-recovery/runs/472-audio-property-integration/README.md).
-Original property application is integrated; frontier REA dossiers are cached.
+Latest recovery intake: [Run474](iterations/v2/001-original-recovery/runs/474-audio-sample-integration/README.md).
+Five original sample-pipeline functions are integrated; frontier REA dossiers are cached.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next recover lower config and sample-processing dependencies.
+Next close lower ramp/stop, file and resource dependencies in parallel.
 
 ## Recovery milestones
 

@@ -1,5 +1,16 @@
 # Отложенные проверки восстановления v2
 
+Run474:5originals1150B/18Bstate;17062cases/33mutations/633pins PASS;257TUs/
+167names173refs,noEXE. Separate473dispatch/475process/476converter proofs pass;
+combineddefinedproducer scene is stillrequired. Add475initiallynullblockhook case
+inlatercomposition; preservefrozen005proof. Ramp/stop479, files477/resources478
+pending. Existing rendercaller ABI defect:539b30 ECX+4/RET16,539b80 ECX+3/RET12,
+539f40 ECX+0 differfrom render_display.cpp112..117 declarations/argumentplacement.
+Trace originalargumentflow andrefreshcallerproof; don'tfillsymbols withconvenient
+wrappers. Prioropaque/fault/concurrency/live/startup/display/gameplay/403/411 open.
+
+Historical472 follows.
+
 Run472:originalproperty776B/8Bscalars,7164cases/18440events/15mutations/626pins PASS;
 254TUs/166names172refs,noEXE. Canonicalowners and mode/HRESULT/object/vtablereload/
 capturedargs/exactscale/x87 verified. ControlledCOM only: actualdriver/full462

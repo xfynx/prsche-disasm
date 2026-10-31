@@ -1,5 +1,25 @@
 # v2 / 001 - original source recovery plan
 
+Current474,2026-10-31: frozen473/475/476 add5original C++bodies1150B/18Bstate;
+registry663. SharedauditPASS17062cases/33mutations/633pins/444exports; onebuild
+257TUs/8projects,167names173refs,noEXE. Oldrender closes; realramp/stop children
+5980c0/598670 appear. 47328bitmask/signedtiming/chunk/reload/actual435stop,
+475x87/NaN/real434zero and476backwardinterleave/overlap/wrap areproven standalone.
+No productionstubs/guessedguards. Full473+475+476 scene remainsnextcomposition;
+475initiallynullblockhook needs deferredcase. Passedinputs frozen; READMEownscommands.
+
+Activeparallel:477 filewrite/truncate591fa0/5924d0 (sample_converter_476 worker);
+478resourcecleanup/queryad510/ad670/ad6c0 (audio_resource_478 worker);479closed
+ramp/stop5body601B graph (sample_processor_475 worker). Workers owntheirrun/local
+files only; coordinator ownsregistries/build/audit/docs/commit. Reuse469117dossier
+cache andacceptedproof. Nextsharedintegration afterready proofs, no perfn builds.
+RenderABI finding:539b30 ECX+4stack/RET16,539b80 ECX+3/RET12,539f40 ECX/noargs;
+oldrender_display.cpp112..117 bindings disagree. Trace originalcallsite flow and
+refreshaffectedcallerproof beforeimplementation, never hide withguessedwrappers.
+Fullaudio/opaque/fault/concurrency/platform/startup/display/gameplay/403/411 stayopen.
+
+Historical472 follows.
+
 Current472,2026-10-31: frozen471 adds1original776B and8readonlyscalarbytes;
 registry658. SharedauditPASS7164cases/18440events/15mutations/626pins/434exports;
 254TUs/8projects,166names172refs,noEXE. Canonical443property/GUID/availability and

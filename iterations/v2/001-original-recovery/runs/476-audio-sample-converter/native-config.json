@@ -1,0 +1,84 @@
+{
+  "run": 476,
+  "experiment": "local/experiments/v2-audio-sample-converter-476",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/476-audio-sample-converter/audio_sample_converter_476.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/476-audio-sample-converter/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/476-audio-sample-converter"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/476-audio-sample-converter/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "token": "@BODY_CONVERT@",
+      "va": "0059bce0",
+      "bytes": 62,
+      "sha256": "1938bda05edbcbfc507eaaa3862dd4b510384e1313b6e63c89817dfb6a575f12"
+    }
+  ],
+  "pass_marker": "audio_sample_converter_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "channel-order",
+      "source": "iterations/v2/001-original-recovery/runs/476-audio-sample-converter/audio_sample_converter_476.cpp",
+      "old": "(left<<16)|(right&0xffffu)",
+      "new": "(right<<16)|(left&0xffffu)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "high-half",
+      "source": "iterations/v2/001-original-recovery/runs/476-audio-sample-converter/audio_sample_converter_476.cpp",
+      "old": "(left&0xffff0000u)|(right>>16)",
+      "new": "(left&0xffff0000u)|(right&0xffffu)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "second-plane",
+      "source": "iterations/v2/001-original-recovery/runs/476-audio-sample-converter/audio_sample_converter_476.cpp",
+      "old": "source+count*2u",
+      "new": "source+count*4u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "loop-step",
+      "source": "iterations/v2/001-original-recovery/runs/476-audio-sample-converter/audio_sample_converter_476.cpp",
+      "old": "remaining-=2u",
+      "new": "remaining-=1u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "signed-continuation",
+      "source": "iterations/v2/001-original-recovery/runs/476-audio-sample-converter/audio_sample_converter_476.cpp",
+      "old": "static_cast<std::int32_t>(remaining)>2",
+      "new": "static_cast<std::int32_t>(remaining)>3",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "source-pair",
+      "source": "iterations/v2/001-original-recovery/runs/476-audio-sample-converter/audio_sample_converter_476.cpp",
+      "old": "source+remaining*2u-4u",
+      "new": "source+remaining*2u-2u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "store-pair",
+      "source": "iterations/v2/001-original-recovery/runs/476-audio-sample-converter/audio_sample_converter_476.cpp",
+      "old": "destination+remaining*4u-8u",
+      "new": "destination+remaining*4u-4u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

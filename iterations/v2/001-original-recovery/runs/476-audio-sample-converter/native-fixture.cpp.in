@@ -1,0 +1,115 @@
+#include "audio_sample_converter_476.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+using U=std::uint32_t;
+using namespace porsche;
+alignas(16) static unsigned char arena[8192],floating[512];
+static U regs[6],flags;
+struct Fpu {unsigned short control,status;unsigned char tag,padding[3],values[80];};
+struct Trace {U abi,registers[6],flags;Fpu fpu;unsigned char memory[8192];};
+static Trace trace,original;
+static unsigned char* slab;
+static U cases,count_value,source_offset,destination_offset,pattern,precision,rounding,depth;
+static bool cpp_side;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s cases=%u count=%08x source=%u destination=%u pattern=%u cpp=%u\n",why,cases,count_value,source_offset,destination_offset,pattern,cpp_side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault code=%08lx eip=%08lx cases=%u count=%08x cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,count_value,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+static void capture_fpu(Fpu& f){
+    __asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];
+    memset(f.padding,0,3);for(U i=0;i<8;++i)memcpy(f.values+i*10,floating+32+i*16,10);
+}
+static void seed_fpu(){
+    unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));
+    __asm {
+        fninit
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        ffree st(0)
+        ffree st(1)
+        ffree st(2)
+        ffree st(3)
+        ffree st(4)
+        ffree st(5)
+        ffree st(6)
+        ffree st(7)
+        fldcw control
+    }
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+// Synthetic cdecl callsite; raw original and production use the same stack and
+// sentinel registers. ESP/EBP and cdecl callee GPRs checked. The actual caller
+// ignores return, flags and volatile EAX/ECX/EDX, which the original preserves.
+__declspec(noinline) static U invoke(void* fn,U count,U source,U destination){U saved_sp,saved_frame,fail=0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp,esp
+        mov saved_frame,ebp
+        push destination
+        push source
+        push count
+        mov eax,11223344h
+        mov ebx,13579bdfh
+        mov ecx,2468ace0h
+        mov edx,10203040h
+        mov esi,55667788h
+        mov edi,99aabbcch
+        call fn
+        mov regs[0],eax
+        mov regs[4],ebx
+        mov regs[8],ecx
+        mov regs[12],edx
+        mov regs[16],esi
+        mov regs[20],edi
+        pushfd
+        pop flags
+        add esp,12
+        cmp esp,saved_sp
+        jne bad
+        cmp ebp,saved_frame
+        jne bad
+        cmp ebx,13579bdfh
+        jne bad
+        cmp esi,55667788h
+        jne bad
+        cmp edi,99aabbcch
+        je done
+    bad:mov fail,1
+    done:mov esp,saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+static void execute(bool cpp){cpp_side=cpp;memset(&trace,0,sizeof(trace));
+    U random=0x8badf00du^pattern;
+    for(U i=0;i<sizeof(arena);++i){random^=random<<13;random^=random>>17;random^=random<<5;arena[i]=pattern==0?static_cast<unsigned char>(i*37+(i>>8)):pattern==1?static_cast<unsigned char>((i&1)?0x80:0xff):static_cast<unsigned char>(random);}
+    seed_fpu();Fpu before;capture_fpu(before);
+    trace.abi=invoke(cpp?reinterpret_cast<void*>(&audio_mixer_convert_block_0059bce0):slab,count_value,ptr(arena+source_offset),ptr(arena+destination_offset));
+    capture_fpu(trace.fpu);require(memcmp(&before,&trace.fpu,sizeof(Fpu))==0,"x87 preservation");
+    trace.registers[1]=regs[1];trace.registers[4]=regs[4];trace.registers[5]=regs[5];memcpy(trace.memory,arena,sizeof(arena));
+    require(trace.abi==0,"ABI");
+}
+static void compare(){execute(false);original=trace;execute(true);require(memcmp(&original,&trace,sizeof(trace))==0,"original/C++ memory registers flags x87");++cases;}
+int main(){AddVectoredExceptionHandler(1,fault);slab=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(slab!=nullptr,"allocate");
+    static const unsigned char body[]={ @BODY_CONVERT@ };memcpy(slab,body,sizeof(body));
+    require(sizeof(body)==62,"body extent");require(FlushInstructionCache(GetCurrentProcess(),slab,4096)!=0,"flush");
+    const U counts[]={0,1,2,3,4,5,7,8,15,16,31,32,63,64,127,128,255,256,257,0x80000000,0x80000001,0x80000002,0xfffffffd,0xfffffffe,0xffffffff};
+    const int destinations[]={-65,-64,-5,-4,-2,-1,0,1,2,4,5,64,65,512,2048};
+    for(U c:counts)for(int d:destinations)for(U p=0;p<3;++p)for(U alignment=0;alignment<4;++alignment){
+        count_value=c;source_offset=2048+alignment;destination_offset=static_cast<U>(static_cast<int>(source_offset)+d);pattern=p;
+        precision=(cases%3==0)?0:(cases%3==1?2:3);rounding=cases%4;depth=cases%9;compare();
+    }
+    __asm fninit
+    printf("audio_sample_converter_original_x86_vs_cpp=PASS cases=%u events=0\n",cases);return 0;
+}

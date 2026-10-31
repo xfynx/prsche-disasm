@@ -1,0 +1,198 @@
+{
+  "run": 473,
+  "experiment": "local/experiments/v2-audio-sample-dispatch-473",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+    "iterations/v2/001-original-recovery/runs/462-audio-directsound-initialize/audio_directsound_state_462.cpp",
+    "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle/audio_device_lifecycle_455.cpp",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization/audio_initialization_442.cpp",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/audio_capabilities_443.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/exit_registry.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/platform_audio_443.cpp",
+    "iterations/v2/001-original-recovery/runs/439-audio-voice-cleanup/voice_cleanup_439.cpp",
+    "iterations/v2/001-original-recovery/runs/458-audio-release-chain/audio_release_chain_458.cpp",
+    "iterations/v2/001-original-recovery/runs/460-audio-thread-worker/audio_thread_worker_460.cpp",
+    "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel/audio_filter_kernel_461.cpp",
+    "iterations/v2/001-original-recovery/runs/221-readonly-scalar-storage/original_scalars.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch",
+    "iterations/v2/001-original-recovery/runs/462-audio-directsound-initialize",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/runs/439-audio-voice-cleanup",
+    "iterations/v2/001-original-recovery/runs/458-audio-release-chain",
+    "iterations/v2/001-original-recovery/runs/460-audio-thread-worker",
+    "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0058fbc0",
+      "bytes": 265,
+      "sha256": "8972211b580935c20ecccc3b211949ea43e3ac7b4bae584086d96ca7f48c7c5d",
+      "token": "@BODY_OUTER@"
+    },
+    {
+      "va": "00598940",
+      "bytes": 243,
+      "sha256": "02ef3108e207463b685fbcd65f0aab66493f7aa92c6e28c139f141c016e6ebb1",
+      "token": "@BODY_CHUNKS@"
+    },
+    {
+      "va": "0058f650",
+      "bytes": 108,
+      "sha256": "e8093d813ddb008c928467efc18d39fb90532cf8931bae4c04e83f40b96356ec",
+      "token": "@BODY_CHECK@"
+    }
+  ],
+  "pass_marker": "audio_sample_dispatch_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "tick-four",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "(tick&3u)!=0",
+      "new": "(tick&1u)!=0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "completion-signed",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "static_cast<I>(index)<audio_backend_channel_count_006b49a4",
+      "new": "static_cast<I>(index)+1<audio_backend_channel_count_006b49a4",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "finish-nonzero",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": ")(record+0x2c)!=0",
+      "new": ")(record+0x2c)>0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "voice-slot",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "record+0x2c",
+      "new": "record+0x28",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stride",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "outputs[i]+=stride",
+      "new": "outputs[i]+=stride+1",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "temporary-reload",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "U temporary[2];temporary[0]=audio_release_storage_006b174c.optional;",
+      "new": "U temporary[2];temporary[0]=audio_release_storage_006b174c.optional+4;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "temporary-end",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "optional+block*2",
+      "new": "optional+block*4",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "conversion-source",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "block,temporary[0],outputs[0]",
+      "new": "block,temporary[1],outputs[0]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "channel-shift",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "block<<(audio_release_channel_count_006b16a5&31u)",
+      "new": "block<<((audio_release_channel_count_006b16a5+1)&31u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "timing-mask",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "&0x0ffffff0u",
+      "new": "&0xfffffff0u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "reset-signed",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "static_cast<I>(ticks)>30000",
+      "new": "ticks>30000u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "reset-boundary",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "static_cast<I>(ticks)>30000",
+      "new": "static_cast<I>(ticks)>=30000",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "sample-rate",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "device_rate()*ticks",
+      "new": "device_rate()*(ticks+1)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "outer-stride",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "outputs[i]+=block*2",
+      "new": "outputs[i]+=block*4",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "summary-flag",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "if(audio_backend_flag_summary_006b4885!=0)",
+      "new": "if(audio_backend_flag_summary_006b4885==0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "available-signed",
+      "source": "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch/audio_sample_dispatch_473.cpp",
+      "old": "static_cast<I>(available)<=0",
+      "new": "available==0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ],
+  "timeout_seconds": 60
+}
