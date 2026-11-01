@@ -1,0 +1,177 @@
+#include "file_stream_queries_477.hpp"
+#include "porsche/file_events.hpp"
+#include "porsche/heap_locks.hpp"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using namespace porsche;
+static PhysicalFile tables[2][3];
+static unsigned char memory[2048],disk[512];
+static unsigned char* slab;
+static U cases,total_events,which,validation,mapped,block,requested,position,size_value,plan,hook,offset,end_result,seek_result,source_offset,slot;
+static U writes,sleeps,last_error,cursor,hook_calls;
+static bool cpp_side,patch_ok=true;
+struct State {PhysicalFile tables[2][3];unsigned char memory[2048],disk[512];U table,count,mutexes[32],error,cursor;};
+struct Event {U kind,a,b,c,d,e;State state;};
+struct Trace {U count,result,abi;Event events[128];State state;};
+static Trace trace,original;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U v;memcpy(&v,p,4);return v;}
+static void wr(void* p,U v){memcpy(p,&v,4);}
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s cases=%u which=%u validation=%u mapped=%u block=%u request=%u position=%08x size=%08x plan=%u hook=%u cpp=%u\n",why,cases,which,validation,mapped,block,requested,position,size_value,plan,hook,cpp_side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault code=%08lx eip=%08lx cases=%u which=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,which,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+static void snapshot(State& s){memcpy(s.tables,tables,sizeof(tables));memcpy(s.memory,memory,sizeof(memory));memcpy(s.disk,disk,sizeof(disk));s.table=ptr(physical_files_006af084);s.count=static_cast<U>(physical_count_006af080);memcpy(s.mutexes,disk_mutexes_006aeffc,sizeof(s.mutexes));s.error=last_error;s.cursor=cursor;}
+static void event(U kind,U a=0,U b=0,U c=0,U d=0,U e=0){require(trace.count<128,"finite event bound");auto& v=trace.events[trace.count++];v.kind=kind;v.a=a;v.b=b;v.c=c;v.d=d;v.e=e;snapshot(v.state);}
+static void change(U at){
+    if(hook!=at||hook_calls++)return;
+    physical_files_006af084=physical_files_006af084==tables[0]?tables[1]:tables[0];
+    // Captured device is1; callbacks change the record's device and its original
+    // mutex cell so unlock must use reloaded mutex[1], not the changed device.
+    physical_files_006af084[slot].device=7;
+    disk_mutexes_006aeffc[1]=reinterpret_cast<void*>(0x15151515);
+}
+namespace porsche {
+void __stdcall platform_enter_critical_section(void* lock){event(1,ptr(lock));change(1);}
+void __stdcall platform_leave_critical_section(void* lock){event(2,ptr(lock));change(9);}
+U __stdcall platform_sleep(U milliseconds,I alertable){event(3,milliseconds,static_cast<U>(alertable));++sleeps;change(milliseconds?5:4);return 0x89abcdef;}
+// Fail-closed unused optimized-copy and diagnostic transport. The accepted heap
+// dispatch/forward-copy bodies run with asserted production defaults instead.
+void __cdecl heap_copy_005b0100(void*,const void*,U){ExitProcess(90);}
+void __cdecl heap_copy_005b02c0(void*,const void*,U){ExitProcess(90);}
+void __cdecl heap_copy_005b0480(void*,const void*,U){ExitProcess(90);}
+void __cdecl file_diagnostic_00565340(const char*){ExitProcess(90);}
+// Unused functions in the complete canonical owning TUs still require linker
+// definitions. These fail if reached; none is an oracle or production provider.
+U threads_initialized_006a57dc=0;
+void __cdecl thread_init_0055f320(U){ExitProcess(90);}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(90);}
+void __cdecl heap_fill_0053c290(void*,U,U){ExitProcess(90);}
+void __cdecl heap_format_005a0fbf(char*,const char*,const char*){ExitProcess(90);}
+I __cdecl file_exists_00561b80(const char*){ExitProcess(90);return 0;}
+I __cdecl file_wait_00567f70(U){ExitProcess(90);return 0;}
+U __cdecl file_device_name_00568e90(const char*){ExitProcess(90);return 0;}
+void __cdecl file_start_device_00568390(U){ExitProcess(90);}
+void* __cdecl file_object_allocate_0056e5f0(U*){ExitProcess(90);return nullptr;}
+U __cdecl file_object_free_0056e640(void*){ExitProcess(90);return 0;}
+void __cdecl file_format_005a0fbf(char*,const char*,const char*,const char*){ExitProcess(90);}
+void __cdecl file_set_last_error(U){ExitProcess(90);}
+IoNode* __cdecl io_find_00580ad0(IoList*,IoPredicate,U){ExitProcess(90);return nullptr;}
+IoNode* __cdecl io_pop_00580790(IoList*){ExitProcess(90);return nullptr;}
+IoNode* __cdecl io_take_00580c10(IoList*,IoPredicate,U){ExitProcess(90);return nullptr;}
+U __cdecl io_lock_00580ea0(IoList*){ExitProcess(90);return 0;}
+void __cdecl io_append_00580730(IoList*,IoNode*){ExitProcess(90);}
+void __cdecl io_sorted_00580850(IoList*,IoNode*){ExitProcess(90);}
+void __cdecl io_unlock_00580ec0(IoList*,U){ExitProcess(90);}
+void* __stdcall platform_create_event(void*,I,I,const char*){ExitProcess(90);return nullptr;}
+U __stdcall platform_set_event(void*){ExitProcess(90);return 0;}
+U __stdcall platform_reset_event(void*){ExitProcess(90);return 0;}
+U __stdcall platform_wait_events(U,void* const*,I,U,I){ExitProcess(90);return 0;}
+U __stdcall platform_close_handle(void*){ExitProcess(90);return 0;}
+U __stdcall platform_last_error(){ExitProcess(90);return 0;}
+}
+static void __stdcall set_error(U value){event(4,value);last_error=value;if(value==0)change(2);}
+static U __stdcall get_error(){event(5);return last_error;}
+static U __stdcall write_file(void* handle,const void* buffer,U count,U* written,void* overlapped){
+    event(6,ptr(handle),ptr(buffer),count,*written,ptr(overlapped));++writes;require(count<128,"bounded writes");
+    if((plan==3)||(plan==5&&writes==2)||(plan==6&&writes==2)){last_error=5;*written=0x12345678;change(3);return 0;}
+    if((plan==4&&writes==1)||(plan==7&&writes<3)){last_error=0x3e5;*written=0x87654321;change(3);return 0;}
+    U amount=plan==1?0:plan==2?count/2:plan==6?count+1:count;
+    require(cursor+amount<=sizeof(disk),"disk arena");memcpy(disk+cursor,buffer,amount);cursor+=amount;*written=amount;change(3);return end_result;
+}
+static U __stdcall set_end(void* handle){event(7,ptr(handle));change(7);return end_result;}
+static U __stdcall seek(void* handle,I distance,I* high,U method){event(8,ptr(handle),static_cast<U>(distance),ptr(high),method);change(8);return seek_result;}
+static void absolute(U at,U bytes,U old,const void* target,U expected){U n=0;for(U i=0;i+4<=bytes;++i)if(rd(slab+at+i)==old){wr(slab+at+i,ptr(target));++n;i+=3;}if(n!=expected){printf("patch absolute %x %x %u/%u\n",at,old,n,expected);patch_ok=false;}}
+static void relative(U at,U bytes,U va,U old,const void* target,U expected){U n=0;for(U i=0;i+5<=bytes;++i)if(slab[at+i]==0xe8&&va+i+5+rd(slab+at+i+1)==old){wr(slab+at+i+1,ptr(target)-ptr(slab+at+i+5));++n;i+=4;}if(n!=expected){printf("patch relative %x %x %u/%u\n",at,old,n,expected);patch_ok=false;}}
+static void initialize(){
+    AddVectoredExceptionHandler(1,fault);slab=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(slab!=nullptr,"allocate");
+    const unsigned char write_body[]={ @BODY_WRITE@ };const unsigned char end_body[]={ @BODY_END@ };
+    memcpy(slab,write_body,sizeof(write_body));memcpy(slab+0x200,end_body,sizeof(end_body));
+    for(U side=0;side<2;++side){U at=side?0x200:0,bytes=side?183:408,va=side?0x5924d0:0x591fa0;
+        absolute(at,bytes,0x6af084,&physical_files_006af084,side?4:4);absolute(at,bytes,0x6af080,&physical_count_006af080,1);
+        absolute(at,bytes,0x6aeffc,disk_mutexes_006aeffc,2);absolute(at,bytes,0x5b21a4,&platform_disk_set_last_error,2);
+        relative(at,bytes,va,0x5322b0,reinterpret_cast<void*>(&heap_enter_005322b0),1);relative(at,bytes,va,0x5322c0,reinterpret_cast<void*>(&heap_leave_005322c0),1);
+    }
+    absolute(0,408,0x5b21f0,&platform_disk_write_file,1);absolute(0,408,0x5b213c,&platform_disk_get_last_error,1);
+    relative(0,408,0x591fa0,0x5323e0,reinterpret_cast<void*>(&heap_copy_dispatch_005323e0),1);relative(0,408,0x591fa0,0x55f740,reinterpret_cast<void*>(&file_sleep_0055f740),2);
+    absolute(0x200,183,0x5b2240,&platform_disk_set_end_of_file,1);absolute(0x200,183,0x5b223c,&platform_disk_set_file_pointer,1);
+    require(patch_ok&&FlushInstructionCache(GetCurrentProcess(),slab,4096),"patch/flush");
+    require(physical_files_006af084==nullptr&&physical_count_006af080==0,"canonical initial physical state");
+    for(void* lock:disk_mutexes_006aeffc)require(lock==nullptr,"canonical initial mutex state");
+    require(copy_flag_005deb1c==0&&copy_flag_005deb18==0&&copy_flag_005deb10==1&&copy_flag_005deb30==0,"accepted copy defaults");
+    U written=0;SetLastError(0);require(platform_disk_write_file(INVALID_HANDLE_VALUE,memory,0,&written,nullptr)==0&&GetLastError()==ERROR_INVALID_HANDLE,"SDK WriteFile invalid handle");
+    SetLastError(0);require(platform_disk_set_end_of_file(INVALID_HANDLE_VALUE)==0&&GetLastError()==ERROR_INVALID_HANDLE,"SDK SetEndOfFile invalid handle");
+    platform_disk_set_last_error=set_error;platform_disk_get_last_error=get_error;platform_disk_write_file=write_file;platform_disk_set_end_of_file=set_end;platform_disk_set_file_pointer=seek;
+}
+// Synthetic cdecl caller. Return EAX matters; volatile ECX/EDX/flags do not.
+__declspec(noinline) static U invoke(void* fn,void* encoded,void* buffer,U arg){U result,saved_sp,saved_frame,fail=0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp,esp
+        mov saved_frame,ebp
+        cmp which,0
+        jne two
+        push arg
+        push buffer
+        jmp handle
+    two:push arg
+    handle:push encoded
+        mov ebx,13579bdfh
+        mov esi,55667788h
+        mov edi,99aabbcch
+        call fn
+        mov result,eax
+        cmp which,0
+        jne cleanup_two
+        add esp,4
+    cleanup_two:add esp,8
+        cmp esp,saved_sp
+        jne bad
+        cmp ebp,saved_frame
+        jne bad
+        cmp ebx,13579bdfh
+        jne bad
+        cmp esi,55667788h
+        jne bad
+        cmp edi,99aabbcch
+        je done
+    bad:mov fail,1
+    done:mov esp,saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    trace.abi=fail;return result;
+}
+static void load(){memset(&trace,0,sizeof(trace));memset(tables,0xa5,sizeof(tables));memset(disk,0x5a,sizeof(disk));
+    for(U i=0;i<sizeof(memory);++i)memory[i]=static_cast<unsigned char>(i*37+(i>>8));
+    for(U table=0;table<2;++table)for(U i=0;i<3;++i){auto& f=tables[table][i];f.active=1;f.device=1;f.os_handle=0x10101010+table;f.mode=0x11111111+table;f.block_size=block+table;f.mapping=0x20202020+table;f.view=mapped?ptr(memory+512):0;f.field18=position+table;f.size=size_value+table;}
+    physical_files_006af084=tables[0];physical_count_006af080=3;for(U i=0;i<32;++i)disk_mutexes_006aeffc[i]=reinterpret_cast<void*>(0x14141400+i);
+    if(validation==1)physical_files_006af084=nullptr;if(validation==2)physical_count_006af080=0;if(validation==3)tables[0][slot].active=0;if(validation==4)physical_count_006af080=-1;
+    writes=sleeps=cursor=hook_calls=0;last_error=0xabababab;
+}
+static void execute(bool cpp){cpp_side=cpp;load();U encoded=~slot;if(validation==5)encoded=0;if(validation==6)encoded=0x80000000;
+    void* fn=which?(cpp?reinterpret_cast<void*>(&file_backend_005924d0):slab+0x200):(cpp?reinterpret_cast<void*>(&file_backend_write_00591fa0):slab);
+    trace.result=invoke(fn,reinterpret_cast<void*>(encoded),memory+source_offset,which?offset:requested);snapshot(trace.state);require(trace.abi==0,"cdecl ABI");
+}
+static void compare(){execute(false);original=trace;execute(true);require(memcmp(&original,&trace,sizeof(trace))==0,"original/C++ return/intermediate/final state");total_events+=trace.count;++cases;}
+int main(){initialize();which=validation=slot=hook=plan=0;end_result=1;seek_result=17;source_offset=1024;position=3;size_value=39;
+    const U blocks[]={1,2,7,8,16,63};const U requests[]={0,1,2,7,8,9,23,39,40,63};
+    for(U m=0;m<2;++m)for(U b:blocks)for(U n:requests)for(U p=0;p<8;++p){mapped=m;block=b;requested=n;plan=p;compare();}
+    block=8;requested=23;plan=0;
+    for(U m=0;m<2;++m)for(U h=0;h<=9;++h)for(U p:{0u,4u,5u,7u}){mapped=m;hook=h;plan=p;compare();}
+    hook=plan=0;
+    for(U m=0;m<2;++m)for(U v=1;v<=6;++v)for(U s=0;s<3;++s){mapped=m;validation=v;slot=s;compare();}
+    validation=slot=0;
+    const U positions[]={0,3,39,40,0x7fffffffu,0x80000000u,0xfffffffeu};
+    mapped=0;plan=1;requested=7;for(U p:positions)for(U s:positions){position=p;size_value=s;compare();}
+    position=3;size_value=39;plan=0;mapped=1;requested=23;
+    for(U source:{508u,511u,512u,513u,516u,1023u,1024u,1025u}){source_offset=source;compare();}
+    source_offset=1024;which=1;
+    for(U m=0;m<2;++m)for(U h:{0u,1u,2u,7u,8u,9u})for(U r:{0u,1u,2u,0x80000000u,0xffffffffu})for(U o:{0u,1u,0x80000000u,0xffffffffu}){mapped=m;hook=h;end_result=r;offset=o;seek_result=o^0x80000011;compare();}
+    hook=0;for(U v=1;v<=6;++v){validation=v;compare();}
+    printf("file_stream_queries_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,total_events);return 0;
+}

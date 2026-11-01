@@ -1,0 +1,142 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_resource_controls_478.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(const void* p){U x;memcpy(&x,p,4);return x;}
+static void write(void* p,U x){memcpy(p,&x,4);}
+static U cases,events_total,mode,pattern,layout,kind,precision,rounding,depth;
+static bool cpp_side;
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s cases=%u kind=%u pattern=%u mode=%u layout=%u cpp=%u\n",why,cases,kind,pattern,mode,layout,cpp_side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault code=%08lx eip=%08lx cases=%u kind=%u mode=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,kind,mode,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+alignas(16) static B objects[3][2048],floating[512];
+struct State{U roots[2],query;B objects[3][2048];};
+struct Event{U handle;State before;};
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+struct Trace{U count,result,abi;Event events[140];State final;Fpu fpu;};
+static Trace trace,expected;
+static void snapshot(State& s){memcpy(s.roots,audio_channel_banks_00656aa8,8);s.query=audio_resource_query_root_00656ab4;memcpy(s.objects,objects,sizeof(objects));}
+// Controlled child boundary only. Run435 native002 proves the actual production
+// stop algorithm. Here each entry records pre-call state and makes adversarial
+// writes so delayed resets, captured objects and live reloads are observable.
+namespace porsche {
+I __cdecl audio_channel_stop_00565d60(U handle){
+    require(trace.count<140,"event bound");auto& event=trace.events[trace.count++];event.handle=handle;snapshot(event.before);
+    if(mode&1){audio_channel_banks_00656aa8[0]=objects[2];audio_channel_banks_00656aa8[1]=objects[2];}
+    if(mode&2)for(auto& object:objects){write(object+0x38,read(object+0x38)^7u);write(object+0x3c,read(object+0x3c)^13u);}
+    if(mode&4)for(auto& object:objects)for(U i=0;i<32;++i)write(object+0x5dc+12*i,read(object+0x5dc+12*i)^3u);
+    if(mode&8)for(auto& object:objects)for(U i=0;i<32;++i){write(object+0x45c+12*i,read(object+0x45c+12*i)^17u);write(object+0x44+4*i,0x87654321u);}
+    if(mode&16)audio_channel_banks_00656aa8[1]=0;
+    return static_cast<I>(handle^0x12345678u);
+}
+}
+static B* raw[3];
+static void absolute(B* code,U size,U old,const void* target,U wanted){U n=0;for(U i=0;i+4<=size;++i)if(read(code+i)==old){write(code+i,ptr(target));++n;i+=3;}require(n==wanted,"absolute relocation count");}
+static void relative(B* code,U size,U va,U target,const void* replacement,U wanted){U n=0;for(U i=0;i+5<=size;++i)if(code[i]==0xe8&&va+i+5+read(code+i+1)==target){write(code+i+1,ptr(replacement)-ptr(code+i+5));++n;i+=4;}require(n==wanted,"relative relocation count");}
+static void capture_fpu(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i)memcpy(f.values+i*10,floating+32+i*16,10);
+}
+static void seed_fpu(){unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm{
+    fninit
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    ffree st(0)
+    ffree st(1)
+    ffree st(2)
+    ffree st(3)
+    ffree st(4)
+    ffree st(5)
+    ffree st(6)
+    ffree st(7)
+    fldcw control
+    }
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+// Synthetic cdecl0 callsite; result is used for getters only. Callee-saved GPRs,
+// EBP/ESP and x87 state are checked, volatile GPRs/flags are not used by callers.
+__declspec(noinline) static U invoke(void* fn,U& result){U before,frame,fail=0,returned;__asm{
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov returned,eax
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    result=returned;return fail;
+}
+// Referenced exact legacy signed names force the /alternatename directives to
+// resolve in the native link as they must in the real game graph.
+extern "C" I __cdecl old_begin();extern "C" I __cdecl old_end();
+#pragma comment(linker,"/alternatename:_old_begin=?splash_progress_resource_begin_004ad670@porsche@@YAHXZ")
+#pragma comment(linker,"/alternatename:_old_end=?splash_progress_resource_end_004ad6c0@porsche@@YAHXZ")
+static void compare(){
+    State initial;snapshot(initial);
+    for(U side=0;side<2;++side){cpp_side=side!=0;memcpy(objects,initial.objects,sizeof(objects));memcpy(audio_channel_banks_00656aa8,initial.roots,8);audio_resource_query_root_00656ab4=initial.query;trace.count=trace.result=trace.abi=0;
+        seed_fpu();Fpu before;capture_fpu(before);void* fn=raw[kind];
+        if(side)fn=kind==0?reinterpret_cast<void*>(&frame_services_boundary_004ad510):kind==1?reinterpret_cast<void*>(&old_begin):reinterpret_cast<void*>(&old_end);
+        U result;trace.abi=invoke(fn,result);capture_fpu(trace.fpu);require(memcmp(&before,&trace.fpu,sizeof(Fpu))==0,"x87 preservation");
+        trace.result=kind?result:0;snapshot(trace.final);require(trace.abi==0,"cdecl ABI");
+        if(side){require(expected.count==trace.count&&expected.result==trace.result&&expected.abi==trace.abi&&memcmp(expected.events,trace.events,trace.count*sizeof(Event))==0&&memcmp(&expected.final,&trace.final,sizeof(State))==0&&memcmp(&expected.fpu,&trace.fpu,sizeof(Fpu))==0,"original/C++ state output callback order");events_total+=trace.count;}
+        else{expected.count=trace.count;expected.result=trace.result;expected.abi=trace.abi;memcpy(expected.events,trace.events,trace.count*sizeof(Event));expected.final=trace.final;expected.fpu=trace.fpu;}
+    }
+    ++cases;
+}
+static void init(){
+    require(audio_channel_banks_00656aa8[0]==0&&audio_channel_banks_00656aa8[1]==0&&audio_resource_query_root_00656ab4==0,"production loader zero roots");
+    require(ptr(audio_channel_banks_00656aa8+1)==ptr(audio_channel_banks_00656aa8)+4,"physical root alias stride");
+    static const B a[]={ @BODY_CLEANUP@ },b[]={ @BODY_BEGIN@ },c[]={ @BODY_END@ };
+    const B* bodies[]={a,b,c};U sizes[]={172,78,43};
+    for(U i=0;i<3;++i){raw[i]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(raw[i]!=nullptr,"raw allocation");memcpy(raw[i],bodies[i],sizes[i]);}
+    absolute(raw[0],172,0x656aa8,audio_channel_banks_00656aa8,1);absolute(raw[0],172,0x656ab0,audio_channel_banks_00656aa8+2,1);
+    relative(raw[0],172,0x4ad510,0x565d60,reinterpret_cast<void*>(&audio_channel_stop_00565d60),4);
+    for(U i:{1u,2u})absolute(raw[i],sizes[i],0x656ab4,&audio_resource_query_root_00656ab4,1);
+    for(B* code:raw)require(FlushInstructionCache(GetCurrentProcess(),code,4096)!=0,"instruction cache");
+}
+int main(){AddVectoredExceptionHandler(1,fault);init();
+    const U values[]={0xffffffffu,0,1,7,0xfffffffeu,0x80000000u,0x7fffffffu};
+    for(layout=0;layout<8;++layout)for(pattern=0;pattern<7;++pattern)for(mode=0;mode<32;++mode){
+        for(U object=0;object<3;++object){for(U j=0;j<2048;++j)objects[object][j]=static_cast<B>(j*37+object*13+pattern);
+            write(objects[object]+0x38,values[(pattern+object)%7]);write(objects[object]+0x3c,values[(pattern+object+1)%7]);
+            for(U i=0;i<32;++i){write(objects[object]+0x45c+12*i,values[(i+pattern)%7]);write(objects[object]+0x5dc+12*i,values[(i+pattern+2)%7]);}
+        }
+        audio_channel_banks_00656aa8[0]=(layout==0||layout==2)?nullptr:objects[0];
+        audio_channel_banks_00656aa8[1]=layout==0||layout==1?nullptr:layout==3?objects[0]:layout==4?objects[0]+4:layout==5?objects[0]+64:layout==6?objects[0]+128:objects[1];
+        audio_resource_query_root_00656ab4=ptr(objects[2]);kind=0;precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%9;compare();
+    }
+    mode=0;layout=0;pattern=0;
+    for(U present=0;present<2;++present)for(U enabled:values)for(U pending:values)for(U blocked:{0u,1u,0xffffffffu})for(U type:{0u,1u,2u,3u,0xffffffffu})for(U lhs:values)for(U rhs:values){
+        memset(objects,0xa5,sizeof(objects));audio_resource_query_root_00656ab4=present?ptr(objects[0]):0;
+        write(objects[0]+0x88,enabled);write(objects[0]+0x8c,pending);write(objects[0]+0x1c,blocked);write(objects[0]+0x14,type);write(objects[0]+0xa0,lhs);write(objects[0]+0xa4,rhs);write(objects[0]+0x84,values[cases%7]);
+        for(kind=1;kind<3;++kind){precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%9;compare();}
+    }
+    __asm fninit
+    printf("audio_resource_controls_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;
+}

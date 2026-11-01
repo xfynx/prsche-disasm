@@ -1,17 +1,17 @@
 # Current project status
 
-Updated 2026-10-31. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-01. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run474](iterations/v2/001-original-recovery/runs/474-audio-sample-integration/README.md)
-compiles 257 C++ translation units across 8 projects. The game link still has 167 unresolved
-names / 173 references. **There is no recovered playable C++ game executable yet.**
+[Run480](iterations/v2/001-original-recovery/runs/480-file-resource-ramp-integration/README.md)
+compiles 260 C++ translation units across 8 projects. The game link still has 160 unresolved
+names / 166 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates five original sample-pipeline functions:
-17,062 native cases,33 detected mutations and a633-pin audit. The old render
-name closes and two real ramp/stop dependencies appear. Registry:663 entries.
-File/resource/ramp work continues in parallel using the117-dossier REA cache.
+The latest batch integrates ten original file/resource/ramp functions:
+301,680 native cases,38 detected mutations and a640-pin audit. Seven names close
+without new dependencies. Registry:673 entries. Actual processor/ramp/pool
+composition now covers null hooks; full-game execution remains unverified.
 These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 

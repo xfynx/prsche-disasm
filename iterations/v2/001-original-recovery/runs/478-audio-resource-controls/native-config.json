@@ -1,0 +1,184 @@
+{
+  "run": 478,
+  "experiment": "local/experiments/v2-audio-resource-controls-478",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004ad510",
+      "bytes": 172,
+      "sha256": "729a0d7c5d247b044125ad1c4e1ea9b3f7d513a8df606771c95a6d5ae03f03e4",
+      "token": "@BODY_CLEANUP@"
+    },
+    {
+      "va": "004ad670",
+      "bytes": 78,
+      "sha256": "99c556e77ed8c7d17aefdbb5f8fb9e8d9b3a900559dcf788fc9adc4813779d9a",
+      "token": "@BODY_BEGIN@"
+    },
+    {
+      "va": "004ad6c0",
+      "bytes": 43,
+      "sha256": "3dcd7f98e3dff525289c4ef7ee0022988ef48c6849223351b2eec89a6c63077c",
+      "token": "@BODY_END@"
+    }
+  ],
+  "pass_marker": "audio_resource_controls_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "leading-zero",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "static_cast<I>(cell(object,0x3c))>=0",
+      "new": "static_cast<I>(cell(object,0x3c))>0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "second-leading-signed",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "static_cast<I>(cell(object,0x38))>=0",
+      "new": "cell(object,0x38)!=0xffffffffu",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "leading-reset-order",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "audio_channel_stop_00565d60(cell(object,0x3c));\n            cell(object,0x3c)=0xffffffffu;",
+      "new": "U old=cell(object,0x3c);cell(object,0x3c)=0xffffffffu;\n            audio_channel_stop_00565d60(old);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "byte-copy",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "object[0x2d3]=object[0x2d2]",
+      "new": "object[0x2d3]=object[0x2d1]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "table-negative",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "if(cell(object,first)!=0xffffffffu)",
+      "new": "if(static_cast<I>(cell(object,first))>=0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "second-table-negative",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "if(cell(object,second)!=0xffffffffu)",
+      "new": "if(static_cast<I>(cell(object,second))>=0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "second-handle-reload",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "if(cell(object,first)!=0xffffffffu)audio_channel_stop_00565d60(cell(object,first));\n            if(cell(object,second)!=0xffffffffu)audio_channel_stop_00565d60(cell(object,second));",
+      "new": "U old_second=cell(object,second);if(cell(object,first)!=0xffffffffu)audio_channel_stop_00565d60(cell(object,first));\n            if(old_second!=0xffffffffu)audio_channel_stop_00565d60(old_second);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "record-count",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "index<32",
+      "new": "index<31",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "record-stride",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "first=0x45c+12*index,second=0x5dc+12*index",
+      "new": "first=0x45c+8*index,second=0x5dc+8*index",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "record-zero",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "cell(object,0x44+4*index)=0",
+      "new": "cell(object,0x44+4*index)=1",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "next-root-live",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "for(U root=0;root<2;++root){\n        auto* const object=reinterpret_cast<B*>(audio_channel_banks_00656aa8[root]);",
+      "new": "void* frozen_next=audio_channel_banks_00656aa8[1];for(U root=0;root<2;++root){\n        auto* const object=reinterpret_cast<B*>(root==0?audio_channel_banks_00656aa8[0]:frozen_next);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "captured-object",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "audio_channel_stop_00565d60(cell(object,0x3c));\n            cell(object,0x3c)=0xffffffffu;",
+      "new": "audio_channel_stop_00565d60(cell(object,0x3c));\n            cell(audio_channel_banks_00656aa8[root]?reinterpret_cast<B*>(audio_channel_banks_00656aa8[root]):object,0x3c)=0xffffffffu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "query-mode-two",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "cell(object,0x14)!=2",
+      "new": "cell(object,0x14)!=3",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "query-signed",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "static_cast<I>(cell(object,0xa0))<=static_cast<I>(cell(object,0xa4))",
+      "new": "cell(object,0xa0)<=cell(object,0xa4)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "query-equal",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "static_cast<I>(cell(object,0xa0))<=static_cast<I>(cell(object,0xa4))",
+      "new": "static_cast<I>(cell(object,0xa0))<static_cast<I>(cell(object,0xa4))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "query-blocked",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "cell(object,0x1c)!=0",
+      "new": "cell(object,0x1c)==0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "query-begin-result",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "return cell(object,0x84)",
+      "new": "return cell(object,0xa4)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "query-end-result",
+      "source": "iterations/v2/001-original-recovery/runs/478-audio-resource-controls/audio_resource_controls_478.cpp",
+      "old": "return cell(object,0xa4);\n}",
+      "new": "return cell(object,0x84);\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

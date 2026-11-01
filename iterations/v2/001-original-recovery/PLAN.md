@@ -1,5 +1,28 @@
 # v2 / 001 - original source recovery plan
 
+Current480,2026-11-01: frozen477/478/479 add10original C++bodies1485B/24Bdata;
+registry673. SharedauditPASS301680cases/362086events/38mutations/640pins/461exports;
+onebuild260TUs/8projects,160names166refs,noEXE. Sevennamesclose/no newchildren.
+477exactIAT/SDK andcanonicalfile/mutex/locks/copy/sleep reused;478bankowner andsigned
+getteraliases proven;479actual475+479+438composition closesnullblockhook concern.
+Full473+475+476 producer scene andpriorlive/fault/partial boundaries remainopen.
+480README ownscommands/bounds. Nativeinputs frozen; original local/game unchanged.
+
+Workers hitquota; do notrespawn to bypass. Coordinator ownsremaining481drafts:
+startup415dc0/4b0fa0/560030,114B/6Bdata, no proofyet. Cached469/raw gatejumptable
+415de8 has5 identical415de1targets; verifyoriginal0101 gatebytes/canonicalstates,
+then native/sharedintegration. 434a90 is5B JMP434aa0(unregistered), not zerochild;
+recorddeferred realtarget beforeanybinding. No activeworker assignments remain.
+Render482trace was interruptedbeforeartifact:539b30 ECX+4/RET16,539b80 ECX+3/RET12,
+539f40 ECX/noargs; render_display.cpp112..117 disagrees. Raw467a3c surfaceword47800000
+vs current40800000, signedFILD dimensions vs unsignedcasts. Originaltranslation
+queue(-1,+1,-.1) survivesgetter untilinit; secondgetter leavesmatrixptr for539b00.
+Oldfixture checks tags notargs/matrices. 53454048Bdescriptor5de680..6af overlaps
+ownedwindow_shutdown_state005de6ac lastDWORD; neverduplicatewholeblock. Need traced
+caller/owner repair +refreshedproof. Fullgame/sourcegoal unchanged, no approximation.
+
+Historical474 follows.
+
 Current474,2026-10-31: frozen473/475/476 add5original C++bodies1150B/18Bstate;
 registry663. SharedauditPASS17062cases/33mutations/633pins/444exports; onebuild
 257TUs/8projects,167names173refs,noEXE. Oldrender closes; realramp/stop children

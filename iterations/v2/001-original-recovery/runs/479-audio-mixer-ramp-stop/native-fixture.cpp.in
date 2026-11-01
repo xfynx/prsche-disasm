@@ -1,0 +1,196 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_mixer_ramp_stop_479.hpp"
+#include "../382-rectangle/rectangle.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;std::memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){std::memcpy(p,&x,4);}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s\n",why);std::fflush(stdout);ExitProcess(1);}}
+// Dead dependencies of accepted owner TUs, never exercised or game providers.
+namespace porsche {
+I __cdecl application_audio_backend_initialize_0058a4f0(){ExitProcess(90);}
+void __cdecl application_audio_backend_apply_0058a690(){ExitProcess(90);}
+I __cdecl application_audio_backend_start_device_0058fdb0(){ExitProcess(90);}
+void __cdecl application_audio_backend_stop_device_0058fe80(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_enter_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_leave_critical_section(void*){ExitProcess(90);}
+I __cdecl audio_channel_stop_00565d60(U){ExitProcess(90);}
+void __cdecl audio_release_filter_initialize_0059a170(U){ExitProcess(90);}
+void __cdecl audio_release_filter_set_0059a150(U,U){ExitProcess(90);}
+I __stdcall audio_direct_sound_create_00597f70(const void*,U*,void*){ExitProcess(90);}
+void* __stdcall audio_platform_foreground_window(){ExitProcess(90);}
+void* __stdcall audio_platform_desktop_window(){ExitProcess(90);}
+void __stdcall render_display_draw_quad_006bd9a8(const void*,const void*,const void*,const void*){ExitProcess(90);}
+}
+alignas(16) static B floating[512];
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+static U depth=0,precision=3,rounding=0;
+static void fpu(Fpu& f){
+    __asm fxsave floating
+    f.control=static_cast<unsigned short>(rd(floating));f.status=static_cast<unsigned short>(rd(floating+2));f.tag=floating[4];std::memset(f.padding,0,3);
+    for(U i=0;i<8;++i)std::memcpy(f.values+i*10,floating+32+i*16,10);
+}
+static void seed(){
+    unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));
+    __asm {
+        fninit
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        ffree st(0)
+        ffree st(1)
+        ffree st(2)
+        ffree st(3)
+        ffree st(4)
+        ffree st(5)
+        ffree st(6)
+        ffree st(7)
+        fldcw control
+    }
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+// Synthetic cdecl1/2/3 carrier; only the ramp DWORD return is consumed.
+static U invoke(void* fn,U a,U b,U c,U argc,U& result){U saved_sp,saved_frame,fail=0,value;__asm {
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    cmp argc,3
+    jne two
+    push c
+two:cmp argc,2
+    jb one
+    push b
+one:push a
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov value,eax
+    mov eax,argc
+    lea esp,[esp+eax*4]
+    cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }result=value;return fail;}
+static B records[2][4][0x50],pool[512];
+static U objects[12][2],buffers[4],memory[16][80],factors[4];
+static U cases,events_total,flags,once,process_result,gain_bits=0x3f800001,initial_bits=0x3f000001,target_bits=0x3f800001,hook_mode=3;
+static B* slab;
+enum:U{GAIN=0,RAMP=0x40,STOP=0x200,DETACH=0x240,TARGET=0x2c0,PROCESSOR=0x340};
+struct State{AudioReleaseStorage458 storage;U format,hooks[4],buffers[4],objects[12][2];B records[2][4][0x50],pool[512];};
+struct Event{U tag,args[5];State state;Fpu fpu;};
+struct Trace{U count,abi,result;Event events[192];State state;U memory[16][80];Fpu fpu;};
+static Trace actual,original;
+static void snapshot(State& s){
+    s.storage=audio_release_storage_006b174c;s.format=audio_release_format_006b16a4;
+    s.hooks[0]=audio_mixer_voice_hook_006b16b4;s.hooks[1]=audio_mixer_block_hook_006b16b8;s.hooks[2]=audio_mixer_accumulate_006b17d4;s.hooks[3]=audio_mixer_stopped_hook_006b16a8;
+    std::memcpy(s.buffers,buffers,sizeof(buffers));std::memcpy(s.records,records,sizeof(records));std::memcpy(s.pool,pool,sizeof(pool));std::memcpy(s.objects,objects,sizeof(objects));
+}
+static void event(U tag,U a=0,U b=0,U c=0,U d=0,U e=0){
+    require(actual.count<192,"event extent");auto& x=actual.events[actual.count++];x.tag=tag;x.args[0]=a;x.args[1]=b;x.args[2]=c;x.args[3]=d;x.args[4]=e;snapshot(x.state);fpu(x.fpu);
+}
+static I __cdecl chain(U object,U count,U input,U output,U zero){
+    U id=99;for(U i=0;i<12;++i)if(object==ptr(objects[i]))id=i;require(id<12&&zero==0,"chain contract");event(10+id,object,count,input,output,zero);
+    if((flags&1)&&!(once&1)){once|=1;audio_release_storage_006b174c.table=ptr(records[1]);}
+    if((flags&2)&&!(once&2)){once|=2;audio_release_channel_count_006b16a5=audio_release_channel_count_006b16a5==1?4:1;}
+    if((flags&4)&&!(once&4)){once|=4;audio_release_storage_006b174c.aligned[1]=ptr(memory[15]);for(U i=0;i<4;++i)audio_release_storage_006b174c.channel_aligned[i]=ptr(memory[8+i]);}
+    if((flags&8)&&!(once&8)){once|=8;wr(records[0][0]+0xc,0x3e800001);wr(records[0][0]+0x10,0x3f400001);wr(records[0][0]+4,0x3f100001);}
+    if((flags&16)&&!(once&16)){once|=16;wr(records[0][0]+0x34,ptr(objects[1]));}
+    return id<4?static_cast<I>(process_result):static_cast<I>(0x80000001u+id);
+}
+static void __cdecl accumulate(U count,U factor,U source,U destination){
+    require(count==1||count<=32,"bounded accumulator count");event(30,count,factor,source,destination);
+    if((flags&32)&&!(once&32)){once|=32;audio_release_channel_count_006b16a5=audio_release_channel_count_006b16a5==1?4:1;audio_release_storage_006b174c.aligned[1]=ptr(memory[15]);}
+}
+static void __cdecl voice_hook(U record,U count,U source,U consumed){
+    event(31,record,count,source,consumed);if((flags&64)&&!(once&64)){once|=64;audio_mixer_voice_hook_006b16b4=0;wr(reinterpret_cast<void*>(record+0x10),0x3f400001);}
+}
+static void __cdecl block_hook(U count){event(32,count);}
+static void __cdecl stopped_hook(U index){event(33,index);if((flags&128)&&!(once&128)){once|=128;audio_release_format_006b16a4=(audio_release_format_006b16a4&~255u)|1u;}}
+static void absolute(U offset,U size,U old,const void* target,U expected){U found=0;for(U i=0;i+4<=size;++i)if(rd(slab+offset+i)==old){wr(slab+offset+i,ptr(target));++found;i+=3;}require(found==expected,"absolute relocation count");}
+static void relative(U offset,U site,U original_va,U old,const void* target){require(slab[offset+site]==0xe8&&original_va+site+5+rd(slab+offset+site+1)==old,"original relative call");wr(slab+offset+site+1,ptr(target)-ptr(slab+offset+site+5));}
+static const B raw_scale[]={ @SCALE@ },raw_floor[]={ @FLOOR@ };
+static void init(){
+    require(audio_mixer_stopped_hook_006b16a8==0,"production stopped callback zero");
+    require(std::memcmp(raw_scale,&audio_mixer_gain_scale_005b246c,4)==0&&std::memcmp(raw_floor,&audio_mixer_gain_floor_005b2738,4)==0,"raw original scalar bits before reset");
+    static const B a[]={ @GAIN@ },b[]={ @RAMP@ },c[]={ @STOP@ },d[]={ @DETACH@ },e[]={ @TARGET@ },f[]={ @PROCESSOR@ };
+    slab=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(slab!=nullptr,"raw slab");std::memcpy(slab+GAIN,a,sizeof(a));std::memcpy(slab+RAMP,b,sizeof(b));std::memcpy(slab+STOP,c,sizeof(c));std::memcpy(slab+DETACH,d,sizeof(d));std::memcpy(slab+TARGET,e,sizeof(e));std::memcpy(slab+PROCESSOR,f,sizeof(f));
+    auto& s=audio_release_storage_006b174c;
+    absolute(GAIN,20,0x5b246c,&audio_mixer_gain_scale_005b246c,1);
+    absolute(RAMP,361,0x6b1754,&s.aligned[0],1);absolute(RAMP,361,0x6b1758,&s.aligned[1],4);absolute(RAMP,361,0x6b16a5,&audio_release_channel_count_006b16a5,4);absolute(RAMP,361,0x6b16b4,&audio_mixer_voice_hook_006b16b4,1);absolute(RAMP,361,0x6b17d4,&audio_mixer_accumulate_006b17d4,1);
+    absolute(STOP,23,0x6b16a8,&audio_mixer_stopped_hook_006b16a8,1);absolute(DETACH,108,0x6b17d0,&s.table,1);
+    absolute(TARGET,89,0x6b17d0,&s.table,1);absolute(TARGET,89,0x6b16a5,&audio_release_channel_count_006b16a5,1);absolute(TARGET,89,0x5b2738,&audio_mixer_gain_floor_005b2738,1);
+    relative(RAMP,0x10a,0x5980c0,0x5980a0,slab+GAIN);relative(STOP,6,0x598670,0x598690,slab+DETACH);
+    relative(DETACH,0x36,0x598690,0x598700,slab+TARGET);relative(DETACH,0x41,0x598690,0x5980c0,slab+RAMP);relative(DETACH,0x51,0x598690,0x58ac30,reinterpret_cast<void*>(&audio_backend_pool_release_0058ac30));
+    absolute(PROCESSOR,472,0x6b16a4,&audio_release_format_006b16a4,2);absolute(PROCESSOR,472,0x6b16a5,&audio_release_channel_count_006b16a5,4);absolute(PROCESSOR,472,0x6b17d0,&s.table,1);absolute(PROCESSOR,472,0x6b1754,&s.aligned[0],3);absolute(PROCESSOR,472,0x6b1758,&s.aligned[1],4);absolute(PROCESSOR,472,0x6b1790,&s.filter[0],1);
+    absolute(PROCESSOR,472,0x6b16b4,&audio_mixer_voice_hook_006b16b4,1);absolute(PROCESSOR,472,0x6b16b8,&audio_mixer_block_hook_006b16b8,1);absolute(PROCESSOR,472,0x6b17d4,&audio_mixer_accumulate_006b17d4,1);absolute(PROCESSOR,472,0x5b23f8,&rectangle_zero_005b23f8,1);
+    relative(PROCESSOR,0x3d,0x598760,0x5980c0,slab+RAMP);relative(PROCESSOR,0x7d,0x598760,0x598670,slab+STOP);relative(PROCESSOR,0x1b8,0x598760,0x58fef0,reinterpret_cast<void*>(&application_audio_backend_configure_0058fef0));
+    require(FlushInstructionCache(GetCurrentProcess(),slab,4096)!=0,"raw cache");
+}
+static void reset(U lanes){
+    std::memset(&actual,0,sizeof(actual));std::memset(pool,0xa5,sizeof(pool));once=0;auto& s=audio_release_storage_006b174c;std::memset(&s,0,sizeof(s));
+    for(U i=0;i<16;++i)for(U j=0;j<80;++j)memory[i][j]=0xbabe0000+i*256+j;
+    for(U i=0;i<12;++i){objects[i][0]=i<3?ptr(objects[i+1]):0;objects[i][1]=ptr(reinterpret_cast<void*>(&chain));}
+    for(U t=0;t<2;++t)for(U i=0;i<4;++i){std::memset(records[t][i],0x5a,0x50);records[t][i][0]=2;records[t][i][1]=1;wr(records[t][i]+4,gain_bits);wr(records[t][i]+8,0xdddddddd);wr(records[t][i]+0xc,initial_bits);wr(records[t][i]+0x10,target_bits);wr(records[t][i]+0x34,ptr(objects[i]));for(U j=0;j<4;++j){wr(records[t][i]+0x14+j*4,initial_bits);wr(records[t][i]+0x24+j*4,target_bits);}}
+    s.table=ptr(records[0]);s.aligned[0]=ptr(memory[4]);s.aligned[1]=ptr(memory[5]);
+    for(U i=0;i<4;++i){s.channel_aligned[i]=ptr(memory[i]);s.channel_word[i]=ptr(objects[8+i]);s.filter[i]=0;buffers[i]=ptr(memory[8+i]);factors[i]=target_bits;}
+    audio_release_format_006b16a4=0xbeef0002u|(lanes<<8);audio_backend_pool_006b4a18=ptr(pool);
+    wr(pool,ptr(objects));wr(pool+4,ptr(pool+0x100));wr(pool+0xc,0x100);wr(pool+0x10,0x100);wr(pool+0x14,0xfffffffcu);
+    for(U i=0;i<4;++i){wr(pool+0x100-i*8,i*8);wr(pool+0x104-i*8,8);}
+    audio_mixer_voice_hook_006b16b4=(hook_mode&1)?ptr(reinterpret_cast<void*>(&voice_hook)):0;audio_mixer_block_hook_006b16b8=(hook_mode&2)?ptr(reinterpret_cast<void*>(&block_hook)):0;audio_mixer_accumulate_006b17d4=ptr(reinterpret_cast<void*>(&accumulate));audio_mixer_stopped_hook_006b16a8=ptr(reinterpret_cast<void*>(&stopped_hook));
+}
+static void execute(bool cpp,U kind,U count,U lanes){
+    reset(lanes);seed();U a=ptr(records[0][0]),b=count,c=0,argc=1;void* fn=nullptr;
+    switch(kind){
+    case 0:fn=cpp?reinterpret_cast<void*>(&audio_mixer_refresh_gain_005980a0):slab+GAIN;break;
+    case 1:fn=cpp?reinterpret_cast<void*>(&audio_mixer_ramp_voice_005980c0):slab+RAMP;argc=2;break;
+    case 2:fn=cpp?reinterpret_cast<void*>(&audio_mixer_target_slot_00598700):slab+TARGET;a=0;b=gain_bits;c=(flags&256)?ptr(records[0][0]+0x20):ptr(factors);argc=3;break;
+    case 3:fn=cpp?reinterpret_cast<void*>(&audio_mixer_detach_slot_00598690):slab+DETACH;a=0;break;
+    case 4:fn=cpp?reinterpret_cast<void*>(&audio_mixer_stop_slot_00598670):slab+STOP;a=0;break;
+    case 5:fn=cpp?reinterpret_cast<void*>(&audio_mixer_process_block_00598760):slab+PROCESSOR;a=count;b=ptr(buffers);argc=2;break;
+    default:require(false,"kind");}
+    actual.abi=invoke(fn,a,b,c,argc,actual.result);if(kind!=1)actual.result=0;snapshot(actual.state);std::memcpy(actual.memory,memory,sizeof(memory));fpu(actual.fpu);
+}
+static void check(U kind,U count,U lanes){
+    execute(false,kind,count,lanes);original=actual;execute(true,kind,count,lanes);
+    if(actual.abi||original.abi||std::memcmp(&actual,&original,sizeof(actual))!=0){const B* a=reinterpret_cast<const B*>(&actual);const B* b=reinterpret_cast<const B*>(&original);U n=0;while(n<sizeof(actual)&&a[n]==b[n])++n;std::printf("divergence case=%u kind=%u count=%08x lanes=%u result=%08x gain=%08x cur=%08x target=%08x flags=%u hooks=%u pc=%u rc=%u depth=%u byte=%u %02x/%02x events=%u/%u ret=%08x/%08x\n",cases,kind,count,lanes,process_result,gain_bits,initial_bits,target_bits,flags,hook_mode,precision,rounding,depth,n,n<sizeof(actual)?a[n]:0,n<sizeof(actual)?b[n]:0,actual.count,original.count,actual.result,original.result);std::fflush(stdout);ExitProcess(1);}
+    ++cases;events_total+=actual.count;
+}
+int main(){
+    SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);init();flags=0;process_result=1;
+    for(U count:{0u,1u,2u,31u,32u,33u,256u,0x80000000u,0xffffffffu})for(U lanes=0;lanes<=4;++lanes)for(U result:{0u,1u,0x7fffffffu,0x80000000u,0xffffffffu}){process_result=result;check(1,count,lanes);}
+    for(U hooks=0;hooks<4;++hooks)for(U kind=0;kind<6;++kind)for(U lanes=0;lanes<=4;++lanes){hook_mode=hooks;process_result=1;check(kind,3,lanes);}
+    hook_mode=3;
+    for(U f=0;f<256;++f)for(U result:{1u,0xffffffffu}){flags=f;process_result=result;check(1,3,4);check(4,3,4);check(5,3,4);}
+    flags=0;process_result=1;
+    for(U bits:{0u,0x80000000u,1u,0x3f800001u,0xbf800001u,0x7f800000u,0x7fc12345u,0x7f812345u})for(U pc:{0u,2u,3u})for(U rc=0;rc<4;++rc)for(U d:{0u,1u,6u}){gain_bits=bits;initial_bits=bits;target_bits=bits^0x00800000;precision=pc;rounding=rc;depth=d;check(0,3,4);check(2,3,4);check(1,3,4);check(1,0,0);}
+    gain_bits=0x3f800000;initial_bits=0x3f000001;
+    for(U bits:{0u,0x80000000u,0x3ba3d709u,0x3ba3d70au,0x3ba3d70bu,0xbba3d70au,0x7fc12345u,0x7f812345u})for(U pc:{0u,2u,3u})for(U rc=0;rc<4;++rc)for(U d:{0u,1u,6u}){target_bits=bits;precision=pc;rounding=rc;depth=d;flags=0;check(2,3,4);flags=256;check(2,3,4);}
+    require(VirtualFree(slab,0,MEM_RELEASE)!=0,"raw cleanup");std::printf("audio_mixer_ramp_stop_original_x86_vs_cpp=PASS cases=%u events=%u x87=PASS pool=PASS composed475=PASS null_hooks=PASS ABI=PASS\n",cases,events_total);return 0;
+}

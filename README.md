@@ -31,8 +31,8 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run474](iterations/v2/001-original-recovery/runs/474-audio-sample-integration/README.md)
-  integrates original sample dispatch, processing and packed conversion.
+  [Run480](iterations/v2/001-original-recovery/runs/480-file-resource-ramp-integration/README.md)
+  integrates original file, resource and mixer ramp/stop dependency closures.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

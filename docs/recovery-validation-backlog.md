@@ -1,5 +1,17 @@
 # Отложенные проверки восстановления v2
 
+Run480:10originals1485B/24Bdata;301680cases/38mutations/640pins PASS;260TUs/
+160names166refs,noEXE. Actual475+479+438composition/all4null-presenthookmodes now
+closes475initiallynullblockhook concern. Full473+475+476 producer scene stillopen.
+Fileworker/liveasync/realPCM/subscribers/nonprogress/fault/concurrency/game stayopen.
+Render482concrete trace: rawsurfaceinitword47800000 differsold40800000; original
+signedFILD width/height differsunsignedcasts; queuedtranslation/getter/matrixcall
+argumentflow andECX/RET contracts differoldbindings. Existingfixture records tags,
+notreceivers/args/matrices. Descriptor5de68048B overlapsowned5de6ac lastDWORD;
+provephysicalowner beforeleaf534540. 481drafts unaccepted;434a90 JMP434aa0 deferred.
+
+Historical474 follows.
+
 Run474:5originals1150B/18Bstate;17062cases/33mutations/633pins PASS;257TUs/
 167names173refs,noEXE. Separate473dispatch/475process/476converter proofs pass;
 combineddefinedproducer scene is stillrequired. Add475initiallynullblockhook case

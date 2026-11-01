@@ -1,0 +1,121 @@
+{
+  "run": 477,
+  "experiment": "local/experiments/v2-file-stream-queries-477",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/files.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/file_disk.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/heap_locks.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/heap.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/file_events.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/shared_runtime_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/477-file-stream-queries",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/477-file-stream-queries/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00591fa0",
+      "bytes": 408,
+      "sha256": "f31d903170e107293d01d33de8db5662886c930a7b261bdf341bd7caeae7577c",
+      "token": "@BODY_WRITE@"
+    },
+    {
+      "va": "005924d0",
+      "bytes": 183,
+      "sha256": "7cd96456696afdcc300b2b13158c44843f4e01a30dbe0d11be60e04897450fd5",
+      "token": "@BODY_END@"
+    }
+  ],
+  "pass_marker": "file_stream_queries_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "write-return-zero",
+      "source": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+      "old": "transferred=0;break;",
+      "new": "break;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "pending-error",
+      "source": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+      "old": "!=0x3e5u",
+      "new": "!=0x3e6u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "sleep-mapped",
+      "source": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+      "old": "file_sleep_0055f740(0)",
+      "new": "file_sleep_0055f740(1)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "mapped-clamp",
+      "source": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+      "old": "if(initial.view&&",
+      "new": "if(!initial.view&&",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "position-signed",
+      "source": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+      "old": "static_cast<I>(position)>static_cast<I>(current.size)",
+      "new": "position>current.size",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "short-write",
+      "source": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+      "old": "written<chunk?0:requested-written",
+      "new": "written<=chunk?0:requested-written",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "initial-written",
+      "source": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+      "old": "U input=number(buffer);",
+      "new": "written=0; U input=number(buffer);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "table-reload",
+      "source": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+      "old": "auto& current=base[slot];",
+      "new": "auto& current=initial;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "unlock-device",
+      "source": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+      "old": "heap_leave_005322c0(disk_mutexes_006aeffc[device]);\n    return transferred;",
+      "new": "heap_leave_005322c0(disk_mutexes_006aeffc[physical_files_006af084[slot].device]);\n    return transferred;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "end-result",
+      "source": "iterations/v2/001-original-recovery/runs/477-file-stream-queries/file_stream_queries_477.cpp",
+      "old": "return result;",
+      "new": "return result?1u:0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

@@ -1,0 +1,161 @@
+{
+  "run": 479,
+  "experiment": "local/experiments/v2-audio-mixer-ramp-stop-479",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator/audio_pool_438.cpp",
+    "iterations/v2/001-original-recovery/runs/475-audio-sample-processor/audio_sample_processor_475.cpp",
+    "iterations/v2/001-original-recovery/runs/458-audio-release-chain/audio_release_chain_458.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp",
+    "iterations/v2/001-original-recovery/runs/382-rectangle/rectangle.cpp",
+    "iterations/v2/001-original-recovery/runs/221-readonly-scalar-storage/original_scalars.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/audio_capabilities_443.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop",
+    "iterations/v2/001-original-recovery/runs/475-audio-sample-processor",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005980a0",
+      "bytes": 20,
+      "sha256": "47a0c7046a37bbd09b6ba2f6f8fb08d86aed0bfae140981b27af88862e050899",
+      "token": "@GAIN@"
+    },
+    {
+      "va": "005980c0",
+      "bytes": 361,
+      "sha256": "adb16f115540735ad75586943efc982d5d563c02fb533fa14905e477bf49b947",
+      "token": "@RAMP@"
+    },
+    {
+      "va": "00598670",
+      "bytes": 23,
+      "sha256": "162ac327b3ffc009eb204abb6a3ea57ef8af92a295faaac8cf73c21d3b5a3534",
+      "token": "@STOP@"
+    },
+    {
+      "va": "00598690",
+      "bytes": 108,
+      "sha256": "6ca518538a5ef1c2f0504c886a4dce381e96cd416df20d72e1acb9e54e189a52",
+      "token": "@DETACH@"
+    },
+    {
+      "va": "00598700",
+      "bytes": 89,
+      "sha256": "52beace34cc2a68ae97479d6c90d9eda6eaa5586b016700b054ec6b8ecb3ce7f",
+      "token": "@TARGET@"
+    },
+    {
+      "va": "00598760",
+      "bytes": 472,
+      "sha256": "4d0eaeb99b6f8a321e1ba6c7e5fa6654e3efcfbd6bc0f613754211646e6f09f0",
+      "token": "@PROCESSOR@"
+    },
+    {
+      "va": "005b246c",
+      "bytes": 4,
+      "sha256": "c0e336a5f371ef22cd534e094269f2c1a9635cd080b71ffa671086832d3b60b7",
+      "token": "@SCALE@"
+    },
+    {
+      "va": "005b2738",
+      "bytes": 4,
+      "sha256": "1229f28c7e699bf60a4b44363dcb39610e8b7206037302d7f69ba6f80d4009e7",
+      "token": "@FLOOR@"
+    }
+  ],
+  "pass_marker": "audio_mixer_ramp_stop_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 90,
+  "mutations": [
+    {
+      "name": "count-cap",
+      "source": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+      "old": "if(static_cast<I>(count)>32)count=32;",
+      "new": "if(static_cast<I>(count)>32)count=31;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "nonpositive",
+      "source": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+      "old": "if(result<=0)",
+      "new": "if(result<0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "volume-finish",
+      "source": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+      "old": "store(record+0xc,word(record+0x10));\n    return count;",
+      "new": "store(record+0xc,word(record+0xc));\n    return count;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "target-equality",
+      "source": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+      "old": "if(status&0x100u)",
+      "new": "if((status&0x100u)==0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "target-step",
+      "source": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+      "old": "record+0x24+lane*4,gain_bits",
+      "new": "record+0x24+lane*4+4,gain_bits",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "sample-offset",
+      "source": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+      "old": "state.aligned[1]+sample*4,state.channel_aligned[lane]+sample*4",
+      "new": "state.aligned[1]+sample*2,state.channel_aligned[lane]+sample*4",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "last-lane",
+      "source": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+      "old": "if(lane==lanes()-1u)",
+      "new": "if(lane==lanes())",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "detach-ramp",
+      "source": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+      "old": "audio_mixer_ramp_voice_005980c0(record,256)",
+      "new": "audio_mixer_ramp_voice_005980c0(record,1)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "chain-finish",
+      "source": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+      "old": "store(record+0x34,0);",
+      "new": "store(record+0x34,object+4);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "refresh-factor",
+      "source": "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop/audio_mixer_ramp_stop_479.cpp",
+      "old": "fmul dword ptr [eax+4]",
+      "new": "fmul dword ptr [eax+0ch]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
