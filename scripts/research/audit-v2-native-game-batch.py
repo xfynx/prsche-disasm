@@ -130,6 +130,25 @@ def audit_native(cfg, cache, sha):
     return result
 
 
+def audit_source_changes(old_sources, sources, added_sources, replaced_sources=None,
+                         native_sources=()):
+    """Allow only declared additions and explicitly proved one-for-one replacements."""
+    old_sources, sources = set(old_sources), set(sources)
+    additions = set(added_sources)
+    assert len(additions) == len(added_sources), 'duplicate added source'
+    replacements = {} if replaced_sources is None else replaced_sources
+    assert isinstance(replacements, dict), 'replaced_sources must map old paths to new paths'
+    assert all(isinstance(old, str) and isinstance(new, str)
+               for old, new in replacements.items()), 'invalid replacement path'
+    assert old_sources - sources == set(replacements), 'unlisted or ineffective source removal'
+    assert sources - old_sources == additions, 'unexpected added source'
+    targets = set(replacements.values())
+    assert len(targets) == len(replacements), 'replacement targets must be unique'
+    assert targets <= additions, 'replacement target must be a new compiler input'
+    assert targets <= set(native_sources), 'replacement target lacks a passed native packet'
+    return replacements
+
+
 def audit_game_source_names(sources, original_probe_sources=()):
     # Original game audio probes are legitimate recovered code. Exceptions must
     # name exact compiler inputs; fixture inputs remain forbidden unconditionally.
@@ -170,7 +189,12 @@ def audit(config_path):
     _, pins = reader.verify(current, 'source', expected_hash_mode='crlf-to-lf')
     assert current['input_unchanged'] and not current['compiler_errors'] and not current['other_linker_errors']
     old_sources, sources = set(baseline['compiled_source_roots']), set(current['compiled_source_roots'])
-    assert old_sources <= sources and sources - old_sources == set(cfg['added_sources'])
+    replacements = cfg.get('replaced_sources', {})
+    native_sources = set()
+    if replacements:
+        for item in batches:
+            native_sources.update(load(ROOT / item['native_config'])['sources'])
+    audit_source_changes(old_sources, sources, cfg['added_sources'], replacements, native_sources)
     assert current['source_count'] == len(sources)
     assert collections.Counter(Path(p).name for p in current['project_paths']) == collections.Counter(
         Path(p).name for p in baseline['project_paths'])
@@ -232,6 +256,8 @@ def audit(config_path):
         result['platform_import_thunks'] = platform
     if cfg.get('original_probe_sources'):
         result['original_probe_sources'] = sorted(cfg['original_probe_sources'])
+    if replacements:
+        result['replaced_sources'] = replacements
     return result
 
 

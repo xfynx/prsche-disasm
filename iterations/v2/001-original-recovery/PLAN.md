@@ -1,5 +1,25 @@
 # v2 / 001 - original source recovery plan
 
+Current487,2026-11-02: frozen484/485/486 add16originals1192B +repaired1761Bcaller,
+2048Bdata;registry692. SharedauditPASS29346cases/1116912events/38mutations/650pins/
+505exports;264TUs/8projects,166names172refs,noEXE.7oldnamesclose/16realtypedchildren
+appear(15audio+networkcleanup). 484oldTU explicitlyreplaced, immutablefiles retained;
+sourceguard3positive/9negative +483regressionPASS. No sourceconsolidationnow.
+ConstructorremainsPARTIAL: matrix/surface/etc fixesproven but494discovered44e870
+requires2args;484forwardsone. 487present-followup.json recordsqueuedreadOK flow.
+No one-argguessedprovider; new494core/496callerfreshproofrequired. READMEownscommands.
+
+Ready491intake:488closedcallbackdrain(8func582B/4B),489pixelU32conversion+usedAL
+facade/actual484parent(1func267B/0B),492ordinaryC++PCM(4func520B/4B).490staysunintegrated
+assemblyreference;3DNow59bc40/59bb90 lackhostoracle andremainexplicitunresolved.
+Active493PCMconstructors711B/2lowerfrontiers(sample_processor_475);494renderleaves/
+sparsefields+following496callerrepair(audio_resource_478);495bankcleanup141B
+(sample_converter_476). Workers ownrun/local files, coordinatorownscommonintegration.
+Fullproducer/init/fault/concurrency/live/rendergameplay/403/411 boundaries persist.
+Future unifiedsource tree onlyafterfulloriginalcoderecovery(rootPLAN milestone4).
+
+Historical483 follows.
+
 Current483,2026-11-01: frozen481 adds3originalC++bodies114B/6Bdata;registry676.
 SharedauditPASS978cases/4088events/12mutations/643pins/467exports;261TUs/8projects,
 157names163refs,noEXE. Threeoldnamesclose/no newchildren; firstnative001PASS.

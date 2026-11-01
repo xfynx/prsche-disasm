@@ -1,0 +1,202 @@
+{
+  "run": 484,
+  "experiment": "local/experiments/v2-render-constructor-repair-484",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_transform_484.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_objects.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/shared_runtime_globals.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004677e0",
+      "bytes": 1761,
+      "sha256": "bd0bab14fda45ace7f6f0565df8fa216fbdd922e6927f541ff73c792d53fc607",
+      "token": "@BODY_CALLER@"
+    },
+    {
+      "va": "00539b30",
+      "bytes": 68,
+      "sha256": "6bc4cbec86852b3cd0dca5a1ddd345d507829666932aaaaf88b7965e6ee2ffd2",
+      "token": "@BODY_DIAGONAL@"
+    },
+    {
+      "va": "00539b80",
+      "bytes": 69,
+      "sha256": "0d6869eff44e85fedb074633f878fafc1a7d933d8a85194c636af1f7f5082486",
+      "token": "@BODY_TRANSLATION@"
+    },
+    {
+      "va": "00539f40",
+      "bytes": 15,
+      "sha256": "6c0e49bdef6b8dc69d34873790afdedfc4c12e8f78bb52952344449f6891f06f",
+      "token": "@BODY_GETTER@"
+    },
+    {
+      "va": "00466e80",
+      "bytes": 9,
+      "sha256": "aa1d0523d277f6a14d7950c488982e29fa08fe5d88274b15a712c4427302720a",
+      "token": "@BODY_SETTER@"
+    }
+  ],
+  "pass_marker": "render_constructor_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "surface-depth-word",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "0,0,0x3f800000,0x47800000",
+      "new": "0,0,0x3f800000,0x40800000",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "dimension-signed",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "__asm {fild value}",
+      "new": "__asm {fld value}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "translation-x",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "transform,0xbf800000,0x3f800000,0xbdcccccd",
+      "new": "transform,0x3f800000,0x3f800000,0xbdcccccd",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "height-capture",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "divide_word(0xc0000000,actual_height)",
+      "new": "divide_word(0xc0000000,signed_float_word(render_display_actual_height_00619788))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "height-sign",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "divide_word(0xc0000000,actual_height)",
+      "new": "divide_word(0x40000000,actual_height)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "width-divisor",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "divide_word(0x40000000,actual_width)",
+      "new": "divide_word(0x40000000,actual_height)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getter-receiver",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "render_display_surface_transform_00539f40(reinterpret_cast<void*>(read32(self,0x7c)));\n    render_display_transform_init",
+      "new": "render_display_surface_transform_00539f40(surface);\n    render_display_transform_init",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "attach-receiver",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "render_display_transform_attach_00539b00(attached,matrix)",
+      "new": "render_display_transform_attach_00539b00(surface,matrix)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "local-reload",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "reinterpret_cast<void*>(read32(self,0x7c)+0xb8u)",
+      "new": "static_cast<std::uint8_t*>(surface)+0xb8",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "vertex-field",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "0,0,0x3f7fff00,0x37800080,0xffffffff,0,0,0,",
+      "new": "0,0x3f7fff00,0,0x37800080,0xffffffff,0,0,0,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "pixel-decoder",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "(bits==4||bits==8)?0u:(bits==24||bits==32)?1u:2u",
+      "new": "bits==4?0u:2u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "copy-source",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "reinterpret_cast<void*>(read32(texture,0x28)+0x10u)",
+      "new": "static_cast<std::uint8_t*>(texture)+0x38",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "driver-finish",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+      "old": "reinterpret_cast<void*>(read32(reinterpret_cast<void*>(read32(self,0x70)),4))",
+      "new": "reinterpret_cast<void*>(read32(self,0x70)+4u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "matrix-diagonal",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_transform_484.cpp",
+      "old": "store(matrix,40,z);store(matrix,60,w)",
+      "new": "store(matrix,40,w);store(matrix,60,z)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "translation-z",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_transform_484.cpp",
+      "old": "store(matrix,56,z);store(matrix,60,0x3f800000)",
+      "new": "store(matrix,56,y);store(matrix,60,0x3f800000)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getter-dirty",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_transform_484.cpp",
+      "old": "static_cast<B*>(object)[24]=1",
+      "new": "static_cast<B*>(object)[24]=0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getter-count",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_transform_484.cpp",
+      "old": "store(object,16,count+1u)",
+      "new": "store(object,16,count+2u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "local-value",
+      "source": "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_transform_484.cpp",
+      "old": "store(object,0,value);",
+      "new": "store(object,0,value+1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

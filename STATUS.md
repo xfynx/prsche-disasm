@@ -1,18 +1,18 @@
 # Current project status
 
-Updated 2026-11-01. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-02. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run483](iterations/v2/001-original-recovery/runs/483-startup-gates-integration/README.md)
-compiles 261 C++ translation units across 8 projects. The game link still has 157 unresolved
-names / 163 references. **There is no recovered playable C++ game executable yet.**
+[Run487](iterations/v2/001-original-recovery/runs/487-render-network-mixer-integration/README.md)
+compiles 264 C++ translation units across 8 projects. The game link still has 166 unresolved
+names / 172 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates three original startup/update functions:
-978 native cases,12 detected mutations and a643-pin audit. Three names close
-without new dependencies. Registry:676 entries, including explicit partial domains.
-Follow-up482 found real renderer argument/ABI defects hidden by older tag-only
-endpoints; constructor4677e0 is now PARTIAL pending repaired caller/helper proof.
+The latest batch integrates16 original helper/network/configuration functions and
+replaces the defective renderer TU:29,346 native cases,38 mutations,650-pin audit.
+Seven names close;16 real callback/constructor dependencies appear. Registry692.
+Matrix/surface and other caller fixes are proved, while constructor4677e0 remains
+PARTIAL for a newly traced second present argument pending494/496.
 These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 

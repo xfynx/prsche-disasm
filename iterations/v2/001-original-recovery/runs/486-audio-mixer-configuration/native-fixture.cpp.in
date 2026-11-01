@@ -1,0 +1,325 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_mixer_configuration_486.hpp"
+#include "porsche/exit_registry.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(U p){U x;std::memcpy(&x,reinterpret_cast<void*>(p),4);return x;}
+static void write(U p,U x){std::memcpy(reinterpret_cast<void*>(p),&x,4);}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s\n",why);std::fflush(stdout);ExitProcess(1);}}
+namespace porsche {
+// Dead dependencies of unchanged accepted owners are not fixture substitutes
+// for any production function exercised by this packet.
+void* __stdcall platform_create_thread(void*,U,ThreadBootstrap,void*,U,U*){ExitProcess(90);}
+U __stdcall platform_thread_priority(void*,I){ExitProcess(90);}
+void __stdcall audio_platform_sleep_455(U){ExitProcess(90);}
+void __cdecl audio_thread_mix_0058f8e0(){ExitProcess(90);}
+void __cdecl exit_registry_lock_api_005a4ba4(U){ExitProcess(90);}
+void __cdecl exit_registry_unlock_api_005a4c05(U){ExitProcess(90);}
+U __cdecl exit_registry_allocation_size_005a8161(const void*){ExitProcess(90);}
+void* __cdecl exit_registry_reallocate_005a8029(void*,U){ExitProcess(90);}
+void* __cdecl exit_registry_malloc_005a3be5(U){ExitProcess(90);}
+void __cdecl exit_registry_fatal_005a2e22(U){ExitProcess(90);}
+I __cdecl application_audio_probe_measure_00565890(){ExitProcess(90);}
+I __cdecl audio_device_initialize_ds_0058ebe0(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_enter_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_leave_critical_section(void*){ExitProcess(90);}
+I __cdecl audio_backend_find_channel_00589d20(U){ExitProcess(90);}
+U __cdecl audio_backend_next_voice_00590340(I,U*){ExitProcess(90);}
+U __cdecl audio_backend_cpu_features_00597070(){ExitProcess(90);}
+}
+extern "C" I __stdcall DirectSoundCreate(const void*,U*,void*){ExitProcess(90);}
+#pragma comment(linker,"/alternatename:_GetForegroundWindow@0=_unused_foreground_466@0")
+#pragma comment(linker,"/alternatename:_GetDesktopWindow@0=_unused_desktop_466@0")
+extern "C" void* __stdcall unused_foreground_466(){ExitProcess(90);}
+extern "C" void* __stdcall unused_desktop_466(){ExitProcess(90);}
+
+
+namespace porsche { void __stdcall render_display_draw_quad_006bd9a8(const void*,const void*,const void*,const void*){ExitProcess(90);} }
+static U rd(const void* p){return read(ptr(p));}
+static void wr(void* p,U x){write(ptr(p),x);}
+alignas(16) static B floating[512];
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+static U depth=0,precision=3,rounding=0;
+static void fpu(Fpu& f){
+    __asm fxsave floating
+    f.control=static_cast<unsigned short>(rd(floating));f.status=static_cast<unsigned short>(rd(floating+2));f.tag=floating[4];std::memset(f.padding,0,3);
+    for(U i=0;i<8;++i)std::memcpy(f.values+i*10,floating+32+i*16,10);
+}
+static void seed(){
+    unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));
+    __asm {
+        fninit
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        ffree st(0)
+        ffree st(1)
+        ffree st(2)
+        ffree st(3)
+        ffree st(4)
+        ffree st(5)
+        ffree st(6)
+        ffree st(7)
+        fldcw control
+    }
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+// Synthetic cdecl1/2/3 carrier; only the ramp DWORD return is consumed.
+static U invoke(void* fn,U a,U b,U c,U argc,U& result){U saved_sp,saved_frame,fail=0,value;__asm {
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    cmp argc,3
+    jne two
+    push c
+two:cmp argc,2
+    jb one
+    push b
+one:cmp argc,0
+    je callsite
+    push a
+callsite:
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov value,eax
+    mov eax,argc
+    lea esp,[esp+eax*4]
+    cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }result=value;return fail;}
+alignas(64) static B arena[0x20000];
+static U parameters[8],object[1024],node_head,nodes[8][3];
+static B* slab;static U cases,events_total,base_bias,list_mode,callback_mode=1,phase;
+struct Event{U tag,args[5],params[8];Fpu fpu;};
+struct Trace{
+    U count,abi;Event events[24];
+    B arena[0x20000],device[0x18c];AudioReleaseStorage458 storage;
+    U rate,format,hooks[4],constructors[15],sizes[15],tables[464],params[8],node_head,nodes[8][3],object[1024];
+    std::uint16_t stride,padding;Fpu fpu;
+};
+static Trace actual,original;
+static void event(U tag,U a=0,U b=0,U c=0,U d=0,U e=0){
+    require(actual.count<24,"event extent");auto& x=actual.events[actual.count++];x.tag=tag;x.args[0]=a;x.args[1]=b;x.args[2]=c;x.args[3]=d;x.args[4]=e;std::memcpy(x.params,parameters,sizeof(parameters));fpu(x.fpu);
+}
+static void constructor(U id,U output,U* input){require(output==ptr(object)&&input==parameters,"constructor cdecl2 transport");event(100+id,output,ptr(input));input[7]=0xface0000+id;}
+namespace porsche {
+void __cdecl audio_mixer_construct_pcm_00597c10(U o,U* p){constructor(0,o,p);}
+void __cdecl audio_mixer_construct_pcm_loop_0059cc30(U o,U* p){constructor(1,o,p);}
+void __cdecl audio_mixer_construct_pcm_stream_0059cb50(U o,U* p){constructor(2,o,p);}
+void __cdecl audio_mixer_construct_nibble_00597dc0(U o,U* p){constructor(3,o,p);}
+void __cdecl audio_mixer_construct_nibble_loop_0059c9f0(U o,U* p){constructor(4,o,p);}
+void __cdecl audio_mixer_construct_nibble_stream_0059c610(U o,U* p){constructor(5,o,p);}
+void __cdecl audio_mixer_construct_adpcm_00597f20(U o,U* p){constructor(6,o,p);}
+void __cdecl audio_mixer_construct_adpcm_stream_0059c360(U o,U* p){constructor(7,o,p);}
+void __cdecl audio_mixer_construct_resampler_0059b830(U o,U* p){constructor(8,o,p);}
+void __cdecl audio_mixer_accumulate_scalar_0059ba70(U n,U f,U s,U d){event(200,n,f,s,d);}
+void __cdecl audio_mixer_accumulate_x87_0059baf0(U n,U f,U s,U d){event(201,n,f,s,d);}
+void __cdecl audio_mixer_accumulate_3dnow_0059bc40(U n,U f,U s,U d){event(202,n,f,s,d);}
+void __cdecl audio_mixer_decode_s16_x87_0059b9f0(U n,U s,U d){event(210,n,s,d);}
+void __cdecl audio_mixer_decode_s16_3dnow_0059bb90(U n,U s,U d){event(211,n,s,d);}
+I __cdecl audio_mixer_output_pcm16_0059a350(U o,U n,U s,U d,U z){event(215,o,n,s,d,z);return -17;}
+}
+static void __cdecl stopped(U index){event(300,index);}
+static void patch(U offset,U expected,const void* target){require(rd(slab+offset)==expected,"raw absolute operand identity");wr(slab+offset,ptr(target));}
+static void call(U offset,U original_va,U expected,const void* target){require(slab[offset]==0xe8&&original_va+5+rd(slab+offset+1)==expected,"raw relative call identity");wr(slab+offset+1,ptr(target)-ptr(slab+offset+5));}
+static const B raw_scale[]={ @SCALE@ };
+static void init(){
+    require(audio_mixer_rate_006b16a0==0&&audio_mixer_decode_s16_006b17d8==0,"production scalar zero state");
+    for(U x:audio_mixer_constructors_006b16bc)require(x==0,"production constructor zero state");for(U x:audio_mixer_object_sizes_006b1704)require(x==0,"production object size zero state");
+    for(U i=0;i<256;++i)require(rd(audio_mixer_pcm8_lookup_006b00c0+i)==0,"production PCM8 table zero state");for(U i=0;i<208;++i)require(rd(audio_mixer_nibble_lookup_006b04c0+i)==0,"production nibble table zero state");
+    require(std::memcmp(raw_scale,&audio_mixer_pcm8_scale_005b26b0,4)==0,"raw original scale before reset");
+    slab=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(slab!=nullptr,"raw slab");
+    static const B bytes_CONFIG[]={ @CONFIG@ };std::memcpy(slab+0x0,bytes_CONFIG,sizeof(bytes_CONFIG));
+    static const B bytes_INSERT[]={ @INSERT@ };std::memcpy(slab+0x200,bytes_INSERT,sizeof(bytes_INSERT));
+    static const B bytes_SELECT[]={ @SELECT@ };std::memcpy(slab+0x240,bytes_SELECT,sizeof(bytes_SELECT));
+    static const B bytes_OUTPUT[]={ @OUTPUT@ };std::memcpy(slab+0x300,bytes_OUTPUT,sizeof(bytes_OUTPUT));
+    static const B bytes_ADPCM[]={ @ADPCM@ };std::memcpy(slab+0x320,bytes_ADPCM,sizeof(bytes_ADPCM));
+    static const B bytes_NIBBLE_REG[]={ @NIBBLE_REG@ };std::memcpy(slab+0x360,bytes_NIBBLE_REG,sizeof(bytes_NIBBLE_REG));
+    static const B bytes_PCM16_REG[]={ @PCM16_REG@ };std::memcpy(slab+0x3b0,bytes_PCM16_REG,sizeof(bytes_PCM16_REG));
+    static const B bytes_PCM8_REG[]={ @PCM8_REG@ };std::memcpy(slab+0x400,bytes_PCM8_REG,sizeof(bytes_PCM8_REG));
+    static const B bytes_NIBBLE_TABLE[]={ @NIBBLE_TABLE@ };std::memcpy(slab+0x450,bytes_NIBBLE_TABLE,sizeof(bytes_NIBBLE_TABLE));
+    static const B bytes_PCM8_TABLE[]={ @PCM8_TABLE@ };std::memcpy(slab+0x490,bytes_PCM8_TABLE,sizeof(bytes_PCM8_TABLE));
+    auto& s=audio_release_storage_006b174c;
+    patch(0xa,0x6b1754,&s.aligned[0]);
+    patch(0x10,0x6b16a0,&audio_mixer_rate_006b16a0);
+    patch(0x19,0x6b16a4,&audio_release_format_006b16a4);
+    patch(0x21,0x6b16a8,&audio_mixer_stopped_hook_006b16a8);
+    call(0x2a,0x59825a,0x58aae0,reinterpret_cast<void*>(&application_audio_backend_allocate_0058aae0));
+    patch(0x50,0x6b175c,&s.channel_raw[0]);
+    patch(0x57,0x6b16a6,reinterpret_cast<B*>(&audio_release_format_006b16a4)+2);
+    call(0x64,0x598294,0x58aae0,reinterpret_cast<void*>(&application_audio_backend_allocate_0058aae0));
+    patch(0x6d,0x6b177c,&s.optional);
+    patch(0x72,0x6b16a4,&audio_release_format_006b16a4);
+    patch(0x7d,0x6b176c,&s.channel_aligned[0]);
+    call(0x86,0x5982b6,0x58aae0,reinterpret_cast<void*>(&application_audio_backend_allocate_0058aae0));
+    patch(0xa5,0x6b16a4,&audio_release_format_006b16a4);
+    call(0xc1,0x5982f1,0x58aae0,reinterpret_cast<void*>(&application_audio_backend_allocate_0058aae0));
+    patch(0xc9,0x6b16a4,&audio_release_format_006b16a4);
+    patch(0xd4,0x6b17d0,&s.table);
+    call(0xf1,0x598321,0x59b9a0,slab+0x400);
+    call(0xf6,0x598326,0x59b960,slab+0x3b0);
+    call(0xfb,0x59832b,0x59b910,slab+0x360);
+    call(0x100,0x598330,0x59b8a0,slab+0x320);
+    patch(0x107,0x6b16f4,audio_mixer_constructors_006b16bc+14);
+    patch(0x10b,0x59b830,reinterpret_cast<void*>(&audio_mixer_construct_resampler_0059b830));
+    patch(0x111,0x6b173c,audio_mixer_object_sizes_006b1704+14);
+    call(0x119,0x598349,0x598460,slab+0x240);
+    patch(0x11f,0x6b16a5,&audio_release_channel_count_006b16a5);
+    patch(0x12b,0x6b1780,&s.channel_word[0]);
+    patch(0x130,0x6b17a0,s.opaque_006b17a0);
+    call(0x13c,0x59836c,0x59a3d0,slab+0x300);
+    call(0x149,0x598379,0x596cd0,slab+0x200);
+    patch(0x15e,0x6b16a5,&audio_release_channel_count_006b16a5);
+    patch(0x241,0x6b49a3,application_audio_device_state_006b48c0.data()+0xe3);
+    patch(0x24b,0x6b17d4,&audio_mixer_accumulate_006b17d4);
+    patch(0x24f,0x59bc40,reinterpret_cast<void*>(&audio_mixer_accumulate_3dnow_0059bc40));
+    patch(0x255,0x6b17d8,&audio_mixer_decode_s16_006b17d8);
+    patch(0x259,0x59bb90,reinterpret_cast<void*>(&audio_mixer_decode_s16_3dnow_0059bb90));
+    patch(0x263,0x6b17d4,&audio_mixer_accumulate_006b17d4);
+    patch(0x267,0x59baf0,reinterpret_cast<void*>(&audio_mixer_accumulate_x87_0059baf0));
+    patch(0x26f,0x6b17d4,&audio_mixer_accumulate_006b17d4);
+    patch(0x273,0x59ba70,reinterpret_cast<void*>(&audio_mixer_accumulate_scalar_0059ba70));
+    patch(0x279,0x6b17d8,&audio_mixer_decode_s16_006b17d8);
+    patch(0x27d,0x59b9f0,reinterpret_cast<void*>(&audio_mixer_decode_s16_x87_0059b9f0));
+    patch(0x282,0x6b16a6,reinterpret_cast<B*>(&audio_release_format_006b16a4)+2);
+    patch(0x289,0x6b16ac,&audio_mixer_block_stride_006b16ac);
+    patch(0x297,0x6b16a5,&audio_release_channel_count_006b16a5);
+    patch(0x2a0,0x6b16ac,&audio_mixer_block_stride_006b16ac);
+    patch(0x307,0x59a350,reinterpret_cast<void*>(&audio_mixer_output_pcm16_0059a350));
+    patch(0x322,0x6b16e0,audio_mixer_constructors_006b16bc+9);
+    patch(0x326,0x597f20,reinterpret_cast<void*>(&audio_mixer_construct_adpcm_00597f20));
+    patch(0x32c,0x6b16e8,audio_mixer_constructors_006b16bc+11);
+    patch(0x330,0x59c360,reinterpret_cast<void*>(&audio_mixer_construct_adpcm_stream_0059c360));
+    patch(0x336,0x6b1728,audio_mixer_object_sizes_006b1704+9);
+    patch(0x340,0x6b1730,audio_mixer_object_sizes_006b1704+11);
+    call(0x360,0x59b910,0x59b8d0,slab+0x450);
+    patch(0x367,0x6b16d4,audio_mixer_constructors_006b16bc+6);
+    patch(0x36b,0x597dc0,reinterpret_cast<void*>(&audio_mixer_construct_nibble_00597dc0));
+    patch(0x371,0x6b16d8,audio_mixer_constructors_006b16bc+7);
+    patch(0x375,0x59c9f0,reinterpret_cast<void*>(&audio_mixer_construct_nibble_loop_0059c9f0));
+    patch(0x37b,0x6b16dc,audio_mixer_constructors_006b16bc+8);
+    patch(0x37f,0x59c610,reinterpret_cast<void*>(&audio_mixer_construct_nibble_stream_0059c610));
+    patch(0x385,0x6b171c,audio_mixer_object_sizes_006b1704+6);
+    patch(0x38f,0x6b1720,audio_mixer_object_sizes_006b1704+7);
+    patch(0x399,0x6b1724,audio_mixer_object_sizes_006b1704+8);
+    patch(0x3b2,0x6b16c8,audio_mixer_constructors_006b16bc+3);
+    patch(0x3b6,0x597c10,reinterpret_cast<void*>(&audio_mixer_construct_pcm_00597c10));
+    patch(0x3bc,0x6b1710,audio_mixer_object_sizes_006b1704+3);
+    patch(0x3c6,0x6b16cc,audio_mixer_constructors_006b16bc+4);
+    patch(0x3ca,0x59cc30,reinterpret_cast<void*>(&audio_mixer_construct_pcm_loop_0059cc30));
+    patch(0x3d0,0x6b1714,audio_mixer_object_sizes_006b1704+4);
+    patch(0x3da,0x6b16d0,audio_mixer_constructors_006b16bc+5);
+    patch(0x3de,0x59cb50,reinterpret_cast<void*>(&audio_mixer_construct_pcm_stream_0059cb50));
+    patch(0x3e4,0x6b1718,audio_mixer_object_sizes_006b1704+5);
+    call(0x400,0x59b9a0,0x59c1b0,slab+0x490);
+    patch(0x407,0x6b16bc,audio_mixer_constructors_006b16bc+0);
+    patch(0x40b,0x597c10,reinterpret_cast<void*>(&audio_mixer_construct_pcm_00597c10));
+    patch(0x411,0x6b16c0,audio_mixer_constructors_006b16bc+1);
+    patch(0x415,0x59cc30,reinterpret_cast<void*>(&audio_mixer_construct_pcm_loop_0059cc30));
+    patch(0x41b,0x6b16c4,audio_mixer_constructors_006b16bc+2);
+    patch(0x41f,0x59cb50,reinterpret_cast<void*>(&audio_mixer_construct_pcm_stream_0059cb50));
+    patch(0x425,0x6b1704,audio_mixer_object_sizes_006b1704+0);
+    patch(0x42f,0x6b1708,audio_mixer_object_sizes_006b1704+1);
+    patch(0x439,0x6b170c,audio_mixer_object_sizes_006b1704+2);
+    patch(0x455,0x6b04c0,audio_mixer_nibble_lookup_006b04c0);
+    patch(0x47c,0x6b0800,audio_mixer_nibble_lookup_006b04c0+208);
+    patch(0x4a9,0x5b26b0,&audio_mixer_pcm8_scale_005b26b0);
+    patch(0x4b7,0x6b00c0,audio_mixer_pcm8_lookup_006b00c0);
+    require(FlushInstructionCache(GetCurrentProcess(),slab,4096)!=0,"raw cache");
+}
+static void reset(U voices,U lanes,U mono,U opaque,U cpu){
+    std::memset(&actual,0,sizeof(actual));std::memset(arena,0x5a,sizeof(arena));std::memset(object,0xc3,sizeof(object));
+    std::memset(application_audio_device_state_006b48c0.backing.data(),0xa5,application_audio_device_state_006b48c0.backing.size());application_audio_device_state_006b48c0[0xe3]=static_cast<B>(cpu);
+    std::memset(&audio_release_storage_006b174c,0xa5,sizeof(audio_release_storage_006b174c));
+    for(U i=0;i<15;++i){audio_mixer_constructors_006b16bc[i]=0xfeed0000+i;audio_mixer_object_sizes_006b1704[i]=0xbeef0000+i;}
+    for(U i=0;i<256;++i)wr(audio_mixer_pcm8_lookup_006b00c0+i,0xdeadbeef);for(U i=0;i<208;++i)wr(audio_mixer_nibble_lookup_006b04c0+i,0xdeadbeef);
+    audio_mixer_rate_006b16a0=0xdecafbad;audio_release_format_006b16a4=voices|(lanes<<8)|(mono<<16)|(opaque<<24);
+    audio_mixer_accumulate_006b17d4=0xace01234;audio_mixer_decode_s16_006b17d8=0xace05678;audio_mixer_stopped_hook_006b16a8=0xace07890;audio_mixer_voice_hook_006b16b4=0;audio_mixer_block_hook_006b16b8=0;audio_mixer_block_stride_006b16ac=0xa5a5;
+    audio_backend_pool_006b4a18=ptr(arena+0x40);wr(arena+0x40,ptr(arena+0x100+base_bias));wr(arena+0x44,ptr(arena+0x1e000));wr(arena+0x48,0x1c000);wr(arena+0x4c,0x1c000);wr(arena+0x50,0x1c000);wr(arena+0x54,0);
+    for(U i=0;i<8;++i)parameters[i]=0x12340000+i;
+    static const std::uint16_t priorities[8]={0x8000,0xffff,0,0,1,0x7fff,0,0};
+    for(U i=0;i<8;++i){nodes[i][0]=i<5?ptr(nodes[i+1]):0;nodes[i][1]=0xfaca0000+i;nodes[i][2]=0xbabe0000|priorities[i];}
+    node_head=list_mode==0?0:ptr(nodes[0]);nodes[6][0]=0xdeadbeef;nodes[6][2]=0xbabe0000|static_cast<std::uint16_t>(list_mode>>1);
+}
+static void snapshot(){
+    std::memcpy(actual.arena,arena,sizeof(arena));std::memcpy(actual.device,application_audio_device_state_006b48c0.backing.data(),sizeof(actual.device));actual.storage=audio_release_storage_006b174c;
+    actual.rate=audio_mixer_rate_006b16a0;actual.format=audio_release_format_006b16a4;actual.hooks[0]=audio_mixer_stopped_hook_006b16a8;actual.hooks[1]=audio_mixer_voice_hook_006b16b4;actual.hooks[2]=audio_mixer_block_hook_006b16b8;actual.hooks[3]=audio_mixer_decode_s16_006b17d8;
+    std::memcpy(actual.constructors,audio_mixer_constructors_006b16bc,60);std::memcpy(actual.sizes,audio_mixer_object_sizes_006b1704,60);std::memcpy(actual.tables,audio_mixer_pcm8_lookup_006b00c0,1024);std::memcpy(actual.tables+256,audio_mixer_nibble_lookup_006b04c0,832);
+    std::memcpy(actual.params,parameters,sizeof(parameters));std::memcpy(actual.nodes,nodes,sizeof(nodes));std::memcpy(actual.object,object,sizeof(object));actual.node_head=node_head;actual.stride=audio_mixer_block_stride_006b16ac;fpu(actual.fpu);
+}
+static void consumers(U kind){
+    if(kind==0){
+        // Synthetic typed transports after the real producer; bodies stay controlled.
+        for(U i:{0u,1u,2u,3u,4u,5u,6u,7u,8u,9u,11u,14u}){
+            const U callback=audio_mixer_constructors_006b16bc[i];
+            bool known=false;for(auto provider:{&audio_mixer_construct_pcm_00597c10,&audio_mixer_construct_pcm_loop_0059cc30,&audio_mixer_construct_pcm_stream_0059cb50,&audio_mixer_construct_nibble_00597dc0,&audio_mixer_construct_nibble_loop_0059c9f0,&audio_mixer_construct_nibble_stream_0059c610,&audio_mixer_construct_adpcm_00597f20,&audio_mixer_construct_adpcm_stream_0059c360,&audio_mixer_construct_resampler_0059b830})if(callback==ptr(reinterpret_cast<void*>(provider)))known=true;
+            require(known,"mapped constructor transport");reinterpret_cast<void(__cdecl*)(U,U*)>(callback)(ptr(object),parameters);
+        }
+        reinterpret_cast<void(__cdecl*)(U,U,U,U)>(audio_mixer_accumulate_006b17d4)(3,0x7fc12345,ptr(arena+0x100),ptr(arena+0x200));
+        reinterpret_cast<void(__cdecl*)(U,U,U)>(audio_mixer_decode_s16_006b17d8)(3,ptr(arena+0x100),ptr(arena+0x200));
+        if(audio_release_channel_count_006b16a5!=0){U buffers[4]={ptr(arena+0x18000),ptr(arena+0x18400),ptr(arena+0x18800),ptr(arena+0x18c00)};audio_mixer_process_block_00598760(3,buffers);}
+    }else if(kind==1){reinterpret_cast<void(__cdecl*)(U,U,U,U)>(audio_mixer_accumulate_006b17d4)(3,0x7fc12345,ptr(arena+0x100),ptr(arena+0x200));reinterpret_cast<void(__cdecl*)(U,U,U)>(audio_mixer_decode_s16_006b17d8)(3,ptr(arena+0x100),ptr(arena+0x200));}
+}
+static void execute(bool cpp,U kind,U voices,U lanes,U mono,U opaque,U cpu){
+    reset(voices,lanes,mono,opaque,cpu);if(kind==0)for(U& filter:audio_release_storage_006b174c.filter)filter=0;AudioMixerConfig462 config;config.rate=0xfedcba98;const U incoming=voices|(lanes<<8)|(mono<<16)|(opaque<<24);std::memcpy(&config.bits,&incoming,4);config.callback=callback_mode?&stopped:nullptr;if(kind==0)audio_release_format_006b16a4=~incoming;
+    U a=0,b=0,argc=0,result=0;void* fn=nullptr;
+    switch(kind){
+    case 0:fn=cpp?reinterpret_cast<void*>(&audio_ds_mixer_initialize_00598230):slab;a=ptr(&config);argc=1;break;
+    case 1:fn=cpp?reinterpret_cast<void*>(&audio_mixer_select_kernels_00598460):slab+0x240;break;
+    case 2:fn=cpp?reinterpret_cast<void*>(&audio_mixer_insert_node_00596cd0):slab+0x200;a=ptr(&node_head);b=ptr(nodes[6]);argc=2;break;
+    case 3:fn=cpp?reinterpret_cast<void*>(&audio_mixer_initialize_output_0059a3d0):slab+0x300;a=ptr(object);argc=1;break;
+    case 4:fn=cpp?reinterpret_cast<void*>(&audio_mixer_register_adpcm_0059b8a0):slab+0x320;break;
+    case 5:fn=cpp?reinterpret_cast<void*>(&audio_mixer_register_nibble_0059b910):slab+0x360;break;
+    case 6:fn=cpp?reinterpret_cast<void*>(&audio_mixer_register_pcm16_0059b960):slab+0x3b0;break;
+    case 7:fn=cpp?reinterpret_cast<void*>(&audio_mixer_register_pcm8_0059b9a0):slab+0x400;break;
+    case 8:fn=cpp?reinterpret_cast<void*>(&audio_mixer_initialize_nibble_table_0059b8d0):slab+0x450;break;
+    case 9:fn=cpp?reinterpret_cast<void*>(&audio_mixer_initialize_pcm8_table_0059c1b0):slab+0x490;break;
+    default:require(false,"kind");}
+    seed();phase=1;actual.abi=invoke(fn,a,b,0,argc,result);phase=2;consumers(kind);phase=3;snapshot();
+}
+static void check(U kind,U voices=4,U lanes=4,U mono=1,U opaque=0xa5,U cpu=0){
+    execute(false,kind,voices,lanes,mono,opaque,cpu);original=actual;execute(true,kind,voices,lanes,mono,opaque,cpu);
+    if(actual.abi||original.abi||std::memcmp(&actual,&original,sizeof(actual))!=0){const B* a=reinterpret_cast<const B*>(&actual);const B* b=reinterpret_cast<const B*>(&original);U n=0;while(n<sizeof(actual)&&a[n]==b[n])++n;std::printf("divergence case=%u kind=%u voices=%u lanes=%u mono=%u opaque=%u cpu=%u bias=%u list=%08x pc=%u rc=%u depth=%u byte=%u %02x/%02x events=%u/%u\n",cases,kind,voices,lanes,mono,opaque,cpu,base_bias,list_mode,precision,rounding,depth,n,n<sizeof(actual)?a[n]:0,n<sizeof(actual)?b[n]:0,actual.count,original.count);std::fflush(stdout);ExitProcess(1);}
+    ++cases;events_total+=actual.count;
+}
+static LONG CALLBACK fault(EXCEPTION_POINTERS* e){
+    std::printf("divergence fault code=%08x eip=%08x slab=%08x offset=%08x case=%u phase=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,ptr(slab),e->ContextRecord->Eip-ptr(slab),cases,phase);std::fflush(stdout);ExitProcess(1);return EXCEPTION_CONTINUE_SEARCH;
+}
+int main(){
+    SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);AddVectoredExceptionHandler(1,&fault);init();list_mode=0;
+    for(U bias=0;bias<64;bias+=4)for(U voices=0;voices<=4;++voices)for(U lanes=0;lanes<=4;++lanes)for(U mono:{0u,1u})for(U opaque:{0u,255u}){base_bias=bias;callback_mode=opaque&1;check(0,voices,lanes,mono,opaque,bias&7);}
+    for(U cpu=0;cpu<256;++cpu)for(U lanes=0;lanes<=4;++lanes)for(U mono:{0u,255u})check(1,4,lanes,mono,0xa5,cpu);
+    for(U p:{0x8000u,0xffffu,0u,1u,0x7fffu}){list_mode=(p<<1)|1;check(2);}list_mode=0;check(2);
+    for(U kind=3;kind<10;++kind)check(kind);
+    for(U pc:{0u,2u,3u})for(U rc=0;rc<4;++rc)for(U d:{0u,1u,6u})for(U kind:{0u,5u,7u,8u,9u}){precision=pc;rounding=rc;depth=d;check(kind);}
+    require(VirtualFree(slab,0,MEM_RELEASE)!=0,"raw cleanup");std::printf("audio_mixer_configuration_original_x86_vs_cpp=PASS cases=%u events=%u allocator438=PASS state=PASS pointer_transport=PASS consumer475=PASS x87=PASS ABI=PASS\n",cases,events_total);return 0;
+}

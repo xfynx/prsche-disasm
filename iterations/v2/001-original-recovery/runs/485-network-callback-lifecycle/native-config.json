@@ -1,0 +1,114 @@
+{
+  "run": 485,
+  "experiment": "local/experiments/v2-network-callback-lifecycle-485",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/file_device.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_pool.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/exit_registry.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/shared_runtime_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00560340",
+      "bytes": 61,
+      "sha256": "1aad13ef2574ace5a742d6a694606d2e7032f32d9a7800c8d8e6ab8aa9aa93b1",
+      "token": "@BODY_START@"
+    },
+    {
+      "va": "00561110",
+      "bytes": 101,
+      "sha256": "b36b5cd42ae9e5a0d0c39201022479407b54fcfe06cd7b539abc1657041aa20d",
+      "token": "@BODY_REMOVE@"
+    }
+  ],
+  "pass_marker": "network_callback_lifecycle_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "list-order",
+      "source": "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+      "old": "io_init_00580630(&network_callbacks_list_006b7d20,nullptr,0);",
+      "new": "io_init_00580630(&network_callbacks_list_006b7d00,nullptr,0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "flag-after-children",
+      "source": "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+      "old": "io_init_00580630(&network_callbacks_list_006b7d20,nullptr,0);",
+      "new": "network_callbacks_initialized_006a5b28=1; io_init_00580630(&network_callbacks_list_006b7d20,nullptr,0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "callback-identity",
+      "source": "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+      "old": "thread_exit_register_00557380(network_callbacks_stop_00560380);",
+      "new": "thread_exit_register_00557380(nullptr);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "flag-nonzero",
+      "source": "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+      "old": "network_callbacks_initialized_006a5b28==0",
+      "new": "network_callbacks_initialized_006a5b28!=1",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "signed-count",
+      "source": "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+      "old": "return static_cast<std::int8_t>(value);",
+      "new": "return value&0x7fu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "first-match",
+      "source": "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+      "old": "callback(static_cast<U>(index))!=value",
+      "new": "callback(static_cast<U>(index))==value",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "forward-compaction",
+      "source": "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+      "old": "callback(static_cast<U>(index)-1u,next);",
+      "new": "callback(static_cast<U>(index),next);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "count-decrement",
+      "source": "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+      "old": "captured-1u",
+      "new": "captured",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "miss-unlock",
+      "source": "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+      "old": "if(index>=count){audio_backend_unlock_005896f0();return;}",
+      "new": "if(index>=count){return;}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

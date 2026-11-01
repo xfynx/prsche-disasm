@@ -1,5 +1,16 @@
 # Отложенные проверки восстановления v2
 
+Run487:16neworiginals1192B/repairedcaller1761B/2048Bdata;29346cases/38mutations/
+650pins PASS;264TUs/166names172refs,noEXE. Originalcaller/matrix/surface/vertices/
+copy/string fixes nowcomparematerialeffects. BUT44e870calleeindependentlyrequires
+2args;484stillforwardsone. Keep4677e0PARTIAL, repair494+496withBOTHargsobserved.
+Sharedqueuedstackargs showRETcleanup aloneisnotarity; deriveunknownendpointinputs
+fromactualcallee andcallsite independently, neveronlytheC++prototype. Priorproofs
+stayfrozen. Fullactualparents/opaquefields/concurrency/fault/livegame stillopen.
+Ready488/489/492, unsupported3DNowexplicit;490assemblyreference notproductionC++.
+
+Historical483 follows.
+
 Run483:3originals114B/6Bdata;978cases/12mutations/643pins PASS;261TUs/157names163refs,
 noEXE. Controlled481callbacks/frameview are notwholepump/scheduler/queue acceptance.
 Run482 nowpinsrawcaller/helper/source/probe findings: wrong4677e0 surfaceword,

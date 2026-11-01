@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run483](iterations/v2/001-original-recovery/runs/483-startup-gates-integration/README.md).
-Three original startup/update functions are integrated; renderer call-contract repair is active.
+Latest recovery intake: [Run487](iterations/v2/001-original-recovery/runs/487-render-network-mixer-integration/README.md).
+Renderer, network and mixer configuration are integrated; remaining caller contracts stay explicit.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next repair renderer caller/ABI contracts and close network/mixer dependencies.
+Next integrate callback drain, pixel conversion and C++ PCM; finish caller repair.
 
 ## Recovery milestones
 

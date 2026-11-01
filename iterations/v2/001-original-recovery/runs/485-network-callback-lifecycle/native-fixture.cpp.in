@@ -1,0 +1,143 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "network_callback_lifecycle_485.hpp"
+#include "porsche/application_audio_device.hpp"
+#include "porsche/file_device.hpp"
+#include "porsche/file_threads.hpp"
+#include "porsche/application_pool.hpp"
+#include "porsche/exit_registry.hpp"
+#include "audio_canonical_434.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static unsigned char* slab;
+static U cases,event_total,which,initial_flag,initial_count,match,mode,depth,allocation,pattern,value,creates,capacity;
+static bool cpp_side,patch_ok=true;
+static U registry[2][32];
+struct State {U initialized;IoList first,second;B device[0x18c];U registry[2][32],base,next;};
+struct Event {U kind,a,b;State state;};
+struct Trace {U count,abi;Event events[16];State final;};
+static Trace trace,original;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){memcpy(p,&x,4);}
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s cases=%u which=%u count=%u match=%u mode=%u allocation=%u cpp=%u\n",why,cases,which,initial_count,match,mode,allocation,cpp_side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault code=%08lx eip=%08lx cases=%u which=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,which,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+static void snapshot(State& s){s.initialized=network_callbacks_initialized_006a5b28;s.first=network_callbacks_list_006b7d20;s.second=network_callbacks_list_006b7d00;memcpy(s.device,application_audio_device_state_006b48c0.backing.data(),sizeof(s.device));memcpy(s.registry,registry,sizeof(registry));s.base=ptr(exit_registry_base_006c1534);s.next=ptr(exit_registry_next_006c1530);}
+static void event(U kind,U a=0,U b=0){require(trace.count<16,"event capacity");auto& e=trace.events[trace.count++];e.kind=kind;e.a=a;e.b=b;snapshot(e.state);}
+namespace porsche {
+void __cdecl network_callbacks_stop_00560380(){ExitProcess(90);}
+void* __cdecl heap_lock_create_005321f0(){event(1,creates);++creates;if(mode&1)network_callbacks_initialized_006a5b28=0x55555555;if((mode&2)&&creates==2)network_callbacks_list_006b7d20.count=0x12345678;return allocation==1?nullptr:reinterpret_cast<void*>(0x11110000+creates*0x100);}
+void __stdcall platform_enter_critical_section(void* p){event(2,ptr(p));if(mode&1){network_lifecycle_callback_count_006b49a0=static_cast<B>(initial_count);wr(application_audio_device_state_006b48c0.data()+0xf0,value);}if(mode&2)audio_backend_lock_depth_006b499f=0xff;}
+void __stdcall platform_leave_critical_section(void* p){event(3,ptr(p));if(mode&4)network_lifecycle_callback_count_006b49a0=0x85;}
+void __cdecl exit_registry_lock_api_005a4ba4(U id){event(4,id);if(mode&4)network_callbacks_initialized_006a5b28=0xaabbccdd;}
+void __cdecl exit_registry_unlock_api_005a4c05(U id){event(5,id);if(mode&8)network_callbacks_initialized_006a5b28=0xffffffff;}
+U __cdecl exit_registry_allocation_size_005a8161(const void* p){event(6,ptr(p));return capacity;}
+void* __cdecl exit_registry_reallocate_005a8029(void* p,U bytes){event(7,ptr(p),bytes);if(allocation==2)return nullptr;memcpy(registry[1],registry[0],sizeof(registry[0]));capacity=bytes;return registry[1];}
+void* __cdecl exit_registry_malloc_005a3be5(U){ExitProcess(90);return nullptr;}
+void __cdecl exit_registry_fatal_005a2e22(U){ExitProcess(90);}
+// Unused dependencies from complete accepted owning TUs; fail closed if reached.
+I __cdecl application_audio_backend_initialize_0058a4f0(){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_apply_0058a690(){ExitProcess(90);}
+U __cdecl application_audio_backend_allocate_0058aae0(U){ExitProcess(90);return 0;}
+I __cdecl application_audio_backend_start_device_0058fdb0(){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_stop_device_0058fe80(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(90);}
+I __cdecl audio_channel_stop_00565d60(U){ExitProcess(90);return 0;}
+// Link-only cells belonging to dead application-pool/file-worker functions.
+// None participates in the accepted start/remove path or enters the game graph.
+FileDevice* devices_006a5c7c=nullptr;
+IoList free_operations_006a5c58{},free_auxiliary_006a5c38{};
+PhysicalFile* physical_files_006af084=nullptr;
+I physical_count_006af080=0;
+void* disk_slot_mutex_006af07c=nullptr;
+void* disk_mutexes_006aeffc[32]{};
+void (__cdecl* diagnostic_handler_005debf0)(const char*)=nullptr;
+void __cdecl heap_enter_005322b0(void*){ExitProcess(90);}
+void __cdecl heap_leave_005322c0(void*){ExitProcess(90);}
+void __cdecl heap_fill_0053c290(void*,U,U){ExitProcess(90);}
+U __cdecl io_lock_00580ea0(IoList*){ExitProcess(90);return 0;}
+void __cdecl io_unlock_00580ec0(IoList*,U){ExitProcess(90);}
+void __cdecl io_prepend_005806e0(IoList*,IoNode*){ExitProcess(90);}
+U __cdecl operation_key_005684c0(IoNode*,U){ExitProcess(90);return 0;}
+void* __cdecl file_object_allocate_0056e5f0(U*){ExitProcess(90);return nullptr;}
+void __cdecl file_worker_00568530(U){ExitProcess(90);}
+I __cdecl file_thread_start_0055f5f0(FileWorker,U,U,U,I,void*){ExitProcess(90);return 0;}
+void* __cdecl file_auto_event_0055fb20(){ExitProcess(90);return nullptr;}
+void* __cdecl file_manual_event_0055fc20(){ExitProcess(90);return nullptr;}
+void* __cdecl file_wait_event_0055fc60(void*){ExitProcess(90);return nullptr;}
+U __cdecl file_reset_event_0055fc40(void*){ExitProcess(90);return 0;}
+void __cdecl application_pool_shutdown_005678f0(){ExitProcess(90);}
+void __cdecl application_pool_disk_slots_release_005918c0(){ExitProcess(90);}
+}
+static void absolute(U at,U bytes,U old,const void* target,U expected){U n=0;for(U i=0;i+4<=bytes;++i)if(rd(slab+at+i)==old){wr(slab+at+i,ptr(target));++n;i+=3;}if(n!=expected){printf("patch abs %x %x %u/%u\n",at,old,n,expected);patch_ok=false;}}
+static void relative(U at,U bytes,U va,U old,const void* target,U expected){U n=0;for(U i=0;i+5<=bytes;++i)if(slab[at+i]==0xe8&&va+i+5+rd(slab+at+i+1)==old){wr(slab+at+i+1,ptr(target)-ptr(slab+at+i+5));++n;i+=4;}if(n!=expected){printf("patch rel %x %x %u/%u\n",at,old,n,expected);patch_ok=false;}}
+static void initialize(){AddVectoredExceptionHandler(1,fault);slab=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(slab!=nullptr,"allocate");
+    const B start[]={ @BODY_START@ };const B remove[]={ @BODY_REMOVE@ };memcpy(slab,start,sizeof(start));memcpy(slab+0x100,remove,sizeof(remove));
+    absolute(0,61,0x6a5b28,&network_callbacks_initialized_006a5b28,2);absolute(0,61,0x6b7d20,&network_callbacks_list_006b7d20,1);absolute(0,61,0x6b7d00,&network_callbacks_list_006b7d00,1);
+    absolute(0,61,0x560380,reinterpret_cast<void*>(&network_callbacks_stop_00560380),1);relative(0,61,0x560340,0x580630,reinterpret_cast<void*>(&io_init_00580630),2);relative(0,61,0x560340,0x557380,reinterpret_cast<void*>(&thread_exit_register_00557380),1);
+    absolute(0x100,101,0x6b49a0,&network_lifecycle_callback_count_006b49a0,3);absolute(0x100,101,0x6b49b0,application_audio_device_state_006b48c0.data()+0xf0,2);
+    relative(0x100,101,0x561110,0x5896d0,reinterpret_cast<void*>(&audio_backend_lock_005896d0),1);relative(0x100,101,0x561110,0x5896f0,reinterpret_cast<void*>(&audio_backend_unlock_005896f0),2);
+    require(patch_ok&&FlushInstructionCache(GetCurrentProcess(),slab,4096),"patch/flush");
+    require(network_callbacks_initialized_006a5b28==0,"initial loader flag");IoList zero{};require(memcmp(&zero,&network_callbacks_list_006b7d00,28)==0&&memcmp(&zero,&network_callbacks_list_006b7d20,28)==0,"initial loader lists");
+    for(B b:application_audio_device_state_006b48c0.backing)require(b==0,"canonical initial audio block");require(exit_registry_base_006c1534==nullptr&&exit_registry_next_006c1530==nullptr,"canonical initial registry");
+}
+// Synthetic void-cdecl carrier: check required callee-preserved registers and
+// ESP/EBP. Incidental original volatile GPR/flags results are not caller values.
+__declspec(noinline) static U invoke(void* fn,U argument){U saved_sp,saved_frame,fail=0;__asm {
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    cmp which,0
+    je call_target
+    push argument
+call_target:mov ebx,13579bdfh
+    mov esi,55667788h
+    mov edi,99aabbcch
+    call fn
+    cmp which,0
+    je cleaned
+    add esp,4
+cleaned:cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,55667788h
+    jne bad
+    cmp edi,99aabbcch
+    je done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }return fail;
+}
+static void load(){memset(&trace,0,sizeof(trace));creates=0;capacity=allocation?0:128;
+    memset(&network_callbacks_list_006b7d20,0xa5,28);memset(&network_callbacks_list_006b7d00,0x5a,28);network_callbacks_initialized_006a5b28=initial_flag;
+    for(U i=0;i<application_audio_device_state_006b48c0.backing.size();++i)application_audio_device_state_006b48c0.backing[i]=static_cast<B>(i*37+pattern);
+    audio_backend_lock_depth_006b499f=static_cast<B>(depth);network_lifecycle_callback_count_006b49a0=static_cast<B>(initial_count);
+    for(U i=0;i<35;++i)wr(application_audio_device_state_006b48c0.data()+0xf0+i*4,0x11000000+i+pattern*0x100);
+    value=0x87654321;
+    if(match&&initial_count&&initial_count<=35){U index=match==1?0:match==2?initial_count/2:initial_count-1;value=rd(application_audio_device_state_006b48c0.data()+0xf0+index*4);if(match==4){value=0;wr(application_audio_device_state_006b48c0.data()+0xf0,0);wr(application_audio_device_state_006b48c0.data()+0xf0+(initial_count-1)*4,0);}if(match==5)for(U i=0;i<initial_count;++i)wr(application_audio_device_state_006b48c0.data()+0xf0+i*4,value);}
+    // For signed-negative probes use a first-slot match: erroneous positive
+    // interpretation must not hide behind an absent callback.
+    if(initial_count>=128)value=rd(application_audio_device_state_006b48c0.data()+0xf0);
+    memset(registry,0x6c,sizeof(registry));exit_registry_base_006c1534=registry[0];exit_registry_next_006c1530=registry[0];
+}
+static void execute(bool cpp){cpp_side=cpp;load();void* fn=which?(cpp?reinterpret_cast<void*>(&network_lifecycle_unregister_00561110):slab+0x100):(cpp?reinterpret_cast<void*>(&network_callbacks_start_00560340):slab);trace.abi=invoke(fn,value);snapshot(trace.final);require(trace.abi==0,"cdecl ABI");}
+static void compare(){execute(false);original=trace;execute(true);require(memcmp(&original,&trace,sizeof(trace))==0,"original/C++ ordered calls/state");event_total+=trace.count;++cases;}
+int main(){initialize();which=0;initial_count=depth=match=pattern=0;
+    for(U flag:{0u,1u,2u,0x80000000u,0xffffffffu})for(U m=0;m<16;++m)for(U a=0;a<3;++a){initial_flag=flag;mode=m;allocation=a;compare();}
+    which=1;initial_flag=0;allocation=0;
+    for(U count=0;count<=35;++count)for(U target=0;target<6;++target)for(U d:{0u,1u,127u,255u})for(U m=0;m<8;++m){initial_count=count;match=target;depth=d;mode=m;pattern=(cases%7);compare();}
+    mode=0;match=1;for(U count=128;count<256;++count)for(U d:{0u,255u}){initial_count=count;depth=d;compare();}
+    printf("network_callback_lifecycle_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,event_total);return 0;
+}

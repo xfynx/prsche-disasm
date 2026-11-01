@@ -1,0 +1,251 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "render_display_484.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include <cstdlib>
+#include <csetjmp>
+using U=std::uint32_t;using B=std::uint8_t;using I=std::int32_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(const void* p,U off=0){U x;memcpy(&x,static_cast<const B*>(p)+off,4);return x;}
+static void write(void* p,U off,U x){memcpy(static_cast<B*>(p)+off,&x,4);}
+static U cases,events_total,scenario,mode,format,seed,precision,rounding,depth,kind;
+static bool cpp_side;
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s case=%u scenario=%u mode=%u format=%u kind=%u cpp=%u events=%u\n",why,cases,scenario,mode,format,kind,cpp_side,events_total);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault %08lx eip=%08lx case=%u scenario=%u mode=%u kind=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,scenario,mode,kind,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+struct Arena{RenderDisplay display;B resource[8],driver[0x24],subobject[32],finish[32],surface_memory[0x224],surface[2][0x240],matrix[2][64],texture[256],pixels[256],temporary[256],readback[4096];U descriptor[3];};
+alignas(16) static Arena arena;
+alignas(16) static B floating[512];
+static const char name[]="dx7",resolution[]="800x600";
+static U actual_width,actual_height,request_width,request_height,request_mode,selected,flags,desktop_depth,driver_result,reserve_result;
+static U member_index,clock_index,compare_index,driver_vtable[2],subobject_vtable[1];
+struct State{B display[128],resource[8],driver[0x24],surface[2][0x240],matrix[2][64];U globals[15];};
+struct Event{U tag,argc,args[8];B payload[128];State before;};
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+struct Trace{U count,result,abi,terminal;Event events[260];Arena final;State state;Fpu fpu;};
+static Trace trace,expected;
+static std::jmp_buf terminal_escape;
+static void snapshot(State& s){memcpy(s.display,arena.display.bytes,128);memcpy(s.resource,arena.resource,8);memcpy(s.driver,arena.driver,0x24);memcpy(s.surface,arena.surface,sizeof(s.surface));memcpy(s.matrix,arena.matrix,sizeof(s.matrix));
+    U globals[]={ptr(render_display_00628130),render_display_clock_005deb1c,render_display_name_0069ecf8,render_display_callback1_0069ecfc,render_display_callback2_0069ed00,render_display_selected_0069ed08,render_display_actual_width_00619784,render_display_actual_height_00619788,render_display_actual_mode_0061978c,render_display_texture_width_005deac8,render_display_texture_height_005deacc,render_display_requested_width_00657a48,render_display_requested_height_00657a4c,render_display_requested_mode_00657a50,compare_index};memcpy(s.globals,globals,sizeof(globals));
+}
+static Event& event(U tag,std::initializer_list<U> args){require(trace.count<260,"event bound");auto& e=trace.events[trace.count++];memset(&e,0,sizeof(e));e.tag=tag;e.argc=static_cast<U>(args.size());U i=0;for(U a:args)e.args[i++]=a;snapshot(e.before);return e;}
+static void text(Event& e,const char* string){const auto length=strlen(string);require(length<sizeof(e.payload),"text bound");memcpy(e.payload,string,length+1);}
+static U __cdecl endpoint(U tag,U receiver,const U* a){
+    switch(tag){
+    case 0x466380:event(tag,{receiver});memset(reinterpret_cast<void*>(receiver),member_index++?0xb2:0xa1,32);return 0;
+    case 0x555bc0:event(tag,{});return clock_index++?0x456:0x123;
+    case 0x5b2274:event(tag,{});return 0x1111;
+    case 0x5b226c:event(tag,{a[0]});return 0x2222;
+    case 0x5b2044:event(tag,{a[0],a[1]});return desktop_depth;
+    case 0x5b2268:event(tag,{a[0],a[1]});return 0;
+    case 0x5b2270:{auto& e=event(tag,{a[0],a[3]});text(e,reinterpret_cast<const char*>(a[1]));const auto* title=reinterpret_cast<const char*>(a[2]);require(strlen(title)<32,"message title bound");memcpy(e.payload+96,title,strlen(title)+1);return 0;}
+    case 0x5a0fbf:{auto& e=event(tag,{a[2]});text(e,reinterpret_cast<const char*>(a[1]));strcpy(reinterpret_cast<char*>(a[0]),"Please set your display to 256 colors or higher.\n");return 0;}
+    case 0x557370:event(tag,{});trace.terminal=tag;std::longjmp(terminal_escape,1);
+    case 0x59ef90:event(tag,{a[0]});if(a[0]==8)return ptr(arena.resource);if(a[0]==0x24)return ptr(arena.driver);require(a[0]==0x224,"allocation size");if(mode&1){render_display_texture_width_005deac8=actual_width^0x80000001u;render_display_texture_height_005deacc=actual_height^0x80000001u;}return ptr(arena.surface_memory);
+    case 0x540390:event(tag,{receiver,a[0]});write(reinterpret_cast<void*>(receiver),4,0x11223344);return receiver;
+    case 0x557100:case 0x556a90:event(tag,{receiver,a[0]});write(reinterpret_cast<void*>(receiver),0,ptr(driver_vtable));write(reinterpret_cast<void*>(receiver),4,ptr(arena.finish));write(reinterpret_cast<void*>(receiver),0x20,a[0]);return receiver;
+    case 0xf00001:event(tag,{receiver});write(reinterpret_cast<void*>(receiver),0x18,ptr(arena.subobject));return driver_result;
+    case 0xf00002:event(tag,{receiver,a[0]});return 0x44556677;
+    case 0x5a246e:event(tag,{a[0]});trace.terminal=tag;std::longjmp(terminal_escape,1);
+    case 0x44e2c0:event(tag,{});return 0;
+    case 0x537600:event(tag,{a[0],a[1],a[2],a[3],a[4],a[5]});return 0;
+    case 0x5376c0:event(tag,{a[0],a[1],a[2],a[3],a[4]});return 0x43;
+    case 0x468030:event(tag,{receiver,a[0]});return 0;
+    case 0x53c3d0:event(tag,{});return 0;
+    case 0x553fc0:event(tag,{a[0]});return reserve_result;
+    case 0x5a177b:{auto& e=event(tag,{a[1]});text(e,reinterpret_cast<const char*>(a[0]));return 0;}
+    case 0x538d10:event(tag,{receiver,a[0]});return ptr(arena.surface[0]);
+    case 0x538da0:event(tag,{receiver,a[0],a[1],a[2],a[3],a[4],a[5]});if(mode&2){write(arena.display.bytes,0x7c,ptr(arena.surface[1]));render_display_actual_width_00619784=actual_width+101;render_display_actual_height_00619788=actual_height+103;}return 0;
+    case 0x5392d0:event(tag,{receiver,a[0],a[1],a[2]});if(mode&4){render_display_actual_width_00619784^=0xf0101001u;render_display_actual_height_00619788^=0xe0202002u;write(arena.display.bytes,0x7c,ptr(arena.surface[0]));write(arena.surface[0],4,ptr(arena.matrix[1]));}return 0;
+    case 0x539b00:{auto& e=event(tag,{receiver});memcpy(e.payload,reinterpret_cast<void*>(a[0]),64);if(mode&8){write(arena.display.bytes,0x7c,ptr(arena.surface[1]));}return 0;}
+    case 0x6bd984:event(tag,{a[0]});switch(a[0]){case 2:return 0x102;case 7:return 0x107;case 10:return 0x10a;case 3:return 0x103;case 0x1d:return ptr(arena.descriptor);}require(false,"getstate key");return 0;
+    case 0x6bd97c:event(tag,{a[0],a[1]});return 0;
+    case 0x555390:event(tag,{});return 0;
+    case 0x6bd9b0:case 0x6bd954:case 0x6bd978:event(tag,{a[0]});return 0;
+    case 0x6bd91c:case 0x6bd970:event(tag,{});return 0;
+    case 0x535950:event(tag,{a[0],a[1],a[2],a[3]});return ptr(arena.texture);
+    case 0x534480:event(tag,{a[0]});return 1;
+    case 0x537e00:event(tag,{a[0]});return 0;
+    case 0x556910:event(tag,{a[0],a[1],a[2]});return 0;
+    case 0x554960:{auto& e=event(tag,{a[0],a[1],a[2],a[3],a[4]});text(e,reinterpret_cast<const char*>(a[5]));return ptr(arena.temporary);}
+    case 0x5550e0:event(tag,{});return 0;
+    case 0x554d70:event(tag,{a[0],a[1],a[2]});return 0;
+    case 0x555440:event(tag,{a[0]});return 0;
+    case 0x6bd9a8:{auto& e=event(tag,{0,a[1]-a[0],a[2]-a[0],a[3]-a[0]});for(U i=0;i<4;++i)memcpy(e.payload+32*i,reinterpret_cast<void*>(a[i]),32);return 0;}
+    case 0x531ca0:{auto& e=event(tag,{a[1],a[2]});text(e,reinterpret_cast<const char*>(a[0]));return ptr(arena.readback);}
+    case 0x6bd96c:event(tag,{a[0],a[1],a[2],a[3],a[4]});for(U i=0;i<sizeof(arena.readback);++i)arena.readback[i]=static_cast<B>(i*37+seed*13+(i>>3));return 0;
+    case 0x468110:event(tag,{a[0],a[1]});return (compare_index++&1u)^((mode>>4)&1u);
+    case 0x533f80:event(tag,{a[0]});return 0;
+    case 0x44e870:event(tag,{a[0]});return 0;
+    case 0x537850:event(tag,{receiver,a[0]});return 0;
+    case 0x4b0eb0:event(tag,{});return 0;
+    default:require(false,"unrecognized endpoint");return 0;
+    }
+}
+static U call(U tag,U receiver,std::initializer_list<U> args){U words[8]={};U i=0;for(U a:args)words[i++]=a;return endpoint(tag,receiver,words);}
+namespace porsche {
+RenderDisplay* render_display_00628130=nullptr;
+void __cdecl render_core_first_004b76f0(RenderCore*){ExitProcess(90);}
+void __cdecl render_display_member_00466380(void* p){call(0x466380,ptr(p),{});}
+U __cdecl render_clock_00555bc0(){return call(0x555bc0,0,{});}
+U __cdecl render_get_desktop_005b2274(){return call(0x5b2274,0,{});}
+U __cdecl render_get_window_dc_005b226c(U a){return call(0x5b226c,0,{a});}
+I __cdecl render_get_device_caps_005b2044(U a,I b){return static_cast<I>(call(0x5b2044,0,{a,static_cast<U>(b)}));}
+void __cdecl render_release_dc_005b2268(U a,U b){call(0x5b2268,0,{a,b});}
+void __cdecl render_message_box_005b2270(U a,const char* b,const char* c,U d){call(0x5b2270,0,{a,ptr(b),ptr(c),d});}
+void __cdecl render_format_depth_005a0fbf(char* a,I b){call(0x5a0fbf,0,{ptr(a),ptr("Please set your display to 256 colors or higher.\n"),static_cast<U>(b)});}
+[[noreturn]] void __cdecl render_depth_failure_00557370(){call(0x557370,0,{});ExitProcess(90);}
+void* __cdecl render_display_allocate_0059ef90(U a){return reinterpret_cast<void*>(call(0x59ef90,0,{a}));}
+void* __cdecl render_display_resource_ctor_00540390(void* p,U a){return reinterpret_cast<void*>(call(0x540390,ptr(p),{a}));}
+void* __cdecl render_display_driver_ctor_00557100(void* p,void* a){return reinterpret_cast<void*>(call(0x557100,ptr(p),{ptr(a)}));}
+void* __cdecl render_display_driver_alt_ctor_00556a90(void* p,void* a){return reinterpret_cast<void*>(call(0x556a90,ptr(p),{ptr(a)}));}
+B __cdecl render_display_driver_start_vslot1(void* p){return static_cast<B>(call(0xf00001,ptr(p),{}));}
+U __cdecl render_display_driver_present_vslot0(void* p,U a){return call(0xf00002,read(p,0x18),{a});}
+[[noreturn]] void __cdecl render_driver_failure_005a246e(U a){call(0x5a246e,0,{a});ExitProcess(90);}
+void __cdecl render_display_prevideo_0044e2c0(){call(0x44e2c0,0,{});}
+void __cdecl render_display_video_base_00537600(U a,U b,U c,U d,U e,U f){call(0x537600,0,{a,b,c,d,e,f});}
+U __cdecl render_display_video_mode_005376c0(U a,U b,U c,U d,U e){return call(0x5376c0,0,{a,b,c,d,e});}
+void __cdecl render_display_video_result_00468030(RenderDisplay* p,U a){call(0x468030,ptr(p),{a});}
+void __cdecl render_display_texture_reset_0053c3d0(){call(0x53c3d0,0,{});}
+int __cdecl render_display_texture_reserve_00553fc0(U a){return static_cast<int>(call(0x553fc0,0,{a}));}
+void __cdecl render_display_texture_report_005a177b(const char* p,U a){call(0x5a177b,0,{ptr(p),a});}
+void* __cdecl render_display_surface_ctor_00538d10(void* p,U a){return reinterpret_cast<void*>(call(0x538d10,ptr(p),{a}));}
+void __cdecl render_display_surface_init_00538da0(void* p,float a,float b,U c,U d,U e,U f){call(0x538da0,ptr(p),{read(&a),read(&b),c,d,e,f});}
+void __cdecl render_display_surface_config_005392d0(void* p,U a,U b,U c){call(0x5392d0,ptr(p),{a,b,c});}
+void __cdecl render_display_transform_attach_00539b00(void* p,void* a){call(0x539b00,ptr(p),{ptr(a)});}
+U __stdcall render_display_getstate_006bd984(U a){return call(0x6bd984,0,{a});}
+void __stdcall render_display_setstate_006bd97c(U a,U b){call(0x6bd97c,0,{a,b});}
+void __cdecl render_display_thr_cleanup_00555390(){call(0x555390,0,{});}
+void __stdcall render_display_window_006bd9b0(U a){call(0x6bd9b0,0,{a});}
+void __stdcall render_display_set_texture_006bd954(U a){call(0x6bd954,0,{a});}
+void __stdcall render_display_clear_window_006bd91c(){call(0x6bd91c,0,{});}
+void* __cdecl render_display_texture_create_00535950(U a,U b,U c,U d){return reinterpret_cast<void*>(call(0x535950,0,{a,b,c,d}));}
+void __cdecl render_display_texture_bind_00534480(void* a){call(0x534480,0,{ptr(a)});}
+void __cdecl render_display_fill_00537e00(U a){call(0x537e00,0,{a});}
+void __cdecl render_display_select_buffer_00556910(U a,U b,U c){call(0x556910,0,{a,b,c});}
+void* __cdecl render_display_texture_alloc_00554960(U a,U b,U c,U d,U e,const char* f){return reinterpret_cast<void*>(call(0x554960,0,{a,b,c,d,e,ptr(f)}));}
+void __cdecl render_display_texture_update_005550e0(){call(0x5550e0,0,{});}
+void __cdecl render_display_texture_copy_00554d70(void* a,void* b,U c){call(0x554d70,0,{ptr(a),ptr(b),c});}
+void __cdecl render_display_texture_release_00555440(void* a){call(0x555440,0,{ptr(a)});}
+void __stdcall render_display_draw_quad_006bd9a8(const void* a,const void* b,const void* c,const void* d){call(0x6bd9a8,0,{ptr(a),ptr(b),ptr(c),ptr(d)});}
+void __stdcall render_display_flush_006bd970(){call(0x6bd970,0,{});}
+void __stdcall render_display_sync_006bd978(U a){call(0x6bd978,0,{a});}
+void* __cdecl render_display_buffer_alloc_00531ca0(const char* a,U b,U c){return reinterpret_cast<void*>(call(0x531ca0,0,{ptr(a),b,c}));}
+void __stdcall render_display_read_rect_006bd96c(U a,U b,U c,U d,void* e){call(0x6bd96c,0,{a,b,c,d,ptr(e)});}
+bool __cdecl render_display_compare_pixel_00468110(U a,U b){return call(0x468110,0,{a,b})!=0;}
+void __cdecl render_display_release_texture_00533f80(void* a){call(0x533f80,0,{ptr(a)});}
+U __cdecl render_display_present_0044e870(U a){return call(0x44e870,0,{a});}
+void __cdecl render_display_finish_driver_00537850(void* p,U a){call(0x537850,ptr(p),{a});}
+void __cdecl render_display_finish_init_004b0eb0(){call(0x4b0eb0,0,{});}
+}
+static B* image;static B* thunks;static U thunk_count;
+struct Hook{U target,cleanup;B* code;};
+static Hook hooks[]={ {0x44e2c0,0,nullptr},{0x44e870,0,nullptr},{0x466380,0,nullptr},{0x468030,4,nullptr},{0x468110,0,nullptr},{0x4b0eb0,0,nullptr},{0x531ca0,0,nullptr},{0x533f80,0,nullptr},{0x534480,0,nullptr},{0x535950,0,nullptr},{0x537600,0,nullptr},{0x5376c0,0,nullptr},{0x537850,4,nullptr},{0x537e00,0,nullptr},{0x538d10,4,nullptr},{0x538da0,24,nullptr},{0x5392d0,12,nullptr},{0x539b00,4,nullptr},{0x53c3d0,0,nullptr},{0x540390,4,nullptr},{0x553fc0,0,nullptr},{0x554960,0,nullptr},{0x554d70,0,nullptr},{0x5550e0,0,nullptr},{0x555390,0,nullptr},{0x555440,0,nullptr},{0x555bc0,0,nullptr},{0x556910,0,nullptr},{0x556a90,4,nullptr},{0x557100,4,nullptr},{0x557370,0,nullptr},{0x59ef90,0,nullptr},{0x5a0fbf,0,nullptr},{0x5a177b,0,nullptr},{0x5a246e,0,nullptr},{0x5b2044,8,nullptr},{0x5b2268,8,nullptr},{0x5b226c,4,nullptr},{0x5b2270,16,nullptr},{0x5b2274,0,nullptr},{0x6bd91c,0,nullptr},{0x6bd954,4,nullptr},{0x6bd96c,20,nullptr},{0x6bd970,0,nullptr},{0x6bd978,4,nullptr},{0x6bd97c,8,nullptr},{0x6bd984,4,nullptr},{0x6bd9a8,16,nullptr},{0x6bd9b0,4,nullptr},{0xf00001,0,nullptr},{0xf00002,0,nullptr} };
+static B* thunk(U target){for(auto& h:hooks)if(h.target==target)return h.code;require(false,"hook target");return nullptr;}
+static B* original(U va){return image+va-0x400000;}
+static U absolute_target(U va){switch(va){
+case 0x628130:return ptr(&render_display_00628130);
+case 0x5deb1c:return ptr(&render_display_clock_005deb1c);
+case 0x69ecf8:return ptr(&render_display_name_0069ecf8);case 0x69ecfc:return ptr(&render_display_callback1_0069ecfc);case 0x69ed00:return ptr(&render_display_callback2_0069ed00);case 0x69ed08:return ptr(&render_display_selected_0069ed08);
+case 0x619784:return ptr(&render_display_actual_width_00619784);case 0x619788:return ptr(&render_display_actual_height_00619788);case 0x61978c:return ptr(&render_display_actual_mode_0061978c);
+case 0x657a48:return ptr(&render_display_requested_width_00657a48);case 0x657a4c:return ptr(&render_display_requested_height_00657a4c);case 0x657a50:return ptr(&render_display_requested_mode_00657a50);
+case 0x5deac8:return ptr(&render_display_texture_width_005deac8);case 0x5deacc:return ptr(&render_display_texture_height_005deacc);
+default:for(auto& h:hooks)if(h.target==va&&(va>=0x6bd000||(va>=0x5b2000&&va<0x5b2300)))return ptr(&h.code);return ptr(original(va));}}
+static void init(const char* pe_path){
+    FILE* file=nullptr;require(fopen_s(&file,pe_path,"rb")==0,"open original");fseek(file,0,SEEK_END);const auto size=ftell(file);rewind(file);auto* data=static_cast<B*>(malloc(size));require(data&&fread(data,1,size,file)==static_cast<size_t>(size),"read original");fclose(file);
+    auto* nt=reinterpret_cast<IMAGE_NT_HEADERS32*>(data+read(data,0x3c));const U image_size=nt->OptionalHeader.SizeOfImage;image=static_cast<B*>(VirtualAlloc(nullptr,image_size,0x3000,0x40));require(image!=nullptr,"image allocation");
+    auto* section=IMAGE_FIRST_SECTION(nt);for(U i=0;i<nt->FileHeader.NumberOfSections;++i)memcpy(image+section[i].VirtualAddress,data+section[i].PointerToRawData,section[i].SizeOfRawData);free(data);
+    static const B caller[]={ @BODY_CALLER@ },diagonal[]={ @BODY_DIAGONAL@ },translation[]={ @BODY_TRANSLATION@ },getter[]={ @BODY_GETTER@ },setter[]={ @BODY_SETTER@ };
+    require(memcmp(original(0x4677e0),caller,sizeof(caller))==0&&memcmp(original(0x539b30),diagonal,sizeof(diagonal))==0&&memcmp(original(0x539b80),translation,sizeof(translation))==0&&memcmp(original(0x539f40),getter,sizeof(getter))==0&&memcmp(original(0x466e80),setter,sizeof(setter))==0,"raw code before relocation");
+    require(read(original(0x5b2580))==0x40000000&&read(original(0x5b2628))==0xc0000000,"raw signed projection constants");
+    thunks=static_cast<B*>(VirtualAlloc(nullptr,16384,0x3000,0x40));require(thunks!=nullptr,"synthetic thunk allocation");
+    for(auto& h:hooks){B code[]={0x55,0x8b,0xec,0x8d,0x45,0x08,0x50,0x51,0x68,0,0,0,0,0xe8,0,0,0,0,0x83,0xc4,0x0c,0x5d,0xc2,0,0};h.code=thunks+32*thunk_count++;write(code,9,h.target);write(code,14,ptr(reinterpret_cast<void*>(&endpoint))-ptr(h.code+18));code[23]=static_cast<B>(h.cleanup);memcpy(h.code,code,sizeof(code));}
+    struct Patch{U offset,target;};static const Patch absolute[]={ {96,0x628130},{107,0x5deb1c},{113,0x5b2274},{122,0x5b226c},{133,0x5b2044},{143,0x5b2268},{149,0x5b2270},{164,0x5cf8bc},{189,0x5cf8a4},{223,0x69ecf8},{229,0x69ecfc},{239,0x69ed00},{249,0x69ed08},{357,0x5cf7b4},{362,0x5cf874},{382,0x619788},{388,0x619784},{404,0x657a48},{410,0x619784},{416,0x657a50},{422,0x657a4c},{428,0x619788},{445,0x61978c},{529,0x5cf848},{536,0x5cf81c},{547,0x619784},{553,0x619788},{562,0x5deac8},{568,0x5deacc},{620,0x5deacc},{631,0x5deac8},{648,0x619784},{672,0x619788},{717,0x5b2628},{741,0x5b2580},{1087,0x6bd984},{1099,0x6bd984},{1111,0x6bd984},{1123,0x6bd984},{1141,0x6bd97c},{1150,0x6bd97c},{1160,0x6bd97c},{1168,0x6bd984},{1180,0x6bd9b0},{1193,0x6bd97c},{1200,0x6bd954},{1206,0x6bd91c},{1264,0x5cf814},{1336,0x6bd9a8},{1342,0x6bd970},{1349,0x6bd978},{1357,0x6bd9b0},{1379,0x467ec4},{1433,0x5cf80c},{1459,0x6bd96c},{1493,0x467ed8},{1542,0x467f14},{1549,0x467f08},{1644,0x6bd97c},{1657,0x6bd97c},{1670,0x6bd97c},{1683,0x6bd97c},{1730,0x6bd97c} },calls[]={ {38,0x466380},{46,0x466380},{54,0x555bc0},{100,0x555bc0},{169,0x5a0fbf},{197,0x557370},{253,0x59ef90},{268,0x540390},{289,0x59ef90},{307,0x556a90},{314,0x59ef90},{332,0x557100},{371,0x5a246e},{376,0x44e2c0},{398,0x537600},{476,0x5376c0},{487,0x468030},{501,0x53c3d0},{511,0x553fc0},{540,0x5a177b},{577,0x59ef90},{595,0x538d10},{641,0x538da0},{680,0x5392d0},{703,0x539f40},{710,0x539b80},{757,0x539b30},{770,0x539f40},{777,0x539b00},{796,0x466e80},{1131,0x555390},{1217,0x535950},{1225,0x534480},{1235,0x537e00},{1249,0x556910},{1276,0x554960},{1283,0x5550e0},{1297,0x554d70},{1303,0x555440},{1437,0x531ca0},{1570,0x468110},{1621,0x555390},{1627,0x533f80},{1703,0x44e870},{1719,0x537850},{1741,0x4b0eb0} };
+    for(auto& p:absolute)write(original(0x4677e0),p.offset,absolute_target(p.target));
+    for(auto& p:calls){B* target=(p.target==0x539b30||p.target==0x539b80||p.target==0x539f40||p.target==0x466e80)?original(p.target):thunk(p.target);write(original(0x4677e0),p.offset+1,ptr(target)-ptr(original(0x4677e0)+p.offset+5));}
+    for(U offset=0;offset<80;offset+=4){const U va=read(original(0x467ec4)+offset);require(va>=0x4677e0&&va<=0x467ec0,"raw jump table target");write(original(0x467ec4),offset,ptr(original(va)));}
+    driver_vtable[0]=ptr(thunk(0xf00002));driver_vtable[1]=ptr(thunk(0xf00001));subobject_vtable[0]=ptr(thunk(0xf00002));
+    require(FlushInstructionCache(GetCurrentProcess(),image,image_size)!=0&&FlushInstructionCache(GetCurrentProcess(),thunks,16384)!=0,"instruction cache");
+}
+static void capture(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))memcpy(f.values+i*10,floating+32+i*16,10);else memset(f.values+i*10,0,10);}}
+static void seed_fpu(){unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm{fninit}__asm{fldcw control}for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}}
+static U invoke(void* fn,U receiver,const U* args,U count,bool raw,U& output){U before,frame,fail=0,result,cleanup=raw?0:(count+1)*4;__asm{
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov eax,count
+    mov edx,args
+pushargs:test eax,eax
+    jz pushed
+    dec eax
+    push dword ptr [edx+eax*4]
+    jmp pushargs
+pushed:cmp raw,0
+    jne rawcall
+    push receiver
+rawcall:mov ecx,receiver
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov result,eax
+    add esp,cleanup
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    output=result;return fail;
+}
+static void setup(){
+    memset(&arena,static_cast<int>(seed),sizeof(arena));trace.count=trace.result=trace.abi=trace.terminal=0;member_index=clock_index=compare_index=0;
+    render_display_00628130=nullptr;render_display_clock_005deb1c=0xabcdef01;render_display_name_0069ecf8=0x5555;render_display_callback1_0069ecfc=0x6666;render_display_callback2_0069ed00=0x7777;render_display_selected_0069ed08=0x8888;
+    render_display_actual_width_00619784=actual_width;render_display_actual_height_00619788=actual_height;render_display_actual_mode_0061978c=1;render_display_texture_width_005deac8=render_display_texture_height_005deacc=0;render_display_requested_width_00657a48=request_width;render_display_requested_height_00657a4c=request_height;render_display_requested_mode_00657a50=request_mode;
+    write(arena.subobject,0,ptr(subobject_vtable));for(U i=0;i<2;++i){write(arena.surface[i],4,ptr(arena.matrix[i]));write(arena.surface[i],16,0xfffffffeu+i);}
+    write(arena.texture,0x28,ptr(arena.pixels));arena.descriptor[0]=arena.descriptor[1]=0;arena.descriptor[2]=format;
+}
+static void compare(){
+    for(U side=0;side<2;++side){cpp_side=side!=0;setup();seed_fpu();
+        U args[]={ptr(name),selected,flags,ptr(resolution)};
+        if(setjmp(terminal_escape)==0)trace.abi=invoke(side?reinterpret_cast<void*>(&render_construct_display_004677e0):original(0x4677e0),ptr(&arena.display),args,4,side==0,trace.result);
+        capture(trace.fpu);snapshot(trace.state);trace.final=arena;
+        require(trace.terminal!=0||(trace.abi==0&&trace.result==ptr(&arena.display)),"constructor ABI/result");
+        if(side){
+            require(expected.count==trace.count&&expected.terminal==trace.terminal,"event count/terminal");for(U i=0;i<trace.count;++i)if(memcmp(&expected.events[i],&trace.events[i],sizeof(Event))!=0){printf("event mismatch index=%u rawtag=%x cpptag=%x rawargs=%x,%x,%x,%x,%x,%x,%x cppargs=%x,%x,%x,%x,%x,%x,%x\n",i,expected.events[i].tag,trace.events[i].tag,expected.events[i].args[0],expected.events[i].args[1],expected.events[i].args[2],expected.events[i].args[3],expected.events[i].args[4],expected.events[i].args[5],expected.events[i].args[6],trace.events[i].args[0],trace.events[i].args[1],trace.events[i].args[2],trace.events[i].args[3],trace.events[i].args[4],trace.events[i].args[5],trace.events[i].args[6]);require(false,"endpoint arguments/state/payload");}
+            require(memcmp(&expected.final,&trace.final,sizeof(Arena))==0&&memcmp(&expected.state,&trace.state,sizeof(State))==0,"final arena/state");
+            if(memcmp(&expected.fpu,&trace.fpu,sizeof(Fpu))!=0){printf("x87 raw cw=%x sw=%x tag=%x cpp cw=%x sw=%x tag=%x\n",expected.fpu.control,expected.fpu.status,expected.fpu.tag,trace.fpu.control,trace.fpu.status,trace.fpu.tag);require(false,"x87 active values/control/status/tag");}events_total+=trace.count;
+        }else{expected=trace;}
+    }++cases;
+}
+static void helpers(){const U values[]={0,1,0x80000000u,0xffffffffu,0x7fc01234u,0x3f800000u,0xdeadbeefu};
+    for(kind=0;kind<4;++kind)for(U offset=0;offset<8;++offset)for(U v:values){
+        U args[]={v,v^0x80000001u,v+1u,v-1u};U va=kind==0?0x539b30:kind==1?0x539b80:kind==2?0x539f40:0x466e80;U argc=kind==0?4:kind==1?3:kind==2?0:1;
+        void* cpp=kind==0?reinterpret_cast<void*>(&render_display_transform_compose_00539b30):kind==1?reinterpret_cast<void*>(&render_display_transform_init_00539b80):kind==2?reinterpret_cast<void*>(&render_display_surface_transform_00539f40):reinterpret_cast<void*>(&render_display_local_transform_00466e80);
+        U outputs[2],abi;B saved[sizeof(arena)];Fpu before,after;
+        for(U side=0;side<2;++side){cpp_side=side!=0;setup();for(U i=0;i<128;++i)arena.texture[i]=static_cast<B>(i*17+seed);write(arena.texture,offset+4,v);write(arena.texture,offset+16,v);seed_fpu();capture(before);abi=invoke(side?cpp:original(va),ptr(arena.texture+offset),args,argc,side==0,outputs[side]);capture(after);require(abi==0,"helper ABI");require(memcmp(&before,&after,sizeof(Fpu))==0,"helper x87 preservation");
+            if(side){require(memcmp(saved,&arena,sizeof(arena))==0,"helper memory");if(kind==2)require(outputs[0]==outputs[1],"getter EAX");}else memcpy(saved,&arena,sizeof(arena));
+        }++cases;
+    }
+}
+int main(int argc,char** argv){require(argc==2,"PE argument");AddVectoredExceptionHandler(1,fault);init(argv[1]);
+    actual_width=800;actual_height=600;request_width=800;request_height=600;request_mode=1;selected=1;flags=0;desktop_depth=32;driver_result=1;reserve_result=0;mode=0;format=1;seed=0x51;precision=3;rounding=0;depth=0;kind=0;
+    const U sizes[][2]={{800,600},{640,480},{0,0},{1,3},{0x7fffffff,0x80000000},{0xffffffff,0xfffffffe},{16777217,16777219}};
+    for(scenario=0;scenario<7;++scenario)for(format=1;format<=12;++format)for(mode=0;mode<32;++mode){actual_width=sizes[scenario][0];actual_height=sizes[scenario][1];selected=format;request_width=mode&1?0:actual_width;request_height=mode&1?0:actual_height;request_mode=mode&1?3:1;flags=mode&2?0x100:0x101;desktop_depth=scenario==0&&mode==30?4:32;driver_result=scenario==0&&mode==27?0:1;reserve_result=mode&16?1:0;seed=0x51+(cases&15);precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%5;kind=4;compare();}
+    helpers();__asm fninit
+    printf("render_constructor_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;
+}
