@@ -1,5 +1,27 @@
 # v2 / 001 - original source recovery plan
 
+Current483,2026-11-01: frozen481 adds3originalC++bodies114B/6Bdata;registry676.
+SharedauditPASS978cases/4088events/12mutations/643pins/467exports;261TUs/8projects,
+157names163refs,noEXE. Threeoldnamesclose/no newchildren; firstnative001PASS.
+Unsignedswitchtable/0101gatebytes, callbackorder/sleepafterclear/tailpump andfull
+nonzeroqueuewords checked. Canonicalapplicationarena reused, frameview/endpoints
+controllednative only. 483README ownscommands/bounds. Passedinputs/originals frozen.
+482rawaudit confirms4677e0 callerdefects; oldtag-onlyproof stayshistorical but
+currentregistry downgradesconstructor toPARTIAL pending484. No guessedwrappers.
+
+Userconfirmedquota restored: active484rendercaller/helperrepair(audio_resource_478),
+485networkcallbacklifecycle(sample_converter_476),486mixerconfigurationtrace
+(sample_processor_475). Workers ownnewrun/local files only; coordinator ownsbuild/
+audit/registry/docs/commit. 484needs explicitreviewedsource replacement inshared
+CMake/audit; do notcompileunusedhistoricalclone to evadeownershipchecks. 485uses
+canonicalaudiobytecount/table +approved60B DWORD/twolists;38Baddress-takencleanup
+edge mustbeclosedorreported.486callbacktargets requireconsumerABI beforebindings.
+Afterfulloriginalcoderecovery consolidateacceptedC++ intoonecanonicalsource tree
+perrootPLAN milestone4; no consolidationnow. Prioropaque/fault/concurrency/live/
+fullstartup/display/gameplay/403/411 boundaries stayopen.434a90?434aa0 deferred.
+
+Historical480 follows.
+
 Current480,2026-11-01: frozen477/478/479 add10original C++bodies1485B/24Bdata;
 registry673. SharedauditPASS301680cases/362086events/38mutations/640pins/461exports;
 onebuild260TUs/8projects,160names166refs,noEXE. Sevennamesclose/no newchildren.

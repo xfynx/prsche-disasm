@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run480](iterations/v2/001-original-recovery/runs/480-file-resource-ramp-integration/README.md).
-Ten original file/resource/ramp functions are integrated; cached REA evidence is reused.
+Latest recovery intake: [Run483](iterations/v2/001-original-recovery/runs/483-startup-gates-integration/README.md).
+Three original startup/update functions are integrated; renderer call-contract repair is active.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next finish startup gates and trace render caller/ABI repairs.
+Next repair renderer caller/ABI contracts and close network/mixer dependencies.
 
 ## Recovery milestones
 
@@ -33,9 +33,14 @@ Next finish startup gates and trace render caller/ABI repairs.
 3. Validate menus, Quick Race, Evolution, Factory Driver, physics, damage, AI, progression,
    used-car purchases, saves and audio against the original. Close the
    [validation backlog](docs/recovery-validation-backlog.md).
-4. Document how the complete game works at code level: module boundaries, state,
+4. After original-code recovery is complete, consolidate the accepted C/C++ sources
+   into one canonical `source` tree organized by subsystem and update the build paths.
+   Keep immutable native fixtures, original comparisons and run history in `runs`;
+   preserve function/address provenance and proof hashes through an explicit migration
+   manifest. This consolidation is deferred; do not relocate sources during recovery.
+5. Document how the complete game works at code level: module boundaries, state,
    lifetimes, call/data flows and platform dependencies.
-5. Use that verified structure for the Rust native/web port.
+6. Use that verified structure for the Rust native/web port.
 
 The older [Rust iteration 012 prototype](iterations/012-campaign-fidelity/README.md) is unfinished
 and integration is paused. Snapshots 001?011 remain immutable. New experimental paths do

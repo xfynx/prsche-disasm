@@ -1,0 +1,86 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "startup_gates_481.hpp"
+#include "porsche/application_state.hpp"
+#include "porsche/frame_pump.hpp"
+#include "porsche/window_runtime.hpp"
+#include "porsche/window_event_queue.hpp"
+#include "porsche/file_disk.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;std::memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){std::memcpy(p,&x,4);}
+static U cases,total_events,mode,clear_after,queue_length,queue_value,timer_calls,pump_calls,sleep_calls,dequeue_calls;
+static B frame[48];
+struct State{U selector,word;B flags[2],frame[48],pad[2];};
+struct Event{U tag,arg;State state;};
+struct Trace{U count,abi;Event events[96];State final;};
+static Trace trace,expected;
+static U& selector(){return application_state_006573e8.words_[(0x657404-application_state_base_va)/4];}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s case=%u mode=%u\n",why,cases,mode);std::fflush(stdout);ExitProcess(1);}}
+static void snapshot(State& s){s.selector=selector();s.word=startup_gate_word_00606ae8;s.flags[0]=startup_gate_byte_005cc81c;s.flags[1]=startup_gate_byte_005cc81d;std::memcpy(s.frame,frame,48);std::memset(s.pad,0,2);}
+static void event(U tag,U arg){require(trace.count<96,"finite endpoint script");auto& e=trace.events[trace.count++];e.tag=tag;e.arg=arg;snapshot(e.state);}
+namespace porsche {
+// Fixture-only transport for one accepted physical frame-state view. The game
+// obtains this reference from the unchanged canonical frame_pump.cpp owner.
+B& frame_pump_byte_006573e0=frame[0x28];
+void __cdecl frame_pump_004b0d70(){event(1,++pump_calls);if((mode&1)&&pump_calls==1)frame_pump_byte_006573e0=1;if(mode&16)startup_gate_word_00606ae8^=0x12345678;}
+U __cdecl timed_callbacks_005366e0(U argument){event(2,argument);++timer_calls;if(timer_calls>=clear_after||((mode&2)&&timer_calls==1))frame_pump_byte_006573e0=0;return 0xa5a5a5a5;}
+U __cdecl file_sleep_0055f740(U delay){event(3,delay);++sleep_calls;if((mode&8)&&sleep_calls==1)frame_pump_byte_006573e0=1;return 0xffffffff;}
+U __cdecl window_event_dequeue_0053aa60(){event(4,dequeue_calls);return dequeue_calls++<queue_length?queue_value:0;}
+}
+static B* gate_code;static B* drain_code;static B* event_code;static U jump_table[5];
+static void absolute(B* code,U n,U old,const void* value,U wanted){U count=0;for(U i=0;i+4<=n;++i)if(rd(code+i)==old){wr(code+i,ptr(value));++count;i+=3;}require(count==wanted,"raw absolute relocation");}
+static void relative(B* code,U n,U original,U target,const void* value,U wanted){U count=0;for(U i=0;i+5<=n;++i)if((code[i]==0xe8||code[i]==0xe9)&&original+i+5+rd(code+i+1)==target){wr(code+i+1,ptr(value)-ptr(code+i+5));++count;i+=4;}require(count==wanted,"raw call or tail relocation");}
+static void init(){
+    static const B g[]={ @GATE@ },d[]={ @DRAIN@ },e[]={ @EVENTS@ },table[]={ @DISPATCH@ },flags[]={ @FLAGS@ };
+    require(selector()==0&&startup_gate_word_00606ae8==0,"canonical initial zero");require(startup_gate_byte_005cc81c==flags[0]&&startup_gate_byte_005cc81d==flags[1],"raw initialized gate bytes");require(ptr(&startup_gate_byte_005cc81d)==ptr(&startup_gate_byte_005cc81c)+1,"physical adjacent gate bytes");
+    B** targets[]={&gate_code,&drain_code,&event_code};for(auto t:targets){*t=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(*t!=nullptr,"raw allocations");}std::memcpy(gate_code,g,40);std::memcpy(drain_code,d,55);std::memcpy(event_code,e,19);
+    for(U i=0;i<5;++i){require(rd(table+i*4)==0x415de1,"original switch target");jump_table[i]=ptr(gate_code+0x21);}
+    absolute(gate_code,40,0x5cc81c,&startup_gate_byte_005cc81c,1);absolute(gate_code,40,0x5cc81d,&startup_gate_byte_005cc81d,1);absolute(gate_code,40,0x657404,&selector(),1);absolute(gate_code,40,0x606ae8,&startup_gate_word_00606ae8,1);absolute(gate_code,40,0x415de8,jump_table,1);
+    absolute(drain_code,55,0x6573e0,&frame_pump_byte_006573e0,2);relative(drain_code,55,0x4b0fa0,0x4b0d70,reinterpret_cast<void*>(&frame_pump_004b0d70),2);relative(drain_code,55,0x4b0fa0,0x5366e0,reinterpret_cast<void*>(&timed_callbacks_005366e0),2);relative(drain_code,55,0x4b0fa0,0x55f740,reinterpret_cast<void*>(&file_sleep_0055f740),1);relative(event_code,19,0x560030,0x53aa60,reinterpret_cast<void*>(&window_event_dequeue_0053aa60),2);
+    for(B* p:{gate_code,drain_code,event_code})require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"raw cache");
+}
+static U invoke(void* fn){U before,frame,fail=0;__asm{
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }return fail;}
+
+static void check(U family,U value,U word,U flags,U frame_flag){
+    for(U side=0;side<2;++side){std::memset(&trace,0,sizeof(trace));std::memset(frame,0xa5,48);frame_pump_byte_006573e0=static_cast<B>(frame_flag);selector()=value;startup_gate_word_00606ae8=word;startup_gate_byte_005cc81c=static_cast<B>(flags);startup_gate_byte_005cc81d=static_cast<B>(flags>>8);timer_calls=pump_calls=sleep_calls=dequeue_calls=0;
+        void* raw=family==0?gate_code:family==1?drain_code:event_code;void* cpp=family==0?reinterpret_cast<void*>(&startup_sequence_call_00415dc0):family==1?reinterpret_cast<void*>(&startup_sequence_call_004b0fa0):reinterpret_cast<void*>(&game_setup_update_00560030);trace.abi=invoke(side?cpp:raw);snapshot(trace.final);if(side==0)expected=trace;
+    }
+    if(trace.abi||expected.abi||std::memcmp(&trace,&expected,sizeof(trace))!=0){const B* a=reinterpret_cast<const B*>(&trace);const B* b=reinterpret_cast<const B*>(&expected);U n=0;while(n<sizeof(trace)&&a[n]==b[n])++n;std::printf("divergence case=%u family=%u value=%x word=%x flags=%x frame=%u mode=%u clear=%u queue=%u offset=%u bytes=%02x/%02x events=%u/%u ABI=%u/%u\n",cases,family,value,word,flags,frame_flag,mode,clear_after,queue_length,n,n<sizeof(trace)?a[n]:0,n<sizeof(trace)?b[n]:0,trace.count,expected.count,trace.abi,expected.abi);std::fflush(stdout);ExitProcess(1);}++cases;total_events+=trace.count;
+}
+int main(){
+    SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);init();mode=0;clear_after=1;queue_length=0;queue_value=1;
+    for(U value:{0u,1u,2u,3u,4u,5u,0x7fffffffu,0x80000000u,0xffffffffu})for(U word:{0u,4u,0xa5a5a5a5u})for(U flags:{0u,0xffffu,0x1234u})check(0,value,word,flags,0);
+    for(U m=0;m<32;++m)for(U limit:{1u,2u,3u,6u})for(U flag:{0u,1u,255u}){mode=m;clear_after=limit;check(1,7,0x87654321,0x1234,flag);}
+    mode=0;for(U n:{0u,1u,2u,4u,8u,32u})for(U value:{1u,2u,0x80000000u,0xffffffffu}){queue_length=n;queue_value=value;check(2,7,0x87654321,0x1234,1);}
+    for(B* p:{gate_code,drain_code,event_code})require(VirtualFree(p,0,MEM_RELEASE)!=0,"raw cleanup");std::printf("startup_gates_original_x86_vs_cpp=PASS cases=%u events=%u ABI=PASS callbacks=PASS\n",cases,total_events);return 0;
+}

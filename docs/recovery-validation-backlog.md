@@ -1,5 +1,15 @@
 # Отложенные проверки восстановления v2
 
+Run483:3originals114B/6Bdata;978cases/12mutations/643pins PASS;261TUs/157names163refs,
+noEXE. Controlled481callbacks/frameview are notwholepump/scheduler/queue acceptance.
+Run482 nowpinsrawcaller/helper/source/probe findings: wrong4677e0 surfaceword,
+signeddimensions andreceiver/stack/matrixflow. Existing136tagsdidnotobserveargs;
+currentconstructorregistry isPARTIAL until484 freshfullargument/matrixproof.
+Descriptor5de68048B shares5de6ac ownedlastDWORD, noindependentcopy. Source
+consolidation deferreduntilcompleteoriginalrecovery (rootPLAN4), no move now.
+
+Historical480 follows.
+
 Run480:10originals1485B/24Bdata;301680cases/38mutations/640pins PASS;260TUs/
 160names166refs,noEXE. Actual475+479+438composition/all4null-presenthookmodes now
 closes475initiallynullblockhook concern. Full473+475+476 producer scene stillopen.

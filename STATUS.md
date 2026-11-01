@@ -4,14 +4,15 @@ Updated 2026-11-01. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run480](iterations/v2/001-original-recovery/runs/480-file-resource-ramp-integration/README.md)
-compiles 260 C++ translation units across 8 projects. The game link still has 160 unresolved
-names / 166 references. **There is no recovered playable C++ game executable yet.**
+[Run483](iterations/v2/001-original-recovery/runs/483-startup-gates-integration/README.md)
+compiles 261 C++ translation units across 8 projects. The game link still has 157 unresolved
+names / 163 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates ten original file/resource/ramp functions:
-301,680 native cases,38 detected mutations and a640-pin audit. Seven names close
-without new dependencies. Registry:673 entries. Actual processor/ramp/pool
-composition now covers null hooks; full-game execution remains unverified.
+The latest batch integrates three original startup/update functions:
+978 native cases,12 detected mutations and a643-pin audit. Three names close
+without new dependencies. Registry:676 entries, including explicit partial domains.
+Follow-up482 found real renderer argument/ABI defects hidden by older tag-only
+endpoints; constructor4677e0 is now PARTIAL pending repaired caller/helper proof.
 These are batch results, not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
