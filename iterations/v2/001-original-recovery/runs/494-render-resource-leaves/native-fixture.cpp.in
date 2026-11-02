@@ -1,0 +1,164 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "render_resource_494.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/heap_locks.hpp"
+#include "porsche/window_shutdown.hpp"
+#include "porsche/window_scheduler.hpp"
+#include "porsche/render_mode.hpp"
+#include "porsche/render_loader.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(const void* p,U off=0){U v;memcpy(&v,static_cast<const B*>(p)+off,4);return v;}
+static void write(void* p,U off,U v){memcpy(static_cast<B*>(p)+off,&v,4);}
+static U cases,events_total,kind,mode,pattern,variant,chosen,slot_value,release_form,precision,rounding,depth;
+static bool cpp_side;
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s cases=%u kind=%u mode=%u pattern=%u variant=%u slot=%08x cpp=%u\n",why,cases,kind,mode,pattern,variant,slot_value,cpp_side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault %08lx eip=%08lx case=%u kind=%u mode=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,kind,mode,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+alignas(16) static B heap_arena[512],raw_slots[0x1200],floating[512];
+static OriginalHeap heap;
+static U devices[3][8],vtables[3][9],memory_words[8],dummy_lock;
+static U callback_ecx;
+static void* texture;
+struct State{B renderer[0x71],arena[512];OriginalHeap heap;U heaps[16],config[12],handle,state67c,state6ac,sources,devices[3][8];FrameControlSlotFields_494 slots[32];};
+struct Event{U tag,a,b;State before;};
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+struct Trace{U count,result,abi;Event events[16];State final;Fpu fpu;};
+static Trace trace,expected;
+static FrameControlSlotFields_494 get_slot(U index){if(cpp_side)return frame_control_slot_fields_494[index];B* p=raw_slots+index*0x90;return {read(p),read(p,8),read(p,12)};}
+static void set_slot(U index,const FrameControlSlotFields_494& v){if(cpp_side)frame_control_slot_fields_494[index]=v;else{B* p=raw_slots+index*0x90;write(p,0,v.active);write(p,8,v.device);write(p,12,v.state);}}
+static void snapshot(State& s){memcpy(s.renderer,render_mode_state_00619790,0x71);memcpy(s.arena,heap_arena,512);s.heap=heap;for(U i=0;i<16;++i)s.heaps[i]=ptr(heaps_006b4f20[i]);memcpy(s.config,window_shutdown_config_005de620,48);s.handle=ptr(window_shutdown_handle_0069dd18);s.state67c=window_shutdown_state_005de67c;s.state6ac=window_shutdown_state_005de6ac;s.sources=window_shutdown_source_005de65c|(U(window_shutdown_source_005de65d)<<8);memcpy(s.devices,devices,sizeof(devices));for(U i=0;i<32;++i)s.slots[i]=get_slot(i);}
+static void event(U tag,U a=0,U b=0){require(trace.count<16,"event bound");auto& e=trace.events[trace.count++];memset(&e,0,sizeof(e));e.tag=tag;e.a=a;e.b=b;snapshot(e.before);}
+static void WINAPI memory_status(LPMEMORYSTATUS status){event(1,status->dwLength);memcpy(status,memory_words,32);}
+static U __stdcall unlock(void* handle){event(2,ptr(handle));if(mode&1){window_shutdown_mode_005de630=2;static_cast<B*>(texture)[12]=0x81;static_cast<B*>(texture)[13]=0x82;}return 0x87654321;}
+static void __stdcall display(U value){require(trace.count!=0&&trace.events[trace.count-1].tag==2,"unlock precedes display via exact slot7");event(3,value);if(mode&2){write(texture,0,0xabcdef01);write(texture,0x28,0xfeeddeed);}if(mode&4)window_shutdown_handle_0069dd18=reinterpret_cast<void*>(0x456789ab);}
+static void __stdcall released_impl(void* device){event(4,ptr(device),callback_ecx);require(callback_ecx==read(device),"callback ECX vtable");require(slot_value<32,"released slot");auto entry=get_slot(slot_value);if(mode&1){entry.device=ptr(devices[2]);entry.state=0xffffffffu;}if(mode&2)entry.active=0x87654321;set_slot(slot_value,entry);if(mode&4){auto other=get_slot(slot_value^1u);other.active=0x55667788;set_slot(slot_value^1u,other);}static_cast<U*>(device)[1]^=0x4321abcd;}
+static void __declspec(naked) __stdcall released(void*){__asm mov callback_ecx,ecx __asm jmp released_impl}
+namespace porsche {
+RenderDisplay* render_display_00628130=nullptr;
+U render_display_actual_width_00619784=0,render_display_actual_height_00619788=0,render_display_actual_mode_0061978c=0,render_display_mode_index_00619780=0;
+void __stdcall platform_enter_critical_section(void* lock){event(5,ptr(lock));}
+void __stdcall platform_leave_critical_section(void* lock){event(6,ptr(lock));}
+// Uncalled dependencies of unchanged complete canonical owners fail closed.
+U threads_initialized_006a57dc=0;
+void __cdecl thread_init_0055f320(U){ExitProcess(90);}
+void* __cdecl file_object_allocate_0056e5f0(U*){ExitProcess(90);return nullptr;}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(90);}
+void __cdecl heap_fill_0053c290(void*,U,U){ExitProcess(90);}
+void __cdecl heap_format_005a0fbf(char*,const char*,const char*){ExitProcess(90);}
+void __cdecl heap_copy_005b0100(void*,const void*,U){ExitProcess(90);}
+void __cdecl heap_copy_005b02c0(void*,const void*,U){ExitProcess(90);}
+void __cdecl heap_copy_005b0480(void*,const void*,U){ExitProcess(90);}
+void __cdecl application_instance_exit_005a246e(U){ExitProcess(90);}
+TimedCallbackSlot* __cdecl window_scheduler_remove_005366a0(TimedCallback){ExitProcess(90);return nullptr;}
+void __cdecl render_mode_driver_prepare_vslot9(void*){ExitProcess(90);}
+void __cdecl render_mode_apply_settings_0044e890(){ExitProcess(90);}
+void __cdecl render_mode_update_alternate_0044f020(){ExitProcess(90);}
+U __cdecl render_mode_clock_00555bc0(){ExitProcess(90);return 0;}
+U __cdecl render_win_load_library_005b2050(const char*){ExitProcess(90);return 0;}
+U __cdecl render_win_get_proc_005b205c(U,const char*){ExitProcess(90);return 0;}
+void __cdecl render_win_free_library_005b2088(U){ExitProcess(90);}
+U __cdecl render_win_get_module_005b2138(const char*){ExitProcess(90);return 0;}
+void __cdecl render_win_disable_thread_calls_005b21b4(U){ExitProcess(90);}
+U __cdecl render_win_last_error_005b213c(){ExitProcess(90);return 0;}
+void __cdecl render_loader_format_005a0fbf(char*,const char*,...){ExitProcess(90);}
+void __cdecl render_loader_report_00565340(const char*){ExitProcess(90);}
+void __cdecl render_loader_directx_00574eb0(U[2],const char*){ExitProcess(90);}
+void __cdecl render_loader_reset_00594f00(U){ExitProcess(90);}
+void __cdecl render_loader_set_state_006bd97c(U,U,U){ExitProcess(90);}
+const U* __cdecl render_loader_about_006bd934(U){ExitProcess(90);return nullptr;}
+}
+extern "C" void* memory_cell;
+#pragma comment(linker,"/alternatename:_memory_cell=__imp__GlobalMemoryStatus@4")
+static void** imported_cell(const char* dll,const char* name){auto* base=reinterpret_cast<B*>(GetModuleHandleA(nullptr));auto* nt=reinterpret_cast<IMAGE_NT_HEADERS32*>(base+reinterpret_cast<IMAGE_DOS_HEADER*>(base)->e_lfanew);auto* entry=reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(base+nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);for(;entry->Name;++entry){if(_stricmp(reinterpret_cast<char*>(base+entry->Name),dll)!=0)continue;auto* names=reinterpret_cast<IMAGE_THUNK_DATA32*>(base+entry->OriginalFirstThunk);auto* cells=reinterpret_cast<void**>(base+entry->FirstThunk);for(U n=0;names[n].u1.AddressOfData;++n)if(!IMAGE_SNAP_BY_ORDINAL32(names[n].u1.Ordinal)){auto* imported=reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(base+names[n].u1.AddressOfData);if(strcmp(reinterpret_cast<char*>(imported->Name),name)==0)return cells+n;}}return nullptr;}
+static void write_cell(void** cell,void* value){DWORD old,restored;require(VirtualProtect(cell,4,PAGE_READWRITE,&old)!=0,"IAT writable");*cell=value;require(VirtualProtect(cell,4,old,&restored)!=0,"IAT restored protection");}
+static B* code[4];
+static void absolute(B* p,U size,U old,const void* value,U count){U found=0;for(U i=0;i+4<=size;++i)if(read(p,i)==old){write(p,i,ptr(value));++found;i+=3;}require(found==count,"absolute relocation count");}
+static void relative(B* p,U size,U va,U target,const void* replacement,U count){U found=0;for(U i=0;i+5<=size;++i)if(p[i]==0xe8&&va+i+5+read(p,i+1)==target){write(p,i+1,ptr(replacement)-ptr(p+i+5));++found;i+=4;}require(found==count,"call relocation count");}
+static void init(){
+    for(auto& entry:frame_control_slot_fields_494)require(entry.active==0&&entry.device==0&&entry.state==0,"new field loader zeros");
+    for(B value:render_mode_state_00619790)require(value==0,"canonical render loader zeros");
+    for(U value:window_shutdown_config_005de620)require(value==0,"canonical config loader zeros");
+    require(copy_flag_005deb10==1&&copy_flag_005deb18==0&&copy_flag_005deb30==0&&heap_lock_pool_count_005de000==32,"canonical initial flags");
+    static const B memory[]={ @BODY_MEMORY@ },texture_body[]={ @BODY_TEXTURE@ },slots[]={ @BODY_SLOT@ },present[]={ @BODY_PRESENT@ };const B* bodies[]={memory,texture_body,slots,present};U sizes[]={30,50,53,20};
+    for(U i=0;i<4;++i){code[i]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[i]!=nullptr,"raw code allocation");memcpy(code[i],bodies[i],sizes[i]);}
+    absolute(code[0],30,0x5b2140,&memory_cell,1);
+    absolute(code[1],50,0x5de648,window_shutdown_config_005de620+10,1);relative(code[1],50,0x533f80,0x534550,reinterpret_cast<void*>(&window_shutdown_prepare_00534550),1);relative(code[1],50,0x533f80,0x531f90,reinterpret_cast<void*>(&free_00531f90),1);
+    absolute(code[2],53,0x69cb9c,raw_slots+12,1);absolute(code[2],53,0x69cb98,raw_slots+8,1);absolute(code[2],53,0x69cb90,raw_slots,1);
+    absolute(code[3],20,0x6197ab,render_mode_state_00619790+0x1b,1);absolute(code[3],20,0x6197ac,render_mode_state_00619790+0x1c,1);
+    for(B* p:code)require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"instruction cache");
+    require(imported_cell("kernel32.dll","GlobalMemoryStatus")==&memory_cell,"SDK import identity");require(memory_cell==reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA("kernel32.dll"),"GlobalMemoryStatus")),"SDK loaded target identity");
+}
+static void capture(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))memcpy(f.values+i*10,floating+32+i*16,10);else memset(f.values+i*10,0,10);}}
+static void seed_fpu(){unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm fninit __asm fldcw control
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}}
+static U invoke(void* fn,const U* args,U argc,U& result){U before,frame,fail=0,out;__asm{
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov eax,argc
+    mov edx,args
+pushargs:test eax,eax
+    jz pushed
+    dec eax
+    push dword ptr [edx+eax*4]
+    jmp pushargs
+pushed:mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov out,eax
+    mov eax,argc
+    lea esp,[esp+eax*4]
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    result=out;return fail;
+}
+static void setup(){trace.count=trace.result=trace.abi=0;memset(heap_arena,0x65,sizeof(heap_arena));memset(render_mode_state_00619790,0x39,0x71);memset(&heap,0,sizeof(heap));memset(raw_slots,0xa5,sizeof(raw_slots));
+    for(U i=0;i<16;++i)heaps_006b4f20[i]=nullptr;heaps_006b4f20[0]=&heap;heap.lock=(variant&1)?&dummy_lock:nullptr;heap.sentinel.free_next=heap.sentinel.free_previous=&heap.sentinel.block;
+    auto* previous=reinterpret_cast<HeapBlock*>(heap_arena);auto* target=reinterpret_cast<HeapBlock*>(heap_arena+64);auto* next=reinterpret_cast<HeapBlock*>(heap_arena+256);previous->flags=next->flags=0;target->flags=0;target->previous=previous;target->next=next;previous->next=target;next->previous=target;texture=heap_arena+80;
+    write(texture,0x28,pattern==0?0:pattern==1?0x12345678:0x87654321);for(U i=0;i<12;++i)window_shutdown_config_005de620[i]=0x90000000+i;window_shutdown_config_005de620[10]=0x12345678;window_shutdown_mode_005de630=static_cast<B>(chosen);window_shutdown_handle_0069dd18=(variant&2)?reinterpret_cast<void*>(0x2468ace0):nullptr;window_shutdown_state_005de67c=0x13579bdf;window_shutdown_state_005de6ac=0x11223344;window_shutdown_source_005de65c=0x78;window_shutdown_source_005de65d=0x9a;
+    render_thrash_exports_006bd910[7]=ptr(reinterpret_cast<void*>(&unlock));render_thrash_exports_006bd910[40]=ptr(reinterpret_cast<void*>(&display));
+    for(U i=0;i<3;++i){memset(devices[i],static_cast<int>(0x31+i),sizeof(devices[i]));devices[i][0]=ptr(vtables[i]);vtables[i][8]=ptr(reinterpret_cast<void*>(&released));}
+    for(U i=0;i<32;++i)set_slot(i,{0x11110000u+i,ptr(devices[i%3]),0xffffffffu});
+    if(slot_value<32)set_slot(slot_value,{0x12345678,ptr(devices[variant%3]),chosen});
+    for(U i=0;i<8;++i)memory_words[i]=0x98765432u+i*0x112233u;memory_words[2]=chosen;
+}
+static void compare(U first=0,U second=0){
+    for(U side=0;side<2;++side){cpp_side=side!=0;setup();seed_fpu();Fpu before;capture(before);U args[2]={first,second};U argc=kind==0?0:kind==3?2:1;if(kind==1)args[0]=ptr(texture);if(kind==2)args[0]=slot_value;
+        void* candidate=kind==0?reinterpret_cast<void*>(&render_resource_total_phys_0053c3d0):kind==1?reinterpret_cast<void*>(&render_resource_release_texture_00533f80):kind==2?reinterpret_cast<void*>(&frame_control_slot_release_005338d0):reinterpret_cast<void*>(static_cast<void(__cdecl*)(U,U)>(&render_display_present_0044e870));
+        bool used=kind<=1;if(kind==0&&release_form){candidate=reinterpret_cast<void*>(&render_display_texture_reset_0053c3d0);used=false;}if(kind==1&&release_form==1){candidate=reinterpret_cast<void*>(&render_display_release_texture_00533f80);used=false;}if(kind==1&&release_form==2){candidate=reinterpret_cast<void*>(&splash_progress_release_texture_00533f80);used=false;}
+        U result;trace.abi=invoke(side?candidate:code[kind],args,argc,result);trace.result=used?result:0;snapshot(trace.final);capture(trace.fpu);require(trace.abi==0,"cdecl stack/nonvolatile ABI");require(memcmp(&before,&trace.fpu,sizeof(Fpu))==0,"x87 preserved");
+        if(side){require(expected.count==trace.count&&expected.result==trace.result,"return/event count");for(U i=0;i<trace.count;++i)require(memcmp(&expected.events[i],&trace.events[i],sizeof(Event))==0,"ordered args/pre-call state");require(memcmp(&expected.final,&trace.final,sizeof(State))==0,"final heap/config/renderer/fields state");events_total+=trace.count;}else expected=trace;
+    }++cases;
+}
+int main(){AddVectoredExceptionHandler(1,fault);init();void* saved=memory_cell;write_cell(&memory_cell,reinterpret_cast<void*>(&memory_status));precision=3;rounding=0;depth=0;variant=0;pattern=0;mode=0;chosen=0;slot_value=0xffffffffu;release_form=0;
+    const U values[]={0,1,7,31,32,0x7fffffffu,0x80000000u,0xfffffffeu,0xffffffffu};
+    kind=0;for(U value:values)for(release_form=0;release_form<2;++release_form){chosen=value;precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%5;compare();}
+    kind=1;for(pattern=0;pattern<3;++pattern)for(U value:{0u,1u,2u,255u})for(variant=0;variant<4;++variant)for(mode=0;mode<8;++mode)for(release_form=0;release_form<3;++release_form){chosen=value;precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%5;compare();}
+    kind=2;release_form=0;for(slot_value=0;slot_value<32;++slot_value)for(U value:values)for(variant=0;variant<3;++variant)for(mode=0;mode<8;++mode){chosen=value;precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%5;compare();}for(U value:{32u,33u,0x7fffffffu,0x80000000u,0xfffffffeu,0xffffffffu}){slot_value=value;compare();}
+    kind=3;mode=0;variant=0;for(U a=0;a<256;++a)for(U b=0;b<256;++b){precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%5;compare(a|0x12345600,b|0xfedcba00);}
+    write_cell(&memory_cell,saved);require(memory_cell==reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA("kernel32.dll"),"GlobalMemoryStatus")),"restored actual SDK target");__asm fninit
+    printf("render_resource_leaves_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;
+}

@@ -1,0 +1,100 @@
+{
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "index_queries": [
+    "GlobalMemoryStatus -> KERNEL32 import 005b2140",
+    "0053c3d0 / 00533f80 / 005338d0 / 0044e870 complete indexed functions and caller/callee references"
+  ],
+  "bodies": [
+    {
+      "va": "0053c3d0",
+      "bytes": 30,
+      "sha256": "89f8554dee9e23a0bc742a0f8b352b6c01dc496cdcb286d8e7e3e7483e894e2b",
+      "raw_hex": "83ec208d442400c74424002000000050ff1540215b008b44240883c420c3",
+      "instructions": [
+        "0053c3d0 sub esp, 0x20",
+        "0053c3d3 lea eax, [esp]",
+        "0053c3d7 mov dword ptr [esp], 0x20",
+        "0053c3df push eax",
+        "0053c3e0 call dword ptr [0x5b2140]",
+        "0053c3e6 mov eax, dword ptr [esp + 8]",
+        "0053c3ea add esp, 0x20",
+        "0053c3ed ret "
+      ]
+    },
+    {
+      "va": "00533f80",
+      "bytes": 50,
+      "sha256": "b85160e9f94f74b370c46881ed8a8139bb7e65358872650efe43bfaa14e52aa3",
+      "raw_hex": "568b7424088b462885c0740d3b0548e65d007505e8b705000056c6460c00c6460d00c7066b4e4957e8e3dfffff83c4045ec3",
+      "instructions": [
+        "00533f80 push esi",
+        "00533f81 mov esi, dword ptr [esp + 8]",
+        "00533f85 mov eax, dword ptr [esi + 0x28]",
+        "00533f88 test eax, eax",
+        "00533f8a je 0x533f99",
+        "00533f8c cmp eax, dword ptr [0x5de648]",
+        "00533f92 jne 0x533f99",
+        "00533f94 call 0x534550",
+        "00533f99 push esi",
+        "00533f9a mov byte ptr [esi + 0xc], 0",
+        "00533f9e mov byte ptr [esi + 0xd], 0",
+        "00533fa2 mov dword ptr [esi], 0x57494e6b",
+        "00533fa8 call 0x531f90",
+        "00533fad add esp, 4",
+        "00533fb0 pop esi",
+        "00533fb1 ret "
+      ]
+    },
+    {
+      "va": "005338d0",
+      "bytes": 53,
+      "sha256": "b4d761e0a23c3a72f55784fee4221bff648cad215c3b78d834132c91a51c4dc2",
+      "raw_hex": "8b4424045685c07c2a83f8207d258d34c0c1e60483be9ccb6900ff74168b8698cb6900508b08ff5120c78690cb6900000000005ec3",
+      "instructions": [
+        "005338d0 mov eax, dword ptr [esp + 4]",
+        "005338d4 push esi",
+        "005338d5 test eax, eax",
+        "005338d7 jl 0x533903",
+        "005338d9 cmp eax, 0x20",
+        "005338dc jge 0x533903",
+        "005338de lea esi, [eax + eax*8]",
+        "005338e1 shl esi, 4",
+        "005338e4 cmp dword ptr [esi + 0x69cb9c], -1",
+        "005338eb je 0x533903",
+        "005338ed mov eax, dword ptr [esi + 0x69cb98]",
+        "005338f3 push eax",
+        "005338f4 mov ecx, dword ptr [eax]",
+        "005338f6 call dword ptr [ecx + 0x20]",
+        "005338f9 mov dword ptr [esi + 0x69cb90], 0",
+        "00533903 pop esi",
+        "00533904 ret "
+      ]
+    },
+    {
+      "va": "0044e870",
+      "bytes": 20,
+      "sha256": "4cb650f75d18c0dce983c68aad21c021820e3b580dc1b83b55ec4948fd53037f",
+      "raw_hex": "8a4424048a4c2408a2ab976100880dac976100c3",
+      "instructions": [
+        "0044e870 mov al, byte ptr [esp + 4]",
+        "0044e874 mov cl, byte ptr [esp + 8]",
+        "0044e878 mov byte ptr [0x6197ab], al",
+        "0044e87d mov byte ptr [0x6197ac], cl",
+        "0044e883 ret "
+      ]
+    }
+  ],
+  "ownership": {
+    "memory": "MEMORYSTATUS 32B stack-local; totalPhys DWORD+8; SDK Kernel32 GlobalMemoryStatus stdcall1",
+    "texture": "canonical config[10] 005de648 and accepted shutdown/heap owners; no new storage",
+    "slots": "only 3 DWORD fields per slot original 0069cb90+0x90*i+{0,8,12}, 32 slots; sparse 384B semantic map; padding and unrelated globals unowned; no full record pointer exposed",
+    "present": "canonical 00619790 arena bytes+1b/+1c; no new storage",
+    "unlock": "exact _THRASH_unlockwindow@4 transport via existing exports[7]; no original algorithm or storage"
+  },
+  "deferred": [
+    "00534540 descriptor overlap at 005de6ac",
+    "live API/device",
+    "slot producers/full ownership consolidation"
+  ]
+}

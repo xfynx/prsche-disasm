@@ -4,15 +4,15 @@ Updated 2026-11-02. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run491](iterations/v2/001-original-recovery/runs/491-callback-pixel-pcm-integration/README.md)
-compiles267 C++ translation units across8 projects. The game link still has160 unresolved
-names/166 references. **There is no recovered playable C++ game executable yet.**
+[Run500](iterations/v2/001-original-recovery/runs/500-render-pcm-file-integration/README.md)
+compiles273 C++ translation units across8 projects. The game link still has151 unresolved
+names/157 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates13 original functions/1,369B and8B original data:
-13,849,300 native cases,42 mutations and657 source pins pass the shared audit.
-Six names close with no new dependencies; registry705 entries.490 assembly research
-is excluded from production. Constructor4677e0 remains PARTIAL pending494/496's
-second present argument. These batch results are not a completion percentage.
+The latest batch adds15 original functions/1,203B,384B sparse slot fields and repairs
+the renderer constructor's missing present argument.487,996 native cases,55 mutations
+and669 source pins pass the shared audit.11 names close and two actual stream children
+appear; registry720 entries. These batch results are not a completion percentage.
+497's emulated3DNow feasibility passes;498 providers await separate integration.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through

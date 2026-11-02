@@ -1,15 +1,34 @@
 # v2 / 001 - original source recovery plan
 
+Current500,2026-11-02: frozen493/494/495/496/499 add15originals1203B/384Bsparsefields
+andrepair1761Bcaller;registry720. SharedauditPASS487996cases/1893890events/55mutants/
+669pins/544exports;273TUs/8projects,151names157refs,noEXE.11close/2realstreamchildren.
+Build001wrongCMakeowner retainedoldcaller;002freshrootcorrectsexactoneTUreplacement.
+496twoargpresent/full494composition closesknownconstructorbug; boundednativeverified,
+notlive/fullgame. Originals/passednativeinputs frozen. Sourceconsolidationdeferred.
+Ready498emulated3DNow2providers319indexedB/322rawspan +501streamlookup2bodies305B/64B.
+Coordinatorowns502emulatedauditsupport/sharedintegration.497capabilityreportfrozen.
+Active503resource/surfaceconstruction(render_resources_494),504codedconstructors
+(simd_oracle_497),505streambufferdelivery(pcm_constructors_493); workers ownrun/local.
+Fullproducer/lifetime/fault/concurrency/live/startup/gameplay/403/411 boundaries persist.
+Next502combineonlyready498/501; emulatedproofmuststaydistinctfromnativehardware.
+
+Historical491 follows.
+
 Current491,2026-11-02:488/489/492 add13originals1369B/8Bdata;registry705.
 SharedauditPASS13849300cases/371966events/42mutations/657pins/521exports;
 267TUs/8projects,160names166refs,noEXE. Sixoldnamesclose/no newchildren.
 490assemblyreference excluded fromproduction/counts. Passedinputs frozen.
-Active493PCMconstructors(pcm_constructors_493),494renderleaves then496callerrepair
-(render_resources_494),497bounded3DNoworacle(simd_oracle_497; capabilityonly).
-495bankcleanup ready/frozen fornextsharedbatch. Coordinatorownsintake/build/registry.
+Ready493PCMconstructors/494renderleaves/495bankcleanup/499rootedfileexists.
+Active496freshpresentcallerrepair(render_resources_494),498exact3DNowC++emulated
+comparison(simd_oracle_497),501PCMstreamlookup(pcm_constructors_493).
+Coordinatorowns500sharedintake/build/registry;499native003PASS194400cases/9mutations,
+198B/0state, setup+splashresultbitfacades, controlledfile/formatendpoints.
+497feasibilityPASS: pinnedUnicornAthlon/Phenom executeoriginalPFopcodes; defaultmodel
+rejects. Thisisnotnativehardware/fullkernelacceptance;498mustproveactualcompiledcode.
 Constructor4677e0 staysPARTIAL until496fresh2argpresentproof. Fullproducer/lifetime/
 fault/concurrency/live/startup/display/gameplay/403/411 boundaries persist.
-Nextsharedbatch:493/494/495/496 whenready; reusecachedREA andpassedchildproof.
+Nextsharedbatch500:493/494/495/496/499 whenready; reusecachedREA andpassedchildproof.
 Sourceconsolidation onlyaftercompleteoriginalcoderecovery(rootPLAN milestone4).
 
 Historical487 follows.

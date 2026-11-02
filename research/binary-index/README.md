@@ -1,5 +1,10 @@
 # Индекс оригинальных бинарников
 
+Run493: [PCM callback/getter supplement](../../iterations/v2/001-original-recovery/runs/493-audio-pcm-constructors/original-index-supplement.json)
+adds omitted00597b50 complete8B/RET/ABI. [Run500](../../iterations/v2/001-original-recovery/runs/500-render-pcm-file-integration/README.md)
+integrates its bounded native packet; main generated indexes remain unchanged.
+
+
 Run488: [callback original index](../../iterations/v2/001-original-recovery/runs/488-network-callback-drain/original-index.json)
 supplements omitted005602f0/00560310 with full raw bodies, callers and ABI before
 implementation. [Run491](../../iterations/v2/001-original-recovery/runs/491-callback-pixel-pcm-integration/README.md)

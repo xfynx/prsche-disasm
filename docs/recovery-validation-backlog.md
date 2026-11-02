@@ -1,5 +1,14 @@
 # Отложенные проверки восстановления v2
 
+Run500:15originals1203B/384Bsparsefields +1761Bcallerrepair;487996cases/55mutations/
+669pins PASS;273TUs/151names157refs,noEXE. Knownpresent2ndargumentbugclosed through
+fresh496fullcaller+actual494effects; priorPARTIALfor thisdefect removed. Stillbounded:
+slotproducer/unification, actualcallbacks/virtual/APIeffects, fullfile/formatter/
+streamcomposition, overflow/lifetime/fault/concurrency/live/startup/gameplay and403/411.
+497emulated3DNowcapability passes;498fullkernels+501streamlookup await502intake.
+EmulatedcommonCPU proof mustnotbe reportedasnativeAMD hardwareacceptance.
+
+
 Run491:13originals1369B/8Bdata;13849300cases/42mutations/657pins PASS;
 267TUs/160names166refs,noEXE. Actualcallbackchildren, fullEAX/usedALpixel and
 C++PCMloops/SSE/x87state proved;490reference excluded. Stillopen: callbackproducer/

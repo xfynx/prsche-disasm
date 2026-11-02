@@ -1,0 +1,161 @@
+{
+  "run": 496,
+  "experiment": "local/experiments/v2-render-present-caller-repair-496",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/496-render-present-caller-repair/render_display_496.cpp",
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_transform_484.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_objects.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/shared_runtime_globals.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_globals.cpp",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/render_resource_494.cpp",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/render_present_494.cpp",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/platform_render_resource_494.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/heap.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/heap_locks.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_shutdown.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_mode.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_loader.cpp",
+    "iterations/v2/001-original-recovery/runs/359-render-settings-bindings/render_settings_binding.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/496-render-present-caller-repair/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/496-render-present-caller-repair",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/original-evidence.json",
+    "iterations/v2/001-original-recovery/runs/496-render-present-caller-repair/replacement-scope.json",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004677e0",
+      "bytes": 1761,
+      "sha256": "bd0bab14fda45ace7f6f0565df8fa216fbdd922e6927f541ff73c792d53fc607",
+      "token": "@BODY_CALLER@"
+    },
+    {
+      "va": "00539b30",
+      "bytes": 68,
+      "sha256": "6bc4cbec86852b3cd0dca5a1ddd345d507829666932aaaaf88b7965e6ee2ffd2",
+      "token": "@BODY_DIAGONAL@"
+    },
+    {
+      "va": "00539b80",
+      "bytes": 69,
+      "sha256": "0d6869eff44e85fedb074633f878fafc1a7d933d8a85194c636af1f7f5082486",
+      "token": "@BODY_TRANSLATION@"
+    },
+    {
+      "va": "00539f40",
+      "bytes": 15,
+      "sha256": "6c0e49bdef6b8dc69d34873790afdedfc4c12e8f78bb52952344449f6891f06f",
+      "token": "@BODY_GETTER@"
+    },
+    {
+      "va": "00466e80",
+      "bytes": 9,
+      "sha256": "aa1d0523d277f6a14d7950c488982e29fa08fe5d88274b15a712c4427302720a",
+      "token": "@BODY_SETTER@"
+    },
+    {
+      "va": "0053c3d0",
+      "bytes": 30,
+      "sha256": "89f8554dee9e23a0bc742a0f8b352b6c01dc496cdcb286d8e7e3e7483e894e2b",
+      "token": "@BODY_MEMORY@"
+    },
+    {
+      "va": "00533f80",
+      "bytes": 50,
+      "sha256": "b85160e9f94f74b370c46881ed8a8139bb7e65358872650efe43bfaa14e52aa3",
+      "token": "@BODY_TEXTURE@"
+    },
+    {
+      "va": "0044e870",
+      "bytes": 20,
+      "sha256": "4cb650f75d18c0dce983c68aad21c021820e3b580dc1b83b55ec4948fd53037f",
+      "token": "@BODY_PRESENT@"
+    }
+  ],
+  "pass_marker": "render_present_caller_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "present-drop-readok",
+      "source": "iterations/v2/001-original-recovery/runs/496-render-present-caller-repair/render_display_496.cpp",
+      "old": "render_display_present_0044e870(present,read_ok);",
+      "new": "render_display_present_0044e870(present,0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "present-swap",
+      "source": "iterations/v2/001-original-recovery/runs/496-render-present-caller-repair/render_display_496.cpp",
+      "old": "render_display_present_0044e870(present,read_ok);",
+      "new": "render_display_present_0044e870(read_ok,present);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "memory-length",
+      "source": "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/render_resource_494.cpp",
+      "old": "status[0]=32;",
+      "new": "status[0]=28;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "texture-owner",
+      "source": "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/render_resource_494.cpp",
+      "old": "window_shutdown_config_005de620[10]",
+      "new": "window_shutdown_config_005de620[11]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "texture-clear",
+      "source": "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/render_resource_494.cpp",
+      "old": "bytes[0x0c]=0;",
+      "new": "bytes[0x0c]=1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "texture-magic",
+      "source": "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/render_resource_494.cpp",
+      "old": "0x57494e6b",
+      "new": "0x57494e6a",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "present-first",
+      "source": "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/render_present_494.cpp",
+      "old": "static_cast<std::uint8_t>(result)",
+      "new": "static_cast<std::uint8_t>(read_ok)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "present-second",
+      "source": "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/render_present_494.cpp",
+      "old": "[0x1c]",
+      "new": "[0x1d]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "unlock-slot",
+      "source": "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/platform_render_resource_494.cpp",
+      "old": "render_thrash_exports_006bd910[7]",
+      "new": "render_thrash_exports_006bd910[40]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

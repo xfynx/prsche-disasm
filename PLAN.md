@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run491](iterations/v2/001-original-recovery/runs/491-callback-pixel-pcm-integration/README.md).
-Callback drain, pixel conversion and C++ PCM are integrated; renderer caller repair remains open.
+Latest recovery intake: [Run500](iterations/v2/001-original-recovery/runs/500-render-pcm-file-integration/README.md).
+PCM constructors, renderer caller repair and bank/file cleanup are integrated.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next integrate PCM constructors, renderer leaves and bank cleanup; finish caller repair.
+Next integrate stream lookup and the separately audited emulated3DNow providers.
 
 ## Recovery milestones
 

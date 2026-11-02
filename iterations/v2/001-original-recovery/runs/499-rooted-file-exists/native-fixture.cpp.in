@@ -1,0 +1,109 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "rooted_file_exists_499.hpp"
+#include "porsche/files.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using B=unsigned char;using I=std::int32_t;using namespace porsche;
+namespace porsche {
+// Standalone fixture storage for the exact declared canonical cells. Production
+// storage stays in files.cpp and is checked by the shared game ownership audit.
+char file_root_006af168[260],file_fallback_006af26c[260],file_roots_enabled_006af370;
+void (__cdecl* missing_file_006afbe4)(const char*,I)=nullptr;
+}
+static U cases,event_total,mode,query_index,pattern,variant,length,depth,precision,rounding;
+static B* raw;static char input[260];static const char* argument;static U returns[3];
+alignas(16) static B floating[512];
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s case=%u mode=%u query=%u pattern=%u variant=%u length=%u\n",why,cases,mode,query_index,pattern,variant,length);fflush(stdout);ExitProcess(1);}}
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){memcpy(p,&x,4);}
+struct State {char root[260],fallback[260],input[260];B enabled,callback,padding[2];};
+struct Event {U tag,index;I code;char text[260],prefix[260],suffix[260];State before;};
+struct Fpu {unsigned short control,status;B tag,padding[3],values[80];};
+struct Trace {U count,result,abi;Event events[8];State final;Fpu fpu;};
+static Trace trace,expected;
+static void snapshot(State& s){memcpy(s.root,file_root_006af168,260);memcpy(s.fallback,file_fallback_006af26c,260);memcpy(s.input,input,260);s.enabled=static_cast<B>(file_roots_enabled_006af370);s.callback=missing_file_006afbe4!=nullptr;s.padding[0]=s.padding[1]=0;}
+static void restore(const State& s);
+static Event& event(U tag){require(trace.count<8,"event bound");auto& e=trace.events[trace.count++];memset(&e,0,sizeof(e));e.tag=tag;e.index=query_index;snapshot(e.before);return e;}
+static void text(char* out,const char* in){const auto n=strlen(in);require(n<260,"bounded string");memcpy(out,in,n+1);}
+static void __cdecl missing(const char* path,I code){auto& e=event(3);text(e.text,path);e.code=code;if(mode&32){file_root_006af168[0]='!';input[0]='!';}}
+static void restore(const State& s){memcpy(file_root_006af168,s.root,260);memcpy(file_fallback_006af26c,s.fallback,260);memcpy(input,s.input,260);file_roots_enabled_006af370=static_cast<char>(s.enabled);missing_file_006afbe4=s.callback?missing:nullptr;}
+namespace porsche {
+I __cdecl file_exists_00561b80(const char* path){auto& e=event(2);text(e.text,path);require(query_index<3,"query bound");const U result=returns[query_index++];
+    if(query_index==1){if(mode&1)file_fallback_006af26c[0]=0;if(mode&2){file_fallback_006af26c[0]='Z';file_fallback_006af26c[1]=0;}if((mode&4)&&input[0])input[0]='X';if(mode&8)missing_file_006afbe4=nullptr;if(mode&16)file_roots_enabled_006af370=0;}
+    return static_cast<I>(result);
+}
+void __cdecl file_format_005a0fbf(char* out,const char* format,const char* prefix,const char* suffix){auto& e=event(1);require(strcmp(format,"%s%s")==0,"original format");text(e.prefix,prefix);text(e.suffix,suffix);const U a=static_cast<U>(strlen(e.prefix)),b=static_cast<U>(strlen(e.suffix));require(a+b<260,"bounded formatted path");memcpy(out,e.prefix,a);memcpy(out+a,e.suffix,b+1);if((mode&64)&&input[0])input[0]='Y';}
+}
+static void capture(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i)memcpy(f.values+i*10,floating+32+i*16,10);
+}
+static void seed(){unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm {
+    fninit
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    ffree st(0)
+    ffree st(1)
+    ffree st(2)
+    ffree st(3)
+    ffree st(4)
+    ffree st(5)
+    ffree st(6)
+    ffree st(7)
+    fldcw control
+    }
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+__declspec(noinline) static U invoke(void* fn,U& result){U before,frame,fail=0,returned=0;__asm {
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    push argument
+    call fn
+    mov returned,eax
+    add esp,4
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }result=returned;return fail;
+}
+static void absolute(U old,const void* to,U wanted){U n=0;for(U i=0;i+4<=198;++i)if(rd(raw+i)==old){wr(raw+i,ptr(to));++n;i+=3;}require(n==wanted,"absolute relocation count");}
+static void calls(U target,const void* to,U wanted){U n=0;for(U i=0;i+5<=198;++i)if(raw[i]==0xe8&&0x59dc30+i+5+rd(raw+i+1)==target){wr(raw+i+1,ptr(to)-ptr(raw+i+5));++n;i+=4;}require(n==wanted,"call relocation count");}
+static void initialize(){raw=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(raw!=nullptr,"allocate");const B body[]={ @BODY_EXISTS@ };const B format[]={ @FORMAT@ };require(sizeof(body)==198&&sizeof(format)==5&&memcmp(format,"%s%s",5)==0,"raw input extents/format");memcpy(raw,body,198);memcpy(raw+256,format,5);
+    absolute(0x6af370,&file_roots_enabled_006af370,1);absolute(0x6af168,file_root_006af168,1);absolute(0x6af26c,file_fallback_006af26c,2);absolute(0x6afbe4,&missing_file_006afbe4,1);absolute(0x5cc588,raw+256,2);
+    calls(0x561b80,reinterpret_cast<void*>(&file_exists_00561b80),3);calls(0x5a0fbf,reinterpret_cast<void*>(&file_format_005a0fbf),2);require(FlushInstructionCache(GetCurrentProcess(),raw,4096)!=0,"flush");
+}
+static void compare(){State initial;snapshot(initial);for(U side=0;side<2;++side){restore(initial);trace.count=trace.result=trace.abi=0;query_index=0;seed();Fpu before;capture(before);void* fn=raw;if(side)fn=variant==0?reinterpret_cast<void*>(&rooted_file_exists_0059dc30):variant==1?reinterpret_cast<void*>(&game_setup_file_exists_0059dc30):reinterpret_cast<void*>(&splash_progress_file_exists_0059dc30);trace.abi=invoke(fn,trace.result);capture(trace.fpu);snapshot(trace.final);require(trace.abi==0,"cdecl preserved registers/stack");require(memcmp(&before,&trace.fpu,sizeof(Fpu))==0,"x87 preserved");if(side){require(trace.count==expected.count&&trace.result==expected.result&&memcmp(trace.events,expected.events,trace.count*sizeof(Event))==0&&memcmp(&trace.final,&expected.final,sizeof(State))==0&&memcmp(&trace.fpu,&expected.fpu,sizeof(Fpu))==0,"original/C++ result/intermediate/final");event_total+=trace.count;}else expected=trace;}++cases;}
+int main(){initialize();const U values[]={0,1,0xffffffffu,0x80000000u,0x7fffffffu};
+    for(U flag:{0u,1u,128u,255u})for(U fallback:{0u,1u})for(U callback:{0u,1u})for(U len:{0u,1u,2u,3u,4u,7u,31u,127u,255u})for(pattern=0;pattern<25;++pattern)for(U m:{0u,1u,2u,4u,8u,16u,32u,64u,127u})for(variant=0;variant<3;++variant){
+        length=len;mode=m;memset(file_root_006af168,0xa5,260);memcpy(file_root_006af168,"R:/",4);memset(file_fallback_006af26c,0x5a,260);memcpy(file_fallback_006af26c,fallback?"B:/":"",fallback?4:1);file_roots_enabled_006af370=static_cast<char>(flag);missing_file_006afbe4=callback?missing:nullptr;memset(input,0xcc,260);for(U i=0;i<length;++i)input[i]=static_cast<char>(33+(i*37)%220);input[length]=0;argument=input;
+        returns[0]=values[pattern%5];returns[1]=values[pattern/5];returns[2]=values[(pattern+3)%5];precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%9;compare();
+    }
+    __asm fninit
+    printf("rooted_file_exists_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,event_total);return 0;
+}

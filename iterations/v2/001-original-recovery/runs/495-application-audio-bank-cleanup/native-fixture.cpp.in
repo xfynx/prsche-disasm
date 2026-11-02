@@ -1,0 +1,128 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "application_audio_bank_cleanup_495.hpp"
+#include "../478-audio-resource-controls/audio_resource_controls_478.hpp"
+#include "audio_stop_435.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+enum:U{EVENTS=768,CHANNELS=8,VOICE=0xf8};
+alignas(16) static B objects[3][2048],voices[2][CHANNELS][VOICE],channels[CHANNELS*0x70],floating[512];
+static U cases,events_total,mode,pattern,layout,path,precision,rounding,depth,current_voice;
+static B* raw;
+static bool cpp_side;
+struct State {U roots[2],query,voice_table;B objects[3][2048],voices[2][CHANNELS][VOICE],channels[CHANNELS*0x70],audio[0x18c],cs[24];};
+struct Fpu {unsigned short control,status;B tag,padding[3],values[80];};
+struct Event {U tag,a,b;State state;};
+struct Trace {U count,abi;Event events[EVENTS];State final;Fpu fpu;};
+static Trace trace,expected;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U value;memcpy(&value,p,4);return value;}
+static void wr(void* p,U value){memcpy(p,&value,4);}
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s cases=%u layout=%u pattern=%u mode=%u path=%u cpp=%u\n",why,cases,layout,pattern,mode,path,cpp_side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault code=%08lx eip=%08lx cases=%u layout=%u pattern=%u mode=%u path=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,layout,pattern,mode,path,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+static void snapshot(State& s){memcpy(s.roots,audio_channel_banks_00656aa8,8);s.query=audio_resource_query_root_00656ab4;s.voice_table=audio_backend_voice_table_006b489c;memcpy(s.objects,objects,sizeof(objects));memcpy(s.voices,voices,sizeof(voices));memcpy(s.channels,channels,sizeof(channels));memcpy(s.audio,application_audio_device_state_006b48c0.backing.data(),sizeof(s.audio));memcpy(s.cs,audio_backend_lock_cs_006b1800,24);}
+static void restore(const State& s){memcpy(audio_channel_banks_00656aa8,s.roots,8);audio_resource_query_root_00656ab4=s.query;audio_backend_voice_table_006b489c=s.voice_table;memcpy(objects,s.objects,sizeof(objects));memcpy(voices,s.voices,sizeof(voices));memcpy(channels,s.channels,sizeof(channels));memcpy(application_audio_device_state_006b48c0.backing.data(),s.audio,sizeof(s.audio));memcpy(audio_backend_lock_cs_006b1800,s.cs,24);}
+static void event(U tag,U a=0,U b=0){require(trace.count<EVENTS,"finite event capacity");auto& e=trace.events[trace.count++];e.tag=tag;e.a=a;e.b=b;snapshot(e.state);}
+static U voice_id(void* p,U offset){U address=ptr(p)-offset;for(U table=0;table<2;++table)for(U index=0;index<CHANNELS;++index)if(address==ptr(voices[table][index]))return table*CHANNELS+index;require(false,"mapped voice identity");return 0;}
+static void hooks(){
+    if(mode&1){audio_channel_banks_00656aa8[0]=objects[2];audio_channel_banks_00656aa8[1]=objects[2];}
+    if(mode&2)for(auto& o:objects){wr(o+0x38,rd(o+0x38)^7);wr(o+0x3c,rd(o+0x3c)^13);o[0x40]^=0x5a;}
+    if(mode&4)for(auto& o:objects)for(U i=0;i<32;++i)wr(o+0x5dc+i*12,7);
+    if(mode&8)for(auto& o:objects)for(U i=0;i<32;++i){wr(o+0x45c+i*12,rd(o+0x45c+i*12)^17);wr(o+0x44+i*4,0x87654321);}
+    if(mode&16)audio_channel_banks_00656aa8[1]=nullptr;
+}
+static void __cdecl stopped(void* p){current_voice=voice_id(p,0x2c);event(3,current_voice);if(mode&32){audio_backend_voice_table_006b489c=ptr(voices[1]);voices[current_voice/CHANNELS][current_voice%CHANNELS][0]=0x12;}}
+namespace porsche {
+void __stdcall platform_enter_critical_section(void* p){event(1,ptr(p));hooks();}
+void __stdcall platform_leave_critical_section(void* p){event(2,ptr(p));}
+void __cdecl audio_backend_voice_release_00597010(void* p){current_voice=voice_id(p,0x64);event(4,current_voice);voices[current_voice/CHANNELS][current_voice%CHANNELS][0]|=0x10;}
+void __cdecl audio_backend_voice_finalize_00589c00(U slot){event(5,slot,current_voice);voices[current_voice/CHANNELS][current_voice%CHANNELS][0x20]^=0x77;}
+// Unused dependencies from complete canonical owning TUs; never game providers.
+I __cdecl application_audio_backend_initialize_0058a4f0(){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_apply_0058a690(){ExitProcess(90);}
+U __cdecl application_audio_backend_allocate_0058aae0(U){ExitProcess(90);return 0;}
+I __cdecl application_audio_backend_start_device_0058fdb0(){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_stop_device_0058fe80(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(90);}
+}
+static void capture(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i)memcpy(f.values+i*10,floating+32+i*16,10);
+}
+static void seed(){unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm {
+    fninit
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    ffree st(0)
+    ffree st(1)
+    ffree st(2)
+    ffree st(3)
+    ffree st(4)
+    ffree st(5)
+    ffree st(6)
+    ffree st(7)
+    fldcw control
+    }
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+// Same synthetic void-cdecl0 carrier as accepted478; callers do not consume
+// volatile GPR/flags. Check ESP/EBP/EBX/ESI/EDI and complete x87 payload state.
+__declspec(noinline) static U invoke(void* fn){U before,frame,fail=0;__asm {
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }return fail;
+}
+static void absolute(U old,const void* target,U wanted){U n=0;for(U i=0;i+4<=141;++i)if(rd(raw+i)==old){wr(raw+i,ptr(target));++n;i+=3;}require(n==wanted,"absolute relocation count");}
+static void initialize(){AddVectoredExceptionHandler(1,fault);require(audio_channel_banks_00656aa8[0]==nullptr&&audio_channel_banks_00656aa8[1]==nullptr&&audio_resource_query_root_00656ab4==0,"canonical initial bank state");require(ptr(audio_channel_banks_00656aa8+1)==ptr(audio_channel_banks_00656aa8)+4,"canonical adjacent root cells");
+    raw=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(raw!=nullptr,"allocate");const B body[]={ @BODY_CLEANUP@ };memcpy(raw,body,sizeof(body));
+    absolute(0x656aa8,audio_channel_banks_00656aa8,1);absolute(0x656ab0,audio_channel_banks_00656aa8+2,1);
+    U patched=0;for(U i=0;i+5<=141;++i)if(raw[i]==0xe8&&0x4acb80+i+5+rd(raw+i+1)==0x565d60){wr(raw+i+1,ptr(reinterpret_cast<void*>(&audio_channel_stop_00565d60))-ptr(raw+i+5));++patched;i+=4;}require(patched==2,"stop call relocation count");require(FlushInstructionCache(GetCurrentProcess(),raw,4096)!=0,"flush");
+}
+static void compare(){State initial;snapshot(initial);
+    for(U side=0;side<2;++side){cpp_side=side!=0;restore(initial);trace.count=trace.abi=0;current_voice=0;seed();Fpu before;capture(before);trace.abi=invoke(side?reinterpret_cast<void*>(&application_main_function_004acb80):raw);capture(trace.fpu);snapshot(trace.final);require(trace.abi==0,"cdecl ABI");require(memcmp(&before,&trace.fpu,sizeof(Fpu))==0,"x87 preservation");
+        if(side){require(trace.count==expected.count&&memcmp(trace.events,expected.events,trace.count*sizeof(Event))==0&&memcmp(&trace.final,&expected.final,sizeof(State))==0&&memcmp(&trace.fpu,&expected.fpu,sizeof(Fpu))==0,"original/C++ state and callback order");events_total+=trace.count;}
+        else {expected.count=trace.count;memcpy(expected.events,trace.events,trace.count*sizeof(Event));expected.final=trace.final;expected.fpu=trace.fpu;}
+    }++cases;
+}
+int main(){initialize();const U values[]={0xffffffffu,0,1,7,0xfffffffeu,0x80000000u,0x7fffffffu};
+    for(layout=0;layout<8;++layout)for(pattern=0;pattern<7;++pattern)for(U m:{0u,1u,2u,4u,8u,16u,31u,32u,63u})for(path=0;path<3;++path){mode=m;
+        for(U o=0;o<3;++o){for(U i=0;i<2048;++i)objects[o][i]=static_cast<B>(i*37+o*13+pattern);wr(objects[o]+0x38,values[(pattern+o)%7]);wr(objects[o]+0x3c,values[(pattern+o+1)%7]);for(U i=0;i<32;++i){wr(objects[o]+0x45c+i*12,values[(i+pattern)%7]);wr(objects[o]+0x5dc+i*12,values[(i+pattern+2)%7]);}}
+        audio_channel_banks_00656aa8[0]=(layout==0||layout==2)?nullptr:objects[0];audio_channel_banks_00656aa8[1]=(layout==0||layout==1)?nullptr:layout==3?objects[0]:layout==4?objects[0]+1:layout==5?objects[0]+4:layout==6?objects[0]+128:objects[1];audio_resource_query_root_00656ab4=ptr(objects[2]);
+        memset(application_audio_device_state_006b48c0.backing.data(),0,application_audio_device_state_006b48c0.backing.size());application_audio_device_state_006b48c0[0xdc]=path?1:0;audio_backend_channel_count_006b49a4=path==2?CHANNELS:0;audio_backend_channels_006b4a00=ptr(channels);audio_backend_voice_table_006b489c=ptr(voices[0]);audio_backend_lock_depth_006b499f=static_cast<B>(cases);memset(audio_backend_lock_cs_006b1800,0x33,24);memset(channels,0x55,sizeof(channels));
+        for(U i=0;i<CHANNELS;++i){wr(channels+i*0x70,i);channels[i*0x70+0x0f]=1;channels[i*0x70+0x1e]=0;for(U t=0;t<2;++t){memset(voices[t][i],0x77,VOICE);voices[t][i][0]=1;wr(voices[t][i]+0xc8,ptr(reinterpret_cast<void*>(&stopped)));}}
+        precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%9;compare();
+    }
+    __asm fninit
+    printf("application_audio_bank_cleanup_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;
+}
