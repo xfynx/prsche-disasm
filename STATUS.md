@@ -4,15 +4,15 @@ Updated 2026-11-02. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run500](iterations/v2/001-original-recovery/runs/500-render-pcm-file-integration/README.md)
-compiles273 C++ translation units across8 projects. The game link still has151 unresolved
-names/157 references. **There is no recovered playable C++ game executable yet.**
+[Run502](iterations/v2/001-original-recovery/runs/502-stream-surface-3dnow-integration/README.md)
+compiles276 C++ translation units across8 projects. The link has147 unresolved names/
+153 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch adds15 original functions/1,203B,384B sparse slot fields and repairs
-the renderer constructor's missing present argument.487,996 native cases,55 mutations
-and669 source pins pass the shared audit.11 names close and two actual stream children
-appear; registry720 entries. These batch results are not a completion percentage.
-497's emulated3DNow feasibility passes;498 providers await separate integration.
+The latest batch adds8 original functions/1,006 indexed bytes and128B sparse state.
+165,960 native cases/25 mutations and2,084 separately emulated3DNow cases/18 mutation
+detections pass;676 source pins/557 canonical providers. Six names close, two actual
+stream children appear; registry728 entries. Emulation uses pinned Unicorn/Athlon;
+native AMD3DNow arithmetic is unverified. These results are not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through

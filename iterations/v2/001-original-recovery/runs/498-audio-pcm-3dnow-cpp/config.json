@@ -1,0 +1,27 @@
+{
+  "experiment": "local/experiments/v2-audio-pcm-3dnow-cpp-498",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "source": "audio_pcm_3dnow_498.cpp",
+  "header": "audio_pcm_3dnow_498.hpp",
+  "cpu_model": 11,
+  "original_bodies": [
+    {"name":"accumulate","va":"0059bc40","bytes":159,"index_bytes":159,"sha256":"6e25f58e53cc629cdd3253c743c5eff0994cad8d769e1de409baba3c08ec7b5f"},
+    {"name":"decode","va":"0059bb90","bytes":163,"index_bytes":160,"sha256":"a598f2aab97d7bf579a502c2d76c36980f87134dd93010f20ba74aaf228d523a"}
+  ],
+  "exports": {
+    "accumulate":"?audio_mixer_accumulate_3dnow_0059bc40@porsche@@YAXIIII@Z",
+    "decode":"?audio_mixer_decode_s16_3dnow_0059bb90@porsche@@YAXIII@Z"
+  },
+  "mutations": [
+    {"name":"zero_guard","from":"    gain(gain_bits);","to":"    if(count==0)return;\n    gain(gain_bits);","count":1},
+    {"name":"residual_forward","from":"const U offset=(remaining-1u)*4u;","to":"const U offset=(count-remaining)*4u;","count":1},
+    {"name":"gain_lane","from":"psllq mm0,20h","to":"psllq mm0,1fh","count":1},
+    {"name":"signed16","from":"psrad mm1,10h","to":"psrld mm1,10h","count":2},
+    {"name":"pointer_step","from":"decode_eight(source+index*2u,destination+index*4u);","to":"decode_eight(source+index*4u,destination+index*4u);","count":1},
+    {"name":"missing_femms","from":"    _emit 0fh\n    _emit 0eh","to":"    nop","count":1},
+    {"name":"block_count","from":"        remaining-=8u;","to":"        remaining-=7u;","count":2},
+    {"name":"pf_operation_order","from":"    movd mm1,[eax]\n    _emit 0fh\n    _emit 0fh\n    _emit 0c8h\n    _emit 0b4h\n    movd mm2,[edx]\n    _emit 0fh\n    _emit 0fh\n    _emit 0cah\n    _emit 09eh","to":"    movd mm1,[eax]\n    movd mm2,[edx]\n    _emit 0fh\n    _emit 0fh\n    _emit 0cah\n    _emit 09eh\n    _emit 0fh\n    _emit 0fh\n    _emit 0c8h\n    _emit 0b4h","count":1},
+    {"name":"source_block_order","from":"    movq mm2,[eax+8]\n    movq mm3,[eax+10h]\n    movq mm4,[eax+18h]","to":"    movq [edx],mm1\n    movq mm2,[eax+8]\n    movq mm3,[eax+10h]\n    movq mm4,[eax+18h]","count":1}
+  ]
+}

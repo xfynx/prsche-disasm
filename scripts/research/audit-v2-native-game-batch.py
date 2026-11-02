@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import struct
 import subprocess
+import sys
 from v2_shared_manifests import ManifestReader
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -160,6 +161,116 @@ def audit_game_source_names(sources, original_probe_sources=()):
     assert not any('probe' in Path(p).name.lower() and p not in allowed for p in sources)
 
 
+def audit_emulated(item, cache, sha):
+    """Admit an explicit original/compiled-C++ emulator proof, never as native."""
+    load = cache.document
+    cfg_path, receipt_path = ROOT / item['config'], ROOT / item['receipt']
+    cfg, receipt = load(cfg_path), load(receipt_path)
+    assert receipt['status'] == 'PASS'
+    assert receipt['kind'] == 'emulated-original-vs-emulated-compiled-cpp'
+    assert receipt['optimizations'] == ['Od', 'O2']
+    assert receipt['cpu_model'] == cfg['cpu_model'] == 11
+    for group in ('input_sha256', 'output_sha256'):
+        assert receipt[group]
+        for path, expected in receipt[group].items():
+            assert sha(ROOT / path) == expected, path
+    verifier_path = ROOT / item['verifier']
+    assert receipt['input_sha256'][item['verifier']] == sha(verifier_path)
+    assert receipt['input_sha256'][item['config']] == sha(cfg_path)
+    verifier = module('emulated_batch_verifier', verifier_path)
+    assert verifier.RUN == cfg_path.parent
+    work = receipt_path.parent
+    for filename in (cfg['source'], cfg['header'], 'config.json', 'compare.py'):
+        assert cache.data(work / 'inputs' / filename) == cache.data(cfg_path.parent / filename)
+    original = cache.data(ROOT / cfg['original_pe'])
+    assert sha(ROOT / cfg['original_pe']) == receipt['original_sha256'] == cfg['original_sha256']
+    for row in cfg['original_bodies']:
+        assert hashlib.sha256(verifier.native.pe_at(original, int(row['va'], 16), row['bytes'])).hexdigest() == row['sha256']
+
+    # The pilot pinned the engine DLL but not every Python binding/disassembler
+    # module. Replay unchanged compiled outputs once under this complete semantic
+    # dependency snapshot; no recompilation or native-hardware claim follows.
+    package_roots = [Path(package.__file__).resolve().parent
+                     for package in (verifier.unicorn, verifier.capstone)]
+    dependencies = {Path(sys.executable).resolve(), Path(__file__).resolve()}
+    for imported in tuple(sys.modules.values()):
+        filename = getattr(imported, '__file__', None)
+        if filename:
+            path = Path(filename).resolve()
+            if path.is_file() and any(path.is_relative_to(root) for root in package_roots):
+                dependencies.add(path)
+    for root in package_roots:
+        dependencies.update(root.rglob('*.py'))
+        dependencies.update(root.rglob('*.dll'))
+        dependencies.update(root.rglob('*.so'))
+    dependency_pins = {path: sha(path) for path in dependencies}
+    assert verifier.unicorn.__version__ == receipt['unicorn_version']
+    assert list(verifier.unicorn.uc_version()) == receipt['unicorn_core_version']
+    executions = load(work / 'executions.json')
+    for execution in executions:
+        assert execution['exit_code'] == 0
+        assert sha(work / (execution['name'] + '.log')) == execution['log_sha256']
+    scenes, records = load(work / 'cases.json'), load(work / 'comparisons.json')
+    assert scenes == verifier.cases() and len(scenes) == len(records)
+    names = ['baseline'] + [entry['name'] for entry in cfg['mutations']]
+    assert len(names) == len(set(names))
+    assert receipt['variants_per_optimization'] == len(names)
+    coffs = load(work / 'coff.json')
+    images = {}
+    pinned = {(ROOT / path).resolve() for group in ('input_sha256', 'output_sha256')
+              for path in receipt[group]}
+    for optimization in receipt['optimizations']:
+        assert verifier.dependency_paths(work / optimization) <= pinned
+        images[optimization] = {}
+        for name in names:
+            obj = work / optimization / (name + '.obj')
+            symbols = verifier.coff.coff_symbols(obj)
+            assert not symbols['undefined_external_symbols']
+            assert set(symbols['defined_external_symbols']) == set(cfg['exports'].values())
+            assert coffs[optimization][name] == dict(**symbols, sha256=sha(obj))
+            raw = cache.data(work / optimization / (name + '.exe'))
+            info = verifier.image_info(raw)
+            assert info['directories'][1] == info['directories'][5] == (0, 0)
+            exports = verifier.exports(raw, info)
+            assert set(exports) == set(cfg['exports'])
+            images[optimization][name] = (raw, exports)
+    bounds = [(int(row['va'], 16), int(row['va'], 16) + row['bytes']) for row in cfg['original_bodies']]
+    oracle = verifier.Machine(original, {row['name']: int(row['va'], 16) for row in cfg['original_bodies']}, cfg['cpu_model'], bounds)
+    machines = {opt: verifier.Machine(*variants['baseline'], cfg['cpu_model']) for opt, variants in images.items()}
+    expected_cache, counts = {}, dict(cases=0, events=0, fp_events=0)
+    for case, record in zip(scenes, records):
+        expected = oracle.run(case)
+        assert record == json.loads(json.dumps(dict(case=case['name'], **expected))), case['name']
+        for optimization, machine in machines.items():
+            assert not verifier.difference(expected, machine.run(case)), (optimization, case['name'])
+        if case['group'] in ('count', 'alias'):
+            expected_cache[case['name']] = expected
+        counts['cases'] += 1
+        counts['events'] += expected['event_count']
+        counts['fp_events'] += expected['fp_event_count']
+    assert counts == receipt['case_counts_per_optimization']
+    mutation_records = load(work / 'mutations.json')
+    assert len(mutation_records) == receipt['mutations_detected'] == 2 * len(cfg['mutations'])
+    expected_pairs = {(opt, name) for opt in images for name in names[1:]}
+    assert {(row['optimization'], row['mutation']) for row in mutation_records} == expected_pairs
+    for row in mutation_records:
+        case = next(case for case in scenes if case['name'] == row['case'])
+        machine = verifier.Machine(*images[row['optimization']][row['mutation']], cfg['cpu_model'])
+        try:
+            changed = verifier.difference(expected_cache[case['name']], machine.run(case))
+        except (AssertionError, verifier.UcError) as error:
+            changed = [str(error)]
+        assert changed and row['differences'] == changed, row
+    assert item['cases'] == counts['cases'] * 2
+    for path, expected in dependency_pins.items():
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected, path
+    return dict(kind=receipt['kind'], receipt_sha256=sha(receipt_path),
+                cases=item['cases'], mutations=len(mutation_records), cpu_model=cfg['cpu_model'],
+                events=counts['events'] * 2, fp_events=counts['fp_events'] * 2,
+                semantic_dependencies_sha256={str(path): value for path, value in sorted(dependency_pins.items())},
+                unchanged_compiled_outputs_replayed=True, native_hardware_verified=False)
+
+
 def audit(config_path):
     reader = ManifestReader(ROOT)
     cache = reader.cache
@@ -176,6 +287,8 @@ def audit(config_path):
     batches = cfg.get('native_batches', [cfg])
     native_proofs = [audit_native(item, cache, sha) for item in batches]
     assert sum(item['cases'] for item in native_proofs) == cfg['native_cases']
+    emulated_proofs = [audit_emulated(item, cache, sha) for item in cfg.get('emulated_batches', [])]
+    assert sum(item['cases'] for item in emulated_proofs) == cfg.get('emulated_cases', 0)
 
     rea_module = module('native_batch_rea', ROOT / 'scripts/research/audit-v2-rea-session.py')
     rea = [rea_module.audit(ROOT / item['config'], item['attempt'], cache, sha)
@@ -258,6 +371,10 @@ def audit(config_path):
         result['original_probe_sources'] = sorted(cfg['original_probe_sources'])
     if replacements:
         result['replaced_sources'] = replacements
+    if emulated_proofs:
+        result.update(emulated_proofs=emulated_proofs,
+                      emulated_cases=sum(item['cases'] for item in emulated_proofs),
+                      emulated_mutations=sum(item['mutations'] for item in emulated_proofs))
     return result
 
 

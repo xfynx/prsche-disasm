@@ -1,0 +1,154 @@
+{
+  "run": 503,
+  "experiment": "local/experiments/v2-render-surface-construction-503",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/game_setup_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/503-render-surface-construction/",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/503-render-surface-construction/scope.json",
+    "iterations/v2/001-original-recovery/runs/503-render-surface-construction/initial-state.json",
+    "iterations/v2/001-original-recovery/runs/503-render-surface-construction/ownership-search.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00540390",
+      "bytes": 136,
+      "sha256": "35dcb6a189aa21dbe0b7e6bd0bcca816ec94b4a2669f469e9502dbe58bd9b903",
+      "token": "@BODY_RESOURCE@"
+    },
+    {
+      "va": "00538d10",
+      "bytes": 102,
+      "sha256": "3d348f7c123d550201ee51678fd279d78a899450233e4786399b3764be9482f7",
+      "token": "@BODY_SURFACE@"
+    },
+    {
+      "va": "00539e50",
+      "bytes": 89,
+      "sha256": "3f717a60a6c3107a2b466376cd648ba79877ec1ef49c8f9d3a79b537735e5ff8",
+      "token": "@BODY_STACK@"
+    },
+    {
+      "va": "00539c90",
+      "bytes": 55,
+      "sha256": "dace8dc64cbef3f96fb85e8dea58e68f1cbb31d4abbd1e47f8ef9f65f76d0d45",
+      "token": "@BODY_IDENTITY@"
+    }
+  ],
+  "pass_marker": "render_surface_construction_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 120,
+  "mutations": [
+    {
+      "name": "resource-source-field",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "get(reinterpret_cast<void*>(optional_source),12)",
+      "new": "get(reinterpret_cast<void*>(optional_source),8)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "resource-cache-tail",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "for(U& value:render_resource_cells_0069ecc0)value=0;",
+      "new": "for(U i=0;i<12;++i)render_resource_cells_0069ecc0[i]=0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "resource-callback-order",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "render_resource_callback2_0069ed14=callback2;",
+      "new": "render_resource_callback2_0069ed14=callback1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "resource-canonical-pointer",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "game_setup_movie_service_0069ed0c=object;",
+      "new": "game_setup_movie_service_0069ed0c=static_cast<B*>(object)+4;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "identity-diagonal",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "i==10",
+      "new": "i==11",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stack-capacity",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "capacity<1u?1u:capacity",
+      "new": "capacity<2u?2u:capacity",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stack-allocation",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "get(object,12)<<6",
+      "new": "get(object,12)<<5",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stack-reload-capacity",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "put(object,0,word(matrix));put(object,8,0);",
+      "new": "put(object,0,word(matrix));put(object,12,capacity);put(object,8,0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stack-callback-write-order",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "    put(object,20,0);put(object,16,1);",
+      "new": "    put(object,20,1);put(object,16,1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stack-dirty-byte",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "[24]=1",
+      "new": "[24]=2",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "surface-stack-offset",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "p+0x5c,0x28",
+      "new": "p+0x60,0x28",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "surface-matrix-offset",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "p+0x188",
+      "new": "p+0x18c",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "surface-reverse-link",
+      "source": "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+      "old": "put(reinterpret_cast<void*>(driver),0x14,word(object))",
+      "new": "put(reinterpret_cast<void*>(driver),0x10,word(object))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

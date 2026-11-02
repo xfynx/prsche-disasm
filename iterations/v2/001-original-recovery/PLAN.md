@@ -1,5 +1,20 @@
 # v2 / 001 - original source recovery plan
 
+Current502,2026-11-02: frozen498/501/503 add8originals1006indexedB/1009rawspanB,
+128Bnarrowstate;registry728. Native165960cases/17866events/25mutations; emulated2084
+cases/165320arenaevents/111858FPsnapshots/18mutations keptseparate. SharedauditPASS,
+676pins/557exports;276TUs/8projects,147names153refs,noEXE.6close/2realstreamchildren.
+Optionalemulatedauditpins62semanticdependencies/replaysunchangedPEs, notnativeAMD.
+Fiveinvalidreceiptguards/unchanged500regressionPASS. Proofinputs/originals frozen.
+All3workers hitquota; no activeassignments/respawns.505native001finishedPASS(19076cases/
+1890events/12mutants/400pins), rootowns507intake.504codedaudio10body840B/48B drafts
+needcompletefixture/config/nativeproof;506matrix3body745B/0state draftneedsfixture/
+nativeproof. Preserveallunacceptedfiles, no guessedintegration. Resumeafternextquota.
+Live/fullproducer/allocator/fault/concurrency/startup/gameplay/403/411 stayopen.
+Sourceconsolidation onlyaftercompleteoriginalrecovery perrootPLAN milestone4.
+
+Historical500 follows.
+
 Current500,2026-11-02: frozen493/494/495/496/499 add15originals1203B/384Bsparsefields
 andrepair1761Bcaller;registry720. SharedauditPASS487996cases/1893890events/55mutants/
 669pins/544exports;273TUs/8projects,151names157refs,noEXE.11close/2realstreamchildren.
@@ -7,11 +22,14 @@ Build001wrongCMakeowner retainedoldcaller;002freshrootcorrectsexactoneTUreplacem
 496twoargpresent/full494composition closesknownconstructorbug; boundednativeverified,
 notlive/fullgame. Originals/passednativeinputs frozen. Sourceconsolidationdeferred.
 Ready498emulated3DNow2providers319indexedB/322rawspan +501streamlookup2bodies305B/64B.
-Coordinatorowns502emulatedauditsupport/sharedintegration.497capabilityreportfrozen.
-Active503resource/surfaceconstruction(render_resources_494),504codedconstructors
+Coordinatorowns502intake498/501/503; newoptionalemulatedauditpinsallPythonbindings/
+engine/disassembler and replaysunchangedcompiledPEs once forpilotmissingbindingpins.
+Fiveinvalidreceiptguards +unchanged500auditregressionPASS; nativeproofnotrerun.
+497capabilityreportfrozen.
+503resource/surfaceconstructionREADY; active506matrix/config(render_resources_494),504codedconstructors
 (simd_oracle_497),505streambufferdelivery(pcm_constructors_493); workers ownrun/local.
 Fullproducer/lifetime/fault/concurrency/live/startup/gameplay/403/411 boundaries persist.
-Next502combineonlyready498/501; emulatedproofmuststaydistinctfromnativehardware.
+Next502combineonlyready498/501/503; emulatedproofmuststaydistinctfromnativehardware.
 
 Historical491 follows.
 

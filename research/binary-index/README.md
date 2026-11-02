@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run501: [omitted PCM stream callback](../../iterations/v2/001-original-recovery/runs/501-audio-pcm-stream-lookup/original-index-supplement.json)
+records full0059ca50/245B through both returns and exact slot-table bounds.
+[Run502](../../iterations/v2/001-original-recovery/runs/502-stream-surface-3dnow-integration/README.md)
+integrates bounded native proof; runtime buffer delivery remains a separate consumer.
+
+
 Run493: [PCM callback/getter supplement](../../iterations/v2/001-original-recovery/runs/493-audio-pcm-constructors/original-index-supplement.json)
 adds omitted00597b50 complete8B/RET/ABI. [Run500](../../iterations/v2/001-original-recovery/runs/500-render-pcm-file-integration/README.md)
 integrates its bounded native packet; main generated indexes remain unchanged.

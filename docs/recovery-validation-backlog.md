@@ -1,5 +1,13 @@
 # Отложенные проверки восстановления v2
 
+Run502:8originals1006indexedB/128Bstate; native165960cases/25mutations +separate
+emulated2084cases/18mutations;676pins/557providers PASS.276TUs/147names153refs,noEXE.
+Unicorn2.1.3/Athlon11 commonCPUdependency remains: nativeAMD3DNow andactualproducer
+executionunverified.62semanticpins +unchangedPE replay closepilotbindingpin gap.
+Fullstream/allocator/runtimecallbacks/unsafe/fault/concurrency/live/gameplay remain.
+505nativebufferdelivery readyfor507;504/506draftsunvalidated afterworkerquota.
+
+
 Run500:15originals1203B/384Bsparsefields +1761Bcallerrepair;487996cases/55mutations/
 669pins PASS;273TUs/151names157refs,noEXE. Knownpresent2ndargumentbugclosed through
 fresh496fullcaller+actual494effects; priorPARTIALfor thisdefect removed. Stillbounded:

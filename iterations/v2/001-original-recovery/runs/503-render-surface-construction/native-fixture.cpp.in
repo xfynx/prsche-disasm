@@ -1,0 +1,101 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "render_surface_503.hpp"
+#include "porsche/game_setup.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(const void* p,U o=0){U v;memcpy(&v,static_cast<const B*>(p)+o,4);return v;}
+static void write(void* p,U o,U v){memcpy(static_cast<B*>(p)+o,&v,4);}
+static U cases,events_total,kind,mode,offset,capacity,source_form,allocation_count,precision,rounding,depth;
+static bool cpp_side;
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s case=%u kind=%u mode=%u offset=%u capacity=%08x source=%u cpp=%u\n",why,cases,kind,mode,offset,capacity,source_form,cpp_side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault %08lx eip=%08lx case=%u kind=%u mode=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,kind,mode,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+namespace porsche {
+// Fixture transport views of the two immutable496-owned cells, not game providers.
+U render_display_callback1_0069ecfc=0,render_display_callback2_0069ed00=0;
+}
+alignas(16) static B arena[1024],allocations[2][8192],floating[512];
+static B* self;
+struct State{B arena[1024],allocations[2][8192];U cells[13],option,cb1,cb2,movie,input_cb1,input_cb2;};
+struct Event{U bytes,index;State state;};
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+struct Trace{U count,result,abi;Event events[4];State final;Fpu fpu;};
+static Trace trace,expected;
+static void snapshot(State& s){memcpy(s.arena,arena,sizeof(arena));memcpy(s.allocations,allocations,sizeof(allocations));memcpy(s.cells,render_resource_cells_0069ecc0,sizeof(s.cells));s.option=render_resource_option_0069ed04;s.cb1=render_resource_callback1_0069ed10;s.cb2=render_resource_callback2_0069ed14;s.movie=ptr(game_setup_movie_service_0069ed0c);s.input_cb1=render_display_callback1_0069ecfc;s.input_cb2=render_display_callback2_0069ed00;}
+namespace porsche {
+void* __cdecl startup_network_allocate_0059ef90(U bytes){require(trace.count<4&&allocation_count<2,"allocation count");auto& e=trace.events[trace.count++];e.bytes=bytes;e.index=allocation_count;snapshot(e.state);if(mode&1){write(self,12,0x12345678);write(self,16,0x87654321);write(self,20,0xabcdef01);self[24]=0xa5;}
+    if(mode&2){render_display_callback1_0069ecfc^=0x13579bdf;render_display_callback2_0069ed00+=1;render_resource_option_0069ed04^=0x2468ace0;}
+    void* p=(mode&4)?self+allocation_count*0x5c:allocations[allocation_count];++allocation_count;return p;
+}
+}
+static B* code[4];
+static void absolute(B* p,U n,U old,const void* replacement,U count){U found=0;for(U i=0;i+4<=n;++i)if(read(p,i)==old){write(p,i,ptr(replacement));++found;i+=3;}require(found==count,"absolute relocation count");}
+static void relative(B* p,U n,U va,U old,const void* replacement,U count){U found=0;for(U i=0;i+5<=n;++i)if(p[i]==0xe8&&va+i+5+read(p,i+1)==old){write(p,i+1,ptr(replacement)-ptr(p+i+5));++found;i+=4;}require(found==count,"relative relocation count");}
+static void init(){for(U v:render_resource_cells_0069ecc0)require(v==0,"new cache loader zeros");require(render_resource_option_0069ed04==0&&render_resource_callback1_0069ed10==0&&render_resource_callback2_0069ed14==0&&game_setup_movie_service_0069ed0c==nullptr,"new/canonical loader zeros");
+    static const B resource[]={ @BODY_RESOURCE@ },surface[]={ @BODY_SURFACE@ },stack[]={ @BODY_STACK@ },identity[]={ @BODY_IDENTITY@ };const B* bodies[]={resource,surface,stack,identity};const U sizes[]={136,102,89,55};
+    for(U i=0;i<4;++i){code[i]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[i]!=nullptr,"raw code allocation");memcpy(code[i],bodies[i],sizes[i]);}
+    for(U i=0;i<13;++i)absolute(code[0],136,0x69ecc0+i*4,render_resource_cells_0069ecc0+i,1);
+    absolute(code[0],136,0x69ed04,&render_resource_option_0069ed04,1);absolute(code[0],136,0x69ed0c,&game_setup_movie_service_0069ed0c,1);absolute(code[0],136,0x69ed10,&render_resource_callback1_0069ed10,1);absolute(code[0],136,0x69ed14,&render_resource_callback2_0069ed14,1);absolute(code[0],136,0x69ecfc,&render_display_callback1_0069ecfc,1);absolute(code[0],136,0x69ed00,&render_display_callback2_0069ed00,1);
+    relative(code[1],102,0x538d10,0x539e50,code[2],2);relative(code[1],102,0x538d10,0x539c90,code[3],3);relative(code[2],89,0x539e50,0x59ef90,reinterpret_cast<void*>(&startup_network_allocate_0059ef90),1);relative(code[2],89,0x539e50,0x539c90,code[3],1);
+    for(B* p:code)require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"instruction cache");
+}
+static void capture(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))memcpy(f.values+i*10,floating+32+i*16,10);else memset(f.values+i*10,0,10);}}
+static void seed_fpu(){unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm fninit __asm fldcw control
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}}
+static U invoke(void* fn,void* receiver,U argument,bool has_arg,bool raw,U& output){U before,frame,fail=0,result,cleanup=raw?0:(has_arg?8:4);__asm {
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    cmp has_arg,0
+    je noarg
+    push argument
+noarg:cmp raw,0
+    jne rawcall
+    push receiver
+rawcall:mov ecx,receiver
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov result,eax
+    add esp,cleanup
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    output=result;return fail;
+}
+static void setup(){trace.count=trace.result=trace.abi=0;allocation_count=0;for(U i=0;i<sizeof(arena);++i)arena[i]=static_cast<B>(i*37+capacity*13+mode*11);for(U i=0;i<sizeof(allocations);++i)reinterpret_cast<B*>(allocations)[i]=static_cast<B>(i*17+capacity*7+mode*3);self=arena+32+offset;
+    for(U i=0;i<13;++i)render_resource_cells_0069ecc0[i]=0x43210000u+i;render_resource_option_0069ed04=0x12345678;render_resource_callback1_0069ed10=0xabcdef01;render_resource_callback2_0069ed14=0x76543210;game_setup_movie_service_0069ed0c=reinterpret_cast<void*>(0x87654321);render_display_callback1_0069ecfc=0x004672c0u^(capacity<<8);render_display_callback2_0069ed00=0x004672e0u^(capacity<<16);
+}
+static U resource_source(){switch(source_form){case 0:return 0;case 1:return ptr(arena+800);case 2:return ptr(self-12);case 3:return ptr(self-8);case 4:return ptr(&render_display_callback1_0069ecfc)-12;case 5:return ptr(&render_display_callback2_0069ed00)-12;default:return ptr(render_resource_cells_0069ecc0+3)-12;}}
+static void compare(){for(U side=0;side<2;++side){cpp_side=side!=0;setup();seed_fpu();Fpu before;capture(before);
+    U argument=kind==0?resource_source():kind==1?ptr((mode&8)?self+0x1bc:arena+800):capacity;
+    void* candidate=kind==0?reinterpret_cast<void*>(&render_display_resource_ctor_00540390):kind==1?reinterpret_cast<void*>(&render_display_surface_ctor_00538d10):kind==2?reinterpret_cast<void*>(&render_transform_stack_ctor_00539e50):reinterpret_cast<void*>(&render_matrix_identity_00539c90);
+    U result;trace.abi=invoke(side?candidate:code[kind],self,argument,kind!=3,side==0,result);trace.result=kind==3?0:result;snapshot(trace.final);capture(trace.fpu);require(trace.abi==0,"ESP/nonvolatile ABI");require(kind==3||result==ptr(self),"constructor EAX self");require(memcmp(&before,&trace.fpu,sizeof(Fpu))==0,"x87 preserved");
+    if(side){require(expected.count==trace.count&&expected.result==trace.result,"result/event count");for(U i=0;i<trace.count;++i)require(memcmp(&expected.events[i],&trace.events[i],sizeof(Event))==0,"ordered allocation args/pre-state");require(memcmp(&expected.final,&trace.final,sizeof(State))==0,"final object/allocation/global state");events_total+=trace.count;}else expected=trace;
+    }++cases;
+}
+int main(){AddVectoredExceptionHandler(1,fault);init();const U capacities[]={0,1,2,7,31,40,127,0x04000000,0x40000001,0x7fffffff,0x80000000,0xffffffff};
+    for(kind=0;kind<4;++kind)for(offset=0;offset<8;++offset)for(U value:capacities)for(mode=0;mode<16;++mode)for(source_form=0;source_form<(kind==0?7u:1u);++source_form){capacity=value;precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%5;compare();}
+    __asm fninit
+    printf("render_surface_construction_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;
+}

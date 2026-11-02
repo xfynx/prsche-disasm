@@ -31,8 +31,8 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run500](iterations/v2/001-original-recovery/runs/500-render-pcm-file-integration/README.md)
-  integrates PCM constructors, renderer caller repair and cleanup;151 link names remain.
+  [Run502](iterations/v2/001-original-recovery/runs/502-stream-surface-3dnow-integration/README.md)
+  integrates stream lookup, surfaces and explicitly emulated3DNow;147 link names remain.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.
