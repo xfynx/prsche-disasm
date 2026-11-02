@@ -1,0 +1,191 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "network_callback_drain_488.hpp"
+#include "porsche/network_workers_members.hpp"
+#include "porsche/network_transport.hpp"
+#include "porsche/file_device.hpp"
+#include "porsche/file_threads.hpp"
+#include "porsche/heap_locks.hpp"
+#include "porsche/event_lifecycle.hpp"
+#include "porsche/window_runtime.hpp"
+#include "porsche/application_audio_device.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+enum:U{N=6,STOP=0,DRAIN=0x100,DISPATCH=0x200,RELEASE=0x300,POLL=0x400,VISIT=0x500,LOCKED=0x600,ENUMERATE=0x700};
+alignas(16) static B nodes[N][0x38],providers[2][24],queues[N][96];
+static OriginalHeap heap;
+static HeapBlock previous[N];
+static HeapLockCell locks[16];
+static B* slab;
+static U cases,event_total,which,mode,flag,pending,result_value,provider_on,node_on,queue_on,main_thread,counts,enum_flags,enum_result,enum_break,opaque,visit_on=1,poll_target=1;
+static U callback_calls,enum_calls,current_node;
+static bool cpp_side,patch_ok=true,draining;
+struct State {U flag,pending;IoList lists[2];B nodes[N][0x38],providers[2][24],queues[N][96];OriginalHeap heap;HeapBlock previous[N];HeapLockCell locks[16];U free_lock,thread_lock,aux_lock,callbacks[8];TimedCallbackSlot slots[16];U tick,last,heaps[16];B audio[0x18c];};
+struct Event {U kind,a,b,c;State state;};
+struct Trace {U count,abi,result;Event events[128];State final;};
+static Trace trace,original;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p,U at=0){U v;memcpy(&v,static_cast<const B*>(p)+at,4);return v;}
+static void wr(void* p,U at,U v){memcpy(static_cast<B*>(p)+at,&v,4);}
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s cases=%u which=%u mode=%u flag=%x pending=%x result=%x count=%u enumcalls=%u cpp=%u\n",why,cases,which,mode,flag,pending,result_value,counts,enum_calls,cpp_side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault code=%08lx eip=%08lx slab=%08x cases=%u which=%u mode=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,ptr(slab),cases,which,mode,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+static U normalize(U p){if(p==ptr(slab+POLL)||p==ptr(reinterpret_cast<void*>(&network_callback_poll_005602f0)))return 0x5602f0;if(p==ptr(slab+VISIT)||p==ptr(reinterpret_cast<void*>(&network_callback_visit_00560310)))return 0x560310;return p;}
+static void snapshot(State& s){s.flag=network_callbacks_initialized_006a5b28;s.pending=network_callbacks_pending_006a5b2c;s.lists[0]=network_callbacks_list_006b7d20;s.lists[1]=network_callbacks_list_006b7d00;memcpy(s.nodes,nodes,sizeof(nodes));memcpy(s.providers,providers,sizeof(providers));memcpy(s.queues,queues,sizeof(queues));s.heap=heap;memcpy(s.previous,previous,sizeof(previous));memcpy(s.locks,locks,sizeof(locks));s.free_lock=ptr(heap_lock_free_0069cb04);s.thread_lock=ptr(thread_start_lock_006a57d8);s.aux_lock=ptr(auxiliary_event_lock_0069e5d4);for(U i=0;i<8;++i)s.callbacks[i]=normalize(ptr(reinterpret_cast<void*>(auxiliary_event_callbacks_0069e5b4[i])));memcpy(s.slots,timed_callbacks_0069dd20,sizeof(s.slots));s.tick=current_tick_006b7c40;s.last=last_callback_tick_0069de24;memcpy(s.heaps,heaps_006b4f20,sizeof(s.heaps));memcpy(s.audio,application_audio_device_state_006b48c0.backing.data(),sizeof(s.audio));}
+static void event(U kind,U a=0,U b=0,U c=0){require(trace.count<128,"finite event bound");auto& e=trace.events[trace.count++];e.kind=kind;e.a=normalize(a);e.b=normalize(b);e.c=normalize(c);snapshot(e.state);}
+static U node_id(void* p){for(U i=0;i<N;++i)if(p==nodes[i])return i;require(false,"node identity");return 0;}
+static IoList& list(U index){return index?network_callbacks_list_006b7d00:network_callbacks_list_006b7d20;}
+static void* queue(U i){return queues[i]+16;}
+static void detach(void* node){for(U i=0;i<2;++i){auto& l=list(i);if(l.head==node){l.head=reinterpret_cast<IoNode*>(rd(node));if(!l.head)l.tail=nullptr;--l.count;}}}
+static U __cdecl poll_handler(void* node){event(11,node_id(node));if(mode&64)wr(node,0,0);return 0xffffffff;}
+static U __cdecl node_handler(void* node){current_node=node_id(node);event(10,current_node);++callback_calls;if(draining)detach(node);if(mode&1)wr(node,8,ptr(providers[1]));if(mode&2)network_callbacks_pending_006a5b2c=1;if(mode&4)wr(node,0x34,ptr(queue(current_node<2?current_node+4:current_node)));if(mode&32)network_callbacks_initialized_006a5b28=0;return result_value;}
+static U __cdecl enumerator(void* node,U arg){event(12,node_id(node),arg);++enum_calls;if(mode&1)list(0).flags^=0x80000010;if(mode&2)list(0).flags|=1;if(mode&4)wr(node,0,0);if(mode&8)list(0).lock=&locks[14];return enum_calls==enum_break?0:enum_result;}
+static U __cdecl timed(U arg,U elapsed){event(13,arg,elapsed);if(mode&128){using F=void(__cdecl*)();reinterpret_cast<F>(cpp_side?reinterpret_cast<void*>(&network_callback_poll_005602f0):slab+POLL)();}return 0x12345678;}
+static void __cdecl unrelated(){ExitProcess(90);}
+namespace porsche {
+void __stdcall platform_enter_critical_section(void* p){event(1,ptr(p));if((mode&16)&&p==&locks[0])thread_start_lock_006a57d8=&locks[15];}
+void __stdcall platform_leave_critical_section(void* p){event(2,ptr(p));}
+void __stdcall platform_delete_critical_section(void* p){event(3,ptr(p));if((mode&8)&&which==3)wr(nodes[0],0x34,ptr(queue(5)));}
+U __stdcall platform_current_thread_id(){event(4);++current_tick_006b7c40;return main_thread?0x1234:0x5678;}
+// Entire canonical owning TUs also contain dead helpers. Bind only those unused
+// external functions below; they fail closed and are not game providers.
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __cdecl thread_exit_register_00557380(void(__cdecl*)()){ExitProcess(90);}
+void __cdecl io_init_00580630(IoList*,IoKey,U){ExitProcess(90);}
+void __cdecl heap_copy_005b0100(void*,const void*,U){ExitProcess(90);}
+void __cdecl heap_copy_005b02c0(void*,const void*,U){ExitProcess(90);}
+void __cdecl heap_copy_005b0480(void*,const void*,U){ExitProcess(90);}
+void __cdecl heap_fill_0053c290(void*,U,U){ExitProcess(90);}
+void __cdecl heap_format_005a0fbf(char*,const char*,const char*){ExitProcess(90);}
+I __cdecl application_audio_backend_initialize_0058a4f0(){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_apply_0058a690(){ExitProcess(90);}
+U __cdecl application_audio_backend_allocate_0058aae0(U){ExitProcess(90);return 0;}
+I __cdecl application_audio_backend_start_device_0058fdb0(){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_stop_device_0058fe80(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+I __cdecl audio_channel_stop_00565d60(U){ExitProcess(90);return 0;}
+void* auxiliary_wait_event_0069e5dc=nullptr;
+void (__cdecl* diagnostic_handler_005debf0)(const char*)=nullptr;
+IoNode* __cdecl io_pop_00580790(IoList*){ExitProcess(90);return nullptr;}
+void __cdecl io_prepend_005806e0(IoList*,IoNode*){ExitProcess(90);}
+U* __fastcall network_services_begin_004c3150(void*,void*,U*){ExitProcess(90);return nullptr;}
+U* __fastcall network_services_unlink_0048b660(void*,void*,U*,U){ExitProcess(90);return nullptr;}
+void __fastcall network_services_remove_matching_00493180(void*,void*,const U*){ExitProcess(90);}
+void __fastcall network_member_group_remove_0048bda0(void*,void*,void*){ExitProcess(90);}
+void __fastcall application_network_message_0048c870(void*,void*,U,U,U,U,U){ExitProcess(90);}
+void __cdecl network_lifecycle_remove_callback_00560180(U){ExitProcess(90);}
+void* __cdecl application_context_heap_state_005e4fe8(){ExitProcess(90);return nullptr;}
+void __cdecl application_context_new_head_0059eeb0(U,U){ExitProcess(90);}
+U __cdecl application_release_0059f050(void*){ExitProcess(90);return 0;}
+void* __cdecl file_object_allocate_0056e5f0(U*){ExitProcess(90);return nullptr;}
+U __cdecl file_close_event_0055fc10(void*){ExitProcess(90);return 0;}
+U __cdecl file_event_signal_0055fb30(void*){ExitProcess(90);return 0;}
+U __cdecl file_sleep_0055f740(U){ExitProcess(90);return 0;}
+void* __cdecl file_auto_event_0055fb20(){ExitProcess(90);return nullptr;}
+void* __cdecl file_worker_wait_0055fb90(void*){ExitProcess(90);return nullptr;}
+void __cdecl thread_shutdown_0055f1c0(){ExitProcess(90);}
+U __cdecl thread_wait_0055fa10(ThreadRecord*,U){ExitProcess(90);return 0;}
+U __stdcall platform_close_handle(void*){ExitProcess(90);return 0;}
+U __stdcall platform_duplicate_handle(void*,void*,void*,void**,U,I,U){ExitProcess(90);return 0;}
+void* __stdcall platform_create_thread(void*,U,ThreadBootstrap,void*,U,U*){ExitProcess(90);return nullptr;}
+void* __stdcall platform_current_process(){ExitProcess(90);return nullptr;}
+void* __stdcall platform_current_thread(){ExitProcess(90);return nullptr;}
+U __stdcall platform_resume_thread(void*){ExitProcess(90);return 0;}
+U __stdcall platform_thread_priority(void*,I){ExitProcess(90);return 0;}
+U __stdcall platform_sleep(U,I){ExitProcess(90);return 0;}
+U __cdecl window_thread_start_0055f420(void*,U,U,U,U*){ExitProcess(90);return 0;}
+I __stdcall window_get_system_metrics(I){ExitProcess(90);return 0;}
+I __stdcall window_show_cursor(I){ExitProcess(90);return 0;}
+U __stdcall window_adjust_rect(WindowRect*,U,I,U){ExitProcess(90);return 0;}
+void* __stdcall window_create_ex(U,const char*,const char*,U,I,I,I,I,void*,void*,void*,void*){ExitProcess(90);return nullptr;}
+void* __stdcall window_set_cursor(void*){ExitProcess(90);return nullptr;}
+void __cdecl window_channel_005739b0(U,U){ExitProcess(90);}
+}
+static void absolute(U at,U bytes,U old,const void* target,U expected){U n=0;for(U i=0;i+4<=bytes;++i)if(rd(slab+at+i)==old){wr(slab+at+i,0,ptr(target));++n;i+=3;}if(n!=expected){printf("patch absolute at=%x old=%x %u/%u\n",at,old,n,expected);patch_ok=false;}}
+static void relative(U at,U bytes,U va,U old,const void* target,U expected){U n=0;for(U i=0;i+5<=bytes;++i)if(slab[at+i]==0xe8&&va+i+5+rd(slab+at+i+1)==old){wr(slab+at+i+1,0,ptr(target)-ptr(slab+at+i+5));++n;i+=4;}if(n!=expected){printf("patch relative at=%x old=%x %u/%u\n",at,old,n,expected);patch_ok=false;}}
+static void initialize(){AddVectoredExceptionHandler(1,fault);slab=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(slab!=nullptr,"allocate");
+    const B a[]={ @BODY_00560380@ };const B b[]={ @BODY_005603B0@ };const B c[]={ @BODY_00560490@ };const B d[]={ @BODY_00586E40@ };const B e[]={ @BODY_005602F0@ };const B f[]={ @BODY_00560310@ };const B g[]={ @BODY_00580E60@ };const B h[]={ @BODY_00580DC0@ };
+    memcpy(slab+STOP,a,sizeof(a));memcpy(slab+DRAIN,b,sizeof(b));memcpy(slab+DISPATCH,c,sizeof(c));memcpy(slab+RELEASE,d,sizeof(d));memcpy(slab+POLL,e,sizeof(e));memcpy(slab+VISIT,f,sizeof(f));memcpy(slab+LOCKED,g,sizeof(g));memcpy(slab+ENUMERATE,h,sizeof(h));
+    absolute(STOP,38,0x6a5b28,&network_callbacks_initialized_006a5b28,1);absolute(DRAIN,98,0x6a5b28,&network_callbacks_initialized_006a5b28,1);
+    for(U at:{STOP,DRAIN}){U bytes=at?98:38;absolute(at,bytes,0x6b7d20,&network_callbacks_list_006b7d20,at?2:1);absolute(at,bytes,0x6b7d00,&network_callbacks_list_006b7d00,at?2:1);}
+    relative(STOP,38,0x560380,0x5603b0,slab+DRAIN,1);relative(STOP,38,0x560380,0x5806c0,reinterpret_cast<void*>(&network_worker_queue_dispose_005806c0),2);
+    relative(DRAIN,98,0x5603b0,0x580b20,reinterpret_cast<void*>(&network_route_at_00580b20),4);relative(DRAIN,98,0x5603b0,0x560490,slab+DISPATCH,2);
+    absolute(DISPATCH,148,0x6a5b2c,&network_callbacks_pending_006a5b2c,2);absolute(DISPATCH,148,0x6a57d8,&thread_start_lock_006a57d8,2);absolute(DISPATCH,148,0x5602f0,slab+POLL,1);
+    relative(DISPATCH,148,0x560490,0x5322b0,reinterpret_cast<void*>(&heap_enter_005322b0),1);relative(DISPATCH,148,0x560490,0x5322c0,reinterpret_cast<void*>(&heap_leave_005322c0),1);relative(DISPATCH,148,0x560490,0x53c1d0,reinterpret_cast<void*>(&auxiliary_event_callback_remove_0053c1d0),1);relative(DISPATCH,148,0x560490,0x586e40,slab+RELEASE,1);relative(DISPATCH,148,0x560490,0x55f780,reinterpret_cast<void*>(&file_current_thread_0055f780),1);relative(DISPATCH,148,0x560490,0x5366e0,reinterpret_cast<void*>(&timed_callbacks_005366e0),1);
+    relative(RELEASE,38,0x586e40,0x5806c0,reinterpret_cast<void*>(&network_worker_queue_dispose_005806c0),1);relative(RELEASE,38,0x586e40,0x531f90,reinterpret_cast<void*>(&free_00531f90),1);
+    absolute(POLL,21,0x560310,slab+VISIT,1);absolute(POLL,21,0x6b7d20,&network_callbacks_list_006b7d20,1);relative(POLL,21,0x5602f0,0x580e60,slab+LOCKED,1);
+    for(U at:{LOCKED,ENUMERATE}){U bytes=at==LOCKED?50:156,va=at==LOCKED?0x580e60:0x580dc0;relative(at,bytes,va,0x5322b0,reinterpret_cast<void*>(&heap_enter_005322b0),at==LOCKED?1:2);relative(at,bytes,va,0x5322c0,reinterpret_cast<void*>(&heap_leave_005322c0),at==LOCKED?1:2);}
+    relative(LOCKED,50,0x580e60,0x580dc0,slab+ENUMERATE,1);require(patch_ok&&FlushInstructionCache(GetCurrentProcess(),slab,4096),"patch/flush");
+    require(network_callbacks_pending_006a5b2c==0&&network_callbacks_initialized_006a5b28==0,"initial canonical flags");IoList zero{};require(memcmp(&zero,&list(0),28)==0&&memcmp(&zero,&list(1),28)==0,"initial canonical lists");require(thread_start_lock_006a57d8==nullptr&&heap_lock_free_0069cb04==nullptr,"initial canonical locks");
+}
+__declspec(noinline) static U invoke(void* fn,U a,U b,U c,U argc){U saved_sp,saved_frame,fail=0,value;__asm {
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    cmp argc,3
+    jb less3
+    push c
+less3:cmp argc,2
+    jb less2
+    push b
+less2:cmp argc,1
+    jb target
+    push a
+target:mov ebx,13579bdfh
+    mov esi,55667788h
+    mov edi,99aabbcch
+    call fn
+    mov value,eax
+    mov ecx,argc
+    shl ecx,2
+    add esp,ecx
+    cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,55667788h
+    jne bad
+    cmp edi,99aabbcch
+    je done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }trace.abi|=fail;return value;
+}
+static void load(){memset(&trace,0,sizeof(trace));memset(nodes,0xa5,sizeof(nodes));memset(providers,0,sizeof(providers));memset(queues,0x5a,sizeof(queues));memset(&heap,0,sizeof(heap));memset(previous,0,sizeof(previous));memset(locks,0,sizeof(locks));callback_calls=enum_calls=current_node=0;
+    network_callbacks_initialized_006a5b28=flag;network_callbacks_pending_006a5b2c=pending;heap_lock_free_0069cb04=nullptr;heap.lock=&locks[12];heap.sentinel.free_next=heap.sentinel.free_previous=&heap.sentinel.block;
+    for(U i=0;i<16;++i)heaps_006b4f20[i]=nullptr;heaps_006b4f20[0]=&heap;
+    for(U i=0;i<N;++i){auto* b=reinterpret_cast<HeapBlock*>(queues[i]);auto* next=reinterpret_cast<HeapBlock*>(queues[i]+64);b->magic=0x4253;b->flags=0;b->previous=&previous[i];b->next=next;b->bytes=48;next->flags=0;next->previous=b;auto* q=static_cast<IoList*>(queue(i));memset(q,0,28);q->flags=2;q->lock=&locks[4+i];wr(nodes[i],0,0);wr(nodes[i],8,provider_on?ptr(providers[0]):0);wr(nodes[i],0x14,node_on);wr(nodes[i],0x28,visit_on);wr(nodes[i],0x34,queue_on?ptr(q):0);}
+    for(U i=0;i<2;++i){wr(providers[i],0x14,ptr(reinterpret_cast<void*>(&node_handler)));wr(providers[i],0x10,(!poll_target||(i==1&&(mode&1)))?0:ptr(reinterpret_cast<void*>(&poll_handler)));auto& l=list(i);memset(&l,0,28);l.flags=enum_flags;l.lock=&locks[2+i];l.count=static_cast<I>(counts);if(counts){l.head=reinterpret_cast<IoNode*>(nodes[i*2]);l.tail=reinterpret_cast<IoNode*>(nodes[i*2+counts-1]);}for(U j=0;j<counts;++j)wr(nodes[i*2+j],0,j+1<counts?ptr(nodes[i*2+j+1]):0);}
+    thread_start_lock_006a57d8=&locks[0];threads_initialized_006a57dc=1;main_thread_id_006a57d4=0x1234;auxiliary_event_lock_0069e5d4=&locks[1];
+    for(auto& p:auxiliary_event_callbacks_0069e5b4)p=nullptr;auxiliary_event_callbacks_0069e5b4[0]=reinterpret_cast<AuxiliaryEventCallback>(cpp_side?reinterpret_cast<void*>(&network_callback_poll_005602f0):slab+POLL);auxiliary_event_callbacks_0069e5b4[7]=unrelated;
+    memset(timed_callbacks_0069dd20,0,sizeof(timed_callbacks_0069dd20));timed_callbacks_0069dd20[0]={timed,0,0,0};current_tick_006b7c40=1;last_callback_tick_0069de24=0;
+}
+static void execute(bool cpp){cpp_side=cpp;load();U a=ptr(nodes[0]),b=0,c=0,argc=0,at=which*0x100;void* fn=nullptr;
+    if(which==0)fn=cpp?reinterpret_cast<void*>(&network_callbacks_stop_00560380):slab+STOP;
+    if(which==1)fn=cpp?reinterpret_cast<void*>(&network_callbacks_drain_005603b0):slab+DRAIN;
+    if(which==2){fn=cpp?reinterpret_cast<void*>(&network_callback_dispatch_00560490):slab+DISPATCH;argc=1;if(node_on==2)a=0;}
+    if(which==3){fn=cpp?reinterpret_cast<void*>(&network_callback_queue_release_00586e40):slab+RELEASE;argc=1;}
+    if(which==4)fn=cpp?reinterpret_cast<void*>(&network_callback_poll_005602f0):slab+POLL;
+    if(which==5){fn=cpp?reinterpret_cast<void*>(&network_callback_visit_00560310):slab+VISIT;argc=2;b=opaque;}
+    if(which>=6){fn=cpp?(which==6?reinterpret_cast<void*>(&network_callback_enumerate_locked_00580e60):reinterpret_cast<void*>(&network_callback_enumerate_00580dc0)):slab+at;a=ptr(&list(0));b=ptr(reinterpret_cast<void*>(&enumerator));c=opaque;argc=3;}
+    U result=invoke(fn,a,b,c,argc);trace.result=(which==2||which==5||which>=6)?result:0;snapshot(trace.final);require(trace.abi==0,"cdecl ABI");
+}
+static void compare(){execute(false);original=trace;execute(true);require(memcmp(&original,&trace,sizeof(trace))==0,"original/C++ intermediate/final/call state");event_total+=trace.count;++cases;}
+int main(){initialize();opaque=0x87654321;enum_result=1;enum_break=0;enum_flags=2;flag=1;pending=1;result_value=1;node_on=provider_on=queue_on=main_thread=1;
+    draining=true;for(U w:{0u,1u})for(U n=0;n<=2;++n)for(U f:{0u,1u,0xffffffffu})for(U r:{0u,1u,0x80000000u})for(U m:{0u,1u,2u,4u,16u,32u,128u}){which=w;counts=n;flag=f;result_value=r;mode=m;compare();}
+    draining=false;which=2;counts=1;flag=1;enum_flags=2;
+    for(U on=0;on<3;++on)for(U table=0;table<2;++table)for(U q=0;q<2;++q)for(U r:{0u,1u,0xffffffffu})for(U p:{0u,1u,2u,0xffffffffu})for(U mt=0;mt<2;++mt){node_on=on;provider_on=table;queue_on=q;result_value=r;pending=p;main_thread=mt;mode=0;compare();}
+    node_on=provider_on=queue_on=main_thread=1;result_value=1;pending=1;for(U m:{1u,2u,4u,8u,16u,32u,64u,128u,255u}){mode=m;compare();}
+    which=3;for(U q=0;q<2;++q)for(U m:{0u,8u}){queue_on=q;mode=m;compare();}
+    queue_on=0;mode=0;node_on=provider_on=1;for(U w:{4u,5u})for(U n=0;n<=2;++n)for(U active:{0u,1u,0xffffffffu})for(U target:{0u,1u})for(U m:{0u,1u,64u}){which=w;counts=n;visit_on=active;poll_target=target;mode=m;compare();}
+    for(U w:{6u,7u})for(U n=0;n<=2;++n)for(U f:{0u,1u,2u,0xffffffffu})for(U r:{0u,1u,0xffffffffu})for(U stop:{0u,1u,2u})for(U m:{0u,1u,2u,4u,8u}){which=w;counts=n;enum_flags=f;enum_result=r;enum_break=stop;mode=m;compare();}
+    printf("network_callback_drain_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,event_total);return 0;
+}

@@ -1,0 +1,203 @@
+{
+  "run": 488,
+  "experiment": "local/experiments/v2-network-callback-drain-488",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+    "iterations/v2/001-original-recovery/runs/485-network-callback-lifecycle/network_callback_lifecycle_485.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/network_transport.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/network_workers_members.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/heap.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/heap_locks.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/file_threads.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/event_lifecycle.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_runtime.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/shared_runtime_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/488-network-callback-drain",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/488-network-callback-drain/original-index.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00560380",
+      "bytes": 38,
+      "sha256": "78afa6ab868a89ca61b82dcb61163f8f37dde0d3f149dd68295edb794cdaaaf6",
+      "token": "@BODY_00560380@"
+    },
+    {
+      "va": "005603b0",
+      "bytes": 98,
+      "sha256": "26f1265f9141ce0cb9bf9acda9fbd2484c97f9d0f644be904e0c1ecd8b3fafab",
+      "token": "@BODY_005603B0@"
+    },
+    {
+      "va": "00560490",
+      "bytes": 148,
+      "sha256": "70357a6539c87c20ae813d9ead08698a8faa0492bc4f7510d036d116294af971",
+      "token": "@BODY_00560490@"
+    },
+    {
+      "va": "00586e40",
+      "bytes": 38,
+      "sha256": "88f63c8d0ec16bace825fdbed5620d87e4f6659dd651e8f1aa1067cdca16cf69",
+      "token": "@BODY_00586E40@"
+    },
+    {
+      "va": "005602f0",
+      "bytes": 21,
+      "sha256": "2845c46bad4ea6599a64e40aa6fb4b2d88484d332be77600222f8255534ef237",
+      "token": "@BODY_005602F0@"
+    },
+    {
+      "va": "00560310",
+      "bytes": 33,
+      "sha256": "2f2485cdc70c52c7188d977f4a4e4abe6d762e97ce1c202ace2655a302ae7a62",
+      "token": "@BODY_00560310@"
+    },
+    {
+      "va": "00580e60",
+      "bytes": 50,
+      "sha256": "afd9587242aabbe3b266e1ac6e0494d2334f183f27420c7dc7a8962d1136b12f",
+      "token": "@BODY_00580E60@"
+    },
+    {
+      "va": "00580dc0",
+      "bytes": 156,
+      "sha256": "743c0cae3d6de2544bc234bcbd73024dbec3781058a6c3845c210e7601db5df9",
+      "token": "@BODY_00580DC0@"
+    }
+  ],
+  "pass_marker": "network_callback_drain_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 60,
+  "mutations": [
+    {
+      "name": "stop-nonzero",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "if(network_callbacks_initialized_006a5b28!=0){",
+      "new": "if(network_callbacks_initialized_006a5b28==1){",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "drain-first-list",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "void* node=network_route_at_00580b20(&network_callbacks_list_006b7d20,0);",
+      "new": "void* node=network_route_at_00580b20(&network_callbacks_list_006b7d00,0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "node-table-reload",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "if(result!=0&&read(pointer(read(node,8)),0x10)!=0){",
+      "new": "if(result!=0&&read(node,8)!=0){",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "pending-decrement",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "previous-1u",
+      "new": "previous+1u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "thread-lock-reload",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "heap_enter_005322b0(thread_start_lock_006a57d8);\n                    auxiliary_event_callback_remove_0053c1d0(network_callback_poll_005602f0);\n                    heap_leave_005322c0(thread_start_lock_006a57d8);",
+      "new": "void* captured_lock=thread_start_lock_006a57d8;\n                    heap_enter_005322b0(captured_lock);\n                    auxiliary_event_callback_remove_0053c1d0(network_callback_poll_005602f0);\n                    heap_leave_005322c0(captured_lock);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "node-result",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "return result;\n}\nvoid __cdecl network_callback_queue_release_00586e40",
+      "new": "return result?1u:0u;\n}\nvoid __cdecl network_callback_queue_release_00586e40",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "clear-after-free",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "free_00531f90(queue);write(node,0x34,0);",
+      "new": "write(node,0x34,0);free_00531f90(queue);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "queue-capture",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "free_00531f90(queue);",
+      "new": "free_00531f90(pointer(read(node,0x34)));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "poll-list",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "network_callback_enumerate_locked_00580e60(&network_callbacks_list_006b7d20,network_callback_visit_00560310,0);",
+      "new": "network_callback_enumerate_locked_00580e60(&network_callbacks_list_006b7d00,network_callback_visit_00560310,0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "visit-field",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "if(call!=0&&read(node,0x28)!=0)",
+      "new": "if(call!=0&&read(node,0x14)!=0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "visit-result",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "return 1;\n}\nU __cdecl network_callback_enumerate_locked",
+      "new": "return 0;\n}\nU __cdecl network_callback_enumerate_locked",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrapper-lock-reload",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "heap_enter_005322b0(list->lock);\n    const U result=network_callback_enumerate_00580dc0(list,predicate,opaque);\n    heap_leave_005322c0(list->lock);",
+      "new": "void* captured_lock=list->lock;\n    heap_enter_005322b0(captured_lock);\n    const U result=network_callback_enumerate_00580dc0(list,predicate,opaque);\n    heap_leave_005322c0(captured_lock);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "captured-flags",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "if(predicate(node,opaque)==0)list->flags=captured_flags|1u;",
+      "new": "if(predicate(node,opaque)==0)list->flags|=1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "restore-flag",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "list->flags=flags|original_flag;",
+      "new": "list->flags=flags;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "next-after-callback",
+      "source": "iterations/v2/001-original-recovery/runs/488-network-callback-drain/network_callback_drain_488.cpp",
+      "old": "node=pointer(read(node));",
+      "new": "node=nullptr;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

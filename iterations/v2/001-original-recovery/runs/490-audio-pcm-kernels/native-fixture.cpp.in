@@ -1,0 +1,152 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_pcm_kernels_490.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;std::memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){std::memcpy(p,&x,4);}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s\n",why);std::fflush(stdout);ExitProcess(1);}}
+alignas(16) static B floating[512];
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];U mxcsr;};
+static U depth=0,precision=3,rounding=0,mx_round=0,ftz=0,daz=0,mx_flags=0;
+static void fpu(Fpu& f){
+    __asm fxsave floating
+    f.control=static_cast<unsigned short>(rd(floating));f.status=static_cast<unsigned short>(rd(floating+2));f.tag=floating[4];f.mxcsr=rd(floating+24);std::memset(f.padding,0,3);
+    for(U i=0;i<8;++i)std::memcpy(f.values+i*10,floating+32+i*16,10);
+}
+static void seed(){
+    unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));
+    __asm {
+        fninit
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        fldz
+        ffree st(0)
+        ffree st(1)
+        ffree st(2)
+        ffree st(3)
+        ffree st(4)
+        ffree st(5)
+        ffree st(6)
+        ffree st(7)
+        fldcw control
+    }
+    U mxcsr=0x1f80u|(mx_round<<13)|(ftz<<15)|(daz<<6)|mx_flags;
+    __asm ldmxcsr mxcsr
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+alignas(16) static B memory[2048];
+static U nodes[3][3],cases,events_total,pattern,sample_bits=0x3f800001,gain_bits=0x3f000001,child_mode,child_result=1,child_flags,priority_bits=0x8000;
+static B* slab;
+struct Event{U args[5],nodes[3][3],source[4],destination[4];Fpu fpu;};
+struct Trace{U abi,result,count;Event events[1];B memory[2048];U nodes[3][3];Fpu fpu;};
+static Trace actual,original;
+// Synthetic cdecl3/4/5 carrier. Original extra ECX preservation is checked for
+// the three unrolled kernels; only the chain processor's EAX is consumed.
+static U invoke(void* fn,U a,U b,U c,U d,U e,U argc,U& result,U preserve_ecx){U saved_sp,saved_frame,fail=0,value;__asm {
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    cmp argc,5
+    jne four
+    push e
+four:cmp argc,4
+    jb three
+    push d
+three:push c
+    push b
+    push a
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    mov ecx,11223344h
+    call fn
+    mov value,eax
+    cmp preserve_ecx,0
+    je ecx_done
+    cmp ecx,11223344h
+    je ecx_done
+    or fail,2
+ecx_done:mov eax,argc
+    lea esp,[esp+eax*4]
+    cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:or fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }result=value;return fail;}
+static I __cdecl child(U object,U count,U output,U input,I priority){
+    require(actual.count==0,"single captured child");auto& e=actual.events[actual.count++];e.args[0]=object;e.args[1]=count;e.args[2]=output;e.args[3]=input;e.args[4]=static_cast<U>(priority);std::memcpy(e.nodes,nodes,sizeof(nodes));std::memcpy(e.source,reinterpret_cast<void*>(input),16);std::memcpy(e.destination,reinterpret_cast<void*>(output),16);fpu(e.fpu);
+    if(child_flags&1){nodes[0][0]=ptr(nodes[2]);nodes[1][1]=0xdeadbeef;}
+    if(child_flags&2)nodes[0][2]=0x7fffbeef;
+    if(child_flags&4)wr(reinterpret_cast<void*>(input),0x47000000);
+    if(child_flags&8){const std::uint16_t value=0x1234;std::memcpy(reinterpret_cast<void*>(output),&value,2);}
+    return static_cast<I>(child_result);
+}
+static void init(){
+    static const B a[]={ @SCALAR@ },b[]={ @SSE@ },c[]={ @DECODE@ },d[]={ @OUTPUT@ },bias[]={ @BIAS@ };
+    require(std::memcmp(bias,&audio_mixer_pcm16_bias_005c1800,4)==0,"raw original readonly bias");require(IsProcessorFeaturePresent(PF_XMMI_INSTRUCTIONS_AVAILABLE)!=0,"host SSE capability");
+    __asm fxsave floating
+    require((rd(floating+28)&0x40u)!=0,"host MXCSR DAZ capability");
+    slab=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(slab!=nullptr,"raw slab");std::memcpy(slab,a,sizeof(a));std::memcpy(slab+0x100,b,sizeof(b));std::memcpy(slab+0x200,c,sizeof(c));std::memcpy(slab+0x300,d,sizeof(d));
+    require(rd(slab+0x339)==0x5c1800,"original bias operand");wr(slab+0x339,ptr(&audio_mixer_pcm16_bias_005c1800));require(FlushInstructionCache(GetCurrentProcess(),slab,4096)!=0,"raw cache");
+}
+static const U values[]={0,0x80000000,1,0x80000001,0x007fffff,0x00800000,0x3f000000,0xbf000000,0x3fc00000,0xbfc00000,0x46fffe00,0x47000000,0xc7000000,0xc6fffe00,0xc7000100,0x49742400,0x7f800000,0xff800000,0x7fc12345,0x7f812345,0xff812345,0x4b400000};
+static void reset(){
+    std::memset(&actual,0,sizeof(actual));
+    for(U i=0;i<512;++i){U bits=0x3f000001+(i%97)*0x1000;if(i&1)bits|=0x80000000;if(pattern==1)bits=values[i%(sizeof(values)/4)];if(pattern==2)bits=sample_bits;wr(memory+i*4,bits);}
+    nodes[0][0]=child_mode?ptr(nodes[1]):0;nodes[0][1]=0xface0000;nodes[0][2]=(priority_bits<<16)|0xabcd;nodes[1][0]=0;nodes[1][1]=ptr(reinterpret_cast<void*>(&child));nodes[1][2]=0x7fff1234;nodes[2][0]=nodes[2][1]=nodes[2][2]=0;
+}
+static void execute(bool cpp,U kind,U count,U source,U destination){
+    reset();if(pattern==3){const std::uint16_t value=static_cast<std::uint16_t>(sample_bits);std::memcpy(memory+source,&value,2);}
+    U a=count,b=gain_bits,c=ptr(memory+source),d=ptr(memory+destination),e=0xdeadbeef,argc=4;void* fn=nullptr;
+    switch(kind){
+    case 0:fn=cpp?reinterpret_cast<void*>(&audio_mixer_accumulate_scalar_0059ba70):slab;break;
+    case 1:fn=cpp?reinterpret_cast<void*>(&audio_mixer_accumulate_x87_0059baf0):slab+0x100;break;
+    case 2:fn=cpp?reinterpret_cast<void*>(&audio_mixer_decode_s16_x87_0059b9f0):slab+0x200;b=c;c=d;argc=3;break;
+    case 3:fn=cpp?reinterpret_cast<void*>(&audio_mixer_output_pcm16_0059a350):slab+0x300;a=ptr(nodes[0]);b=count;argc=5;break;
+    default:require(false,"kind");}
+    seed();actual.abi=invoke(fn,a,b,c,d,e,argc,actual.result,kind<3);fpu(actual.fpu);if(kind!=3)actual.result=0;std::memcpy(actual.memory,memory,sizeof(memory));std::memcpy(actual.nodes,nodes,sizeof(nodes));
+}
+static void check(U kind,U count,U source=512,U destination=1024){
+    execute(false,kind,count,source,destination);original=actual;execute(true,kind,count,source,destination);
+    if(actual.abi||original.abi||std::memcmp(&actual,&original,sizeof(actual))!=0){const B* a=reinterpret_cast<const B*>(&actual);const B* b=reinterpret_cast<const B*>(&original);U n=0;while(n<sizeof(actual)&&a[n]==b[n])++n;std::printf("divergence case=%u kind=%u count=%08x source=%u dest=%u pattern=%u sample=%08x gain=%08x child=%u/%08x flags=%u priority=%04x pc=%u rc=%u depth=%u mxrc=%u ftz=%u daz=%u mxflags=%x byte=%u %02x/%02x abi=%u/%u ret=%08x/%08x\n",cases,kind,count,source,destination,pattern,sample_bits,gain_bits,child_mode,child_result,child_flags,priority_bits,precision,rounding,depth,mx_round,ftz,daz,mx_flags,n,n<sizeof(actual)?a[n]:0,n<sizeof(actual)?b[n]:0,actual.abi,original.abi,actual.result,original.result);std::fflush(stdout);ExitProcess(1);}
+    ++cases;events_total+=actual.count;
+}
+int main(){
+    SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);init();pattern=0;
+    for(U kind=0;kind<3;++kind)for(U count=1;count<=32;++count)for(U sa=0;sa<16;++sa)for(U da=0;da<16;++da)check(kind,count,512+sa,1024+da);
+    for(U kind=0;kind<3;++kind)for(U count:{1u,2u,3u,4u,7u,8u,15u,16u,17u,31u,32u,33u,48u,63u,64u})for(I offset:{-64,-16,-4,-2,0,2,4,8,16,32,64,128})check(kind,count,512,static_cast<U>(512+offset));
+    for(U kind=0;kind<3;++kind)for(U count:{0u,0xffffffffu,0xfffffffdu,0xfffffff8u,0xfffffff0u})check(kind,count);
+    pattern=3;for(U value=0;value<65536;++value){sample_bits=value;check(2,1);}
+    pattern=1;
+    for(U kind=0;kind<3;++kind)for(U gain:values)for(U pc:{0u,2u,3u})for(U rc=0;rc<4;++rc)for(U d:{0u,1u,3u,6u}){gain_bits=gain;precision=pc;rounding=rc;depth=d;check(kind,17);check(kind,0);}
+    for(U rc=0;rc<4;++rc)for(U f=0;f<2;++f)for(U z=0;z<2;++z)for(U status:{0u,0x3fu})for(U gain:values){mx_round=rc;ftz=f;daz=z;mx_flags=status;gain_bits=gain;check(1,17);check(1,17,513,1025);}
+    mx_round=ftz=daz=mx_flags=0;precision=3;rounding=0;depth=0;gain_bits=0x3f000001;
+    for(U count:{0u,1u,2u,3u,4u,15u,16u,17u,64u,0x40000000u,0x80000000u,0xffffffffu})for(U child_value:{0u,1u,0x7fffffffu,0x80000000u,0xffffffffu})for(U active=0;active<2;++active)for(U flags=0;flags<16;++flags){child_mode=active;child_result=child_value;child_flags=flags;check(3,count);}
+    child_mode=0;child_flags=0;
+    for(U bits:values)for(I neighbor:{-2,-1,0,1,2})for(U pc:{0u,2u,3u})for(U rc=0;rc<4;++rc)for(U d:{0u,1u,6u}){pattern=2;sample_bits=bits+static_cast<U>(neighbor);precision=pc;rounding=rc;depth=d;check(3,3);}
+    pattern=1;precision=3;rounding=0;depth=0;child_mode=1;child_result=1;
+    for(U priority:{0x8000u,0xffffu,0u,1u,0x7fffu})for(I offset:{-64,-16,-4,-2,0,2,4,8,16,32,64,128}){priority_bits=priority;check(3,17,512,static_cast<U>(512+offset));}
+    require(VirtualFree(slab,0,MEM_RELEASE)!=0,"raw cleanup");std::printf("audio_pcm_kernels_original_x86_vs_cpp=PASS cases=%u events=%u overlap=PASS count_prefix=PASS saturation=PASS x87=PASS MXCSR=PASS ABI=PASS deferred_3dnow=2\n",cases,events_total);return 0;
+}

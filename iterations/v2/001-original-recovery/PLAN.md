@@ -1,5 +1,19 @@
 # v2 / 001 - original source recovery plan
 
+Current491,2026-11-02:488/489/492 add13originals1369B/8Bdata;registry705.
+SharedauditPASS13849300cases/371966events/42mutations/657pins/521exports;
+267TUs/8projects,160names166refs,noEXE. Sixoldnamesclose/no newchildren.
+490assemblyreference excluded fromproduction/counts. Passedinputs frozen.
+Active493PCMconstructors(pcm_constructors_493),494renderleaves then496callerrepair
+(render_resources_494),497bounded3DNoworacle(simd_oracle_497; capabilityonly).
+495bankcleanup ready/frozen fornextsharedbatch. Coordinatorownsintake/build/registry.
+Constructor4677e0 staysPARTIAL until496fresh2argpresentproof. Fullproducer/lifetime/
+fault/concurrency/live/startup/display/gameplay/403/411 boundaries persist.
+Nextsharedbatch:493/494/495/496 whenready; reusecachedREA andpassedchildproof.
+Sourceconsolidation onlyaftercompleteoriginalcoderecovery(rootPLAN milestone4).
+
+Historical487 follows.
+
 Current487,2026-11-02: frozen484/485/486 add16originals1192B +repaired1761Bcaller,
 2048Bdata;registry692. SharedauditPASS29346cases/1116912events/38mutations/650pins/
 505exports;264TUs/8projects,166names172refs,noEXE.7oldnamesclose/16realtypedchildren

@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run488: [callback original index](../../iterations/v2/001-original-recovery/runs/488-network-callback-drain/original-index.json)
+supplements omitted005602f0/00560310 with full raw bodies, callers and ABI before
+implementation. [Run491](../../iterations/v2/001-original-recovery/runs/491-callback-pixel-pcm-integration/README.md)
+accepts the bounded callback/pixel/PCM batch; live producers remain unverified.
+
+
 Run464: [omitted audio scheduler/no-op callbacks](supplemental/audio-probe-464.jsonl)
 records00565930 (8B) and00565940 (1B), raw SHA/instructions/ABI and index gaps.
 [Run465](../../iterations/v2/001-original-recovery/runs/465-audio-device-mix-integration/README.md)

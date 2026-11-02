@@ -1,5 +1,13 @@
 # Отложенные проверки восстановления v2
 
+Run491:13originals1369B/8Bdata;13849300cases/42mutations/657pins PASS;
+267TUs/160names166refs,noEXE. Actualcallbackchildren, fullEAX/usedALpixel and
+C++PCMloops/SSE/x87state proved;490reference excluded. Stillopen: callbackproducer/
+progress/lifetimes, nonpositiveunalignedSSE,3DNoworacle/fullkernels, fullaudio
+producercomposition, live/fault/concurrency/startup/gameplay. Constructor4677e0
+remainsPARTIAL for494/4962argpresent.493/494/495/496 nextsharedintake.
+
+
 Run487:16neworiginals1192B/repairedcaller1761B/2048Bdata;29346cases/38mutations/
 650pins PASS;264TUs/166names172refs,noEXE. Originalcaller/matrix/surface/vertices/
 copy/string fixes nowcomparematerialeffects. BUT44e870calleeindependentlyrequires

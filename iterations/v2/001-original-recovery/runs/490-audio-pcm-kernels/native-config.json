@@ -1,0 +1,164 @@
+{
+  "run": 490,
+  "experiment": "local/experiments/v2-audio-pcm-kernels-490",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels",
+    "iterations/v2/001-original-recovery/runs/486-audio-mixer-configuration",
+    "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch",
+    "iterations/v2/001-original-recovery/runs/462-audio-directsound-initialize",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/runs/439-audio-voice-cleanup",
+    "iterations/v2/001-original-recovery/runs/458-audio-release-chain",
+    "iterations/v2/001-original-recovery/runs/460-audio-thread-worker",
+    "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0059ba70",
+      "bytes": 125,
+      "token": "@SCALAR@",
+      "sha256": "b6cce7942199ded10ee6c417247d8dd505897c9ce31c29720aeb6163c1ed11cb"
+    },
+    {
+      "va": "0059baf0",
+      "bytes": 159,
+      "token": "@SSE@",
+      "sha256": "43878461b86d3987ba3aa63b6ea10cdfa3f6a667140b25e324a884fb719ebbdd"
+    },
+    {
+      "va": "0059b9f0",
+      "bytes": 114,
+      "token": "@DECODE@",
+      "sha256": "55cca4b28b0d647d2a1a018a692a97adb114b8f5abe5995dbab1f8b5f31d92a0"
+    },
+    {
+      "va": "0059a350",
+      "bytes": 122,
+      "token": "@OUTPUT@",
+      "sha256": "2692f08a02865a4ed94789062872a31cf4b14b074332abd4b81444a03875b0f7"
+    },
+    {
+      "va": "005c1800",
+      "bytes": 4,
+      "token": "@BIAS@",
+      "sha256": "7d3f90dfc0e70f45748a18c03b6d3e35246d7892ccf9fb433ce9e68cf6588d58"
+    }
+  ],
+  "pass_marker": "audio_pcm_kernels_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 120,
+  "mutations": [
+    {
+      "name": "scalar-product",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "fmul st(0),st(4)",
+      "new": "fadd st(0),st(4)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scalar-count-prefix",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "scalar_tail:\n    test ecx,3",
+      "new": "scalar_tail:\n    jecxz scalar_end\n    test ecx,3",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "SSE-product",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "    mulps xmm3,xmm0",
+      "new": "    addps xmm3,xmm0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "SSE-residual",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "    mulss xmm1,xmm0",
+      "new": "    addss xmm1,xmm0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "decode-block-order",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "    fxch st(7)",
+      "new": "    fxch st(6)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "decode-residual-sign",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "    je decode_block\n    fild word ptr [esi+ecx*2-2]",
+      "new": "    je decode_block\n    fild dword ptr [esi+ecx*2-2]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "bias-operation",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "    fadd audio_mixer_pcm16_bias_005c1800",
+      "new": "    fsub audio_mixer_pcm16_bias_005c1800",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "clip-high",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "sample>0x7fffu",
+      "new": "sample>0x6fffu",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "clip-low",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "sample<0xf8000u",
+      "new": "sample<0xf9000u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "child-order",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "(next,count,output,input,priority)",
+      "new": "(next,count,input,output,priority)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "child-signed-result",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "if(result<=0)",
+      "new": "if(result<0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "return-count",
+      "source": "iterations/v2/001-original-recovery/runs/490-audio-pcm-kernels/audio_pcm_kernels_490.cpp",
+      "old": "return static_cast<I>(count);",
+      "new": "return static_cast<I>(count+1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

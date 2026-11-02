@@ -1,0 +1,187 @@
+{
+  "run": 489,
+  "experiment": "local/experiments/v2-render-pixel-compare-489",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_display_484.cpp",
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/render_transform_484.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_objects.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/shared_runtime_globals.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/489-render-pixel-compare",
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/original-evidence.json",
+    "iterations/v2/001-original-recovery/runs/484-render-constructor-repair/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004677e0",
+      "bytes": 1761,
+      "sha256": "bd0bab14fda45ace7f6f0565df8fa216fbdd922e6927f541ff73c792d53fc607",
+      "token": "@BODY_CALLER@"
+    },
+    {
+      "va": "00539b30",
+      "bytes": 68,
+      "sha256": "6bc4cbec86852b3cd0dca5a1ddd345d507829666932aaaaf88b7965e6ee2ffd2",
+      "token": "@BODY_DIAGONAL@"
+    },
+    {
+      "va": "00539b80",
+      "bytes": 69,
+      "sha256": "0d6869eff44e85fedb074633f878fafc1a7d933d8a85194c636af1f7f5082486",
+      "token": "@BODY_TRANSLATION@"
+    },
+    {
+      "va": "00539f40",
+      "bytes": 15,
+      "sha256": "6c0e49bdef6b8dc69d34873790afdedfc4c12e8f78bb52952344449f6891f06f",
+      "token": "@BODY_GETTER@"
+    },
+    {
+      "va": "00466e80",
+      "bytes": 9,
+      "sha256": "aa1d0523d277f6a14d7950c488982e29fa08fe5d88274b15a712c4427302720a",
+      "token": "@BODY_SETTER@"
+    },
+    {
+      "va": "00468110",
+      "bytes": 267,
+      "sha256": "d6c371b98ffbc350a7a1da99030bd1742fa713d7217eb641b11c0e2370897eae",
+      "token": "@BODY_PIXEL@"
+    }
+  ],
+  "pass_marker": "render_pixel_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 90,
+  "mutations": [
+    {
+      "name": "rgb555-red",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "(pixel>>10)&31u",
+      "new": "(pixel>>11)&31u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "rgb555-green",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "green=scale5((pixel>>5)&31u)",
+      "new": "green=scale5((pixel>>5)&63u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "rgb565-red",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "(pixel>>11)&31u",
+      "new": "(pixel>>10)&31u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "rgb565-green",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "green=scale6((pixel>>5)&63u)",
+      "new": "green=scale6((pixel>>5)&31u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scale5-bias",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "component*255u+16u",
+      "new": "component*255u+15u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scale6-bias",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "component*255u+31u",
+      "new": "component*255u+15u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scale5-shift",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "(((weighted-high)>>1)+high)>>4",
+      "new": "(((weighted-high)>>1)+high)>>5",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "scale6-shift",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "(((weighted-high)>>1)+high)>>5",
+      "new": "(((weighted-high)>>1)+high)>>4",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "opaque-alpha",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "pixel|0xff000000u",
+      "new": "pixel|0x00ff0000u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "packed-zero",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "case 3:case 11:\n        if(pixel==0)return 0;",
+      "new": "case 3:case 11:\n        if(pixel==0)return 0xff000000u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "whole-dword-zero",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "case 3:case 11:\n        if(pixel==0)return 0;",
+      "new": "case 3:case 11:\n        if((pixel&0xffffu)==0)return 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "default-fallthrough",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "default:return pixel",
+      "new": "default:return 0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "blue-low-mask",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "scale5(pixel&31u)",
+      "new": "scale5(pixel&15u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "format-high-mask",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "switch(format)",
+      "new": "switch(format&0x7fffffffu)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "legacy-al-truth",
+      "source": "iterations/v2/001-original-recovery/runs/489-render-pixel-compare/render_pixel_489.cpp",
+      "old": "(render_pixel_convert_00468110(pixel,format)&0xffu)!=0",
+      "new": "render_pixel_convert_00468110(pixel,format)!=0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

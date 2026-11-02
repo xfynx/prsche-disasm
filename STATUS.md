@@ -4,16 +4,15 @@ Updated 2026-11-02. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run487](iterations/v2/001-original-recovery/runs/487-render-network-mixer-integration/README.md)
-compiles 264 C++ translation units across 8 projects. The game link still has 166 unresolved
-names / 172 references. **There is no recovered playable C++ game executable yet.**
+[Run491](iterations/v2/001-original-recovery/runs/491-callback-pixel-pcm-integration/README.md)
+compiles267 C++ translation units across8 projects. The game link still has160 unresolved
+names/166 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch integrates16 original helper/network/configuration functions and
-replaces the defective renderer TU:29,346 native cases,38 mutations,650-pin audit.
-Seven names close;16 real callback/constructor dependencies appear. Registry692.
-Matrix/surface and other caller fixes are proved, while constructor4677e0 remains
-PARTIAL for a newly traced second present argument pending494/496.
-These are batch results, not a completion percentage.
+The latest batch integrates13 original functions/1,369B and8B original data:
+13,849,300 native cases,42 mutations and657 source pins pass the shared audit.
+Six names close with no new dependencies; registry705 entries.490 assembly research
+is excluded from production. Constructor4677e0 remains PARTIAL pending494/496's
+second present argument. These batch results are not a completion percentage.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through
