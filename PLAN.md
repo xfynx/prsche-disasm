@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run502](iterations/v2/001-original-recovery/runs/502-stream-surface-3dnow-integration/README.md).
-Stream lookup, surfaces and explicitly emulated3DNow providers are integrated.
+Latest recovery intake: [Run507](iterations/v2/001-original-recovery/runs/507-stream-buffer-integration/README.md).
+Stream buffer delivery is integrated; emulated3DNow retains its explicit proof boundary.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next integrate verified stream buffer delivery; resume remaining audio/matrix drafts.
+Next finish original coded-audio and matrix/config native comparisons from preserved drafts.
 
 ## Recovery milestones
 

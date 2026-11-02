@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(porsche_stream_buffer_507 LANGUAGES CXX)
+include("${CMAKE_CURRENT_SOURCE_DIR}/../502-stream-surface-3dnow-integration/CMakeLists.txt")
+target_sources(porsche_game_entry_bridges PRIVATE ../505-audio-stream-buffer-delivery/audio_stream_buffer_delivery_505.cpp)
+target_include_directories(porsche_game_entry_bridges PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../505-audio-stream-buffer-delivery")

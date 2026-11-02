@@ -4,15 +4,16 @@ Updated 2026-11-02. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run502](iterations/v2/001-original-recovery/runs/502-stream-surface-3dnow-integration/README.md)
-compiles276 C++ translation units across8 projects. The link has147 unresolved names/
-153 references. **There is no recovered playable C++ game executable yet.**
+[Run507](iterations/v2/001-original-recovery/runs/507-stream-buffer-integration/README.md)
+compiles277 C++ translation units across8 projects. The link has145 unresolved names/
+151 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch adds8 original functions/1,006 indexed bytes and128B sparse state.
-165,960 native cases/25 mutations and2,084 separately emulated3DNow cases/18 mutation
-detections pass;676 source pins/557 canonical providers. Six names close, two actual
-stream children appear; registry728 entries. Emulation uses pinned Unicorn/Athlon;
-native AMD3DNow arithmetic is unverified. These results are not a completion percentage.
+The latest batch adds2 original functions/240B with no new state.19,076 native cases/
+12 mutations and679 source pins pass; both stream-buffer names close with no new
+names. Registry730 entries.502's separate emulated3DNow proof is retained; native
+AMD3DNow arithmetic is unverified. These results are not a completion percentage.
+Workers reached quota; coded-audio504 and matrix506 drafts remain unvalidated and
+outside the compiler graph, with concrete continuation instructions.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through

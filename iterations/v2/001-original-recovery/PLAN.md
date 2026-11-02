@@ -1,5 +1,21 @@
 # v2 / 001 - original source recovery plan
 
+Current507,2026-11-02: frozen505 adds2originals240B/0state;registry730.
+SharedauditPASS19076nativecases/1890events/12mutations/679pins/559exports;
+277TUs/8projects,145names151refs,noEXE. Bothstreamnamesclose/no newchildren.
+Actual505+501+493+492+434 composition provescaptured/late signed16alias/callback
+transport; realproducer/release/consumed callbacksemantics stillcontrolled/open.
+Prior5023DNow emulation reusedunchanged, notnativeAMD hardwareproof.
+All3workers reachedquota, no activeassignments/respawns.504unvalidateddraft10bodies
+840B/48B hasCPP/header/fixturebody butneedscompleteconfig/fixture/indexsupplement/
+OdO2/mutations;506unvalidateddraft3bodies745B/0state needsfullnativefixture/config/
+proof. READMEs/504PLAN/506scope ownnextsteps. Neitherdraftisregistered orcompiled.
+Originals/passedinputs immutable; no broadregressionreruns. Fullproducer/lifetime/
+fault/concurrency/live/startup/gameplay/403/411 stayopen. Sourceconsolidationdeferred.
+Next: finish504sharednativefixture, then506; intakeonlyafteractualproof.
+
+Historical502 follows.
+
 Current502,2026-11-02: frozen498/501/503 add8originals1006indexedB/1009rawspanB,
 128Bnarrowstate;registry728. Native165960cases/17866events/25mutations; emulated2084
 cases/165320arenaevents/111858FPsnapshots/18mutations keptseparate. SharedauditPASS,

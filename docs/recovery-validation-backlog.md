@@ -1,5 +1,14 @@
 # Отложенные проверки восстановления v2
 
+Run507:2originals240B/0state;19076nativecases/12mutations/679pins PASS;
+277TUs/145names151refs,noEXE. Realstream/PCM/decoder composition closesbuffer
+providerfrontier; actualproducer/release/consumedcallbackeffects, faults/lifetimes/
+concurrency/live/startup/gameplay remainopen.5023DNow emulationnotnativeAMD proof.
+Quota leftovers:50410body840B/48B draft needsfullfixture/config/indexsupplement/
+OdO2/mutations;5063body745B/0state draft needsfixture/config/nativeproof. Both
+excludedfromregistry/gamegraph. Resumefromtheirhandoffs; do notforgetthesechecks.
+
+
 Run502:8originals1006indexedB/128Bstate; native165960cases/25mutations +separate
 emulated2084cases/18mutations;676pins/557providers PASS.276TUs/147names153refs,noEXE.
 Unicorn2.1.3/Athlon11 commonCPUdependency remains: nativeAMD3DNow andactualproducer
