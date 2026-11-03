@@ -1,18 +1,19 @@
 # v2 / 001 - original source recovery plan
 
-Current516,2026-11-03: frozen513002/515002 add16originals543B/181Bdata
-(45writable/136readonly);registry773. AuditPASS42998cases/54542events/27mutations/
-696pins/628providers;284TUs/8projects,140names146refs,noEXE.8close/8realchildren.
-ExplicitNOICF +nativeidentitycontrol +4projectflags guard callbackidentity.
-Passedinputs/originals immutable; fullproducer/COM/start/probe/dtor/fault/concurrency/
-live/startup/gameplay/403/411 remainopen. No sourceconsolidationnow.
-Twoagents hitquota again; do notrespawn.512 researchonly(385B/272B physicalfootprint
-proposal, count<=0/headerdomains notclosed): readonlyphysical-views/layout-feasibility
-andPLANrecordnextstep. No512code/PASS.518unvalidated4body475B/0state CPP+fixture
-exists, nativeconfig/mutations/proof missing; exactRegFlushKey ADVAPI32 IAT5b2004
-corrects initialSetErrorMode hypothesis. Do notcallliveAPIinproof. Rootmayfinish518;
-519backend-fill scope(proposed3body427B/26B) assignedpcm_constructors_493ifquota.
-Nextonlyactualproofs enter520intake. BatchREADMEsowncommands, backlogownsremainingchecks.
+Current520,2026-11-04: frozen518002/519003 add7 originals902B/26B writable;
+registry780. AuditPASS58,764cases/386,676events/27mutations/702pins/638providers.
+287TUs/8projects,144names150refs,noEXE;3close/7actualchildren. NOICF inherited.
+Originals/passedproof immutable; bounded COM/IAT transport is not live-game proof.
+Full real children/producer/aliases/fault/concurrency/startup/gameplay/403/411 open.
+Ready512003:2 decoders385B/272B physicalwindows +placement-only486clone,
+34,226cases/14mutations; old486/header untouched. Ready521:2originals305B,
+8Bstate/90Bwritable strings +narrow374 descriptor field-view replacement.
+Coordinator owns520 publication then524 intake; render_resources_494 prepares524
+build graph for512/521 with exactsource replacements. pcm_constructors_493 owns522
+DSP597660/__ftol/597120(516B/8Bro), proof pending. simd_oracle_497 hitquota after512;
+523 trace proposal notstarted, no respawn/quota retries. No sourceconsolidation now.
+BatchREADMEs owncommands; backlog owns remainingchecks. Next: publish520, then
+accept524 only from passed512/521, leave unfinished522 out.
 
 Historical514 follows.
 

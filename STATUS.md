@@ -1,18 +1,17 @@
 # Current project status
 
-Updated 2026-11-03. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-04. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run516](iterations/v2/001-original-recovery/runs/516-decoder-stream-driver-integration/README.md)
-compiles284 C++ translation units across8 projects. The link has140 unresolved names/
-146 references. **There is no recovered playable C++ game executable yet.**
+[Run520](iterations/v2/001-original-recovery/runs/520-driver-start-capture-integration/README.md)
+compiles287 C++ translation units across8 projects. The link has144 unresolved names/
+150 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:16 originals/543B and181B data;42,998 native cases/27 mutations/696 source pins
-pass.8 namesclose/8 actual driver/backend children appear; registry773. Distinct
-callback identities are protected from linker folding. These are bounded proofs,
-not completion percentage/live-game acceptance. Earlier3DNow proof remains emulated.
-The modem enumerator/callback retain partial domains; live platform behavior is unverified.
+Latest:7 originals/902B and26B writable state;58,764 native cases/27 mutations/
+702 source pins pass. Three names close/seven actual children appear; registry780.
+These are bounded proofs, not completion percentage/live-game acceptance. Earlier
+3DNow proof remains emulated. Full platform/gameplay and403/411 domains remain open.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through
 [Run445](iterations/v2/001-original-recovery/runs/445-audio-owner-alias-regression/README.md).

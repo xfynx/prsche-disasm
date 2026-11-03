@@ -1,11 +1,13 @@
 # Отложенные проверки восстановления v2
 
-Run516:16originals543B/181Bdata;42998nativecases/27mutations/696pins PASS;
-284TUs/140names146refs,noEXE. NOICF/nativeidentitycontrol preservesdistinctcallbacks.
-Sevenactualdriver methods and58acf0 remain.512physicalwindows/layout+count/header
-research and518driver-startCPP/fixture notaccepted; nativeconfig/proof stillneeded.
-518exactAPIisADVAPI32!RegFlushKey(HKEY_CLASSES_ROOT), notSetErrorMode.519pending.
-
+Run520:7originals902B/26Bstate;58,764cases/27mutations/702pins PASS;
+287TUs/144names150refs,noEXE. RegFlushKey SDK/IAT checked under redirection;
+no live flush. Capture HRESULT==0, output slots/aliases and forwardcopy proven.
+Actual driver/context/initializer/DSP children, cross-owner capture aliases,
+full producer, live COM/device/API/fault/concurrency/startup/gameplay remain open.
+512003 decoder/window placement and521 initialization/view replacement await524
+integration;522 DSP proof pending. Preserve old486/374 sources and refresh only
+changed owners through actual native regressions. Earlier3DNow remains emulated.
 
 Run514:2originals759B/4Breadonly;542720nativecases/15mutations/691pins PASS;
 282TUs/140names146refs,noEXE. Genericvslot+actualgetter/alternatecallbacks, unordered
