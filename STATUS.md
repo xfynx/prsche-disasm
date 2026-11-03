@@ -4,15 +4,14 @@ Updated 2026-11-03. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run514](iterations/v2/001-original-recovery/runs/514-surface-init-integration/README.md)
-compiles282 C++ translation units across8 projects. The link has140 unresolved names/
+[Run516](iterations/v2/001-original-recovery/runs/516-decoder-stream-driver-integration/README.md)
+compiles284 C++ translation units across8 projects. The link has140 unresolved names/
 146 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch adds2 originals/759B and4B readonly data.542,720 native cases/
-15 mutations/691 source pins pass; one name closes with no new names. Registry757.
-Decoder/stream-worker/driver recovery continues in parallel. These counts describe
-bounded proofs, not completion percentage or live-game acceptance. Earlier3DNow
-proof remains emulated; native AMD arithmetic is unverified.
+Latest:16 originals/543B and181B data;42,998 native cases/27 mutations/696 source pins
+pass.8 namesclose/8 actual driver/backend children appear; registry773. Distinct
+callback identities are protected from linker folding. These are bounded proofs,
+not completion percentage/live-game acceptance. Earlier3DNow proof remains emulated.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through

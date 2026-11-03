@@ -1,5 +1,12 @@
 # Отложенные проверки восстановления v2
 
+Run516:16originals543B/181Bdata;42998nativecases/27mutations/696pins PASS;
+284TUs/140names146refs,noEXE. NOICF/nativeidentitycontrol preservesdistinctcallbacks.
+Sevenactualdriver methods and58acf0 remain.512physicalwindows/layout+count/header
+research and518driver-startCPP/fixture notaccepted; nativeconfig/proof stillneeded.
+518exactAPIisADVAPI32!RegFlushKey(HKEY_CLASSES_ROOT), notSetErrorMode.519pending.
+
+
 Run514:2originals759B/4Breadonly;542720nativecases/15mutations/691pins PASS;
 282TUs/140names146refs,noEXE. Genericvslot+actualgetter/alternatecallbacks, unordered
 clipping/80bit/F32/alias effects proven. Actualdriver/fullparent/resourcevalidity/

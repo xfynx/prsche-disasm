@@ -1,5 +1,25 @@
 # v2 / 001 - original source recovery plan
 
+Current516,2026-11-03: frozen513002/515002 add16originals543B/181Bdata
+(45writable/136readonly);registry773. AuditPASS42998cases/54542events/27mutations/
+696pins/628providers;284TUs/8projects,140names146refs,noEXE.8close/8realchildren.
+ExplicitNOICF +nativeidentitycontrol +4projectflags guard callbackidentity.
+Passedinputs/originals immutable; fullproducer/COM/start/probe/dtor/fault/concurrency/
+live/startup/gameplay/403/411 remainopen. No sourceconsolidationnow.
+Twoagents hitquota again; do notrespawn.512 researchonly(385B/272B physicalfootprint
+proposal, count<=0/headerdomains notclosed): readonlyphysical-views/layout-feasibility
+andPLANrecordnextstep. No512code/PASS.518unvalidated4body475B/0state CPP+fixture
+exists, nativeconfig/mutations/proof missing; exactRegFlushKey ADVAPI32 IAT5b2004
+corrects initialSetErrorMode hypothesis. Do notcallliveAPIinproof. Rootmayfinish518;
+519backend-fill scope(proposed3body427B/26B) assignedpcm_constructors_493ifquota.
+Nextonlyactualproofs enter520intake. BatchREADMEsowncommands, backlogownsremainingchecks.
+
+Historical514 follows.
+
+NativeWindowslabels: avoid 'dispatch'/'patch' innewmutationEXEnames (WinError740,
+seen488/513). Renameonlyunpassedmetadata; noadminworkaroundforthisfilenameissue; passedinputsimmutable.
+
+
 Current514,2026-11-03: frozen511004 adds2originals759B/4Breadonly;registry757.
 AuditPASS542720nativecases/450560events/15mutations/691pins/597providers;
 282TUs/8projects,140names146refs,noEXE. Oneclose/no newnames. Init/getter+alternate
