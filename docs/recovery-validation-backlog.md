@@ -1,13 +1,14 @@
 # Отложенные проверки восстановления v2
 
-Run520:7originals902B/26Bstate;58,764cases/27mutations/702pins PASS;
-287TUs/144names150refs,noEXE. RegFlushKey SDK/IAT checked under redirection;
-no live flush. Capture HRESULT==0, output slots/aliases and forwardcopy proven.
-Actual driver/context/initializer/DSP children, cross-owner capture aliases,
-full producer, live COM/device/API/fault/concurrency/startup/gameplay remain open.
-512003 decoder/window placement and521 initialization/view replacement await524
-integration;522 DSP proof pending. Preserve old486/374 sources and refresh only
-changed owners through actual native regressions. Earlier3DNow remains emulated.
+Run524:4 originals690B/370B writable;74,706 comparisons/31 mutations/710 pins PASS;
+290 TUs/147 names153 refs,noEXE. Fresh486 and374 regressions accompany exact source
+replacements; no duplicated owner/extra function count. Combined parser checks
+both result sets, with6 rejection controls and unchanged520 audit regression.
+Recheck actual832B LUT/tail adjacency in the eventual game EXE. Arbitrary fault/
+unmasked FP/concurrency/mutable string producer domains remain unverified.
+Complete DSP/3DNow/renderer children, cross-owner capture aliases, full producer,
+live COM/device/registry/startup/gameplay and403/411 stay open.522 proof pending;
+523 scope trace pending. Frozen original sources/proofs must remain immutable.
 
 Run514:2originals759B/4Breadonly;542720nativecases/15mutations/691pins PASS;
 282TUs/140names146refs,noEXE. Genericvslot+actualgetter/alternatecallbacks, unordered

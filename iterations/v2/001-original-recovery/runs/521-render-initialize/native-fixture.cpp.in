@@ -1,0 +1,436 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include <utility>
+#include "render_descriptor.hpp"
+#include "render_initialize_521.hpp"
+#include "render_driver_start_518.hpp"
+#include "porsche/render_settings.hpp"
+#include "cursor_snapshot.hpp"
+#include "porsche/window_shutdown.hpp"
+#include "porsche/window_scheduler.hpp"
+#include "porsche/render_loader.hpp"
+#include "porsche/render_display.hpp"
+#include "porsche/splash_progress.hpp"
+using U=std::uint32_t;using B=std::uint8_t;
+static_assert(sizeof(void*)==4);
+static const B bind_raw[169]={@BIND@},window_raw[200]={@WINDOW@},format_raw[79]={@FORMAT@},
+    bits_raw[18]={@BITS@},create_raw[35]={@CREATE@},bits_data[128]={@BITSDATA@},
+    jump_data[52]={@JUMPDATA@},flags_data[4]={@FLAGS@},option_data[4]={@OPTION@},initial_data[48]={@INITIAL@};
+static const B runtime_raw[80]={@RUNTIME@},prepare_raw[9]={@PREPARE@},init_raw[285]={@INIT@},input_raw[20]={@INPUT@},alt_raw[157]={@ALT@},main_raw[157]={@MAIN@},canonical_initial[48]={@CANONICAL@};
+static B *runtime_code,*prepare_code,*init_code,*input_code,*alt_code,*main_code;
+static B *bind_code,*window_code,*format_code,*bits_code,*create_code;
+static U jump_table[13],cases=0,checks=0;
+static B arena[160],fallback[64],flat[48],driver_storage[64],resource_storage[16],context_storage[0x11830],child_storage[64],buffer_storage[64],about_storage[0x50];
+static bool cpp_side=false,canonical_case=false,in_initializer=false;
+static U init_first,init_name,init_selected,init_mode,library_result,window_result,event_word,dispatch_result,prepare_edit,call_layer;
+static U scene,cw_precision=3,cw_rounding=0,stack_depth=0;
+alignas(16) static B fp_area[512];
+static void* lock_buffer;static bool lock_fail;
+static B* current_descriptor;static U endpoint_mutation=0,allocation_result=0;
+struct Fpu{unsigned short cw,sw;B tag,pad[3],values[80];};
+struct Event{U kind,a,b,c,d,e;B config[48],descriptor[48],canonical[48];U globals[8];Fpu fpu;};
+static Event events[64];static U event_count;
+namespace porsche {
+U render_thrash_exports_006bd910[43]{};
+// Controlled external format cell only; actual splash_progress.cpp is pinned
+// and its unique production owner is checked by the integration COFF audit.
+U splash_progress_format_005dead0=0;
+U render_display_texture_width_005deac8=0,render_display_texture_height_005deacc=0;
+U render_display_name_0069ecf8=0,render_display_selected_0069ed08=0;
+U render_driver_name_006a64b4=0;
+void* render_driver_context_0069e0d4=nullptr;
+void* startup_input_key_callback_005df6a4=nullptr;
+}
+static void canonical_get(B* out){using namespace porsche;
+    if(!cpp_side){std::memcpy(out,flat,48);return;}
+    std::memcpy(out,cursor_snapshot_prefix_005de650,12);out[12]=window_shutdown_source_005de65c;out[13]=window_shutdown_source_005de65d;
+    std::memcpy(out+14,cursor_snapshot_suffix_005de65e,30);std::memcpy(out+44,&window_shutdown_state_005de67c,4);
+}
+static void canonical_set(const B* in){using namespace porsche;
+    if(!cpp_side){std::memcpy(flat,in,48);return;}
+    std::memcpy(cursor_snapshot_prefix_005de650,in,12);window_shutdown_source_005de65c=in[12];window_shutdown_source_005de65d=in[13];
+    std::memcpy(cursor_snapshot_suffix_005de65e,in+14,30);std::memcpy(&window_shutdown_state_005de67c,in+44,4);
+}
+static void canonical_edit(U offset,B value){using namespace porsche;
+    if(!cpp_side){flat[offset]=value;return;}
+    // Independent fixture callback effects, not the production field-view core.
+    if(offset==12)window_shutdown_source_005de65c=value;
+    else if(offset==13)window_shutdown_source_005de65d=value;
+    else if(offset==44)reinterpret_cast<B*>(&window_shutdown_state_005de67c)[0]=value;
+    else if(offset==47)reinterpret_cast<B*>(&window_shutdown_state_005de67c)[3]=value;
+    else if(offset==16)cursor_snapshot_suffix_005de65e[2]=value;
+    else if(offset==4)cursor_snapshot_prefix_005de650[4]=value;
+    else if(offset==8)cursor_snapshot_prefix_005de650[8]=value;
+    else ExitProcess(99);
+}
+static void capture_fpu(Fpu& f){__asm fxsave fp_area
+ f.cw=*reinterpret_cast<unsigned short*>(fp_area);f.sw=*reinterpret_cast<unsigned short*>(fp_area+2)&0x387f;f.tag=fp_area[4];std::memset(f.pad,0,3);
+ for(U i=0;i<8;++i){const U physical=((f.sw>>11)+i)&7u;if(f.tag&(1u<<physical))std::memcpy(f.values+i*10,fp_area+32+i*16,10);else std::memset(f.values+i*10,0,10);}}
+static void seed_fpu(){unsigned short cw=static_cast<unsigned short>(0x7f|(cw_precision<<8)|(cw_rounding<<10));__asm fninit __asm fldcw cw
+ for(U i=0;i<stack_depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}}
+static U ptr(const void* p){return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));}
+static U word(const void* p){U v;std::memcpy(&v,p,4);return v;}
+static void put(void* p,U v){std::memcpy(p,&v,4);}
+static void die(const char* s,U detail=0){std::printf("fixture %s %08x\n",s,detail);std::fflush(stdout);ExitProcess(98);}
+static void rec(U kind,U a=0,U b=0,U c=0,U d=0,U e=0){
+    if(event_count>=64)die("events");Event& v=events[event_count++];v={};
+    v.kind=kind;v.a=a;v.b=b;v.c=c;v.d=d;v.e=e;
+    std::memcpy(v.config,porsche::window_shutdown_config_005de620,48);
+    if(current_descriptor&&!canonical_case)std::memcpy(v.descriptor,current_descriptor,48);
+    canonical_get(v.canonical);v.globals[0]=porsche::render_video_mode_005deaa8;v.globals[1]=porsche::render_video_state_005dead8;
+    v.globals[2]=porsche::render_display_texture_width_005deac8;v.globals[3]=porsche::render_display_texture_height_005deacc;
+    v.globals[4]=porsche::splash_progress_format_005dead0;v.globals[5]=porsche::render_descriptor_flags_005deb60;v.globals[6]=porsche::render_descriptor_option_005deb88;capture_fpu(v.fpu);
+}
+extern "C" void __stdcall window_endpoint(U mode){
+    rec(1,mode);
+    if(endpoint_mutation&16){canonical_edit(12,0x7a);canonical_edit(13,0x1f);canonical_edit(44,0x51);canonical_edit(47,0xe9);}
+    if(prepare_edit&&in_initializer&&event_count>5){canonical_edit(4,0x81);canonical_edit(8,0x91);canonical_edit(13,0x80);porsche::render_video_state_005dead8=0x99887766;}
+    // Controlled child writes expose the original order, rather than claiming
+    // a particular renderer's side effects.
+    if(endpoint_mutation&1){porsche::window_shutdown_config_005de620[0]^=0x51a3c2e7u;
+        if(current_descriptor&&!canonical_case){current_descriptor[16]^=0xa5;current_descriptor[17]^=0x5a;}}
+}
+extern "C" void* __stdcall lock_endpoint(){
+    rec(2);if(endpoint_mutation&32){canonical_edit(12,0x7e);canonical_edit(13,0xe1);canonical_edit(44,0x61);canonical_edit(47,0xb3);}
+    if(endpoint_mutation&2){
+        if(current_descriptor&&!canonical_case)current_descriptor[19]^=0xa5;
+        porsche::render_descriptor_flags_005deb60^=0xa7314265u;
+    }
+    return lock_fail?nullptr:lock_buffer;
+}
+namespace porsche {
+U __stdcall window_shutdown_close_handle_006bd92c(void* handle){
+    rec(3,ptr(handle));
+    if(endpoint_mutation&64){canonical_edit(12,0x7b);canonical_edit(13,0xf1);canonical_edit(44,0x71);canonical_edit(47,0xc5);}
+    if(prepare_edit&&in_initializer){canonical_edit(4,0x82);canonical_edit(8,0x92);canonical_edit(13,0xff);}
+    if(endpoint_mutation&4){window_shutdown_mode_005de630=2;
+        if(current_descriptor&&!canonical_case)current_descriptor[18]^=0x3c;}
+    return 0xf00dcafe;
+}
+void* __cdecl render_descriptor_allocate_00535700(U w,U h,U format,U flags,U option){
+    rec(4,w,h,format,flags,option);
+    if(endpoint_mutation&8){put(fallback+44,word(fallback+44)^0x87654321u);
+        render_descriptor_option_005deb88^=0x4321abcd;}
+    return reinterpret_cast<void*>(allocation_result);
+}
+// Unused services of the frozen canonical owner fail closed.
+void __cdecl application_instance_exit_005a246e(U){die("unexpected-exit");}
+TimedCallbackSlot* __cdecl window_scheduler_remove_005366a0(TimedCallback){die("unexpected-remove");return nullptr;}
+}
+extern "C" void __cdecl zero_endpoint(void* p,U pattern,U count){
+    if(pattern||count!=48||p!=porsche::window_shutdown_config_005de620)die("null-fill");std::memset(p,0,count);
+}
+static B* install(const B* raw,U count){auto* p=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));
+    if(!p)die("alloc");std::memcpy(p,raw,count);return p;
+}
+static void patch(B* code,U count,U before,U after,U expected){U n=0;
+    for(U i=0;i+4<=count;++i)if(word(code+i)==before){put(code+i,after);++n;i+=3;}
+    if(n!=expected)die("absolute-relocation",before);
+}
+static void call(B* code,U base,U count,U site,U target,const void* replacement){
+    U offset=site-base;if(offset+5>count||code[offset]!=0xe8)die("call-opcode",site);
+    if(base+offset+5+word(code+offset+1)!=target)die("call-original-target",site);
+    put(code+offset+1,ptr(replacement)-ptr(code+offset+5));
+}
+static void protect(B* p){DWORD old;if(!VirtualProtect(p,4096,PAGE_EXECUTE_READ,&old))die("protect");FlushInstructionCache(GetCurrentProcess(),p,4096);}
+static void install_new();
+static void install_all(){using namespace porsche;
+    runtime_code=install(runtime_raw,80);prepare_code=install(prepare_raw,9);init_code=install(init_raw,285);input_code=install(input_raw,20);alt_code=install(alt_raw,157);main_code=install(main_raw,157);
+    bind_code=install(bind_raw,169);window_code=install(window_raw,200);format_code=install(format_raw,79);
+    bits_code=install(bits_raw,18);create_code=install(create_raw,35);
+    for(U i=0;i<13;++i){U target=word(jump_data+i*4);if(target<0x556880||target>0x5568ce)die("format-jump",i);jump_table[i]=ptr(format_code+target-0x556880);}
+    patch(format_code,79,0x5568d0,ptr(jump_table),1);
+    patch(bits_code,18,0x5de890,ptr(bits_data),1);
+    patch(create_code,35,0x5deb88,ptr(&render_descriptor_option_005deb88),1);
+    call(create_code,0x535950,35,0x53596a,0x535700,reinterpret_cast<const void*>(&render_descriptor_allocate_00535700));
+    patch(window_code,200,0x6bd9b0,ptr(&render_thrash_exports_006bd910[40]),1);
+    patch(window_code,200,0x6bd964,ptr(&render_thrash_exports_006bd910[21]),1);
+    patch(window_code,200,0x69dd18,ptr(&window_shutdown_handle_0069dd18),2);
+    call(window_code,0x534360,200,0x5343a1,0x556880,format_code);
+    call(window_code,0x534360,200,0x5343a9,0x537f90,bits_code);
+    call(bind_code,0x534480,169,0x534488,0x534430,runtime_code);
+    call(bind_code,0x534480,169,0x5344a1,0x534360,window_code);
+    call(bind_code,0x534480,169,0x5344db,0x535950,create_code);
+    call(bind_code,0x534480,169,0x534505,0x53c290,reinterpret_cast<const void*>(&zero_endpoint));
+    patch(bind_code,169,0x5de620,ptr(window_shutdown_config_005de620),3);
+    patch(bind_code,169,0x69dd14,ptr(&render_descriptor_fallback_0069dd14),2);
+    patch(bind_code,169,0x5deb60,ptr(&render_descriptor_flags_005deb60),1);
+    patch(bind_code,169,0x5dead0,ptr(&splash_progress_format_005dead0),1);
+    patch(bind_code,169,0x5de65c,ptr(flat+12),1);
+    patch(bind_code,169,0x5de65d,ptr(flat+13),1);
+    patch(bind_code,169,0x5de62c,ptr(reinterpret_cast<B*>(window_shutdown_config_005de620)+12),1);
+    patch(bind_code,169,0x5de62d,ptr(reinterpret_cast<B*>(window_shutdown_config_005de620)+13),1);
+    render_thrash_exports_006bd910[40]=ptr(reinterpret_cast<const void*>(&window_endpoint));
+    render_thrash_exports_006bd910[21]=ptr(reinterpret_cast<const void*>(&lock_endpoint));
+    install_new();
+    for(auto p:{bind_code,window_code,format_code,bits_code,create_code,runtime_code,prepare_code,init_code,input_code,alt_code,main_code})protect(p);
+}
+struct Capture{U sp0,sp1,bp0,bp1,bx0,bx1,si0,si1,di0,di1,eax;};
+static Capture invoke(const void* fn,U argc,const U* args){Capture r{};
+    __asm {
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,6a31c5e7h
+        lea edx,r
+        mov [edx],esp
+        mov [edx+8],ebp
+        mov [edx+16],ebx
+        mov [edx+24],esi
+        mov [edx+32],edi
+        mov ecx,argc
+        mov edx,args
+        cmp ecx,4
+        jb three
+        push dword ptr [edx+12]
+    three:
+        cmp ecx,3
+        jb two
+        push dword ptr [edx+8]
+    two:
+        cmp ecx,2
+        jb one
+        push dword ptr [edx+4]
+    one:
+        cmp ecx,1
+        jb callit
+        push dword ptr [edx]
+    callit:
+        mov ecx,fn
+        call ecx
+        lea edx,r
+        mov [edx+40],eax
+        mov ecx,argc
+        shl ecx,2
+        add esp,ecx
+        mov [edx+4],esp
+        mov [edx+12],ebp
+        mov [edx+20],ebx
+        mov [edx+28],esi
+        mov [edx+36],edi
+    }return r;
+}
+static bool abi(const Capture& c){return c.sp0==c.sp1&&c.bp0==c.bp1&&c.bx0==c.bx1&&c.si0==c.si1&&c.di0==c.di1&&
+    c.bx0==0x13579bdfu&&c.si0==0x2468ace0u&&c.di0==0x6a31c5e7u;}
+struct State{B config[48],arena[160],fallback[64];U handle,s67c,s6ac,cache,flags,option,format;B source0,source1;U count;Event log[64];B canonical[48],driver[64],resource[16],context[0x11830],child[64],buffer[64];U newglobals[7];Fpu fpu;};
+static U normalized_callback();
+static State state(){using namespace porsche;State s{};std::memcpy(s.config,window_shutdown_config_005de620,48);
+    std::memcpy(s.arena,arena,160);std::memcpy(s.fallback,fallback,64);s.handle=ptr(window_shutdown_handle_0069dd18);
+    s.s67c=cpp_side?window_shutdown_state_005de67c:word(flat+44);s.s6ac=window_shutdown_state_005de6ac;s.cache=ptr(render_descriptor_fallback_0069dd14);
+    s.flags=render_descriptor_flags_005deb60;s.option=render_descriptor_option_005deb88;s.format=splash_progress_format_005dead0;
+    s.source0=cpp_side?window_shutdown_source_005de65c:flat[12];s.source1=cpp_side?window_shutdown_source_005de65d:flat[13];s.count=event_count;std::memcpy(s.log,events,sizeof events);canonical_get(s.canonical);
+    std::memcpy(s.driver,driver_storage,64);std::memcpy(s.resource,resource_storage,16);std::memcpy(s.context,context_storage,sizeof context_storage);std::memcpy(s.child,child_storage,64);std::memcpy(s.buffer,buffer_storage,64);
+    s.newglobals[0]=render_video_mode_005deaa8;s.newglobals[1]=render_video_state_005dead8;s.newglobals[2]=render_display_texture_width_005deac8;s.newglobals[3]=render_display_texture_height_005deacc;s.newglobals[4]=normalized_callback();s.newglobals[5]=ptr(render_driver_context_0069e0d4);s.newglobals[6]=render_driver_name_006a64b4;capture_fpu(s.fpu);return s;
+}
+static U random(U& s){s=s*1664525u+1013904223u;return s;}
+static void reset(U seed,U mode,U alias,U old_handle,U fail,U cache,U mutation,U format){using namespace porsche;
+    for(auto& b:arena)b=static_cast<B>(random(seed)>>24);for(auto& b:fallback)b=static_cast<B>(random(seed)>>24);
+    for(auto& v:window_shutdown_config_005de620)v=random(seed);
+    window_shutdown_source_005de65c=static_cast<B>(random(seed));window_shutdown_source_005de65d=static_cast<B>(random(seed));
+    window_shutdown_state_005de67c=random(seed);window_shutdown_state_005de6ac=random(seed);
+    window_shutdown_handle_0069dd18=old_handle?reinterpret_cast<void*>(0x87654321u):nullptr;
+    render_descriptor_flags_005deb60=random(seed);render_descriptor_option_005deb88=random(seed);splash_progress_format_005dead0=random(seed);
+    render_descriptor_fallback_0069dd14=cache?fallback:nullptr;allocation_result=ptr(fallback);lock_fail=fail!=0;endpoint_mutation=mutation;
+    current_descriptor=alias==4?reinterpret_cast<B*>(window_shutdown_config_005de620):arena+32;
+    lock_buffer=alias==1?current_descriptor:(alias==2?current_descriptor+4:(alias==3?current_descriptor+12:arena+96));
+    put(static_cast<B*>(lock_buffer)+0,0x91a2b3c4u);put(static_cast<B*>(lock_buffer)+4,0xfedcba98u);
+    put(static_cast<B*>(lock_buffer)+8,format);put(static_cast<B*>(lock_buffer)+12,0x80000280u);put(static_cast<B*>(lock_buffer)+16,0x123401e0u);
+    B initial[48];for(auto& b:initial)b=static_cast<B>(random(seed)>>24);canonical_set(initial);
+    current_descriptor[16]=static_cast<B>(mode);
+    std::memset(driver_storage,0,sizeof driver_storage);std::memset(resource_storage,0,sizeof resource_storage);std::memset(context_storage,0x53,sizeof context_storage);std::memset(child_storage,0x61,sizeof child_storage);std::memset(buffer_storage,0x71,sizeof buffer_storage);
+    render_video_mode_005deaa8=0xf1234567;render_video_state_005dead8=0xf2345678;render_display_texture_width_005deac8=0xf3456789;render_display_texture_height_005deacc=0xf456789a;
+    startup_input_key_callback_005df6a4=nullptr;render_driver_context_0069e0d4=context_storage;render_driver_name_006a64b4=0;event_count=0;std::memset(events,0,sizeof events);
+}
+static void compare(const Capture& a,const State& expected,const Capture& b,const State& actual,bool used,U kind){
+    ++cases;checks+=3;
+    if(!abi(a)||!abi(b)||(used&&a.eax!=b.eax)||std::memcmp(&expected,&actual,sizeof actual)){
+        std::printf("divergence render-descriptor kind=%u case=%u abi=%u/%u eax=%08x/%08x events=%u/%u\n",kind,cases,abi(a),abi(b),a.eax,b.eax,expected.count,actual.count);
+        const auto* x=reinterpret_cast<const B*>(&expected);const auto* y=reinterpret_cast<const B*>(&actual);
+        for(U i=0;i<sizeof(State);++i)if(x[i]!=y[i]){std::printf("first state offset=%u value=%02x/%02x\n",i,x[i],y[i]);break;}
+        std::fflush(stdout);ExitProcess(1);
+    }
+}
+static void bind_case(U seed,U mode,U alias,U old_handle,U fail,U cache,U mutation,U format,U facade){
+    auto run=[&](bool native){cpp_side=native;canonical_case=false;in_initializer=false;reset(seed,mode,alias,old_handle,fail,cache,mutation,format);
+        if(mode==256)current_descriptor=nullptr;U args[4]={ptr(current_descriptor)};
+        const void* fn=bind_code;
+        if(native)fn=facade==1?reinterpret_cast<const void*>(&porsche::render_display_texture_bind_00534480):
+            facade==2?reinterpret_cast<const void*>(&porsche::splash_progress_bind_texture_00534480):reinterpret_cast<const void*>(&porsche::render_descriptor_bind_00534480);
+        seed_fpu();auto c=invoke(fn,1,args);return std::make_pair(c,state());
+    };auto a=run(false),b=run(true);compare(a.first,a.second,b.first,b.second,facade!=1,0);
+}
+static void window_case(U seed,U mode,U alias,U fail,U mutation,U format){
+    auto run=[&](bool native){cpp_side=native;canonical_case=false;in_initializer=false;reset(seed,mode,alias,0,fail,0,mutation,format);U args[4]={ptr(current_descriptor)};
+        seed_fpu();auto c=invoke(native?reinterpret_cast<const void*>(&porsche::render_descriptor_window_00534360):window_code,1,args);return std::make_pair(c,state());};
+    auto a=run(false),b=run(true);compare(a.first,a.second,b.first,b.second,true,1);
+}
+static void helper_case(U kind,U value){const U argc=kind>=4?4:1;
+    auto run=[&](bool native){cpp_side=native;canonical_case=false;in_initializer=false;reset(0x3827ac15,0,0,0,0,0,8,1);put(arena,value);
+        U args[4]={kind==3?ptr(arena):value,0x80000008,0xffffffff,0x9abcdef0};
+        const void* fn=kind==2?format_code:kind==3?bits_code:create_code;
+        if(native)fn=kind==2?reinterpret_cast<const void*>(&porsche::render_descriptor_format_00556880):kind==3?
+            reinterpret_cast<const void*>(&porsche::render_descriptor_bits_00537f90):(kind==5?reinterpret_cast<const void*>(&porsche::render_display_texture_create_00535950):kind==6?reinterpret_cast<const void*>(&porsche::splash_progress_create_texture_00535950):reinterpret_cast<const void*>(&porsche::render_descriptor_create_00535950));
+        seed_fpu();auto c=invoke(fn,argc,args);return std::make_pair(c,state());};
+    auto a=run(false),b=run(true);compare(a.first,a.second,b.first,b.second,true,kind);
+}
+int original374_cases(){using namespace porsche;
+    // Assert production definitions before any fixture reset or boundary setup.
+    if(render_descriptor_fallback_0069dd14||render_descriptor_flags_005deb60!=word(flags_data)||render_descriptor_option_005deb88!=word(option_data)||
+       std::memcmp(render_descriptor_bits_005de890,bits_data,128)||std::memcmp(window_shutdown_config_005de620,initial_data,48)||
+       window_shutdown_handle_0069dd18||window_shutdown_source_005de65c||window_shutdown_source_005de65d||window_shutdown_state_005de67c||window_shutdown_state_005de6ac||splash_progress_format_005dead0)die("production-initial-state");
+    if(&window_shutdown_mode_005de630!=reinterpret_cast<B*>(window_shutdown_config_005de620)+16||&window_shutdown_state_005de64c!=window_shutdown_config_005de620+11)die("canonical-alias");
+    install_all();
+    for(U value=0;value<256;++value){helper_case(2,value);helper_case(2,value|0x80000000u);helper_case(3,value);helper_case(3,value|0xffffff00u);}
+    for(U value:{0x7fffffffu,0xffffffffu,0x80000000u,0x40000001u}){helper_case(2,value);helper_case(4,value);helper_case(5,value);helper_case(6,value);}
+    for(U seed:{0u,0xffffffffu,0x6184a273u})for(U alias=0;alias<5;++alias)for(U mode:{0u,1u,2u,127u,128u,255u})
+        for(U format:{1u,2u,3u,4u,5u,6u,7u,8u,11u,12u,13u,0xffffffffu}){
+            window_case(seed,mode,alias,0,3,format);window_case(seed,mode,alias,1,3,format);
+            bind_case(seed,mode,alias,0,0,0,3,format,0);
+        }
+    for(U old:{0u,1u})for(U cache:{0u,1u})for(U mutation:{0u,15u})for(U mode:{0u,1u,2u,255u,256u})
+        for(U facade=0;facade<3;++facade){bind_case(0xa76c3812,mode,0,old,1,cache,mutation,13,facade);}
+    return 0;
+}
+static U normalized_callback(){const void* p=porsche::startup_input_key_callback_005df6a4;
+    if(p==input_code||p==reinterpret_cast<const void*>(&porsche::render_input_callback_00560060))return 0x560060;
+    return ptr(p);
+}
+static void child_effect(U tag){if(endpoint_mutation&128){unsigned short cw=static_cast<unsigned short>(0x7f|((cw_precision==0?3u:0u)<<8)|(((cw_rounding+1)%4)<<10));__asm fldcw cw}
+    if(endpoint_mutation&256){canonical_edit(12,static_cast<B>(tag));canonical_edit(13,static_cast<B>(tag>>8));canonical_edit(44,static_cast<B>(tag>>16));canonical_edit(47,0xab);}}
+static const char* names[]={"SST_VIDEO_24BPP","FX_GLIDE_SHAMELESS_PLUG","FX_GLIDE_NO_SPLASH","SST_DUALHEAD","SSTV2_DUALHEAD"};
+namespace porsche {
+U __cdecl render_environment_00573030(const char* name,const char* value,U ignored){U index=5;
+    for(U i=0;i<5;++i)if(std::strcmp(name,names[i])==0)index=i;
+    if(index==5||std::strcmp(value,index<2?"":"1")||ignored!=(index<2?0u:1u))die("environment-string-transport");
+    rec(0x573030,index,static_cast<U>(std::strlen(value)),ignored);child_effect(0x573030);return 0;
+}
+U __cdecl render_initialize_library_00575640(U name){rec(0x575640,name);child_effect(0x575640);return library_result;}
+U __cdecl render_initialize_window_00575820(U first){rec(0x575820,first);child_effect(0x575820);return window_result;}
+void __cdecl render_initialize_callbacks_005759f0(){rec(0x5759f0);child_effect(0x5759f0);}
+void __cdecl render_initialize_service_0053c8e0(){rec(0x53c8e0);child_effect(0x53c8e0);}
+void __cdecl startup_subsystem_00536e50(){rec(0x536e50);child_effect(0x536e50);}
+U __cdecl startup_input_initialize_0055fcf0(){rec(0x55fcf0);child_effect(0x55fcf0);return 0x80000000;}
+void __cdecl startup_subsystem_00564e70(){rec(0x564e70);child_effect(0x564e70);}
+U __cdecl startup_input_set_key_state_0055fe50(U state,void* value){
+    const U target=value==input_code||value==reinterpret_cast<void*>(&render_input_callback_00560060)?0x560060:ptr(value);
+    rec(0x55fe50,state,target);if(state!=10||target!=0x560060)die("actual-key-callback-identity");startup_input_key_callback_005df6a4=value;
+    child_effect(0x55fe50);if(endpoint_mutation&512){using Callback=U(__cdecl*)();(void)reinterpret_cast<Callback>(value)();}return 1;
+}
+U __cdecl window_event_dequeue_0053aa60(){rec(0x53aa60);child_effect(0x53aa60);return event_word;}
+U __cdecl render_input_dispatch_00586cd0(U value){rec(0x586cd0,value);child_effect(0x586cd0);return dispatch_result;}
+// Real518 algorithms compose with controlled endpoints for their unchanged six
+// other children; no second implementation of any recovered algorithm.
+void* __cdecl startup_network_allocate_0059ef90(U bytes){rec(0x59ef90,bytes);return bytes==0x14?child_storage:buffer_storage;}
+void* __fastcall render_resource_bound_child_ctor_00535b50(void* self,void*,void* driver){rec(0x535b50,ptr(self),ptr(driver));return self;}
+void* __fastcall render_driver_buffer_ctor_00537700(void* self,void*){rec(0x537700,ptr(self));return self;}
+void __cdecl render_driver_calibrate_00536870(){rec(0x536870);}
+void __fastcall render_driver_context_mode_00549220(void* self,void*,U mode){rec(0x549220,ptr(self),mode);}
+void __fastcall render_driver_apply_states_00538af0(void* self,void*){rec(0x538af0,ptr(self));}
+U __stdcall render_driver_reg_flush_005b2004(U key){rec(0x5b2004,key);return 0x80123456;}
+}
+static U __stdcall select_endpoint(U selected){rec(0x6bd9b8,selected);child_effect(0x6bd9b8);return 0;}
+static U __stdcall mode_endpoint(U mode,U two,U one){rec(0x6bd958,mode,two,one);child_effect(0x6bd958);return 0;}
+static const porsche::RenderSettingsDevice* __stdcall about_endpoint(){rec(0x6bd934);return reinterpret_cast<const porsche::RenderSettingsDevice*>(about_storage);}
+static U __stdcall state_endpoint(U a,U b){rec(0x6bd97c,a,b);return 0x80765432;}
+static U flush_cell=ptr(reinterpret_cast<const void*>(&porsche::render_driver_reg_flush_005b2004));
+static void relative_all(B* code,U count,U va,U original,const void* replacement,U expected){U n=0;
+    for(U i=0;i+5<=count;++i)if(code[i]==0xe8&&va+i+5+word(code+i+1)==original){put(code+i+1,ptr(replacement)-ptr(code+i+5));++n;i+=4;}
+    if(n!=expected)die("relative-count",original);
+}
+static void install_new(){using namespace porsche;
+    patch(runtime_code,80,0x69dd18,ptr(&window_shutdown_handle_0069dd18),3);
+    patch(runtime_code,80,0x6bd92c,ptr(render_thrash_exports_006bd910+7),1);
+    patch(runtime_code,80,0x5de630,ptr(reinterpret_cast<B*>(window_shutdown_config_005de620)+16),1);
+    patch(runtime_code,80,0x5de64c,ptr(window_shutdown_config_005de620+11),1);
+    patch(runtime_code,80,0x5de67c,ptr(flat+44),1);patch(runtime_code,80,0x5de6ac,ptr(&window_shutdown_state_005de6ac),1);
+    patch(runtime_code,80,0x6bd9b0,ptr(render_thrash_exports_006bd910+40),2);
+    relative_all(prepare_code,9,0x534550,0x534480,bind_code,1);
+    const U original_names[]={0x5df330,0x5df318,0x5df304,0x5df2f4,0x5df2e4};
+    // Raw source strings are independently pinned bytes, not C++ text constants.
+    static const B n0[]={@NAME0@},n1[]={@NAME1@},n2[]={@NAME2@},n3[]={@NAME3@},n4[]={@NAME4@},empty[]={@EMPTY@},one[]={@ONE@};
+    const B* targets[]={n0,n1,n2,n3,n4};for(U i=0;i<5;++i)patch(init_code,285,original_names[i],ptr(targets[i]),1);
+    patch(init_code,285,0x5e8e50,ptr(empty),2);patch(init_code,285,0x5ccc44,ptr(one),3);
+    patch(init_code,285,0x6bd9b8,ptr(render_thrash_exports_006bd910+42),1);patch(init_code,285,0x6bd958,ptr(render_thrash_exports_006bd910+18),1);
+    patch(init_code,285,0x5de650,ptr(flat),1);patch(init_code,285,0x5de654,ptr(flat+4),1);patch(init_code,285,0x5de658,ptr(flat+8),1);patch(init_code,285,0x5de65d,ptr(flat+13),1);
+    patch(init_code,285,0x5deaa8,ptr(&render_video_mode_005deaa8),1);patch(init_code,285,0x5deac8,ptr(&render_display_texture_width_005deac8),1);patch(init_code,285,0x5deacc,ptr(&render_display_texture_height_005deacc),1);patch(init_code,285,0x5dead0,ptr(&splash_progress_format_005dead0),1);patch(init_code,285,0x5dead8,ptr(&render_video_state_005dead8),1);
+    patch(init_code,285,0x560060,ptr(input_code),1);
+    relative_all(init_code,285,0x556bb0,0x573030,reinterpret_cast<const void*>(&render_environment_00573030),5);
+    relative_all(init_code,285,0x556bb0,0x575640,reinterpret_cast<const void*>(&render_initialize_library_00575640),1);
+    relative_all(init_code,285,0x556bb0,0x575820,reinterpret_cast<const void*>(&render_initialize_window_00575820),1);
+    relative_all(init_code,285,0x556bb0,0x5759f0,reinterpret_cast<const void*>(&render_initialize_callbacks_005759f0),1);
+    relative_all(init_code,285,0x556bb0,0x534480,bind_code,1);relative_all(init_code,285,0x556bb0,0x534550,prepare_code,1);
+    relative_all(init_code,285,0x556bb0,0x53c8e0,reinterpret_cast<const void*>(&render_initialize_service_0053c8e0),1);
+    relative_all(init_code,285,0x556bb0,0x536e50,reinterpret_cast<const void*>(&startup_subsystem_00536e50),1);
+    relative_all(init_code,285,0x556bb0,0x55fcf0,reinterpret_cast<const void*>(&startup_input_initialize_0055fcf0),1);
+    relative_all(init_code,285,0x556bb0,0x564e70,reinterpret_cast<const void*>(&startup_subsystem_00564e70),1);
+    relative_all(init_code,285,0x556bb0,0x55fe50,reinterpret_cast<const void*>(&startup_input_set_key_state_0055fe50),1);
+    relative_all(input_code,20,0x560060,0x53aa60,reinterpret_cast<const void*>(&window_event_dequeue_0053aa60),1);relative_all(input_code,20,0x560060,0x586cd0,reinterpret_cast<const void*>(&render_input_dispatch_00586cd0),1);
+    for(U i=0;i<2;++i){B* code=i?main_code:alt_code;U va=i?0x557180:0x556b10;
+        patch(code,157,0x69ecf8,ptr(&render_display_name_0069ecf8),1);patch(code,157,0x6a64b4,ptr(&render_driver_name_006a64b4),2);patch(code,157,0x69ed08,ptr(&render_display_selected_0069ed08),1);patch(code,157,0x69e0d4,ptr(&render_driver_context_0069e0d4),2);patch(code,157,0x5b2004,ptr(&flush_cell),1);patch(code,157,0x6bd934,ptr(render_thrash_exports_006bd910+9),1);
+        relative_all(code,157,va,0x556bb0,init_code,1);relative_all(code,157,va,0x540440,reinterpret_cast<const void*>(&render_resource_bind_driver_00540440),1);relative_all(code,157,va,0x59ef90,reinterpret_cast<const void*>(&startup_network_allocate_0059ef90),1);relative_all(code,157,va,0x537700,reinterpret_cast<const void*>(&render_driver_buffer_ctor_00537700),1);relative_all(code,157,va,0x536870,reinterpret_cast<const void*>(&render_driver_calibrate_00536870),1);relative_all(code,157,va,0x549220,reinterpret_cast<const void*>(&render_driver_context_mode_00549220),1);relative_all(code,157,va,0x538af0,reinterpret_cast<const void*>(&render_driver_apply_states_00538af0),1);relative_all(code,157,va,0x5405f0,reinterpret_cast<const void*>(&render_driver_context_defaults_005405f0),1);
+    }
+    render_thrash_exports_006bd910[7]=ptr(reinterpret_cast<const void*>(&window_shutdown_close_handle_006bd92c));
+    render_thrash_exports_006bd910[42]=ptr(reinterpret_cast<const void*>(&select_endpoint));render_thrash_exports_006bd910[18]=ptr(reinterpret_cast<const void*>(&mode_endpoint));
+    render_thrash_exports_006bd910[9]=ptr(reinterpret_cast<const void*>(&about_endpoint));render_thrash_exports_006bd910[27]=ptr(reinterpret_cast<const void*>(&state_endpoint));
+}
+static Capture invoke_method(const void* fn,void* self){Capture r{};__asm {
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,6a31c5e7h
+    lea eax,r
+    mov [eax],esp
+    mov [eax+8],ebp
+    mov [eax+16],ebx
+    mov [eax+24],esi
+    mov [eax+32],edi
+    mov ecx,self
+    mov edx,91a2b3c4h
+    mov eax,fn
+    call eax
+    lea edx,r
+    mov [edx+40],eax
+    mov [edx+4],esp
+    mov [edx+12],ebp
+    mov [edx+20],ebx
+    mov [edx+28],esi
+    mov [edx+36],edi
+    }return r;
+}
+static void extended_case(U type,U seed,U mode,U alias,U fail,U old,U mutation,U format){
+    auto run=[&](bool native){cpp_side=native;canonical_case=type!=3;in_initializer=type<=2;reset(seed,mode,alias,old,fail,scene&1,mutation,format);
+        B bytes[48];canonical_get(bytes);bytes[16]=static_cast<B>(mode);canonical_set(bytes);current_descriptor=nullptr;
+        put(driver_storage+0x20,ptr(resource_storage));put(driver_storage+0xc,1);put(about_storage+0x40,0x98765432);
+        porsche::render_display_name_0069ecf8=init_name;porsche::render_display_selected_0069ed08=init_selected;
+        U args[4]={init_first,init_name,init_selected,init_mode};const void* fn=init_code;U argc=4;
+        if(type==0&&native)fn=reinterpret_cast<const void*>(&porsche::render_driver_initialize_00556bb0);
+        if(type==1||type==2){fn=native?(type==1?reinterpret_cast<const void*>(&porsche::render_driver_alt_start_00556b10):reinterpret_cast<const void*>(&porsche::render_driver_main_start_00557180)):(type==1?alt_code:main_code);}
+        if(type==3){canonical_case=false;current_descriptor=alias==4?reinterpret_cast<B*>(porsche::window_shutdown_config_005de620):arena+32;args[0]=ptr(current_descriptor);fn=native?reinterpret_cast<const void*>(&porsche::render_descriptor_bind_00534480):bind_code;argc=1;}
+        if(type==4){fn=native?reinterpret_cast<const void*>(&porsche::render_descriptor_bind_canonical_00534480):bind_code;args[0]=ptr(flat);argc=native?0:1;}
+        if(type==5){fn=native?reinterpret_cast<const void*>(&porsche::render_input_callback_00560060):input_code;argc=0;}
+        seed_fpu();Capture c=(type==1||type==2)?invoke_method(fn,driver_storage):invoke(fn,argc,args);if(type<=2)c.eax&=0xff;
+        return std::make_pair(c,state());};
+    auto a=run(false),b=run(true);compare(a.first,a.second,b.first,b.second,true,10+type);
+}
+static LONG WINAPI fault521(EXCEPTION_POINTERS* e){std::printf("native-fault code=%08lx ip=%08lx access=%08lx module=%08x fp=%08x raw=%08x/%08x/%08x cpp=%u cases=%u scene=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,e->ExceptionRecord->ExceptionInformation[1],ptr(GetModuleHandleA(nullptr)),ptr(fp_area),ptr(bind_code),ptr(window_code),ptr(init_code),cpp_side,cases,scene);std::fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+int main(){using namespace porsche;AddVectoredExceptionHandler(1,fault521);
+    B initial[48];cpp_side=true;canonical_get(initial);if(std::memcmp(initial,canonical_initial,48)||render_video_mode_005deaa8||render_video_state_005dead8!=2)die("521-production-initial-state");
+    original374_cases();
+    const U words[]={0,1,0x80,0x100,0x80000000,0xffffffff};
+    for(U pc:{0u,2u,3u})for(U rc=0;rc<4;++rc)for(U depth:{0u,3u,6u}){
+        cw_precision=pc;cw_rounding=rc;stack_depth=depth;
+        for(scene=0;scene<48;++scene){library_result=words[scene%6];window_result=words[(scene/6)%6];init_first=words[(scene+2)%6];init_name=0x81234567;init_selected=words[(scene+4)%6];init_mode=words[(scene+3)%6];event_word=words[(scene+1)%6];dispatch_result=words[(scene+5)%6];prepare_edit=scene&1;
+            U mode=scene%4==0?0:scene%4==1?1:scene%4==2?2:255;U mutation=(scene&1)?1023:0;
+            for(U type=0;type<3;++type)extended_case(type,0x8364a172u+scene,mode,0,(scene>>1)&1,(scene>>2)&1,mutation,scene%2?1:13);
+            extended_case(4,0x9876abceu+scene,mode,0,(scene>>1)&1,(scene>>2)&1,mutation,scene%2?3:12);
+            extended_case(5,0x12345678u+scene,mode,0,0,0,mutation,1);
+        }
+        for(U alias=0;alias<5;++alias)for(U mutation:{0u,16u,32u,64u,127u})for(U mode:{0u,1u,2u,255u}){
+            extended_case(3,0xfedcba98,mode,alias,0,1,mutation,1);extended_case(4,0xabcdef12,mode,0,1,1,mutation,3);
+        }
+    }
+    __asm fninit
+    std::printf("render_initialize_original_x86_vs_cpp=PASS cases=%u checks=%u\n",cases,checks);return 0;
+}

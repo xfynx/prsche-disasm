@@ -1,19 +1,23 @@
 # v2 / 001 - original source recovery plan
 
-Current520,2026-11-04: frozen518002/519003 add7 originals902B/26B writable;
-registry780. AuditPASS58,764cases/386,676events/27mutations/702pins/638providers.
-287TUs/8projects,144names150refs,noEXE;3close/7actualchildren. NOICF inherited.
-Originals/passedproof immutable; bounded COM/IAT transport is not live-game proof.
-Full real children/producer/aliases/fault/concurrency/startup/gameplay/403/411 open.
-Ready512003:2 decoders385B/272B physicalwindows +placement-only486clone,
-34,226cases/14mutations; old486/header untouched. Ready521:2originals305B,
-8Bstate/90Bwritable strings +narrow374 descriptor field-view replacement.
-Coordinator owns520 publication then524 intake; render_resources_494 prepares524
-build graph for512/521 with exactsource replacements. pcm_constructors_493 owns522
-DSP597660/__ftol/597120(516B/8Bro), proof pending. simd_oracle_497 hitquota after512;
-523 trace proposal notstarted, no respawn/quota retries. No sourceconsolidation now.
-BatchREADMEs owncommands; backlog owns remainingchecks. Next: publish520, then
-accept524 only from passed512/521, leave unfinished522 out.
+Current524,2026-11-04: frozen512003/521002 add4 originals690B/370B writable;
+registry784. Audit PASS74,706 comparisons/31 mutations/710 pins/650 providers.
+290 TUs/8 projects,147 names153 refs,noEXE;3 close/6 actual children. NOICF inherited.
+Exact486 placement-only clone and374 shared descriptor field-view replace15
+existing registered owners, count unchanged. Old sources and proof are immutable.
+524001 stopped before compilation; escalated002 gives the measured result.
+Combined-result parser counts both fresh486 regression and512 decoder reports;
+6 rejection controls and identical unchanged520 audit pass, no native reruns.
+
+Active: pcm_constructors_493 owns522 DSP597660/__ftol/597120(516B/8B readonly),
+proof pending. render_resources_494 owns523 buffer/resource dependency trace;
+scope proposal before code. simd_oracle_497 delivered frozen512 then hit quota;
+no retry/respawn. Coordinator owns524 publication and next ready intake only.
+Full real children/producer/aliases/fault/concurrency/unmasked FP/mutable strings/
+live APIs/startup/gameplay/403/411 remain open. Verify832B LUT adjacency in the
+first actual game EXE. No source consolidation now. Batch READMEs own commands;
+validation backlog owns remaining checks. Next: publish524, then actual522 proof
+and approved523 cohort; do not enlarge this passed batch.
 
 Historical514 follows.
 

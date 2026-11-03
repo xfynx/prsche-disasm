@@ -4,14 +4,15 @@ Updated 2026-11-04. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run520](iterations/v2/001-original-recovery/runs/520-driver-start-capture-integration/README.md)
-compiles287 C++ translation units across8 projects. The link has144 unresolved names/
-150 references. **There is no recovered playable C++ game executable yet.**
+[Run524](iterations/v2/001-original-recovery/runs/524-decoder-display-integration/README.md)
+compiles290 C++ translation units across8 projects. The link has147 unresolved names/
+153 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:7 originals/902B and26B writable state;58,764 native cases/27 mutations/
-702 source pins pass. Three names close/seven actual children appear; registry780.
-These are bounded proofs, not completion percentage/live-game acceptance. Earlier
-3DNow proof remains emulated. Full platform/gameplay and403/411 domains remain open.
+Latest:4 originals/690B and370B writable storage;74,706 comparisons/31 mutations/
+710 source pins pass. Three names close/six actual children appear; registry784.
+Decoder lookup placement and renderer descriptor sharing use verified existing
+owners. These are bounded proofs, not completion percentage/live-game acceptance.
+Earlier3DNow remains emulated; full platform/gameplay and403/411 domains stay open.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through
 [Run445](iterations/v2/001-original-recovery/runs/445-audio-owner-alias-regression/README.md).

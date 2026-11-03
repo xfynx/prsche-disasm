@@ -63,6 +63,22 @@ def audit_import_thunk(data, symbol, imported):
     return code.hex()
 
 
+def measured_native_cases(output, markers=None):
+    if markers is None:
+        match = re.search(r'\bcases=(\d+)\b', output)
+        assert match, 'native result must report its measured case count'
+        return int(match.group(1))
+    assert isinstance(markers, list) and markers, 'case markers must be a nonempty list'
+    assert all(isinstance(marker, str) and marker for marker in markers)
+    assert len(markers) == len(set(markers)), 'duplicate case marker'
+    total = 0
+    for marker in markers:
+        matches = re.findall(r'^' + re.escape(marker) + r'\s+cases=(\d+)\b', output, re.M)
+        assert len(matches) == 1, f'missing or repeated case marker: {marker}'
+        total += int(matches[0])
+    return total
+
+
 def audit_native(cfg, cache, sha):
     load = cache.document
     native_cfg = load(ROOT / cfg['native_config'])
@@ -101,9 +117,7 @@ def audit_native(cfg, cache, sha):
         receipt = native['receipts'][f'{variant}-native']
         output = cache.data(ROOT / receipt['log']).decode('utf8')
         assert native_cfg['pass_marker'] in output
-        case_marker = re.search(r'\bcases=(\d+)\b', output)
-        assert case_marker, 'native result must report its measured case count'
-        total_cases += int(case_marker.group(1))
+        total_cases += measured_native_cases(output, cfg.get('case_markers'))
         assert result['output_sha256'] == receipt['log_sha256']
     assert total_cases == cfg['native_cases']
     dependencies = module('native_batch_dependencies', ROOT / 'scripts/research/audio_recovery_provenance.py')

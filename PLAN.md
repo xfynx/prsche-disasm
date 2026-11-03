@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run520](iterations/v2/001-original-recovery/runs/520-driver-start-capture-integration/README.md).
-Driver starts and capture fill are integrated; actual child methods remain explicit.
+Latest recovery intake: [Run524](iterations/v2/001-original-recovery/runs/524-decoder-display-integration/README.md).
+Decoder storage placement and renderer initialization are integrated; actual children remain explicit.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next integrate verified decoder placement and descriptor initialization; recover remaining dependencies.
+Next recover the remaining DSP, resource/buffer and renderer dependencies.
 
 ## Recovery milestones
 
