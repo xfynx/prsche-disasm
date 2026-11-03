@@ -1,0 +1,102 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "render_matrix_506.hpp"
+#include "audio_fixed_vector_468.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(const void* p,U o=0){U v;memcpy(&v,static_cast<const B*>(p)+o,4);return v;}
+static void write(void* p,U o,U v){memcpy(static_cast<B*>(p)+o,&v,4);}
+static U cases,kind,pattern,layout,offset,facade,precision,rounding,depth,scale_word,near_word,far_word;
+static bool cpp_side;
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s case=%u kind=%u pattern=%u layout=%u offset=%u facade=%u PC=%u RC=%u depth=%u cpp=%u args=%08x,%08x,%08x\n",why,cases,kind,pattern,layout,offset,facade,precision,rounding,depth,cpp_side,scale_word,near_word,far_word);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault %08lx eip=%08lx case=%u kind=%u pattern=%u layout=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,kind,pattern,layout,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+namespace porsche {
+// Uncalled dependencies of the unchanged complete503 TU fail closed.
+U render_display_callback1_0069ecfc=0,render_display_callback2_0069ed00=0;
+void* __cdecl startup_network_allocate_0059ef90(U){ExitProcess(90);return nullptr;}
+}
+alignas(16) static B arena[1024],saved[1024],floating[512];
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+static Fpu expected_fpu;
+static B* code[4];
+static void relative(B* p,U n,U va,U old,const void* replacement,U count){U found=0;for(U i=0;i+5<=n;++i)if(p[i]==0xe8&&va+i+5+read(p,i+1)==old){write(p,i+1,ptr(replacement)-ptr(p+i+5));++found;i+=4;}require(found==count,"relative relocation count");}
+static void absolute(B* p,U n,U old,const void* replacement,U count){U found=0;for(U i=0;i+4<=n;++i)if(read(p,i)==old){write(p,i,ptr(replacement));++found;i+=3;}require(found==count,"absolute relocation count");}
+static void init(const char* path){
+    FILE* file=nullptr;require(fopen_s(&file,path,"rb")==0,"open pinned original");require(fseek(file,0x1b2624,SEEK_SET)==0,"original scalar file offset");U word;require(fread(&word,4,1,file)==1&&fclose(file)==0,"read original scalar");require(word==0xbf800000&&read(&_DAT_005b2624)==word,"raw minusone equals actual canonical468 owner");MEMORY_BASIC_INFORMATION info{};require(VirtualQuery(&_DAT_005b2624,&info,sizeof(info))==sizeof(info),"scalar mapped");require((info.Protect&0xff)==PAGE_READONLY||(info.Protect&0xff)==PAGE_EXECUTE_READ,"canonical scalar readonly");
+    static const B multiply[]={ @BODY_MULTIPLY@ },attach[]={ @BODY_ATTACH@ },config[]={ @BODY_CONFIG@ },identity[]={ @BODY_IDENTITY@ };const B* bodies[]={multiply,attach,config,identity};const U sizes[]={532,45,168,55};for(U i=0;i<4;++i){code[i]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[i]!=nullptr,"raw code allocation");memcpy(code[i],bodies[i],sizes[i]);}
+    relative(code[1],45,0x539b00,0x5398b0,code[0],1);relative(code[2],168,0x5392d0,0x539c90,code[3],1);absolute(code[2],168,0x5b2624,&_DAT_005b2624,1);for(B* p:code)require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"instruction cache");
+}
+static void capture(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))memcpy(f.values+i*10,floating+32+i*16,10);else memset(f.values+i*10,0,10);}}
+static void seed_fpu(){unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm fninit __asm fldcw control
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}}
+static U invoke(void* fn,void* receiver,const U* args,U count,bool member,bool raw,U& result){U before,frame,fail=0,out,cleanup=raw?(member?0:count*4):(count+(member?1:0))*4;__asm {
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov eax,count
+    mov edx,args
+pushargs:test eax,eax
+    jz pushed
+    dec eax
+    push dword ptr [edx+eax*4]
+    jmp pushargs
+pushed:cmp member,0
+    je callfn
+    cmp raw,0
+    jne callfn
+    push receiver
+callfn:mov ecx,receiver
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov out,eax
+    add esp,cleanup
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    result=out;return fail;
+}
+static U random_word(U& seed){seed^=seed<<13;seed^=seed>>17;seed^=seed<<5;return seed;}
+static void setup(){
+    static const U special[]={0,0x80000000,1,0x80000001,0x007fffff,0x807fffff,0x00800000,0x80800000,0x3f800000,0xbf800000,0x3f800001,0xbf800001,0x7f7fffff,0xff7fffff,0x7f800000,0xff800000,0x7fc00001,0xffc00001,0x7fffffff,0xffffffff,0x7f800001,0xff800001,0x7fbfffff,0xffbfffff};
+    U seed=0x12345678u+pattern*0x1020304u;
+    for(U i=0;i<sizeof(arena)/4;++i){U value;if(pattern==0)value=(random_word(seed)&0x807fffffu)|((100u+random_word(seed)%56u)<<23);else if(pattern==1){static const U cancel[]={0x4f000000,0x3f800000,0xcf000000,0x3f800001,0x33800000,0xb3800000,0x3f800002,0xbf800003};value=cancel[i%8];}else value=special[(i*7+pattern*11)%24];write(arena,i*4,value);}
+    if(pattern>=24){for(U i=0;i<sizeof(arena)/4;++i)write(arena,i*4,(random_word(seed)&0x807fffffu)|((118u+random_word(seed)%18u)<<23));scale_word=read(arena,12);near_word=read(arena,16);far_word=read(arena,20);}
+    else {scale_word=special[pattern];near_word=special[(pattern*7+1)%24];far_word=(pattern%4==0)?near_word:special[(pattern*11+9)%24];}
+    if(kind==2)write(arena+offset,0x1d0,pattern%3==0?0xffffffffu:pattern%3==1?0x7fffffffu:0x12345678);
+}
+static void compare(){static const U views[][3]={{128,256,384},{128,256,128},{128,256,256},{128,256,124},{128,256,132},{128,256,127},{128,256,129},{128,256,252},{128,256,260},{128,256,255},{128,256,257},{128,128,384},{128,132,384},{132,128,128},{128,132,130},{128,129,128}};
+    U expected_result=0;
+    for(U side=0;side<2;++side){cpp_side=side!=0;setup();seed_fpu();B* left=arena+views[layout][0]+offset;B* right=arena+views[layout][1]+offset;B* output=arena+views[layout][2]+offset;B* self=kind==2?arena+offset:right;U args[3]={ptr(left),ptr(right),ptr(output)};U count=3;bool member=kind!=0,used=kind==0||facade==0;
+        void* candidate=kind==0?reinterpret_cast<void*>(&render_matrix_multiply_005398b0):kind==1?(facade?reinterpret_cast<void*>(&render_display_transform_attach_00539b00):reinterpret_cast<void*>(&render_matrix_attach_00539b00)):(facade?reinterpret_cast<void*>(&render_display_surface_config_005392d0):reinterpret_cast<void*>(&render_surface_config_005392d0));if(kind==1){args[0]=ptr(left);count=1;}if(kind==2){args[0]=scale_word;args[1]=near_word;args[2]=far_word;}
+        U result;const U abi=invoke(side?candidate:code[kind],self,args,count,member,side==0,result);Fpu fpu;capture(fpu);require(abi==0,"stack/nonvolatile ABI");if(!used)result=0;
+        if(side){require(result==expected_result,"used EAX");if(memcmp(saved,arena,sizeof(arena))!=0){for(U i=0;i<sizeof(arena);++i)if(saved[i]!=arena[i]){printf("memory offset=%u raw=%08x cpp=%08x\n",i,read(saved,i&~3u),read(arena,i&~3u));break;}require(false,"exact output/guard bytes");}if(memcmp(&expected_fpu,&fpu,sizeof(Fpu))!=0){printf("x87 raw CW=%x SW=%x tag=%x cpp CW=%x SW=%x tag=%x\n",expected_fpu.control,expected_fpu.status,expected_fpu.tag,fpu.control,fpu.status,fpu.tag);require(false,"x87 active80/control/status/tag");}}
+        else {memcpy(saved,arena,sizeof(arena));expected_fpu=fpu;expected_result=result;}
+    }++cases;
+}
+int main(int argc,char** argv){require(argc==2,"PE argument");AddVectoredExceptionHandler(1,fault);init(argv[1]);
+    for(kind=0;kind<3;++kind)for(pattern=0;pattern<24;++pattern)for(layout=0;layout<(kind==0?16u:kind==1?8u:1u);++layout)for(offset=0;offset<4;++offset)for(facade=0;facade<(kind==0?1u:2u);++facade)for(U pc:{0u,2u,3u})for(rounding=0;rounding<4;++rounding)for(depth=0;depth<7;++depth){precision=pc;compare();}
+    kind=2;layout=offset=0;precision=3;rounding=depth=0;for(pattern=24;pattern<2072;++pattern)for(facade=0;facade<2;++facade)compare();
+    __asm fninit
+    printf("render_matrix_config_original_x86_vs_cpp=PASS cases=%u\n",cases);return 0;
+}

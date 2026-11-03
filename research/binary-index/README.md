@@ -1,5 +1,12 @@
 # Индекс оригинальных бинарников
 
+Run504: [coded-audio entry supplement](../../iterations/v2/001-original-recovery/runs/504-audio-coded-constructors/original-index-supplement.json)
+records six omitted constructor/getter bodies and their original caller ABI.
+Run508: [transport supplement](../../iterations/v2/001-original-recovery/runs/508-audio-stream-producer-lifecycle/original-transport-supplement.json)
+records raw noarg callback dispatch/used-return contracts. [Run509](../../iterations/v2/001-original-recovery/runs/509-coded-matrix-stream-query-integration/README.md)
+integrates bounded native proof; decoder/runtime producers remain open.
+
+
 Run501: [omitted PCM stream callback](../../iterations/v2/001-original-recovery/runs/501-audio-pcm-stream-lookup/original-index-supplement.json)
 records full0059ca50/245B through both returns and exact slot-table bounds.
 [Run502](../../iterations/v2/001-original-recovery/runs/502-stream-surface-3dnow-integration/README.md)

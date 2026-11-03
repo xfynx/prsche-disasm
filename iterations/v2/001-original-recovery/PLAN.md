@@ -1,15 +1,35 @@
 # v2 / 001 - original source recovery plan
 
+Current509,2026-11-03: frozen504003/506001/508002/510001 add25originals2177B/56Bdata
+(44writable/12readonly);registry755. SharedauditPASS913288nativecases/10364events/
+49mutations/688pins/593exports;281TUs/8projects,141names147refs,noEXE.15close/11real
+codedprocess/nibbledecoder/backendchildren. ExactFPorder/aliases, canonicalstream
+producer/lifecycle andqueryABI proved; runtime/fullparent/fault/live domains persist.
+Passedinputs/originals frozen; no sourceconsolidationnow. READMEownscommands.
+Ready511surfaceinit2originals759B/4Breadonly,542720cases/450560events/15mutations;
+coordinatorowns514nextintake. Active512nibbledecode trace(simd_oracle_497),513stream
+worker/stop(pcm_constructors_493),515driverctortrace(render_resources_494,resumedat
+user-confirmedquotareset). Workers ownrun/local only; commonbuild/registryrootowned.
+512header-validity constraints unresolved: don'tinfer capacitiesfromlabels/copy
+unrelateddata; proposeexplicitboundedproof ifactualwriterconstraints unproved.
+Fullproducer/allocator/runtimecallback/fault/lifetime/concurrency/startup/gameplay/
+403/411 remainopen. Prior3DNowemulationnotnativeAMD acceptance. Next514readysetonly.
+
+Historical507 follows.
+
 Current507,2026-11-02: frozen505 adds2originals240B/0state;registry730.
 SharedauditPASS19076nativecases/1890events/12mutations/679pins/559exports;
 277TUs/8projects,145names151refs,noEXE. Bothstreamnamesclose/no newchildren.
 Actual505+501+493+492+434 composition provescaptured/late signed16alias/callback
 transport; realproducer/release/consumed callbacksemantics stillcontrolled/open.
 Prior5023DNow emulation reusedunchanged, notnativeAMD hardwareproof.
-All3workers reachedquota, no activeassignments/respawns.504unvalidateddraft10bodies
-840B/48B hasCPP/header/fixturebody butneedscompleteconfig/fixture/indexsupplement/
-OdO2/mutations;506unvalidateddraft3bodies745B/0state needsfullnativefixture/config/
-proof. READMEs/504PLAN/506scope ownnextsteps. Neitherdraftisregistered orcompiled.
+Resumed504codedaudio(simd_oracle_497), ready506matrix/config,
+508streamproducer/lifecycle native(pcm_constructors_493),511surfaceinit trace/native
+(render_resources_494). Workers ownrun/local only;
+coordinatorowns509sharedintake and510four splash/networkqueries195B/4B.
+510native001PASS347628cases/13mutations/4B;506native001PASS556544cases/12mutations/0B.
+504/508fixtures retain corrections/failedattempts, no guessedimplementations. Retain
+unvalidateddrafts outsidegamegraph; no repeatedpassedproof or quota-retryloops.
 Originals/passedinputs immutable; no broadregressionreruns. Fullproducer/lifetime/
 fault/concurrency/live/startup/gameplay/403/411 stayopen. Sourceconsolidationdeferred.
 Next: finish504sharednativefixture, then506; intakeonlyafteractualproof.

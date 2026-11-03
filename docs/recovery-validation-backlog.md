@@ -1,5 +1,13 @@
 # Отложенные проверки восстановления v2
 
+Run509:25originals2177B/56Bdata;913288nativecases/49mutations/688pins PASS;
+281TUs/141names147refs,noEXE. Constructor/ADPCMsetup/matrix/streamproducer/query
+scopes proven; actualprocess/decoder/backend children remain. Fullheader/resource
+validity, runtimecallbacks, corruptedlists/unsafe domains, faults/lifetimes/
+concurrency/live/startup/gameplay stayopen. 511readyfor514;512table/header-validity
+trace and513streamworker/515drivertrace mustnotinvent tablecapacity/state/ABIs.
+
+
 Run507:2originals240B/0state;19076nativecases/12mutations/679pins PASS;
 277TUs/145names151refs,noEXE. Realstream/PCM/decoder composition closesbuffer
 providerfrontier; actualproducer/release/consumedcallbackeffects, faults/lifetimes/

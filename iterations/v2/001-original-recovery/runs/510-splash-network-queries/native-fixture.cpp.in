@@ -1,0 +1,123 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "splash_network_queries_510.hpp"
+#include "porsche/splash_progress.hpp"
+#include "porsche/startup_services.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+namespace porsche {void* startup_network_00628c70=nullptr;}
+static U cases,kind,precision,rounding,depth,keybits,layout,mask,shift,gate;
+static bool cpp_side;static B* slab;static void* item;
+alignas(16) static B floating[512],root_bytes[0x310],items[5][0x80],heads[2][32],nodes[2][5][32],data[5][16];
+static B *root,*head,*data_head;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p,U at=0){U value;memcpy(&value,static_cast<const B*>(p)+at,4);return value;}
+static void wr(void* p,U at,U value){memcpy(static_cast<B*>(p)+at,&value,4);}
+static void short_word(void* p,U value){const unsigned short v=static_cast<unsigned short>(value);memcpy(p,&v,2);}
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s cases=%u kind=%u key=%08x gate=%u shift=%u mask=%u layout=%u cpp=%u\n",why,cases,kind,keybits,gate,shift,mask,layout,cpp_side);fflush(stdout);ExitProcess(1);}}
+struct State{B root[sizeof(root_bytes)],items[sizeof(items)],heads[sizeof(heads)],nodes[sizeof(nodes)],data[sizeof(data)];U global,format;};
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+static State initial,expected;static Fpu before,after;
+static void snapshot(State& s){memcpy(s.root,root_bytes,sizeof(root_bytes));memcpy(s.items,items,sizeof(items));memcpy(s.heads,heads,sizeof(heads));memcpy(s.nodes,nodes,sizeof(nodes));memcpy(s.data,data,sizeof(data));s.global=ptr(startup_network_00628c70);s.format=splash_render_format_00691e50;}
+static void capture(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i)memcpy(f.values+i*10,floating+32+i*16,10);
+}
+static void seed(){unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm {
+    fninit
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    ffree st(0)
+    ffree st(1)
+    ffree st(2)
+    ffree st(3)
+    ffree st(4)
+    ffree st(5)
+    ffree st(6)
+    ffree st(7)
+    fldcw control
+    }
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+}
+__declspec(noinline) static U invoke(void* fn,U& result){U saved,frame,bad=0,returned=0;const U mode=kind==3&&!cpp_side?2:kind;__asm {
+    push ebx
+    push esi
+    push edi
+    mov saved,esp
+    mov frame,ebp
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    cmp mode,0
+    jne visible
+    push keybits
+    call fn
+    add esp,4
+    jmp check
+visible:cmp mode,1
+    jne data_core
+    mov ecx,item
+    call fn
+    movzx eax,al
+    jmp check
+data_core:cmp mode,2
+    jne data_bridge
+    mov ecx,item
+    mov edx,0fedcba98h
+    push keybits
+    call fn
+    jmp check
+data_bridge:cmp mode,3
+    jne getter
+    push keybits
+    push item
+    call fn
+    add esp,8
+    jmp check
+getter:call fn
+check:mov returned,eax
+    cmp esp,saved
+    jne failed
+    cmp ebp,frame
+    jne failed
+    cmp ebx,13579bdfh
+    jne failed
+    cmp esi,2468ace0h
+    jne failed
+    cmp edi,10203040h
+    je done
+failed:mov bad,1
+done:mov esp,saved
+    pop edi
+    pop esi
+    pop ebx
+    }result=returned;return bad;
+}
+static void relocate(B* code,U size,U old,const void* to,U wanted){U count=0;for(U i=0;i+4<=size;++i)if(rd(code,i)==old){wr(code,i,ptr(to));++count;i+=3;}require(count==wanted,"raw absolute relocation count");}
+static void initialize(){require(startup_network_00628c70==nullptr&&splash_render_format_00691e50==0,"original loader-zero initial state");slab=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(slab!=nullptr,"allocate");const B a[]={ @FIND@ },b[]={ @VISIBLE@ },c[]={ @DATA@ },d[]={ @FORMAT@ };require(sizeof(a)==66&&sizeof(b)==81&&sizeof(c)==42&&sizeof(d)==6,"original extents");memcpy(slab,a,66);memcpy(slab+128,b,81);memcpy(slab+256,c,42);memcpy(slab+384,d,6);relocate(slab,66,0x628c70,&startup_network_00628c70,1);relocate(slab+128,81,0x628c70,&startup_network_00628c70,1);relocate(slab+384,6,0x691e50,&splash_render_format_00691e50,1);require(FlushInstructionCache(GetCurrentProcess(),slab,4096)!=0,"flush");}
+static void setup(U count){memset(root_bytes,0xa5,sizeof(root_bytes));memset(items,0x5a,sizeof(items));memset(heads,0xcd,sizeof(heads));memset(nodes,0xef,sizeof(nodes));memset(data,0x99,sizeof(data));root=root_bytes+layout;head=heads[0]+layout;data_head=heads[1]+layout;startup_network_00628c70=root;wr(root,8,0x80000001);root[0xbf]=0;root[0xbe]=0x80;wr(root,0xdc,0x7fffffff);root[0xe5]=static_cast<B>(mask);wr(root,0x260,ptr(head));wr(head,0,count?ptr(nodes[0][0]+layout):ptr(head));wr(data_head,0,count?ptr(nodes[1][0]+layout):ptr(data_head));
+    for(U i=0;i<5;++i){B* a=nodes[0][i]+layout;B* b=nodes[1][i]+layout;wr(a,0,i+1<count?ptr(nodes[0][i+1]+layout):ptr(head));wr(b,0,i+1<count?ptr(nodes[1][i+1]+layout):ptr(data_head));wr(a,8,ptr(items[i]+layout));wr(b,8,ptr(data[i]+layout));wr(items[i]+layout,0x4c,0x80000010u+i);wr(items[i]+layout,0x40,shift);wr(items[i]+layout,0x5c,ptr(data_head));short_word(data[i]+layout,i*17u+3u);}
+    item=items[0]+layout;
+}
+static void compare(){snapshot(initial);precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=cases%9;U reference=0;
+    for(U side=0;side<2;++side){cpp_side=side!=0;seed();capture(before);void* fn=kind==0?slab:kind==1?slab+128:kind==4?slab+384:slab+256;
+        if(side)fn=kind==0?reinterpret_cast<void*>(&splash_progress_find_item_0048d720):kind==1?reinterpret_cast<void*>(&splash_progress_item_visible_00490390):kind==2?reinterpret_cast<void*>(&network_item_data_004903f0):kind==3?reinterpret_cast<void*>(&splash_progress_item_data_004903f0):reinterpret_cast<void*>(&splash_progress_render_format_005032d0);
+        U result=0;require(invoke(fn,result)==0,"ABI/stack/nonvolatile registers");capture(after);snapshot(expected);require(memcmp(&initial,&expected,sizeof(State))==0,"read-only state");require(memcmp(&before,&after,sizeof(Fpu))==0,"x87 environment/payload preserved");if(side)require(result==reference,"used return bits");else reference=result;
+    }++cases;
+}
+int main(){initialize();mask=0xff;shift=0;
+    kind=0;for(layout=0;layout<4;++layout)for(U count=0;count<=5;++count)for(gate=0;gate<4;++gate)for(U selected=0;selected<7;++selected){setup(count);keybits=selected==6?0xffffffffu:0x80000010u+selected;if(gate==1)startup_network_00628c70=nullptr;if(gate==2)wr(root,8,0);if(gate==3)root[0xbf]=0x80;if(count>2)wr(items[2]+layout,0x4c,0x80000010u);compare();}
+    kind=1;for(layout=0;layout<4;++layout)for(gate=0;gate<9;++gate)for(mask=0;mask<256;mask+=gate?85u:1u)for(U s=0;s<40;s+=gate?7u:1u){shift=s<32?s:s==32?32:s==33?33:s==34?255:s==35?256:s==36?0xffffffffu:s==37?0x80000000u:s==38?0x7fffffffu:0x10001u;setup(1);if(gate==1)startup_network_00628c70=nullptr;if(gate==2)wr(root,8,0);if(gate==3)root[0xbf]=1;if(gate==4)root[0xbe]=0;if(gate==5)wr(root,0xdc,0x80000000);if(gate==6)wr(root,0xdc,0xffffffff);if(gate==7)wr(root,0xdc,0);if(gate==8)root[0xbe]=1;compare();}
+    for(kind=2;kind<=3;++kind)for(U value=0;value<65536;++value){layout=value%3;setup(3);keybits=0xa5a50000u|value;short_word(data[0]+layout,value);short_word(data[1]+layout,value);compare();}
+    for(kind=2;kind<=3;++kind)for(layout=0;layout<4;++layout)for(U count=0;count<=5;++count)for(U selected=0;selected<7;++selected){setup(count);keybits=0xcccc0000u|((selected*17u+3u)&0xffff);compare();}
+    kind=4;layout=0;for(U value:{0u,1u,0xffffffffu,0x80000000u,0x7fffffffu,0x12345678u}){setup(0);splash_render_format_00691e50=value;compare();}
+    __asm fninit
+    printf("splash_network_queries_original_x86_vs_cpp=PASS cases=%u events=0\n",cases);return 0;
+}

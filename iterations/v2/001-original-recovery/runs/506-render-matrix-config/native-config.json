@@ -1,0 +1,150 @@
+{
+  "run": 506,
+  "experiment": "local/experiments/v2-render-matrix-config-506",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+    "iterations/v2/001-original-recovery/runs/503-render-surface-construction/render_surface_503.cpp",
+    "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/audio_fixed_vector_468.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/game_setup_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/506-render-matrix-config/",
+    "iterations/v2/001-original-recovery/runs/503-render-surface-construction",
+    "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/506-render-matrix-config/scope.json",
+    "iterations/v2/001-original-recovery/runs/503-render-surface-construction/scope.json",
+    "iterations/v2/001-original-recovery/runs/468-audio-fixed-vector/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00539b00",
+      "bytes": 45,
+      "sha256": "745996ff5b5da9c6b78e75bb5ee1db53076c0326555f3c53b3c54b1bafa8139d",
+      "token": "@BODY_ATTACH@"
+    },
+    {
+      "va": "005398b0",
+      "bytes": 532,
+      "sha256": "bf8ebdd19ed881fccbb16d37614b1dc3b3d72b2b67660839bcaaed18e8df4903",
+      "token": "@BODY_MULTIPLY@"
+    },
+    {
+      "va": "005392d0",
+      "bytes": 168,
+      "sha256": "fd90c9d1485b9ab47d8fa3fe952b6ce5e25046116730aeb4371e8a3acb5f988f",
+      "token": "@BODY_CONFIG@"
+    },
+    {
+      "va": "00539c90",
+      "bytes": 55,
+      "sha256": "dace8dc64cbef3f96fb85e8dea58e68f1cbb31d4abbd1e47f8ef9f65f76d0d45",
+      "token": "@BODY_IDENTITY@"
+    }
+  ],
+  "pass_marker": "render_matrix_config_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "dot-operand-reversal",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "        fld p0\n        fmul p1",
+      "new": "        fld p1\n        fmul p0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "dot-term-order",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "        fld p2\n        fmul p3\n        faddp st(1),st(0)\n        fld p4\n        fmul p5",
+      "new": "        fld p4\n        fmul p5\n        faddp st(1),st(0)\n        fld p2\n        fmul p3",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "dot-float-spill",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "        faddp st(1),st(0)\n        fld p4",
+      "new": "        faddp st(1),st(0)\n        fstp result\n        fld result\n        fld p4",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "multiply-alias-cache",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "    put(output,0,dot4(get(left,0),get(right,0),get(right,32),get(left,8),get(left,4),get(right,16),get(left,12),get(right,48)));\n    put(output,4,dot4(get(right,36),get(left,8),get(left,0),get(right,4),get(left,4),get(right,20),get(right,52),get(left,12)));",
+      "new": "    const U cached_left0=get(left,0);\n    put(output,0,dot4(get(left,0),get(right,0),get(right,32),get(left,8),get(left,4),get(right,16),get(left,12),get(right,48)));\n    put(output,4,dot4(get(right,36),get(left,8),cached_left0,get(right,4),get(left,4),get(right,20),get(right,52),get(left,12)));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "multiply-source-offset",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "get(right,52),get(left,12)",
+      "new": "get(right,48),get(left,12)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "attach-product-order",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "render_matrix_multiply_005398b0(source,destination,temporary)",
+      "new": "render_matrix_multiply_005398b0(destination,source,temporary)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "config-scaled-negation",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "    __asm fmul scale",
+      "new": "    __asm fmul value",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "config-denominator-spill",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "        fsub near_word",
+      "new": "        fsub near_word\n        fstp a\n        fld a",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "config-ratio-sign",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "        fdiv st(0),st(1)\n        fchs",
+      "new": "        fdiv st(0),st(1)\n        fnop",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "config-scalar-owner-value",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "        fld dword ptr [_DAT_005b2624]",
+      "new": "        fld1",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "config-matrix-field",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "put(matrix,0,get(surface,0x210))",
+      "new": "put(matrix,0,get(surface,0x214))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "config-counter",
+      "source": "iterations/v2/001-original-recovery/runs/506-render-matrix-config/render_matrix_506.cpp",
+      "old": "get(surface,0x1d0)+1u",
+      "new": "get(surface,0x1d0)+2u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "run": 510,
+  "experiment": "local/experiments/v2-splash-network-queries-510",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/510-splash-network-queries",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/510-splash-network-queries/original-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0048d720",
+      "bytes": 66,
+      "sha256": "65fc6d7266470ff8c63a291650a4e753a29ef174c95848e9cdb85a3567380850",
+      "token": "@FIND@"
+    },
+    {
+      "va": "00490390",
+      "bytes": 81,
+      "sha256": "ea3ad8d61d70ca8c804692cb4872f2120cdd7def48b93708d4a8c46b9ce89d73",
+      "token": "@VISIBLE@"
+    },
+    {
+      "va": "004903f0",
+      "bytes": 42,
+      "sha256": "5f23cc8cf8485477a849ccdb48bab387cbd583893566d50f428d929e0230a40d",
+      "token": "@DATA@"
+    },
+    {
+      "va": "005032d0",
+      "bytes": 6,
+      "sha256": "37c9819907cfc6159431acb147b4b71bcb12f1a89cb61baa78a551d5bf6be2bb",
+      "token": "@FORMAT@"
+    }
+  ],
+  "pass_marker": "splash_network_queries_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 120,
+  "mutations": [
+    {
+      "name": "find-disabled",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "read(root,8)==0||root[0xbf]!=0)return 0;",
+      "new": "read(root,8)==0||root[0xbf]==0)return 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "find-key-field",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "read(pointer(item),0x4c)",
+      "new": "read(pointer(item),0x48)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "find-key-width",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "==static_cast<U>(key))",
+      "new": "==(static_cast<U>(key)&0xffffu))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "find-result",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "return static_cast<std::int32_t>(item);",
+      "new": "return static_cast<std::int32_t>(read(pointer(item),0x4c));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "visible-enabled",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "root[0xbe]==0",
+      "new": "root[0xbe]==1",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "visible-signed-gate",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "static_cast<std::int32_t>(read(root,0xdc))<0",
+      "new": "static_cast<std::int32_t>(read(root,0xdc))==0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "visible-shift-mask",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "read(item,0x40)&31u",
+      "new": "read(item,0x40)&7u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "visible-bit-result",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "(static_cast<U>(root[0xe5])&(1u<<shift))!=0",
+      "new": "(static_cast<U>(root[0xe5])&(1u<<shift))==0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "data-short-offset",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "word(data)==",
+      "new": "static_cast<std::uint16_t>(read(data,2))==",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "data-first-node",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "for(void* node=pointer(read(head,0));node!=head;node=pointer(read(node,0))){\n        void* data",
+      "new": "for(void* node=pointer(read(pointer(read(head,0)),0));node!=head;node=pointer(read(node,0))){\n        void* data",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "data-bridge-key",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "network_item_data_004903f0(item,nullptr,key);",
+      "new": "network_item_data_004903f0(item,nullptr,static_cast<std::int16_t>(key+1));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "format-full-result",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "return splash_render_format_00691e50;",
+      "new": "return splash_render_format_00691e50!=0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "format-loader-initial",
+      "source": "iterations/v2/001-original-recovery/runs/510-splash-network-queries/splash_network_queries_510.cpp",
+      "old": "U splash_render_format_00691e50=0;",
+      "new": "U splash_render_format_00691e50=1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
