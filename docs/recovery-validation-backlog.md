@@ -1,14 +1,14 @@
 # Отложенные проверки восстановления v2
 
-Run524:4 originals690B/370B writable;74,706 comparisons/31 mutations/710 pins PASS;
-290 TUs/147 names153 refs,noEXE. Fresh486 and374 regressions accompany exact source
-replacements; no duplicated owner/extra function count. Combined parser checks
-both result sets, with6 rejection controls and unchanged520 audit regression.
-Recheck actual832B LUT/tail adjacency in the eventual game EXE. Arbitrary fault/
-unmasked FP/concurrency/mutable string producer domains remain unverified.
-Complete DSP/3DNow/renderer children, cross-owner capture aliases, full producer,
-live COM/device/registry/startup/gameplay and403/411 stay open.522 proof pending;
-523 scope trace pending. Frozen original sources/proofs must remain immutable.
+Run526:9 originals591B/4B state;324,096 comparisons/30 mutations/715 pins PASS;
+292 TUs/145 names152 refs,noEXE. Cleanup/order/live reload/used returns and buffer
+FP/state callbacks match original x86. Actual deallocator/window/library/virtual
+children are controlled: no heap/device cleanup or use-after-free acceptance.
+535b00/575930 and existing575640 remain real frontiers;522 DSP proof and527 flush
+recovery pending. Resource factory/table ABI still needs actual consumer tracing;
+RET cleanup alone does not establish arity. Preserve prior descriptor/LUT owner
+proof and recheck832B adjacency in the first game EXE. Fault/unmasked FP/concurrent/
+mutable string/live API/full producer/startup/gameplay/403/411 checks remain open.
 
 Run514:2originals759B/4Breadonly;542720nativecases/15mutations/691pins PASS;
 282TUs/140names146refs,noEXE. Genericvslot+actualgetter/alternatecallbacks, unordered

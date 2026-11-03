@@ -1,0 +1,68 @@
+{
+  "REA": "local/experiments/v2-driver-destruction-rea-525/002",
+  "queries": "iterations/v2/001-original-recovery/runs/525-render-driver-destruction/queries.json",
+  "notes": [
+    "REA575930 infersvoid/noargument and removes a reachable shutdown branch; raw57595a loads stackargument1 and575960 tests it, while both caller bodies push1. Typed cdecl1 is grounded in caller and callee, not RET alone.",
+    "538ce0 is the complete34B shared cleanup body, raw/native compared; no new REA session needed for the closed straight-line leaf.",
+    "Native deallocation/window/library children are controlled endpoints. No actual heap destruction, platform cleanup, use-after-free or fault acceptance."
+  ],
+  "callee_proof": [
+    {
+      "va": "00536840",
+      "bytes": 44,
+      "sha256": "50e3f3d9caaac79bd2112800bc69b207e5f736da0140e62116d2bed8329915b4",
+      "instructions": [
+        "00536840 push esi",
+        "00536841 mov esi, ecx",
+        "00536843 mov eax, dword ptr [esi + 4]",
+        "00536846 mov dword ptr [esi], 0x5bb708",
+        "0053684c push eax",
+        "0053684d call 0x53c8b0",
+        "00536852 mov al, byte ptr [esp + 0xc]",
+        "00536856 add esp, 4",
+        "00536859 test al, 1",
+        "0053685b je 0x536866",
+        "0053685d push esi",
+        "0053685e call 0x59f050",
+        "00536863 add esp, 4",
+        "00536866 mov eax, esi",
+        "00536868 pop esi",
+        "00536869 ret 4"
+      ]
+    },
+    {
+      "va": "00575930",
+      "bytes": 68,
+      "sha256": "949c9f1f4d336e38753df0cab463c52eef3d8926ba889f6f0bd8647d4b5d2b54",
+      "instructions": [
+        "00575930 mov eax, dword ptr [0x6a64b8]",
+        "00575935 test eax, eax",
+        "00575937 je 0x575971",
+        "00575939 push 0",
+        "0057593b push 0x25",
+        "0057593d call dword ptr [0x6bd97c]",
+        "00575943 test eax, eax",
+        "00575945 je 0x575954",
+        "00575947 push 0x5756c0",
+        "0057594c call 0x5366a0",
+        "00575951 add esp, 4",
+        "00575954 call dword ptr [0x6bd938]",
+        "0057595a mov eax, dword ptr [esp + 4]",
+        "0057595e test eax, eax",
+        "00575960 je 0x575967",
+        "00575962 call 0x53bcb0",
+        "00575967 mov dword ptr [0x6a64b8], 0",
+        "00575971 xor eax, eax",
+        "00575973 ret "
+      ]
+    }
+  ],
+  "virtual_method": {
+    "writer": "536870 stores table5bb708 in object then stores pointer69de44",
+    "table_va": "005bb708",
+    "slot0": "00536840",
+    "raw_slot_hex": "40685300",
+    "ABI": "actualcallee readsbyteflags1 atoriginalstackslot;thiscall1/RET4/EAXself;536950 callerpushes1, no owncleanup",
+    "new_original_count": 0
+  }
+}

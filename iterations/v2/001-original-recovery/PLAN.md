@@ -1,23 +1,21 @@
 # v2 / 001 - original source recovery plan
 
-Current524,2026-11-04: frozen512003/521002 add4 originals690B/370B writable;
-registry784. Audit PASS74,706 comparisons/31 mutations/710 pins/650 providers.
-290 TUs/8 projects,147 names153 refs,noEXE;3 close/6 actual children. NOICF inherited.
-Exact486 placement-only clone and374 shared descriptor field-view replace15
-existing registered owners, count unchanged. Old sources and proof are immutable.
-524001 stopped before compilation; escalated002 gives the measured result.
-Combined-result parser counts both fresh486 regression and512 decoder reports;
-6 rejection controls and identical unchanged520 audit pass, no native reruns.
+Current526,2026-11-04: frozen525002/523001 add9 originals591B/4B writable;
+registry793. Audit PASS324,096 comparisons/2,038,272 events/30 mutations/715 pins/
+660 providers.292 TUs/8 projects,145 names152 refs,noEXE;4 close/2 actual children.
+Driver cleanup and state application use canonical owners; actual original515
+constructor and518/503/511/359 compositions pass bounded checks. Original x87
+FLD/FST/FSTP effects retained. REA575930 prototype corrected from raw caller/callee.
+Passed sources/proof remain immutable; inherited NOICF and future LUT adjacency gate.
 
 Active: pcm_constructors_493 owns522 DSP597660/__ftol/597120(516B/8B readonly),
-proof pending. render_resources_494 owns523 buffer/resource dependency trace;
-scope proposal before code. simd_oracle_497 delivered frozen512 then hit quota;
-no retry/respawn. Coordinator owns524 publication and next ready intake only.
-Full real children/producer/aliases/fault/concurrency/unmasked FP/mutable strings/
-live APIs/startup/gameplay/403/411 remain open. Verify832B LUT adjacency in the
-first actual game EXE. No source consolidation now. Batch READMEs own commands;
-validation backlog owns remaining checks. Next: publish524, then actual522 proof
-and approved523 cohort; do not enlarge this passed batch.
+proof pending. render_resources_494 owns527 state-flush535b00 and actual small
+callback targets: scope/ownership/ABI proposal before code. simd_oracle_497 hit
+quota after512; no retries. Coordinator owns526 publication and next ready intake.
+Full actual children/producer/resource/table ABI, external stack aliases/fault/
+lifetime/concurrency/unmasked FP/mutable strings/live APIs/startup/gameplay and
+403/411 remain open. No source consolidation now. Batch READMEs own commands;
+validation backlog owns remaining checks. Next: publish526, then actual522/527 proof.
 
 Historical514 follows.
 

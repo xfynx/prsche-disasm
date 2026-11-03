@@ -4,15 +4,15 @@ Updated 2026-11-04. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run524](iterations/v2/001-original-recovery/runs/524-decoder-display-integration/README.md)
-compiles290 C++ translation units across8 projects. The link has147 unresolved names/
-153 references. **There is no recovered playable C++ game executable yet.**
+[Run526](iterations/v2/001-original-recovery/runs/526-driver-destruction-integration/README.md)
+compiles292 C++ translation units across8 projects. The link has145 unresolved names/
+152 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:4 originals/690B and370B writable storage;74,706 comparisons/31 mutations/
-710 source pins pass. Three names close/six actual children appear; registry784.
-Decoder lookup placement and renderer descriptor sharing use verified existing
-owners. These are bounded proofs, not completion percentage/live-game acceptance.
-Earlier3DNow remains emulated; full platform/gameplay and403/411 domains stay open.
+Latest:9 originals/591B and4B writable state;324,096 comparisons/30 mutations/
+715 source pins pass. Four names close/two actual children appear; registry793.
+Driver destruction and buffer state application retain original callback ordering
+and FP effects. These are bounded proofs, not completion percentage/live-game
+acceptance. Earlier3DNow remains emulated; full platform/gameplay and403/411 remain.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through
 [Run445](iterations/v2/001-original-recovery/runs/445-audio-owner-alias-regression/README.md).

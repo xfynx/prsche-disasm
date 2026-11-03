@@ -1,0 +1,179 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "render_driver_start_518.hpp"
+#include "render_buffer_523.hpp"
+#include "render_driver_515.hpp"
+#include "render_surface_503.hpp"
+#include "porsche/render_loader.hpp"
+#include "porsche/render_settings.hpp"
+#include "porsche/game_setup.hpp"
+#include "porsche/network_vtables.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(const void* p,U o=0){U v;memcpy(&v,static_cast<const B*>(p)+o,4);return v;}
+static void write(void* p,U o,U v){memcpy(static_cast<B*>(p)+o,&v,4);}
+static U cases,events_total,kind,variant,flags,failures,offset,old_present,init_result,value,precision,rounding,depth,setup_index;
+static bool cpp_side,setup_phase;
+static B* active_buffer;
+static U initial_status=0,dead_word=0x87654321;
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s case=%u kind=%u variant=%u flags=%u failures=%u offset=%u old=%u init=%x value=%08x PC=%u RC=%u depth=%u cpp=%u\n",why,cases,kind,variant,flags,failures,offset,old_present,init_result,value,precision,rounding,depth,cpp_side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault %08lx eip=%08lx case=%u kind=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,kind,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+struct Arena{B context[2][0x11900],driver[2][64],resource[2][32],oldnode[2][32],newnode[2][32],buffer[2][128],descriptor[2][256],modes[2][128],helper[2][32];};
+alignas(16) static Arena arena;
+alignas(16) static B floating[512];
+static B* expected_context;
+static U old_table[1];
+static const char name0[]="dx7",name1[]="dx6";
+extern "C" void* registry_cell;
+#pragma comment(linker,"/alternatename:_registry_cell=__imp__RegFlushKey@4")
+namespace porsche {
+// Fixture transport views of immutable496-owned cells, not game definitions.
+U render_display_name_0069ecf8=0,render_display_selected_0069ed08=0;
+U render_display_callback1_0069ecfc=0,render_display_callback2_0069ed00=0;
+U render_display_texture_width_005deac8=0,render_display_texture_height_005deacc=0;
+}
+static B* driver(U i=0){return arena.driver[i]+offset;}
+static B* resource(U i=0){return arena.resource[i]+offset;}
+static B* context(U i=0){return arena.context[i]+offset;}
+struct State{Arena arena;U globals[25],exports[43],api;};
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+struct Event{U tag,argc,args[6];State state;Fpu fpu;};
+struct Trace{U count,result,abi;Event events[64];State final;Fpu fpu;};
+static Trace trace,expected;
+static void capture(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))memcpy(f.values+i*10,floating+32+i*16,10);else memset(f.values+i*10,0,10);}}
+static void snapshot(State& s){s.arena=arena;U g[]={render_display_name_0069ecf8,render_display_selected_0069ed08,render_display_callback1_0069ecfc,render_display_callback2_0069ed00,ptr(game_setup_movie_service_0069ed0c),ptr(render_driver_context_0069e0d4),render_driver_name_006a64b4,render_display_texture_width_005deac8,render_display_texture_height_005deacc,render_resource_option_0069ed04,render_resource_callback1_0069ed10,render_resource_callback2_0069ed14};memcpy(s.globals,g,sizeof(g));for(U i=0;i<13;++i)s.globals[12+i]=render_resource_cells_0069ecc0[i];memcpy(s.exports,render_thrash_exports_006bd910,sizeof(s.exports));s.api=ptr(registry_cell);}
+static void event(U tag,std::initializer_list<U> args){require(trace.count<64,"event bound");auto& e=trace.events[trace.count++];e.tag=tag;e.argc=static_cast<U>(args.size());U i=0;for(U a:args)e.args[i++]=a;while(i<6)e.args[i++]=0;snapshot(e.state);capture(e.fpu);}
+static void control(){if(flags&8){unsigned short cw=static_cast<unsigned short>(0x7f|((precision==0?3u:0u)<<8)|(((rounding+1u)%4)<<10));__asm fldcw cw}}
+static void** imported_cell(const char* dll,const char* target){auto* b=reinterpret_cast<B*>(GetModuleHandleA(nullptr));auto* nt=reinterpret_cast<IMAGE_NT_HEADERS32*>(b+reinterpret_cast<IMAGE_DOS_HEADER*>(b)->e_lfanew);auto* d=reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(b+nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);for(;d->Name;++d){if(_stricmp(reinterpret_cast<char*>(b+d->Name),dll))continue;auto* names=reinterpret_cast<IMAGE_THUNK_DATA32*>(b+d->OriginalFirstThunk);auto* cells=reinterpret_cast<void**>(b+d->FirstThunk);for(U n=0;names[n].u1.AddressOfData;++n)if(!IMAGE_SNAP_BY_ORDINAL32(names[n].u1.Ordinal)){auto* i=reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(b+names[n].u1.AddressOfData);if(strcmp(reinterpret_cast<char*>(i->Name),target)==0)return cells+n;}}return nullptr;}
+static void write_cell(void* value){DWORD old,restored;require(VirtualProtect(&registry_cell,4,PAGE_READWRITE,&old)!=0,"registry IAT writable");registry_cell=value;require(VirtualProtect(&registry_cell,4,old,&restored)!=0,"registry IAT protection restored");}
+static LSTATUS WINAPI registry2(HKEY);
+static const RenderSettingsDevice* __stdcall about2();
+static U __stdcall setstate2(U,U);
+static U __stdcall alias_state(U,U);
+static U __stdcall alias_state2(U,U);
+static LSTATUS WINAPI registry(HKEY key){event(0x5b2004,{ptr(key)});if(kind<=1)require(ptr(key)==0x80000000,"exact HKEY_CLASSES_ROOT transport");if(flags&4){render_thrash_exports_006bd910[9]=ptr(reinterpret_cast<void*>(&about2));write_cell(reinterpret_cast<void*>(&registry2));}if(flags&2){render_display_name_0069ecf8=ptr(name1);render_display_selected_0069ed08^=0x87654321;}control();return static_cast<LSTATUS>(0xc0123456u^ptr(key));}
+static LSTATUS WINAPI registry2(HKEY key){event(0x15b2004,{ptr(key)});control();return static_cast<LSTATUS>(0x81234567u^ptr(key));}
+static const RenderSettingsDevice* about_impl(U tag,U index){event(tag,{});if(flags&2){write(driver(),0x10,ptr(arena.descriptor[1-index]));render_driver_context_0069e0d4=context(1);}control();return reinterpret_cast<const RenderSettingsDevice*>(arena.descriptor[index]);}
+static const RenderSettingsDevice* __stdcall about(){return about_impl(0x6bd934,0);}
+static const RenderSettingsDevice* __stdcall about2(){return about_impl(0x16bd934,1);}
+static U setstate_impl(U tag,U key,U data){event(tag,{key,data});require(expected_context!=nullptr,"captured defaults receiver fixture");if(key==0x29){if(kind<7)require(data==8,"first defaults state");if(flags&1)write(expected_context,0x11828,0);else if(flags&2)write(expected_context,0x11828,0x87654321);if(flags&4){render_driver_context_0069e0d4=expected_context==context()?context(1):context();render_thrash_exports_006bd910[27]=ptr(reinterpret_cast<void*>(&setstate2));}}
+    if(key==0x10029&&(flags&2))write(expected_context,0x11828,0x13579bdf);
+    if(key==0x2a&&(flags&2)){write(expected_context,0x11810,0xabcdef01);write(expected_context,0x11824,0x10203040);}if(flags&32){for(U o:{4u,8u,12u,0x14u,0x18u,0x1cu,0x20u,0x24u,0x28u,0x2cu,0x30u})write(active_buffer,o,value^key^(o*0x01020304u));}
+    if(flags&64){render_thrash_exports_006bd910[27]=ptr(reinterpret_cast<void*>(&setstate2));render_thrash_exports_006bd910[2]=ptr(reinterpret_cast<void*>(&alias_state2));}
+    if(flags&128)write(active_buffer,0x34,value);
+    control();return 0x89abcdefu^tag^key^data;}
+static U __stdcall setstate(U key,U data){return setstate_impl(0x6bd97c,key,data);}
+static U __stdcall setstate2(U key,U data){return setstate_impl(0x16bd97c,key,data);}
+static U __stdcall alias_state(U key,U data){return setstate_impl(0x6bd918,key,data);}
+static U __stdcall alias_state2(U key,U data){return setstate_impl(0x16bd918,key,data);}
+static U __cdecl release_old(void* old){event(0x59f050,{ptr(old)});if(flags&1){B* r=reinterpret_cast<B*>(read(driver(),0x20));write(r,0,ptr(driver(1)));write(r,4,ptr(arena.oldnode[1]+offset));}if(flags&2)render_driver_context_0069e0d4=context(1);control();return 0x87654321;}
+namespace porsche {
+void* __cdecl startup_network_allocate_0059ef90(U bytes){if(setup_phase){require(bytes==0x1182c||bytes==4,"reused515 constructor allocation");return bytes==0x1182c?static_cast<void*>(context(setup_index)):static_cast<void*>(arena.helper[setup_index]+offset);}event(0x59ef90,{bytes});require(bytes==0x14||bytes==0x38,"start/binding allocation size");if(flags&1){B* r=reinterpret_cast<B*>(read(driver(),0x20));write(r,0,ptr(driver(1)));}if(flags&2){write(arena.descriptor[0],0x40,ptr(arena.modes[1]));write(arena.descriptor[1],0x40,ptr(arena.modes[0]));}control();if(bytes==0x14)return failures&1?nullptr:arena.newnode[0]+offset;return failures&2?nullptr:arena.buffer[0]+offset;}
+std::uint8_t __cdecl render_driver_initialize_00556bb0(U first,U name,U selected,U last){event(0x556bb0,{first,name,selected,last});require(first==(variant==0?1u:0u)&&last==1,"actual driver initializer constants");if(flags&1){write(driver(),0x20,ptr(resource(1)));game_setup_movie_service_0069ed0c=resource(1);}if(flags&2){write(driver(),0xc,value^0x12345678);render_driver_context_0069e0d4=context(1);}control();return static_cast<std::uint8_t>(init_result);}
+void* __fastcall render_resource_bound_child_ctor_00535b50(void* self,void*,void* live_driver){event(0x535b50,{ptr(self),ptr(live_driver)});if(flags&2){B* r=reinterpret_cast<B*>(read(driver(),0x20));write(r,0,ptr(driver()));write(r,4,0x87654321);}control();return flags&4?arena.newnode[1]+offset:self;}
+void __cdecl render_driver_calibrate_00536870(){event(0x536870,{});if(flags&2){write(driver(),0xc,value^0x13579bdf);render_driver_context_0069e0d4=context(1);}if(flags&16){void* current=reinterpret_cast<void*>(read(game_setup_movie_service_0069ed0c));require(current==driver()||current==driver(1),"bound resource root before calibration");(void)render_display_driver_present_vslot0(current,value);}control();}
+void __fastcall render_driver_context_mode_00549220(void* self,void*,U index){event(0x549220,{ptr(self),index});if(flags&4)render_driver_context_0069e0d4=context();control();}
+void __fastcall render_driver_apply_states_00538af0(void* self,void*){event(0x538af0,{ptr(self)});if(flags&4)render_driver_context_0069e0d4=context(1);expected_context=static_cast<B*>(render_driver_context_0069e0d4);control();}
+void __cdecl render_resource_flush_states_00535b00(){event(0x535b00,{});if(flags&32){write(active_buffer,0,value);render_driver_context_0069e0d4=context(1);}if(flags&128)write(active_buffer,0x34,value^0x4321);control();}
+// Other515 real method providers remain controlled, never game implementations.
+void* __fastcall render_driver_base_destroy_00538ab0(void* p,void*,U f){event(0x538ab0,{ptr(p),f});return p;}
+void* __fastcall render_driver_alt_destroy_00556ab0(void* p,void*,U f){event(0x556ab0,{ptr(p),f});return p;}
+void* __fastcall render_driver_main_destroy_00557120(void* p,void*,U f){event(0x557120,{ptr(p),f});return p;}
+std::uint8_t __fastcall render_driver_select_mode_00538b30(void* p,void*,U f){event(0x538b30,{ptr(p),f});return 1;}
+U __fastcall render_driver_probe_00556d20(void* p,void*){event(0x556d20,{ptr(p)});return value&1;}
+[[noreturn]] void __fastcall network_purecall_005a1056(void*,void*,U,const B*,U){ExitProcess(90);}
+void __stdcall render_display_draw_quad_006bd9a8(const void*,const void*,const void*,const void*){ExitProcess(90);}
+U __cdecl render_win_load_library_005b2050(const char*){ExitProcess(90);return 0;}
+U __cdecl render_win_get_proc_005b205c(U,const char*){ExitProcess(90);return 0;}
+void __cdecl render_win_free_library_005b2088(U){ExitProcess(90);}
+U __cdecl render_win_get_module_005b2138(const char*){ExitProcess(90);return 0;}
+void __cdecl render_win_disable_thread_calls_005b21b4(U){ExitProcess(90);}
+U __cdecl render_win_last_error_005b213c(){ExitProcess(90);return 0;}
+void __cdecl render_loader_format_005a0fbf(char*,const char*,...){ExitProcess(90);}
+void __cdecl render_loader_report_00565340(const char*){ExitProcess(90);}
+void __cdecl render_loader_directx_00574eb0(U[2],const char*){ExitProcess(90);}
+void __cdecl render_loader_reset_00594f00(U){ExitProcess(90);}
+void __cdecl render_loader_set_state_006bd97c(U,U,U){ExitProcess(90);}
+const U* __cdecl render_loader_about_006bd934(U){ExitProcess(90);return nullptr;}
+}
+static B* code[9];
+static U __cdecl unreachable_state(U,U){require(false,"raw self-CMP branch must stay unreachable");return 0;}
+static void absolute(B* p,U n,U old,const void* replacement,U count){U found=0;for(U i=0;i+4<=n;++i)if(read(p,i)==old){write(p,i,ptr(replacement));++found;i+=3;}require(found==count,"absolute relocation count");}
+static void relative(B* p,U n,U va,U old,const void* replacement,U count){U found=0;for(U i=0;i+5<=n;++i)if(p[i]==0xe8&&va+i+5+read(p,i+1)==old){write(p,i+1,ptr(replacement)-ptr(p+i+5));++found;i+=4;}require(found==count,"relative relocation count");}
+static void init(){require(render_driver_context_0069e0d4==nullptr&&game_setup_movie_service_0069ed0c==nullptr,"canonical pointer initial zeros");for(U v:render_thrash_exports_006bd910)require(v==0,"canonical exports initial zeros");for(U v:render_resource_cells_0069ecc0)require(v==0,"503 cache initial zeros");require(imported_cell("ADVAPI32.dll","RegFlushKey")==&registry_cell,"SDKADVAPI32RegFlushKey IATidentity");require(registry_cell==reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA("advapi32.dll"),"RegFlushKey")),"SDK loaded RegFlushKey target");
+    static const B alt[]={ @BODY_ALT@ },main[]={ @BODY_MAIN@ },bind[]={ @BODY_BIND@ },defaults[]={ @BODY_DEFAULTS@ },old[]={ @BODY_OLD_DTOR@ },ctor[]={ @BUFFER_CTOR@ },apply[]={ @BUFFER_APPLY@ },state[]={ @BUFFER_STATE@ },alias[]={ @BUFFER_ALIAS@ };const B* bodies[]={alt,main,bind,defaults,old,ctor,apply,state,alias};U sizes[]={157,157,62,99,32,86,197,17,17};for(U i=0;i<9;++i){code[i]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[i]!=nullptr,"raw code allocation");memcpy(code[i],bodies[i],sizes[i]);}
+    for(U i=0;i<2;++i){U va=i==0?0x556b10:0x557180;absolute(code[i],157,0x69ecf8,&render_display_name_0069ecf8,1);absolute(code[i],157,0x6a64b4,&render_driver_name_006a64b4,2);absolute(code[i],157,0x69ed08,&render_display_selected_0069ed08,1);absolute(code[i],157,0x69e0d4,&render_driver_context_0069e0d4,2);absolute(code[i],157,0x5b2004,&registry_cell,1);absolute(code[i],157,0x6bd934,render_thrash_exports_006bd910+9,1);relative(code[i],157,va,0x556bb0,reinterpret_cast<void*>(&render_driver_initialize_00556bb0),1);relative(code[i],157,va,0x540440,code[2],1);relative(code[i],157,va,0x59ef90,reinterpret_cast<void*>(&startup_network_allocate_0059ef90),1);relative(code[i],157,va,0x537700,code[5],1);relative(code[i],157,va,0x536870,reinterpret_cast<void*>(&render_driver_calibrate_00536870),1);relative(code[i],157,va,0x549220,reinterpret_cast<void*>(&render_driver_context_mode_00549220),1);relative(code[i],157,va,0x538af0,reinterpret_cast<void*>(&render_driver_apply_states_00538af0),1);relative(code[i],157,va,0x5405f0,code[3],1);}
+    relative(code[2],62,0x540440,0x59ef90,reinterpret_cast<void*>(&startup_network_allocate_0059ef90),1);relative(code[2],62,0x540440,0x535b50,reinterpret_cast<void*>(&render_resource_bound_child_ctor_00535b50),1);absolute(code[3],99,0x6bd97c,render_thrash_exports_006bd910+27,3);old_table[0]=ptr(code[4]);absolute(code[4],32,0x5bb6c8,old_table,1);relative(code[4],32,0x535ba0,0x59f050,reinterpret_cast<void*>(&release_old),1);relative(code[5],86,0x537700,0x537760,code[6],1);relative(code[5],86,0x537700,0x535b00,reinterpret_cast<void*>(&render_resource_flush_states_00535b00),1);
+    relative(code[6],197,0x537760,0x540480,code[7],7);relative(code[6],197,0x537760,0x5404e0,code[8],4);relative(code[6],197,0x537760,0x5404a0,reinterpret_cast<void*>(&unreachable_state),1);absolute(code[6],197,0x5dedf4,&dead_word,1);
+    absolute(code[7],17,0x6bd97c,render_thrash_exports_006bd910+27,1);absolute(code[8],17,0x6bd918,render_thrash_exports_006bd910+2,1);
+    for(B* p:code)require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"instruction cache");
+}
+static void seed_fpu(){unsigned short cw=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm fninit __asm fldcw cw
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+    B environment[28];__asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment+4)|=static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+static U invoke(void* fn,void* receiver,const U* args,U count,U cleanup,U& result){U before,frame,fail=0,out;__asm {
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov eax,count
+    mov edx,args
+pushargs:test eax,eax
+    jz pushed
+    dec eax
+    push dword ptr [edx+eax*4]
+    jmp pushargs
+pushed:mov ecx,receiver
+    mov edx,0deadc0deh
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov out,eax
+    add esp,cleanup
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    result=out;return fail;}
+static void setup(){memset(&arena,0x65+(value&7),sizeof(arena));expected_context=context();write_cell(reinterpret_cast<void*>(&registry));setup_phase=true;render_display_name_0069ecf8=ptr(name0);render_display_selected_0069ed08=value;render_display_callback1_0069ecfc=0x004672c0;render_display_callback2_0069ed00=0x004672e0;render_driver_name_006a64b4=0x12345678;render_display_texture_width_005deac8=800;render_display_texture_height_005deacc=600;
+    for(U i:{1u,0u}){setup_index=i;render_display_resource_ctor_00540390(resource(i),0);if((i==0&&variant==0)||(i==1&&variant==1))render_display_driver_alt_ctor_00556a90(driver(i),resource(i));else render_display_driver_ctor_00557100(driver(i),resource(i));write(driver(i),4,ptr(arena.buffer[i]+offset));write(driver(i),8,ptr(arena.modes[i]));write(driver(i),0x10,ptr(arena.descriptor[i]));write(driver(i),0x1c,ptr(context(i)));write(arena.descriptor[i],0x40,ptr(arena.modes[i]));write(arena.oldnode[i]+offset,0,ptr(old_table));if(old_present)write(resource(i),4,ptr(arena.oldnode[i]+offset));}
+    active_buffer=arena.buffer[0]+offset;write(active_buffer,0x34,value);setup_phase=false;game_setup_movie_service_0069ed0c=resource();render_driver_context_0069e0d4=context();for(U& x:render_thrash_exports_006bd910)x=0;render_thrash_exports_006bd910[9]=ptr(reinterpret_cast<void*>(&about));render_thrash_exports_006bd910[27]=ptr(reinterpret_cast<void*>(&setstate));render_thrash_exports_006bd910[2]=ptr(reinterpret_cast<void*>(&alias_state));trace.count=trace.result=trace.abi=0;
+}
+static void compare(){for(U side=0;side<2;++side){cpp_side=side!=0;setup();seed_fpu();void* receiver=driver();void* fn=code[variant];U args[2]={},count=0,cleanup=0,mask=0xff;if(kind<=1){if(side){if(kind==0){fn=reinterpret_cast<void*>(&render_display_driver_start_vslot1);args[0]=ptr(driver());count=1;cleanup=4;receiver=nullptr;}else fn=variant==0?reinterpret_cast<void*>(&render_driver_alt_start_00556b10):reinterpret_cast<void*>(&render_driver_main_start_00557180);}}
+    else if(kind==2){receiver=resource();args[0]=value==0?0:value==1?ptr(driver()):ptr(driver(1));count=1;mask=0xffffffff;fn=side?reinterpret_cast<void*>(&render_resource_bind_driver_00540440):code[2];}
+    else if(kind==3){receiver=context();fn=side?reinterpret_cast<void*>(&render_driver_context_defaults_005405f0):code[3];mask=0xffffffff;}
+    else if(kind==4){receiver=nullptr;args[0]=value;count=1;fn=side?reinterpret_cast<void*>(&render_driver_reg_flush_005b2004):registry_cell;mask=0xffffffff;}
+    else if(kind==5){receiver=active_buffer;fn=side?reinterpret_cast<void*>(&render_driver_buffer_ctor_00537700):code[5];mask=0xffffffff;}
+    else if(kind==6){receiver=active_buffer;fn=side?reinterpret_cast<void*>(&render_driver_buffer_apply_00537760):code[6];mask=0xffffffff;}
+    else {receiver=nullptr;args[0]=value^0x2156be09;args[1]=value;count=2;cleanup=8;fn=side?(kind==7?reinterpret_cast<void*>(&render_buffer_state_00540480):reinterpret_cast<void*>(&render_buffer_state_alias_005404e0)):code[kind];mask=0xffffffff;}
+    U result;trace.abi=invoke(fn,receiver,args,count,cleanup,result);trace.result=result&mask;snapshot(trace.final);capture(trace.fpu);require(trace.abi==0,"stack/nonvolatile ABI");if(side){require(trace.count==expected.count&&trace.result==expected.result,"eventcount/usedreturn");for(U i=0;i<trace.count;++i)if(memcmp(&trace.events[i],&expected.events[i],sizeof(Event))!=0){printf("eventindex=%u rawtag=%x cpptag=%x rawargs=%x,%x,%x,%x cppargs=%x,%x,%x,%x\n",i,expected.events[i].tag,trace.events[i].tag,expected.events[i].args[0],expected.events[i].args[1],expected.events[i].args[2],expected.events[i].args[3],trace.events[i].args[0],trace.events[i].args[1],trace.events[i].args[2],trace.events[i].args[3]);require(false,"endpointargs/prestate/x87");}require(memcmp(&trace.final,&expected.final,sizeof(State))==0,"final resource/driver/context/opaque/globalstate");if(memcmp(&trace.fpu,&expected.fpu,sizeof(Fpu))!=0){printf("x87 raw CW=%x SW=%x tag=%x cpp CW=%x SW=%x tag=%x\n",expected.fpu.control,expected.fpu.status,expected.fpu.tag,trace.fpu.control,trace.fpu.status,trace.fpu.tag);require(false,"x87 active80/control/status/tag");}events_total+=trace.count;}else expected=trace;
+    }++cases;}
+static void settings(){precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=((cases/12)%3)*3;}
+int main(){AddVectoredExceptionHandler(1,fault);init();void* saved=registry_cell;
+    const U specials[]={0,0x80000000,0x3f800001,0x7f800000,0xff800000,0x7fc12345,0x7fa12345,0xffa54321,1,0x007fffff,0x00800000,0x7f7fffff,0xffffffff};
+    for(kind=0;kind<2;++kind)for(variant=0;variant<2;++variant)for(old_present=0;old_present<2;++old_present)for(U composition_flags: {0u,8u,32u,64u,128u,255u})for(failures=0;failures<4;++failures)for(offset=0;offset<4;++offset)for(U r:{0u,1u,0x80u}){flags=composition_flags;init_result=r;value=specials[cases%13];initial_status=cases&1?0x3f:0;settings();compare();}
+    init_result=1;variant=0;old_present=0;failures=0;
+    for(kind=5;kind<9;++kind)for(U pc:{0u,2u,3u})for(U rc=0;rc<4;++rc)for(U d:{0u,3u,6u,7u,8u})for(U status:{0u,0x3fu})for(U mutation:{0u,8u,32u,64u,128u,255u})for(offset=0;offset<4;++offset)for(U bits:specials){value=bits;flags=mutation;precision=pc;rounding=rc;depth=d;initial_status=status;compare();}
+    write_cell(saved);require(registry_cell==reinterpret_cast<void*>(GetProcAddress(GetModuleHandleA("advapi32.dll"),"RegFlushKey")),"restored loaded SDKregistrytarget");__asm fninit
+    printf("render_buffer_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;}
