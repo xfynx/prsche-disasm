@@ -1,0 +1,159 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "render_state_flush_527.hpp"
+#include "render_buffer_523.hpp"
+#include "porsche/render_mode.hpp"
+#include "porsche/render_settings.hpp"
+#include "porsche/render_loader.hpp"
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U word(const void* p,U o=0){U x;memcpy(&x,static_cast<const B*>(p)+o,4);return x;}
+static void put(void* p,U o,U x){memcpy(static_cast<B*>(p)+o,&x,4);}
+static U cases,events_total,kind,flags,offset,value,key,precision,rounding,depth,initial_status;
+static bool cpp_side;static B buffer[128];static B* code[6];static U raw_table[7],dead_word;
+alignas(16) static B floating[512];
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+struct State{B buffer[128];U records[28],callbacks[7],exports[43];B option,pad[3];};
+struct Event{U tag,key,value;State state;Fpu fpu;};
+struct Trace{U count,result;Event events[64];State final;Fpu fpu;};
+static Trace trace,expected;
+static void require(bool ok,const char* s){if(!ok){printf("divergence %s case=%u kind=%u flags=%u key=%08x value=%08x offset=%u cpp=%u\n",s,cases,kind,flags,key,value,offset,cpp_side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault %08lx ip=%08lx case=%u kind=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,kind,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+namespace porsche {U render_thrash_exports_006bd910[43]{};}
+namespace porsche {
+// Fixture views for uncalled services of the actual canonical mode owner.
+RenderDisplay* render_display_00628130=nullptr;
+U render_display_actual_width_00619784=0,render_display_actual_height_00619788=0,render_display_actual_mode_0061978c=0,render_display_mode_index_00619780=0;
+static U unused_clock=0;U& render_display_clock_005deb1c=unused_clock;
+static std::int32_t unused_settings[7]{};
+std::int32_t& render_mode_setting_00657d5c=unused_settings[0];std::int32_t& render_mode_setting_00657d60=unused_settings[1];
+std::int32_t& render_mode_setting_00657d68=unused_settings[2];std::int32_t& render_mode_setting_00657d6c=unused_settings[3];
+std::int32_t& render_mode_setting_00657d70=unused_settings[4];std::int32_t& render_mode_setting_00657d78=unused_settings[5];std::int32_t& render_mode_setting_00657d80=unused_settings[6];
+void __cdecl render_mode_driver_prepare_vslot9(void*){ExitProcess(90);}
+void __cdecl render_mode_apply_settings_0044e890(){ExitProcess(90);}
+void __cdecl render_mode_update_alternate_0044f020(){ExitProcess(90);}
+U __cdecl render_mode_clock_00555bc0(){ExitProcess(90);return 0;}
+}
+static U __cdecl alternate1(U,U);static U __cdecl alternate2(U,U);
+static U __stdcall api(U,U);static U __stdcall api2(U,U);static U __stdcall alias_api(U,U);
+static U identity(U p){
+    if(p==ptr(reinterpret_cast<void*>(&render_buffer_state_00540480))||(code[4]&&p==ptr(code[4])))return 0x540480;
+    if(p==ptr(reinterpret_cast<void*>(&render_buffer_state_alias_005404e0))||(code[5]&&p==ptr(code[5])))return 0x5404e0;
+    if(p==ptr(reinterpret_cast<void*>(&render_resource_option_state_00535a60))||(code[1]&&p==ptr(code[1])))return 0x535a60;
+    if(p==ptr(reinterpret_cast<void*>(&render_resource_texture_state_00535a90)))return 0x535a90;
+    if(p==ptr(reinterpret_cast<void*>(&alternate1)))return 0xa001;
+    if(p==ptr(reinterpret_cast<void*>(&alternate2)))return 0xa002;
+    if(p==ptr(reinterpret_cast<void*>(&api)))return 0x6bd97c;
+    if(p==ptr(reinterpret_cast<void*>(&api2)))return 0x16bd97c;
+    if(p==ptr(reinterpret_cast<void*>(&alias_api)))return 0x6bd918;
+    return p;
+}
+static void snapshot(State& s){memcpy(s.buffer,buffer,128);memcpy(s.records,render_state_flush_records_005de6bc,112);
+    const U* t=cpp_side?render_state_flush_callbacks_005de72c:raw_table;for(U i=0;i<7;++i)s.callbacks[i]=identity(t[i]);
+    for(U i=0;i<43;++i)s.exports[i]=identity(render_thrash_exports_006bd910[i]);s.option=render_mode_option_0069dd1d;memset(s.pad,0,3);
+}
+static void capture(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))memcpy(f.values+i*10,floating+32+i*16,10);else memset(f.values+i*10,0,10);}}
+
+static void seed_fpu(){unsigned short cw=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm fninit __asm fldcw cw
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+    B environment[28];__asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment+4)|=static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+static U invoke(void* fn,void* receiver,const U* args,U count,U cleanup,U& result){U before,frame,fail=0,out;__asm {
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov eax,count
+    mov edx,args
+pushargs:test eax,eax
+    jz pushed
+    dec eax
+    push dword ptr [edx+eax*4]
+    jmp pushargs
+pushed:mov ecx,receiver
+    mov edx,0deadc0deh
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov out,eax
+    add esp,cleanup
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    result=out;return fail;}
+
+static U endpoint(U tag,U a,U b){require(trace.count<64,"event bound");auto& e=trace.events[trace.count++];e.tag=tag;e.key=a;e.value=b;snapshot(e.state);capture(e.fpu);
+    const U base=kind==2?11:0;const bool flush=(kind==0||kind==2)&&trace.count>base;U* t=cpp_side?render_state_flush_callbacks_005de72c:raw_table;
+    if(flush){const U call=trace.count-1-base,i=call/2;require(i<7,"actual fourteen-call frontier");
+        if(flags&1)t[i]=ptr(reinterpret_cast<void*>((call&1)?&alternate1:&alternate2));
+        if(flags&2){render_state_flush_records_005de6bc[2*i+14]=0x80000000u^a^i;render_state_flush_records_005de6bc[2*i+15]=0xffffffffu^b^(i<<8);}
+        if((flags&4)&&i<6){render_state_flush_records_005de6bc[2*i+2]=0x13570000u^(i+1);render_state_flush_records_005de6bc[2*i+3]=0x24680000u^(i+1);t[i+1]=ptr(reinterpret_cast<void*>(&alternate1));}
+    }
+    if(flags&8)render_mode_set_option_00535b40(render_mode_option_0069dd1d?0:0x80);
+    if(flags&16){render_thrash_exports_006bd910[27]=ptr(reinterpret_cast<void*>(&api2));for(U o:{4u,8u,0xcu,0x14u,0x18u,0x1cu,0x20u,0x24u,0x28u,0x2cu})put(buffer+offset,o,a^b^o);put(buffer+offset,0x34,value);}
+    if(flags&32){unsigned short cw=static_cast<unsigned short>(0x7f|((precision==0?3u:0u)<<8)|(((rounding+1)%4)<<10));__asm fldcw cw}
+    return 0x89abcdefu^tag^a^(b<<1);
+}
+static U __stdcall api(U a,U b){return endpoint(0x6bd97c,a,b);}
+static U __stdcall api2(U a,U b){return endpoint(0x16bd97c,a,b);}
+static U __stdcall alias_api(U a,U b){return endpoint(0x6bd918,a,b);}
+static U __cdecl alternate1(U a,U b){return endpoint(0xa001,a,b);}
+static U __cdecl alternate2(U a,U b){return endpoint(0xa002,a,b);}
+namespace porsche {U __cdecl render_resource_texture_state_00535a90(U a,U b){return endpoint(0x535a90,a,b);}}
+static U __cdecl unreachable(U,U){require(false,"raw523 self-CMP dead path");return 0;}
+static void absolute(B* p,U n,U old,const void* replacement,U expected_count){U found=0;for(U i=0;i+4<=n;++i)if(word(p,i)==old){put(p,i,ptr(replacement));++found;i+=3;}require(found==expected_count,"absolute relocation count");}
+static void relative(B* p,U n,U va,U old,const void* replacement,U expected_count){U found=0;for(U i=0;i+5<=n;++i)if(p[i]==0xe8&&va+i+5+word(p,i+1)==old){put(p,i+1,ptr(replacement)-ptr(p+i+5));++found;i+=4;}require(found==expected_count,"relative relocation count");}
+static const B records_initial[112]={@RECORDS@},table_initial[28]={@TABLE@};
+static void init(){require(render_mode_option_0069dd1d==0,"actual canonical option initial zero");require(memcmp(render_state_flush_records_005de6bc,records_initial,112)==0,"original records initial bytes");
+    const U mapping[]={0x540480,0x540480,0x540480,0x535a60,0x540480,0x535a90,0x535a90};
+    for(U i=0;i<7;++i)require(word(table_initial,4*i)==mapping[i]&&identity(render_state_flush_callbacks_005de72c[i])==mapping[i],"raw initial slot to canonical symbol");
+    for(const void* p:{static_cast<const void*>(render_state_flush_records_005de6bc),static_cast<const void*>(render_state_flush_callbacks_005de72c)}){MEMORY_BASIC_INFORMATION q{};require(VirtualQuery(p,&q,sizeof q)!=0&&(q.Protect==PAGE_READWRITE||q.Protect==PAGE_EXECUTE_READWRITE||q.Protect==PAGE_WRITECOPY),"mutable production records/table permissions");}
+    static const B flush[]={@FLUSH@},option[]={@OPTION@},ctor[]={@CTOR@},apply[]={@APPLY@},state[]={@STATE@},alias[]={@ALIAS@};const B* bodies[]={flush,option,ctor,apply,state,alias};const U sizes[]={51,44,86,197,17,17};
+    for(U i=0;i<6;++i){code[i]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[i]!=nullptr,"raw allocation");memcpy(code[i],bodies[i],sizes[i]);}
+    absolute(code[0],51,0x5de72c,raw_table,1);absolute(code[0],51,0x5de748,raw_table+7,1);absolute(code[0],51,0x5de6bc,render_state_flush_records_005de6bc,1);
+    absolute(code[1],44,0x69dd1d,&render_mode_option_0069dd1d,1);absolute(code[1],44,0x6bd97c,render_thrash_exports_006bd910+27,2);
+    relative(code[2],86,0x537700,0x537760,code[3],1);relative(code[2],86,0x537700,0x535b00,code[0],1);
+    relative(code[3],197,0x537760,0x540480,code[4],7);relative(code[3],197,0x537760,0x5404e0,code[5],4);relative(code[3],197,0x537760,0x5404a0,reinterpret_cast<void*>(&unreachable),1);absolute(code[3],197,0x5dedf4,&dead_word,1);
+    absolute(code[4],17,0x6bd97c,render_thrash_exports_006bd910+27,1);absolute(code[5],17,0x6bd918,render_thrash_exports_006bd910+2,1);
+    for(B* p:code)require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"instruction cache");
+}
+static void reset(U mode,U layout){memset(buffer,0x65+(value&7),128);memcpy(render_state_flush_records_005de6bc,records_initial,112);
+    if(layout)for(U i=0;i<28;++i)render_state_flush_records_005de6bc[i]=value^(0x1020304u*(i+1));
+    for(U i=0;i<7;++i){U id=word(table_initial,4*i);raw_table[i]=id==0x540480?ptr(code[4]):id==0x535a60?ptr(code[1]):ptr(reinterpret_cast<void*>(&render_resource_texture_state_00535a90));render_state_flush_callbacks_005de72c[i]=id==0x540480?ptr(reinterpret_cast<void*>(&render_buffer_state_00540480)):id==0x535a60?ptr(reinterpret_cast<void*>(&render_resource_option_state_00535a60)):ptr(reinterpret_cast<void*>(&render_resource_texture_state_00535a90));}
+    if(layout==2)for(U i=0;i<7;++i)raw_table[i]=render_state_flush_callbacks_005de72c[i]=ptr(reinterpret_cast<void*>(&alternate1));
+    render_mode_set_option_00535b40(mode);for(U& x:render_thrash_exports_006bd910)x=0;render_thrash_exports_006bd910[27]=ptr(reinterpret_cast<void*>(&api));render_thrash_exports_006bd910[2]=ptr(reinterpret_cast<void*>(&alias_api));trace.count=trace.result=0;
+}
+static void compare(U mode,U layout){for(U side=0;side<2;++side){cpp_side=side!=0;reset(mode,layout);seed_fpu();void* fn;void* receiver=nullptr;U args[2]={key,value},count=0,cleanup=0;
+        if(kind==0)fn=side?reinterpret_cast<void*>(&render_resource_flush_states_00535b00):code[0];
+        else if(kind==1){fn=side?reinterpret_cast<void*>(&render_resource_option_state_00535a60):code[1];count=2;cleanup=8;}
+        else {fn=side?reinterpret_cast<void*>(&render_driver_buffer_ctor_00537700):code[2];receiver=buffer+offset;}
+        U result;require(invoke(fn,receiver,args,count,cleanup,result)==0,"cdecl/thiscall stack and preserved registers");trace.result=kind==0?0:result;snapshot(trace.final);capture(trace.fpu);
+        if(!side)expected=trace;else{require(trace.count==expected.count&&trace.result==expected.result,"event count/used result");for(U i=0;i<trace.count;++i)if(memcmp(&trace.events[i],&expected.events[i],sizeof(Event))){printf("event=%u tags=%x/%x args=%x,%x/%x,%x\n",i,expected.events[i].tag,trace.events[i].tag,expected.events[i].key,expected.events[i].value,trace.events[i].key,trace.events[i].value);require(false,"callback reload/paired records/prestate/x87");}require(memcmp(&trace.final,&expected.final,sizeof(State))==0,"final mutable records/table/buffer/option");require(memcmp(&trace.fpu,&expected.fpu,sizeof(Fpu))==0,"final x87");events_total+=trace.count;}
+    }++cases;
+}
+int main(){AddVectoredExceptionHandler(1,fault);init();const U values[]={0,1,0x80000000,0xffffffff,0x7fa12345,0x80000001};
+    for(kind=0;kind<3;++kind)for(U mode:{0u,1u,0x80u,0xffu})for(U layout=0;layout<3;++layout)for(flags=0;flags<64;++flags)for(offset=0;offset<4;++offset)for(U v:values){value=v;key=v^0x51a3c2e7;precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=(cases%4)*2;initial_status=cases&1?0x3f:0;compare(mode,layout);}
+    __asm fninit
+    printf("render_state_flush_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;
+}

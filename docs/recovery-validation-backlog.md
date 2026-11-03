@@ -1,14 +1,15 @@
 # Отложенные проверки восстановления v2
 
-Run526:9 originals591B/4B state;324,096 comparisons/30 mutations/715 pins PASS;
-292 TUs/145 names152 refs,noEXE. Cleanup/order/live reload/used returns and buffer
-FP/state callbacks match original x86. Actual deallocator/window/library/virtual
-children are controlled: no heap/device cleanup or use-after-free acceptance.
-535b00/575930 and existing575640 remain real frontiers;522 DSP proof and527 flush
-recovery pending. Resource factory/table ABI still needs actual consumer tracing;
-RET cleanup alone does not establish arity. Preserve prior descriptor/LUT owner
-proof and recheck832B adjacency in the first game EXE. Fault/unmasked FP/concurrent/
-mutable string/live API/full producer/startup/gameplay/403/411 checks remain open.
+Run529:5 originals611B/148B data;118,028 comparisons/24 mutations/720 pins PASS;
+294 TUs/146 names153 refs,noEXE. Exact FTOL and13-byte packet packing plus mutable
+state table/paired callback reloads match original. Byte13 remains opaque.
+535a90 signed-stage physical reads need actual writer/consumer range evidence;
+full597360/597180 DSP and5972b0 composition remain open. Original coefficient
+zero/NaN exit leaves later stack outputs unwritten: preserve this, prove which
+metric outputs depend on opaque locals, label partial domains rather than zeroing.
+Private splash casts stay unchanged. Preserve prior owner/NOICF/descriptor proofs;
+recheck832B LUT adjacency in the first game EXE. Actual heap/device cleanup, faults,
+unmasked FP/concurrency/mutable strings/full producer/startup/gameplay/403/411 stay open.
 
 Run514:2originals759B/4Breadonly;542720nativecases/15mutations/691pins PASS;
 282TUs/140names146refs,noEXE. Genericvslot+actualgetter/alternatecallbacks, unordered

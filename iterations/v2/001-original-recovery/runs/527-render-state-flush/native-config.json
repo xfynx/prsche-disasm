@@ -1,0 +1,183 @@
+{
+  "run": 527,
+  "experiment": "local/experiments/v2-render-state-flush-527",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+    "iterations/v2/001-original-recovery/runs/523-render-resource-buffer/render_buffer_523.cpp",
+    "iterations/v2/001-original-recovery/runs/359-render-settings-bindings/render_settings_binding.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_mode.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/527-render-state-flush/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/527-render-state-flush",
+    "iterations/v2/001-original-recovery/runs/523-render-resource-buffer",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.hpp",
+    "iterations/v2/001-original-recovery/runs/527-render-state-flush/ownership-search.json",
+    "iterations/v2/001-original-recovery/runs/527-render-state-flush/initial-state.json",
+    "iterations/v2/001-original-recovery/runs/527-render-state-flush/original-evidence.json",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/render_loader.cpp"
+  ],
+  "timeout_seconds": 240,
+  "pass_marker": "render_state_flush_original_x86_vs_cpp=PASS",
+  "original_bodies": [
+    {
+      "token": "@FLUSH@",
+      "va": "00535b00",
+      "bytes": 51,
+      "sha256": "81b0b4ccc4695e661195427209db09d7fc623fb9beca718065a798a5baa1efbe"
+    },
+    {
+      "token": "@OPTION@",
+      "va": "00535a60",
+      "bytes": 44,
+      "sha256": "e37bf4a50435b4551f14d7a54a4d9cef720924a852cf728c33b5a98ffc2065cd"
+    },
+    {
+      "token": "@CTOR@",
+      "va": "00537700",
+      "bytes": 86,
+      "sha256": "c5afdcaeafffc415957e08487864940365d70f550b60a759bb9582cf2cfdc1d5"
+    },
+    {
+      "token": "@APPLY@",
+      "va": "00537760",
+      "bytes": 197,
+      "sha256": "1d597e5ccee71cc60392dc167d1c632ffb4be0205f92c18ec2232da081287024"
+    },
+    {
+      "token": "@STATE@",
+      "va": "00540480",
+      "bytes": 17,
+      "sha256": "f133d994b7d3d50a4c1e34656b526d716494cbf8615c0176bb53902b07fed064"
+    },
+    {
+      "token": "@ALIAS@",
+      "va": "005404e0",
+      "bytes": 17,
+      "sha256": "8561f60a4b534dcef76060351811fa6e31d1355b92b8dcfb68552d2891d949f7"
+    },
+    {
+      "token": "@RECORDS@",
+      "va": "005de6bc",
+      "bytes": 112,
+      "sha256": "bedef876fd96d6d036d7104546857e2ee14869df86d1f0231873408da9cb735e"
+    },
+    {
+      "token": "@TABLE@",
+      "va": "005de72c",
+      "bytes": 28,
+      "sha256": "6691633e4c2753b1fa4d3da20a2c85714902497827d6723f542d9e49c977d123"
+    }
+  ],
+  "mutations": [
+    {
+      "name": "loop-bound",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "i<7;++i",
+      "new": "i<6;++i",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "first-key",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "const U key1=render_state_flush_records_005de6bc[2*i];",
+      "new": "const U key1=render_state_flush_records_005de6bc[2*i+1];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "first-value",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "const U value1=render_state_flush_records_005de6bc[2*i+1];",
+      "new": "const U value1=render_state_flush_records_005de6bc[2*i];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "second-key",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "const U key2=render_state_flush_records_005de6bc[2*i+14];",
+      "new": "const U key2=render_state_flush_records_005de6bc[2*i+15];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "second-value",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "const U value2=render_state_flush_records_005de6bc[2*i+15];",
+      "new": "const U value2=render_state_flush_records_005de6bc[2*i+14];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "callback-reload",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "for(U i=0;i<7;++i){\n        const U value1=render_state_flush_records_005de6bc[2*i+1];\n        const U key1=render_state_flush_records_005de6bc[2*i];\n        (void)reinterpret_cast<Callback>(render_state_flush_callbacks_005de72c[i])(key1,value1);\n        const U value2=render_state_flush_records_005de6bc[2*i+15];\n        const U key2=render_state_flush_records_005de6bc[2*i+14];\n        (void)reinterpret_cast<Callback>(render_state_flush_callbacks_005de72c[i])(key2,value2);",
+      "new": "for(U i=0;i<7;++i){\n        const U cached_callback=render_state_flush_callbacks_005de72c[i];\n        const U value1=render_state_flush_records_005de6bc[2*i+1];\n        const U key1=render_state_flush_records_005de6bc[2*i];\n        (void)reinterpret_cast<Callback>(cached_callback)(key1,value1);\n        const U value2=render_state_flush_records_005de6bc[2*i+15];\n        const U key2=render_state_flush_records_005de6bc[2*i+14];\n        (void)reinterpret_cast<Callback>(cached_callback)(key2,value2);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "record-reload",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "(void)reinterpret_cast<Callback>(render_state_flush_callbacks_005de72c[i])(key1,value1);\n        const U value2=render_state_flush_records_005de6bc[2*i+15];\n        const U key2=render_state_flush_records_005de6bc[2*i+14];",
+      "new": "const U value2=render_state_flush_records_005de6bc[2*i+15];\n        const U key2=render_state_flush_records_005de6bc[2*i+14];\n        (void)reinterpret_cast<Callback>(render_state_flush_callbacks_005de72c[i])(key1,value1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "option-byte",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "render_mode_option_0069dd1d!=0",
+      "new": "render_mode_option_0069dd1d==1",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "option-zero",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "&&value!=0",
+      "new": "",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "option-constant",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "value=3;",
+      "new": "value=2;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "used-result",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "return render_settings_set_state_006bd97c(key,value);",
+      "new": "return static_cast<std::uint8_t>(render_settings_set_state_006bd97c(key,value));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "initial-records",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "[28]={5,0,7,1,12,0",
+      "new": "[28]={6,0,7,1,12,0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "initial-slot",
+      "source": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.cpp",
+      "old": "reinterpret_cast<U>(&render_resource_option_state_00535a60),",
+      "new": "reinterpret_cast<U>(&render_buffer_state_00540480),",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

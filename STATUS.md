@@ -4,15 +4,15 @@ Updated 2026-11-04. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run526](iterations/v2/001-original-recovery/runs/526-driver-destruction-integration/README.md)
-compiles292 C++ translation units across8 projects. The link has145 unresolved names/
-152 references. **There is no recovered playable C++ game executable yet.**
+[Run529](iterations/v2/001-original-recovery/runs/529-dsp-state-flush-integration/README.md)
+compiles294 C++ translation units across8 projects. The link has146 unresolved names/
+153 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:9 originals/591B and4B writable state;324,096 comparisons/30 mutations/
-715 source pins pass. Four names close/two actual children appear; registry793.
-Driver destruction and buffer state application retain original callback ordering
-and FP effects. These are bounded proofs, not completion percentage/live-game
-acceptance. Earlier3DNow remains emulated; full platform/gameplay and403/411 remain.
+Latest:5 originals/611B and148B data;118,028 comparisons/24 mutations/720 source
+pins pass. Two names close/three actual children appear; registry798. Exact FTOL,
+13-byte DSP packing and mutable state-flush transport are verified within bounded
+original comparisons. Full DSP/stage/platform/gameplay domains remain open;
+earlier3DNow is emulated. These metrics are not a completion percentage.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through
 [Run445](iterations/v2/001-original-recovery/runs/445-audio-owner-alias-regression/README.md).

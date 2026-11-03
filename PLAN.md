@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run526](iterations/v2/001-original-recovery/runs/526-driver-destruction-integration/README.md).
-Driver destruction and buffer state application are integrated; actual children remain explicit.
+Latest recovery intake: [Run529](iterations/v2/001-original-recovery/runs/529-dsp-state-flush-integration/README.md).
+DSP transform and mutable state-flush transport are integrated; actual children remain explicit.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next recover the remaining DSP, state-flush, resource and renderer dependencies.
+Next recover remaining DSP, stage/resource and renderer library/cache dependencies.
 
 ## Recovery milestones
 
