@@ -1,0 +1,161 @@
+{
+  "run": 511,
+  "experiment": "local/experiments/v2-render-surface-init-511",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+    "iterations/v2/001-original-recovery/runs/382-rectangle/rectangle.cpp",
+    "iterations/v2/001-original-recovery/runs/221-readonly-scalar-storage/original_scalars.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/game_setup_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/511-render-surface-init/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/511-render-surface-init/",
+    "iterations/v2/001-original-recovery/runs/382-rectangle",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/511-render-surface-init/scope.json",
+    "iterations/v2/001-original-recovery/runs/511-render-surface-init/ownership-search.json",
+    "iterations/v2/001-original-recovery/runs/511-render-surface-init/original-index-supplement.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00538da0",
+      "bytes": 732,
+      "sha256": "95b29687af8a581016ede7f3e3dd06432b1ddd2ef77eb5ba8645019f38ee09e4",
+      "token": "@BODY_INIT@"
+    },
+    {
+      "va": "00556d00",
+      "bytes": 27,
+      "sha256": "cee707103f0981f71a108098d8f193201fc5c396035791fd696494ce56ca0be6",
+      "token": "@BODY_BOUNDS@"
+    }
+  ],
+  "pass_marker": "render_surface_init_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "half-value",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "render_surface_half_005b23f0=0.5f",
+      "new": "render_surface_half_005b23f0=0.25f",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "bounds-signed",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "__asm {fild value}",
+      "new": "__asm {fld value}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "bounds-height-reload",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "*width=signed_float(render_display_texture_width_005deac8);\n    *height=signed_float(render_display_texture_height_005deacc);",
+      "new": "const U cached_height=render_display_texture_height_005deacc;\n    *width=signed_float(render_display_texture_width_005deac8);\n    *height=signed_float(cached_height);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "virtual-slot",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "[eax+18h]",
+      "new": "[eax+14h]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "negative-unordered",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "(compare_words(a,0)&0x100u)!=0",
+      "new": "(compare_words(a,0)&0x4500u)==0x0100u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "bound-clamp-mask",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "(status&0x4100u)==0",
+      "new": "(status&0x4000u)==0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "bottom-float-spill",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "E bottom=add_words(height,y);",
+      "new": "E bottom=extended(add_store(height,y));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "area-unordered",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "(compare_area(clipped_width,clipped_height)&0x4000u)!=0",
+      "new": "(compare_area(clipped_width,clipped_height)&0x4500u)==0x4000u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "width-float-spill",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "const E clipped_width=sub_words(right,left);",
+      "new": "const E clipped_width=extended(word(sub_words(right,left)));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "half-width-spill",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "const E half_width=half(clipped_width);",
+      "new": "const E half_width=extended(word(half(clipped_width)));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "centerx-spill",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "const E center_x=add_word(half_width,left);",
+      "new": "const E center_x=extended(word(add_word(half_width,left)));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "halfheight-spill",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "const U half_height=word(half(extended(clipped_height)));",
+      "new": "const U half_height=word(half(clipped_width));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "opaque-field",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "put(surface,0x1ec,opaque1ec);\n        for(U o:{0x1f8u",
+      "new": "put(surface,0x1ec,opaque1e8);\n        for(U o:{0x1f8u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "adjustment-x-sign",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "sub_ext(add_word(half(extended(width)),x),center_x)",
+      "new": "sub_ext(center_x,add_word(half(extended(width)),x))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "offset-y-source",
+      "source": "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.cpp",
+      "old": "offset_y(delta_y,clipped_height)",
+      "new": "offset_y(delta_y,word(clipped_width))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

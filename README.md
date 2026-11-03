@@ -31,8 +31,8 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run509](iterations/v2/001-original-recovery/runs/509-coded-matrix-stream-query-integration/README.md)
-  integrates coded-audio setup, matrix/configuration, stream lifecycle and queries;141 link names remain.
+  [Run514](iterations/v2/001-original-recovery/runs/514-surface-init-integration/README.md)
+  integrates original surface initialization;140 link names remain.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

@@ -1,0 +1,109 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "render_surface_init_511.hpp"
+#include "rectangle.hpp"
+#include "porsche/game_setup.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(const void* p,U o=0){U v;memcpy(&v,static_cast<const B*>(p)+o,4);return v;}
+static void write(void* p,U o,U v){memcpy(static_cast<B*>(p)+o,&v,4);}
+static U cases,events_total,kind,pattern,mode,offset,facade,precision,rounding,depth,alias,boundw,boundh,callback_ecx;
+static U input[6];static bool cpp_side;
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s case=%u kind=%u pattern=%u mode=%u offset=%u facade=%u PC=%u RC=%u depth=%u alias=%u cpp=%u input=%08x,%08x,%08x,%08x bounds=%08x,%08x\n",why,cases,kind,pattern,mode,offset,facade,precision,rounding,depth,alias,cpp_side,input[0],input[1],input[2],input[3],boundw,boundh);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("native-fault %08lx eip=%08lx case=%u kind=%u pattern=%u mode=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,kind,pattern,mode,cpp_side);fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+namespace porsche {
+// Native fixture transport views; game storage remains the immutable496 owner.
+U render_display_texture_width_005deac8=0,render_display_texture_height_005deacc=0;
+void __stdcall render_display_draw_quad_006bd9a8(const void*,const void*,const void*,const void*){ExitProcess(90);}
+}
+alignas(16) static B arena[1024],floating[512];
+static U resource[2][2],driver[2][8],vtable[2][8];
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+struct State{B arena[1024];U resource[2][2],driver[2][8],movie,width,height;};
+struct Event{U receiver,pointer_delta;State state;Fpu fpu;};
+struct Trace{U count,result,abi;Event event;State final;Fpu fpu;};
+static Trace trace,expected;
+static void capture(Fpu& f){__asm fxsave floating
+    f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);for(U i=0;i<8;++i){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))memcpy(f.values+i*10,floating+32+i*16,10);else memset(f.values+i*10,0,10);}}
+static void snapshot(State& s){memcpy(s.arena,arena,sizeof(arena));memcpy(s.resource,resource,sizeof(resource));memcpy(s.driver,driver,sizeof(driver));s.movie=ptr(game_setup_movie_service_0069ed0c);s.width=render_display_texture_width_005deac8;s.height=render_display_texture_height_005deacc;}
+static void __stdcall alternate_impl(U* width,U* height){require(trace.count==0,"one virtual bounds call");trace.count=1;trace.event.receiver=callback_ecx;trace.event.pointer_delta=ptr(height)-ptr(width);snapshot(trace.event.state);capture(trace.event.fpu);require(callback_ecx==ptr(driver[0]),"virtual ECXreceiver");require(ptr(height)==ptr(width)+4,"RET8 two separate adjacent output pointers");*width=boundw;*height=boundh;
+    if(mode&1){write(arena+offset,0x1f0,0x12345678);write(arena+offset,0x210,0x87654321);driver[0][3]^=0x4321abcd;}
+    if(mode&2){resource[0][0]=ptr(driver[1]);game_setup_movie_service_0069ed0c=resource[1];render_display_texture_width_005deac8^=0x87654321;render_display_texture_height_005deacc+=17;}
+    if(mode&4){unsigned short cw=static_cast<unsigned short>(0x7f|((precision==0?3u:0u)<<8)|(((rounding+1u)%4)<<10));__asm fldcw cw}
+}
+static void __declspec(naked) __stdcall alternate(U*,U*){__asm mov callback_ecx,ecx __asm jmp alternate_impl}
+static U __stdcall unexpected_slot(U*,U*){require(false,"virtual slot must be6");return 0;}
+static B* code[2];
+static void absolute(B* p,U n,U old,const void* replacement,U count){U found=0;for(U i=0;i+4<=n;++i)if(read(p,i)==old){write(p,i,ptr(replacement));++found;i+=3;}require(found==count,"absolute relocation count");}
+static void init(const char* pe){FILE* f=nullptr;require(fopen_s(&f,pe,"rb")==0,"open original");U half,zero;require(fseek(f,0x1b23f0,SEEK_SET)==0&&fread(&half,4,1,f)==1&&fseek(f,0x1b23f8,SEEK_SET)==0&&fread(&zero,4,1,f)==1&&fclose(f)==0,"raw scalar read");require(half==0x3f000000&&zero==0&&read(&render_surface_half_005b23f0)==half&&read(&rectangle_zero_005b23f8)==zero,"actual scalar owners equal raw original");for(const float* p:{&render_surface_half_005b23f0,&rectangle_zero_005b23f8}){MEMORY_BASIC_INFORMATION info{};require(VirtualQuery(p,&info,sizeof(info))==sizeof(info)&&((info.Protect&0xff)==PAGE_READONLY||(info.Protect&0xff)==PAGE_EXECUTE_READ),"readonly scalar owner");}
+    static const B init_body[]={ @BODY_INIT@ },bounds[]={ @BODY_BOUNDS@ };const B* bodies[]={init_body,bounds};const U sizes[]={732,27};for(U i=0;i<2;++i){code[i]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[i]!=nullptr,"raw code allocation");memcpy(code[i],bodies[i],sizes[i]);}
+    absolute(code[0],732,0x69ed0c,&game_setup_movie_service_0069ed0c,1);absolute(code[0],732,0x5b23f0,&render_surface_half_005b23f0,4);absolute(code[0],732,0x5b23f8,&rectangle_zero_005b23f8,6);
+    absolute(code[1],27,0x5deac8,&render_display_texture_width_005deac8,1);absolute(code[1],27,0x5deacc,&render_display_texture_height_005deacc,1);for(B* p:code)require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"instruction cache");
+}
+static void seed_fpu(){unsigned short control=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm fninit __asm fldcw control
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}}
+static U invoke(void* fn,void* receiver,const U* args,U count,bool raw,U& result){U before,frame,fail=0,out,cleanup=kind==2||raw?0:(count+1)*4;__asm {
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov eax,count
+    mov edx,args
+pushargs:test eax,eax
+    jz pushed
+    dec eax
+    push dword ptr [edx+eax*4]
+    jmp pushargs
+pushed:cmp raw,0
+    jne callfn
+    cmp kind,2
+    je callfn
+    push receiver
+callfn:mov ecx,receiver
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov out,eax
+    add esp,cleanup
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    result=out;return fail;
+}
+static U random_word(U& v){v^=v<<13;v^=v>>17;v^=v<<5;return v;}
+static void setup(){trace.count=trace.result=trace.abi=0;memset(&trace.event,0,sizeof(trace.event));for(U i=0;i<sizeof(arena);++i)arena[i]=static_cast<B>(i*37+pattern*17);for(U i=0;i<2;++i){for(U j=0;j<8;++j){driver[i][j]=0x11110000+i*16+j;vtable[i][j]=ptr(reinterpret_cast<void*>(&unexpected_slot));}driver[i][0]=ptr(vtable[i]);resource[i][0]=ptr(driver[i]);resource[i][1]=0x12345678+i;}game_setup_movie_service_0069ed0c=resource[0];vtable[0][6]=kind==0?ptr(reinterpret_cast<void*>(&alternate)):cpp_side?ptr(reinterpret_cast<void*>(&render_surface_bounds_00556d00)):ptr(code[1]);
+    static const U special[]={0,0x80000000,1,0x80000001,0x007fffff,0x807fffff,0x00800000,0x80800000,0x3f800000,0xbf800000,0x3f800001,0xbf800001,0x7f7fffff,0xff7fffff,0x7f800000,0xff800000,0x7fc00001,0xffc00001,0x7fffffff,0xffffffff,0x7f800001,0xff800001,0x7fbfffff,0xffbfffff};
+    U seed=0x12345678u+pattern*0x1020304u;for(U i=0;i<6;++i)input[i]=pattern<24?special[(pattern*7+i*11)%24]:(random_word(seed)&0x807fffff)|((118u+random_word(seed)%18u)<<23);boundw=pattern<24?special[(pattern*13+1)%24]:0x4c000000;boundh=pattern<24?special[(pattern*5+9)%24]:0x4c000000;
+    if(pattern==0){input[0]=0x44480000;input[1]=0x44160000;input[2]=input[3]=0;boundw=input[0];boundh=input[1];}
+    if(pattern==1){input[0]=0x41200000;input[1]=0x41a00000;input[2]=0x3f800000;input[3]=0x40000000;boundw=boundh=0x42c80000;}
+    if(pattern==8){input[0]=input[1]=0x3f800000;input[2]=0;input[3]=0x4b800000;boundw=0x42c80000;boundh=0x4c000000;}
+    static const U dimensions[]={0,1,800,600,0xffffffff,0xfffffffe,0x7fffffff,0x80000000,16777217,16777219,0x01000003,0xff000001};render_display_texture_width_005deac8=dimensions[pattern%12];render_display_texture_height_005deacc=dimensions[(pattern*7+1)%12];
+}
+static void compare(){for(U side=0;side<2;++side){cpp_side=side!=0;setup();seed_fpu();U args[6];memcpy(args,input,sizeof(args));U count=6;void* candidate=facade?reinterpret_cast<void*>(&render_display_surface_init_00538da0):reinterpret_cast<void*>(&render_surface_init_bits_00538da0);void* raw=code[0];if(kind==2){U* w=reinterpret_cast<U*>(arena+300),*h=reinterpret_cast<U*>(arena+304);switch(alias){case 1:h=w;break;case 2:w=&render_display_texture_height_005deacc;break;case 3:h=&render_display_texture_width_005deac8;break;case 4:w=&render_display_texture_width_005deac8;h=&render_display_texture_height_005deacc;break;case 5:w=&render_display_texture_height_005deacc;h=&render_display_texture_width_005deac8;break;case 6:w=h=&render_display_texture_height_005deacc;break;case 7:w=reinterpret_cast<U*>(arena+301);h=reinterpret_cast<U*>(arena+303);break;}args[0]=ptr(w);args[1]=ptr(h);count=2;candidate=reinterpret_cast<void*>(&render_surface_bounds_00556d00);raw=code[1];}
+        U result;trace.abi=invoke(side?candidate:raw,arena+offset,args,count,side==0,result);trace.result=kind==2?result:0;snapshot(trace.final);capture(trace.fpu);require(trace.abi==0,"ESP/nonvolatile ABI");
+        if(side){require(expected.count==trace.count&&expected.result==trace.result,"event count/used EAX");require(memcmp(&expected.event,&trace.event,sizeof(Event))==0,"virtual receiver/output layout/prestate/x87");if(memcmp(&expected.final,&trace.final,sizeof(State))!=0){for(U i=0;i<sizeof(arena);++i)if(expected.final.arena[i]!=trace.final.arena[i]){printf("memory offset=%u raw=%08x cpp=%08x\n",i,read(expected.final.arena,i&~3u),read(trace.final.arena,i&~3u));break;}require(false,"final object/global/guard bytes");}if(memcmp(&expected.fpu,&trace.fpu,sizeof(Fpu))!=0){printf("x87 raw CW=%x SW=%x tag=%x cpp CW=%x SW=%x tag=%x\n",expected.fpu.control,expected.fpu.status,expected.fpu.tag,trace.fpu.control,trace.fpu.status,trace.fpu.tag);require(false,"x87 active80/control/status/tag");}events_total+=trace.count;}else expected=trace;
+    }++cases;}
+int main(int argc,char** argv){require(argc==2,"PE argument");AddVectoredExceptionHandler(1,fault);init(argv[1]);alias=0;
+    for(kind=0;kind<2;++kind)for(pattern=0;pattern<48;++pattern)for(offset=0;offset<4;++offset)for(facade=0;facade<2;++facade)for(mode=0;mode<(kind==0?8u:1u);++mode)for(U pc:{0u,2u,3u})for(rounding=0;rounding<4;++rounding)for(depth=0;depth<6;++depth){precision=pc;compare();}
+    kind=2;offset=facade=mode=0;for(pattern=0;pattern<24;++pattern)for(alias=0;alias<8;++alias)for(U pc:{0u,2u,3u})for(rounding=0;rounding<4;++rounding)for(depth=0;depth<8;++depth){precision=pc;compare();}
+    kind=0;alias=offset=facade=0;for(pattern=48;pattern<4144;++pattern){precision=pattern%3==0?0:pattern%3==1?2:3;rounding=pattern%4;depth=pattern%6;mode=pattern%8;compare();}
+    __asm fninit
+    printf("render_surface_init_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;}

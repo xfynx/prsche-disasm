@@ -19,8 +19,8 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run509](iterations/v2/001-original-recovery/runs/509-coded-matrix-stream-query-integration/README.md).
-Coded-audio setup, matrix/configuration, stream lifecycle and splash queries are integrated.
+Latest recovery intake: [Run514](iterations/v2/001-original-recovery/runs/514-surface-init-integration/README.md).
+Original surface initialization and dimension-getter transport are integrated.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Next integrate surface initialization and recover remaining decoder/stream/display dependencies.

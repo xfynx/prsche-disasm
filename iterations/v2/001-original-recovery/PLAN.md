@@ -1,5 +1,21 @@
 # v2 / 001 - original source recovery plan
 
+Current514,2026-11-03: frozen511004 adds2originals759B/4Breadonly;registry757.
+AuditPASS542720nativecases/450560events/15mutations/691pins/597providers;
+282TUs/8projects,140names146refs,noEXE. Oneclose/no newnames. Init/getter+alternate
+vslotcallbacks, FP/alias/domain proofs bounded; actualdriver/fullparent/live open.
+Build001missingexisting382include stoppedprecompile;002fixesconfigonly, noproreruns.
+Active512nibbleconstraints(simd_oracle_497),513worker/stop(pcm_constructors_493),
+515driverctors(render_resources_494,userresetconfirmed). Coordinatorowns516next
+ready-set intake; no expansionofpassed514. Originals/passedinputs immutable.
+512mustproveheader/table domains orlabelpartial, no inventedbroadcapacity/guards.
+515scope12fullbodies299B/4Bwritable/136Breadonlytables,7actualmethodfrontiers;
+ctorresourceargignored andlaterbindingmustnotbeinferred. Remainingruntime/fault/
+lifetime/concurrency/live/startup/gameplay/403/411 boundaries persist. Source
+consolidationonlyaftercompleteoriginalcoderecovery. BatchREADMEs owncommands.
+
+Historical509 follows.
+
 Current509,2026-11-03: frozen504003/506001/508002/510001 add25originals2177B/56Bdata
 (44writable/12readonly);registry755. SharedauditPASS913288nativecases/10364events/
 49mutations/688pins/593exports;281TUs/8projects,141names147refs,noEXE.15close/11real
@@ -7,7 +23,7 @@ codedprocess/nibbledecoder/backendchildren. ExactFPorder/aliases, canonicalstrea
 producer/lifecycle andqueryABI proved; runtime/fullparent/fault/live domains persist.
 Passedinputs/originals frozen; no sourceconsolidationnow. READMEownscommands.
 Ready511surfaceinit2originals759B/4Breadonly,542720cases/450560events/15mutations;
-coordinatorowns514nextintake. Active512nibbledecode trace(simd_oracle_497),513stream
+coordinatorbuilds514forready511 only (freeze509scope). Active512nibbledecode trace(simd_oracle_497),513stream
 worker/stop(pcm_constructors_493),515driverctortrace(render_resources_494,resumedat
 user-confirmedquotareset). Workers ownrun/local only; commonbuild/registryrootowned.
 512header-validity constraints unresolved: don'tinfer capacitiesfromlabels/copy

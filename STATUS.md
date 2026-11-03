@@ -4,15 +4,15 @@ Updated 2026-11-03. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run509](iterations/v2/001-original-recovery/runs/509-coded-matrix-stream-query-integration/README.md)
-compiles281 C++ translation units across8 projects. The link has141 unresolved names/
-147 references. **There is no recovered playable C++ game executable yet.**
+[Run514](iterations/v2/001-original-recovery/runs/514-surface-init-integration/README.md)
+compiles282 C++ translation units across8 projects. The link has140 unresolved names/
+146 references. **There is no recovered playable C++ game executable yet.**
 
-The latest batch adds25 original functions/2,177B and56B data.913,288 native cases/
-49 mutations and688 source pins pass;15 names close and11 actual coded-audio/stream
-children appear. Registry755 entries. These are measured batch results, not a
-completion percentage. Ready511 and parallel decoder/stream/display work continue.
-Earlier3DNow proof is emulated; native AMD arithmetic remains unverified.
+The latest batch adds2 originals/759B and4B readonly data.542,720 native cases/
+15 mutations/691 source pins pass; one name closes with no new names. Registry757.
+Decoder/stream-worker/driver recovery continues in parallel. These counts describe
+bounded proofs, not completion percentage or live-game acceptance. Earlier3DNow
+proof remains emulated; native AMD arithmetic is unverified.
 The modem enumerator/callback retain partial domains; live platform behavior is unverified.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through

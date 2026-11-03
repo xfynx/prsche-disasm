@@ -1,5 +1,12 @@
 # Отложенные проверки восстановления v2
 
+Run514:2originals759B/4Breadonly;542720nativecases/15mutations/691pins PASS;
+282TUs/140names146refs,noEXE. Genericvslot+actualgetter/alternatecallbacks, unordered
+clipping/80bit/F32/alias effects proven. Actualdriver/fullparent/resourcevalidity/
+fault/lifetime/concurrency/livegraphics/gameplay remainopen.512table/header domains,
+513streamworker and515driver/probe/start semantics remainindependent pendingwork.
+
+
 Run509:25originals2177B/56Bdata;913288nativecases/49mutations/688pins PASS;
 281TUs/141names147refs,noEXE. Constructor/ADPCMsetup/matrix/streamproducer/query
 scopes proven; actualprocess/decoder/backend children remain. Fullheader/resource

@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(porsche_surface_init_514 LANGUAGES CXX)
+include("${CMAKE_CURRENT_SOURCE_DIR}/../509-coded-matrix-stream-query-integration/CMakeLists.txt")
+target_sources(porsche_game_entry_bridges PRIVATE ../511-render-surface-init/render_surface_init_511.cpp)
+target_include_directories(porsche_game_entry_bridges PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../511-render-surface-init" "${CMAKE_CURRENT_SOURCE_DIR}/../382-rectangle")

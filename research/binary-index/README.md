@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run511: [driver getter supplement](../../iterations/v2/001-original-recovery/runs/511-render-surface-init/original-index-supplement.json)
+records omitted00556d00 full27B/RET8 and both driver-table references.
+[Run514](../../iterations/v2/001-original-recovery/runs/514-surface-init-integration/README.md)
+accepts bounded initializer/getter proof; real driver construction remains open.
+
+
 Run504: [coded-audio entry supplement](../../iterations/v2/001-original-recovery/runs/504-audio-coded-constructors/original-index-supplement.json)
 records six omitted constructor/getter bodies and their original caller ABI.
 Run508: [transport supplement](../../iterations/v2/001-original-recovery/runs/508-audio-stream-producer-lifecycle/original-transport-supplement.json)
