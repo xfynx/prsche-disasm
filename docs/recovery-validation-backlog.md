@@ -1,15 +1,17 @@
 # Отложенные проверки восстановления v2
 
-Run529:5 originals611B/148B data;118,028 comparisons/24 mutations/720 pins PASS;
-294 TUs/146 names153 refs,noEXE. Exact FTOL and13-byte packet packing plus mutable
-state table/paired callback reloads match original. Byte13 remains opaque.
-535a90 signed-stage physical reads need actual writer/consumer range evidence;
-full597360/597180 DSP and5972b0 composition remain open. Original coefficient
-zero/NaN exit leaves later stack outputs unwritten: preserve this, prove which
-metric outputs depend on opaque locals, label partial domains rather than zeroing.
-Private splash casts stay unchanged. Preserve prior owner/NOICF/descriptor proofs;
+Run532:11 originals2334B/1486B data +1630B loader recheck;131,536 comparisons/
+35 mutations/725 pins PASS;296 TUs/141 names147 refs,noEXE. Loader fallback raw-code
+addresses are replaced with verified native symbols; old source is unchanged.
+597360 remains PARTIAL: original zero/unordered coefficient exits leave A stack
+slots unwritten. Accepted raw-observed full-write cases do not establish those
+paths or global equivalence.597180/5972b0 have direct bounded acceptance.
+Numeric diagnostic file tag5c0dd0 remains an old pointer boundary: next trace actual
+565340 consumer/dereference before promoting it.531 signed-stage reads remain
+unbounded; follow44d380 argument7 producers, not initial table values.533 ready,
+534 draft unvalidated,536 scope pending. Preserve owner/NOICF/descriptor proof;
 recheck832B LUT adjacency in the first game EXE. Actual heap/device cleanup, faults,
-unmasked FP/concurrency/mutable strings/full producer/startup/gameplay/403/411 stay open.
+unmasked FP/concurrency/full producer/startup/gameplay/403/411 remain open.
 
 Run514:2originals759B/4Breadonly;542720nativecases/15mutations/691pins PASS;
 282TUs/140names146refs,noEXE. Genericvslot+actualgetter/alternatecallbacks, unordered

@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run528: [small fallback/timed callback supplement](../../iterations/v2/001-original-recovery/runs/528-render-library-lifecycle/index-supplement.json)
+pins omitted574f80/574f90/5756c0 full raw bodies, original consumers and RET extents.
+[Run532](../../iterations/v2/001-original-recovery/runs/532-library-dsp-integration/README.md)
+accepts bounded library/cache proof and a native-fallback loader replacement.
+
+
 Run511: [driver getter supplement](../../iterations/v2/001-original-recovery/runs/511-render-surface-init/original-index-supplement.json)
 records omitted00556d00 full27B/RET8 and both driver-table references.
 [Run514](../../iterations/v2/001-original-recovery/runs/514-surface-init-integration/README.md)

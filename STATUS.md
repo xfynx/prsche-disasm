@@ -4,14 +4,14 @@ Updated 2026-11-04. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run529](iterations/v2/001-original-recovery/runs/529-dsp-state-flush-integration/README.md)
-compiles294 C++ translation units across8 projects. The link has146 unresolved names/
-153 references. **There is no recovered playable C++ game executable yet.**
+[Run532](iterations/v2/001-original-recovery/runs/532-library-dsp-integration/README.md)
+compiles296 C++ translation units across8 projects. The link has141 unresolved names/
+147 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:5 originals/611B and148B data;118,028 comparisons/24 mutations/720 source
-pins pass. Two names close/three actual children appear; registry798. Exact FTOL,
-13-byte DSP packing and mutable state-flush transport are verified within bounded
-original comparisons. Full DSP/stage/platform/gameplay domains remain open;
+Latest:11 originals/2334B (10 bounded complete,1 partial metric) and1486B data;
+131,536 comparisons/35 mutations/725 pins pass. Five names close/no new names;
+registry809. Original loader/cache/native fallback paths are verified; metric
+unwritten-local paths remain unaccepted. Full platform/gameplay stays open;
 earlier3DNow is emulated. These metrics are not a completion percentage.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through

@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run529](iterations/v2/001-original-recovery/runs/529-dsp-state-flush-integration/README.md).
-DSP transform and mutable state-flush transport are integrated; actual children remain explicit.
+Latest recovery intake: [Run532](iterations/v2/001-original-recovery/runs/532-library-dsp-integration/README.md).
+Library/cache/native fallback paths and bounded DSP are integrated; metric597360 stays partial.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next recover remaining DSP, stage/resource and renderer library/cache dependencies.
+Next integrate verified resources and recover remaining processor/node dependencies.
 
 ## Recovery milestones
 

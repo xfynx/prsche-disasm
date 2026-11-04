@@ -1,0 +1,485 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "render_library_lifecycle_528.hpp"
+#include "porsche/render_loader.hpp"
+#include "porsche/window_scheduler.hpp"
+#include "porsche/window_position.hpp"
+#include <cstdio>
+#include <cstring>
+#include <cstdarg>
+#include <initializer_list>
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+#define FPTR(function) reinterpret_cast<U>(&function)
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(const void* p,U offset=0){U v;std::memcpy(&v,static_cast<const B*>(p)+offset,4);return v;}
+static void write(void* p,U offset,U v){std::memcpy(static_cast<B*>(p)+offset,&v,4);}
+static U cases,which,mode,effects,seed,value,precision,rounding,depth,load_count,proc_count,events_total;
+static bool cpp_side;
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s case=%u which=%u mode=%u effects=%u seed=%u value=%08x cpp=%u\n",why,cases,which,mode,effects,seed,value,cpp_side);std::fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){std::printf("native-fault %08lx eip=%08lx case=%u which=%u cpp=%u\n",e->ExceptionRecord->ExceptionCode,e->ContextRecord->Eip,cases,which,cpp_side);std::fflush(stdout);ExitProcess(98);return EXCEPTION_CONTINUE_SEARCH;}
+alignas(16) static B floating[512];
+struct Fpu{unsigned short control,status;B tag,padding[3],values[80];};
+struct State{U cache[8][45],exports[43],handle,token,started,name,error,file,line,registered;B timers[sizeof(timed_callbacks_0069dd20)];};
+struct Event{U tag,a,b;char text[512];State state;Fpu fpu;};
+struct Trace{U count,result,abi;Event events[64];State final;Fpu fpu;};
+static Trace trace,expected;
+static void(__cdecl* registered)();
+static char name_driver[]="driver",name_bang[]="!driver",name_empty[]="",name_only_bang[]="!",environment_driver[]="override";
+static const U about_data[]={0x33444658,0,0,0};
+namespace porsche {TimedCallbackSlot timed_callbacks_0069dd20[16]{};U current_tick_006b7c40=0;}
+static void capture(Fpu& f){__asm fxsave floating
+ f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];std::memset(f.padding,0,3);for(U i=0;i<8;++i){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))std::memcpy(f.values+i*10,floating+32+i*16,10);else std::memset(f.values+i*10,0,10);}}
+static void snapshot(State& s){std::memset(&s,0,sizeof(s));std::memcpy(s.cache,render_library_cache_0069e5f0,sizeof(s.cache));std::memcpy(s.exports,render_thrash_exports_006bd910,sizeof(s.exports));s.handle=render_library_handle_0069e5e8;s.token=render_cleanup_token_0069e5ec;s.started=render_library_started_006a64b8;s.name=render_driver_name_006a64b4;s.error=render_error_flag_005deb70;s.file=render_error_file_005deb74;s.line=render_error_line_005deb78;s.registered=reinterpret_cast<U>(registered);std::memcpy(s.timers,timed_callbacks_0069dd20,sizeof(s.timers));}
+static void event(U tag,U a=0,U b=0,const char* text=nullptr){require(trace.count<64,"event bound");Event& e=trace.events[trace.count++];std::memset(&e,0,sizeof(e));e.tag=tag;e.a=a;e.b=b;if(text){require(std::strlen(text)<sizeof(e.text),"bounded fixture string");std::strcpy(e.text,text);}snapshot(e.state);capture(e.fpu);}
+static U __stdcall restore_alt();
+static void effect(U tag){
+ if((effects&1)&&tag==0x5b2088){render_cleanup_token_0069e5ec=7;render_library_cache_0069e5f0[0][0]^=0x13579bdf;}
+ if((effects&2)&&tag==0x5a3050)render_cleanup_token_0069e5ec=0;
+ if((effects&4)&&tag==0x557380)render_cleanup_token_0069e5ec=seed&7;
+ if((effects&8)&&tag==0x6bd97c){render_thrash_exports_006bd910[10]=FPTR(restore_alt);render_library_started_006a64b8^=0x80000001;}
+ if(effects&16){unsigned short cw=static_cast<unsigned short>(0x7f|((precision==0?3u:0u)<<8)|(((rounding+1)%4)<<10));__asm fldcw cw}
+}
+static U __stdcall setstate(U a,U b){event(0x6bd97c,a,b);effect(0x6bd97c);const U returns[]={0,1,0x100,0x80000000};return returns[(seed+2*mode)%4];}
+static U __stdcall restore(){event(0x6bd938);effect(0x6bd938);return value;}
+static U __stdcall restore_alt(){event(0x6bd939);effect(0x6bd939);return ~value;}
+static const U* __stdcall about(){event(0x6bd934);return mode&16?nullptr:about_data;}
+static U __stdcall normal_optional(U argument){event(0x0f7,argument);return value^argument;}
+static U __stdcall unused_export(){require(false,"uncalled export");return 0;}
+static U __stdcall api_load(const char* name){event(0x5b2050,load_count,0,name);const U call=load_count++;return (mode&4)||((mode&1)&&call==0)?0:0x44000000u+call+1;}
+static U __stdcall api_getproc(U module,const char* name){event(0x5b205c,module,proc_count++,name);if((mode&8)&&std::strcmp(name,"_THRASH_clip@16")==0)return 0;
+ if(std::strcmp(name,"_THRASH_getstate@4")==0||std::strcmp(name,"_THRASH_tfree@4")==0)return mode&2?0:FPTR(normal_optional);
+ if(std::strcmp(name,"_THRASH_about@0")==0)return FPTR(about);if(std::strcmp(name,"_THRASH_setstate@8")==0)return FPTR(setstate);if(std::strcmp(name,"_THRASH_restore@0")==0)return FPTR(restore);return FPTR(unused_export);}
+static U __stdcall api_free(U module){event(0x5b2088,module);effect(0x5b2088);return 1;}
+static U __stdcall api_module(const char* name){event(0x5b2138,0,0,name);return mode&16?0:0x55667788;}
+static U __stdcall api_disable(U module){event(0x5b21b4,module);return 1;}
+static U __stdcall api_error(){event(0x5b213c);return 126;}
+namespace porsche {
+U __cdecl render_win_load_library_005b2050(const char* name){return api_load(name);}
+U __cdecl render_win_get_proc_005b205c(U module,const char* name){return api_getproc(module,name);}
+void __cdecl render_win_free_library_005b2088(U module){(void)api_free(module);}
+U __cdecl render_win_get_module_005b2138(const char* name){return api_module(name);}
+void __cdecl render_win_disable_thread_calls_005b21b4(U module){(void)api_disable(module);}
+U __cdecl render_win_last_error_005b213c(){return api_error();}
+void __cdecl render_loader_format_005a0fbf(char* out,const char* format,...){va_list args;va_start(args,format);std::vsnprintf(out,512,format,args);va_end(args);event(0x5a0fbf,0,0,out);}
+void __cdecl render_loader_report_00565340(const char* text){event(0x565340,0,0,text);}
+void __cdecl render_loader_directx_00574eb0(U out[2],const char* dll){event(0x574eb0,0,0,dll);out[0]=0;out[1]=mode&16?7:6;}
+void __cdecl render_loader_set_state_006bd97c(U function,U key,U val){using F=U(__stdcall*)(U,U);(void)reinterpret_cast<F>(function)(key,val);}
+const U* __cdecl render_loader_about_006bd934(U function){using F=const U*(__stdcall*)();return reinterpret_cast<F>(function)();}
+const char* __cdecl application_diagnostic_environment_005a3050(const char* name){event(0x5a3050,ptr(name),0,name);effect(0x5a3050);return seed%3==0?nullptr:seed%3==1?environment_driver:name_empty;}
+void __cdecl thread_exit_register_00557380(void(__cdecl* callback)()){event(0x557380,reinterpret_cast<U>(callback));registered=callback;effect(0x557380);}
+void __cdecl window_position_cleanup_0053bcb0(){event(0x53bcb0);effect(0x53bcb0);}
+void __cdecl window_scheduler_diagnostic_00565340(const char*){require(false,"uncalled register diagnostic");}
+}
+static B* code[9];
+static U iats[7],report_cell;
+static const U original_va[9]={0x594cd0,0x594f00,0x575600,0x575640,0x575930,0x5756c0,0x574f80,0x574f90,0x574fa0};
+static const U sizes[9]={558,553,51,115,68,13,5,5,1630};
+static const B body0[]={@BODY0@},body1[]={@BODY1@},body2[]={@BODY2@},body3[]={@BODY3@},body4[]={@BODY4@},body5[]={@BODY5@},body6[]={@BODY6@},body7[]={@BODY7@},body8[]={@BODY8@};
+static void absolute(B* p,U bytes,U old,const void* replacement,U expected_count){U count=0;for(U i=0;i+4<=bytes;++i)if(read(p,i)==old){write(p,i,ptr(replacement));++count;i+=3;}require(count==expected_count,"absolute relocation count");}
+static void relative(B* p,U bytes,U va,U old,const void* replacement,U expected_count){U count=0;for(U i=0;i+5<=bytes;++i)if(p[i]==0xe8&&va+i+5+read(p,i+1)==old){write(p,i+1,ptr(replacement)-ptr(p+i+5));++count;i+=4;}require(count==expected_count,"relative relocation count");}
+static const B pe_string_005c0de8[]={84,72,82,65,83,72,95,111,112,101,110,100,108,108,32,45,32,78,79,32,76,73,66,82,65,82,89,32,83,80,69,67,73,70,73,69,68,46,10,0};
+static const B pe_string_005ccb84[]={37,115,0};
+static const B pe_string_005c0dcc[]={37,115,122,0};
+static const B pe_string_005c0dbc[]={95,84,72,82,65,83,72,95,97,98,111,117,116,64,48,0};
+static const B pe_string_005c0da4[]={95,84,72,82,65,83,72,95,99,108,101,97,114,119,105,110,100,111,119,64,48,0};
+static const B pe_string_005c0d94[]={95,84,72,82,65,83,72,95,99,108,105,112,64,49,54,0};
+static const B pe_string_005c0d80[]={95,84,72,82,65,83,72,95,100,114,97,119,108,105,110,101,64,56,0};
+static const B pe_string_005c0d68[]={95,84,72,82,65,83,72,95,100,114,97,119,108,105,110,101,109,101,115,104,64,49,50,0};
+static const B pe_string_005c0d4c[]={95,84,72,82,65,83,72,95,100,114,97,119,108,105,110,101,115,116,114,105,112,64,49,50,0};
+static const B pe_string_005c0d38[]={95,84,72,82,65,83,72,95,100,114,97,119,112,111,105,110,116,64,52,0};
+static const B pe_string_005c0d1c[]={95,84,72,82,65,83,72,95,100,114,97,119,112,111,105,110,116,109,101,115,104,64,49,50,0};
+static const B pe_string_005c0d08[]={95,84,72,82,65,83,72,95,100,114,97,119,113,117,97,100,64,49,54,0};
+static const B pe_string_005c0cf0[]={95,84,72,82,65,83,72,95,100,114,97,119,113,117,97,100,109,101,115,104,64,49,50,0};
+static const B pe_string_005c0cdc[]={95,84,72,82,65,83,72,95,100,114,97,119,116,114,105,64,49,50,0};
+static const B pe_string_005c0cc4[]={95,84,72,82,65,83,72,95,100,114,97,119,116,114,105,102,97,110,64,49,50,0};
+static const B pe_string_005c0cac[]={95,84,72,82,65,83,72,95,100,114,97,119,116,114,105,109,101,115,104,64,49,50,0};
+static const B pe_string_005c0c94[]={95,84,72,82,65,83,72,95,100,114,97,119,116,114,105,115,116,114,105,112,64,49,50,0};
+static const B pe_string_005c0c7c[]={95,84,72,82,65,83,72,95,100,114,97,119,115,112,114,105,116,101,64,56,0};
+static const B pe_string_005c0c60[]={95,84,72,82,65,83,72,95,100,114,97,119,115,112,114,105,116,101,109,101,115,104,64,49,50,0};
+static const B pe_string_005c0c48[]={95,84,72,82,65,83,72,95,102,108,117,115,104,119,105,110,100,111,119,64,48,0};
+static const B pe_string_005c0c38[]={95,84,72,82,65,83,72,95,105,110,105,116,64,48,0};
+static const B pe_string_005c0c28[]={95,84,72,82,65,83,72,95,105,115,64,48,0};
+static const B pe_string_005c0c10[]={95,84,72,82,65,83,72,95,108,111,99,107,119,105,110,100,111,119,64,48,0};
+static const B pe_string_005c0bfc[]={95,84,72,82,65,83,72,95,112,97,103,101,102,108,105,112,64,48,0};
+static const B pe_string_005c0be8[]={95,84,72,82,65,83,72,95,114,101,97,100,114,101,99,116,64,50,48,0};
+static const B pe_string_005c0bd4[]={95,84,72,82,65,83,72,95,114,101,115,116,111,114,101,64,48,0};
+static const B pe_string_005c0bbc[]={95,84,72,82,65,83,72,95,115,101,108,101,99,116,100,105,115,112,108,97,121,64,52,0};
+static const B pe_string_005c0ba8[]={95,84,72,82,65,83,72,95,115,101,116,115,116,97,116,101,64,56,0};
+static const B pe_string_005c0b94[]={95,84,72,82,65,83,72,95,103,101,116,115,116,97,116,101,64,52,0};
+static const B pe_string_005c0b7c[]={95,84,72,82,65,83,72,95,115,101,116,116,101,120,116,117,114,101,64,52,0};
+static const B pe_string_005c0b64[]={95,84,72,82,65,83,72,95,115,101,116,118,105,100,101,111,109,111,100,101,64,49,50,0};
+static const B pe_string_005c0b54[]={95,84,72,82,65,83,72,95,115,121,110,99,64,52,0};
+static const B pe_string_005c0b40[]={95,84,72,82,65,83,72,95,116,97,108,108,111,99,64,50,48,0};
+static const B pe_string_005c0b30[]={95,84,72,82,65,83,72,95,116,102,114,101,101,64,52,0};
+static const B pe_string_005c0b1c[]={95,84,72,82,65,83,72,95,116,114,101,115,101,116,64,48,0};
+static const B pe_string_005c0b08[]={95,84,72,82,65,83,72,95,116,117,112,100,97,116,101,64,49,50,0};
+static const B pe_string_005c0af0[]={95,84,72,82,65,83,72,95,117,110,108,111,99,107,119,105,110,100,111,119,64,52,0};
+static const B pe_string_005c0adc[]={95,84,72,82,65,83,72,95,119,105,110,100,111,119,64,52,0};
+static const B pe_string_005c0ac4[]={95,84,72,82,65,83,72,95,119,114,105,116,101,114,101,99,116,64,50,48,0};
+static const B pe_string_005c0aa0[]={84,72,82,65,83,72,95,111,112,101,110,100,108,108,32,45,32,110,111,116,32,97,32,51,114,97,115,104,32,68,76,76,0};
+static const B pe_string_005c0a94[]={100,100,114,97,119,46,100,108,108,0};
+static const B pe_string_005c0a50[]={89,111,117,32,104,97,118,101,32,68,105,114,101,99,116,88,32,37,100,46,32,80,108,101,97,115,101,32,105,110,115,116,97,108,108,32,68,105,114,101,99,116,88,32,55,46,10,67,111,117,108,100,32,110,111,116,32,108,111,97,100,32,34,37,115,34,0};
+static const B pe_string_005c09d4[]={84,72,82,65,83,72,95,111,112,101,110,100,108,108,32,45,32,76,79,65,68,76,73,66,82,65,82,89,32,70,65,73,76,69,68,32,79,78,32,34,37,115,34,46,10,71,69,84,76,65,83,84,69,82,82,79,82,32,67,79,68,69,32,73,83,32,37,100,46,32,32,67,72,69,67,75,32,84,72,73,83,32,68,76,76,32,73,83,32,73,78,83,84,65,76,76,69,68,46,10,68,73,82,69,67,84,32,88,32,86,69,82,83,73,79,78,32,73,83,32,37,100,10,0};
+static void init(){require(render_library_started_006a64b8==0,"started loader zero");for(auto& row:render_library_cache_0069e5f0)for(U v:row)require(v==0,"cache loader zero");require(std::strcmp(render_library_environment_005c0e10,"THRASH_DRIVERNAME")==0,"raw environment transport");volatile U a=FPTR(render_library_fallback_getstate_00574f80),b=FPTR(render_library_fallback_tfree_00574f90);require(a!=b,"distinct original fallback identities");
+ const B* bodies[]={body0,body1,body2,body3,body4,body5,body6,body7,body8};for(U i=0;i<9;++i){code[i]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[i]!=nullptr,"raw code allocation");std::memcpy(code[i],bodies[i],sizes[i]);}
+ iats[0]=FPTR(api_load);iats[1]=FPTR(api_getproc);iats[2]=FPTR(api_free);iats[3]=FPTR(api_module);iats[4]=FPTR(api_disable);iats[5]=FPTR(api_error);report_cell=FPTR(render_loader_report_00565340);
+ absolute(code[0],558,0x69e5ec,&render_cleanup_token_0069e5ec,1);
+absolute(code[0],558,0x69e5f0,reinterpret_cast<B*>(render_library_cache_0069e5f0)+0,1);
+absolute(code[0],558,0x69e5f4,reinterpret_cast<B*>(render_library_cache_0069e5f0)+4,1);
+absolute(code[0],558,0x69e5e8,&render_library_handle_0069e5e8,1);
+absolute(code[0],558,0x69e5f8,reinterpret_cast<B*>(render_library_cache_0069e5f0)+8,1);
+absolute(code[0],558,0x6bd934,render_thrash_exports_006bd910+9,1);
+absolute(code[0],558,0x69e5fc,reinterpret_cast<B*>(render_library_cache_0069e5f0)+12,1);
+absolute(code[0],558,0x6bd990,render_thrash_exports_006bd910+32,1);
+absolute(code[0],558,0x69e600,reinterpret_cast<B*>(render_library_cache_0069e5f0)+16,1);
+absolute(code[0],558,0x6bd95c,render_thrash_exports_006bd910+19,1);
+absolute(code[0],558,0x69e604,reinterpret_cast<B*>(render_library_cache_0069e5f0)+20,1);
+absolute(code[0],558,0x6bd938,render_thrash_exports_006bd910+10,1);
+absolute(code[0],558,0x69e608,reinterpret_cast<B*>(render_library_cache_0069e5f0)+24,1);
+absolute(code[0],558,0x6bd9b8,render_thrash_exports_006bd910+42,1);
+absolute(code[0],558,0x69e60c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+28,1);
+absolute(code[0],558,0x6bd958,render_thrash_exports_006bd910+18,1);
+absolute(code[0],558,0x69e610,reinterpret_cast<B*>(render_library_cache_0069e5f0)+32,1);
+absolute(code[0],558,0x6bd968,render_thrash_exports_006bd910+22,1);
+absolute(code[0],558,0x69e614,reinterpret_cast<B*>(render_library_cache_0069e5f0)+36,1);
+absolute(code[0],558,0x6bd94c,render_thrash_exports_006bd910+15,1);
+absolute(code[0],558,0x69e618,reinterpret_cast<B*>(render_library_cache_0069e5f0)+40,1);
+absolute(code[0],558,0x6bd940,render_thrash_exports_006bd910+12,1);
+absolute(code[0],558,0x69e61c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+44,1);
+absolute(code[0],558,0x6bd988,render_thrash_exports_006bd910+30,1);
+absolute(code[0],558,0x69e620,reinterpret_cast<B*>(render_library_cache_0069e5f0)+48,1);
+absolute(code[0],558,0x6bd9b0,render_thrash_exports_006bd910+40,1);
+absolute(code[0],558,0x69e624,reinterpret_cast<B*>(render_library_cache_0069e5f0)+52,1);
+absolute(code[0],558,0x6bd914,render_thrash_exports_006bd910+1,1);
+absolute(code[0],558,0x69e628,reinterpret_cast<B*>(render_library_cache_0069e5f0)+56,1);
+absolute(code[0],558,0x6bd9a4,render_thrash_exports_006bd910+37,1);
+absolute(code[0],558,0x69e62c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+60,1);
+absolute(code[0],558,0x6bd980,render_thrash_exports_006bd910+28,1);
+absolute(code[0],558,0x69e630,reinterpret_cast<B*>(render_library_cache_0069e5f0)+64,1);
+absolute(code[0],558,0x6bd91c,render_thrash_exports_006bd910+3,1);
+absolute(code[0],558,0x69e634,reinterpret_cast<B*>(render_library_cache_0069e5f0)+68,1);
+absolute(code[0],558,0x6bd970,render_thrash_exports_006bd910+24,1);
+absolute(code[0],558,0x69e63c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+76,1);
+absolute(code[0],558,0x6bd948,render_thrash_exports_006bd910+14,1);
+absolute(code[0],558,0x69e640,reinterpret_cast<B*>(render_library_cache_0069e5f0)+80,1);
+absolute(code[0],558,0x6bd978,render_thrash_exports_006bd910+26,1);
+absolute(code[0],558,0x69e644,reinterpret_cast<B*>(render_library_cache_0069e5f0)+84,1);
+absolute(code[0],558,0x6bd9b4,render_thrash_exports_006bd910+41,1);
+absolute(code[0],558,0x69e648,reinterpret_cast<B*>(render_library_cache_0069e5f0)+88,1);
+absolute(code[0],558,0x6bd97c,render_thrash_exports_006bd910+27,1);
+absolute(code[0],558,0x69e64c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+92,1);
+absolute(code[0],558,0x6bd918,render_thrash_exports_006bd910+2,1);
+absolute(code[0],558,0x69e650,reinterpret_cast<B*>(render_library_cache_0069e5f0)+96,1);
+absolute(code[0],558,0x6bd920,render_thrash_exports_006bd910+4,1);
+absolute(code[0],558,0x69e654,reinterpret_cast<B*>(render_library_cache_0069e5f0)+100,1);
+absolute(code[0],558,0x6bd984,render_thrash_exports_006bd910+29,1);
+absolute(code[0],558,0x69e658,reinterpret_cast<B*>(render_library_cache_0069e5f0)+104,1);
+absolute(code[0],558,0x6bd9a0,render_thrash_exports_006bd910+36,1);
+absolute(code[0],558,0x69e65c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+108,1);
+absolute(code[0],558,0x6bd998,render_thrash_exports_006bd910+34,1);
+absolute(code[0],558,0x69e660,reinterpret_cast<B*>(render_library_cache_0069e5f0)+112,1);
+absolute(code[0],558,0x6bd954,render_thrash_exports_006bd910+17,1);
+absolute(code[0],558,0x69e664,reinterpret_cast<B*>(render_library_cache_0069e5f0)+116,1);
+absolute(code[0],558,0x6bd964,render_thrash_exports_006bd910+21,1);
+absolute(code[0],558,0x69e668,reinterpret_cast<B*>(render_library_cache_0069e5f0)+120,1);
+absolute(code[0],558,0x6bd92c,render_thrash_exports_006bd910+7,1);
+absolute(code[0],558,0x69e66c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+124,1);
+absolute(code[0],558,0x6bd96c,render_thrash_exports_006bd910+23,1);
+absolute(code[0],558,0x69e670,reinterpret_cast<B*>(render_library_cache_0069e5f0)+128,1);
+absolute(code[0],558,0x6bd930,render_thrash_exports_006bd910+8,1);
+absolute(code[0],558,0x69e674,reinterpret_cast<B*>(render_library_cache_0069e5f0)+132,1);
+absolute(code[0],558,0x6bd9a8,render_thrash_exports_006bd910+38,1);
+absolute(code[0],558,0x69e678,reinterpret_cast<B*>(render_library_cache_0069e5f0)+136,1);
+absolute(code[0],558,0x6bd944,render_thrash_exports_006bd910+13,1);
+absolute(code[0],558,0x69e67c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+140,1);
+absolute(code[0],558,0x6bd928,render_thrash_exports_006bd910+6,1);
+absolute(code[0],558,0x69e680,reinterpret_cast<B*>(render_library_cache_0069e5f0)+144,1);
+absolute(code[0],558,0x6bd9ac,render_thrash_exports_006bd910+39,1);
+absolute(code[0],558,0x69e684,reinterpret_cast<B*>(render_library_cache_0069e5f0)+148,1);
+absolute(code[0],558,0x6bd99c,render_thrash_exports_006bd910+35,1);
+absolute(code[0],558,0x69e688,reinterpret_cast<B*>(render_library_cache_0069e5f0)+152,1);
+absolute(code[0],558,0x6bd98c,render_thrash_exports_006bd910+31,1);
+absolute(code[0],558,0x69e68c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+156,1);
+absolute(code[0],558,0x6bd950,render_thrash_exports_006bd910+16,1);
+absolute(code[0],558,0x69e690,reinterpret_cast<B*>(render_library_cache_0069e5f0)+160,1);
+absolute(code[0],558,0x6bd93c,render_thrash_exports_006bd910+11,1);
+absolute(code[0],558,0x69e694,reinterpret_cast<B*>(render_library_cache_0069e5f0)+164,1);
+absolute(code[0],558,0x6bd994,render_thrash_exports_006bd910+33,1);
+absolute(code[0],558,0x69e698,reinterpret_cast<B*>(render_library_cache_0069e5f0)+168,1);
+absolute(code[0],558,0x6bd924,render_thrash_exports_006bd910+5,1);
+absolute(code[0],558,0x69e69c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+172,1);
+absolute(code[0],558,0x6bd960,render_thrash_exports_006bd910+20,1);
+absolute(code[0],558,0x69e6a0,reinterpret_cast<B*>(render_library_cache_0069e5f0)+176,1);
+absolute(code[0],558,0x6bd974,render_thrash_exports_006bd910+25,1);
+absolute(code[0],558,0x6bd910,render_thrash_exports_006bd910+0,1);
+absolute(code[1],553,0x69e5e8,&render_library_handle_0069e5e8,1);
+absolute(code[1],553,0x6bd934,render_thrash_exports_006bd910+9,1);
+absolute(code[1],553,0x69e5f0,reinterpret_cast<B*>(render_library_cache_0069e5f0)+0,1);
+absolute(code[1],553,0x6bd990,render_thrash_exports_006bd910+32,1);
+absolute(code[1],553,0x69e5f4,reinterpret_cast<B*>(render_library_cache_0069e5f0)+4,1);
+absolute(code[1],553,0x6bd95c,render_thrash_exports_006bd910+19,1);
+absolute(code[1],553,0x69e5f8,reinterpret_cast<B*>(render_library_cache_0069e5f0)+8,1);
+absolute(code[1],553,0x6bd938,render_thrash_exports_006bd910+10,1);
+absolute(code[1],553,0x69e5fc,reinterpret_cast<B*>(render_library_cache_0069e5f0)+12,1);
+absolute(code[1],553,0x6bd9b8,render_thrash_exports_006bd910+42,1);
+absolute(code[1],553,0x69e600,reinterpret_cast<B*>(render_library_cache_0069e5f0)+16,1);
+absolute(code[1],553,0x6bd958,render_thrash_exports_006bd910+18,1);
+absolute(code[1],553,0x69e604,reinterpret_cast<B*>(render_library_cache_0069e5f0)+20,1);
+absolute(code[1],553,0x6bd968,render_thrash_exports_006bd910+22,1);
+absolute(code[1],553,0x69e608,reinterpret_cast<B*>(render_library_cache_0069e5f0)+24,1);
+absolute(code[1],553,0x6bd94c,render_thrash_exports_006bd910+15,1);
+absolute(code[1],553,0x69e60c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+28,1);
+absolute(code[1],553,0x6bd940,render_thrash_exports_006bd910+12,1);
+absolute(code[1],553,0x69e610,reinterpret_cast<B*>(render_library_cache_0069e5f0)+32,1);
+absolute(code[1],553,0x6bd988,render_thrash_exports_006bd910+30,1);
+absolute(code[1],553,0x69e614,reinterpret_cast<B*>(render_library_cache_0069e5f0)+36,1);
+absolute(code[1],553,0x6bd9b0,render_thrash_exports_006bd910+40,1);
+absolute(code[1],553,0x69e618,reinterpret_cast<B*>(render_library_cache_0069e5f0)+40,1);
+absolute(code[1],553,0x6bd914,render_thrash_exports_006bd910+1,1);
+absolute(code[1],553,0x69e61c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+44,1);
+absolute(code[1],553,0x6bd9a4,render_thrash_exports_006bd910+37,1);
+absolute(code[1],553,0x69e620,reinterpret_cast<B*>(render_library_cache_0069e5f0)+48,1);
+absolute(code[1],553,0x6bd980,render_thrash_exports_006bd910+28,1);
+absolute(code[1],553,0x69e624,reinterpret_cast<B*>(render_library_cache_0069e5f0)+52,1);
+absolute(code[1],553,0x6bd91c,render_thrash_exports_006bd910+3,1);
+absolute(code[1],553,0x69e628,reinterpret_cast<B*>(render_library_cache_0069e5f0)+56,1);
+absolute(code[1],553,0x6bd970,render_thrash_exports_006bd910+24,1);
+absolute(code[1],553,0x69e62c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+60,1);
+absolute(code[1],553,0x6bd948,render_thrash_exports_006bd910+14,1);
+absolute(code[1],553,0x69e630,reinterpret_cast<B*>(render_library_cache_0069e5f0)+64,1);
+absolute(code[1],553,0x6bd978,render_thrash_exports_006bd910+26,1);
+absolute(code[1],553,0x69e634,reinterpret_cast<B*>(render_library_cache_0069e5f0)+68,1);
+absolute(code[1],553,0x6bd9b4,render_thrash_exports_006bd910+41,1);
+absolute(code[1],553,0x69e63c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+76,1);
+absolute(code[1],553,0x6bd97c,render_thrash_exports_006bd910+27,1);
+absolute(code[1],553,0x69e640,reinterpret_cast<B*>(render_library_cache_0069e5f0)+80,1);
+absolute(code[1],553,0x6bd918,render_thrash_exports_006bd910+2,1);
+absolute(code[1],553,0x69e644,reinterpret_cast<B*>(render_library_cache_0069e5f0)+84,1);
+absolute(code[1],553,0x6bd920,render_thrash_exports_006bd910+4,1);
+absolute(code[1],553,0x69e648,reinterpret_cast<B*>(render_library_cache_0069e5f0)+88,1);
+absolute(code[1],553,0x6bd984,render_thrash_exports_006bd910+29,1);
+absolute(code[1],553,0x69e64c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+92,1);
+absolute(code[1],553,0x6bd9a0,render_thrash_exports_006bd910+36,1);
+absolute(code[1],553,0x69e650,reinterpret_cast<B*>(render_library_cache_0069e5f0)+96,1);
+absolute(code[1],553,0x6bd998,render_thrash_exports_006bd910+34,1);
+absolute(code[1],553,0x69e654,reinterpret_cast<B*>(render_library_cache_0069e5f0)+100,1);
+absolute(code[1],553,0x6bd954,render_thrash_exports_006bd910+17,1);
+absolute(code[1],553,0x69e658,reinterpret_cast<B*>(render_library_cache_0069e5f0)+104,1);
+absolute(code[1],553,0x6bd964,render_thrash_exports_006bd910+21,1);
+absolute(code[1],553,0x69e65c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+108,1);
+absolute(code[1],553,0x6bd92c,render_thrash_exports_006bd910+7,1);
+absolute(code[1],553,0x69e660,reinterpret_cast<B*>(render_library_cache_0069e5f0)+112,1);
+absolute(code[1],553,0x6bd96c,render_thrash_exports_006bd910+23,1);
+absolute(code[1],553,0x69e664,reinterpret_cast<B*>(render_library_cache_0069e5f0)+116,1);
+absolute(code[1],553,0x6bd930,render_thrash_exports_006bd910+8,1);
+absolute(code[1],553,0x69e668,reinterpret_cast<B*>(render_library_cache_0069e5f0)+120,1);
+absolute(code[1],553,0x6bd9a8,render_thrash_exports_006bd910+38,1);
+absolute(code[1],553,0x69e66c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+124,1);
+absolute(code[1],553,0x6bd944,render_thrash_exports_006bd910+13,1);
+absolute(code[1],553,0x69e670,reinterpret_cast<B*>(render_library_cache_0069e5f0)+128,1);
+absolute(code[1],553,0x6bd928,render_thrash_exports_006bd910+6,1);
+absolute(code[1],553,0x69e674,reinterpret_cast<B*>(render_library_cache_0069e5f0)+132,1);
+absolute(code[1],553,0x6bd9ac,render_thrash_exports_006bd910+39,1);
+absolute(code[1],553,0x69e678,reinterpret_cast<B*>(render_library_cache_0069e5f0)+136,1);
+absolute(code[1],553,0x6bd99c,render_thrash_exports_006bd910+35,1);
+absolute(code[1],553,0x69e67c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+140,1);
+absolute(code[1],553,0x6bd98c,render_thrash_exports_006bd910+31,1);
+absolute(code[1],553,0x69e680,reinterpret_cast<B*>(render_library_cache_0069e5f0)+144,1);
+absolute(code[1],553,0x6bd950,render_thrash_exports_006bd910+16,1);
+absolute(code[1],553,0x69e684,reinterpret_cast<B*>(render_library_cache_0069e5f0)+148,1);
+absolute(code[1],553,0x6bd93c,render_thrash_exports_006bd910+11,1);
+absolute(code[1],553,0x69e688,reinterpret_cast<B*>(render_library_cache_0069e5f0)+152,1);
+absolute(code[1],553,0x69e68c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+156,1);
+absolute(code[1],553,0x6bd994,render_thrash_exports_006bd910+33,1);
+absolute(code[1],553,0x6bd924,render_thrash_exports_006bd910+5,1);
+absolute(code[1],553,0x69e690,reinterpret_cast<B*>(render_library_cache_0069e5f0)+160,1);
+absolute(code[1],553,0x6bd960,render_thrash_exports_006bd910+20,1);
+absolute(code[1],553,0x69e694,reinterpret_cast<B*>(render_library_cache_0069e5f0)+164,1);
+absolute(code[1],553,0x6bd974,render_thrash_exports_006bd910+25,1);
+absolute(code[1],553,0x69e698,reinterpret_cast<B*>(render_library_cache_0069e5f0)+168,1);
+absolute(code[1],553,0x6bd910,render_thrash_exports_006bd910+0,1);
+absolute(code[1],553,0x69e69c,reinterpret_cast<B*>(render_library_cache_0069e5f0)+172,1);
+absolute(code[1],553,0x69e6a0,reinterpret_cast<B*>(render_library_cache_0069e5f0)+176,1);
+absolute(code[2],51,0x69e5e8,&render_library_handle_0069e5e8,2);
+absolute(code[2],51,0x69e5ec,&render_cleanup_token_0069e5ec,1);
+absolute(code[2],51,0x5b2088,iats+2,1);
+relative(code[2],51,0x575600,0x594cd0,code[0],1);
+relative(code[2],51,0x575600,0x594f00,code[1],1);
+absolute(code[3],115,0x69e5e8,&render_library_handle_0069e5e8,1);
+absolute(code[3],115,0x5c0e10,render_library_environment_005c0e10,1);
+absolute(code[3],115,0x69e5ec,&render_cleanup_token_0069e5ec,2);
+absolute(code[3],115,0x575600,reinterpret_cast<void*>(&render_library_unload_00575600),1);
+relative(code[3],115,0x575640,0x575600,code[2],1);
+relative(code[3],115,0x575640,0x5a3050,reinterpret_cast<void*>(&application_diagnostic_environment_005a3050),1);
+relative(code[3],115,0x575640,0x557380,reinterpret_cast<void*>(&thread_exit_register_00557380),1);
+relative(code[3],115,0x575640,0x574fa0,code[8],1);
+absolute(code[4],68,0x6a64b8,&render_library_started_006a64b8,2);
+absolute(code[4],68,0x6bd97c,render_thrash_exports_006bd910+27,1);
+absolute(code[4],68,0x5756c0,reinterpret_cast<void*>(&render_library_disable_state_005756c0),1);
+absolute(code[4],68,0x6bd938,render_thrash_exports_006bd910+10,1);
+relative(code[4],68,0x575930,0x5366a0,reinterpret_cast<void*>(&window_scheduler_remove_005366a0),1);
+relative(code[4],68,0x575930,0x53bcb0,reinterpret_cast<void*>(&window_position_cleanup_0053bcb0),1);
+absolute(code[5],13,0x6bd97c,render_thrash_exports_006bd910+27,1);
+absolute(code[8],1630,0x5c0de8,pe_string_005c0de8,1);
+absolute(code[8],1630,0x5deb74,&render_error_file_005deb74,3);
+absolute(code[8],1630,0x5deb78,&render_error_line_005deb78,3);
+absolute(code[8],1630,0x5debf0,&report_cell,3);
+absolute(code[8],1630,0x5ccb84,pe_string_005ccb84,1);
+absolute(code[8],1630,0x5b2050,iats+0,1);
+absolute(code[8],1630,0x69e5e8,&render_library_handle_0069e5e8,38);
+absolute(code[8],1630,0x5c0dcc,pe_string_005c0dcc,1);
+absolute(code[8],1630,0x5b205c,iats+1,1);
+absolute(code[8],1630,0x5c0dbc,pe_string_005c0dbc,1);
+absolute(code[8],1630,0x5c0da4,pe_string_005c0da4,1);
+absolute(code[8],1630,0x6bd934,render_thrash_exports_006bd910+9,3);
+absolute(code[8],1630,0x5c0d94,pe_string_005c0d94,1);
+absolute(code[8],1630,0x6bd91c,render_thrash_exports_006bd910+3,2);
+absolute(code[8],1630,0x6bd9b4,render_thrash_exports_006bd910+41,2);
+absolute(code[8],1630,0x5c0d80,pe_string_005c0d80,1);
+absolute(code[8],1630,0x5c0d68,pe_string_005c0d68,1);
+absolute(code[8],1630,0x6bd950,render_thrash_exports_006bd910+16,2);
+absolute(code[8],1630,0x5c0d4c,pe_string_005c0d4c,1);
+absolute(code[8],1630,0x6bd93c,render_thrash_exports_006bd910+11,2);
+absolute(code[8],1630,0x6bd994,render_thrash_exports_006bd910+33,2);
+absolute(code[8],1630,0x5c0d38,pe_string_005c0d38,1);
+absolute(code[8],1630,0x5c0d1c,pe_string_005c0d1c,1);
+absolute(code[8],1630,0x6bd924,render_thrash_exports_006bd910+5,2);
+absolute(code[8],1630,0x5c0d08,pe_string_005c0d08,1);
+absolute(code[8],1630,0x6bd960,render_thrash_exports_006bd910+20,2);
+absolute(code[8],1630,0x6bd9a8,render_thrash_exports_006bd910+38,2);
+absolute(code[8],1630,0x5c0cf0,pe_string_005c0cf0,1);
+absolute(code[8],1630,0x5c0cdc,pe_string_005c0cdc,1);
+absolute(code[8],1630,0x6bd944,render_thrash_exports_006bd910+13,2);
+absolute(code[8],1630,0x5c0cc4,pe_string_005c0cc4,1);
+absolute(code[8],1630,0x6bd928,render_thrash_exports_006bd910+6,2);
+absolute(code[8],1630,0x6bd98c,render_thrash_exports_006bd910+31,2);
+absolute(code[8],1630,0x5c0cac,pe_string_005c0cac,1);
+absolute(code[8],1630,0x5c0c94,pe_string_005c0c94,1);
+absolute(code[8],1630,0x6bd9ac,render_thrash_exports_006bd910+39,2);
+absolute(code[8],1630,0x5c0c7c,pe_string_005c0c7c,1);
+absolute(code[8],1630,0x6bd99c,render_thrash_exports_006bd910+35,2);
+absolute(code[8],1630,0x6bd974,render_thrash_exports_006bd910+25,1);
+absolute(code[8],1630,0x5c0c60,pe_string_005c0c60,1);
+absolute(code[8],1630,0x6bd910,render_thrash_exports_006bd910+0,1);
+absolute(code[8],1630,0x5c0c48,pe_string_005c0c48,1);
+absolute(code[8],1630,0x5c0c38,pe_string_005c0c38,1);
+absolute(code[8],1630,0x6bd970,render_thrash_exports_006bd910+24,2);
+absolute(code[8],1630,0x6bd95c,render_thrash_exports_006bd910+19,2);
+absolute(code[8],1630,0x5c0c28,pe_string_005c0c28,1);
+absolute(code[8],1630,0x5c0c10,pe_string_005c0c10,1);
+absolute(code[8],1630,0x6bd990,render_thrash_exports_006bd910+32,2);
+absolute(code[8],1630,0x5c0bfc,pe_string_005c0bfc,1);
+absolute(code[8],1630,0x6bd964,render_thrash_exports_006bd910+21,2);
+absolute(code[8],1630,0x6bd948,render_thrash_exports_006bd910+14,2);
+absolute(code[8],1630,0x5c0be8,pe_string_005c0be8,1);
+absolute(code[8],1630,0x5c0bd4,pe_string_005c0bd4,1);
+absolute(code[8],1630,0x6bd96c,render_thrash_exports_006bd910+23,2);
+absolute(code[8],1630,0x5c0bbc,pe_string_005c0bbc,1);
+absolute(code[8],1630,0x6bd938,render_thrash_exports_006bd910+10,2);
+absolute(code[8],1630,0x6bd9b8,render_thrash_exports_006bd910+42,2);
+absolute(code[8],1630,0x5c0ba8,pe_string_005c0ba8,1);
+absolute(code[8],1630,0x5c0b94,pe_string_005c0b94,1);
+absolute(code[8],1630,0x6bd97c,render_thrash_exports_006bd910+27,3);
+absolute(code[8],1630,0x5c0b7c,pe_string_005c0b7c,1);
+absolute(code[8],1630,0x6bd984,render_thrash_exports_006bd910+29,4);
+absolute(code[8],1630,0x6bd954,render_thrash_exports_006bd910+17,2);
+absolute(code[8],1630,0x5c0b64,pe_string_005c0b64,1);
+absolute(code[8],1630,0x5c0b54,pe_string_005c0b54,1);
+absolute(code[8],1630,0x6bd958,render_thrash_exports_006bd910+18,2);
+absolute(code[8],1630,0x5c0b40,pe_string_005c0b40,1);
+absolute(code[8],1630,0x6bd978,render_thrash_exports_006bd910+26,2);
+absolute(code[8],1630,0x6bd968,render_thrash_exports_006bd910+22,2);
+absolute(code[8],1630,0x5c0b30,pe_string_005c0b30,1);
+absolute(code[8],1630,0x5c0b1c,pe_string_005c0b1c,1);
+absolute(code[8],1630,0x6bd94c,render_thrash_exports_006bd910+15,3);
+absolute(code[8],1630,0x6bd988,render_thrash_exports_006bd910+30,2);
+absolute(code[8],1630,0x5c0b08,pe_string_005c0b08,1);
+absolute(code[8],1630,0x6bd940,render_thrash_exports_006bd910+12,2);
+absolute(code[8],1630,0x5c0af0,pe_string_005c0af0,1);
+absolute(code[8],1630,0x5c0adc,pe_string_005c0adc,1);
+absolute(code[8],1630,0x6bd92c,render_thrash_exports_006bd910+7,2);
+absolute(code[8],1630,0x5c0ac4,pe_string_005c0ac4,1);
+absolute(code[8],1630,0x6bd9b0,render_thrash_exports_006bd910+40,2);
+absolute(code[8],1630,0x6bd9a0,render_thrash_exports_006bd910+36,1);
+absolute(code[8],1630,0x6bd998,render_thrash_exports_006bd910+34,1);
+absolute(code[8],1630,0x6bd930,render_thrash_exports_006bd910+8,1);
+absolute(code[8],1630,0x6bd918,render_thrash_exports_006bd910+2,1);
+absolute(code[8],1630,0x6bd920,render_thrash_exports_006bd910+4,1);
+absolute(code[8],1630,0x5b2138,iats+3,1);
+absolute(code[8],1630,0x5b21b4,iats+4,1);
+absolute(code[8],1630,0x574f80,reinterpret_cast<void*>(&render_library_fallback_getstate_00574f80),1);
+absolute(code[8],1630,0x574f90,reinterpret_cast<void*>(&render_library_fallback_tfree_00574f90),1);
+absolute(code[8],1630,0x5b2088,iats+2,1);
+absolute(code[8],1630,0x5c0aa0,pe_string_005c0aa0,1);
+absolute(code[8],1630,0x5b213c,iats+5,1);
+absolute(code[8],1630,0x5c0a94,pe_string_005c0a94,1);
+absolute(code[8],1630,0x5c0a50,pe_string_005c0a50,1);
+absolute(code[8],1630,0x5c09d4,pe_string_005c09d4,1);
+absolute(code[8],1630,0x5deb70,&render_error_flag_005deb70,2);
+absolute(code[8],1630,0x6a64b4,&render_driver_name_006a64b4,1);
+absolute(code[8],1630,0x69e5ec,&render_cleanup_token_0069e5ec,1);
+relative(code[8],1630,0x574fa0,0x5a0fbf,reinterpret_cast<void*>(&render_loader_format_005a0fbf),4);
+relative(code[8],1630,0x574fa0,0x574eb0,reinterpret_cast<void*>(&render_loader_directx_00574eb0),1);
+relative(code[8],1630,0x574fa0,0x594f00,code[1],1);
+ for(B* p:code)require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"instruction cache");}
+static void seed_fpu(){unsigned short cw=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm fninit __asm fldcw cw
+ for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}}
+static U invoke(void* fn,void* receiver,const U* args,U count,U cleanup,U& result){U before,frame,fail=0,out;__asm {
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov eax,count
+    mov edx,args
+pushargs:test eax,eax
+    jz pushed
+    dec eax
+    push dword ptr [edx+eax*4]
+    jmp pushargs
+pushed:mov ecx,receiver
+    mov edx,0deadc0deh
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov out,eax
+    add esp,cleanup
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    result=out;return fail;}
+
+static void setup(){trace.count=trace.result=trace.abi=0;load_count=proc_count=0;registered=nullptr;
+ for(U row=0;row<8;++row)for(U col=0;col<45;++col)render_library_cache_0069e5f0[row][col]=0x11000000u^(row*0x10001u+col*0x101u+seed);
+ for(U i=0;i<43;++i)render_thrash_exports_006bd910[i]=0x22000000u^(i*0x10203u+seed);
+ render_thrash_exports_006bd910[27]=FPTR(setstate);render_thrash_exports_006bd910[10]=FPTR(restore);
+ render_library_handle_0069e5e8=seed&1?0:0x8899aabb;render_cleanup_token_0069e5ec=value;render_library_started_006a64b8=seed&2?0:0x80000001;
+ render_driver_name_006a64b4=0x76543210;render_error_flag_005deb70=0x1234;render_error_file_005deb74=0x4321;render_error_line_005deb78=0x789a;
+ std::memset(timed_callbacks_0069dd20,0,sizeof(timed_callbacks_0069dd20));timed_callbacks_0069dd20[seed%16].callback=&render_library_disable_state_005756c0;timed_callbacks_0069dd20[(seed+7)%16].callback=&render_library_disable_state_005756c0;
+}
+static U argument(){switch(seed%5){case 0:return 0;case 1:return ptr(name_empty);case 2:return ptr(name_only_bang);case 3:return ptr(name_driver);default:return ptr(name_bang);}}
+static void compare(){for(U side=0;side<2;++side){cpp_side=side!=0;setup();seed_fpu();U args[2]={value,0x98765432},count=1,cleanup=4,mask=0xffffffff;void* fn=nullptr;
+ switch(which){case 0:fn=reinterpret_cast<void*>(&render_library_cache_restore_00594cd0);mask=0;break;case 1:fn=reinterpret_cast<void*>(&render_loader_reset_00594f00);mask=0;break;case 2:fn=reinterpret_cast<void*>(&render_library_unload_00575600);count=cleanup=mask=0;break;case 3:fn=reinterpret_cast<void*>(&render_initialize_library_00575640);args[0]=argument();break;case 4:fn=reinterpret_cast<void*>(&render_initialize_shutdown_00575930);break;case 5:fn=reinterpret_cast<void*>(&render_library_disable_state_005756c0);count=2;cleanup=8;break;case 6:fn=reinterpret_cast<void*>(&render_library_fallback_getstate_00574f80);cleanup=0;break;case 7:fn=reinterpret_cast<void*>(&render_library_fallback_tfree_00574f90);cleanup=0;break;default:fn=reinterpret_cast<void*>(&render_load_thrash_00574fa0);args[0]=argument();break;}
+ if(!side)fn=code[which];U result;trace.abi=invoke(fn,nullptr,args,count,cleanup,result);trace.result=result&mask;require(trace.abi==0,"stack/nonvolatile ABI");
+ if((which==3||which==8)&&result&&proc_count&&(mode&2)){require(render_thrash_exports_006bd910[29]==FPTR(render_library_fallback_getstate_00574f80)&&render_thrash_exports_006bd910[15]==FPTR(render_library_fallback_tfree_00574f90),"canonical fallback slots");for(U slot:{29u,15u}){U out;U arg=value;require(invoke(reinterpret_cast<void*>(render_thrash_exports_006bd910[slot]),nullptr,&arg,1,0,out)==0&&out==0,"fallback actual invocation RET4/EAX0");}}
+ snapshot(trace.final);capture(trace.fpu);if(side){require(trace.count==expected.count&&trace.result==expected.result,"event count/used return");for(U i=0;i<trace.count;++i)require(std::memcmp(&trace.events[i],&expected.events[i],sizeof(Event))==0,"ordered callbacks/strings/prestate/FP");require(std::memcmp(&trace.final,&expected.final,sizeof(State))==0,"all cache/export/canonical state");require(std::memcmp(&trace.fpu,&expected.fpu,sizeof(Fpu))==0,"active80/x87 state");events_total+=trace.count;}else expected=trace;}++cases;}
+int main(){AddVectoredExceptionHandler(1,fault);init();char executable[MAX_PATH]{};GetModuleFileNameA(nullptr,executable,MAX_PATH);const bool quick=std::strstr(executable,"mutation-")!=nullptr;
+ for(which=0;which<9;++which)for(mode=0;mode<(which==3||which==8?32u:2u);++mode)for(effects=0;effects<32;++effects)for(seed=0;seed<10;++seed)for(U v:{0u,1u,2u,7u,8u,0x7fffffffu,0x80000000u,0xffffffffu}){
+ value=v;if((which==3||which==8)&&v!=0&&v!=7)continue;if(which>=5&&which<=7&&(v!=0||mode!=0))continue;
+ if(quick){if(v!=0&&v!=7&&v!=8&&v!=0xffffffffu)continue;if(mode!=0&&mode!=1&&mode!=2&&mode!=4&&mode!=8&&mode!=16&&mode!=31)continue;if(effects!=0&&effects!=1&&effects!=2&&effects!=4&&effects!=8&&effects!=16&&effects!=31)continue;}
+ precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;const U depths[]={0,3,6,8};depth=depths[cases%4];compare();}__asm fninit
+ std::printf("render_library_lifecycle_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;}

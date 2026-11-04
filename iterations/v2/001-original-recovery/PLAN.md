@@ -1,23 +1,25 @@
 # v2 / 001 - original source recovery plan
 
-Current529,2026-11-04: frozen522001/527003 add5 originals611B/148B data
-(140 writable/8 readonly); registry798. Audit PASS118,028 comparisons/1,490,568
-events/24 mutations/720 pins/669 providers.294 TUs/8 projects,146 names153 refs,
-noEXE;2 close/3 actual children. Exact FTOL/13-byte DSP packing and mutable paired
-callback/record reloads pass. Prior private splash casts remain unchanged.
+Current532,2026-11-04: frozen528003/530005 add11 originals2334B/1486B data
+(1448 writable/38 readonly);10 bounded complete +partial597360. Existing574fa0
+1630B is rechecked/replaced once at its actualporsche_original owner, count unchanged.
+Registry809; audit PASS131,536 comparisons/1,303,560 events/35 mutations/725 pins/
+692 providers.296 TUs/8 projects,141 names147 refs,noEXE;5 close/no new names.
+Library/cache/native fallbacks and direct DSP/filter paths pass; metric opaque
+zero/NaN unwritten-local paths remain PARTIAL in registry/backlog. No initialization.
 
-Active: pcm_constructors_493 owns530 DSP597360/597180/5972b0(966B/24B data),
-native proof pending. Original zero/NaN coefficient exit can leave stack slots
-unwritten: preserve it, bound metric comparisons/mark partial if unresolved;
-no invented initialization. render_resources_494 owns531 actual535a90 stage/input
-and resource ABI trace, no implementation approved. Coordinator owns528 renderer
-library/cache scope; REA0014 dossiers complete, mapping/ownership before code.
-simd_oracle_497 hit quota after512; no retries. Coordinator publishes529, then
-accepts only passed new packets. No source consolidation now. Inherited NOICF,
-eventual832B LUT adjacency, full real children/producer/fault/lifetime/concurrency/
-unmasked FP/mutable strings/live APIs/startup/gameplay and403/411 remain open.
-Batch READMEs own commands; backlog owns outstanding checks. Next: publish529,
-finish528 scope, then actual530/531 proof; keep this passed batch frozen.
+Ready533 resource factories:4 originals253B/13B data, frozen003 proof; next535
+intake only from ready packets. Coordinator owns534 processor draft after worker
+service filtering stopped that task: four proposed bodies1380B/0data, CPP/fixture/
+config exist but no accepted proof. Inspect/preserve inputs, complete validation.
+render_resources_494 owns536 node-constructor/table/initializer scope proposal;
+531 remains exact stage-provenance research, next44d380 argument7 producer trace,
+no legal-stage bounds claimed. simd quota/pcm service-error agents are not retried.
+Coordinator publishes532, then finishes534 proof and533 intake. No source consolidation.
+Passed inputs/originals immutable. Inherited NOICF/future832B LUT adjacency, actual
+APIs/heap/device cleanup, metric opaque locals, numeric diagnostic file-pointer
+consumer565340, faults/unmasked FP/concurrency/full producer/startup/gameplay/
+403/411 remain open. Batch READMEs own commands; backlog owns remaining checks.
 
 Historical514 follows.
 
