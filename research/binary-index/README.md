@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run535: [processor RET/CFG supplement](../../iterations/v2/001-original-recovery/runs/534-audio-nibble-process/original-index-supplement.json)
+and [resource-node bodies/references](../../iterations/v2/001-original-recovery/runs/536-render-resource-nodes/original-bodies.json)
+pin complete original ranges and caller/child ABI before integration.
+[Intake535](../../iterations/v2/001-original-recovery/runs/535-resource-processor-integration/README.md)
+retains partial querylocal domains for535bc0/535d80; no stage-validity inference.
+
 Run528: [small fallback/timed callback supplement](../../iterations/v2/001-original-recovery/runs/528-render-library-lifecycle/index-supplement.json)
 pins omitted574f80/574f90/5756c0 full raw bodies, original consumers and RET extents.
 [Run532](../../iterations/v2/001-original-recovery/runs/532-library-dsp-integration/README.md)

@@ -1,0 +1,166 @@
+{
+  "status": "PASS",
+  "kind": "link-infrastructure-not-original-algorithm",
+  "archive_only_fails": true,
+  "command_line_alias_resolves": true,
+  "argument_transport_exit": 0,
+  "volatile_address_identity_equal": true,
+  "zero_new_originals": true,
+  "source_sha256": {
+    "iterations/v2/001-original-recovery/runs/535-resource-processor-integration/archive-alias-caller.cpp": "2fe6da649d719f95087914f3e5df8aaaae22d4eb51f2e73807f6d93bfa2f2c5a",
+    "iterations/v2/001-original-recovery/runs/535-resource-processor-integration/archive-alias-identity.cpp": "738842490ce9f9d56ee93dd44e393ec6402baf3572b6f91e3dedaf9071ee53e2",
+    "iterations/v2/001-original-recovery/runs/535-resource-processor-integration/archive-alias-provider.cpp": "2d95f30714feba7b0a7de52321053a2711a40a7fa1ede7e4f8ae16204bcfb9e9"
+  },
+  "tool_sha256": {
+    "local/tools/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x86/cl.exe": "303bfbe5523af2e925871a1bc7fd2ec5f199a69208a3b6716724c3e6d6b6962d",
+    "local/tools/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x86/link.exe": "83b11a6a9b1674472fe069a8d315a6ac6d6dfe3670d39cb55c2cda303544b1d6",
+    "local/tools/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x86/lib.exe": "7d408bc2f412d21d099bcd88ba15e9d5054deb601bf380b284829160c19c3408",
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x86/kernel32.lib": "0916cf9c90410acf8fe000b23443f54c467bdecb14078034f3c9ec086200afc7",
+    "local/tools/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x86/c1xx.dll": "4383c4845a3f00d45a6abe847f003a7eeb522110eab536418d058db98b05e48d",
+    "local/tools/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x86/c2.dll": "d0b540a4f0d87c6d35de9756e9c6fd58335e09416b227f8be4ed7c91d41b4b33"
+  },
+  "records": [
+    {
+      "name": "compile-provider",
+      "command": [
+        "local\\tools\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x86\\cl.exe",
+        "/nologo",
+        "/c",
+        "/O2",
+        "/Gy",
+        "/GS-",
+        "iterations\\v2\\001-original-recovery\\runs\\535-resource-processor-integration\\archive-alias-provider.cpp",
+        "/Folocal\\experiments\\v2-archive-alias-535\\001\\provider.obj"
+      ],
+      "exit_code": 0,
+      "log": "local/experiments/v2-archive-alias-535/001/compile-provider.log",
+      "log_sha256": "2fa1f4f427b9132efb5bfe2c681106e473ce35f9c9817457f938df97ae61c6db"
+    },
+    {
+      "name": "compile-caller",
+      "command": [
+        "local\\tools\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x86\\cl.exe",
+        "/nologo",
+        "/c",
+        "/O2",
+        "/Gy",
+        "/GS-",
+        "iterations\\v2\\001-original-recovery\\runs\\535-resource-processor-integration\\archive-alias-caller.cpp",
+        "/Folocal\\experiments\\v2-archive-alias-535\\001\\caller.obj"
+      ],
+      "exit_code": 0,
+      "log": "local/experiments/v2-archive-alias-535/001/compile-caller.log",
+      "log_sha256": "3dd39922f71232e774e5f9f2298f20b18e6ccdb3666df5e1a0ee9531d61b0e45"
+    },
+    {
+      "name": "compile-identity",
+      "command": [
+        "local\\tools\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x86\\cl.exe",
+        "/nologo",
+        "/c",
+        "/O2",
+        "/Gy",
+        "/GS-",
+        "iterations\\v2\\001-original-recovery\\runs\\535-resource-processor-integration\\archive-alias-identity.cpp",
+        "/Folocal\\experiments\\v2-archive-alias-535\\001\\identity.obj"
+      ],
+      "exit_code": 0,
+      "log": "local/experiments/v2-archive-alias-535/001/compile-identity.log",
+      "log_sha256": "12dbdc10b87a4973aa9aed53d9bce59ac31839c2b3bf15af4cec036a21779705"
+    },
+    {
+      "name": "library",
+      "command": [
+        "local\\tools\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x86\\lib.exe",
+        "/nologo",
+        "/OUT:local\\experiments\\v2-archive-alias-535\\001\\provider.lib",
+        "local\\experiments\\v2-archive-alias-535\\001\\provider.obj"
+      ],
+      "exit_code": 0,
+      "log": "local/experiments/v2-archive-alias-535/001/library.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "archive-only",
+      "command": [
+        "local\\tools\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x86\\link.exe",
+        "/nologo",
+        "/MACHINE:X86",
+        "/SUBSYSTEM:CONSOLE",
+        "/ENTRY:alias_entry",
+        "/NODEFAULTLIB",
+        "/OPT:REF",
+        "/OUT:local\\experiments\\v2-archive-alias-535\\001\\archive-only.exe",
+        "/MAP:local\\experiments\\v2-archive-alias-535\\001\\archive-only.map",
+        "local\\experiments\\v2-archive-alias-535\\001\\caller.obj",
+        "local\\experiments\\v2-archive-alias-535\\001\\provider.lib",
+        "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x86\\kernel32.lib"
+      ],
+      "exit_code": 1120,
+      "log": "local/experiments/v2-archive-alias-535/001/archive-only.log",
+      "log_sha256": "8004bb3cdfe1c5ffd9fb198d02d25521a86579df5252e1c9876dda8a52b9e25f"
+    },
+    {
+      "name": "link-option",
+      "command": [
+        "local\\tools\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x86\\link.exe",
+        "/nologo",
+        "/MACHINE:X86",
+        "/SUBSYSTEM:CONSOLE",
+        "/ENTRY:alias_entry",
+        "/NODEFAULTLIB",
+        "/OPT:REF",
+        "/OUT:local\\experiments\\v2-archive-alias-535\\001\\link-option.exe",
+        "/MAP:local\\experiments\\v2-archive-alias-535\\001\\link-option.map",
+        "/alternatename:?network_lifecycle_wait_0053c380@porsche@@YAXH@Z=?application_audio_wait_0053c380@porsche@@YAXH@Z",
+        "local\\experiments\\v2-archive-alias-535\\001\\caller.obj",
+        "local\\experiments\\v2-archive-alias-535\\001\\provider.lib",
+        "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x86\\kernel32.lib"
+      ],
+      "exit_code": 0,
+      "log": "local/experiments/v2-archive-alias-535/001/link-option.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "link-option-native",
+      "command": [
+        "local\\experiments\\v2-archive-alias-535\\001\\link-option.exe"
+      ],
+      "exit_code": 0,
+      "log": "local/experiments/v2-archive-alias-535/001/link-option-native.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "identity",
+      "command": [
+        "local\\tools\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x86\\link.exe",
+        "/nologo",
+        "/MACHINE:X86",
+        "/SUBSYSTEM:CONSOLE",
+        "/ENTRY:alias_entry",
+        "/NODEFAULTLIB",
+        "/OPT:REF",
+        "/OUT:local\\experiments\\v2-archive-alias-535\\001\\identity.exe",
+        "/MAP:local\\experiments\\v2-archive-alias-535\\001\\identity.map",
+        "/alternatename:?network_lifecycle_wait_0053c380@porsche@@YAXH@Z=?application_audio_wait_0053c380@porsche@@YAXH@Z",
+        "local\\experiments\\v2-archive-alias-535\\001\\identity.obj",
+        "local\\experiments\\v2-archive-alias-535\\001\\provider.lib",
+        "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x86\\kernel32.lib"
+      ],
+      "exit_code": 0,
+      "log": "local/experiments/v2-archive-alias-535/001/identity.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "identity-native",
+      "command": [
+        "local\\experiments\\v2-archive-alias-535\\001\\identity.exe"
+      ],
+      "exit_code": 0,
+      "log": "local/experiments/v2-archive-alias-535/001/identity-native.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "original_provider": "iterations/v2/001-original-recovery/runs/464-audio-probe-startup/audio_probe_startup_464.cpp",
+  "next": "put the existing alias on the final game link command so archive extraction sees its canonical provider; do not add another implementation"
+}

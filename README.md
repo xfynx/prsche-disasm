@@ -31,8 +31,8 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run532](iterations/v2/001-original-recovery/runs/532-library-dsp-integration/README.md)
-  integrates library/cache paths and bounded DSP;141 link names remain.
+  [Run535](iterations/v2/001-original-recovery/runs/535-resource-processor-integration/README.md)
+  integrates resource factories/nodes and nibble processors;141 link names remain.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

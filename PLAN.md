@@ -19,11 +19,12 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run532](iterations/v2/001-original-recovery/runs/532-library-dsp-integration/README.md).
-Library/cache/native fallback paths and bounded DSP are integrated; metric597360 stays partial.
+Latest recovery intake: [Run535](iterations/v2/001-original-recovery/runs/535-resource-processor-integration/README.md).
+Resource factories/nodes and nibble processors are integrated; two texture constructors
+and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next integrate verified resources and recover remaining processor/node dependencies.
+Next recover descriptor/query/node cleanup and remaining audio continuation dependencies.
 
 ## Recovery milestones
 

@@ -1,17 +1,18 @@
 # Current project status
 
-Updated 2026-11-04. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-05. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run532](iterations/v2/001-original-recovery/runs/532-library-dsp-integration/README.md)
-compiles296 C++ translation units across8 projects. The link has141 unresolved names/
-147 references. **There is no recovered playable C++ game executable yet.**
+[Run535](iterations/v2/001-original-recovery/runs/535-resource-processor-integration/README.md)
+compiles299 C++ translation units across8 projects. The link has141 unresolved names/
+149 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:11 originals/2334B (10 bounded complete,1 partial metric) and1486B data;
-131,536 comparisons/35 mutations/725 pins pass. Five names close/no new names;
-registry809. Original loader/cache/native fallback paths are verified; metric
-unwritten-local paths remain unaccepted. Full platform/gameplay stays open;
+Latest:12 originals/2587B (10 bounded complete,2 partial constructors) and23B data;
+1,084,956 comparisons/55 mutations/732 pins pass. Five names close/five real children
+appear;registry821. Factories and nibble processor compositions are verified within
+their bounds; query and earlier metric unwritten-local paths remain unaccepted.
+Full platform/gameplay stays open;
 earlier3DNow is emulated. These metrics are not a completion percentage.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through

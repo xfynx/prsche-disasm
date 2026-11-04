@@ -1,21 +1,27 @@
 # v2 / 001 - original source recovery plan
 
-Current532,2026-11-04: frozen528003/530005 add11 originals2334B/1486B data
-(1448 writable/38 readonly);10 bounded complete +partial597360. Existing574fa0
-1630B is rechecked/replaced once at its actualporsche_original owner, count unchanged.
-Registry809; audit PASS131,536 comparisons/1,303,560 events/35 mutations/725 pins/
-692 providers.296 TUs/8 projects,141 names147 refs,noEXE;5 close/no new names.
-Library/cache/native fallbacks and direct DSP/filter paths pass; metric opaque
-zero/NaN unwritten-local paths remain PARTIAL in registry/backlog. No initialization.
+Current535,2026-11-05: frozen533003/534004/536004 add12 originals2587B/23B data
+(7 writable/16 readonly);10 bounded complete +2partial535bc0/535d80. Registry821.
+Audit PASS1,084,956 comparisons/4,171,790 events/55 mutations/732 pins/708 providers.
+Fresh003 compiles299 TUs/8 projects;141 names149 refs,noEXE;5 close/5 real children.
+533 factories and534 decoder/stream compositions pass.536 allocation/copy/formatter
+are controlled transport; linked518binding is unexecuted in536. Queryout+10 must
+be observed written; opaque querylocal domains stay PARTIAL, no initialization.
+Existing53c380 alias is on final link; pinned archive/transport/identity probe adds
+zero originals.001 source drift and002 sandbox precompile failure preserved;
+003 current inputs accepted without native proof reruns. README535 owns commands.
 
-Ready533 resource factories:4 originals253B/13B data, frozen003 proof; next535
-intake only from ready packets. Coordinator owns534 processor draft after worker
-service filtering stopped that task: four proposed bodies1380B/0data, CPP/fixture/
-config exist but no accepted proof. Inspect/preserve inputs, complete validation.
-render_resources_494 owns536 node-constructor/table/initializer scope proposal;
-531 remains exact stage-provenance research, next44d380 argument7 producer trace,
-no legal-stage bounds claimed. simd quota/pcm service-error agents are not retried.
-Coordinator publishes532, then finishes534 proof and533 intake. No source consolidation.
+Read-only534/536 Sol/high reviews complete. Active Sol/high workers own independent
+537resource descriptor/query/cleanup(resource_children_537) and538audio continuation
+(nibble_continuation_538); new run/local files only. Root owns delivery535 and next
+shared integration539 when ready.537 scope:535d30/556690/537fb0/554de0.
+First inspect indexed caller/body/callee evidence and current registry ownership;
+trace554960/554d70 null results and unwritten querylocal stack provenance before
+promoting partial constructors. Audio59c690 continuation is an independent batch.
+531 remains stage-provenance research: trace44d380 argument7 producer; no stage bound.
+User authorized commit/push and continued recovery2026-11-05. Publish accepted535
+only; unproved537/538 stay outside the game graph until their ready packets pass.
+No source consolidation. Latest handoff:runs/535-resource-processor-integration/README.md.
 Passed inputs/originals immutable. Inherited NOICF/future832B LUT adjacency, actual
 APIs/heap/device cleanup, metric opaque locals, numeric diagnostic file-pointer
 consumer565340, faults/unmasked FP/concurrency/full producer/startup/gameplay/

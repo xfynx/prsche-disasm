@@ -1,5 +1,16 @@
 # Отложенные проверки восстановления v2
 
+Run535:12 originals2587B/23B data;1,084,956 comparisons/55 mutations/732 pins PASS.
+299TUs/8projects,141names149refs,noEXE;registry821.535bc0/535d80 remain PARTIAL:
+query554de0 can leave consumed out+10 unwritten. Accepted536 cases observe writes;
+never initialize that local. Next recover535d30/556690/537fb0/554de0, trace null
+554960/554d70 results and caller stack provenance.536 allocation/copy/formatter
+are controlled endpoints; its518binding is linked but unexecuted. Actual533factory
+and534decoder/stream compositions are bounded.59c690/59a730 stay real children;
+huge-copy/externalstack/fault/unmaskedFP/lifetime/concurrency/live/fullproducer/
+startup/gameplay remain open. Build003 owns fresh acceptance;001 drift/002 sandbox
+precompile failure remain historical. No passed proof reruns or source changes.
+
 Run532:11 originals2334B/1486B data +1630B loader recheck;131,536 comparisons/
 35 mutations/725 pins PASS;296 TUs/141 names147 refs,noEXE. Loader fallback raw-code
 addresses are replaced with verified native symbols; old source is unchanged.
@@ -8,8 +19,8 @@ slots unwritten. Accepted raw-observed full-write cases do not establish those
 paths or global equivalence.597180/5972b0 have direct bounded acceptance.
 Numeric diagnostic file tag5c0dd0 remains an old pointer boundary: next trace actual
 565340 consumer/dereference before promoting it.531 signed-stage reads remain
-unbounded; follow44d380 argument7 producers, not initial table values.533 ready,
-534 draft unvalidated,536 scope pending. Preserve owner/NOICF/descriptor proof;
+unbounded; follow44d380 argument7 producers, not initial table values.533/534/536
+intake is535 with the partial domains above. Preserve owner/NOICF/descriptor proof;
 recheck832B LUT adjacency in the first game EXE. Actual heap/device cleanup, faults,
 unmasked FP/concurrency/full producer/startup/gameplay/403/411 remain open.
 
