@@ -1,8 +1,17 @@
 # Отложенные проверки восстановления v2
 
+Run542:2originals194B/82Bdata;440,376comparisons/17mutations/740pins PASS.
+302TUs/136names144refs,noEXE;registry828. Canonical531f90 actualheap.obj ownership
+verified independently. Normal32slot finite lists, wrapped counts, late free-field
+reads, no-retry diagnostics and unconditional4B/guarded reader domains are bounded.
+Next trace554bd0/555390 insertion/reset/lifetime and all6a3a40 writes before scope.
+Actualheap/device/diagnostic565340/fullproducer/concurrency/gameplay and prior
+partials/AVblocked537005 remain open.5413DNow scope only, no proof/integration;
+workers hit usage limit, no respawn. Freeze542 scope; no broader fault safety claim.
+
 Run539:5originals979B/1596Bdata;1,512,504comparisons/31mutations/737pins PASS.
-301TUs/138names146refs,noEXE;registry826. Next554cc0 texture cleanup and56e290
-reader;actual slot producer/reset/live descriptor/heap/device consumers stay open.
+301TUs/138names146refs,noEXE;registry826.554cc0/56e290 are accepted by542;
+actual slot producer/reset/live descriptor/heap/device consumers stay open.
 537005 query-order EXE AV-blocked before execution; slotbase-12/prefetch controls
 have zero accepted cases.004 alias acceptance is only separate/texture+0/+4/+14/
 table-slotbase+4. Do not bypass/retry/exclude antivirus or claim extra domain passed.

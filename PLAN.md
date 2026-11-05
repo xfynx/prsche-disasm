@@ -19,12 +19,12 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run539](iterations/v2/001-original-recovery/runs/539-resource-continuation-integration/README.md).
-Resource descriptor/query/cleanup and nibble continuation are integrated; two texture constructors
+Latest recovery intake: [Run542](iterations/v2/001-original-recovery/runs/542-texture-cleanup-integration/README.md).
+Texture cleanup and the scalar reader are integrated; two texture constructors
 and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next recover texture cleanup and its scalar-reader dependencies; live resource producers remain open.
+Next trace resource-slot insertion/reset/lifetime consumers; live resource producers remain open.
 
 ## Recovery milestones
 

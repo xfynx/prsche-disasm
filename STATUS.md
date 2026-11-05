@@ -4,13 +4,14 @@ Updated 2026-11-05. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run539](iterations/v2/001-original-recovery/runs/539-resource-continuation-integration/README.md)
-compiles301 C++ translation units across8 projects. The link has138 unresolved names/
-146 references. **There is no recovered playable C++ game executable yet.**
+[Run542](iterations/v2/001-original-recovery/runs/542-texture-cleanup-integration/README.md)
+compiles302 C++ translation units across8 projects. The link has136 unresolved names/
+144 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:5 originals/979B and1596B data;1,512,504 comparisons/31 mutations/737 pins
-pass. Five names close/two real children appear;registry826. Resource descriptor/
-query/cleanup and actual nibble continuation compositions are bounded. Supplemental
+Latest:2 originals/194B and82B data;440,376 comparisons/17 mutations/740 pins
+pass. Two names close/no new names;registry828. Texture cleanup/reader and their
+actual537 compositions are bounded; canonical heap free COFF ownership is checked.
+Supplemental
 537005 query-alias controls were antivirus-blocked before execution and are unaccepted.
 Earlier constructor/metric unwritten-local paths and full platform/gameplay stay open;
 earlier3DNow is emulated. These metrics are not a completion percentage.

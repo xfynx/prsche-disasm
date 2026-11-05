@@ -1,5 +1,10 @@
 # Индекс оригинальных бинарников
 
+Run542: [texture cleanup/reader evidence](../../iterations/v2/001-original-recovery/runs/540-render-texture-cleanup-reader/scope-evidence.json)
+pins554cc0/170B and56e290/24B, complete callers, singleton heap-free ownership,
+exact4B loaderzero count and78B strings. [Intake](../../iterations/v2/001-original-recovery/runs/542-texture-cleanup-integration/README.md)
+accepts bounded native/actual537 composition; live resource lifecycle stays open.
+
 Run539: [resource table/descriptor evidence](../../iterations/v2/001-original-recovery/runs/537-render-resource-descriptor-cleanup/original-state.json)
 and [continuation505B](../../iterations/v2/001-original-recovery/runs/538-audio-nibble-continuation/scope-evidence.json)
 pin full original consumers, normal32-slot bounds and decoder stack history prefix.

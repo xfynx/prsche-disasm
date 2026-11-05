@@ -1,0 +1,103 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
+#include "porsche/files.hpp"
+#include "porsche/render_display.hpp"
+#include "render_descriptor.hpp"
+#include "render_texture_cleanup_540.hpp"
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U word(const void* p,U o=0){U v;memcpy(&v,static_cast<const B*>(p)+o,4);return v;}
+static void put(void* p,U o,U v){memcpy(static_cast<B*>(p)+o,&v,4);}
+static U cases,events_total,kind,flags,offset,value,precision,rounding,depth,initial_status,scene,format_type,reader_calls;
+static U slot,layout,payloads,read_count,free_calls;
+static bool cpp_side;static B* code[4];static B* guard;static U raw_node_table[1],raw_switch[11];
+alignas(16) static B floating[512];
+struct Arena {B node[128],descriptor[3][96],texture[2][96],output[96],counter[2][16],parent[48];};
+static Arena arena;
+static B* node(){return arena.node+offset;}
+static B* descriptor(U n=0){return arena.descriptor[n]+offset;}
+static B* texture(U n=0){return arena.texture[n]+offset;}
+static U identity(U p){return p==ptr(raw_node_table)||p==ptr(render_resource_node_table_005bb6d4)?0x5bb6d4:p;}
+struct Fpu {unsigned short control,status;B tag,padding[3],values[80];};
+struct State {Arena arena;B slots[1536];U diagnostic[3],reader_calls,total,free_calls;};
+struct Event {U tag,argc,args[7];State state;Fpu fpu;};
+struct Trace {U count,result,abi,exception[3];Event events[12];State final;Fpu fpu;};
+static Trace trace,expected;
+static void require(bool ok,const char* s){if(!ok){printf("divergence %s case=%u kind=%u flags=%x slot=%u layout=%u value=%x count=%x cpp=%u\n",s,cases,kind,flags,slot,layout,value,read_count,cpp_side);fflush(stdout);ExitProcess(1);}}
+static void snapshot(State& s){s.arena=arena;put(s.arena.node,offset,identity(word(s.arena.node,offset)));memcpy(s.slots,render_texture_slots_006a33f8,1536);s.diagnostic[0]=shared_runtime_word_005deb74;s.diagnostic[1]=shared_runtime_word_005deb78;s.diagnostic[2]=ptr(reinterpret_cast<void*>(diagnostic_handler_005debf0));s.reader_calls=reader_calls;s.total=render_texture_count_006a3a40;s.free_calls=free_calls;}
+@ABI_HELPERS@
+static void event(U tag,std::initializer_list<U> args){require(trace.count<12,"event bound");auto& e=trace.events[trace.count++];e.tag=tag;e.argc=static_cast<U>(args.size());U i=0;for(U a:args)e.args[i++]=a;while(i<7)e.args[i++]=0;snapshot(e.state);capture(e.fpu);}
+static void control(){if(flags&32){unsigned short cw=static_cast<unsigned short>(0x7f|((precision==0?3u:0u)<<8)|(((rounding+1)%4)<<10));__asm fldcw cw}}
+static void __cdecl diagnostic(const char* format){require(format==render_texture_cleanup_message_005bc2b4,"cleanup message identity");require(diagnostic_file_005deb74()==render_texture_cleanup_file_005bc294,"cleanup file identity");event(0x5debf0,{ptr(format)});if(flags&16)put(render_texture_slots_006a33f8,slot*48+36,ptr(texture()));control();}
+namespace porsche {
+U render_thrash_exports_006bd910[43]{};B cursor_snapshot_prefix_005de650[12]{},cursor_snapshot_suffix_005de65e[30]{};
+void* window_shutdown_handle_0069dd18=nullptr;U window_shutdown_state_005de67c=0,window_shutdown_config_005de620[12]{},splash_progress_format_005dead0=0;
+B window_shutdown_source_005de65c=0,window_shutdown_source_005de65d=0;
+void* __cdecl render_descriptor_allocate_00535700(U,U,U,U,U){require(false,"unexecuted521 allocate");return nullptr;}
+void __stdcall window_shutdown_display_callback_006bd9b0(U){require(false,"unexecuted521 display");}
+void __cdecl window_shutdown_runtime_state_00534430(){require(false,"unexecuted521 shutdown");}
+void (__cdecl* diagnostic_handler_005debf0)(const char*)=&diagnostic;
+U __cdecl free_00531f90(void* p){event(0x531f90,{ptr(p)});++free_calls;if(free_calls==1){if(flags&1)put(texture(),0x1c,ptr(descriptor(2)));if(flags&2)put(texture(),0x1c,0);if(flags&4)put(node(),0x20,ptr(arena.counter[1]+offset));if(flags&8)put(texture(),0x14,0);if(flags&16)render_texture_count_006a3a40^=0xdeadbeef;}control();return 0x91827364^value;}
+U __cdecl application_release_0059f050(void* p){event(0x59f050,{ptr(p)});control();return value^0x91827364;}
+void* __cdecl startup_network_allocate_0059ef90(U){require(false,"unexecuted536 allocation");return nullptr;}
+std::int32_t __cdecl formatter_entry_005a0fbf(char*,const char*,...){require(false,"unexecuted536 formatter");return 0;}
+void* __cdecl render_display_texture_alloc_00554960(U,U,U,U,U,const char*){require(false,"unexecuted536 texturealloc");return nullptr;}
+void __cdecl render_display_texture_copy_00554d70(void*,void*,U){require(false,"unexecuted536 texturecopy");}
+}
+@RELOCATORS@
+static const B jump_initial[44]={@JUMP_TABLE@},lookup_initial[253]={@LOOKUP@},bits_initial[128]={@BITS@},name_initial[6]={@NAME_FORMAT@};
+static const B palette_message[41]={@MESSAGE@},palette_file[19]={@FILE@},cleanup_file[30]={@CLEANUP_FILE@},cleanup_message[48]={@CLEANUP_MESSAGE@};
+static void init(){
+    require(render_texture_count_006a3a40==0,"production loaderzero total before reset");
+    require(memcmp(render_texture_cleanup_file_005bc294,cleanup_file,30)==0,"raw30B file");require(memcmp(render_texture_cleanup_message_005bc2b4,cleanup_message,48)==0,"raw48B message");
+    require(memcmp(render_palette_file_005bb848,palette_file,19)==0&&memcmp(render_palette_message_005bb81c,palette_message,41)==0,"unchanged537 strings");
+    require(memcmp(render_descriptor_bits_005de890,bits_initial,128)==0&&memcmp(render_resource_node_name_format_005de748,name_initial,6)==0,"canonical521/536 data");
+    B zero[1536]{};require(memcmp(render_texture_slots_006a33f8,zero,1536)==0,"canonical zero1536B slot table");
+    MEMORY_BASIC_INFORMATION region{};require(VirtualQuery(&render_texture_count_006a3a40,&region,sizeof region)&&region.Protect==PAGE_READWRITE,"writable total");require(VirtualQuery(render_texture_cleanup_message_005bc2b4,&region,sizeof region)&&region.Protect==PAGE_READONLY,"readonly string");
+    static const B a[]={@DTOR@},b[]={@FORMAT@},c[]={@CLEANUP@},d[]={@READER@};const B* bodies[]={a,b,c,d};const U sizes[]={75,183,170,24};
+    for(U i=0;i<4;++i){code[i]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[i]!=nullptr,"raw code allocation");memcpy(code[i],bodies[i],sizes[i]);}
+    raw_node_table[0]=ptr(code[0]);for(U i=0;i<11;++i)raw_switch[i]=ptr(code[1])+word(jump_initial,4*i)-0x556690;
+    absolute(code[0],75,0x5bb6d4,raw_node_table,1);relative(code[0],75,0x535d30,0x554cc0,code[2],1);relative(code[0],75,0x535d30,0x59f050,reinterpret_cast<void*>(&application_release_0059f050),2);
+    absolute(code[1],183,0x556774,lookup_initial,1);absolute(code[1],183,0x556748,raw_switch,1);relative(code[1],183,0x556690,0x56e290,code[3],2);
+    absolute(code[2],170,0x6a341c,render_texture_slots_006a33f8+36,2);absolute(code[2],170,0x6a33f8,render_texture_slots_006a33f8,2);absolute(code[2],170,0x6a3a40,&render_texture_count_006a3a40,2);
+    absolute(code[2],170,0x5deb74,&shared_runtime_word_005deb74,1);absolute(code[2],170,0x5deb78,&shared_runtime_word_005deb78,1);absolute(code[2],170,0x5debf0,&diagnostic_handler_005debf0,1);absolute(code[2],170,0x5bc294,render_texture_cleanup_file_005bc294,1);absolute(code[2],170,0x5bc2b4,render_texture_cleanup_message_005bc2b4,1);
+    relative(code[2],170,0x554cc0,0x531f90,reinterpret_cast<void*>(&free_00531f90),3);
+    for(B* p:code)require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"instruction cache");
+    guard=static_cast<B*>(VirtualAlloc(nullptr,8192,0x3000,PAGE_READWRITE));require(guard!=nullptr,"read guard allocation");DWORD protection;require(VirtualProtect(guard+4096,4096,PAGE_NOACCESS,&protection)!=0,"read guard page");put(guard,4092,0x11223344);
+}
+static void reset(){
+    memset(&arena,0x69+(value&7),sizeof arena);trace={};reader_calls=free_calls=0;shared_runtime_word_005deb74=0x11223344;shared_runtime_word_005deb78=value;diagnostic_handler_005debf0=&diagnostic;
+    memset(render_texture_slots_006a33f8,0x4d,1536);render_texture_count_006a3a40=value^0x10203040;
+    put(node(),0,cpp_side?ptr(render_resource_node_table_005bb6d4):ptr(raw_node_table));put(node(),8,ptr(texture()));put(node(),0x20,ptr(arena.counter[0]+offset));put(arena.counter[0],offset,1);put(arena.counter[1],offset,1);
+    put(texture(),0,ptr(descriptor(2)));put(texture(),4,slot);put(texture(),0x14,payloads&1?ptr(arena.output+offset):0);put(texture(),0x1c,payloads&2?ptr(arena.parent):0);
+    put(descriptor(0),0,layout==2?ptr(descriptor(1)):layout==3?ptr(descriptor(1)):ptr(texture()));put(descriptor(1),0,layout==3?0:ptr(texture()));put(descriptor(2),0,0);
+    put(render_texture_slots_006a33f8,slot*48,value);put(render_texture_slots_006a33f8,slot*48+36,layout==0?ptr(texture()):layout==4?0:ptr(descriptor()));
+    put(arena.output,offset,value);
+    if(kind==11){put(descriptor(),0,format_type);put(descriptor(),0xc,scene?0x2000:0);put(descriptor(),0x10,value);}
+}
+static void compare(){
+    for(U side=0;side<2;++side){cpp_side=side!=0;reset();seed_fpu();void* fn=nullptr;U args[2]={},count=0,cleanup=0;
+        if(kind==8||kind==14){fn=side?reinterpret_cast<void*>(&render_resource_texture_destroy_00554cc0):code[2];args[0]=kind==14?0:ptr(texture());count=1;cleanup=4;}
+        else if(kind==10){fn=side?reinterpret_cast<void*>(&render_resource_node_destroy_00535d30):code[0];args[0]=flags;count=1;}
+        else if(kind==11){fn=side?reinterpret_cast<void*>(&render_resource_node_format_00556690):code[1];args[0]=ptr(descriptor());count=1;cleanup=4;}
+        else {fn=side?reinterpret_cast<void*>(&render_descriptor_read_be_0056e290):code[3];args[0]=kind==12?ptr(guard+4094):kind==13?0:kind==15?ptr(guard+4092):ptr(arena.output+offset);args[1]=read_count;count=2;cleanup=8;}
+        U result=0;bool completed=true;__try {trace.abi=invoke(fn,node(),args,count,cleanup,result);}__except(exception_record(GetExceptionInformation())){completed=false;}
+        trace.result=kind==8||kind==14?0:result;snapshot(trace.final);capture(trace.fpu);
+        if(kind==12||kind==13||kind==14)require(!completed&&trace.exception[0]==0xc0000005,"unconditional DWORD read fault");
+        require(trace.abi==0,"nonvolatiles/stack/x87 ABI");
+        if(side==0)expected=trace;else {require(trace.result==expected.result,"used return");require(memcmp(trace.exception,expected.exception,sizeof trace.exception)==0,"fault read identity");require(trace.count==expected.count,"call count");require(memcmp(trace.events,expected.events,sizeof trace.events)==0,"intermediate order/late reload/FPU");require(memcmp(&trace.final,&expected.final,sizeof(State))==0,"final arena/table/count");require(memcmp(&trace.fpu,&expected.fpu,sizeof(Fpu))==0,"final x87");events_total+=trace.count;}}
+    ++cases;
+}
+int main(){init();const U values[]={0,1,2,0xffffffff,0x80000000};const U edits[]={0,1,2,4,8,16,32,47};
+    kind=9;for(offset=0;offset<4;++offset)for(U v:{0u,1u,0x01020304u,0x0018fb00u,0x001afb00u,0xffffffffu,0x80000000u})for(read_count=0;read_count<256;++read_count){value=v;compare();}
+    for(kind=12;kind<=15;++kind)for(U c:{0u,1u,2u,3u,4u,0xffffffffu,0x80000000u}){read_count=c;compare();}
+    for(kind=8;kind<=10;kind+=2)for(slot=0;slot<32;++slot)for(layout=0;layout<5;++layout)for(payloads=0;payloads<4;++payloads)for(U edit:edits)for(U v:values)for(offset=0;offset<4;++offset){flags=edit;value=v;precision=cases%3==0?0:cases%3==1?2:3;rounding=cases%4;depth=(cases/12)%3*3;initial_status=cases&1?0x3f:0;compare();}
+    kind=11;flags=0;for(offset=0;offset<4;++offset)for(scene=0;scene<2;++scene)for(format_type=0;format_type<256;++format_type)for(U v:{0u,0x0000fb18u,0x0000fb1au,0xffffffffu}){value=v;compare();}
+    __asm fninit
+    printf("texture_cleanup_reader_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;
+}

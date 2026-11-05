@@ -1,12 +1,13 @@
 # v2 / 001 - original source recovery plan
 
-Current539,2026-11-05: frozen537004/538002 add5 originals979B/1596B data
-(1536 writable/60 readonly). Registry826; prior535bc0/535d80/597360 partials unchanged.
-Audit PASS1,512,504 comparisons/193,188 events/31 mutations/737 pins/716 providers.
-Fresh001 compiles301 TUs/8 projects;138 names146 refs,noEXE;5 close/2 real children.
-Original26format aliases/32x48B slot provenance and actual521/536defined-query
-composition pass.534continuation+512x87/SSE scratch uses8Bhistory+112Boutput,
-no initialization; signed/wrap/late reads/ABI/FP are bounded. README539 owns commands.
+Current542,2026-11-05: frozen540002 adds2 originals194B/82B data
+(4 writable/78 readonly). Registry828; prior535bc0/535d80/597360 partials unchanged.
+Audit PASS440,376 comparisons/903,680 events/17 mutations/740 pins/721 providers.
+Fresh001 compiles302 TUs/8 projects;136 names144 refs,noEXE;2 close/no new names.
+Actual537format/destructor compose with newcleanup/reader. Finite normal32-slot
+lists, countwrap, late freefields, unconditional4B/guarded reader and FPU/ABI pass.
+Separate COFF probe proves singleton canonical531f90 atheap.obj; no new heap body.
+README542 owns commands and the concise handoff. Passed ready set is frozen.
 
 537005 supplemental query-order EXE was blocked by Windows antivirus before any
 execution. No bypass/retry/exclusion; zero accepted cases/controls.004 accepts
@@ -14,16 +15,18 @@ only listed separate/texture+0/+4/+14/table-slotbase+4 aliases; output=slotbase-
 and extra early-prefetch controls remain unaccepted. Preserve blocked005 evidence.
 535bc0/535d80 opaque querylocals remain PARTIAL, including actual null query.
 
-537/538 Sol/high workers complete; no active assignments. Root owns delivery539;
-next coherent packet is554cc0 texture cleanup and56e290 scalar reader, with
-slot producer/reset consumers and current full source/header ownership checked first.
+539 published89c3eab; root completed540/542 after workers hit usage limit. No active
+worker assignments or respawns. Next root scope trace:554bd0/555390 slot insertion/
+reset/lifetime and all006a3a40 writes; check current ownership before proposing543.
+5413DNow scope artifacts remain unaccepted/outside game graph; work deferred.
 531/539 research proves direct44d380 argument7 in0/10000; next factory536180/
 5361e0 virtualslot4/8 flag producers. No global stage bound or535a90 acceptance.
 539 intake corrects535001 source-drift report:001/003 have identical effective732
 base+delta pins. Frozen535 evidence untouched;003 acceptance remains valid.
-User authorized commit/push2026-11-05;535 published5b9f8a3. Before every next commit,
-show concise changes/checks/open work status as requested.539 ready for delivery.
-No source consolidation. Latest handoff:runs/539-resource-continuation-integration/README.md.
+User authorized commit/push2026-11-05;535 published5b9f8a3 and539 published89c3eab.
+Before every next commit show concise changes/checks/open work status as requested.
+542 ready for publication. No source consolidation.
+Latest handoff:runs/542-texture-cleanup-integration/README.md.
 Passed inputs/originals immutable. Inherited NOICF/future832B LUT adjacency, actual
 APIs/heap/device cleanup, metric opaque locals, numeric diagnostic file-pointer
 consumer565340, faults/unmasked FP/concurrency/full producer/startup/gameplay/

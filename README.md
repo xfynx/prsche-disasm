@@ -31,8 +31,8 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run539](iterations/v2/001-original-recovery/runs/539-resource-continuation-integration/README.md)
-  integrates resource descriptor/cleanup and nibble continuation;138 link names remain.
+  [Run542](iterations/v2/001-original-recovery/runs/542-texture-cleanup-integration/README.md)
+  integrates texture cleanup and its scalar reader;136 link names remain.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.
