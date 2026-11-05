@@ -1,27 +1,29 @@
 # v2 / 001 - original source recovery plan
 
-Current535,2026-11-05: frozen533003/534004/536004 add12 originals2587B/23B data
-(7 writable/16 readonly);10 bounded complete +2partial535bc0/535d80. Registry821.
-Audit PASS1,084,956 comparisons/4,171,790 events/55 mutations/732 pins/708 providers.
-Fresh003 compiles299 TUs/8 projects;141 names149 refs,noEXE;5 close/5 real children.
-533 factories and534 decoder/stream compositions pass.536 allocation/copy/formatter
-are controlled transport; linked518binding is unexecuted in536. Queryout+10 must
-be observed written; opaque querylocal domains stay PARTIAL, no initialization.
-Existing53c380 alias is on final link; pinned archive/transport/identity probe adds
-zero originals.001 source drift and002 sandbox precompile failure preserved;
-003 current inputs accepted without native proof reruns. README535 owns commands.
+Current539,2026-11-05: frozen537004/538002 add5 originals979B/1596B data
+(1536 writable/60 readonly). Registry826; prior535bc0/535d80/597360 partials unchanged.
+Audit PASS1,512,504 comparisons/193,188 events/31 mutations/737 pins/716 providers.
+Fresh001 compiles301 TUs/8 projects;138 names146 refs,noEXE;5 close/2 real children.
+Original26format aliases/32x48B slot provenance and actual521/536defined-query
+composition pass.534continuation+512x87/SSE scratch uses8Bhistory+112Boutput,
+no initialization; signed/wrap/late reads/ABI/FP are bounded. README539 owns commands.
 
-Read-only534/536 Sol/high reviews complete. Active Sol/high workers own independent
-537resource descriptor/query/cleanup(resource_children_537) and538audio continuation
-(nibble_continuation_538); new run/local files only. Root owns delivery535 and next
-shared integration539 when ready.537 scope:535d30/556690/537fb0/554de0.
-First inspect indexed caller/body/callee evidence and current registry ownership;
-trace554960/554d70 null results and unwritten querylocal stack provenance before
-promoting partial constructors. Audio59c690 continuation is an independent batch.
-531 remains stage-provenance research: trace44d380 argument7 producer; no stage bound.
-User authorized commit/push and continued recovery2026-11-05. Publish accepted535
-only; unproved537/538 stay outside the game graph until their ready packets pass.
-No source consolidation. Latest handoff:runs/535-resource-processor-integration/README.md.
+537005 supplemental query-order EXE was blocked by Windows antivirus before any
+execution. No bypass/retry/exclusion; zero accepted cases/controls.004 accepts
+only listed separate/texture+0/+4/+14/table-slotbase+4 aliases; output=slotbase-12
+and extra early-prefetch controls remain unaccepted. Preserve blocked005 evidence.
+535bc0/535d80 opaque querylocals remain PARTIAL, including actual null query.
+
+537/538 Sol/high workers complete; no active assignments. Root owns delivery539;
+next coherent packet is554cc0 texture cleanup and56e290 scalar reader, with
+slot producer/reset consumers and current full source/header ownership checked first.
+531/539 research proves direct44d380 argument7 in0/10000; next factory536180/
+5361e0 virtualslot4/8 flag producers. No global stage bound or535a90 acceptance.
+539 intake corrects535001 source-drift report:001/003 have identical effective732
+base+delta pins. Frozen535 evidence untouched;003 acceptance remains valid.
+User authorized commit/push2026-11-05;535 published5b9f8a3. Before every next commit,
+show concise changes/checks/open work status as requested.539 ready for delivery.
+No source consolidation. Latest handoff:runs/539-resource-continuation-integration/README.md.
 Passed inputs/originals immutable. Inherited NOICF/future832B LUT adjacency, actual
 APIs/heap/device cleanup, metric opaque locals, numeric diagnostic file-pointer
 consumer565340, faults/unmasked FP/concurrency/full producer/startup/gameplay/

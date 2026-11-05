@@ -4,15 +4,15 @@ Updated 2026-11-05. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run535](iterations/v2/001-original-recovery/runs/535-resource-processor-integration/README.md)
-compiles299 C++ translation units across8 projects. The link has141 unresolved names/
-149 references. **There is no recovered playable C++ game executable yet.**
+[Run539](iterations/v2/001-original-recovery/runs/539-resource-continuation-integration/README.md)
+compiles301 C++ translation units across8 projects. The link has138 unresolved names/
+146 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:12 originals/2587B (10 bounded complete,2 partial constructors) and23B data;
-1,084,956 comparisons/55 mutations/732 pins pass. Five names close/five real children
-appear;registry821. Factories and nibble processor compositions are verified within
-their bounds; query and earlier metric unwritten-local paths remain unaccepted.
-Full platform/gameplay stays open;
+Latest:5 originals/979B and1596B data;1,512,504 comparisons/31 mutations/737 pins
+pass. Five names close/two real children appear;registry826. Resource descriptor/
+query/cleanup and actual nibble continuation compositions are bounded. Supplemental
+537005 query-alias controls were antivirus-blocked before execution and are unaccepted.
+Earlier constructor/metric unwritten-local paths and full platform/gameplay stay open;
 earlier3DNow is emulated. These metrics are not a completion percentage.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through

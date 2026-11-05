@@ -19,12 +19,12 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run535](iterations/v2/001-original-recovery/runs/535-resource-processor-integration/README.md).
-Resource factories/nodes and nibble processors are integrated; two texture constructors
+Latest recovery intake: [Run539](iterations/v2/001-original-recovery/runs/539-resource-continuation-integration/README.md).
+Resource descriptor/query/cleanup and nibble continuation are integrated; two texture constructors
 and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next recover descriptor/query/node cleanup and remaining audio continuation dependencies.
+Next recover texture cleanup and its scalar-reader dependencies; live resource producers remain open.
 
 ## Recovery milestones
 

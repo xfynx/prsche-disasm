@@ -1,15 +1,29 @@
 # Отложенные проверки восстановления v2
 
+Run539:5originals979B/1596Bdata;1,512,504comparisons/31mutations/737pins PASS.
+301TUs/138names146refs,noEXE;registry826. Next554cc0 texture cleanup and56e290
+reader;actual slot producer/reset/live descriptor/heap/device consumers stay open.
+537005 query-order EXE AV-blocked before execution; slotbase-12/prefetch controls
+have zero accepted cases.004 alias acceptance is only separate/texture+0/+4/+14/
+table-slotbase+4. Do not bypass/retry/exclude antivirus or claim extra domain passed.
+Null query leaves output unwritten;535bc0/535d80 stay PARTIAL.538120B scratch has
+8Bhistory+112Bout;only fullwrite/validtail bounds accepted.3DNow/invalidindices/
+stackaliases/unmaskedFP/fault/concurrency/fullproducer/gameplay remain open.
+539 stage follow-up pins direct44d380 flags0/10000;next actual factory virtualslot4/8
+producers, no globalstagebound/535a90 implementation.535001/003 effective732pins
+match afterbase+delta verification; earlierdriftclaim corrected without proof edits.
+
 Run535:12 originals2587B/23B data;1,084,956 comparisons/55 mutations/732 pins PASS.
 299TUs/8projects,141names149refs,noEXE;registry821.535bc0/535d80 remain PARTIAL:
 query554de0 can leave consumed out+10 unwritten. Accepted536 cases observe writes;
-never initialize that local. Next recover535d30/556690/537fb0/554de0, trace null
+never initialize that local.535d30/556690/537fb0/554de0 are accepted by539;trace null
 554960/554d70 results and caller stack provenance.536 allocation/copy/formatter
 are controlled endpoints; its518binding is linked but unexecuted. Actual533factory
-and534decoder/stream compositions are bounded.59c690/59a730 stay real children;
+and534decoder/stream compositions are bounded.59c690 is accepted by539;59a730 stays open;
 huge-copy/externalstack/fault/unmaskedFP/lifetime/concurrency/live/fullproducer/
-startup/gameplay remain open. Build003 owns fresh acceptance;001 drift/002 sandbox
-precompile failure remain historical. No passed proof reruns or source changes.
+startup/gameplay remain open. Build003 owns acceptance;001 has identical effective
+base+delta pins (earlier drift claim corrected in539).002 sandbox precompile failure
+remains historical. No native proof reruns or source changes.
 
 Run532:11 originals2334B/1486B data +1630B loader recheck;131,536 comparisons/
 35 mutations/725 pins PASS;296 TUs/141 names147 refs,noEXE. Loader fallback raw-code

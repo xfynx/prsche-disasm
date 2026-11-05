@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run539: [resource table/descriptor evidence](../../iterations/v2/001-original-recovery/runs/537-render-resource-descriptor-cleanup/original-state.json)
+and [continuation505B](../../iterations/v2/001-original-recovery/runs/538-audio-nibble-continuation/scope-evidence.json)
+pin full original consumers, normal32-slot bounds and decoder stack history prefix.
+[Stage producer follow-up](../../iterations/v2/001-original-recovery/runs/539-resource-continuation-integration/stage-producer-followup.json)
+narrows direct-call flags; factory inputs and global stage bounds remain unproved.
+
 Run535: [processor RET/CFG supplement](../../iterations/v2/001-original-recovery/runs/534-audio-nibble-process/original-index-supplement.json)
 and [resource-node bodies/references](../../iterations/v2/001-original-recovery/runs/536-render-resource-nodes/original-bodies.json)
 pin complete original ranges and caller/child ABI before integration.

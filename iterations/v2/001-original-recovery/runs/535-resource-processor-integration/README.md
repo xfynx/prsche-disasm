@@ -24,9 +24,12 @@ The existing53c380 alias moves onto the final link before archive extraction.
 The pinned infrastructure probe proves archive-only failure, argument transport
 and volatile pointer identity; this adds no original function or game algorithm.
 
-Build001 is preserved with9 inputs differing from current HEAD.002 stopped at
-Checking Build System inside the sandbox before compilation.003 ran outside it
-and pins the actual current graph. Native proofs were reused with all hashes checked.
+Build001 and003 have identical effective732 source pins (base manifest plus delta).
+The earlier claim of9 changed inputs compared only the old base manifest and was
+incorrect;539 intake records the full verification. Frozen535 intake-review.json
+retains that historical claim.002 stopped at Checking Build System inside the
+sandbox before compilation.003 ran outside it and remains the accepted build.
+Native proofs were reused with all hashes checked.
 
 ```powershell
 py -3 scripts/research/build-v2-game-batch.py --config iterations/v2/001-original-recovery/runs/535-resource-processor-integration/build-config.json --phase configure --attempt 002
