@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run545: [3DNow nibble evidence](../../iterations/v2/001-original-recovery/runs/541-audio-nibble-3dnow/scope-evidence.json)
+pins full0059a730201B,504selector/534/538callers and existing512 window/LUT/tail
+owners. [Intake](../../iterations/v2/001-original-recovery/runs/545-audio-nibble-3dnow-integration/README.md)
+accepts bounded pinnedAthlon emulation with per-image retainedCOFF proof; nativeAMD
+hardware and live producers remain open. No new data owner.
+
 Run544: [slot-reset evidence](../../iterations/v2/001-original-recovery/runs/543-render-slot-reset/scope-evidence.json)
 pins555330/555390/555400245B and six sparse loaderzero DWORDs24B, existing
 canonical slots/total/export ownership and originalVirtualFree import005b2148.

@@ -19,12 +19,13 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run544](iterations/v2/001-original-recovery/runs/544-render-reset-audio-integration/README.md).
-Texture-slot invalidation/reset/arena release are integrated; two texture constructors
+Latest recovery intake: [Run545](iterations/v2/001-original-recovery/runs/545-audio-nibble-3dnow-integration/README.md).
+Exact3DNow nibble decoding is integrated with bounded emulated proof; two texture constructors
 and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Parallel next work: exact3DNow proof541 and resource-allocation scope546; live producers remain open.
+Next work: native resource-allocation packet546; its canonical export547 proof is
+antivirus-blocked before execution. Live producers/nativeAMD hardware remain open.
 
 ## Recovery milestones
 

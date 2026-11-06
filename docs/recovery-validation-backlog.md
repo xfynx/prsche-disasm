@@ -1,5 +1,15 @@
 # Отложенные проверки восстановления v2
 
+Run545:one original201B/0newdata;2560emulatedcases/22mutations/746pins PASS.
+304TUs/134names142refs,noEXE;registry832. Strict24image source/object/retainedcode
+gates and actualcanonical512data/init/534/538composition pass, notnativeAMD proof.
+Tailoutput bounded192B; invalidtails/extremecounts/faults/unmaskedFP/concurrency/
+fullproducer/liveaudio/startup/gameplay remain open. 541004 neverexecuted.
+546resource proof continues separately;547canonicalstatic export is AVblocked
+beforeexecution (VirTool:Win32/Obfuscator.UE),0acceptedcases,no retry/bypass.
+Future548 integration needs accepted export proof; preserve547001 and keep drafts
+outside currentgame. Priorpartials/stage535a90/blocked537005 unchanged.
+
 Run544:3originals245B/24B sparse state;29,376comparisons/20mutations/743pins PASS.
 303TUs/135names143refs,noEXE;registry831. ExistingVirtualFree actualCOFF/import
 transport independently verified; canonical537slots/540total reused. Normal32slot

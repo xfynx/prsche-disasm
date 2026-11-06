@@ -1,0 +1,228 @@
+{
+  "experiment": "local/experiments/v2-audio-nibble-3dnow-541",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "source": "audio_nibble_3dnow_541.cpp",
+  "header": "audio_nibble_3dnow_541.hpp",
+  "cpu_model": 11,
+  "original_bodies": [
+    {
+      "name": "decode",
+      "va": "0059a730",
+      "bytes": 201,
+      "sha256": "6ddddcc41de641e4d03781c3938ab817dfa167179f7c83612d21192a8814f004",
+      "role": "new"
+    },
+    {
+      "name": "initialize",
+      "va": "0059b8d0",
+      "bytes": 53,
+      "sha256": "8325601a138eb2e0353929cbce5f698347580155c6d6af0512c5c8e008fdec55",
+      "role": "canonical-regression"
+    },
+    {
+      "name": "loop",
+      "va": "0059c890",
+      "bytes": 344,
+      "sha256": "a88322e7b2042552e177476eb0036686df516b15859d5e180fb766d13e928866",
+      "role": "canonical-regression"
+    },
+    {
+      "name": "continue",
+      "va": "0059c690",
+      "bytes": 505,
+      "sha256": "d583a51611bddc8f00520539fe09cbf1b925a47687c9bc32140a3521980c4e08",
+      "role": "canonical-regression"
+    },
+    {
+      "name": "drain",
+      "va": "0059d5f0",
+      "bytes": 94,
+      "sha256": "55214b290e2afd3b168a4539035eb65a81aa75bd386013c56d9d588b6763fda8",
+      "role": "canonical-regression"
+    }
+  ],
+  "original_data": [
+    {
+      "name": "window",
+      "va": "005e3b28",
+      "bytes": 80,
+      "kind": "file-backed",
+      "sha256": "a066aaf782f1cdd2969b74fe6540c1f6e368e0d6c6b9ee0ac24ab2aa7962097e"
+    },
+    {
+      "name": "lut",
+      "va": "006b04c0",
+      "bytes": 832,
+      "kind": "loader-zero",
+      "sha256": "e0084b66cb4a03e2aba6cc7342eead6a91610ad915d66f9ae2c734f99b772ac7"
+    },
+    {
+      "name": "tail",
+      "va": "006b0800",
+      "bytes": 192,
+      "kind": "loader-zero",
+      "sha256": "5d89f056865052bcb89c910d2d62872e029fb273c3db03f8968a52a41593c1b5"
+    }
+  ],
+  "original_symbols": {
+    "decode": "0059a730",
+    "initialize": "0059b8d0",
+    "loop": "0059c890",
+    "continue": "0059c690",
+    "drain": "0059d5f0",
+    "window": "005e3b28",
+    "lut": "006b04c0",
+    "tail": "006b0800"
+  },
+  "exports": {
+    "decode": "?audio_nibble_decode_3dnow_0059a730@porsche@@YAXI@Z",
+    "lut": "?audio_mixer_nibble_lookup_006b04c0@porsche@@3PAMA",
+    "window": "?audio_nibble_read_window_005e3b28@porsche@@3PAEA",
+    "tail": "?audio_nibble_read_tail_006b0800@porsche@@3PAEA",
+    "initialize": "?audio_mixer_initialize_nibble_table_0059b8d0@porsche@@YAXXZ",
+    "loop": "?audio_nibble_loop_process_0059c890@porsche@@YAHIIIII@Z",
+    "continue": "?audio_nibble_loop_continue_0059c690@porsche@@YAHIIIII@Z",
+    "drain": "?audio_nibble_drain_0059d5f0@porsche@@YAHIIII@Z"
+  },
+  "data_exports": [
+    "lut",
+    "window",
+    "tail"
+  ],
+  "candidate_exports": {
+    "decode": "?audio_nibble_decode_3dnow_0059a730@porsche@@YAXI@Z"
+  },
+  "expected_candidate_undefined": [
+    "?audio_mixer_nibble_lookup_006b04c0@porsche@@3PAMA",
+    "?audio_nibble_read_window_005e3b28@porsche@@3PAEA",
+    "?read32@nibble512@porsche@@YAII@Z",
+    "?read8@nibble512@porsche@@YAII@Z",
+    "?write32@nibble512@porsche@@YAXII@Z"
+  ],
+  "support_sources": [
+    {
+      "source": "iterations/v2/001-original-recovery/runs/512-audio-nibble-decoders/audio_nibble_decoders_512.cpp",
+      "object_stem": "nibble512"
+    },
+    {
+      "source": "iterations/v2/001-original-recovery/runs/512-audio-nibble-decoders/nibble_memory_512.cpp",
+      "object_stem": "memory512"
+    },
+    {
+      "source": "iterations/v2/001-original-recovery/runs/512-audio-nibble-decoders/audio_mixer_configuration_486.cpp",
+      "object_stem": "configuration512"
+    },
+    {
+      "source": "iterations/v2/001-original-recovery/runs/534-audio-nibble-process/audio_nibble_process_534.cpp",
+      "object_stem": "process534"
+    },
+    {
+      "source": "iterations/v2/001-original-recovery/runs/538-audio-nibble-continuation/audio_nibble_continuation_538.cpp",
+      "object_stem": "continuation538"
+    }
+  ],
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/541-audio-nibble-3dnow",
+    "iterations/v2/001-original-recovery/runs/538-audio-nibble-continuation",
+    "iterations/v2/001-original-recovery/runs/534-audio-nibble-process",
+    "iterations/v2/001-original-recovery/runs/512-audio-nibble-decoders",
+    "iterations/v2/001-original-recovery/runs/504-audio-coded-constructors",
+    "iterations/v2/001-original-recovery/runs/519-audio-stream-capture-fill",
+    "iterations/v2/001-original-recovery/runs/513-audio-stream-worker-stop",
+    "iterations/v2/001-original-recovery/runs/508-audio-stream-producer-lifecycle",
+    "iterations/v2/001-original-recovery/runs/505-audio-stream-buffer-delivery",
+    "iterations/v2/001-original-recovery/runs/501-audio-pcm-stream-lookup",
+    "iterations/v2/001-original-recovery/runs/493-audio-pcm-constructors",
+    "iterations/v2/001-original-recovery/runs/492-audio-pcm-cpp",
+    "iterations/v2/001-original-recovery/runs/486-audio-mixer-configuration",
+    "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch",
+    "iterations/v2/001-original-recovery/runs/462-audio-directsound-initialize",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/runs/439-audio-voice-cleanup",
+    "iterations/v2/001-original-recovery/runs/458-audio-release-chain",
+    "iterations/v2/001-original-recovery/runs/460-audio-thread-worker",
+    "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel"
+  ],
+  "mutations": [
+    {
+      "name": "count_guard",
+      "from": "while(static_cast<I>(read32(state))>0)",
+      "to": "while(static_cast<I>(read32(state))>1)",
+      "count": 1
+    },
+    {
+      "name": "block_count",
+      "from": "read32(state)-28u",
+      "to": "read32(state)-27u",
+      "count": 1
+    },
+    {
+      "name": "input_step",
+      "from": "input+=15u",
+      "to": "input+=14u",
+      "count": 1
+    },
+    {
+      "name": "output_step",
+      "from": "output+=112u",
+      "to": "output+=108u",
+      "count": 1
+    },
+    {
+      "name": "coefficient_pair",
+      "from": "window+16u+high*4u",
+      "to": "window+12u+high*4u",
+      "count": 1
+    },
+    {
+      "name": "row_shift",
+      "from": "(read8(input)&15u)*64u",
+      "to": "(read8(input)&15u)*32u",
+      "count": 1
+    },
+    {
+      "name": "low_nibble",
+      "from": "const U lower=read8(encoded)&15u",
+      "to": "const U lower=read8(encoded)>>4",
+      "count": 1
+    },
+    {
+      "name": "odd_add_order",
+      "from": "_emit 0e6h\n _emit 09eh\n _emit 0fh\n _emit 0fh\n _emit 0e5h",
+      "to": "_emit 0e5h\n _emit 09eh\n _emit 0fh\n _emit 0fh\n _emit 0e6h",
+      "count": 1
+    },
+    {
+      "name": "history_save",
+      "from": "movd [eax+4],mm2\n movd [eax+8],mm3",
+      "to": "movd [eax+4],mm3\n movd [eax+8],mm2",
+      "count": 1
+    },
+    {
+      "name": "missing_femms",
+      "from": " _emit 0fh\n _emit 0eh",
+      "to": " nop",
+      "count": 1
+    },
+    {
+      "name": "premature_even_store",
+      "from": "const U lower=read8(encoded)&15u;",
+      "to": "nibble512::write32(output+index*8u,0);const U lower=read8(encoded)&15u;",
+      "count": 1
+    }
+  ],
+  "new_original_body_bytes": 201,
+  "new_state_bytes": 0,
+  "candidate_auxiliary_symbols": [
+    "__Avx2WmemEnabledWeakValue"
+  ]
+}

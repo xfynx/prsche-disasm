@@ -4,13 +4,17 @@ Updated 2026-11-06. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run544](iterations/v2/001-original-recovery/runs/544-render-reset-audio-integration/README.md)
-compiles303 C++ translation units across8 projects. The link has135 unresolved names/
-143 references. **There is no recovered playable C++ game executable yet.**
+[Run545](iterations/v2/001-original-recovery/runs/545-audio-nibble-3dnow-integration/README.md)
+compiles304 C++ translation units across8 projects. The link has134 unresolved names/
+142 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:3 originals/245B and24B sparse data;29,376 comparisons/20 mutations/743 pins
-pass. One name closes/no new names;registry831. Texture-slot reset and its actual
-three-body composition are bounded; canonical VirtualFree COFF/import ownership is checked.
+Latest:one original201B/0 new state;2560 emulated comparisons/22 mutations/746
+pins pass. One name closes/no new names;registry832. Exact3DNow nibble kernel and
+actual canonical processor/continuation compose in pinnedAthlon emulation;
+all24 compiled comparison images pass strict COFF/compile-source admission gates.
+This does not establish nativeAMD hardware fidelity. Texture-slot reset remains
+accepted by544. Future resource integration's547 export proof was antivirus-blocked
+before execution and is unaccepted.
 Supplemental
 537005 query-alias controls were antivirus-blocked before execution and are unaccepted.
 Earlier constructor/metric unwritten-local paths and full platform/gameplay stay open;

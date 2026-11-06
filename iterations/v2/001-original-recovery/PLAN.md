@@ -1,14 +1,13 @@
 # v2 / 001 - original source recovery plan
 
-Current544,2026-11-06: frozen543002 adds3 originals245B/24B sparse writable state.
-Registry831; prior535bc0/535d80/597360 partials unchanged. Audit PASS29,376
-comparisons/119,328 events/20 mutations/743 pins/730 listed canonical providers.
-Fresh001 compiles303TUs/8projects;135names143refs,noEXE;oneclose/no new names.
-Actual555330/555390/555400 chain preserves late callback reads/count reload,
-epochwrap and reset stores. Normal32slots/finite chains/negative signed skips,
-specified aliases/FPU/ABI proved. ExistingVirtualFree uniqueCOFF/import checked;
-canonical537slots/540total/export/fill/heap reused. Children controlled, notliveAPI.
-README544 owns commands and concise handoff. Passed ready set is frozen.
+Current545,2026-11-06: frozen541007 adds1 original201B/0newstate. Registry832;
+prior535bc0/535d80/597360 partials unchanged. Audit PASS2560emulated comparisons/
+439,550memoryevents/516,410FPsnapshots/22controls/746pins/731listedproviders;
+native0, no nativeAMD claim. Fresh001304TUs/8projects;134names142refs,noEXE;
+oneclose/no newnames. Actualcanonical512data/init/534/538composition and all24
+image retainedCOFF/source/object/optimization gates pass beforeMachine/replay.
+544 reset proof unchanged; existing providers/state reused. README545 owns exact
+commands and concise handoff. Passedreadyset frozen; root owns publication.
 
 537005 supplemental query-order EXE was blocked by Windows antivirus before any
 execution. No bypass/retry/exclusion; zero accepted cases/controls.004 accepts
@@ -16,19 +15,31 @@ only listed separate/texture+0/+4/+14/table-slotbase+4 aliases; output=slotbase-
 and extra early-prefetch controls remain unaccepted. Preserve blocked005 evidence.
 535bc0/535d80 opaque querylocals remain PARTIAL, including actual null query.
 
-542 published08d7842. Root owns544 publication. Two independent Sol/high workers:
-audio_541_resume owns541 exact3DNow comparison under strict per-image retainedCOFF
-proof gate; actual004 read-only reconstruction passes, never executed. Newimages
-require exactcompile/object closure,INCREMENTAL:NO,complete retainedcode reconstruction,
-all unresolvedrelocs from discardedCOMDAT,zeroimports/relocs,no stubs before emulation.
-541 algorithm remains unaccepted until all controls pass; no nativeAMD claim.
+544 published57231fa. Root owns545 integration541ONLY: frozen007 passes2560
+emulated comparisons/439,550events/516,410FPsnapshots/22controls/24images;
+one original201B/0data. Build001304TUs/134names142refs,oneclose/no newnames;
+common supported audit PASS. All images gated beforeMachine: exactcompile/object
+closure,INCREMENTAL:NO,complete retainedcode reconstruction,unresolvedrelocs only
+discardedCOMDAT,zeroimports/relocs,no stubs.004 never executed; no nativeAMD claim.
+Generic wrapper preserves immutable native auditor and additionally checks exact
+variant sources/peropt receipts/allauxzeroCOMDAT/currentgame compilerroot ownership.
 resource_next_scope owns546 sixbody608B/207Bdata resource arena/allocation/insertion
 packet553fc0/554b20/554b50/554b90/554ad0/554bd0. Current743pin/303root/548file
-closure and registry831 have no collisions. Research local/reports/resource-next-546-PLAN.md.
+closure and preflightregistry831 have no collisions. Research local/reports/resource-next-546-PLAN.md.
+Frozen546003 independently ready:22,066nativecomparisons/15,588events/30controls,
+285input/413output pins. Actual543reset/521format compose; heap-slot/heap/API/
+diagnostic/exit boundaries controlled. Root reviews independentpacket publication;
+registry/game remain832/current545 until later accepted integration. Twofailed
+priorattempts preserved:001missingfixtureviews link;002divisionmutant survived,
+003adds negative wrapped-product fixture case only,production unchanged.
 Separate sentinel6a3a08 must preserve derivedread without OOB array access; null
 fill and capacity diagnostic/exit remain exact controlled boundaries. Outer554960
 deferred with actualselector54820/comparator554310, never substitute comparator489.
-Next common integration545 accepts only fully ready future packets, never expands544.
+review_supported_emulation owns547 narrow include-owner export of existing static
+569a70, no duplicate scanner/originalcount. Native001 Defenderblocked before
+hash/execution, VirTool:Win32/Obfuscator.UE;0accepted,no retry/rename/bypass. Until
+proof passes,546 cannot integrate its external heap-slot dependency. Next548 can
+take546+proved547; don't enlarge frozen545/544. Shared builds remain sequential.
 531/539 research proves direct44d380 argument7 in0/10000; next factory536180/
 5361e0 virtualslot4/8 flag producers. No global stage bound or535a90 acceptance.
 539 intake corrects535001 source-drift report:001/003 have identical effective732
@@ -36,7 +47,7 @@ base+delta pins. Frozen535 evidence untouched;003 acceptance remains valid.
 User authorized commit/push2026-11-05;535 published5b9f8a3 and539 published89c3eab.
 Before every next commit show concise changes/checks/open work status as requested.
 Show status before every commit. No source consolidation.
-Latest handoff:runs/544-render-reset-audio-integration/README.md.
+Latest handoff:runs/545-audio-nibble-3dnow-integration/README.md.
 Passed inputs/originals immutable. Inherited NOICF/future832B LUT adjacency, actual
 APIs/heap/device cleanup, metric opaque locals, numeric diagnostic file-pointer
 consumer565340, faults/unmasked FP/concurrency/full producer/startup/gameplay/
