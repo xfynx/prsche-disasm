@@ -1,5 +1,14 @@
 # Отложенные проверки восстановления v2
 
+Run548:sixoriginals608B/207Bdata;22066nativecases/30mutations/749pins PASS.
+305TUs/135names143refs,noEXE;registry838. Integrates546provedbodies;553fc0closes,
+new typedheap-slot569a70 and diagnostic55ec50 remain genuinechildfrontiers.
+Earlier complete-deferral superseded for graphintegration only; no accepted
+external scanner export/completeparent runtime.547blocked0cases preserved.
+ExistingVirtualAllocCOFF/import005b2144 verified. Arbitraryindex/format/aliases/
+fault/corruptlist/liveheap/API/device/process/fullproducer/concurrency/gameplay
+remain open. Next independent549diagnostic/550codecglue,never enlarge548.
+
 Run545:one original201B/0newdata;2560emulatedcases/22mutations/746pins PASS.
 304TUs/134names142refs,noEXE;registry832. Strict24image source/object/retainedcode
 gates and actualcanonical512data/init/534/538composition pass, notnativeAMD proof.

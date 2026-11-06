@@ -4,18 +4,17 @@ Updated 2026-11-06. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run545](iterations/v2/001-original-recovery/runs/545-audio-nibble-3dnow-integration/README.md)
-compiles304 C++ translation units across8 projects. The link has134 unresolved names/
-142 references. **There is no recovered playable C++ game executable yet.**
+[Run548](iterations/v2/001-original-recovery/runs/548-resource-allocation-integration/README.md)
+compiles305 C++ translation units across8 projects. The link has135 unresolved names/
+143 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:one original201B/0 new state;2560 emulated comparisons/22 mutations/746
-pins pass. One name closes/no new names;registry832. Exact3DNow nibble kernel and
-actual canonical processor/continuation compose in pinnedAthlon emulation;
-all24 compiled comparison images pass strict COFF/compile-source admission gates.
-This does not establish nativeAMD hardware fidelity. Texture-slot reset remains
-accepted by544. Future resource integration's547 export proof was antivirus-blocked
-before execution and is unaccepted. Independent546 resource proof passes22,066
-native comparisons/30 mutations; its six functions await game integration.
+Latest:six originals608B/207Bdata;22,066 native comparisons/30 mutations/749pins
+pass;registry838. Reserve553fc0 closes; two actual child names enter the frontier:
+external heap-slot binding569a70 and diagnostic55ec50. Existing static scanner
+algorithm remains accepted; its proposed547 external export was antivirus-blocked
+before execution and is unaccepted.548 integrates proved546 bodies with those
+boundaries unresolved. Previous5453DNow evidence remains emulated; nativeAMD
+hardware fidelity is still open. Texture-slot reset remains accepted by544.
 Supplemental
 537005 query-alias controls were antivirus-blocked before execution and are unaccepted.
 Earlier constructor/metric unwritten-local paths and full platform/gameplay stay open;

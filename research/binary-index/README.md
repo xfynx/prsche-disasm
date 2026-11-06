@@ -1,5 +1,10 @@
 # Индекс оригинальных бинарников
 
+Run548 [integrates546](../../iterations/v2/001-original-recovery/runs/548-resource-allocation-integration/README.md)
+with explicit heap-slot569a70 external-binding and diagnostic55ec50 frontiers.
+ExistingVirtualAllocCOFF identity matches originalIAT005b2144. No547 provider or
+blocked executable is admitted; completeparent/liveallocation remain unaccepted.
+
 Run546: [arena/allocation/insertion evidence](../../iterations/v2/001-original-recovery/runs/546-render-resource-allocation/scope-evidence.json)
 pins six original bodies608B/207B data and derived sentinel read ordering.
 [Independent native packet](../../iterations/v2/001-original-recovery/runs/546-render-resource-allocation/README.md)

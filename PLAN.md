@@ -19,13 +19,13 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run545](iterations/v2/001-original-recovery/runs/545-audio-nibble-3dnow-integration/README.md).
-Exact3DNow nibble decoding is integrated with bounded emulated proof; two texture constructors
+Latest recovery intake: [Run548](iterations/v2/001-original-recovery/runs/548-resource-allocation-integration/README.md).
+Resource allocation bodies are integrated with explicit child frontiers; two texture constructors
 and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next work: native resource-allocation packet546; its canonical export547 proof is
-antivirus-blocked before execution. Live producers/nativeAMD hardware remain open.
+Next parallel work: diagnostic549 and codec caller-glue550. External heap-slot
+export547 remains antivirus-blocked before execution; live producers/nativeAMD remain open.
 
 ## Recovery milestones
 

@@ -1,12 +1,12 @@
 # v2 / 001 - original source recovery plan
 
-Current545,2026-11-06: frozen541007 adds1 original201B/0newstate. Registry832;
-prior535bc0/535d80/597360 partials unchanged. Audit PASS2560emulated comparisons/
-439,550memoryevents/516,410FPsnapshots/22controls/746pins/731listedproviders;
-native0, no nativeAMD claim. Fresh001304TUs/8projects;134names142refs,noEXE;
-oneclose/no newnames. Actualcanonical512data/init/534/538composition and all24
-image retainedCOFF/source/object/optimization gates pass beforeMachine/replay.
-544 reset proof unchanged; existing providers/state reused. README545 owns exact
+Current548,2026-11-06: frozen546003 adds6originals608B/207Bdata. Registry838;
+prior535bc0/535d80/597360 partials unchanged. Audit PASS22066native comparisons/
+15588events/30controls/749pins/742listedproviders. Fresh001305TUs/8projects;
+135names143refs,noEXE;oneclose/twonew genuine childnames. Externalheap-slot569a70
+anddiagnostic55ec50 unresolved; no547provider/completeparent claim. Actual543reset/
+521format compose; uniqueexistingVirtualAllocCOFF/import005b2144 checked.
+Prior5453DNow proof unchanged/emulated, no nativeAMD claim. README548 owns exact
 commands and concise handoff. Passedreadyset frozen; root owns publication.
 
 537005 supplemental query-order EXE was blocked by Windows antivirus before any
@@ -36,11 +36,18 @@ priorattempts preserved:001missingfixtureviews link;002divisionmutant survived,
 Separate sentinel6a3a08 must preserve derivedread without OOB array access; null
 fill and capacity diagnostic/exit remain exact controlled boundaries. Outer554960
 deferred with actualselector54820/comparator554310, never substitute comparator489.
-review_supported_emulation owns547 narrow include-owner export of existing static
+547 narrow include-owner export of existing static
 569a70, no duplicate scanner/originalcount. Native001 Defenderblocked before
 hash/execution, VirTool:Win32/Obfuscator.UE;0accepted,no retry/rename/bypass. Until
-proof passes,546 cannot integrate its external heap-slot dependency. Next548 can
-take546+proved547; don't enlarge frozen545/544. Shared builds remain sequential.
+proof passes,external heap-slot binding remains unresolved. Revised548 intake
+integrates frozen546ONLY as compiled provedbodies with genuine typedchildfrontiers
+application_heap_slot569a70 and diagnostic55ec50; no547provider or completeparent
+claim. This supersedes the earlier full-deferral decision without relaxingproof.
+Root owns548 build/audit/registry/docs; passed545/546 inputs remain frozen.
+resource_next_scope owns549 diagnostic55ec50 originaltrace/proof (newrun/localonly);
+audio_541_resume owns550 remainingcodecfrontier97e30/9c1e0/9b690 scope research.
+Both Sol/high; root approves scope, no commonbuild/registry ownership or retries of
+blocked artifacts. Shared builds sequential; newproofs cannot enlarge548 readyset.
 531/539 research proves direct44d380 argument7 in0/10000; next factory536180/
 5361e0 virtualslot4/8 flag producers. No global stage bound or535a90 acceptance.
 539 intake corrects535001 source-drift report:001/003 have identical effective732
@@ -48,7 +55,7 @@ base+delta pins. Frozen535 evidence untouched;003 acceptance remains valid.
 User authorized commit/push2026-11-05;535 published5b9f8a3 and539 published89c3eab.
 Before every next commit show concise changes/checks/open work status as requested.
 Show status before every commit. No source consolidation.
-Latest handoff:runs/545-audio-nibble-3dnow-integration/README.md.
+Latest handoff:runs/548-resource-allocation-integration/README.md.
 Passed inputs/originals immutable. Inherited NOICF/future832B LUT adjacency, actual
 APIs/heap/device cleanup, metric opaque locals, numeric diagnostic file-pointer
 consumer565340, faults/unmasked FP/concurrency/full producer/startup/gameplay/
