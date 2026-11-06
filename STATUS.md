@@ -4,17 +4,17 @@ Updated 2026-11-06. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run548](iterations/v2/001-original-recovery/runs/548-resource-allocation-integration/README.md)
-compiles305 C++ translation units across8 projects. The link has135 unresolved names/
-143 references. **There is no recovered playable C++ game executable yet.**
+[Run551](iterations/v2/001-original-recovery/runs/551-diagnostic-codec-integration/README.md)
+compiles307 C++ translation units across8 projects. The link has133 unresolved names/
+141 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:six originals608B/207Bdata;22,066 native comparisons/30 mutations/749pins
-pass;registry838. Reserve553fc0 closes; two actual child names enter the frontier:
-external heap-slot binding569a70 and diagnostic55ec50. Existing static scanner
-algorithm remains accepted; its proposed547 external export was antivirus-blocked
-before execution and is unaccepted.548 integrates proved546 bodies with those
-boundaries unresolved. Previous5453DNow evidence remains emulated; nativeAMD
-hardware fidelity is still open. Texture-slot reset remains accepted by544.
+Latest:four originals1130B/0newdata;16,152 native comparisons/33 mutations/754pins
+pass;registry842. Four names close, two real decoder-kernel names enter: ADPCM59a910
+and resampler597810. Diagnostic device/formatter transport and codec caller glue
+compose with existing canonical providers; full codec mathematics/formattercore/
+liveoutputs remain open. Externalheap-slot569a70 binding stays unresolved; proposed
+547 export was antivirus-blocked before execution. Previous5453DNow evidence
+remains emulated; nativeAMD hardware fidelity is open.
 Supplemental
 537005 query-alias controls were antivirus-blocked before execution and are unaccepted.
 Earlier constructor/metric unwritten-local paths and full platform/gameplay stay open;

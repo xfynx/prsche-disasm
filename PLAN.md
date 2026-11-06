@@ -19,13 +19,14 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run548](iterations/v2/001-original-recovery/runs/548-resource-allocation-integration/README.md).
-Resource allocation bodies are integrated with explicit child frontiers; two texture constructors
+Latest recovery intake: [Run551](iterations/v2/001-original-recovery/runs/551-diagnostic-codec-integration/README.md).
+Diagnostic transport and codec caller glue are integrated; two texture constructors
 and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next parallel work: diagnostic549 and codec caller-glue550. External heap-slot
-export547 remains antivirus-blocked before execution; live producers/nativeAMD remain open.
+Next trace original ADPCM/resampler kernels and their canonical children before
+approving the next packet. External heap-slot export547 remains antivirus-blocked;
+live producers/nativeAMD hardware remain open.
 
 ## Recovery milestones
 

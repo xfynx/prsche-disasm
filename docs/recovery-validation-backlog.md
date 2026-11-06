@@ -1,5 +1,14 @@
 # Отложенные проверки восстановления v2
 
+Run551:4originals1130B/0newdata;16152nativecases/43872events/33mutations/754pins PASS.
+307TUs/133names141refs,noEXE;registry842. Fourclose/twonew:ADPCM59a910,resampler597810
+kernel algorithms remain realfrontiers. Actual546capacity/345startup/353wrapper
+and canonical504init/505acquireack/519copy/434zero compose. Device/core/process/
+kernel endpoints controlled;no fullformatter/codec/liveoutput/overflow/hugecopy/
+invalidchannel/externalaliases/fault/unmaskedFP/concurrency/gameplay acceptance.
+Compileraux exactzero4BANYCOMDAT confirmednative+game;0neworiginalstate.
+Next trace kernels/helpers/actualproducers before scope;547binding AVblock unchanged.
+
 Run548:sixoriginals608B/207Bdata;22066nativecases/30mutations/749pins PASS.
 305TUs/135names143refs,noEXE;registry838. Integrates546provedbodies;553fc0closes,
 new typedheap-slot569a70 and diagnostic55ec50 remain genuinechildfrontiers.

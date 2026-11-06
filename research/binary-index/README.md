@@ -1,5 +1,12 @@
 # Индекс оригинальных бинарников
 
+Run551: [diagnostic116B](../../iterations/v2/001-original-recovery/runs/549-render-diagnostic/scope-evidence.json)
+and [codec caller supplement](../../iterations/v2/001-original-recovery/runs/550-audio-codec-frontier/original-index-supplement.json)
+pin rawvararg/device consumers and597e30/59c1e0/59b6901014B;59c1e0 full378B has
+twoRET exits before6NOP/59c360. [Intake](../../iterations/v2/001-original-recovery/runs/551-diagnostic-codec-integration/README.md)
+accepts bounded canonicalcomposition/transport; ADPCM59a910/resampler597810 remain
+unrecovered algorithms, no guessed codec or duplicated state.
+
 Run548 [integrates546](../../iterations/v2/001-original-recovery/runs/548-resource-allocation-integration/README.md)
 with explicit heap-slot569a70 external-binding and diagnostic55ec50 frontiers.
 ExistingVirtualAllocCOFF identity matches originalIAT005b2144. No547 provider or
