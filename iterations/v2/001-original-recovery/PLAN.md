@@ -15,7 +15,7 @@ only listed separate/texture+0/+4/+14/table-slotbase+4 aliases; output=slotbase-
 and extra early-prefetch controls remain unaccepted. Preserve blocked005 evidence.
 535bc0/535d80 opaque querylocals remain PARTIAL, including actual null query.
 
-544 published57231fa. Root owns545 integration541ONLY: frozen007 passes2560
+544 published57231fa;545 published60e29d5. Frozen545readyset541ONLY:007 passes2560
 emulated comparisons/439,550events/516,410FPsnapshots/22controls/24images;
 one original201B/0data. Build001304TUs/134names142refs,oneclose/no newnames;
 common supported audit PASS. All images gated beforeMachine: exactcompile/object
@@ -28,7 +28,8 @@ packet553fc0/554b20/554b50/554b90/554ad0/554bd0. Current743pin/303root/548file
 closure and preflightregistry831 have no collisions. Research local/reports/resource-next-546-PLAN.md.
 Frozen546003 independently ready:22,066nativecomparisons/15,588events/30controls,
 285input/413output pins. Actual543reset/521format compose; heap-slot/heap/API/
-diagnostic/exit boundaries controlled. Root reviews independentpacket publication;
+diagnostic/exit boundaries controlled. Independent raw608B review found no material
+defect;546/intake-review.json accepts standaloneproof,root publishes this packet;
 registry/game remain832/current545 until later accepted integration. Twofailed
 priorattempts preserved:001missingfixtureviews link;002divisionmutant survived,
 003adds negative wrapped-product fixture case only,production unchanged.

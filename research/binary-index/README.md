@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run546: [arena/allocation/insertion evidence](../../iterations/v2/001-original-recovery/runs/546-render-resource-allocation/scope-evidence.json)
+pins six original bodies608B/207B data and derived sentinel read ordering.
+[Independent native packet](../../iterations/v2/001-original-recovery/runs/546-render-resource-allocation/README.md)
+passes22066comparisons/30mutations; gameintegration awaits accepted569a70 export
+and preserves real diagnostic0055ec50 frontier. No currentgame/registry acceptance.
+
 Run545: [3DNow nibble evidence](../../iterations/v2/001-original-recovery/runs/541-audio-nibble-3dnow/scope-evidence.json)
 pins full0059a730201B,504selector/534/538callers and existing512 window/LUT/tail
 owners. [Intake](../../iterations/v2/001-original-recovery/runs/545-audio-nibble-3dnow-integration/README.md)

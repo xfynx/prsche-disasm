@@ -14,7 +14,8 @@ actual canonical processor/continuation compose in pinnedAthlon emulation;
 all24 compiled comparison images pass strict COFF/compile-source admission gates.
 This does not establish nativeAMD hardware fidelity. Texture-slot reset remains
 accepted by544. Future resource integration's547 export proof was antivirus-blocked
-before execution and is unaccepted.
+before execution and is unaccepted. Independent546 resource proof passes22,066
+native comparisons/30 mutations; its six functions await game integration.
 Supplemental
 537005 query-alias controls were antivirus-blocked before execution and are unaccepted.
 Earlier constructor/metric unwritten-local paths and full platform/gameplay stay open;
