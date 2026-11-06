@@ -1,13 +1,23 @@
 # Отложенные проверки восстановления v2
 
+Run544:3originals245B/24B sparse state;29,376comparisons/20mutations/743pins PASS.
+303TUs/135names143refs,noEXE;registry831. ExistingVirtualFree actualCOFF/import
+transport independently verified; canonical537slots/540total reused. Normal32slot
+finite chains, negative signed skips, callback-late state/fillcount reload/epochwrap
+and actual3body reset composition accepted. Children are controlled endpoints:
+liveheap/device/API/fullproducer/fault/concurrency/startup/gameplay remain open.
+Next parallel541 gated exact3DNow proof and546 resource-allocation scope;541 has
+zero accepted algorithm cases until all proof gates pass. Prior partials and
+AVblocked537005 unchanged; freeze544 ready set.
+
 Run542:2originals194B/82Bdata;440,376comparisons/17mutations/740pins PASS.
 302TUs/136names144refs,noEXE;registry828. Canonical531f90 actualheap.obj ownership
 verified independently. Normal32slot finite lists, wrapped counts, late free-field
 reads, no-retry diagnostics and unconditional4B/guarded reader domains are bounded.
-Next trace554bd0/555390 insertion/reset/lifetime and all6a3a40 writes before scope.
+555330/555390/555400 are accepted by544; insertion/allocation remain open.
 Actualheap/device/diagnostic565340/fullproducer/concurrency/gameplay and prior
 partials/AVblocked537005 remain open.5413DNow scope only, no proof/integration;
-workers hit usage limit, no respawn. Freeze542 scope; no broader fault safety claim.
+prior usage-limit handoff superseded by2026-11-06 parallel work. Freeze542 scope.
 
 Run539:5originals979B/1596Bdata;1,512,504comparisons/31mutations/737pins PASS.
 301TUs/138names146refs,noEXE;registry826.554cc0/56e290 are accepted by542;

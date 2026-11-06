@@ -19,12 +19,12 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run542](iterations/v2/001-original-recovery/runs/542-texture-cleanup-integration/README.md).
-Texture cleanup and the scalar reader are integrated; two texture constructors
+Latest recovery intake: [Run544](iterations/v2/001-original-recovery/runs/544-render-reset-audio-integration/README.md).
+Texture-slot invalidation/reset/arena release are integrated; two texture constructors
 and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next trace resource-slot insertion/reset/lifetime consumers; live resource producers remain open.
+Parallel next work: exact3DNow proof541 and resource-allocation scope546; live producers remain open.
 
 ## Recovery milestones
 

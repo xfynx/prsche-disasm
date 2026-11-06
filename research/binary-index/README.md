@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run544: [slot-reset evidence](../../iterations/v2/001-original-recovery/runs/543-render-slot-reset/scope-evidence.json)
+pins555330/555390/555400245B and six sparse loaderzero DWORDs24B, existing
+canonical slots/total/export ownership and originalVirtualFree import005b2148.
+[Intake](../../iterations/v2/001-original-recovery/runs/544-render-reset-audio-integration/README.md)
+accepts bounded native reset composition; live allocation/device effects stay open.
+
 Run542: [texture cleanup/reader evidence](../../iterations/v2/001-original-recovery/runs/540-render-texture-cleanup-reader/scope-evidence.json)
 pins554cc0/170B and56e290/24B, complete callers, singleton heap-free ownership,
 exact4B loaderzero count and78B strings. [Intake](../../iterations/v2/001-original-recovery/runs/542-texture-cleanup-integration/README.md)

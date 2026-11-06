@@ -1,16 +1,16 @@
 # Current project status
 
-Updated 2026-11-05. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-06. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run542](iterations/v2/001-original-recovery/runs/542-texture-cleanup-integration/README.md)
-compiles302 C++ translation units across8 projects. The link has136 unresolved names/
-144 references. **There is no recovered playable C++ game executable yet.**
+[Run544](iterations/v2/001-original-recovery/runs/544-render-reset-audio-integration/README.md)
+compiles303 C++ translation units across8 projects. The link has135 unresolved names/
+143 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:2 originals/194B and82B data;440,376 comparisons/17 mutations/740 pins
-pass. Two names close/no new names;registry828. Texture cleanup/reader and their
-actual537 compositions are bounded; canonical heap free COFF ownership is checked.
+Latest:3 originals/245B and24B sparse data;29,376 comparisons/20 mutations/743 pins
+pass. One name closes/no new names;registry831. Texture-slot reset and its actual
+three-body composition are bounded; canonical VirtualFree COFF/import ownership is checked.
 Supplemental
 537005 query-alias controls were antivirus-blocked before execution and are unaccepted.
 Earlier constructor/metric unwritten-local paths and full platform/gameplay stay open;

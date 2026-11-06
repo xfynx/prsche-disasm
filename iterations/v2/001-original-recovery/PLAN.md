@@ -1,13 +1,14 @@
 # v2 / 001 - original source recovery plan
 
-Current542,2026-11-05: frozen540002 adds2 originals194B/82B data
-(4 writable/78 readonly). Registry828; prior535bc0/535d80/597360 partials unchanged.
-Audit PASS440,376 comparisons/903,680 events/17 mutations/740 pins/721 providers.
-Fresh001 compiles302 TUs/8 projects;136 names144 refs,noEXE;2 close/no new names.
-Actual537format/destructor compose with newcleanup/reader. Finite normal32-slot
-lists, countwrap, late freefields, unconditional4B/guarded reader and FPU/ABI pass.
-Separate COFF probe proves singleton canonical531f90 atheap.obj; no new heap body.
-README542 owns commands and the concise handoff. Passed ready set is frozen.
+Current544,2026-11-06: frozen543002 adds3 originals245B/24B sparse writable state.
+Registry831; prior535bc0/535d80/597360 partials unchanged. Audit PASS29,376
+comparisons/119,328 events/20 mutations/743 pins/730 listed canonical providers.
+Fresh001 compiles303TUs/8projects;135names143refs,noEXE;oneclose/no new names.
+Actual555330/555390/555400 chain preserves late callback reads/count reload,
+epochwrap and reset stores. Normal32slots/finite chains/negative signed skips,
+specified aliases/FPU/ABI proved. ExistingVirtualFree uniqueCOFF/import checked;
+canonical537slots/540total/export/fill/heap reused. Children controlled, notliveAPI.
+README544 owns commands and concise handoff. Passed ready set is frozen.
 
 537005 supplemental query-order EXE was blocked by Windows antivirus before any
 execution. No bypass/retry/exclusion; zero accepted cases/controls.004 accepts
@@ -15,18 +16,27 @@ only listed separate/texture+0/+4/+14/table-slotbase+4 aliases; output=slotbase-
 and extra early-prefetch controls remain unaccepted. Preserve blocked005 evidence.
 535bc0/535d80 opaque querylocals remain PARTIAL, including actual null query.
 
-539 published89c3eab; root completed540/542 after workers hit usage limit. No active
-worker assignments or respawns. Next root scope trace:554bd0/555390 slot insertion/
-reset/lifetime and all006a3a40 writes; check current ownership before proposing543.
-5413DNow scope artifacts remain unaccepted/outside game graph; work deferred.
+542 published08d7842. Root owns544 publication. Two independent Sol/high workers:
+audio_541_resume owns541 exact3DNow comparison under strict per-image retainedCOFF
+proof gate; actual004 read-only reconstruction passes, never executed. Newimages
+require exactcompile/object closure,INCREMENTAL:NO,complete retainedcode reconstruction,
+all unresolvedrelocs from discardedCOMDAT,zeroimports/relocs,no stubs before emulation.
+541 algorithm remains unaccepted until all controls pass; no nativeAMD claim.
+resource_next_scope owns546 sixbody608B/207Bdata resource arena/allocation/insertion
+packet553fc0/554b20/554b50/554b90/554ad0/554bd0. Current743pin/303root/548file
+closure and registry831 have no collisions. Research local/reports/resource-next-546-PLAN.md.
+Separate sentinel6a3a08 must preserve derivedread without OOB array access; null
+fill and capacity diagnostic/exit remain exact controlled boundaries. Outer554960
+deferred with actualselector54820/comparator554310, never substitute comparator489.
+Next common integration545 accepts only fully ready future packets, never expands544.
 531/539 research proves direct44d380 argument7 in0/10000; next factory536180/
 5361e0 virtualslot4/8 flag producers. No global stage bound or535a90 acceptance.
 539 intake corrects535001 source-drift report:001/003 have identical effective732
 base+delta pins. Frozen535 evidence untouched;003 acceptance remains valid.
 User authorized commit/push2026-11-05;535 published5b9f8a3 and539 published89c3eab.
 Before every next commit show concise changes/checks/open work status as requested.
-542 ready for publication. No source consolidation.
-Latest handoff:runs/542-texture-cleanup-integration/README.md.
+Show status before every commit. No source consolidation.
+Latest handoff:runs/544-render-reset-audio-integration/README.md.
 Passed inputs/originals immutable. Inherited NOICF/future832B LUT adjacency, actual
 APIs/heap/device cleanup, metric opaque locals, numeric diagnostic file-pointer
 consumer565340, faults/unmasked FP/concurrency/full producer/startup/gameplay/
