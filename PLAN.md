@@ -20,6 +20,9 @@ bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
 Latest recovery intake: [Run551](iterations/v2/001-original-recovery/runs/551-diagnostic-codec-integration/README.md).
+New research, not accepted: [Run552](iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/README.md)
+implements the six coded-audio kernel bodies behind the 551 processors and proves
+five of them bit-exactly; the full frame proof still has one open divergence.
 Diagnostic transport and codec caller glue are integrated; two texture constructors
 and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)

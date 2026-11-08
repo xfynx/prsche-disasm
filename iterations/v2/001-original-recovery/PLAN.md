@@ -1,75 +1,64 @@
 # v2 / 001 - original source recovery plan
 
-Current551,2026-11-06: frozen549001/550002 adds4originals1130B/0newdata. Registry842;
-prior535bc0/535d80/597360 partials unchanged. Audit PASS16152native comparisons/
-43872events/33controls/754pins/746listedproviders. Fresh001307TUs/8projects;
-133names141refs,noEXE;fourclose/twonew realkernel names59a910/597810. Actual546
-capacity/345startup/353wrapper and504init/505acquireack/519copy/434zero compose;
-formattercore/device/process/kernels controlled,not fullcodec/liveeffects.
-Externalheap-slot569a70 binding unresolved; no547provider. Inertzero4B compileraux
-native+game verified, no neworiginalstate. Prior5453DNow unchanged/emulated.
-README551 owns commands/handoff; passedreadyset frozen,root owns publication.
+Current552,2026-11-09;accepted/frozenstill551 f677d1c. 552researchpacketNOT
+accepted/integrated:sixbodycodedaudiofamily59a910/59abe0/59ad80/59adc0/59ae00/
+59b580 implemented;scope/ABI/state/data/pinnedtables/9bodyslabharnessdone.
+Nativeattempt037bit-exactproves59ad80/59adc0/59abe0/59b580and59ae00
+(offsets0/0xc/0x18/0x24)andmanyframesub-cases;fullframewithrandomdequantbits
+stilldiverges(open:stageprobeafterblend).Immovableattempts001..037in
+local/experiments/v2-audio-adpcm-kernel-552. Commands/findings/nextstep:
+runs/552-audio-adpcm-kernel/README.md. Porsche.exehasnofldcw/fnstcw,so
+originalx87runsat0x027F(53-bit);recoveredC++usesbinary64intermediatesin
+originalorder. No gamegraph/registrychange;551remainsmeasuredcheckpoint.
 
-537005 supplemental query-order EXE was blocked by Windows antivirus before any
-execution. No bypass/retry/exclusion; zero accepted cases/controls.004 accepts
-only listed separate/texture+0/+4/+14/table-slotbase+4 aliases; output=slotbase-12
-and extra early-prefetch controls remain unaccepted. Preserve blocked005 evidence.
-535bc0/535d80 opaque querylocals remain PARTIAL, including actual null query.
+Current551,2026-11-07;publishedf677d1c. Frozen549001/550002 adds4originals1130B/
+0newdata;registry842. AuditPASS16152nativecomparisons/43872events/33controls/
+754effectivepins/746listedproviders. Common001307TUs/8projects;133names141refs,
+noEXE;fourclose/twonewreal kernels59a910/597810. Actual546capacity/345startup/
+353wrapper and504init/505acquireack/519copy/434zero compose;formattercore/device/
+process/kernels controlled. Inertzero4B compileraux verifiednative+game,0newstate.
+Commands/evidence/precisebounds: runs/551-diagnostic-codec-integration/README.md.
+Passed551/549/550 and original inputs are frozen; don't expand passed batches.
 
-544 published57231fa;545 published60e29d5. Frozen545readyset541ONLY:007 passes2560
-emulated comparisons/439,550events/516,410FPsnapshots/22controls/24images;
-one original201B/0data. Build001304TUs/134names142refs,oneclose/no newnames;
-common supported audit PASS. All images gated beforeMachine: exactcompile/object
-closure,INCREMENTAL:NO,complete retainedcode reconstruction,unresolvedrelocs only
-discardedCOMDAT,zeroimports/relocs,no stubs.004 never executed; no nativeAMD claim.
-Generic wrapper preserves immutable native auditor and additionally checks exact
-variant sources/peropt receipts/allauxzeroCOMDAT/currentgame compilerroot ownership.
-resource_next_scope owns546 sixbody608B/207Bdata resource arena/allocation/insertion
-packet553fc0/554b20/554b50/554b90/554ad0/554bd0. Current743pin/303root/548file
-closure and preflightregistry831 have no collisions. Research local/reports/resource-next-546-PLAN.md.
-Frozen546003 independently ready:22,066nativecomparisons/15,588events/30controls,
-285input/413output pins. Actual543reset/521format compose; heap-slot/heap/API/
-diagnostic/exit boundaries controlled. Independent raw608B review found no material
-defect;546/intake-review.json accepts standaloneproof,root publishes this packet;
-registry/game remain832/current545 until later accepted integration. Twofailed
-priorattempts preserved:001missingfixtureviews link;002divisionmutant survived,
-003adds negative wrapped-product fixture case only,production unchanged.
-Separate sentinel6a3a08 must preserve derivedread without OOB array access; null
-fill and capacity diagnostic/exit remain exact controlled boundaries. Outer554960
-deferred with actualselector54820/comparator554310, never substitute comparator489.
-547 narrow include-owner export of existing static
-569a70, no duplicate scanner/originalcount. Native001 Defenderblocked before
-hash/execution, VirTool:Win32/Obfuscator.UE;0accepted,no retry/rename/bypass. Until
-proof passes,external heap-slot binding remains unresolved. Revised548 intake
-integrates frozen546ONLY as compiled provedbodies with genuine typedchildfrontiers
-application_heap_slot569a70 and diagnostic55ec50; no547provider or completeparent
-claim. This supersedes the earlier full-deferral decision without relaxingproof.
-Root owns548 build/audit/registry/docs; passed545/546 inputs remain frozen.
-548 publishedd0d39c0. Frozen549001:1original116B/0data,7560nativecases/24396events/
-16controls. Frozen550002:3originals1014B/0data,8592cases/19476events/17controls.
-Cross-review Sol/high workers found no material defect.550 missingfull378B/twoRET
-59c1e0 indexed supplement accepted; its551closureentries mean550codeheaders+1helper.
-Root551readyset549+550ONLY:common001build307TUs/133names141refs,noEXE;
-fourclose/twonewkernel names. Inertauxexactzero4BANYCOMDAT inbothnativevariants
-and actualnewgameobject verified separately; no neworiginalstate. Common auditPASS,
-registry842;root finishes docs/publication. Codec/resampler math remains realunresolved59a910/597810;
-549formattercore/device/exit children controlled. No blockedartifact retries.
-Next concrete tracing: raw59a910 with59abe0/59adc0/59ae00 helpers and their actual
-table/bitstate producers, separately597810 rand/ftol paths. Check current754pin/
-307root canonicalclosure/body overlaps before choosing one coherent kernelbatch.
-No activeworkers after cross-review; original/passedproofs immutable.
-531/539 research proves direct44d380 argument7 in0/10000; next factory536180/
-5361e0 virtualslot4/8 flag producers. No global stage bound or535a90 acceptance.
-539 intake corrects535001 source-drift report:001/003 have identical effective732
-base+delta pins. Frozen535 evidence untouched;003 acceptance remains valid.
-User authorized commit/push2026-11-05;535 published5b9f8a3 and539 published89c3eab.
-Before every next commit show concise changes/checks/open work status as requested.
-Show status before every commit. No source consolidation.
-Latest handoff:runs/551-diagnostic-codec-integration/README.md.
-Passed inputs/originals immutable. Inherited NOICF/future832B LUT adjacency, actual
-APIs/heap/device cleanup, metric opaque locals, numeric diagnostic file-pointer
-consumer565340, faults/unmasked FP/concurrency/full producer/startup/gameplay/
-403/411 remain open. Batch READMEs own commands; backlog owns remaining checks.
+Active2026-11-09,no worker holds 552/553:
+- 552 coded-audio family: scope/implementation/harness frozen as research; open
+  divergence isolated to the frame with random dequant bits. Next concrete step is
+  the after-blend stage probe described in runs/552-audio-adpcm-kernel/README.md;
+  do not rerun the already-passing kernels or revive old hypotheses.
+- 553 resampler00597810 and actual550state/input/output plus rand/ftol consumers is
+  still unscoped; only start it after 552 either closes or is deliberately parked.
+- Root: scope approval, cross-review, later554 ready-set common integration/audit/
+  registry/docs/publication. No fixture provider in game, one build/audit per set.
+  New scopes verify current754pins/307roots and full source/header closure.
+
+Next: close the 552 frame divergence with the stage probe (blend blocks and
+per-block parity/mode), then freeze a proved set; reuse the shared native runner
+and accepted support TUs. Inputs/intermediate/output, usedreturns/ABI/FP and
+detecting mutations at Od/O2 required. Negative/hugecopy/fault/unmaskedFP/producer
+domains remain explicit. After2failed hypotheses report facts; no endless reruns
+or framework rewrites. Shared builds sequential; freeze ready sets.
+
+Persistent boundaries:
+- 547 include-owner static569a70 export is unaccepted/Defenderblocked001 before
+  hash/execution,VirTool:Win32/Obfuscator.UE;0cases,no retry/rename/exclusion/bypass.
+  548d0d39c0 compiles proved546bodies while trueexternalheap-slot binding remains
+  unresolved; no547code/provider/completeparent claim.546published7e8dedf.
+- 537005 extraqueryalias proof AVblocked beforeexecution;004 admits only listed
+  separate/texture+0/+4/+14/table-slotbase+4 aliases. slotbase-12/prefetch unaccepted.
+- 535bc0/535d80 querylocals and597360 metric stayPARTIAL; don'tinitialize opaque
+  locals. Stage535a90 globaldomain unproved;531/539 direct44d380 arg7 only0/10000,
+  nextactualfactory536180/5361e0 vslots4/8 producertrace. No broadbounds inference.
+- 541007/54560e29d5 3DNow proof is pinnedAthlon emulation,not nativeAMD;832B LUT+
+  192Btail adjacency and actualcanonical512initializer proved there. Old498/502
+  proofs unchanged. Historical541004 linkedprobe neverexecuted.
+- Numeric565340 file-pointer consumer, outer554960/54820/554310, arbitraryaliases/
+  corruptstates/faults/unmaskedFP/concurrency/liveAPI/fullproducer/startup/display/
+  menus/careers/gameplay and403/411 remain open; no guessedimplementation.
+
+User authorized commit/push; before EVERY commit show concise changed/checks/open
+status and git status --short. Stage explicit accepted paths, compare stagedbytes
+to frozenworking inputs; no forcepush or sourceconsolidation. Root PLAN/STATUS/
+README get briefcurrent pointers; eachrunREADME owns detailed handoff/commands.
 
 Historical514 follows.
 

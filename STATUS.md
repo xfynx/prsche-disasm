@@ -1,12 +1,20 @@
 # Current project status
 
-Updated 2026-11-06. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-09. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
 [Run551](iterations/v2/001-original-recovery/runs/551-diagnostic-codec-integration/README.md)
 compiles307 C++ translation units across8 projects. The link has133 unresolved names/
 141 references. **There is no recovered playable C++ game executable yet.**
+
+New research (not accepted, not integrated):
+[Run552](iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/README.md)
+implements the six-body coded-audio family behind the 551 processors
+(59a910/59abe0/59ad80/59adc0/59ae00/59b580) and proves five bodies plus the
+synthesis and many frame sub-cases bit-exactly against the original. The full frame
+with a random dequant bitstream still diverges; the next step is the documented
+after-blend stage probe. No game build, registry entry or pin count changed.
 
 Latest:four originals1130B/0newdata;16,152 native comparisons/33 mutations/754pins
 pass;registry842. Four names close, two real decoder-kernel names enter: ADPCM59a910

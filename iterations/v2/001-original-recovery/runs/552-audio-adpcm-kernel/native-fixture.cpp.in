@@ -1,0 +1,164 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_coded_kernel_552.hpp"
+#include "audio_coded_constructors_504.hpp"
+#include "audio_stream_worker_stop_513.hpp"
+#include <cstdio>
+#include <cstring>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static B* slab;
+static U switch_552[4];
+static void require(bool ok,const char* why){
+    if(!ok){std::printf("divergence %s\n",why);std::fflush(stdout);ExitProcess(1);}
+}
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;std::memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){std::memcpy(p,&x,4);}
+// Dead dependencies of the accepted Run504/Run519 translation units linked for
+// this proof. None of them is reachable from the six bodies under test.
+namespace porsche {
+int __cdecl audio_pcm_channel_owner_00589710(U){ExitProcess(90);return 0;}
+U __cdecl audio_pcm_channel_member_00589740(U){ExitProcess(90);return 0;}
+I __cdecl audio_pcm_stream_find_0059c130(I){ExitProcess(90);return 0;}
+I __cdecl audio_adpcm_process_00597e30(U,U,U,U,U){ExitProcess(90);return 0;}
+I __cdecl audio_adpcm_stream_process_0059c1e0(U,U,U,U,U){ExitProcess(90);return 0;}
+I __cdecl audio_nibble_process_00597c40(U,U,U,U,U){ExitProcess(90);return 0;}
+I __cdecl audio_nibble_loop_process_0059c890(U,U,U,U,U){ExitProcess(90);return 0;}
+I __cdecl audio_nibble_stream_process_0059c3c0(U,U,U,U,U){ExitProcess(90);return 0;}
+I __cdecl audio_resampler_stream_process_0059b690(U,U,U,U,U){ExitProcess(90);return 0;}
+void __cdecl audio_nibble_decode_x87_0059a5a0(U){ExitProcess(90);}
+void __cdecl audio_nibble_decode_sse_0059a660(U){ExitProcess(90);}
+void __cdecl audio_nibble_decode_3dnow_0059a730(U){ExitProcess(90);}
+void __cdecl audio_stream_transform_00597660(U,U){ExitProcess(90);}
+AudioStreamCapture513 audio_stream_capture_006aefb8;
+unsigned char audio_stream_backend_format_006b4862;
+unsigned int audio_stream_backend_buffer_006b4864;
+}
+#define OFF_59A910 0x0000
+#define OFF_59ABE0 0x0400
+#define OFF_59AD80 0x0600
+#define OFF_59ADC0 0x0640
+#define OFF_59AE00 0x0800
+#define OFF_59B580 0x1000
+#define OFF_59A8C0 0x1100
+#define OFF_59A800 0x1200
+#define OFF_598A50 0x1300
+static void setup_slab(){
+    slab=static_cast<B*>(VirtualAlloc(nullptr,0x4000,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+    require(slab!=nullptr,"raw slab");
+    switch_552[0]=ptr(slab+OFF_59ABE0+(0x59ad35-0x59abe0));
+    switch_552[1]=ptr(slab+OFF_59ABE0+(0x59ad3f-0x59abe0));
+    switch_552[2]=ptr(slab+OFF_59ABE0+(0x59ad35-0x59abe0));
+    switch_552[3]=ptr(slab+OFF_59ABE0+(0x59ad47-0x59abe0));
+    static const B raw_DECODE[]={@DECODE552@};
+    std::memcpy(slab+0x0000,raw_DECODE,sizeof(raw_DECODE));
+    static const B raw_DEQUANT[]={@DEQUANT552@};
+    std::memcpy(slab+0x0400,raw_DEQUANT,sizeof(raw_DEQUANT));
+    static const B raw_SKIP[]={@SKIP552@};
+    std::memcpy(slab+0x0600,raw_SKIP,sizeof(raw_SKIP));
+    static const B raw_SMOOTH[]={@SMOOTH552@};
+    std::memcpy(slab+0x0640,raw_SMOOTH,sizeof(raw_SMOOTH));
+    static const B raw_SYNTH[]={@SYNTH552@};
+    std::memcpy(slab+0x0800,raw_SYNTH,sizeof(raw_SYNTH));
+    static const B raw_WINDOW[]={@WINDOW552@};
+    std::memcpy(slab+0x1000,raw_WINDOW,sizeof(raw_WINDOW));
+    static const B raw_READBITS[]={@READBITS552@};
+    std::memcpy(slab+0x1100,raw_READBITS,sizeof(raw_READBITS));
+    static const B raw_INIT[]={@INIT552@};
+    std::memcpy(slab+0x1200,raw_INIT,sizeof(raw_INIT));
+    static const B raw_COPY[]={@COPY552@};
+    std::memcpy(slab+0x1300,raw_COPY,sizeof(raw_COPY));
+    require(rd(slab+0x0015)==0xffffff97,"0059a910 call operand");
+    wr(slab+0x0015,ptr(slab+0x1100)-ptr(slab+0x0019));
+    require(rd(slab+0x0054)==0xffffff58,"0059a910 call operand");
+    wr(slab+0x0054,ptr(slab+0x1100)-ptr(slab+0x0058));
+    require(rd(slab+0x0089)==0xffffff23,"0059a910 call operand");
+    wr(slab+0x0089,ptr(slab+0x1100)-ptr(slab+0x008d));
+    require(rd(slab+0x00c1)==0xfffffeeb,"0059a910 call operand");
+    wr(slab+0x00c1,ptr(slab+0x1100)-ptr(slab+0x00c5));
+    require(rd(slab+0x00cf)==0xfffffedd,"0059a910 call operand");
+    wr(slab+0x00cf,ptr(slab+0x1100)-ptr(slab+0x00d3));
+    require(rd(slab+0x00f1)==0xfffffebb,"0059a910 call operand");
+    wr(slab+0x00f1,ptr(slab+0x1100)-ptr(slab+0x00f5));
+    require(rd(slab+0x0101)==0xfffffeab,"0059a910 call operand");
+    wr(slab+0x0101,ptr(slab+0x1100)-ptr(slab+0x0105));
+    require(rd(slab+0x010b)==0xfffffea1,"0059a910 call operand");
+    wr(slab+0x010b,ptr(slab+0x1100)-ptr(slab+0x010f));
+    require(rd(slab+0x0125)==0x000001a7,"0059a910 call operand");
+    wr(slab+0x0125,ptr(slab+0x0400)-ptr(slab+0x0129));
+    require(rd(slab+0x018c)==0x00000320,"0059a910 call operand");
+    wr(slab+0x018c,ptr(slab+0x0640)-ptr(slab+0x0190));
+    require(rd(slab+0x0200)==0xffffdf3c,"0059a910 call operand");
+    wr(slab+0x0200,ptr(slab+0x1300)-ptr(slab+0x0204));
+    require(rd(slab+0x022c)==0x000002c0,"0059a910 call operand");
+    wr(slab+0x022c,ptr(slab+0x0800)-ptr(slab+0x0230));
+    require(rd(slab+0x0258)==0x00000294,"0059a910 call operand");
+    wr(slab+0x0258,ptr(slab+0x0800)-ptr(slab+0x025c));
+    require(rd(slab+0x0284)==0x00000268,"0059a910 call operand");
+    wr(slab+0x0284,ptr(slab+0x0800)-ptr(slab+0x0288));
+    require(rd(slab+0x02b0)==0x0000023c,"0059a910 call operand");
+    wr(slab+0x02b0,ptr(slab+0x0800)-ptr(slab+0x02b4));
+    require(rd(slab+0x001c)==0x005e34c4,"0059a910 data operand");
+    wr(slab+0x001c,ptr(audio_coded_scale_005e34c4));
+    require(rd(slab+0x0032)==0x005b2468,"0059a910 data operand");
+    wr(slab+0x0032,ptr(&audio_coded_quarter_005b2468));
+    require(rd(slab+0x005b)==0x005e34c4,"0059a910 data operand");
+    wr(slab+0x005b,ptr(audio_coded_scale_005e34c4));
+    require(rd(slab+0x006d)==0x005b2468,"0059a910 data operand");
+    wr(slab+0x006d,ptr(&audio_coded_quarter_005b2468));
+    require(rd(slab+0x0090)==0x005e3504,"0059a910 data operand");
+    wr(slab+0x0090,ptr(audio_coded_scale_005e34c4)+0x40);
+    require(rd(slab+0x00a2)==0x005b2468,"0059a910 data operand");
+    wr(slab+0x00a2,ptr(&audio_coded_quarter_005b2468));
+    require(rd(slab+0x00e8)==0x005c1808,"0059a910 data operand");
+    wr(slab+0x00e8,ptr(audio_coded_window_005c1808));
+    require(rd(slab+0x0196)==0x005b2778,"0059a910 data operand");
+    wr(slab+0x0196,ptr(audio_coded_gain_005b2778));
+    require(rd(slab+0x0450)==0x0000014c,"0059abe0 call operand");
+    wr(slab+0x0450,ptr(slab+0x0600)-ptr(slab+0x0454));
+    require(rd(slab+0x047b)==0xfffffc61,"0059abe0 call operand");
+    wr(slab+0x047b,ptr(slab+0x1100)-ptr(slab+0x047f));
+    require(rd(slab+0x04d6)==0xfffffc06,"0059abe0 call operand");
+    wr(slab+0x04d6,ptr(slab+0x1100)-ptr(slab+0x04da));
+    require(rd(slab+0x04e7)==0xfffffbf5,"0059abe0 call operand");
+    wr(slab+0x04e7,ptr(slab+0x1100)-ptr(slab+0x04eb));
+    require(rd(slab+0x04fb)==0xfffffbe1,"0059abe0 call operand");
+    wr(slab+0x04fb,ptr(slab+0x1100)-ptr(slab+0x04ff));
+    require(rd(slab+0x0571)==0x0000002b,"0059abe0 call operand");
+    wr(slab+0x0571,ptr(slab+0x0600)-ptr(slab+0x0575));
+    require(rd(slab+0x0433)==0x005e35c4,"0059abe0 data operand");
+    wr(slab+0x0433,ptr(audio_coded_context_005e35c4));
+    require(rd(slab+0x043f)==0x005e37cc,"0059abe0 data operand");
+    wr(slab+0x043f,ptr(audio_coded_level_005e37c8)+4);
+    require(rd(slab+0x0445)==0x005e37c8,"0059abe0 data operand");
+    wr(slab+0x0445,ptr(audio_coded_level_005e37c8));
+    require(rd(slab+0x0462)==0x005e37d0,"0059abe0 data operand");
+    wr(slab+0x0462,ptr(audio_coded_level_005e37c8)+8);
+    require(rd(slab+0x0551)==0x0059ad70,"0059abe0 data operand");
+    wr(slab+0x0551,ptr(switch_552));
+    require(rd(slab+0x0657)==0x005c1814,"0059adc0 data operand");
+    wr(slab+0x0657,ptr(audio_coded_window_005c1808)+0xc);
+    require(rd(slab+0x0663)==0x005c1810,"0059adc0 data operand");
+    wr(slab+0x0663,ptr(audio_coded_window_005c1808)+8);
+    require(rd(slab+0x0671)==0x005c180c,"0059adc0 data operand");
+    wr(slab+0x0671,ptr(audio_coded_window_005c1808)+4);
+    require(rd(slab+0x0821)==0x0000075b,"0059ae00 call operand");
+    wr(slab+0x0821,ptr(slab+0x1000)-ptr(slab+0x0825));
+    require(rd(slab+0x1110)==0x005e34a0,"0059a8c0 data operand");
+    wr(slab+0x1110,ptr(audio_adpcm_bit_masks_005e34a0));
+    require(rd(slab+0x1222)==0x0000009a,"0059a800 call operand");
+    wr(slab+0x1222,ptr(slab+0x1100)-ptr(slab+0x1226));
+    require(rd(slab+0x122a)==0x00000092,"0059a800 call operand");
+    wr(slab+0x122a,ptr(slab+0x1100)-ptr(slab+0x122e));
+    require(rd(slab+0x123c)==0x00000080,"0059a800 call operand");
+    wr(slab+0x123c,ptr(slab+0x1100)-ptr(slab+0x1240));
+    require(rd(slab+0x125c)==0x00000060,"0059a800 call operand");
+    wr(slab+0x125c,ptr(slab+0x1100)-ptr(slab+0x1260));
+    require(rd(slab+0x1254)==0x005b2608,"0059a800 data operand");
+    wr(slab+0x1254,ptr(&audio_adpcm_scale_005b2608));
+    require(rd(slab+0x1279)==0x005b27b4,"0059a800 data operand");
+    wr(slab+0x1279,ptr(&audio_adpcm_factor_scale_005b27b4));
+    require(rd(slab+0x127f)==0x005c1804,"0059a800 data operand");
+    wr(slab+0x127f,ptr(&audio_adpcm_factor_bias_005c1804));
+}
+#include "fixture-harness.inc"
