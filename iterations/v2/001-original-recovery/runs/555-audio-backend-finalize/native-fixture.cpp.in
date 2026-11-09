@@ -1,0 +1,55 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_backend_finalize_555.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static B* slab;static U cases,events;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U v;std::memcpy(&v,p,4);return v;}
+static void wr(void* p,U v){std::memcpy(p,&v,4);}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s case=%u\n",why,cases);std::fflush(stdout);ExitProcess(1);}}
+namespace porsche {
+// Dead dependencies of the canonical state-owner TU. None is executed here.
+I __cdecl application_audio_backend_initialize_0058a4f0(){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_apply_0058a690(){ExitProcess(90);}
+void __cdecl application_audio_backend_configure_0058fef0(U,U){ExitProcess(90);}
+void __cdecl application_audio_backend_configure_0058aa90(U,U){ExitProcess(90);}
+U __cdecl application_audio_backend_allocate_0058aae0(U){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_start_0058e2d0(){ExitProcess(90);}
+I __cdecl application_audio_backend_start_device_0058fdb0(){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_stop_device_0058fe80(){ExitProcess(90);}
+void __cdecl application_audio_backend_stop_0058e2e0(){ExitProcess(90);}
+}
+static void setup(){
+    require(sizeof(audio_backend_pan_storage_006b181f)==1025,"exact original data extent");
+    for(B byte:reinterpret_cast<const B(&)[1025]>(audio_backend_pan_storage_006b181f))require(byte==0,"production PE-loader-zero before reset");
+    slab=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(slab!=nullptr,"raw slab");
+const B raw_58e0e0[]={@BODY_0058e0e0@};std::memcpy(slab+0,raw_58e0e0,sizeof raw_58e0e0);
+const B raw_58e0b0[]={@BODY_0058e0b0@};std::memcpy(slab+512,raw_58e0b0,sizeof raw_58e0b0);
+const B raw_58e290[]={@BODY_0058e290@};std::memcpy(slab+768,raw_58e290,sizeof raw_58e290);
+require(rd(slab+11)==0x006b48dc,"raw data operand");wr(slab+11,ptr(application_audio_device_state_006b48c0.data())+28);
+require(rd(slab+28)==0x006b1820,"raw data operand");wr(slab+28,ptr(&audio_backend_pan_storage_006b181f)+1);
+require(rd(slab+55)==0x006b1820,"raw data operand");wr(slab+55,ptr(&audio_backend_pan_storage_006b181f)+1);
+require(rd(slab+74)==0x006b48ec,"raw data operand");wr(slab+74,ptr(application_audio_device_state_006b48c0.data())+44);
+require(rd(slab+121)==0xffffff53,"raw call operand");wr(slab+121,ptr(slab+512)-ptr(slab+125));
+require(rd(slab+128)==0x006b1820,"raw data operand");wr(slab+128,ptr(&audio_backend_pan_storage_006b181f)+1);
+require(rd(slab+144)==0xffffff3c,"raw call operand");wr(slab+144,ptr(slab+512)-ptr(slab+148));
+require(rd(slab+150)==0x006b48dc,"raw data operand");wr(slab+150,ptr(application_audio_device_state_006b48c0.data())+28);
+require(rd(slab+166)==0x006b181f,"raw data operand");wr(slab+166,ptr(&audio_backend_pan_storage_006b181f)+0);
+require(rd(slab+212)==0xfffffef8,"raw call operand");wr(slab+212,ptr(slab+512)-ptr(slab+216));
+require(rd(slab+219)==0x006b1820,"raw data operand");wr(slab+219,ptr(&audio_backend_pan_storage_006b181f)+1);
+require(rd(slab+235)==0xfffffee1,"raw call operand");wr(slab+235,ptr(slab+512)-ptr(slab+239));
+require(rd(slab+241)==0x006b48dc,"raw data operand");wr(slab+241,ptr(application_audio_device_state_006b48c0.data())+28);
+require(rd(slab+257)==0x006b181f,"raw data operand");wr(slab+257,ptr(&audio_backend_pan_storage_006b181f)+0);
+require(rd(slab+322)==0xfffffe8a,"raw call operand");wr(slab+322,ptr(slab+512)-ptr(slab+326));
+require(rd(slab+333)==0x006b1820,"raw data operand");wr(slab+333,ptr(&audio_backend_pan_storage_006b181f)+1);
+require(rd(slab+349)==0xfffffe6f,"raw call operand");wr(slab+349,ptr(slab+512)-ptr(slab+353));
+require(rd(slab+367)==0x006b1821,"raw data operand");wr(slab+367,ptr(&audio_backend_pan_storage_006b181f)+2);
+require(rd(slab+377)==0x006b48dc,"raw data operand");wr(slab+377,ptr(application_audio_device_state_006b48c0.data())+28);
+require(rd(slab+774)==0x006b48dc,"raw data operand");wr(slab+774,ptr(application_audio_device_state_006b48c0.data())+28);
+require(rd(slab+793)==0x006b1820,"raw data operand");wr(slab+793,ptr(&audio_backend_pan_storage_006b181f)+1);
+    require(FlushInstructionCache(GetCurrentProcess(),slab,4096)!=0,"original instruction cache");
+}
+#include "fixture-harness.inc"

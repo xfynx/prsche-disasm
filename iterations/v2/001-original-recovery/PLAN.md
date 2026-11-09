@@ -1,11 +1,11 @@
 # v2 / 001 - original source recovery plan
 
-Current554,2026-11-09: frozen552040+553kernel003/random001 adds9originals4037B/
-1220Breadonly/0writable;registry851. SharedauditPASS44702nativecomparisons/
-373698events/31controls/762effectivepins/771listedproviders. Common001310TUs/
-8projects;131names139refs,noEXE,two kernelsclose/no newnames. Canonical522ftol/
-formatterthread uniqueCOFFownersverified; compilerzero4BANYCOMDAT inspected.
-README554 ownscommands/exactbounds/handoff;rootpublishesafterstagedbyte/status.
+Current557,2026-11-09: frozen555001+556004 adds6entries990B(5full+1partial)/
+1029Bloaderzero/0readonly;registry857. SharedauditPASS80884nativecomparisons/
+972332events/23controls/767effectivepins/779listedproviders. Common001312TUs/
+8projects;132names139refs,noEXE,fourclose/five truechildnames. Actualcanonical
+device/root/free/scheduler owners and compilerzero4BANYCOMDAT verified.
+README557 ownscommands/exactbounds/handoff;rootpublishesafterstagedbyte/status.
 
 Original0.5gain005b2778 fixed552 afterAstra provedexact037counterexample2367B
 divergence/seed1f4ec7c7;localonlygainfix passes2frames. Old001..037 preserved.
@@ -16,23 +16,29 @@ actual550carrycomposition withcontrolledrand; actual47BLCG/seed separatelyproven
 withcontrolledcanonicalgetptd. Actual552+550caller and kernel+realrand/liveTLS
 combinedruntime remain open. Productionstaticinstructions,notbyteblobexecution.
 
+555threebodypan/poly/copy and1025Bbefore+table owner preserved originalcount0
+write6b181f;rawPE/noexistingowner proven,notguessedpadding/globalchannelclamp.
+556activation4ae010PARTIAL:descriptor22/23 genuinelyunwrittenandcopiedby7DWORD
+child;knownwritten16/17observed,neverzeroopaque. Sourcecorrectsigned/40,/1024,
+late-root/freeorder;actualheap/schedulercompose. Partialstatusdoesnotpromote a
+semanticparentedge despiteboundlinkname. Old001..004proofhistory preserved.
+
 Activeparallel2026-11-09,Sol/high disjoint run/local ownership:
-- adpcm_exact_fp_552 completed555pan/weightfamily58e0e0424B/58e0b036B/58e29051B:
-  frozen00178192nativecases/965592events/9controls,511B/1025Bloaderzerostorage.
-  Canonicaldevice state reused. Count0 derived6b181fbyte proven alongside1024B
-  table;nosyntheticpadding/guard/globalproducerbound. Root563codefiles/803literal
-  spans confirmnooverlap,wholePEzero-spanasserted. Actual3bodycomposition proved,
-  create_device/liveaudio/period565c70 deferred. Nextindependentreview/publish557.
-- resampler_kernel_553 owns556trio4ae010/4ae2b0/4ae310479B,one4Bloaderzero655d30.
-  Reuse478root656ab4/canonicalheap/scheduler. Streamchildren5678c0/561960/567660/
-  567690 andcallback4ad9c0 remain realtypedfrontiers. Actualmagicdivision is/40
-  (not/100),plus/1024;002/003failurespreserved,004frozenPASS2692cases/6740events/
-  14controls. Twofullcleanupentries+e010PARTIAL:descriptor22/23
-  genuinelyunwrittenandcopiedbyoriginal7DWORDconsumer;neverzero/mask16/17which
-  actual561960writes. prepare/shutdownfullbounded. Late-root/freeorder proof needed.
-- Worker555 cross-reviews556 read-only;rootowns557nextreadyset commonintegration/
-  audit/registry/docs/publication. Neitherworkerownscommonfiles;passedreadysets
-  immutable,neverexpand554. Current762pins/310roots564closureentries.
+- adpcm_exact_fp_552 owns558period/channeltransport4bodies286B+193B sparsezero
+  spans. 32low-bytegroups needexactcanonicalviews(device/thread/palette/buffers/
+  callback/voice/resourcecount/map),not512Bclone.15actualtouchedhole spans193B
+  ledgeredPE/noowner;higherflagbits AND ALpreservesupper24(addressdomainunknown).
+  ThreeindexedentriesPARTIAL untilbroaderaddressproof;returnzero590290full.
+  Oracle-onlyshadowtransportsaliasing/syncattypedchildren,productiondirectviews.
+  No callback5901b0/5902a0algorithms invented; trueunresolved providers remain.
+- resampler_kernel_553 owns559sevenbody258B/0newdata descriptor/size/beginrouting:
+  561960/5611d0/5611e0/5678a0/5678c0/56afc0/567660. Reusecanonical508prefix,
+  beginforwards5args+0+0 torealcreator5673d0 frontier. Caller-owneddescriptor
+  unknown22/23mustremainpreserved;doesnotupgrade556uninitializedlocalpartial.
+  Actualcreator/oneprojection rawwitnesses narrowreads,notglobalpaddingproof.
+- Rootowns560nextreadysetcommonintegration/audit/registry/docs/publication.
+  Passed555/556/557 readysetsfrozen,neverexpandthem. Current767pins312roots/
+  568closureentries; source/COFF/evidence/status boundaries exact.
 
 Sharednative/proofcache/COFF/effectivepin tools reused. BeforeEVERYcommit show
 changed/checks/openstatus plus git status --short; explicitstaging/stagedbytecheck.

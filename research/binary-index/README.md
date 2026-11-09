@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run557: [pan/weight511B](../../iterations/v2/001-original-recovery/runs/555-audio-backend-finalize/scope-evidence.json)
+and [lifecycle479B](../../iterations/v2/001-original-recovery/runs/556-application-audio-lifecycle/scope-evidence.json)
+pin actual6b181f preceding-byte access/1025Bloaderzero and4B655d30. [Intake](../../iterations/v2/001-original-recovery/runs/557-audio-lifecycle-integration/README.md)
+keeps4ae010PARTIAL:realdescriptor22/23 unwritten yet copied,while16/17 arewritten;
+five true stream/callback frontiers remain. No opaque-local initialization.
+
 Run554: [six coded-audio bodies](../../iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/translation-evidence.json)
 and [LPC/PRNG evidence](../../iterations/v2/001-original-recovery/runs/553-audio-resampler-kernel/scope-evidence.json)
 pin4037B/1220Breadonly with original0.5gain and exactstaticx87 source. [Intake](../../iterations/v2/001-original-recovery/runs/554-audio-kernel-integration/README.md)

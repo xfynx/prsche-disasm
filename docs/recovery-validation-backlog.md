@@ -1,5 +1,14 @@
 # Отложенные проверки восстановления v2
 
+Run557:6entries990B(5full+1partial)/1029Bloaderzero;80884nativecases/972332events/
+23controls/767pins PASS.312TUs/132names139refs/noEXE,registry857;4close/5truechildren.
+Activation4ae010PARTIAL:descriptor22/23unwritten/physicallytransported;known26B+
+pointeridentity/state/ABI verifiedatcontrolledseam. Preserveuninitializedbytes,
+semanticparentedge notfullyclosed. Pan/tablebyte6b181f and655d30ownersrawPEproved;
+canonicaldevice/root/heap/scheduler reused. Actualcreate_device/fullstream/callback/
+producer/lifetime/fault/concurrency/liveaudio/startup/gameplay remain open.
+Next558sparseperiod/559streamrouting;neverexpand557 or retryAVblocked547/537005.
+
 Run554:9originals4037B/1220Breadonly;44702nativecases/373698events/31controls/
 762pins PASS.310TUs/131names139refs,noEXE;registry851. Bothkernelsclose/no newnames.
 552exactx87/fullstate PC-RC matrix+original0.5gain replaces unprovedSSE2/PC53claim;

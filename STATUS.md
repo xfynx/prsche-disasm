@@ -4,18 +4,19 @@ Updated 2026-11-09. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run554](iterations/v2/001-original-recovery/runs/554-audio-kernel-integration/README.md)
-compiles310 C++ translation units across8 projects. The link has131 unresolved names/
+[Run557](iterations/v2/001-original-recovery/runs/557-audio-lifecycle-integration/README.md)
+compiles312 C++ translation units across8 projects. The link has132 unresolved names/
 139 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:nine originals4037B/1220Breadonly/0writable;44,702 native comparisons/31
-mutations/762pins pass;registry851. Both decoder-kernel names close, no new names.
-552 uses exact static x87 source with full PC/RC/state comparisons and the original
-0.5 gain.553 adds LPC/noise-pulse synthesis plus originalrand/seed bound to existing
-canonical thread state. Kernel and PRNG proofs are separately bounded; real streams,
-liveTLS/audio/startup/gameplay remain open. Externalheap-slot569a70 binding remains
-unresolved;547 export was antivirus-blocked before execution. Previous5453DNow
-evidence remains emulated; nativeAMD hardware fidelity is open.
+Latest:six entries990B (five full,one partial)/1029Bloaderzero;80,884 native
+comparisons/23 mutations/767pins pass;registry857. Four names close,five real
+stream/callback frontiers enter. Pan/poly/copy and object cleanup use canonical
+device/root/heap/scheduler owners. Activation4ae010 remains PARTIAL:descriptor22/23
+are unwritten but physically transported; source keeps them uninitialized. Its
+linker binding does not mark semantic parent dependencies fully recovered.
+Prior554 exactx87/PRNG proof remains accepted; realstreams/liveTLS/audio/startup/
+gameplay and externalheap-slot569a70 binding remain open.547 is antivirus-blocked;
+earlier5453DNow evidence is emulated,nativeAMD hardware fidelity open.
 Supplemental
 537005 query-alias controls were antivirus-blocked before execution and are unaccepted.
 Earlier constructor/metric unwritten-local paths and full platform/gameplay stay open;
