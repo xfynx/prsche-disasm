@@ -1,42 +1,43 @@
 # v2 / 001 - original source recovery plan
 
-Current552,2026-11-09;accepted/frozenstill551 f677d1c. 552researchpacketNOT
-accepted/integrated:sixbodycodedaudiofamily59a910/59abe0/59ad80/59adc0/59ae00/
-59b580 implemented;scope/ABI/state/data/pinnedtables/9bodyslabharnessdone.
-Nativeattempt037bit-exactproves59ad80/59adc0/59abe0/59b580and59ae00
-(offsets0/0xc/0x18/0x24)andmanyframesub-cases;fullframewithrandomdequantbits
-stilldiverges(open:stageprobeafterblend).Immovableattempts001..037in
-local/experiments/v2-audio-adpcm-kernel-552. Commands/findings/nextstep:
-runs/552-audio-adpcm-kernel/README.md. Porsche.exehasnofldcw/fnstcw,so
-originalx87runsat0x027F(53-bit);recoveredC++usesbinary64intermediatesin
-originalorder. No gamegraph/registrychange;551remainsmeasuredcheckpoint.
+Current554,2026-11-09: frozen552040+553kernel003/random001 adds9originals4037B/
+1220Breadonly/0writable;registry851. SharedauditPASS44702nativecomparisons/
+373698events/31controls/762effectivepins/771listedproviders. Common001310TUs/
+8projects;131names139refs,noEXE,two kernelsclose/no newnames. Canonical522ftol/
+formatterthread uniqueCOFFownersverified; compilerzero4BANYCOMDAT inspected.
+README554 ownscommands/exactbounds/handoff;rootpublishesafterstagedbyte/status.
 
-Current551,2026-11-07;publishedf677d1c. Frozen549001/550002 adds4originals1130B/
-0newdata;registry842. AuditPASS16152nativecomparisons/43872events/33controls/
-754effectivepins/746listedproviders. Common001307TUs/8projects;133names141refs,
-noEXE;fourclose/twonewreal kernels59a910/597810. Actual546capacity/345startup/
-353wrapper and504init/505acquireack/519copy/434zero compose;formattercore/device/
-process/kernels controlled. Inertzero4B compileraux verifiednative+game,0newstate.
-Commands/evidence/precisebounds: runs/551-diagnostic-codec-integration/README.md.
-Passed551/549/550 and original inputs are frozen; don't expand passed batches.
+Original0.5gain005b2778 fixed552 afterAstra provedexact037counterexample2367B
+divergence/seed1f4ec7c7;localonlygainfix passes2frames. Old001..037 preserved.
+Final552staticx87source/fullCW-SW-16btag/live80/MXCSR+ABI at216PC-RC-depth-sticky
+configs/independent1144BPEwitnesses/staticCOFFaudit. No globalPC53 inference or
+SSE2approximation.553kernel physicalFTW+live80 boundednonfabricatedtagdomain,
+actual550carrycomposition withcontrolledrand; actual47BLCG/seed separatelyproven
+withcontrolledcanonicalgetptd. Actual552+550caller and kernel+realrand/liveTLS
+combinedruntime remain open. Productionstaticinstructions,notbyteblobexecution.
 
-Active2026-11-09,no worker holds 552/553:
-- 552 coded-audio family: scope/implementation/harness frozen as research; open
-  divergence isolated to the frame with random dequant bits. Next concrete step is
-  the after-blend stage probe described in runs/552-audio-adpcm-kernel/README.md;
-  do not rerun the already-passing kernels or revive old hypotheses.
-- 553 resampler00597810 and actual550state/input/output plus rand/ftol consumers is
-  still unscoped; only start it after 552 either closes or is deliberately parked.
-- Root: scope approval, cross-review, later554 ready-set common integration/audit/
-  registry/docs/publication. No fixture provider in game, one build/audit per set.
-  New scopes verify current754pins/307roots and full source/header closure.
+Activeparallel2026-11-09,Sol/high disjoint run/local ownership:
+- adpcm_exact_fp_552 completed555pan/weightfamily58e0e0424B/58e0b036B/58e29051B:
+  frozen00178192nativecases/965592events/9controls,511B/1025Bloaderzerostorage.
+  Canonicaldevice state reused. Count0 derived6b181fbyte proven alongside1024B
+  table;nosyntheticpadding/guard/globalproducerbound. Root563codefiles/803literal
+  spans confirmnooverlap,wholePEzero-spanasserted. Actual3bodycomposition proved,
+  create_device/liveaudio/period565c70 deferred. Nextindependentreview/publish557.
+- resampler_kernel_553 owns556trio4ae010/4ae2b0/4ae310479B,one4Bloaderzero655d30.
+  Reuse478root656ab4/canonicalheap/scheduler. Streamchildren5678c0/561960/567660/
+  567690 andcallback4ad9c0 remain realtypedfrontiers. Actualmagicdivision is/40
+  (not/100),plus/1024;002/003failurespreserved,004frozenPASS2692cases/6740events/
+  14controls. Twofullcleanupentries+e010PARTIAL:descriptor22/23
+  genuinelyunwrittenandcopiedbyoriginal7DWORDconsumer;neverzero/mask16/17which
+  actual561960writes. prepare/shutdownfullbounded. Late-root/freeorder proof needed.
+- Worker555 cross-reviews556 read-only;rootowns557nextreadyset commonintegration/
+  audit/registry/docs/publication. Neitherworkerownscommonfiles;passedreadysets
+  immutable,neverexpand554. Current762pins/310roots564closureentries.
 
-Next: close the 552 frame divergence with the stage probe (blend blocks and
-per-block parity/mode), then freeze a proved set; reuse the shared native runner
-and accepted support TUs. Inputs/intermediate/output, usedreturns/ABI/FP and
-detecting mutations at Od/O2 required. Negative/hugecopy/fault/unmaskedFP/producer
-domains remain explicit. After2failed hypotheses report facts; no endless reruns
-or framework rewrites. Shared builds sequential; freeze ready sets.
+Sharednative/proofcache/COFF/effectivepin tools reused. BeforeEVERYcommit show
+changed/checks/openstatus plus git status --short; explicitstaging/stagedbytecheck.
+Userauthorizednormalpush,no forcepush/sourceconsolidation. Continue originalsources
+andbuild untillimits; oneconcisehandoff perbatch,rootdocsbrief pointers.
 
 Persistent boundaries:
 - 547 include-owner static569a70 export is unaccepted/Defenderblocked001 before

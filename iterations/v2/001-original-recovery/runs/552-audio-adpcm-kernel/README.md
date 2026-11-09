@@ -1,98 +1,92 @@
-# Run552: coded-audio kernel family (59a910/59abe0/59ad80/59adc0/59ae00/59b580)
+# Run552: coded-audio kernel family
 
-**Status: research packet, NOT accepted.** The scope is complete and the six
-bodies are implemented, but the full 0059a910 frame proof still diverges in one
-combined case (see "Open divergence"). Nothing here is integrated into the game
-graph or the registry; no `ready.json`/validation exists for this run.
-The plan that produced this packet is in [PLAN.md](PLAN.md).
+Frozen040 PASS: six originals3312B,1144B exact readonly data, no new writable
+state. Both `/Od` and `/O2` total38,758 comparisons/105,922 events; all16 mutations
+detected. The unchanged shared read-only audit verifies305 input pins/245 outputs,
+logs and compiler dependencies. `ready.json`, `coff.json` and
+`verification-summary.json` own the independent packet handoff. Game integration
+and the six registry entries belong to root's later554 packet.
 
-## Scope evidence (complete)
+## Original evidence and source
 
-`scope-evidence.json` pins original module SHA, body SHA/bytes, the complete
-instruction stream, index callers/consumers and the 551 ownership closure
-(754 effective pins/307 roots/557 source+header closure, zero body collisions).
-`annotate.py` re-prints any body with live ESP resolution; `extract.py` derives
-the 0059ae00 matrix block and fails if the listing shape changes; `gen_tables.py`
-emits every read-only table as exact PE dwords (`table-evidence.json`).
+Porsche.exe SHA256 `ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39`.
+`scope-evidence.json` pins binary-index query/callers/consumers, complete raw
+instructions and551 ownership closure754pins/307roots/557source+header files.
+The six bodies are59a910/706B,59abe0/397B,59ad80/58B,59adc0/61B,59ae00/1914B
+and59b580/176B. `translate.py` checks each instruction byte against the immutable
+PE and emits static MSVC x86 naked inline assembly in
+`audio_coded_kernel_552.cpp`; `translation-evidence.json` records every mapping.
+Production contains source instructions, typed canonical calls and static data.
+It preserves original x87 operations/order, register lifetimes, stores, integer
+flow and stack layout. The local59abe0 switch `[zero,minus,zero,plus]` uses checked
+direct branches with saved/restored flags. It adds no guards or opaque-local
+initialization. MSVC x86 is required.
 
-Facts established from the original bytes:
+`audit-static.py` checks actual COFF instructions at both optimization levels,
+including canonical call/data relocations and every branch target. All934 original
+instructions are covered (944 compiled instructions including the local switch
+transport). It hashes/searches the complete accepted557-file closure and finds
+no existing owner of the new data. The six1144B tables/scalars are256+348+512+4+8+16B;
+`table-evidence.json` and `gen_tables.py` own their actual data extents. In particular,
+the consumed12B level records start at005e37c8; the earlier scope census's
+005e37c4 symbols range starts one dword earlier and is not the production extent.
+The fixture compares every canonical table with independently embedded immutable
+PE bytes before any oracle/compiled execution. Accepted504readbits/init and519copy
+remain canonical; the game550caller itself is not executed in this packet.
 
-- `0059a910` `void __cdecl(state, unused)`, 432 output floats at `state+0x680`,
-  tape `state+0x170..state+0xd40` (324 history + 432 new).
-- Header: one 6-bit read is both the sign source (`idx < state+0xc`) and
-  scalefactor index 0; then 3x6-bit and 8x5-bit indices into `0x5e34c4`
-  (`0x5e3504` is its element 16). `d=(table-state)/4`, then four rounds of
-  `state+=d` interleaved with four `0059ae00` calls at offsets 0/0xc/0x18/0x24
-  with counts 1/1/1/0x21.
-- Per block: 8-bit lag, 4-bit step, 6-bit coefficient, 1-bit parity, 1-bit mode;
-  `c1=step*0x5c1808`, `c2=state[0x10+4*coeff]` (x1.75 when mode==0); dequantize
-  one parity (`0x70+parity`, stride 2) then zero the other (`0x74-parity`) or
-  smooth it (`0059adc0`); blend `out=c1*tape[counter-lag+i]+c2*decoded[i]` for
-  108 samples with counter 0xd8 step 0x6c; finally copy 0x510 bytes
-  `state+0x830 -> state+0x170` through canonical `00598a50`.
-- `0059abe0` 2x256 context table `0x5e35c4` -> 12-byte records at `0x5e37c8`
-  (next context, skip bits, level). Levels >3 store the record float; 2..3 are a
-  6-bit+7 zero run that never adds the single stride; 0..1 are unary `7+ones` with
-  sign. flag==0 emits `0, -2, 0, +2` from the low two payload bits.
-- `0059b580` seeds `h[0..10]=p[10..0]`, `h[11]=1.0`, then per output
-  `acc=-(h[0]*p[11])`, taps `acc-=p[11-j]*h[j]`, `h[j-1]=acc*p[11-j]+h[j]`,
-  `h[11]=acc`, `pre[k]=acc`, triangular correction from `pre[]` and `out[]`.
-- Original runtime precision: `Porsche.exe` has no `fldcw`/`fnstcw` in `.text`,
-  so x87 runs at the process default 0x027F (53-bit precision). The recovered
-  C++ therefore uses binary64 intermediates in the original operation order and
-  rounds to float only where the original stores a dword.
+## Corrected frame finding
 
-## Implementation
+The037 divergence was a production transcription error: original0059aaa4 is
+`FMUL qword [005b2778]`, whose exact bytes encode0.5. The old C++ multiplied by1.75.
+The minimal original failing stream is retained explicitly: scene
+`bytes-headerzeros`, PRNG seed`0x1f4ec7c7`, both frames. Both now match exactly.
+The prior inference that absence ofFLDCW proves global53-bit precision was
+invalid. Static x87 source now obeys the caller's PC/RC and preserves full FP state.
+The old binary64 expression helper `audio_coded_matrix_552.inc` remains a pinned
+historical research artifact; production does not include it.
 
-`audio_coded_kernel_552.{hpp,cpp}` + generated `audio_coded_tables_552.inc`
-(exact dwords) and `audio_coded_matrix_552.inc` (12 unrolled dot products with
-the original per-output summation order). Reuses accepted `0059a8c0`/`0059a800`
-(Run504) and `00598a50` (Run519). All six bodies compile clean at `/Od` and `/O2`
-with `/W4`.
+## Native proof
 
-## Proof harness
+The shared native runner is unchanged. `prepare.py` emits the original-only
+oracle slab with checked calls/data/switch relocations; it is fixture evidence,
+not production code. Full bit-state, matrix/history/output memory, all six body
+scenes, zero/unary/context/parity/mode/lag/step cases, random and initialized
+multi-frame cases and the037 mismatch regression compare bit-exactly.
 
-`prepare.py` builds `native-fixture.cpp.in` + `native-config.json`: nine original
-bodies in an executable slab, relative calls, absolute data operands and the
-`0059ad70` switch table relocated to canonical owners, with an assertion for
-every image-space operand. `fixture-harness.inc` compares original vs compiled
-state/output bit-exactly and checks the x87 control word (the C++ compiles to
-SSE2 binary64, so x87 status/tag are not comparable) plus rounding-mode
-equivalence. 15 mutations are pinned as controls.
+The216 FP configurations arePC0/2/3 x RC0..3 x incoming live depth0..5 x sticky
+status0/0x25/0x453f. Each exercises all six bodies plus two-frame and actual504init
+composition. The harness compares full x87 CW/SW/16-bit tag and every live80-bit
+value, plus completeMXCSR. Only host FIP/FDP addresses and undefined empty-slot
+contents are excluded. Incoming values contain low80-bit precision bits that
+binary64 cannot retain. cdecl stack balance/nonvolatile registers/DF are checked;
+all six bodies return void, and helper-used returns are covered by full downstream
+state/output comparisons. Sixteen material source mutations include incorrect
+mode-zero gain, smooth sign/constants, skip/refill, symbol classes, zero/unary runs,
+window sign/taps, lag, scale accumulation, tail count and matrix stride.
+
+Attempts001..040 remain immutable under
+`local/experiments/v2-audio-adpcm-kernel-552/`. 037 is the old divergent source;
+038 failed to compile because MSVC needs explicitST0 forFADDP/FSUBP;039 passed the
+static-source/full-FP matrix and16 controls with abridged tag capture;040 adds true
+16-bit tags and independent raw-table assertions. No unchanged accepted037 case
+was rerun until the implementation and full FP contract changed.
 
 ```powershell
-py -3 iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/extract.py
-py -3 iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/gen_tables.py
+py -3 iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/translate.py
 py -3 iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/prepare.py
-py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/native-config.json --attempt 038
+py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/native-config.json --attempt 040
+py -3 iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/finalize.py --attempt 040
 ```
 
-Attempts 001..037 are frozen under `local/experiments/v2-audio-adpcm-kernel-552/`
-(001 missing fixture include, 002 missing dead-dependency stubs, 003-013 slab
-relocation faults, 014-016 zero-run/window/dispatch fixes, 017+ frame hunt).
-
-## Proven so far (attempt 037)
-
-Bit-exact at `/Od`: `0059ad80` (all 0..31 bit counts, 3 state shapes),
-`0059adc0` (4 seeds), `0059abe0` flag 0 and 1 (8 random streams each, full state
-and output), `0059b580` (6 seeds), `0059ae00` sequential offsets 0/0xc/0x18/0x24
-(3 seeds), and frame sub-cases: zero stream, zero stream + zero scalefactors,
-random 4-block field stream, single-field probes (parity, mode, coeff, lag 0/100/255,
-step), random header with zero blocks, and the rounding-mode matrix.
-
-## Open divergence
-
-With a random dequant bitstream the frame still diverges: `bytes-headerzeros`
-(zero header, random blocks+dequant) fails first in the matrix/output region,
-while every ingredient passes in isolation and `field-stream` (random fields,
-zero dequant bits) passes. The failure is not in the six bodies' formulas as
-separately proven; the next concrete step is a stage probe that stops 0059a910
-after the blend (patch `0x288` bound and return in a *diagnostic* slab copy) and
-compares the four 108-sample blend blocks and the per-block parity/mode decisions
-against a C++ build with the same stop, then narrows the first differing block.
+These commands identify frozen proof origin, not a request to overwrite/rerun040.
+`finalize.py` uses the shared read-only audit and staticCOFF audit without executing
+any PE. Static evidence report: `local/reports/552-fp-static-audit-040.json`.
 
 ## Boundaries
 
-Real music/ADPCM streams, malformed/truncated bitstreams, lag beyond the tape,
-unaligned/aliased buffers, unmasked FP exceptions, concurrency, live audio device
-and full startup/gameplay stay open. No guards or clamps were added for them.
+Actual550caller composition, real music streams, malformed/truncated/corrupt bit
+states, arbitrary external/caller-stack aliases, unmasked exceptions, incoming
+stack depth beyond5 or invalid-stack states, concurrency/live audio device and
+full startup/gameplay remain open. The existing smooth scene includes align0..3;
+this is bounded local buffer evidence, not an arbitrary alias claim. No native
+3DNow instruction executes, and blocked547/537005 were never retried.

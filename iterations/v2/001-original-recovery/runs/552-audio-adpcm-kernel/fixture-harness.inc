@@ -11,18 +11,22 @@ alignas(64) static B cpp[0x10000];
 #define OUTB 0x9000u
 #define AUX 0xb000u
 alignas(16) static B floating_area[512];
-struct Fpu{unsigned short control,status;B tag,pad[3],values[80];U mxcsr;};
+static B environment_552[28];
+struct Fpu{unsigned short control,status,tag;B pad[2],values[80];U mxcsr;};
 static Fpu fpu_orig,fpu_cpp;
 static unsigned short control_552=0x027f;
 static U mxcsr_552=0x1f80u;
+static U depth_552,sticky_552;
 static void fpu_capture(Fpu& f){
     __asm fxsave floating_area
+    __asm fnstenv environment_552
     f.control=static_cast<unsigned short>(rd(floating_area));
     f.status=static_cast<unsigned short>(rd(floating_area+2));
-    f.tag=floating_area[4];f.mxcsr=rd(floating_area+24);std::memset(f.pad,0,3);
+    f.tag=static_cast<unsigned short>(rd(environment_552+8));
+    f.mxcsr=rd(floating_area+24);std::memset(f.pad,0,2);
     for(U i=0;i<8;++i){
         std::memcpy(f.values+i*10,floating_area+32+i*16,10);
-        if((f.tag&(1u<<(((f.status>>11)+i)&7u)))==0)std::memset(f.values+i*10,0,10);
+        if((floating_area[4]&(1u<<(((f.status>>11)+i)&7u)))==0)std::memset(f.values+i*10,0,10);
     }
 }
 static void fpu_begin(){
@@ -31,19 +35,32 @@ static void fpu_begin(){
         ldmxcsr mxcsr_552
         fldcw control_552
     }
+    __asm fxsave floating_area
+    const U top=(8u-depth_552)&7u;
+    const unsigned short status=static_cast<unsigned short>((top<<11)|sticky_552);
+    std::memcpy(floating_area+2,&status,2);
+    floating_area[4]=0;
+    for(U i=0;i<depth_552;++i){
+        floating_area[4]|=static_cast<B>(1u<<((top+i)&7u));
+        // Exact normal 80-bit values, including low bits absent from binary64.
+        const U lo=0x10203041u+i,hi=0x87654321u+i;
+        const unsigned short exponent=static_cast<unsigned short>(0x3fffu+i);
+        wr(floating_area+32+i*16,lo);wr(floating_area+36+i*16,hi);
+        std::memcpy(floating_area+40+i*16,&exponent,2);
+    }
+    __asm fxrstor floating_area
 }
 static void fpu_end(Fpu& f){
     fpu_capture(f);
     __asm fninit
 }
 static void same_fpu(const char* why){
-    // Porsche.exe has no fldcw in .text, so the original x87 runs at 0x027F
-    // (53-bit precision). The recovered C++ compiles to SSE2 binary64 and must
-    // leave the x87 control word untouched while matching the same rounding mode.
-    if(fpu_orig.control!=fpu_cpp.control||fpu_cpp.control!=control_552||
-       (fpu_orig.mxcsr&0x6000u)!=(fpu_cpp.mxcsr&0x6000u)){
-        std::printf("divergence %s ctl=%04x/%04x want=%04x mx=%08x/%08x\n",why,
-                    fpu_orig.control,fpu_cpp.control,control_552,fpu_orig.mxcsr,fpu_cpp.mxcsr);
+    // Compare all architectural FP state except host instruction/data pointers.
+    // Empty x87 slots are undefined and normalized; every live 80-bit value is exact.
+    if(std::memcmp(&fpu_orig,&fpu_cpp,sizeof(Fpu))||fpu_cpp.control!=control_552){
+        std::printf("divergence %s ctl=%04x/%04x want=%04x sw=%04x/%04x tag=%02x/%02x mx=%08x/%08x depth=%u sticky=%x\n",why,
+                    fpu_orig.control,fpu_cpp.control,control_552,fpu_orig.status,fpu_cpp.status,
+                    fpu_orig.tag,fpu_cpp.tag,fpu_orig.mxcsr,fpu_cpp.mxcsr,depth_552,sticky_552);
         std::fflush(stdout);ExitProcess(1);
     }
     ++events_552;
@@ -118,6 +135,59 @@ using InitFn=void(__cdecl*)(U,U);
 #define ORIG_SYNTH reinterpret_cast<SynthFn>(slab+OFF_59AE00)
 #define ORIG_WINDOW reinterpret_cast<WindowFn>(slab+OFF_59B580)
 #define ORIG_INIT reinterpret_cast<InitFn>(slab+OFF_59A800)
+// Synthetic cdecl carrier. All six bodies return void; used helper returns are
+// exercised by complete state/output comparisons inside the callers.
+static void invoke_552(void* fn,U argc,U a,U b=0,U c=0,U d=0){
+    U saved_sp,saved_frame,fail=0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp,esp
+        mov saved_frame,ebp
+        cmp argc,4
+        jb no_four
+        push d
+    no_four:
+        cmp argc,3
+        jb no_three
+        push c
+    no_three:
+        cmp argc,2
+        jb no_two
+        push b
+    no_two:
+        push a
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,10203040h
+        call fn
+        mov eax,argc
+        lea esp,[esp+eax*4]
+        cmp esp,saved_sp
+        jne bad
+        cmp ebp,saved_frame
+        jne bad
+        cmp ebx,13579bdfh
+        jne bad
+        cmp esi,2468ace0h
+        jne bad
+        cmp edi,10203040h
+        jne bad
+        pushfd
+        pop eax
+        test eax,400h
+        jz done
+    bad:
+        mov fail,1
+    done:
+        mov esp,saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    require(fail==0,"cdecl nonvolatile/stack/DF ABI");++events_552;
+}
 static void scene_skip(){
     static const U rounds[]={0,1,2,3,4,7,8,12,31};
     for(U bits : rounds){
@@ -130,8 +200,8 @@ static void scene_skip(){
             wr(orig+STATE,ptr(orig+STREAM));
             std::memcpy(cpp,orig,sizeof(orig));
             wr(cpp+STATE,ptr(cpp+STREAM));
-            fpu_begin();ORIG_SKIP(ptr(orig+STATE),bits);fpu_end(fpu_orig);
-            fpu_begin();audio_coded_skip_bits_0059ad80(ptr(cpp+STATE),bits);fpu_end(fpu_cpp);
+            fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_SKIP),2,ptr(orig+STATE),bits);fpu_end(fpu_orig);
+            fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_skip_bits_0059ad80),2,ptr(cpp+STATE),bits);fpu_end(fpu_cpp);
             same_fpu("skip fpu");
             same_state("skip bits");
         }
@@ -142,8 +212,8 @@ static void scene_smooth(){
         seed_block();
         for(U i=0;i<0x300u;i+=4u){const float v=rnd_552();std::memcpy(orig+AUX+i,&v,4);}
         std::memcpy(cpp,orig,sizeof(orig));
-        fpu_begin();ORIG_SMOOTH(ptr(orig+AUX)+0x14u-round);fpu_end(fpu_orig);
-        fpu_begin();audio_coded_smooth_0059adc0(ptr(cpp+AUX)+0x14u-round);fpu_end(fpu_cpp);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_SMOOTH),1,ptr(orig+AUX)+0x14u-round);fpu_end(fpu_orig);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_smooth_0059adc0),1,ptr(cpp+AUX)+0x14u-round);fpu_end(fpu_cpp);
         same_fpu("smooth fpu");
         same("smooth",AUX,0x300u);
     }
@@ -156,11 +226,9 @@ static void scene_dequant(U flag){
         for(U i=0;i<0x1b0u;i+=4u){const float v=rnd_552();std::memcpy(orig+AUX+i,&v,4);}
         mirror();
         std::memcpy(orig+OUTB,orig+AUX,0x1b0u);std::memcpy(cpp+OUTB,cpp+AUX,0x1b0u);
-        fpu_begin();std::printf("dq orig f=%u r=%u off=%u\n",flag,round,stream_off_552);
-        ORIG_DEQUANT(ptr(orig+STATE),flag,ptr(orig+OUTB),2);fpu_end(fpu_orig);
-        std::printf("dq cpp\n");
-        fpu_begin();audio_coded_dequantize_0059abe0(ptr(cpp+STATE),flag,ptr(cpp+OUTB),2);fpu_end(fpu_cpp);
-        std::printf("dq done\n");
+        fpu_begin();
+        invoke_552(reinterpret_cast<void*>(ORIG_DEQUANT),4,ptr(orig+STATE),flag,ptr(orig+OUTB),2);fpu_end(fpu_orig);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_dequantize_0059abe0),4,ptr(cpp+STATE),flag,ptr(cpp+OUTB),2);fpu_end(fpu_cpp);
         same_fpu("dequant fpu");
         same_state("dequant state");
         same("dequant output",OUTB,0x1b0u);
@@ -172,8 +240,8 @@ static void scene_window(){
         for(U i=0;i<12u;++i){const float v=rnd_552();std::memcpy(orig+AUX+i*4,&v,4);}
         for(U i=0;i<12u;++i){const float v=rnd_552();std::memcpy(orig+AUX+0x40+i*4,&v,4);}
         std::memcpy(cpp,orig,sizeof(orig));
-        fpu_begin();ORIG_WINDOW(ptr(orig+AUX),ptr(orig+AUX+0x40));fpu_end(fpu_orig);
-        fpu_begin();audio_coded_window_0059b580(ptr(cpp+AUX),ptr(cpp+AUX+0x40));fpu_end(fpu_cpp);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_WINDOW),2,ptr(orig+AUX),ptr(orig+AUX+0x40));fpu_end(fpu_orig);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_window_0059b580),2,ptr(cpp+AUX),ptr(cpp+AUX+0x40));fpu_end(fpu_cpp);
         same_fpu("window fpu");
         same("window",AUX,0x80u);
     }
@@ -187,8 +255,8 @@ static void scene_synth(){
         for(U i=0;i<12u;++i){const float v=rnd_552();std::memcpy(orig+STATE+0x140+i*4,&v,4);}
         std::memcpy(cpp,orig,sizeof(orig));
         for(const auto& item : counts){
-            fpu_begin();ORIG_SYNTH(ptr(orig+STATE),item[0],static_cast<I>(item[1]));fpu_end(fpu_orig);
-            fpu_begin();audio_coded_synthesize_0059ae00(ptr(cpp+STATE),item[0],static_cast<I>(item[1]));fpu_end(fpu_cpp);
+            fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_SYNTH),3,ptr(orig+STATE),item[0],static_cast<I>(item[1]));fpu_end(fpu_orig);
+            fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_synthesize_0059ae00),3,ptr(cpp+STATE),item[0],static_cast<I>(item[1]));fpu_end(fpu_cpp);
             same_fpu("synthesis fpu");
             same("synthesis state",STATE,0x1000u);
         }
@@ -201,12 +269,12 @@ static void scene_frames(U init_first,U frames){
         wr(orig+STATE+0xcu,static_cast<U>(next_552()%40u));
         mirror();
         fpu_begin();
-        if(init_first)ORIG_INIT(ptr(orig+STREAM)+stream_off_552,ptr(orig+STATE));
-        for(U i=0;i<frames;++i)ORIG_DECODE(ptr(orig+STATE),0);
+        if(init_first)invoke_552(reinterpret_cast<void*>(ORIG_INIT),2,ptr(orig+STREAM)+stream_off_552,ptr(orig+STATE));
+        for(U i=0;i<frames;++i)invoke_552(reinterpret_cast<void*>(ORIG_DECODE),2,ptr(orig+STATE),0);
         fpu_end(fpu_orig);
         fpu_begin();
-        if(init_first)audio_adpcm_initialize_0059a800(ptr(cpp+STREAM)+stream_off_552,ptr(cpp+STATE));
-        for(U i=0;i<frames;++i)audio_coded_decode_0059a910(ptr(cpp+STATE),0);
+        if(init_first)invoke_552(reinterpret_cast<void*>(audio_adpcm_initialize_0059a800),2,ptr(cpp+STREAM)+stream_off_552,ptr(cpp+STATE));
+        for(U i=0;i<frames;++i)invoke_552(reinterpret_cast<void*>(audio_coded_decode_0059a910),2,ptr(cpp+STATE),0);
         fpu_end(fpu_cpp);
         same_fpu("frames fpu");
         same_state("frames state");
@@ -214,21 +282,15 @@ static void scene_frames(U init_first,U frames){
     }
 }
 static void scene_fpu_modes(){
-    for(U rc=0;rc<4;++rc){
-        control_552=static_cast<unsigned short>(0x027f|(rc<<10));
-        mxcsr_552=0x1f80u|(rc<<13);
-        seed_block();
-        stream_off_552=(next_552()%96u);
-        wr(orig+STATE+0xcu,static_cast<U>(next_552()%40u));
-        mirror();
-        fpu_begin();ORIG_DECODE(ptr(orig+STATE),0);fpu_end(fpu_orig);
-        fpu_begin();audio_coded_decode_0059a910(ptr(cpp+STATE),0);fpu_end(fpu_cpp);
-        same_fpu("fpu-mode fpu");
-        same_state("fpu-mode state");
-        control_552=0x027fu;
-        mxcsr_552=0x1f80u;
-        events_552+=8;
+    static const U pcs[]={0,2,3},stickies[]={0,0x25,0x453f};
+    for(U pc : pcs)for(U rc=0;rc<4;++rc)for(U depth=0;depth<=5;++depth)for(U sticky : stickies){
+        control_552=static_cast<unsigned short>(0x007f|(pc<<8)|(rc<<10));
+        mxcsr_552=0x1f80u|(rc<<13)|(sticky&0x3fu);
+        depth_552=depth;sticky_552=sticky;
+        scene_skip();scene_smooth();scene_dequant(0);scene_dequant(1);
+        scene_window();scene_synth();scene_frames(0,2);scene_frames(1,1);
     }
+    control_552=0x027fu;mxcsr_552=0x1f80u;depth_552=sticky_552=0;
 }
 static void put_bits(B* stream,U bit,U width,U value){
     for(U i=0;i<width;++i)if((value>>i)&1u)stream[(bit+i)/8u]=static_cast<B>(stream[(bit+i)/8u]|(1u<<((bit+i)%8u)));
@@ -252,8 +314,8 @@ static void scene_field_stream(U mask){
         if(mask&8u)std::memset(orig+STATE+0x170,0,0x510);
         if(mask&16u)for(U i=0;i<0x100u;i+=4u){const float one=1.0f;std::memcpy(orig+STATE+0x10+i,&one,4);}
         mirror();
-        fpu_begin();ORIG_DECODE(ptr(orig+STATE),0);fpu_end(fpu_orig);
-        fpu_begin();audio_coded_decode_0059a910(ptr(cpp+STATE),0);fpu_end(fpu_cpp);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_DECODE),2,ptr(orig+STATE),0);fpu_end(fpu_orig);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_decode_0059a910),2,ptr(cpp+STATE),0);fpu_end(fpu_cpp);
         same_fpu("field-stream fpu");
         same_state("field-stream state");
     }
@@ -271,8 +333,8 @@ static void scene_fields(U parity,U mode,U mask){
         if(mask&8u)std::memset(orig+STATE+0x170,0,0x510);
         if(mask&16u)for(U i=0;i<0x100u;i+=4u){const float one=1.0f;std::memcpy(orig+STATE+0x10+i,&one,4);}
         mirror();
-        fpu_begin();ORIG_DECODE(ptr(orig+STATE),0);fpu_end(fpu_orig);
-        fpu_begin();audio_coded_decode_0059a910(ptr(cpp+STATE),0);fpu_end(fpu_cpp);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_DECODE),2,ptr(orig+STATE),0);fpu_end(fpu_orig);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_decode_0059a910),2,ptr(cpp+STATE),0);fpu_end(fpu_cpp);
         same_fpu("fields fpu");
         same_state("fields state");
     }
@@ -289,8 +351,8 @@ static void scene_bytes(U header_zero,U blocks_zero,U mask){
         if(mask&8u)std::memset(orig+STATE+0x170,0,0x510);
         if(mask&16u)for(U i=0;i<0x100u;i+=4u){const float one=1.0f;std::memcpy(orig+STATE+0x10+i,&one,4);}
         mirror();
-        fpu_begin();ORIG_DECODE(ptr(orig+STATE),0);fpu_end(fpu_orig);
-        fpu_begin();audio_coded_decode_0059a910(ptr(cpp+STATE),0);fpu_end(fpu_cpp);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_DECODE),2,ptr(orig+STATE),0);fpu_end(fpu_orig);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_decode_0059a910),2,ptr(cpp+STATE),0);fpu_end(fpu_cpp);
         same_fpu("bytes fpu");
         same_state("bytes state");
     }
@@ -304,8 +366,8 @@ static void scene_bits(U bit,U width,U value,U scale_zero){
         wr(orig+STATE+0xcu,20u);
         if(scale_zero)for(U i=0;i<12u;++i)std::memset(orig+STATE+0x110+i*4,0,4);
         mirror();
-        fpu_begin();ORIG_DECODE(ptr(orig+STATE),0);fpu_end(fpu_orig);
-        fpu_begin();audio_coded_decode_0059a910(ptr(cpp+STATE),0);fpu_end(fpu_cpp);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_DECODE),2,ptr(orig+STATE),0);fpu_end(fpu_orig);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_decode_0059a910),2,ptr(cpp+STATE),0);fpu_end(fpu_cpp);
         same_fpu("bits fpu");
         same_state("bits state");
     }
@@ -319,8 +381,8 @@ static void scene_zero_stream(U mask){
         if(mask&1u)for(U i=0;i<12u;++i)std::memset(orig+STATE+0x140+i*4,0,4);
         if(mask&2u)for(U i=0;i<12u;++i)std::memset(orig+STATE+0x110+i*4,0,4);
         mirror();
-        fpu_begin();ORIG_DECODE(ptr(orig+STATE),0);fpu_end(fpu_orig);
-        fpu_begin();audio_coded_decode_0059a910(ptr(cpp+STATE),0);fpu_end(fpu_cpp);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_DECODE),2,ptr(orig+STATE),0);fpu_end(fpu_orig);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_decode_0059a910),2,ptr(cpp+STATE),0);fpu_end(fpu_cpp);
         same_fpu("zero-stream fpu");
         same_state("zero-stream state");
     }
@@ -336,8 +398,8 @@ static void scene_probe(U mask){
         if(mask&8u)std::memset(orig+STATE+0x170,0,0x510);
         if(mask&16u)for(U i=0;i<0x100u;i+=4u){const float one=1.0f;std::memcpy(orig+STATE+0x10+i,&one,4);}
         mirror();
-        fpu_begin();ORIG_DECODE(ptr(orig+STATE),0);fpu_end(fpu_orig);
-        fpu_begin();audio_coded_decode_0059a910(ptr(cpp+STATE),0);fpu_end(fpu_cpp);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_DECODE),2,ptr(orig+STATE),0);fpu_end(fpu_orig);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_decode_0059a910),2,ptr(cpp+STATE),0);fpu_end(fpu_cpp);
         same_fpu("probe fpu");
         if(round==0){
             for(U i=0;i<8;++i)std::printf("out%d %08x %08x\n",i,
@@ -354,8 +416,8 @@ static void scene_flat(U zero_matrix,U zero_scale){
         if(zero_matrix)for(U i=0;i<12u;++i)std::memset(orig+STATE+0x140+i*4,0,4);
         if(zero_scale)for(U i=0;i<12u;++i)std::memset(orig+STATE+0x110+i*4,0,4);
         mirror();
-        fpu_begin();ORIG_DECODE(ptr(orig+STATE),0);fpu_end(fpu_orig);
-        fpu_begin();audio_coded_decode_0059a910(ptr(cpp+STATE),0);fpu_end(fpu_cpp);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(ORIG_DECODE),2,ptr(orig+STATE),0);fpu_end(fpu_orig);
+        fpu_begin();invoke_552(reinterpret_cast<void*>(audio_coded_decode_0059a910),2,ptr(cpp+STATE),0);fpu_end(fpu_cpp);
         same_fpu("flat fpu");
         same_state("flat state");
     }
@@ -401,6 +463,7 @@ int main(){
     std::printf("scene frames2\n");scene_frames(0,2);
     std::printf("scene init1\n");scene_frames(1,1);
     std::printf("scene init3\n");scene_frames(1,3);
+    std::printf("scene mismatch regression\n");seed_552=0x1f4ec7c7u;scene_bytes(1,0,27);
     std::printf("scene modes\n");scene_fpu_modes();
     std::printf("audio_coded_kernel_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases_552,events_552);
     std::fflush(stdout);

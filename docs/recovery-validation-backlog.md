@@ -1,5 +1,14 @@
 # Отложенные проверки восстановления v2
 
+Run554:9originals4037B/1220Breadonly;44702nativecases/373698events/31controls/
+762pins PASS.310TUs/131names139refs,noEXE;registry851. Bothkernelsclose/no newnames.
+552exactx87/fullstate PC-RC matrix+original0.5gain replaces unprovedSSE2/PC53claim;
+553LPC/noisepulse+rand/seed usecanonicalftol/thread provider,independentproofs.
+Actual552+550 and kernel+realrand/liveTLScombinedruntime notestablished;realstreams/
+fullproducers/arbitraryaliases/unmaskedFP/concurrency/liveaudio/startup/gameplay
+remain open.555pan/weighttable and556lifecycle proceed independently,donotexpand554.
+Oldpartials/565340/stage535a90/AVblocked547/537005 unchanged,no retry/bypass.
+
 Run551:4originals1130B/0newdata;16152nativecases/43872events/33mutations/754pins PASS.
 307TUs/133names141refs,noEXE;registry842. Fourclose/twonew:ADPCM59a910,resampler597810
 kernel algorithms remain realfrontiers. Actual546capacity/345startup/353wrapper

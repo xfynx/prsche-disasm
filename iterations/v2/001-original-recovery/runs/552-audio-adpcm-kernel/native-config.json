@@ -108,7 +108,9 @@
     "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/fixture-harness.inc",
     "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/prepare.py",
     "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/extract.py",
-    "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/gen_tables.py"
+    "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/gen_tables.py",
+    "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/translate.py",
+    "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/translation-evidence.json"
   ],
   "original_bodies": [
     {
@@ -170,120 +172,128 @@
     {
       "name": "skip-shift",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "payload>>=bits&31u;",
-      "new": "payload>>=(bits+1u)&31u;",
+      "old": "shr edi, cl // 0059ad90",
+      "new": "shr edi, 1 // 0059ad90",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "skip-refill",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "if(static_cast<I>(remaining)<8){",
-      "new": "if(static_cast<I>(remaining)<7){",
+      "old": "cmp ecx, 8 // 0059ad99",
+      "new": "cmp ecx, 7 // 0059ad99",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "smooth-constant",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "table(audio_coded_window_005c1808,3)",
-      "new": "table(audio_coded_window_005c1808,2)",
+      "old": "audio_coded_window_005c1808+0xc] // 0059add5",
+      "new": "audio_coded_window_005c1808+8] // 0059add5",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "smooth-sign",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "sum=sum-(static_cast<double>(f[n-3])+static_cast<double>(f[n+3]))*mid;",
-      "new": "sum=sum+(static_cast<double>(f[n-3])+static_cast<double>(f[n+3]))*mid;",
+      "old": "fsubp st(1),st(0) // 0059ade7",
+      "new": "faddp st(1),st(0) // 0059ade7",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "context-shift",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "(context<<8)+payload",
-      "new": "(context<<7)+payload",
+      "old": "shl ecx, 8 // 0059ac04",
+      "new": "shl ecx, 7 // 0059ac04",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "level-limit",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "if(symbol>3){",
-      "new": "if(symbol>4){",
+      "old": "cmp ebx, 3 // 0059ac37",
+      "new": "cmp ebx, 4 // 0059ac37",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "zero-run-length",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "audio_adpcm_read_bits_0059a8c0(state,6)+7u",
-      "new": "audio_adpcm_read_bits_0059a8c0(state,6)+6u",
+      "old": "add eax, 7 // 0059ac5f",
+      "new": "add eax, 6 // 0059ac5f",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "unary-base",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "I level=7;",
-      "new": "I level=6;",
+      "old": "mov esi, 7 // 0059aca9",
+      "new": "mov esi, 6 // 0059aca9",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "fallback-level",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "if(bits==1u){value=-2.0f;skip=2;}",
-      "new": "if(bits==1u){value=-1.0f;skip=2;}",
+      "old": "mov dword ptr [esi], 0xc0000000 // 0059ad3f",
+      "new": "mov dword ptr [esi], 0xbf800000 // 0059ad3f",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "window-sign",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "double acc=-(static_cast<double>(h[0])*static_cast<double>(q[11]));",
-      "new": "double acc=static_cast<double>(h[0])*static_cast<double>(q[11]);",
+      "old": "fchs // 0059b5d4",
+      "new": "nop // 0059b5d4",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "window-taps",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "for(U j=1;j<=11;++j){",
-      "new": "for(U j=1;j<11;++j){",
+      "old": "mov esi, 0xb // 0059b5d6",
+      "new": "mov esi, 0xa // 0059b5d6",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "tape-lag",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "const U base=counter-lag;",
-      "new": "const U base=counter-lag+1u;",
+      "old": "sub edi, eax // 0059a9dc",
+      "new": "add edi, eax // 0059a9dc",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "scale-accumulate",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "*cell=static_cast<float>(static_cast<double>(*cell)+static_cast<double>(d[i]));",
-      "new": "*cell=static_cast<float>(static_cast<double>(d[i]));",
+      "old": "fadd dword ptr [ecx] // 0059ab28",
+      "new": "fsub dword ptr [ecx] // 0059ab28",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "synth-tail",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "pass==3u?0x21:1",
-      "new": "1",
+      "old": "push 0x21 // 0059abba",
+      "new": "push 1 // 0059abba",
       "expected_exit": 1,
       "failure_marker": "divergence"
     },
     {
       "name": "matrix-count",
       "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
-      "old": "out+=12;",
-      "new": "out+=11;",
+      "old": "add edi, 0x30 // 0059b4aa",
+      "new": "add edi, 0x2c // 0059b4aa",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "mode-zero-gain",
+      "source": "iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/audio_coded_kernel_552.cpp",
+      "old": "fmul qword ptr [audio_coded_gain_005b2778] // 0059aaa4",
+      "new": "fadd qword ptr [audio_coded_gain_005b2778] // 0059aaa4",
       "expected_exit": 1,
       "failure_marker": "divergence"
     }

@@ -4,25 +4,18 @@ Updated 2026-11-09. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run551](iterations/v2/001-original-recovery/runs/551-diagnostic-codec-integration/README.md)
-compiles307 C++ translation units across8 projects. The link has133 unresolved names/
-141 references. **There is no recovered playable C++ game executable yet.**
+[Run554](iterations/v2/001-original-recovery/runs/554-audio-kernel-integration/README.md)
+compiles310 C++ translation units across8 projects. The link has131 unresolved names/
+139 references. **There is no recovered playable C++ game executable yet.**
 
-New research (not accepted, not integrated):
-[Run552](iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/README.md)
-implements the six-body coded-audio family behind the 551 processors
-(59a910/59abe0/59ad80/59adc0/59ae00/59b580) and proves five bodies plus the
-synthesis and many frame sub-cases bit-exactly against the original. The full frame
-with a random dequant bitstream still diverges; the next step is the documented
-after-blend stage probe. No game build, registry entry or pin count changed.
-
-Latest:four originals1130B/0newdata;16,152 native comparisons/33 mutations/754pins
-pass;registry842. Four names close, two real decoder-kernel names enter: ADPCM59a910
-and resampler597810. Diagnostic device/formatter transport and codec caller glue
-compose with existing canonical providers; full codec mathematics/formattercore/
-liveoutputs remain open. Externalheap-slot569a70 binding stays unresolved; proposed
-547 export was antivirus-blocked before execution. Previous5453DNow evidence
-remains emulated; nativeAMD hardware fidelity is open.
+Latest:nine originals4037B/1220Breadonly/0writable;44,702 native comparisons/31
+mutations/762pins pass;registry851. Both decoder-kernel names close, no new names.
+552 uses exact static x87 source with full PC/RC/state comparisons and the original
+0.5 gain.553 adds LPC/noise-pulse synthesis plus originalrand/seed bound to existing
+canonical thread state. Kernel and PRNG proofs are separately bounded; real streams,
+liveTLS/audio/startup/gameplay remain open. Externalheap-slot569a70 binding remains
+unresolved;547 export was antivirus-blocked before execution. Previous5453DNow
+evidence remains emulated; nativeAMD hardware fidelity is open.
 Supplemental
 537005 query-alias controls were antivirus-blocked before execution and are unaccepted.
 Earlier constructor/metric unwritten-local paths and full platform/gameplay stay open;

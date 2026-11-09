@@ -1,0 +1,96 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_random_553.hpp"
+#include "porsche/formatter_crt_runtime.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+static B* random_slab;alignas(16) static B floating[512],threads[2][0x74];
+struct Fpu{unsigned short control,status;B tag,pad[3],values[80];};
+struct Snapshot{B records[2][0x74];Fpu fp;};
+struct Event{U returned;Snapshot before,after;};
+struct Trace{U abi,count,results[32];Event events[32];Snapshot states[32];};
+static Trace actual,original;static U cases,events_total,mode,seed_value,pc,rc,depth,queries;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U value;std::memcpy(&value,p,4);return value;}
+static void wr(void* p,U value){std::memcpy(p,&value,4);}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence random %s case=%u\n",why,cases);std::fflush(stdout);ExitProcess(1);}}
+static void snapshot(Snapshot& s){
+    __asm fxsave floating
+    s.fp.control=static_cast<unsigned short>(rd(floating));s.fp.status=static_cast<unsigned short>(rd(floating+2));s.fp.tag=floating[4];std::memset(s.fp.pad,0,3);
+    for(U i=0;i<8;++i){std::memcpy(s.fp.values+i*10,floating+32+i*16,10);if((s.fp.tag&(1u<<(((s.fp.status>>11)+i)&7)))==0)std::memset(s.fp.values+i*10,0,10);}
+    std::memcpy(s.records,threads,sizeof threads);
+}
+namespace porsche {
+// Canonical ABI; bounded endpoint returns owner-controlled original-sized records.
+void* __cdecl formatter_crt_thread_005a545c(){
+    require(actual.count<32,"finite getptd calls");auto& event=actual.events[actual.count++];snapshot(event.before);
+    const U index=(mode&1)?(queries&1):0;++queries;event.returned=ptr(threads[index]);
+    if(mode&2)wr(threads[index]+0x14,rd(threads[index]+0x14)^0xa5a55a5au);
+    if(mode&4){const unsigned short control=static_cast<unsigned short>(0x7f|(pc<<8)|(((rc+queries)%4)<<10));__asm fldcw control}
+    snapshot(event.after);return threads[index];
+}
+}
+static U invoke(void* fn,U argument,bool has_arg,U& result){U saved_sp,saved_frame,fail=0,value;__asm{
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    cmp has_arg,0
+    je no_arg
+    push argument
+no_arg:mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov value,eax
+    cmp has_arg,0
+    je check_stack
+    add esp,4
+check_stack:cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }result=value;return fail;}
+static void reset(){
+    __asm fninit
+    actual={};queries=0;for(U i=0;i<sizeof threads;++i)reinterpret_cast<B*>(threads)[i]=static_cast<B>(i*13+17);
+    wr(threads[0]+0x14,1);wr(threads[1]+0x14,0xfedcba98);
+    unsigned short control=static_cast<unsigned short>(0x7f|(pc<<8)|(rc<<10));__asm fldcw control
+    for(U i=0;i<depth;++i){U bits=0x3f800001u+i;__asm fld dword ptr bits}
+}
+static void execute(bool cpp){
+    reset();U ignored;
+    actual.abi|=invoke(cpp?reinterpret_cast<void*>(&audio_resampler_seed_005a17bc):random_slab+0x40,seed_value,true,ignored);snapshot(actual.states[0]);
+    for(U i=1;i<32;++i){actual.abi|=invoke(cpp?reinterpret_cast<void*>(&audio_resampler_rand_005a17c9):random_slab,0,false,actual.results[i]);snapshot(actual.states[i]);}
+}
+int main(){
+    SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);
+    random_slab=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(random_slab!=nullptr,"raw slab");
+    const B random_raw[]={@RANDOM553@},seed_raw[]={@SEED553@};std::memcpy(random_slab,random_raw,sizeof random_raw);std::memcpy(random_slab+0x40,seed_raw,sizeof seed_raw);
+    require(random_slab[0]==0xe8&&random_slab[0x40]==0xe8,"raw child calls");
+    wr(random_slab+1,ptr(reinterpret_cast<void*>(&formatter_crt_thread_005a545c))-ptr(random_slab+5));wr(random_slab+0x41,ptr(reinterpret_cast<void*>(&formatter_crt_thread_005a545c))-ptr(random_slab+0x45));
+    require(FlushInstructionCache(GetCurrentProcess(),random_slab,4096)!=0,"raw cache");
+    for(U seed:{0u,1u,0x7fffu,0x8000u,0x7fffffffu,0x80000000u,0xffffffffu,0x12345678u})for(mode=0;mode<8;++mode)for(U precision:{0u,2u,3u})for(rc=0;rc<4;++rc)for(U d:{0u,1u,7u}){
+        seed_value=seed;pc=precision;depth=d;execute(false);original=actual;execute(true);
+        if(actual.abi||original.abi||std::memcmp(&actual,&original,sizeof actual)){
+            const B* a=reinterpret_cast<const B*>(&actual);const B* b=reinterpret_cast<const B*>(&original);U off=0;while(off<sizeof actual&&a[off]==b[off])++off;
+            std::printf("divergence random case=%u seed=%08x mode=%u PC=%u RC=%u depth=%u byte=%u values=%02x/%02x\n",cases,seed_value,mode,pc,rc,depth,off,off<sizeof actual?a[off]:0,off<sizeof actual?b[off]:0);return 1;
+        }++cases;events_total+=actual.count;
+    }
+    __asm fninit
+    std::printf("audio_random_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;
+}

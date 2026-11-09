@@ -1,61 +1,65 @@
-# Run552: coded-audio kernel family (59a910/59abe0/59ad80/59adc0/59ae00/59b580)
+# Run552: coded-audio kernel family
 
-Status 2026-11-09: steps 1-4 done for five bodies and all frame sub-cases;
-step 4 still fails for the frame with a random dequant bitstream. Step 5
-(integration) not started. See README.md "Proven so far"/"Open divergence".
+Status2026-11-09: independent packet frozen040 PASS. Six original bodies3312B,
+1144B exact readonly data.38,758 comparisons/105,922 events atOd/O2;16 mutations;
+shared read-only audit305inputs/245outputs plus actualCOFF static instruction audit.
+Root owns later554 game integration/registry and root documentation. No552
+implementation worker remains assigned after handoff.
 
-Research/implementation packet for the six original bodies behind the accepted
-Run550/551 processors. Scope evidence: `scope-evidence.json` (original SHA, body
-SHA/bytes, complete instructions, index/callers/consumers, 551 ownership closure
-754 pins/307 roots/557 source+header closure, zero body collisions).
-`annotate.py` prints the same bodies with live ESP offsets (argument/scratch
-resolution); `extract.py` turns the 0059ae00 instruction stream into checked C++
-expressions.
+## Goal and acceptance
 
-## Confirmed original facts
+Recover original59a910/59abe0/59ad80/59adc0/59ae00/59b580 behind canonical550
+processors, preserving original x87 and integer behavior. Complete source/body
+provenance, canonical ownership, original-vs-compiled state/output/ABI/fullFP
+comparisons at both optimization levels, meaningful mutations and shared audit
+are complete. Game550caller composition/live audio/game startup are separate.
 
-- `0059a910` `void __cdecl(U state,U unused)`; state base is `object+0xc` of the
-  accepted 550 processors, block length `0x1b0` floats, tape
-  `[state+0x170,state+0xd40)` = 324 history + 432 new samples.
-- Per block: 8-bit `lag`, 4-bit blend step, 6-bit coefficient index, 1-bit
-  parity, 1-bit mode; dequantize 54 values per parity (`0059abe0`), zero the
-  other parity (mode!=0) or 3-tap smooth it (`0059adc0`, mode==0, second gain
-  `1.75`); blend `out=c1*tape[counter-lag]+c2*decoded` for 108 samples.
-- Counter starts `0xd8`, step `0x6c`, four blocks while `<0x288`. Tail copies
-  `0x510` bytes `state+0x830 -> state+0x170` through accepted `00598a50`, adds
-  the 12 differential scalefactors four times and calls `0059ae00` at offsets
-  `0,0xc,0x18` (1 block) and `0x24` (33 blocks).
-- Scalefactors: `(table64[6b] - state)/4` into `state+0x110..+0x13c`
-  (1x6b,3x6b,8x5b from `0x5e3504`); sign flag `idx<state+0xc` is 59abe0's mode.
-- `0059abe0` `void __cdecl(U state,U flag,float* out,I stride)`: flag!=0 uses
-  the 2x256 context byte table `0x5e35c4` -> 12-byte record at `0x5e37c8`
-  (next-context, skip bits, level): level path `>3`, zero run `2..3`,
-  unary `7+ones` + sign otherwise. flag==0 reads the low 2 payload bits and
-  emits `0, -2, 0, +2` skipping 1/2 bits. `0059ad80` is the no-mask skip.
-- `0059ad80` `void __cdecl(U state,U bits)`: `payload>>=bits`, one refill when
-  remaining<8. `0059adc0` `void __cdecl(U p)`: 54 points,
-  `out[2i]=(in[2i-5]+in[2i+5])*c3-(in[2i-3]+in[2i+3])*c2+(in[2i-1]+in[2i+1])*c1`.
-- `0059b580` `void __cdecl(U p,U out)` reads `p[11]` and `p[1..11]`, runs a
-  12-output lattice recursion and a triangular correction; `out` is written and
-  reused. `0059ae00` `void __cdecl(U state,U offset,I count)` forms the 12-value
-  window through `0059b580(state+0x110)`, then `count` blocks of 12 outputs
-  `sum_j w[(j+k)%12]*M[j]`, `out[k]+=sum`, `M[11-k]=sum`, exact order per output.
+## Confirmed facts and completed work
 
-## Plan
+- Six complete raw bodies total3312B; binary-index/full551closure evidence is in
+  `scope-evidence.json`. Actual consumed level table begins005e37c8; the older
+  census's005e37c4 range includes an extra leading dword. Current exact extents
+  are owned by`table-evidence.json` (six allocations/1144B).
+-037 frame divergence was wrong gain: original0059aaa4 multiplies pinned qword
+  005b2778=0.5; the old source used1.75. Regression seed1f4ec7c7 now exact.
+- Absence ofFLDCW does not establish global53-bit precision. The replaced SSE2
+  implementation could not preserve original x87 status/tag/live80-bit state.
+-`translate.py` emits checked static naked assembly; production has no original
+  runtime code blob, no guards and no guessed opaque-local initialization.
+  Every original instruction, original order/spills, typed canonical504readbits/
+  519copy, and original state flow remain. Local switch uses proved branches.
+-040 passes all original fixture scenes plus216PC/RC/depth/sticky configurations,
+  true16-bit tags/live80-bit values/MXCSR, cdecl stack/nonvolatile/DF ABI, and
+  independent raw canonical-data assertions. Both optimization levels pass16
+  source mutations. Native shared runner remains unchanged.
+-`audit-static.py` checks934 original/944 compiled instructions per variant,
+  exact call/data relocations and branch flow. Full557-file accepted closure
+  hashes match; no canonical data-owner collision. `finalize.py` ran unchanged
+  shared audit and generated ready/coff/verification handoff JSON.
 
-1. `audio_coded_kernel_552.{hpp,cpp}` implements the six bodies with the exact
-   x87 expression order; only `0059ae00` dot products come from `extract.py`.
-2. Reuse accepted owners: `0059a8c0`/`0059a800` (Run504), `00598a50` (Run519).
-3. Read-only data keeps exact raw bit patterns (`std::uint32_t` tables).
-4. `native-config.json` + `native-fixture.cpp.in` embed the six original bodies
-   plus `0059a8c0`/`0059a800`/`00598a50` in an executable slab, relocate calls,
-   absolute data operands and the `0059ad70` switch table, and compare full
-   state/output at `/Od` and `/O2`; mutations must diverge.
-5. Freeze, then integrate in the next batch (554) through the CMake chain.
+## Immutable attempt history
 
-## Boundaries (not accepted here)
+001..037 retained;038 only compiler syntax failure (implicitST0 corrected).
+039 all native/control checks passed using abridged tag capture.040 adds the
+independent1144B raw-data witnesses and complete16-bit tag capture and is the
+frozen acceptance proof. No source changes are planned after040 acceptance.
 
-Real music/ADPCM streams, malformed or truncated bitstreams, `lag` beyond the
-324-sample tape, unaligned/aliased buffers, unmasked FP exceptions, concurrency,
-live audio device and full startup/gameplay stay open. No guessed guards or
-clamps for those paths.
+## Exact verification commands
+
+```powershell
+py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/native-config.json --attempt 040
+py -3 iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/finalize.py --attempt 040
+```
+
+The first command records immutable proof origin; do not rerun040. Read-only
+finalize may verify existing receipt. Next concrete step: root554 binds550's
+`audio_adpcm_decode_0059a910` frontier to the existing canonical552export, adds
+this single TU, and runs one shared game integration build/audit with553 when
+ready. Later trace actual music producers/caller composition and live audio.
+
+## Explicit remaining boundaries
+
+Real streams, malformed/truncated/corrupt state, arbitrary external/caller-stack
+aliases, unmaskedFP, extra incoming live slots/invalid stack, concurrency/live
+audio/startup/gameplay are unaccepted. No hypothesis is wired into production.
+Blocked547/537005 remain unchanged with no retry/bypass.

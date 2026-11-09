@@ -1,5 +1,11 @@
 # Индекс оригинальных бинарников
 
+Run554: [six coded-audio bodies](../../iterations/v2/001-original-recovery/runs/552-audio-adpcm-kernel/translation-evidence.json)
+and [LPC/PRNG evidence](../../iterations/v2/001-original-recovery/runs/553-audio-resampler-kernel/scope-evidence.json)
+pin4037B/1220Breadonly with original0.5gain and exactstaticx87 source. [Intake](../../iterations/v2/001-original-recovery/runs/554-audio-kernel-integration/README.md)
+accepts bounded native kernels/independentPRNG proof with canonicalftol/threadstate;
+realstream/liveTLS/audio and fullstartup remain open.
+
 Run551: [diagnostic116B](../../iterations/v2/001-original-recovery/runs/549-render-diagnostic/scope-evidence.json)
 and [codec caller supplement](../../iterations/v2/001-original-recovery/runs/550-audio-codec-frontier/original-index-supplement.json)
 pin rawvararg/device consumers and597e30/59c1e0/59b6901014B;59c1e0 full378B has

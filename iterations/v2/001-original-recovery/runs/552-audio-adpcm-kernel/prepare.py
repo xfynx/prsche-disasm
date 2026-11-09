@@ -99,6 +99,21 @@ for va, size, position, token in BODIES:
                     'calls': [hex(t) for _, _, t, _ in calls],
                     'operands': [hex(d) for _, _, d in operands]}
 
+# Independent original-byte witnesses: both oracle and compiled bodies consume
+# canonical tables, so assert their bytes before either side can execute/reset.
+table_checks = []
+for va, symbol, size in [
+    (0x5e34c4, 'audio_coded_scale_005e34c4', 256),
+    (0x5e37c8, 'audio_coded_level_005e37c8', 348),
+    (0x5e35c4, 'audio_coded_context_005e35c4', 512),
+    (0x5b2468, '&audio_coded_quarter_005b2468', 4),
+    (0x5b2778, 'audio_coded_gain_005b2778', 8),
+    (0x5c1808, 'audio_coded_window_005c1808', 16),
+]:
+    values = ','.join(str(v) for v in n.pe_at(raw, va, size))
+    table_checks.append(f'    static const B witness_{va:08x}[]={{{values}}};\n'
+                        f'    require(std::memcmp({symbol},witness_{va:08x},{size})==0,"raw table {va:08x} before execution");\n')
+
 prelude = f'''#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "audio_coded_kernel_552.hpp"
@@ -145,7 +160,7 @@ unsigned int audio_stream_backend_buffer_006b4864;
 #define OFF_59A800 0x1200
 #define OFF_598A50 0x1300
 static void setup_slab(){{
-    slab=static_cast<B*>(VirtualAlloc(nullptr,0x4000,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+{''.join(table_checks)}    slab=static_cast<B*>(VirtualAlloc(nullptr,0x4000,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
     require(slab!=nullptr,"raw slab");
     switch_552[0]=ptr(slab+OFF_59ABE0+(0x59ad35-0x59abe0));
     switch_552[1]=ptr(slab+OFF_59ABE0+(0x59ad3f-0x59abe0));
@@ -185,32 +200,12 @@ config = {
     'headers': [(RUN / name).relative_to(ROOT).as_posix() for name in
                 ('scope-evidence.json', 'oracle-relocations.json', 'table-evidence.json',
                  'audio_coded_tables_552.inc', 'audio_coded_matrix_552.inc',
-                 'fixture-harness.inc', 'prepare.py', 'extract.py', 'gen_tables.py')],
+                 'fixture-harness.inc', 'prepare.py', 'extract.py', 'gen_tables.py', 'translate.py', 'translation-evidence.json')],
     'original_bodies': [{'va': va, 'bytes': size, 'sha256': sha(n.pe_at(raw, int(va, 16), size)),
                          'token': f'@{token}552@'} for va, size, _, token in BODIES],
 }
 text = (RUN / 'audio_coded_kernel_552.cpp').read_text(encoding='utf-8')
-mutations = [
-    ('skip-shift', 'payload>>=bits&31u;', 'payload>>=(bits+1u)&31u;'),
-    ('skip-refill', 'if(static_cast<I>(remaining)<8){', 'if(static_cast<I>(remaining)<7){'),
-    ('smooth-constant', 'table(audio_coded_window_005c1808,3)', 'table(audio_coded_window_005c1808,2)'),
-    ('smooth-sign', 'sum=sum-(static_cast<double>(f[n-3])+static_cast<double>(f[n+3]))*mid;',
-     'sum=sum+(static_cast<double>(f[n-3])+static_cast<double>(f[n+3]))*mid;'),
-    ('context-shift', '(context<<8)+payload', '(context<<7)+payload'),
-    ('level-limit', 'if(symbol>3){', 'if(symbol>4){'),
-    ('zero-run-length', 'audio_adpcm_read_bits_0059a8c0(state,6)+7u',
-     'audio_adpcm_read_bits_0059a8c0(state,6)+6u'),
-    ('unary-base', 'I level=7;', 'I level=6;'),
-    ('fallback-level', 'if(bits==1u){value=-2.0f;skip=2;}', 'if(bits==1u){value=-1.0f;skip=2;}'),
-    ('window-sign', 'double acc=-(static_cast<double>(h[0])*static_cast<double>(q[11]));',
-     'double acc=static_cast<double>(h[0])*static_cast<double>(q[11]);'),
-    ('window-taps', 'for(U j=1;j<=11;++j){', 'for(U j=1;j<11;++j){'),
-    ('tape-lag', 'const U base=counter-lag;', 'const U base=counter-lag+1u;'),
-    ('scale-accumulate', '*cell=static_cast<float>(static_cast<double>(*cell)+static_cast<double>(d[i]));',
-     '*cell=static_cast<float>(static_cast<double>(d[i]));'),
-    ('synth-tail', 'pass==3u?0x21:1', '1'),
-    ('matrix-count', 'out+=12;', 'out+=11;'),
-]
+mutations = [('skip-shift', 'shr edi, cl // 0059ad90', 'shr edi, 1 // 0059ad90'), ('skip-refill', 'cmp ecx, 8 // 0059ad99', 'cmp ecx, 7 // 0059ad99'), ('smooth-constant', 'audio_coded_window_005c1808+0xc] // 0059add5', 'audio_coded_window_005c1808+8] // 0059add5'), ('smooth-sign', 'fsubp st(1),st(0) // 0059ade7', 'faddp st(1),st(0) // 0059ade7'), ('context-shift', 'shl ecx, 8 // 0059ac04', 'shl ecx, 7 // 0059ac04'), ('level-limit', 'cmp ebx, 3 // 0059ac37', 'cmp ebx, 4 // 0059ac37'), ('zero-run-length', 'add eax, 7 // 0059ac5f', 'add eax, 6 // 0059ac5f'), ('unary-base', 'mov esi, 7 // 0059aca9', 'mov esi, 6 // 0059aca9'), ('fallback-level', 'mov dword ptr [esi], 0xc0000000 // 0059ad3f', 'mov dword ptr [esi], 0xbf800000 // 0059ad3f'), ('window-sign', 'fchs // 0059b5d4', 'nop // 0059b5d4'), ('window-taps', 'mov esi, 0xb // 0059b5d6', 'mov esi, 0xa // 0059b5d6'), ('tape-lag', 'sub edi, eax // 0059a9dc', 'add edi, eax // 0059a9dc'), ('scale-accumulate', 'fadd dword ptr [ecx] // 0059ab28', 'fsub dword ptr [ecx] // 0059ab28'), ('synth-tail', 'push 0x21 // 0059abba', 'push 1 // 0059abba'), ('matrix-count', 'add edi, 0x30 // 0059b4aa', 'add edi, 0x2c // 0059b4aa'), ('mode-zero-gain', 'fmul qword ptr [audio_coded_gain_005b2778] // 0059aaa4', 'fadd qword ptr [audio_coded_gain_005b2778] // 0059aaa4')]
 for name, old, new in mutations:
     assert text.count(old) == 1, (name, text.count(old))
 config['mutations'] = [dict(name=name, source=source, old=old, new=new, expected_exit=1,
