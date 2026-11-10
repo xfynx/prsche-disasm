@@ -3,6 +3,9 @@
 ## Lean recovery workflow (2026-10-21)
 
 - After every push, report the resulting repository status to the user.
+- CodeGraph is optional source navigation; verify its callers and definitions
+  against the real source closure. Original semantics still require the binary
+  index, REA and native comparison. See docs/research/codegraph-evaluation-2026-11-11.md.
 - Batch related functions and proven ABI bindings by subsystem; avoid a new run,
   agent, bespoke runner and audit for every small function. Do not enlarge a
   passed batch just to improve its count; put later work in the next batch.
