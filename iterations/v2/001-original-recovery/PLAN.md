@@ -1,5 +1,14 @@
 # v2 / 001 - original source recovery plan
 
+Current work 2026-11-11: Run560 shared audit PASS integrates frozen Run559:
+23,422 native comparisons, nine mutation controls, 770 pins, 786 providers;
+registry 864. Build records 130 unresolved names, 137 references and no EXE.
+Run558 remains Defender-blocked before execution and is excluded. Run561 is
+tracing stream creation independently. Run547 is
+also blocked; do not retry or bypass blocked executables. Previous assignments
+below are historical, not active owners. Next: finish Run561 native proof and
+integrate only after acceptance; real creator, live streams and gameplay remain open.
+
 Current557,2026-11-09: frozen555001+556004 adds6entries990B(5full+1partial)/
 1029Bloaderzero/0readonly;registry857. SharedauditPASS80884nativecomparisons/
 972332events/23controls/767effectivepins/779listedproviders. Common001312TUs/

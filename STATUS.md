@@ -1,14 +1,18 @@
 # Current project status
 
-Updated 2026-11-09. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-11. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run557](iterations/v2/001-original-recovery/runs/557-audio-lifecycle-integration/README.md)
-compiles312 C++ translation units across8 projects. The link has132 unresolved names/
-139 references. **There is no recovered playable C++ game executable yet.**
+[Run560](iterations/v2/001-original-recovery/runs/560-audio-stream-routing-integration/README.md)
+compiles 313 C++ translation units across 8 projects. The link has 130 unresolved names/
+137 references. **There is no recovered playable C++ game executable yet.**
 
-Latest:six entries990B (five full,one partial)/1029Bloaderzero;80,884 native
+Run559 adds seven bounded original bodies; the shared audit passes 23,422 native
+comparisons and nine mutation controls. The real stream creator remains unresolved.
+Run558 was blocked before execution and is excluded; Run561 is an unaccepted draft.
+
+Previous Run557:six entries990B (five full,one partial)/1029Bloaderzero;80,884 native
 comparisons/23 mutations/767pins pass;registry857. Four names close,five real
 stream/callback frontiers enter. Pan/poly/copy and object cleanup use canonical
 device/root/heap/scheduler owners. Activation4ae010 remains PARTIAL:descriptor22/23

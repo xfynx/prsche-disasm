@@ -19,13 +19,13 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run557](iterations/v2/001-original-recovery/runs/557-audio-lifecycle-integration/README.md).
-Pan-table and audio object lifecycle providers are integrated; activation4ae010,
+Latest recovery intake: [Run560](iterations/v2/001-original-recovery/runs/560-audio-stream-routing-integration/README.md).
+Stream descriptor and routing providers are integrated; activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
-Next parallel packets:558 periodic transport/sparse aliases and559 stream routing.
-External heap-slot export547 remains antivirus-blocked; live producers/nativeAMD
+Run561 investigates stream creation; Run558 periodic transport and external heap-slot
+export547 remain antivirus-blocked. Live producers/nativeAMD
 hardware remain open.
 
 ## Recovery milestones

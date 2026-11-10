@@ -2,6 +2,7 @@
 
 ## Lean recovery workflow (2026-10-21)
 
+- After every push, report the resulting repository status to the user.
 - Batch related functions and proven ABI bindings by subsystem; avoid a new run,
   agent, bespoke runner and audit for every small function. Do not enlarge a
   passed batch just to improve its count; put later work in the next batch.
