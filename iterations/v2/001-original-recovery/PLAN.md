@@ -1,23 +1,37 @@
 # v2 / 001 - original source recovery plan
 
-Current work 2026-11-11: Run563 shared audit PASS integrates frozen Run561003:
-1 full lookup, 7 partial entries, 3,562 comparisons/2,168 events, 16 controls,
-773 pins and 796 canonical providers; registry 872. Build002 compiles314 TUs/
-8 projects with unchanged inputs and zero compile/other-link errors;136 unresolved
-names/143 references,no EXE. Two names close/eight real codec/callback children
-enter. Read README563 for exact commands, COFF/BSS ownership and bounded domains;
-build001 precompile failure is retained. Run558 remains blocked and excluded.
-Run562 REA audit
-passed and its 004ad950 leaf has bounded native proof; both observed callers
-discard EAX, but indirect callers remain unproved, so it is not integrated.
-Run562 statically traces 004ad8b0's output local: 005665b0 writes it on normal
-returns; real resource/diagnostic and stream endpoints need a composed proof.
-Run564 (Terra/high) owns the next resource-output child chain and its local proof;
-coordinator (Sol/high) owns intake/publication. Other assignments below are historical.
-Next: finish Run564 original evidence and bounded native proof, then one shared
-integration for the ready set. Run547 is also blocked; no blocked-file retries or
-bypasses. Run561 stop has not established two live slots. Live streams and gameplay
-remain open. Before publication review/stage explicit paths and report status after push.
+Current 2026-11-11: Run567 shared audit PASS integrates frozen565002:1full
+validator/3partial entries305B/90Breadonly,7392 comparisons/8controls,778pins/
+814COFF providers; registry882. Build001316TUs/8projects,135names142refs,noEXE,
+unchangedinputs,zero compiler/other-link errors. Exactly frame56c840 and set5912e0
+link names close; real56b540 enters. Read README567 for commands, exact production
+ownership/data/auxiliary evidence and bounded semantic domains. No creator parent
+promotion: actual creator-to-wrapper/realcodec production and565340 file-pointer
+consumer remain unproved. REA565001 failed EPERM;002 never launched; raw PE/index
+and native oracle prove the stated scope, no REA audit claimed.
+
+Run566 also PASS integrates frozen564008:6partial entries746B/98Breadonly,
+384comparisons/4controls,775pins/808COFF providers;315TUs and unchanged136names/
+143refs. Its archive member has no external compiled callers, so0close/0new;
+physical archive/provider/data evidence is pinned. Do not claim a reachable game
+closure from that packet. Actual540 reader and one seeded full ABI/FP state are
+covered; name/out2/aliases/callback mutation/fullFPmatrix remain partial.
+
+Next concrete packet: trace/recover real0056b540 transition from Run565 raw/index
+and handle-validation evidence; compose actual005673d0->005912e0 without changing
+original index bits. Reuse frozen561/565 fixtures and canonical device/slot owners.
+Other codec create/destroy/reset and service callbacks566e10/566e40/567270 remain
+open; choose coherent dependency packets, not a full framework rewrite. Coordinator
+owns next assignments and shared intake; no workers remain assigned to old runs.
+Future shared MSBuild runs should request elevation directly in this environment
+(repeated established sandbox precompile failure), preserve attempts and disable
+node reuse. Review/stage explicit paths and compare staged bytes before publication;
+report repository status after every push.
+
+Run562 retains independent splitter/caller evidence. Run561 stop still lacks two
+live slots; earlier descriptor/constructor/metric partials and live game domains
+remain open.547/558/537005 blocks remain unaccepted; no blocked-file retry/bypass.
+All assignments and metrics below are historical.
 
 Current557,2026-11-09: frozen555001+556004 adds6entries990B(5full+1partial)/
 1029Bloaderzero/0readonly;registry857. SharedauditPASS80884nativecomparisons/

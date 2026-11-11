@@ -4,31 +4,25 @@ Updated 2026-11-11. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run563](iterations/v2/001-original-recovery/runs/563-audio-stream-creation-integration/README.md)
-compiles 314 C++ translation units across 8 projects. The link has 136 unresolved names/
-143 references. **There is no recovered playable C++ game executable yet.**
+[Run567](iterations/v2/001-original-recovery/runs/567-audio-codec-control-integration/README.md)
+compiles 316 C++ translation units across 8 projects. The link has 135 unresolved names/
+142 references. **There is no recovered playable C++ game executable yet.**
 
-Run561 adds one full lookup and seven partial stream/lifecycle entries; the shared
-audit passes 3,562 comparisons and 16 mutation controls. Registry: 872 entries.
-Two names close and eight real codec/callback children enter the frontier.
-Signed address/index domains, creator inputs and lifecycle composition remain bounded;
-the stop proof does not establish two live slots. Partial entries do not promote
-semantic parent dependencies. Run562 is independent REA/bounded-leaf research;
-Run564 continues the resource-output chain. Run558 remains blocked and excluded.
+Run565 adds one full handle validator and three partial codec controls; the shared
+audit passes 7,392 comparisons and eight controls. Registry: 882 entries. Two
+names close and real transition0056b540 enters. Creator composition and the raw
+file-label diagnostic consumer remain open.
 
-Previous Run557:six entries990B (five full,one partial)/1029Bloaderzero;80,884 native
-comparisons/23 mutations/767pins pass;registry857. Four names close,five real
-stream/callback frontiers enter. Pan/poly/copy and object cleanup use canonical
-device/root/heap/scheduler owners. Activation4ae010 remains PARTIAL:descriptor22/23
-are unwritten but physically transported; source keeps them uninitialized. Its
-linker binding does not mark semantic parent dependencies fully recovered.
-Prior554 exactx87/PRNG proof remains accepted; realstreams/liveTLS/audio/startup/
-gameplay and externalheap-slot569a70 binding remain open.547 is antivirus-blocked;
-earlier5453DNow evidence is emulated,nativeAMD hardware fidelity open.
-Supplemental
-537005 query-alias controls were antivirus-blocked before execution and are unaccepted.
-Earlier constructor/metric unwritten-local paths and full platform/gameplay stay open;
-earlier3DNow is emulated. These metrics are not a completion percentage.
+Run566 also compiles six partial callback/resource entries (384 comparisons/four
+controls, exact98B readonly data) into an unreferenced archive member. This does
+not close a reachable game dependency; real stream-start semantics remain open.
+
+Activation4ae010 keeps descriptor bytes22/23 uninitialized and remains partial.
+Earlier constructor/metric domains and Run561's true two-live-slot stop remain
+open. Partial bindings do not promote semantic parent dependencies. Runs547,
+558 and supplemental537005 remain blocked and unaccepted; native AMD 3DNow,
+real streams/live TLS, full startup and gameplay remain open. Metrics are not
+a completion percentage; detailed bounds live in the run handoffs/backlog.
 
 The composed stop/cleanup/pool chain remains verified after the owner repair through
 [Run445](iterations/v2/001-original-recovery/runs/445-audio-owner-alias-regression/README.md).
