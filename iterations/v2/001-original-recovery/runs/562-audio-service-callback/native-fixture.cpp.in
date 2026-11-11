@@ -1,0 +1,56 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+namespace porsche { void __cdecl audio_service_split_004ad950(std::uint8_t*); }
+using B=std::uint8_t; using U=std::uint32_t;
+alignas(64) static B arena[1024], expected[1024], initial[1024];
+static U tests;
+static void check(bool ok,const char* why){if(!ok){std::printf("divergence %s case %u\n",why,tests);std::fflush(stdout);ExitProcess(1);}}
+static U invoke(void* fn,B* p){U fail=0,saved_sp=0; __asm {
+ push ebx
+ push esi
+ push edi
+ mov saved_sp,esp
+ push p
+ mov ebx,13579bdfh
+ mov esi,2468ace0h
+ mov edi,10203040h
+ call fn
+ add esp,4
+ cmp esp,saved_sp
+ je stack_ok
+ or fail,1
+ mov esp,saved_sp
+ stack_ok:
+ cmp ebx,13579bdfh
+ je ebx_ok
+ or fail,2
+ ebx_ok:
+ cmp esi,2468ace0h
+ je esi_ok
+ or fail,4
+ esi_ok:
+ cmp edi,10203040h
+ je edi_ok
+ or fail,8
+ edi_ok:
+ pop edi
+ pop esi
+ pop ebx
+ } return fail; }
+static void test(void* original,const char* input,U object_offset,U input_offset){
+ ++tests; std::memset(arena,0x9d,sizeof arena); B* object=arena+object_offset; B* source=arena+input_offset;
+ std::strcpy(reinterpret_cast<char*>(source),input); U address=reinterpret_cast<U>(source); std::memcpy(object,&address,4);
+ std::memcpy(initial,arena,sizeof arena); U a=invoke(original,object); std::memcpy(expected,arena,sizeof arena);
+ std::memcpy(arena,initial,sizeof arena); U b=invoke(reinterpret_cast<void*>(&porsche::audio_service_split_004ad950),object);
+ check(a==0 && b==0,"ABI"); check(std::memcmp(expected,arena,sizeof arena)==0,"memory");
+}
+int main(){
+ B* code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE)); check(code!=nullptr,"allocation");
+ const B original[]={@BODY_004AD950@}; std::memcpy(code,original,sizeof original); FlushInstructionCache(GetCurrentProcess(),code,sizeof original);
+ const char* cases[]={"", "abc", "-", "--", "one-two", "one-two-three", "one--three", "abcdefghijklmnopqrstuvwxyz0123456789-tail-end", "----------------------------------------", "a-b-c-d", "01234567890123456789012345678901", "x-abcdefghijklmnopqrstuvwxyz0123456789-x"};
+ for(U align=0;align<4;++align)for(auto value:cases) {test(code,value,128+align,512);test(code,value,128+align,160+align);}
+ std::printf("audio_service_split_original_x86_vs_cpp=PASS cases=%u\n",tests);return 0;
+}

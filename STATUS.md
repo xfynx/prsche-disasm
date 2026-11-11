@@ -4,13 +4,17 @@ Updated 2026-11-11. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run560](iterations/v2/001-original-recovery/runs/560-audio-stream-routing-integration/README.md)
-compiles 313 C++ translation units across 8 projects. The link has 130 unresolved names/
-137 references. **There is no recovered playable C++ game executable yet.**
+[Run563](iterations/v2/001-original-recovery/runs/563-audio-stream-creation-integration/README.md)
+compiles 314 C++ translation units across 8 projects. The link has 136 unresolved names/
+143 references. **There is no recovered playable C++ game executable yet.**
 
-Run559 adds seven bounded original bodies; the shared audit passes 23,422 native
-comparisons and nine mutation controls. The real stream creator remains unresolved.
-Run558 was blocked before execution and is excluded; Run561 is an unaccepted draft.
+Run561 adds one full lookup and seven partial stream/lifecycle entries; the shared
+audit passes 3,562 comparisons and 16 mutation controls. Registry: 872 entries.
+Two names close and eight real codec/callback children enter the frontier.
+Signed address/index domains, creator inputs and lifecycle composition remain bounded;
+the stop proof does not establish two live slots. Partial entries do not promote
+semantic parent dependencies. Run562 is independent REA/bounded-leaf research;
+Run564 continues the resource-output chain. Run558 remains blocked and excluded.
 
 Previous Run557:six entries990B (five full,one partial)/1029Bloaderzero;80,884 native
 comparisons/23 mutations/767pins pass;registry857. Four names close,five real

@@ -1,13 +1,23 @@
 # v2 / 001 - original source recovery plan
 
-Current work 2026-11-11: Run560 shared audit PASS integrates frozen Run559:
-23,422 native comparisons, nine mutation controls, 770 pins, 786 providers;
-registry 864. Build records 130 unresolved names, 137 references and no EXE.
-Run558 remains Defender-blocked before execution and is excluded. Run561 is
-tracing stream creation independently. Run547 is
-also blocked; do not retry or bypass blocked executables. Previous assignments
-below are historical, not active owners. Next: finish Run561 native proof and
-integrate only after acceptance; real creator, live streams and gameplay remain open.
+Current work 2026-11-11: Run563 shared audit PASS integrates frozen Run561003:
+1 full lookup, 7 partial entries, 3,562 comparisons/2,168 events, 16 controls,
+773 pins and 796 canonical providers; registry 872. Build002 compiles314 TUs/
+8 projects with unchanged inputs and zero compile/other-link errors;136 unresolved
+names/143 references,no EXE. Two names close/eight real codec/callback children
+enter. Read README563 for exact commands, COFF/BSS ownership and bounded domains;
+build001 precompile failure is retained. Run558 remains blocked and excluded.
+Run562 REA audit
+passed and its 004ad950 leaf has bounded native proof; both observed callers
+discard EAX, but indirect callers remain unproved, so it is not integrated.
+Run562 statically traces 004ad8b0's output local: 005665b0 writes it on normal
+returns; real resource/diagnostic and stream endpoints need a composed proof.
+Run564 (Terra/high) owns the next resource-output child chain and its local proof;
+coordinator (Sol/high) owns intake/publication. Other assignments below are historical.
+Next: finish Run564 original evidence and bounded native proof, then one shared
+integration for the ready set. Run547 is also blocked; no blocked-file retries or
+bypasses. Run561 stop has not established two live slots. Live streams and gameplay
+remain open. Before publication review/stage explicit paths and report status after push.
 
 Current557,2026-11-09: frozen555001+556004 adds6entries990B(5full+1partial)/
 1029Bloaderzero/0readonly;registry857. SharedauditPASS80884nativecomparisons/

@@ -1,0 +1,28 @@
+{
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "callee": "004ad950",
+  "index": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/calls.jsonl",
+  "rea_dossier": "local/experiments/v2-audio-service-callback-562-rea/003/function-004ad950.json",
+  "call_sites": [
+    {
+      "call": "004adbf4",
+      "caller": "004ad9c0",
+      "next_va": "004adbf9",
+      "next_instruction": "mov eax, dword ptr [0x656ab4]",
+      "source": "iterations/v2/001-original-recovery/runs/556-application-audio-lifecycle/callback-index-supplement.json"
+    },
+    {
+      "call": "004aded7",
+      "caller": "004ade20",
+      "call_bytes": "e874faffff",
+      "next_va": "004adedc",
+      "next_bytes": "8b44241c",
+      "next_instruction": "mov eax, dword ptr [esp + 0x1c]",
+      "window_va": "004aded7",
+      "window_bytes": 48,
+      "window_sha256": "1e36595d919ea847e99ba9a1a694226c2976071469e668d7c094a04c5abf9baa"
+    }
+  ],
+  "conclusion": "Each observed original call unconditionally overwrites EAX in the next instruction, before any instruction reads it. A void return transports EAX safely at these two call sites. This is a call-site conclusion, not a guarantee for unobserved indirect callers or a complete game integration claim."
+}
