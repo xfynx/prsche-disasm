@@ -1,0 +1,212 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_period_control_558.hpp"
+#include "porsche/window_shutdown.hpp"
+#include "porsche/window_scheduler.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static B* slab;static B shadow_period[512],shadow_notify[32];static bool oracle_run;
+static U caller_configured;static B caller_flags[2];
+alignas(16)static B floating[512],environment[28];
+alignas(16)static B channels[2][4][0x70];
+struct Fpu{unsigned short control,status,tag,pad;B values[80];U mxcsr;};
+struct State{B device[0x18c],buffers[16],thread[8],palette[1024],sparse[193],records[896];U callback,voice,count,map,caller;B notify,caller_bytes[2],pad;Fpu fp;};
+struct Event{U tag,args[3];State before,after;};
+struct Trace{U abi,result,count;Event events[24];State final;};
+static Trace actual,expected;
+static U cases,events_total,kind,flags,value=0x80,third=1,fourth=0x12345678,fifth=0x87654321;
+static U active=1,count_bits=3,effect,channel_calls,pc=2,rc,depth,sticky,mx=0x1f80;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U x;std::memcpy(&x,p,4);return x;}
+static void wr(void* p,U x){std::memcpy(p,&x,4);}
+static U load(const volatile B* p){return U(p[0])|(U(p[1])<<8)|(U(p[2])<<16)|(U(p[3])<<24);}
+static void store(volatile B* p,U v){for(U i=0;i<4;++i)p[i]=static_cast<B>(v>>(i*8));}
+static volatile B* dev(){return reinterpret_cast<volatile B*>(&application_audio_device_state_006b48c0)+16;}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence period %s case=%u kind=%u flags=%02x effect=%u\n",why,cases,kind,flags,effect);std::fflush(stdout);ExitProcess(1);}}
+static void sync_to_live(){
+    for(U i=0;i<32;++i){
+        store(audio_period_value_views_558[i],rd(shadow_period+i*16));
+        *audio_period_byte4_views_558[i]=shadow_period[i*16+4];*audio_period_byte5_views_558[i]=shadow_period[i*16+5];
+        store(audio_period_arg4_views_558[i],rd(shadow_period+i*16+8));store(audio_period_arg5_views_558[i],rd(shadow_period+i*16+12));
+        *audio_period_notify_views_558[i]=shadow_notify[i];
+    }
+}
+static void sync_from_live(){
+    for(U i=0;i<32;++i){
+        wr(shadow_period+i*16,load(audio_period_value_views_558[i]));
+        shadow_period[i*16+4]=*audio_period_byte4_views_558[i];shadow_period[i*16+5]=*audio_period_byte5_views_558[i];
+        wr(shadow_period+i*16+8,load(audio_period_arg4_views_558[i]));wr(shadow_period+i*16+12,load(audio_period_arg5_views_558[i]));
+        shadow_notify[i]=*audio_period_notify_views_558[i];
+    }
+}
+static void guards(){for(U i=0;i<32;++i)require(shadow_period[i*16+6]==0xa5&&shadow_period[i*16+7]==0xa5,"original untouched shadow bytes preserved");}
+static void snapshot(State& s){
+    __asm fxsave floating
+    __asm fnstenv environment
+    __asm fldenv environment
+    s.fp.control=static_cast<unsigned short>(rd(floating));s.fp.status=static_cast<unsigned short>(rd(floating+2));s.fp.tag=static_cast<unsigned short>(rd(environment+8));s.fp.pad=0;s.fp.mxcsr=rd(floating+24);
+    for(U i=0;i<8;++i){std::memcpy(s.fp.values+i*10,floating+32+i*16,10);if(!(floating[4]&(1u<<(((s.fp.status>>11)+i)&7))))std::memset(s.fp.values+i*10,0,10);}
+    std::memcpy(s.device,&application_audio_device_state_006b48c0,sizeof s.device);std::memcpy(s.buffers,&audio_device_buffers_006b4888,16);
+    for(U i=0;i<8;++i)s.thread[i]=reinterpret_cast<volatile B*>(&audio_thread_callbacks_006b4a3c)[i];
+    std::memcpy(s.palette,render_pixel_palette_006b4b20,1024);std::memcpy(s.records,channels,sizeof channels);
+    @SPARSE_CAPTURE@
+    s.callback=audio_device_callback_006b4898;s.voice=audio_backend_voice_table_006b489c;s.count=audio_resource_map_count_006b48a0;s.map=audio_resource_map_006b48a4;
+    s.notify=static_cast<B>(audio_ds_notify_kind_006b4886);s.caller=caller_configured;s.caller_bytes[0]=caller_flags[0];s.caller_bytes[1]=caller_flags[1];s.pad=0;
+}
+static Event& before(U tag,U a,U b=0,U c=0){
+    if(oracle_run){guards();sync_to_live();}
+    require(actual.count<24,"finite endpoint sequence");auto& e=actual.events[actual.count++];e.tag=tag;e.args[0]=a;e.args[1]=b;e.args[2]=c;snapshot(e.before);return e;
+}
+static void after(Event& e){snapshot(e.after);if(oracle_run)sync_from_live();}
+static void fp_effect(){if(effect&32){unsigned short cw=static_cast<unsigned short>(0x7f|(pc<<8)|(((rc+actual.count)&3)<<10));__asm fldcw cw
+    U changed=0x1f80|(((rc+actual.count)&3)<<13)|(actual.count&0x3f);__asm ldmxcsr changed}}
+namespace porsche {
+void __cdecl audio_period_callback_005901b0(I f,U v){auto& e=before(10,static_cast<U>(f),v);
+    const U group=static_cast<U>(f)&31;
+    if(effect&1)store(audio_period_value_views_558[group],v?0:1);
+    if(effect&2)dev()[0xdc]=0;
+    if(effect&4){dev()[0xe4]=2;dev()[0xe5]=0;}
+    if(effect&64)audio_thread_before_006b4a3c=0x11223344;
+    fp_effect();after(e);
+}
+I __cdecl audio_period_channel_notify_005902a0(U handle,U group,I setting){auto& e=before(20,handle,group,static_cast<U>(setting));++channel_calls;
+    if((effect&4)&&channel_calls==1){dev()[0xe4]=0;dev()[0xe5]=0;}
+    if((effect&8)&&channel_calls==1){store(dev()+0x140,ptr(channels[1]));dev()[0xe4]=3;dev()[0xe5]=0;}
+    if(effect&16)channels[1][2][group+0x45]^=0x80;
+    if(effect&64)audio_thread_before_006b4a3c=0xaabbccdd;
+    fp_effect();after(e);return static_cast<I>(0x87654321);
+}
+// Unexecuted dependencies of unchanged canonical state-owner TUs fail closed.
+U __cdecl application_audio_backend_allocate_0058aae0(U){ExitProcess(90);return 0;}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+I __cdecl audio_device_initialize_ds_0058ebe0(){ExitProcess(90);return 0;}
+I __cdecl audio_device_release_ds_0058f1f0(){ExitProcess(90);return 0;}
+void* __stdcall platform_create_thread(void*,U,ThreadBootstrap,void*,U,U*){ExitProcess(90);return nullptr;}
+U __stdcall platform_thread_priority(void*,I){ExitProcess(90);return 0;}
+I __cdecl exit_registry_register_005a2400(void(__cdecl*)()){ExitProcess(90);return 0;}
+void __stdcall audio_platform_sleep_455(U){ExitProcess(90);}
+I __cdecl application_audio_probe_measure_00565890(){ExitProcess(90);return 0;}
+I __cdecl audio_backend_pool_release_0058ac30(U){ExitProcess(90);return 0;}
+void __cdecl audio_thread_mix_0058f8e0(){ExitProcess(90);}
+I __cdecl audio_backend_find_channel_00589d20(U){ExitProcess(90);return 0;}
+U __cdecl audio_backend_next_voice_00590340(I,U*){ExitProcess(90);return 0;}
+void __cdecl audio_backend_voice_release_00597010(void*){ExitProcess(90);}
+void __cdecl audio_backend_voice_finalize_00589c00(U){ExitProcess(90);}
+I __stdcall audio_direct_sound_create_00597f70(const void*,U*,void*){ExitProcess(90);return 0;}
+void* __stdcall audio_platform_foreground_window(){ExitProcess(90);return nullptr;}
+void* __stdcall audio_platform_desktop_window(){ExitProcess(90);return nullptr;}
+U __stdcall window_shutdown_close_handle_006bd92c(void*){ExitProcess(90);return 0;}
+void __stdcall window_shutdown_display_callback_006bd9b0(U){ExitProcess(90);}
+void __cdecl application_instance_exit_005a246e(U){ExitProcess(90);}
+TimedCallbackSlot* __cdecl window_scheduler_remove_005366a0(TimedCallback){ExitProcess(90);return nullptr;}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_enter_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_leave_critical_section(void*){ExitProcess(90);}
+U __cdecl audio_backend_cpu_features_00597070(){ExitProcess(90);return 0;}
+}
+static void seed(){
+    unsigned short cw=static_cast<unsigned short>(0x7f|(pc<<8)|(rc<<10));__asm fninit __asm fldcw cw __asm ldmxcsr mx
+    __asm fxsave floating
+    const U top=(8-depth)&7;const unsigned short sw=static_cast<unsigned short>((top<<11)|sticky);std::memcpy(floating+2,&sw,2);floating[4]=0;
+    for(U i=0;i<depth;++i){floating[4]|=static_cast<B>(1u<<((top+i)&7));wr(floating+32+i*16,0x10203041+i);wr(floating+36+i*16,0x87654321+i);const unsigned short exponent=static_cast<unsigned short>(0x3fff+i);std::memcpy(floating+40+i*16,&exponent,2);}
+    __asm fxrstor floating
+}
+static void reset(){
+    __asm fninit
+    actual={};channel_calls=0;
+    for(U i=0;i<sizeof(ApplicationAudioDeviceStateStorage);++i)application_audio_device_state_006b48c0.preceding_data()[i]=static_cast<B>(i*13+7);
+    for(U i=0;i<16;++i)reinterpret_cast<B*>(&audio_device_buffers_006b4888)[i]=static_cast<B>(i*17+3);
+    audio_thread_before_006b4a3c=0xdecafbad;audio_thread_after_006b4a40=0x01234567;
+    for(U i=0;i<256;++i)render_pixel_palette_006b4b20[i]=0x12345678u+i*0x10101u;
+    audio_ds_notify_kind_006b4886=static_cast<std::int8_t>(0x5a);audio_device_callback_006b4898=0x12345678;
+    audio_backend_voice_table_006b489c=0x87654321;audio_resource_map_count_006b48a0=0xf1e2d3c4;audio_resource_map_006b48a4=0x89abcdef;
+    @SPARSE_RESET@
+    for(U bank=0;bank<2;++bank)for(U row=0;row<4;++row){for(U j=0;j<0x70;++j)channels[bank][row][j]=static_cast<B>(bank*113+row*37+j*17);wr(channels[bank][row],bank*100+row+0x10203040);}
+    dev()[0xdc]=static_cast<B>(active);dev()[0xe4]=static_cast<B>(count_bits);dev()[0xe5]=static_cast<B>(count_bits>>8);store(dev()+0x140,ptr(channels[0]));
+    caller_configured=third&1;caller_flags[0]=0x81;caller_flags[1]=0x42;
+    std::memset(shadow_period,0xa5,sizeof shadow_period);std::memset(shadow_notify,0xa5,sizeof shadow_notify);sync_from_live();seed();
+}
+static U invoke(void* fn,const U* args,U argc,U& result){U saved_sp,saved_frame,fail=0,v;__asm {
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    mov ecx,argc
+    mov eax,args
+    test ecx,ecx
+    je call_target
+push_args:dec ecx
+    push dword ptr [eax+ecx*4]
+    test ecx,ecx
+    jne push_args
+call_target:mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov v,eax
+    mov eax,argc
+    lea esp,[esp+eax*4]
+    cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    jne bad
+    pushfd
+    pop eax
+    test eax,400h
+    jz done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }result=v;return fail;}
+static void execute(bool cpp){
+    reset();oracle_run=!cpp;U ignored;U args[5]={flags,value,third,fourth,fifth};
+    void* target=nullptr;U argc=0;
+    if(kind==0){target=cpp?reinterpret_cast<void*>(&application_audio_period_control_00565c70):slab;argc=5;}
+    if(kind==1){target=cpp?reinterpret_cast<void*>(&frame_services_boundary_00565cd0):slab+0x100;argc=2;}
+    if(kind==2){target=cpp?reinterpret_cast<void*>(&audio_period_callback_set_00590250):slab+0x200;argc=1;}
+    if(kind==3){target=cpp?reinterpret_cast<void*>(&audio_period_value_accept_00590290):slab+0x280;argc=2;}
+    if(kind==4){target=slab+(cpp?0x380:0x300);argc=0;}
+    actual.abi=invoke(target,args,argc,(kind==2||kind==3)?actual.result:ignored);
+    if(oracle_run){guards();sync_to_live();}
+    snapshot(actual.final);
+}
+static void check(){
+    execute(false);expected=actual;execute(true);
+    if(actual.abi||expected.abi||std::memcmp(&actual,&expected,sizeof actual)){
+        const B* a=reinterpret_cast<const B*>(&actual);const B* b=reinterpret_cast<const B*>(&expected);U off=0;while(off<sizeof actual&&a[off]==b[off])++off;
+        std::printf("divergence period case=%u kind=%u flags=%02x value=%08x third=%08x active=%u count=%04x effect=%u PC=%u RC=%u depth=%u sticky=%x byte=%u values=%02x/%02x events=%u/%u\n",cases,kind,flags,value,third,active,count_bits,effect,pc,rc,depth,sticky,off,off<sizeof actual?a[off]:0,off<sizeof actual?b[off]:0,actual.count,expected.count);std::fflush(stdout);ExitProcess(1);
+    }++cases;events_total+=actual.count;
+}
+int main(){
+    SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);
+    SetUnhandledExceptionFilter([](EXCEPTION_POINTERS* p)->LONG{std::printf("divergence period fault=%08lx eip=%p case=%u\n",p->ExceptionRecord->ExceptionCode,p->ExceptionRecord->ExceptionAddress,cases);std::fflush(stdout);ExitProcess(1);return EXCEPTION_EXECUTE_HANDLER;});
+    for(U i=0;i<32;++i){require(load(audio_period_value_views_558[i])==0&&load(audio_period_arg4_views_558[i])==0&&load(audio_period_arg5_views_558[i])==0,"independent canonical/sparse PE-zero DWORDs before reset");require(*audio_period_byte4_views_558[i]==0&&*audio_period_byte5_views_558[i]==0&&*audio_period_notify_views_558[i]==0,"independent canonical/sparse PE-zero bytes before reset");}
+    slab=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(slab!=nullptr,"raw slab");
+    @ORIGINAL_BODIES@
+    @ORIGINAL_RELOCATIONS@
+    require(FlushInstructionCache(GetCurrentProcess(),slab,4096)!=0,"raw cache");
+    for(kind=0;kind<4;++kind)for(flags=0;flags<256;++flags)for(active=0;active<2;++active)for(U count:{0u,1u,3u,0xffffu})for(U t:{0u,1u}){count_bits=count;third=t;value=flags^0x80u;check();}
+    for(kind=0;kind<3;++kind)for(flags=0;flags<256;++flags)for(U ef:{1u,2u,4u,8u,16u,32u,64u,127u}){effect=ef;active=1;count_bits=3;third=flags&1;value=flags&1?0:255;fourth=flags*0x01020304;fifth=~fourth;check();}
+    effect=0;kind=0;active=1;count_bits=3;flags=0;fourth=0x12345678;fifth=0x87654321;
+    for(U v:{0u,1u,0x7fu,0x80u,0xffu,0xffffffffu,0x80000000u})for(U t:{0u,1u,0xffffffffu,0x80000000u}){value=v;third=t;check();}
+    for(U precision:{0u,2u,3u})for(rc=0;rc<4;++rc)for(U d:{0u,1u,5u,8u})for(U st:{0u,0x25u,0x453fu}){
+        pc=precision;depth=d;sticky=st;mx=0x1f80|(rc<<13)|(st&63);effect=32;active=1;count_bits=2;
+        for(kind=0;kind<4;++kind)for(U f:{0u,3u,18u,31u,0x20u,0x83u,0xffu}){flags=f;third=f&1;check();}
+    }
+    pc=2;rc=depth=sticky=effect=0;mx=0x1f80;kind=4;active=1;count_bits=3;
+    for(U configured:{0u,1u})for(U ef:{0u,1u,2u,4u,8u,32u,64u,127u}){third=configured;effect=ef;check();}
+    __asm fninit
+    std::printf("audio_period_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;
+}

@@ -11,8 +11,10 @@ outer-slot lookup on its first word, then calls 0056b4c0 with the looked-up
 object's +4 and the second word. The original 005673d0 call forwards its codec
 result bits as that first word. Keep this identity; do not infer or substitute
 a pointer. Run561 creator is already PARTIAL with a controlled endpoint.
-Other indexed direct calls: 0056c840 uses 0056b380 and diagnostic IAT;
-0056c420 uses 0056b380, 0056c140, 0056bd10, 0056c380 and diagnostic IAT;
+Other indexed direct calls: 0056c840 uses 0056b380 and the canonical writable
+diagnostic callback; 0056c420 uses 0056b380, 0056c140, 0056bd10, 0056c380 and
+that diagnostic callback. Source-label VA 005bd978 remains raw metadata; the
+00565340 diagnostic's pointer-consuming path is not proved;
 0056b3b0 calls reset, validation, lock/thread and allocation children;
 0056aff0 calls accepted 0056afc0, validation/diagnostic and lock creation.
 These call lists are navigation, not proof of their semantics or safe ABI.

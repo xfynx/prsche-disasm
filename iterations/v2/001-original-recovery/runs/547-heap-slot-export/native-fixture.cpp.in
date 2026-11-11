@@ -1,0 +1,83 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include "application_heap_slot_export_547.hpp"
+#include "porsche/application_heap.hpp"
+#include "porsche/application_heap_init.hpp"
+#include "porsche/application_heap_state.hpp"
+#include "porsche/heap.hpp"
+using U=std::uint32_t;using B=unsigned char;using namespace porsche;
+static U cases,pattern,ignored;
+static void require(bool ok,const char* reason){if(!ok){printf("divergence %s case=%u pattern=%u ignored=%u\n",reason,cases,pattern,ignored);fflush(stdout);ExitProcess(1);}}
+namespace porsche {
+OriginalHeap* heaps_006b4f20[16]{};
+ApplicationHeapContexts application_heap_contexts{};
+ApplicationHeapRuntime application_heap_runtime{};
+// Unused children needed only to link the actual included canonical TU.
+std::int32_t __cdecl heap_init_005697f0(U,const char*,void*,std::int32_t,U,U,std::int32_t,std::int32_t,U,std::int32_t,std::int32_t,void*){require(false,"unused heap init");return 0;}
+void* __cdecl application_page_alloc_0059ed40(U*){require(false,"unused page allocation");return nullptr;}
+}
+struct Fpu {unsigned short control,status;B tag,padding[3],values[80];};
+alignas(16) static B floating[512];
+static void capture(Fpu& f){__asm fxsave floating
+ f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);
+ for(U i=0;i<8;++i){U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))memcpy(f.values+i*10,floating+32+i*16,10);else memset(f.values+i*10,0,10);}}
+static void seed(){unsigned short pc[]={0,2,3};unsigned short cw=static_cast<unsigned short>(0x7f|(pc[pattern%3]<<8)|((pattern%4)<<10));__asm fninit __asm fldcw cw
+ for(U i=0;i<ignored%4;++i){U value=0x3f800001+i;__asm fld dword ptr value}
+ B env[28];__asm fnstenv env
+ *reinterpret_cast<unsigned short*>(env+4)|=static_cast<unsigned short>((pattern>>2)&0x3f);
+ __asm fldenv env
+}
+static U invoke(void* fn,U& result){U before,frame,fail=0,out;__asm {
+ push ebx
+ push esi
+ push edi
+ mov before,esp
+ mov frame,ebp
+ mov ebx,13579bdfh
+ mov esi,2468ace0h
+ mov edi,10203040h
+ mov ecx,0badf00dh
+ mov edx,0deadc0deh
+ call fn
+ mov out,eax
+ cmp esp,before
+ jne bad
+ cmp ebp,frame
+ jne bad
+ cmp ebx,13579bdfh
+ jne bad
+ cmp esi,2468ace0h
+ jne bad
+ cmp edi,10203040h
+ je done
+bad:mov fail,1
+done:mov esp,before
+ pop edi
+ pop esi
+ pop ebx
+ }
+ result=out;return fail;}
+struct State {OriginalHeap* table[16];ApplicationHeapContexts contexts;ApplicationHeapRuntime runtime;void* arena;char name[32];};
+static void snapshot(State& s){memcpy(s.table,heaps_006b4f20,sizeof s.table);s.contexts=application_heap_contexts;s.runtime=application_heap_runtime;s.arena=application_default_arena_005deb98;memcpy(s.name,application_object_heap_name_005e8e50,32);}
+int main(){
+ static const B raw[]={@SLOT@};static_assert(sizeof raw==28,"full original body through RET");
+ B* original=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(original!=nullptr,"original allocation");memcpy(original,raw,sizeof raw);
+ require(*reinterpret_cast<U*>(original+6)==0x6b4f2c&&*reinterpret_cast<U*>(original+21)==0x6b4f60,"exact original table operands");
+ U start=reinterpret_cast<U>(heaps_006b4f20+3),end=reinterpret_cast<U>(heaps_006b4f20+16);
+ require((start^end)<0x80000000u,"signed relocation ordering");memcpy(original+6,&start,4);memcpy(original+21,&end,4);FlushInstructionCache(GetCurrentProcess(),original,sizeof raw);
+ require(application_default_arena_005deb98==nullptr,"production initial arena");for(B c:application_object_heap_name_005e8e50)require(c==0,"production initial name");
+ memset(&application_heap_contexts,0xa6,sizeof application_heap_contexts);memset(&application_heap_runtime,0x5b,sizeof application_heap_runtime);
+ application_default_arena_005deb98=reinterpret_cast<void*>(0x12345678);memset(application_object_heap_name_005e8e50,0xc7,32);
+ for(ignored=0;ignored<8;++ignored)for(pattern=0;pattern<8192;++pattern){
+  for(U slot=0;slot<16;++slot){bool occupied=slot<3?!!(ignored&(1u<<slot)):!!(pattern&(1u<<(slot-3)));heaps_006b4f20[slot]=occupied?reinterpret_cast<OriginalHeap*>(0x80000001u+slot*0x10101u):nullptr;}
+  State before,after;snapshot(before);U a,b;Fpu initial,oa,ob;
+  seed();capture(initial);require(invoke(original,a)==0,"original ABI");capture(oa);snapshot(after);require(memcmp(&before,&after,sizeof before)==0,"original unchanged memory");require(memcmp(&initial,&oa,sizeof oa)==0,"original unchanged x87");
+  seed();require(invoke(reinterpret_cast<void*>(&application_heap_slot_00569a70),b)==0,"C++ ABI");capture(ob);snapshot(after);
+  require(a==b,"slot result");require(memcmp(&before,&after,sizeof before)==0,"C++ unchanged memory");require(memcmp(&oa,&ob,sizeof oa)==0,"x87 state");
+  require(a>=3&&a<=16,"return domain");if(pattern==8191)require(a==16,"all full returns16 without dereference");++cases;
+ }
+ __asm fninit
+ VirtualFree(original,0,MEM_RELEASE);printf("heap_slot_export_original_x86_vs_cpp=PASS cases=%u events=0\n",cases);return 0;
+}
