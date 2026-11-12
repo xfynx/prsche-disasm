@@ -19,14 +19,16 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake: [Run567](iterations/v2/001-original-recovery/runs/567-audio-codec-control-integration/README.md).
-Bounded codec controls add one full validator and three partial entries;
+Latest recovery intake: [Run573](iterations/v2/001-original-recovery/runs/573-audio-greedy-integration/README.md).
+Startup service and audio transition/queue providers add three partial originals;
 activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are real codec transition/creator composition and stream callbacks;
+Next is the reachable startup lifecycle/linker frontier; broader
+archive-only continuation and validation domains are deferred under the
+first-executable priority in AGENTS.md;
 Run558 periodic transport and external heap-slot
 export547 remain antivirus-blocked. Live producers/nativeAMD
 hardware remain open.

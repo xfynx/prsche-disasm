@@ -2,6 +2,12 @@
 
 ## Lean recovery workflow (2026-10-21)
 
+- First-executable priority (2026-11-11): choose packets on the actual unresolved
+  linker/startup path. Defer archive-only providers until a reachable parent needs
+  them. Use bounded original comparisons, ABI checks and material mutation controls;
+  keep narrower domains PARTIAL. Reuse accepted proof and defer broader fault,
+  alias, concurrency and unrelated FP matrices. Preserve original algorithms;
+  this priority does not authorize guessed behavior or skipped acceptance gates.
 - After every push, report the resulting repository status to the user.
 - CodeGraph is optional source navigation; verify its callers and definitions
   against the real source closure. Original semantics still require the binary

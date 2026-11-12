@@ -4,10 +4,8 @@ Owner: creation (Sol/high). Start from accepted Run567; preserve prior proof
 inputs and keep all changes in this run and local artifacts. Original game
 files remain read-only. Shared integration and registry belong to coordinator.
 
-Closeout 2026-11-11: planning/index-trace checkpoint only. No implementation,
-native proof or integration is included. Worker mutations are frozen while the
-coordinator reviews and publishes outstanding research; ownership is historical
-until reassigned. Continue from the concrete census/ABI step below.
+Resumed 2026-11-11 after accepted workspace closeout. Worker owns this run and
+local artifacts only; concurrent Run569 owns its independent continuation.
 
 The Porsche.exe binary index query `--address 0x56b540 --disassemble` identifies
 110 bytes at 0056b540..0056b5ad, module SHA256
@@ -32,9 +30,28 @@ when nonzero writes the second argument's low byte at +0x11 before 00568200.
 No current source declaration or owner was found by address. Its actual queue
 composition and argument domains remain unproved.
 
-No implementation, native receipt or integration exists yet. Next: census the
-567 source closure and registry, resolve canonical device/00580c10/00568200
-ownership and child ABI, then select a bounded batch and pin evidence before code.
+`scope-evidence.json` pins the 567 build and registry: 316 source roots, 575
+source/header files and 778 effective pins; no overlapping registered bodies
+for 0056b540 or 005681b0. Canonical owner `files.cpp` defines devices_006a5c7c,
+operation_matches_00567bf0 and operation_queue_00568200; `io_lists.cpp` owns
+io_take_00580c10. Both child functions have existing native proofs. The predicate
+is a real typed function pointer, not a raw original VA transport.
+
+Draft 0056b540/005681b0 C++ preserves the wrapped computed-address zero test,
+the full transition word and the low group-byte write. It uses canonical
+predicate/device/list/queue owners. The native fixture checks original diagnostic
+bytes and composes raw 565 caller -> raw 568 bodies against compiled equivalents,
+using actual list/queue implementations and controlled lock/event boundaries.
+Shared attempt001 passed both 1,126-case baselines but failed its group-byte
+mutation: the fixture had seeded the completed list, while the original uses
+the queued list at +0x24. Zero accepted receipt. After correcting the scene,
+diagnostic preflight passed 1,126 cases / 2,290 events; separate diagnostics
+detected group-byte, lookup-id and wrapped-zero mutations. These preflights reuse
+565 Od objects and are not pinned shared proof. Attempt002 is running:
+`py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/568-audio-greedy-transition/native-config.json --attempt 002`.
+It checked seven mutations and one seeded full FP state; no broad FP matrix.
+Native002/read-only audit now PASS2252 comparisons/4580 events/7 controls.
+Run573 shared intake passes; both entries remain partial. Preserve frozen inputs.
 Do not retry 565 REA's interrupted approval;
 use cached REA when present and raw PE/index otherwise. After two failed attempts
 on one hypothesis, preserve artifacts and report the exact issue.

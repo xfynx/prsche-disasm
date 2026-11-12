@@ -1,21 +1,28 @@
 # Current project status
 
-Updated 2026-11-11. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-12. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run567](iterations/v2/001-original-recovery/runs/567-audio-codec-control-integration/README.md)
-compiles 316 C++ translation units across 8 projects. The link has 135 unresolved names/
-142 references. **There is no recovered playable C++ game executable yet.**
+[Run573](iterations/v2/001-original-recovery/runs/573-audio-greedy-integration/README.md)
+compiles 318 C++ translation units across 8 projects. The link has 132 unresolved names/
+139 references. **There is no recovered playable C++ game executable yet.**
 
-Run565 adds one full handle validator and three partial codec controls; the shared
-audit passes 7,392 comparisons and eight controls. Registry: 882 entries. Two
-names close and real transition0056b540 enters. Creator composition and the raw
-file-label diagnostic consumer remain open.
+Runs571/573 add three partial originals: startup service and audio transition/
+queue group. Their shared audits pass360scenes/four controls and2,252comparisons/
+seven controls respectively; startup's720adapter comparisons are a separate count.
+Three linker names close with no new names. Registry:885 entries. Creator
+composition and the raw file-label diagnostic consumer remain open.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
+
+Next: Run572 startup lifecycle is drafted without native acceptance; workers
+reached usage limits, so its current handoff needs reassignment. Run569 remains
+unaccepted deferred research. Later draft directories do not supersede accepted
+build metrics. Active
+iteration remains v2/001; numbered runs are recovery packets within it.
 
 Activation4ae010 keeps descriptor bytes22/23 uninitialized and remains partial.
 Earlier constructor/metric domains and Run561's true two-live-slot stop remain

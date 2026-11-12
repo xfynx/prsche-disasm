@@ -1,48 +1,49 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-11: Run567 shared audit PASS integrates frozen565002:1full
-validator/3partial entries305B/90Breadonly,7392 comparisons/8controls,778pins/
-814COFF providers; registry882. Build001316TUs/8projects,135names142refs,noEXE,
-unchangedinputs,zero compiler/other-link errors. Exactly frame56c840 and set5912e0
-link names close; real56b540 enters. Read README567 for commands, exact production
-ownership/data/auxiliary evidence and bounded semantic domains. No creator parent
-promotion: actual creator-to-wrapper/realcodec production and565340 file-pointer
-consumer remain unproved. REA565001 failed EPERM;002 never launched; raw PE/index
-and native oracle prove the stated scope, no REA audit claimed.
+Current 2026-11-12: Run573 shared audit PASS, frozen568002 on accepted571.
+Two PARTIAL bodies178B/47Breadonly,2252 comparisons/4580events/7controls,
+784pins/823canonical providers. Build001318TUs/8projects,132names139refs,noEXE,
+unchangedinputs and zero compile/other-link errors. Real56b540 closes/no new names.
+All eight file/list dependencies have unique canonical owners; exact47B message,
+no new writable state. Initial audit before provider-list completion is preserved;
+final validation is authoritative. README573 owns commands and exact boundaries.
 
-Run566 also PASS integrates frozen564008:6partial entries746B/98Breadonly,
-384comparisons/4controls,775pins/808COFF providers;315TUs and unchanged136names/
-143refs. Its archive member has no external compiled callers, so0close/0new;
-physical archive/provider/data evidence is pinned. Do not claim a reachable game
-closure from that packet. Actual540 reader and one seeded full ABI/FP state are
-covered; name/out2/aliases/callback mutation/fullFPmatrix remain partial.
+Run571 also PASS, frozen570001: one PARTIAL original536080/27B, two ABI names,
+1Bloaderzero.360audited scenes/720adapter comparisons/4controls,781pins/817providers;
+317TUs133names140refs. Both names close/no new names. Actual canonical543 child
+executes; receiver/alias/incidentalEAX/FP/live-driver domains remain bounded.
+Registry885 includes the three partial originals; no semantic parent promotion.
 
-Workspace closeout 2026-11-11: uncommitted547/558 are preserved as explicitly
-blocked, unaccepted research (zero native cases), absent from all316 accepted
-build roots,575source/header closure files and882registry entries as providers.
-Safe source/object/receipt hashes match; no blocked PE was opened or executed.
-Run565 PLAN's diagnostic-IAT wording is corrected to canonical writable callback.
-Run568 is an index-trace PLAN only; Run569 is a267B raw-body/ownership census
-checkpoint (778pins/316roots/575files). No implementation/native proof in either.
-Worker mutations are frozen for this reviewed publication; reassign on resumption.
+Run568native001 remains failed (group mutation survived wrong-list fixture).
+Corrected queued-list002 passed; preserve both and reuse unchanged native proof.
+Source565 caller and canonical predicate/list/queue execute; diagnostics, locks,
+events and seededFP preservation are bounded. Creator composition/raw file-label
+pointer consumer/arbitrary aliases/lifetime/concurrency/live game remain open.
 
-Next packets: Run568 real0056b540 transition from Run565 raw/index and handle-
-validation evidence, plus actual005673d0->005912e0 composition only if coherent,
-without changing original index bits; Run569 actual00567550 stream continuation
-from564 forwarding. Suggested models: Sol/high and Terra/high respectively.
-Reuse frozen fixtures and canonical device/slot owners; independent run/local scope.
-Other codec create/destroy/reset and service callbacks566e10/566e40/567270 remain
-open; choose coherent dependency packets, not a full framework rewrite. Coordinator
-owns shared intake/publication; no workers remain assigned to old runs.
-Future shared MSBuild runs should request elevation directly in this environment
-(repeated established sandbox precompile failure), preserve attempts and disable
-node reuse. Review/stage explicit paths and compare staged bytes before publication;
-report repository status after every push.
+First-executable priority in AGENTS applies: recover actual reachable linker/startup
+providers; retain bounded original/ABI/material-mutation gates and PARTIAL labels;
+defer archive-only work, broader unrelated validation matrices and extra reports.
+Run569 native001 stopped during compilation (15receipts,zero nativecases) and is
+unaccepted/deferred. Run572 has three-body165B draft and fixture tail only; no
+native run/receipt/integration. Its 5de6b8 byte is file-backed01, distinct from570
+state; actual550e0/5554b0 remain unresolved children. Both workers hit usage
+limits; do not respawn to evade limits. No old worker assignment is active.
 
-Run562 retains independent splitter/caller evidence. Run561 stop still lacks two
-live slots; earlier descriptor/constructor/metric partials and live game domains
-remain open.547/558/537005 blocks remain unaccepted; no blocked-file retry/bypass.
-All assignments and metrics below are historical.
+Next: reassign572 after capacity is available, finish bounded original fixture and
+recensus actual573 source closure before intake. Preserve ECX/RET4 adapters, late
+callbacks, canonical570/543 state and exact byte initializer; no guessed descriptor
+view at5de680 (overlaps existing6ac DWORD). Broader codec/creator and service
+callbacks remain open. Coordinator owns shared intake, registry and publication.
+Future shared MSBuild builds need established elevation and node reuse disabled;
+no repeated empty sandbox builds. Stage explicit paths, verify staged bytes and
+report status after every push. Root STATUS/PLAN/README point at latest accepted
+build; later draft run numbers are not newer acceptance or a completion percentage.
+
+Run566 remains archive-only with no external compiled callers.547/558/537005
+remain blocked/unaccepted, no blocked PE retry/bypass. Run561 true two-live-slot
+stop, descriptor22/23/constructor/metric partials, nativeAMD3DNow, realstreams/
+TLS/startup/display/menus/careers/gameplay all remain open. Original local/game
+and passed inputs are immutable. All assignments and metrics below are historical.
 
 Current557,2026-11-09: frozen555001+556004 adds6entries990B(5full+1partial)/
 1029Bloaderzero/0readonly;registry857. SharedauditPASS80884nativecomparisons/

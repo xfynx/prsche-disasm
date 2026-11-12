@@ -1,0 +1,67 @@
+{
+  "run": 570,
+  "experiment": "local/experiments/v2-startup-service-bindings-570",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/570-startup-service-bindings/startup_service_570.cpp",
+    "iterations/v2/001-original-recovery/runs/543-render-slot-reset/render_slot_reset_543.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/570-startup-service-bindings/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/570-startup-service-bindings",
+    "iterations/v2/001-original-recovery/runs/543-render-slot-reset",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/570-startup-service-bindings/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/570-startup-service-bindings/fixture-tail.inc",
+    "iterations/v2/001-original-recovery/runs/570-startup-service-bindings/prepare.py"
+  ],
+  "original_bodies": [
+    {
+      "va": "00536080",
+      "bytes": 27,
+      "sha256": "42b0ba96bdb248dc0e467b70c0ac9447cab2f79286826d5eecdade18bda21837",
+      "token": "@BODY_00536080@"
+    }
+  ],
+  "pass_marker": "startup_service_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "first-field",
+      "source": "iterations/v2/001-original-recovery/runs/570-startup-service-bindings/startup_service_570.cpp",
+      "old": "std::memcpy(p+8,&zero,4);",
+      "new": "std::memcpy(p+8,&zero,3);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "second-field",
+      "source": "iterations/v2/001-original-recovery/runs/570-startup-service-bindings/startup_service_570.cpp",
+      "old": "std::memcpy(p+12,&zero,4);",
+      "new": "std::memcpy(p+12,&zero,3);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "late-byte",
+      "source": "iterations/v2/001-original-recovery/runs/570-startup-service-bindings/startup_service_570.cpp",
+      "old": "render_texture_invalidate_00555330();\n    startup_service_active_0069dd1e=0;",
+      "new": "startup_service_active_0069dd1e=0;\n    render_texture_invalidate_00555330();",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "child",
+      "source": "iterations/v2/001-original-recovery/runs/570-startup-service-bindings/startup_service_570.cpp",
+      "old": "render_texture_invalidate_00555330();",
+      "new": "/* removed child */",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
