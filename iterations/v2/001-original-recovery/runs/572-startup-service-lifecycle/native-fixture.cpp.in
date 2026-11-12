@@ -1,0 +1,183 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "render_slot_reset_543.hpp"
+#include "startup_service_570.hpp"
+#include "startup_lifecycle_572.hpp"
+#include "porsche/render_loader.hpp"
+#include "porsche/application_heap_state.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/file_device.hpp"
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U word(const void* p,U o=0){U v;memcpy(&v,static_cast<const B*>(p)+o,4);return v;}
+static void put(void* p,U o,U v){memcpy(static_cast<B*>(p)+o,&v,4);}
+static U cases,events_total,kind,flags,offset,value,precision,rounding,depth,initial_status,scene,layout,dirty_mode,initial_count,fill_calls,nesting,input_value;
+static bool cpp_side;static B* code[3];static U virtual_free_target;
+alignas(16) static B floating[512];
+struct Arena {B nodes[32][3][32],storage[2][64];};
+static Arena arena;
+namespace porsche {
+// Fixture views. Production owners remain537,540 and the canonical loader.
+B render_texture_slots_006a33f8[1536]{};
+U render_texture_count_006a3a40=0;
+U render_thrash_exports_006bd910[43]{};
+}
+struct Fpu {unsigned short control,status;B tag,padding[3],values[80];unsigned short full_tag;U mxcsr;};
+struct State {Arena arena;B slots[1536];U globals[7],exports[43],fill_calls,nesting,service,mode;};
+struct Event {U tag,argc,args[7];State state;Fpu fpu;};
+struct Trace {U count,abi,exception[3];Event events[80];State final;Fpu fpu;};
+static Trace trace,expected;
+static void require(bool ok,const char* s){if(!ok){printf("divergence %s case=%u kind=%u flags=%x scene=%u layout=%u count=%x dirty=%u value=%x offset=%u cpp=%u\n",s,cases,kind,flags,scene,layout,initial_count,dirty_mode,value,offset,cpp_side);fflush(stdout);ExitProcess(1);}}
+static void snapshot(State& s){s.arena=arena;memcpy(s.slots,render_texture_slots_006a33f8,1536);const U g[]={render_texture_slot_count_006a3a44,render_texture_dirty_006a3a48,render_texture_pending_006a3a58,render_texture_arena_006a3a5c,render_texture_heap_id_006a3a60,render_texture_epoch_006a3a64,render_texture_count_006a3a40};memcpy(s.globals,g,sizeof g);memcpy(s.exports,render_thrash_exports_006bd910,172);s.fill_calls=fill_calls;s.nesting=nesting;s.service=startup_service_active_0069dd1e;s.mode=startup_lifecycle_mode_005de6b8;}
+static void capture(Fpu& f){B environment[28];
+ __asm {fxsave floating
+        fnstenv environment
+        fldenv environment}
+ f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);
+ f.full_tag=*reinterpret_cast<unsigned short*>(environment+8);f.mxcsr=*reinterpret_cast<U*>(floating+24);
+ for(U i=0;i<8;++i){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))memcpy(f.values+i*10,floating+32+i*16,10);else memset(f.values+i*10,0,10);}
+}
+
+static void seed_fpu(){unsigned short cw=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm fninit __asm fldcw cw
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+    B environment[28];__asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment+4)|=static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+static U invoke(void* fn,void* receiver,const U* args,U count,U cleanup,U& result){U before,frame,fail=0,out;__asm {
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov eax,count
+    mov edx,args
+pushargs:test eax,eax
+    jz pushed
+    dec eax
+    push dword ptr [edx+eax*4]
+    jmp pushargs
+pushed:mov ecx,receiver
+    mov edx,0deadc0deh
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov out,eax
+    add esp,cleanup
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    result=out;return fail;}
+
+
+static int exception_record(EXCEPTION_POINTERS* e){trace.exception[0]=e->ExceptionRecord->ExceptionCode;trace.exception[1]=static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);trace.exception[2]=static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);return EXCEPTION_EXECUTE_HANDLER;}
+static bool execute(void* fn,void* receiver,const U* args,U count,U& result,U& abi){
+    __try {abi=invoke(fn,receiver,args,count,0,result);return true;}
+    __except(exception_record(GetExceptionInformation())) {return false;}
+}
+
+
+
+static void event(U tag,std::initializer_list<U> args){require(trace.count<80,"bounded event count");auto& e=trace.events[trace.count++];e.tag=tag;e.argc=static_cast<U>(args.size());U i=0;for(U a:args)e.args[i++]=a;while(i<7)e.args[i++]=0;snapshot(e.state);capture(e.fpu);}
+static void control(){if(flags&32){unsigned short cw=static_cast<unsigned short>(0x7f|((precision==0?3u:0u)<<8)|(((rounding+1)%4)<<10));__asm fldcw cw}}
+static void release(){U result=0,abi=invoke(cpp_side?reinterpret_cast<void*>(&render_texture_arena_release_00555400):code[2],nullptr,nullptr,0,0,result);require(abi==0,"nested release ABI");}
+static U __stdcall treset_alternate(){require(false,"alternate reset callback must remain unexecuted");return 0;}
+static U __stdcall treset(){event(0x6bd988,{});
+    if(flags&256){startup_service_active_0069dd1e=0x77;put(arena.storage[0]+offset,8,0x12344321);put(arena.storage[0]+offset,12,0xabcdef01);}
+    if(flags&1)render_texture_slot_count_006a3a44=scene&1?0xffffffff:2;
+    if(flags&2){put(render_texture_slots_006a33f8,0x24,ptr(arena.nodes[31][0]+offset));render_texture_pending_006a3a58=value^0xabcdef01;render_texture_epoch_006a3a64=value^0xa5a5a5a5;render_texture_dirty_006a3a48=0;}
+    if(flags&128)render_thrash_exports_006bd910[30]=ptr(reinterpret_cast<void*>(&treset_alternate));
+    control();return value^0x12345678;
+}
+namespace porsche {
+void __cdecl heap_fill_0053c290(void* p,U byte,U bytes){event(0x53c290,{ptr(p),byte,bytes});require(byte==0&&bytes==48,"exact clear48B transport");require(ptr(p)>=ptr(render_texture_slots_006a33f8)&&ptr(p)+48<=ptr(render_texture_slots_006a33f8)+1536,"normal slot clear bounds");memset(p,static_cast<int>(byte),bytes);++fill_calls;
+    if((flags&4)&&fill_calls==1)render_texture_slot_count_006a3a44=scene&1?0xffffffff:3;
+    if(flags&64){render_texture_epoch_006a3a64=value^fill_calls;render_texture_count_006a3a40=value+fill_calls;render_texture_dirty_006a3a48=0x80000001;render_texture_pending_006a3a58=0xdeadbeef;render_texture_arena_006a3a5c=ptr(arena.storage[1]+offset);render_texture_heap_id_006a3a60=value^0x55667788;}
+    control();
+}
+U __cdecl application_heap_destroy_005699f0(U id){event(0x5699f0,{id});
+    if(flags&8){render_texture_arena_006a3a5c=scene&1?0:ptr(arena.storage[1]+offset);render_texture_heap_id_006a3a60=value^0x87654321;}
+    if((flags&16)&&!nesting){++nesting;render_texture_arena_006a3a5c=0;release();--nesting;render_texture_arena_006a3a5c=ptr(arena.storage[1]+offset);}
+    control();return value^0x98765432;
+}
+U __stdcall platform_virtual_free(void* p,U bytes,U mode){event(0x5b2148,{ptr(p),bytes,mode});require(bytes==0&&mode==0x8000,"original MEM_RELEASE ABI");
+    if((flags&16)&&!nesting){++nesting;release();--nesting;}
+    if(flags&8){render_texture_arena_006a3a5c=ptr(arena.storage[0]+offset);render_texture_heap_id_006a3a60=value^0x10203040;}
+    control();return scene&1?0:1;
+}
+}
+static void absolute(B* p,U n,U old,const void* replacement,U expected_count){U found=0;for(U i=0;i+4<=n;++i)if(word(p,i)==old){put(p,i,ptr(replacement));++found;i+=3;}require(found==expected_count,"absolute relocation count");}
+static void relative(B* p,U n,U va,U old,const void* replacement,U expected_count){U found=0;for(U i=0;i+5<=n;++i)if(p[i]==0xe8&&va+i+5+word(p,i+1)==old){put(p,i+1,ptr(replacement)-ptr(p+i+5));++found;i+=4;}require(found==expected_count,"relative relocation count");}
+static void reset(){memset(&trace,0,sizeof trace);fill_calls=nesting=0;memset(&arena,0x65+(value&7),sizeof arena);
+    for(U i=0;i<32;++i){B* record=render_texture_slots_006a33f8+i*48;for(U j=0;j<48;j+=4)put(record,j,value^(i*0x1020304u+j));
+        for(U n=0;n<3;++n){B* p=arena.nodes[i][n]+offset;put(p,0,n<2?ptr(arena.nodes[i][n+1]+offset):0);}
+        if(layout==0)put(record,0x24,0);
+        else if(layout==1){put(record,0x24,ptr(arena.nodes[i][2]+offset));}
+        else if(layout==2)put(record,0x24,ptr(arena.nodes[i][0]+offset));
+        else if(layout==3)put(record,0x24,ptr(arena.nodes[0][0]+offset));
+        else if(layout==4){put(record,0x14,0);put(record,0x24,ptr(record+0x14));}
+        else {if(i<31){put(record,0x24,ptr(record+0x28));put(record,0x28,ptr(arena.nodes[i][0]+offset));}else put(record,0x24,ptr(arena.nodes[i][0]+offset));}
+    }
+    render_texture_slot_count_006a3a44=initial_count;render_texture_dirty_006a3a48=dirty_mode==0?0:dirty_mode==1?1:0x80000000;render_texture_pending_006a3a58=value^0x13579bdf;render_texture_epoch_006a3a64=value;render_texture_count_006a3a40=value^0x2468ace0;render_texture_heap_id_006a3a60=value^0x91827364;render_texture_arena_006a3a5c=scene&2?0:ptr(arena.storage[0]+offset);for(U& x:render_thrash_exports_006bd910)x=0;render_thrash_exports_006bd910[30]=ptr(reinterpret_cast<void*>(&treset));
+}
+static U __stdcall tset(U arg){event(0x6bd954,{arg});if(flags&1024)render_texture_pending_006a3a58=0xdeadbeef;return 0x89abcdef;}
+static U __stdcall tset_alt(U arg){event(0x6bd955,{arg});if(flags&1024)render_texture_pending_006a3a58=0xdeadbeef;return 0x13579bdf;}
+namespace porsche {
+void __cdecl render_display_texture_update_005550e0(){event(0x5550e0,{});if(flags&512){startup_service_active_0069dd1e=0x42;startup_lifecycle_mode_005de6b8=0;render_texture_dirty_006a3a48=1;}}
+void __cdecl render_texture_process_005554b0(void* p){event(0x5554b0,{ptr(p)});if(flags&512){render_texture_dirty_006a3a48=0;put(p,0x10,0x11223344);render_thrash_exports_006bd910[17]=ptr(reinterpret_cast<void*>(&tset_alt));}}
+}
+static void init(){
+ const B raw_mode[]={@MODE_005DE6B8@};require(sizeof raw_mode==1&&raw_mode[0]==1&&startup_lifecycle_mode_005de6b8==1,"PE initial mode before resets");
+ require(startup_service_active_0069dd1e==0,"canonical service initial zero");
+ static const B a[]={@BODY_00536050@},b[]={@BODY_005360A0@},c[]={@BODY_00555440@};const B* bodies[]={a,b,c};const U sizes[]={46,43,76};
+ for(U n=0;n<3;++n){code[n]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[n]!=nullptr,"raw allocation");memcpy(code[n],bodies[n],sizes[n]);}
+ absolute(code[0],46,0x5de6b8,&startup_lifecycle_mode_005de6b8,1);absolute(code[0],46,0x69dd1e,&startup_service_active_0069dd1e,1);
+ relative(code[0],46,0x536050,0x5550e0,reinterpret_cast<void*>(&render_display_texture_update_005550e0),1);relative(code[0],46,0x536050,0x555440,code[2],1);
+ absolute(code[1],43,0x5de6b8,&startup_lifecycle_mode_005de6b8,1);absolute(code[1],43,0x69dd1e,&startup_service_active_0069dd1e,1);
+ relative(code[1],43,0x5360a0,0x555330,reinterpret_cast<void*>(&render_texture_invalidate_00555330),1);relative(code[1],43,0x5360a0,0x5550e0,reinterpret_cast<void*>(&render_display_texture_update_005550e0),1);relative(code[1],43,0x5360a0,0x555440,code[2],1);
+ absolute(code[2],76,0x6a3a48,&render_texture_dirty_006a3a48,1);absolute(code[2],76,0x6a3a58,&render_texture_pending_006a3a58,2);absolute(code[2],76,0x6bd954,render_thrash_exports_006bd910+17,3);
+ relative(code[2],76,0x555440,0x5554b0,reinterpret_cast<void*>(&render_texture_process_005554b0),1);
+ for(B* p:code)require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"instruction cache");
+}
+static void compare(){
+ Trace& original=expected;U result=0;
+ for(U side=0;side<3;++side){
+  if(kind==2&&side==2)continue;
+  cpp_side=side!=0;reset();startup_service_active_0069dd1e=static_cast<B>(scene);startup_lifecycle_mode_005de6b8=static_cast<B>(layout);render_thrash_exports_006bd910[17]=ptr(reinterpret_cast<void*>(&tset));
+  seed_fpu();B* receiver=arena.storage[0]+offset;U args[2]={};void* fn=nullptr;U argc=0,cleanup=0;
+  if(kind==0){fn=side==0?code[0]:side==1?reinterpret_cast<void*>(&startup_lifecycle_end_raw_00536050):reinterpret_cast<void*>(&game_setup_movie_service_end_00536050);if(side==2){args[0]=ptr(receiver);argc=1;cleanup=4;}}
+  if(kind==1){fn=side==0?code[1]:side==1?reinterpret_cast<void*>(&startup_lifecycle_frame_raw_005360a0):reinterpret_cast<void*>(&frame_pump_boundary_005360a0);if(side==2){args[0]=ptr(receiver);args[1]=input_value;argc=2;cleanup=8;}else{args[0]=input_value;argc=1;}}
+  if(kind==2){fn=side==0?code[2]:reinterpret_cast<void*>(&render_display_texture_release_00555440);args[0]=input_value==17?ptr(arena.storage[1]+offset):input_value;put(arena.storage[1]+offset,0x10,0x55667788);argc=1;cleanup=4;}
+  bool complete=true;__try{trace.abi=invoke(fn,side==2?arena.storage[1]+offset:receiver,args,argc,cleanup,result);}__except(exception_record(GetExceptionInformation())){complete=false;}
+  require(complete&&trace.abi==0,"mapped input/stack/nonvolatile ABI");snapshot(trace.final);capture(trace.fpu);
+  if(side==0)original=trace;else{require(memcmp(&trace,&original,sizeof trace)==0,"state/ordered callback/FPU");events_total+=trace.count;}
+ }
+ ++cases;
+}
+int main(){
+ init();initial_count=2;precision=2;rounding=0;depth=1;initial_status=0;
+ for(kind=0;kind<3;++kind)for(offset=0;offset<4;++offset)for(dirty_mode=0;dirty_mode<2;++dirty_mode)for(scene=0;scene<2;++scene)for(layout=0;layout<2;++layout)for(U f:{0u,256u,512u,1024u,1792u})for(U v:{0u,1u,16u,17u,0x100u,0x101u}){
+  if(kind==0&&v!=0)continue;
+  if(kind==2&&v>17)continue;
+  flags=f;value=0x9b8a7c6d;input_value=v;compare();
+ }
+ __asm fninit
+ printf("startup_lifecycle_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);return 0;
+}

@@ -4,22 +4,22 @@ Updated 2026-11-12. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run573](iterations/v2/001-original-recovery/runs/573-audio-greedy-integration/README.md)
-compiles 318 C++ translation units across 8 projects. The link has 132 unresolved names/
-139 references. **There is no recovered playable C++ game executable yet.**
+[Run574](iterations/v2/001-original-recovery/runs/574-startup-lifecycle-integration/README.md)
+compiles 319 C++ translation units across 8 projects. The link has 130 unresolved names/
+138 references. **There is no recovered playable C++ game executable yet.**
 
-Runs571/573 add three partial originals: startup service and audio transition/
-queue group. Their shared audits pass360scenes/four controls and2,252comparisons/
-seven controls respectively; startup's720adapter comparisons are a separate count.
-Three linker names close with no new names. Registry:885 entries. Creator
-composition and the raw file-label diagnostic consumer remain open.
+Run574 adds three partial startup lifecycle originals. Its shared audit passes
+3,520 scenes, 5,760 adapter comparisons and seven mutation controls, with actual
+canonical state and texture transport. Three names close; real005554b0 enters
+and005550e0 remains unresolved. The initialized byte01 is verified. Registry:
+888 entries. Earlier
+creator composition and the raw file-label diagnostic consumer remain open.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Next: Run572 startup lifecycle is drafted without native acceptance; workers
-reached usage limits, so its current handoff needs reassignment. Run569 remains
+Next: recover the actual005550e0/005554b0 child algorithms. Run569 remains
 unaccepted deferred research. Later draft directories do not supersede accepted
 build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.

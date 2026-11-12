@@ -1,49 +1,49 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-12: Run573 shared audit PASS, frozen568002 on accepted571.
-Two PARTIAL bodies178B/47Breadonly,2252 comparisons/4580events/7controls,
-784pins/823canonical providers. Build001318TUs/8projects,132names139refs,noEXE,
-unchangedinputs and zero compile/other-link errors. Real56b540 closes/no new names.
-All eight file/list dependencies have unique canonical owners; exact47B message,
-no new writable state. Initial audit before provider-list completion is preserved;
-final validation is authoritative. README573 owns commands and exact boundaries.
+Current 2026-11-12: Run574 shared audit PASS integrates frozen572001 on573.
+Three PARTIAL originals165B,1Binitialized01,no readonly data;3520scenes/
+5760adapter comparisons/5280events/7controls,787pins/829canonical providers.
+Build001319TUs/8projects,130names138refs,noEXE,unchanged inputs and zero
+compiler/other-link errors. Three names536050/5360a0/555440 close;real5554b0
+enters and5550e0 remains unresolved. Production has6definitions(3originals,
+2host adapters,1byte owner),5unique canonical dependencies and exact.data01.
+Registry888 retains all three partial classifications; no parent promotion.
+README574 owns exact build/audit commands and production evidence.
 
-Run571 also PASS, frozen570001: one PARTIAL original536080/27B, two ABI names,
-1Bloaderzero.360audited scenes/720adapter comparisons/4controls,781pins/817providers;
-317TUs133names140refs. Both names close/no new names. Actual canonical543 child
-executes; receiver/alias/incidentalEAX/FP/live-driver domains remain bounded.
-Registry885 includes the three partial originals; no semantic parent promotion.
+Run572 fixture was completed from the preserved worker draft by the coordinator:
+mode snapshot/variable/unmapped pointer setup repaired before native001; actual
+543 invalidation,570service flag and357texture setter execute. Low-byte inputs,
+receiver/texture/sentinel paths, late callback field/table/global effects and
+ECX/RET0,stack-DWORD/RET4 plus cdecl adapters are compared; cdecl adapter ambient
+ECX differs from the real argument. One seeded fullCW/SW/16-bit tag/live80/MXCSR
+and nonvolatile/stack ABI observed, no broad FP matrix. Real5550e0/5554b0 are
+controlled typed endpoints; incidental EAX, arbitrary aliases/faults/lifetime/
+concurrency/full producers/live driver/startup/gameplay remain open. Cached469
+REA dossiers for all3bodies and raw PE evidence are verified/pinned. Existing
+570/543 data owners are reused;newmode5de6b8 is independently file-backed01.
 
-Run568native001 remains failed (group mutation survived wrong-list fixture).
-Corrected queued-list002 passed; preserve both and reuse unchanged native proof.
-Source565 caller and canonical predicate/list/queue execute; diagnostics, locks,
-events and seededFP preservation are bounded. Creator composition/raw file-label
-pointer consumer/arbitrary aliases/lifetime/concurrency/live game remain open.
+Next coherent packet: trace/recover actual005550e0(434B) and005554b0 from current
+574 frontier and cached469/index/raw evidence, including canonical texture state
+and callback ABI. Reuse572scaffold and existing357/543/570providers. Do not enlarge
+passed572 or recover archive-only569 for cosmetic completion. Before new code,
+recensus actual574 source/header closure/registry and preserve provenance. Both
+workers hit usage limits previously; no old assignment is active and no respawn
+to evade limits. Coordinator completed this packet solo.
 
-First-executable priority in AGENTS applies: recover actual reachable linker/startup
-providers; retain bounded original/ABI/material-mutation gates and PARTIAL labels;
-defer archive-only work, broader unrelated validation matrices and extra reports.
-Run569 native001 stopped during compilation (15receipts,zero nativecases) and is
-unaccepted/deferred. Run572 has three-body165B draft and fixture tail only; no
-native run/receipt/integration. Its 5de6b8 byte is file-backed01, distinct from570
-state; actual550e0/5554b0 remain unresolved children. Both workers hit usage
-limits; do not respawn to evade limits. No old worker assignment is active.
+First-executable priority in AGENTS applies: actual reachable linker/startup
+providers, bounded original/ABI/material-mutation gates and PARTIAL labels;
+defer unrelated wide validation matrices and extra reports. Shared MSBuild needs
+established elevation and node reuse disabled; no repeated empty sandbox builds.
+Stage explicit paths, verify staged/native raw bytes and report status after each
+push. Root docs point at latest accepted build; later drafts are not acceptance
+or a completion percentage. Keep original local/game and passed inputs immutable.
 
-Next: reassign572 after capacity is available, finish bounded original fixture and
-recensus actual573 source closure before intake. Preserve ECX/RET4 adapters, late
-callbacks, canonical570/543 state and exact byte initializer; no guessed descriptor
-view at5de680 (overlaps existing6ac DWORD). Broader codec/creator and service
-callbacks remain open. Coordinator owns shared intake, registry and publication.
-Future shared MSBuild builds need established elevation and node reuse disabled;
-no repeated empty sandbox builds. Stage explicit paths, verify staged bytes and
-report status after every push. Root STATUS/PLAN/README point at latest accepted
-build; later draft run numbers are not newer acceptance or a completion percentage.
-
-Run566 remains archive-only with no external compiled callers.547/558/537005
-remain blocked/unaccepted, no blocked PE retry/bypass. Run561 true two-live-slot
-stop, descriptor22/23/constructor/metric partials, nativeAMD3DNow, realstreams/
-TLS/startup/display/menus/careers/gameplay all remain open. Original local/game
-and passed inputs are immutable. All assignments and metrics below are historical.
+Run566 remains unreferenced archive intake. Run569 is unaccepted/deferred after
+15compile receipts/zero nativecases;no new trial. Draw534540 descriptor5de680
+still overlaps existing6ac DWORD; no contiguous clone.547/558/537005 remain
+blocked/unaccepted, no blocked PE retry/bypass. Earlier Run561two-live-slot,
+descriptor22/23/constructor/metric partials,nativeAMD3DNow,realstreams/TLS,
+startup/display/menus/careers/gameplay remain open. All material below is historical.
 
 Current557,2026-11-09: frozen555001+556004 adds6entries990B(5full+1partial)/
 1029Bloaderzero/0readonly;registry857. SharedauditPASS80884nativecomparisons/

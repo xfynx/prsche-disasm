@@ -1,0 +1,113 @@
+{
+  "run": 572,
+  "experiment": "local/experiments/v2-startup-service-lifecycle-572",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/startup_lifecycle_572.cpp",
+    "iterations/v2/001-original-recovery/runs/570-startup-service-bindings/startup_service_570.cpp",
+    "iterations/v2/001-original-recovery/runs/543-render-slot-reset/render_slot_reset_543.cpp",
+    "iterations/v2/001-original-recovery/runs/357-render-display-bindings/render_binding.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle",
+    "iterations/v2/001-original-recovery/runs/570-startup-service-bindings",
+    "iterations/v2/001-original-recovery/runs/543-render-slot-reset",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/fixture-tail.inc",
+    "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/prepare.py"
+  ],
+  "original_bodies": [
+    {
+      "va": "00536050",
+      "bytes": 46,
+      "sha256": "e489456669cdb444254bf67812576f29ca3394208e22ba680d0b16dade84be84",
+      "token": "@BODY_00536050@"
+    },
+    {
+      "va": "005360a0",
+      "bytes": 43,
+      "sha256": "fa7c34a35838da642eb63783414aa0dfc304d425008a7a3fa3db4e0b29570e68",
+      "token": "@BODY_005360A0@"
+    },
+    {
+      "va": "00555440",
+      "bytes": 76,
+      "sha256": "642815c354ee2e70f61a7f30de90cbb49456f399941b5996e3a66c19d22d6a0e",
+      "token": "@BODY_00555440@"
+    },
+    {
+      "va": "005de6b8",
+      "bytes": 1,
+      "sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+      "token": "@MODE_005DE6B8@",
+      "kind": "original-data-witness"
+    }
+  ],
+  "pass_marker": "startup_lifecycle_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "receiver-field",
+      "source": "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/startup_lifecycle_572.cpp",
+      "old": "std::memcpy(p+8,&zero,4);",
+      "new": "std::memcpy(p+8,&zero,3);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "low-byte",
+      "source": "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/startup_lifecycle_572.cpp",
+      "old": "const B low=static_cast<B>(input);",
+      "new": "const B low=input?1:0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "late-active",
+      "source": "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/startup_lifecycle_572.cpp",
+      "old": "if(startup_lifecycle_mode_005de6b8){render_display_texture_update_005550e0();render_display_texture_release_00555440(nullptr);}\n    startup_service_active_0069dd1e=1;",
+      "new": "startup_service_active_0069dd1e=1;\n    if(startup_lifecycle_mode_005de6b8){render_display_texture_update_005550e0();render_display_texture_release_00555440(nullptr);}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "early-pending",
+      "source": "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/startup_lifecycle_572.cpp",
+      "old": "render_display_set_texture_006bd954(0);return;",
+      "new": "render_display_set_texture_006bd954(0);render_texture_pending_006a3a58=value;return;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "late-getter",
+      "source": "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/startup_lifecycle_572.cpp",
+      "old": "render_texture_process_005554b0(texture);\n        std::memcpy(&selected,static_cast<B*>(texture)+0x10,4);",
+      "new": "std::memcpy(&selected,static_cast<B*>(texture)+0x10,4);\n        render_texture_process_005554b0(texture);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "pending-order",
+      "source": "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/startup_lifecycle_572.cpp",
+      "old": "render_display_set_texture_006bd954(selected);\n    render_texture_pending_006a3a58=value;",
+      "new": "render_texture_pending_006a3a58=value;\n    render_display_set_texture_006bd954(selected);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "invalidate",
+      "source": "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/startup_lifecycle_572.cpp",
+      "old": "render_texture_invalidate_00555330();",
+      "new": "/* removed real invalidation */",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
