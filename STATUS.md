@@ -1,27 +1,28 @@
 # Current project status
 
-Updated 2026-11-12. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-13. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run574](iterations/v2/001-original-recovery/runs/574-startup-lifecycle-integration/README.md)
-compiles 319 C++ translation units across 8 projects. The link has 130 unresolved names/
-138 references. **There is no recovered playable C++ game executable yet.**
+[Run576](iterations/v2/001-original-recovery/runs/576-render-texture-scheduler-integration/README.md)
+compiles 321 C++ translation units across 8 projects. The link has 128 unresolved names/
+135 references. **There is no recovered playable C++ game executable yet.**
 
-Run574 adds three partial startup lifecycle originals. Its shared audit passes
-3,520 scenes, 5,760 adapter comparisons and seven mutation controls, with actual
-canonical state and texture transport. Three names close; real005554b0 enters
-and005550e0 remains unresolved. The initialized byte01 is verified. Registry:
-888 entries. Earlier
-creator composition and the raw file-label diagnostic consumer remain open.
+Run576 integrates five partial texture scheduler/process originals. Its shared
+audit passes 808 scenes, 1,032 core/facade comparisons and ten mutation controls.
+The actual scheduler/prepare/notify and release/process chains execute against
+original x86 with controlled driver endpoints. Both targeted names close, with
+120 readonly bytes and four callback bytes verified. Registry893 retains partial
+classifications. Earlier creator composition and diagnostic consumers remain open.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Next: recover the actual005550e0/005554b0 child algorithms. Run569 remains
-unaccepted deferred research. Later draft directories do not supersede accepted
-build metrics. Active
+Run575 native001 and Run576 integration are accepted within their stated bounds.
+Next are reachable texture allocation00554960 and copy00554d70, including the
+original selector/converter dependencies. Run569 remains unaccepted deferred
+research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
 
 Activation4ae010 keeps descriptor bytes22/23 uninitialized and remains partial.

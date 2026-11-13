@@ -1,5 +1,11 @@
 # Отложенные проверки восстановления v2
 
+Run576 accepted frozen575001 texture scheduler/process integration. The run README
+owns the bounded proof. Remaining domains include count>32 stack behavior,
+arbitrary descriptor aliases/stack identity, indirect return use, invalid node
+lifetimes/faults/concurrency and live drivers/startup/gameplay. Next integration
+work traces reachable00554960 allocation and00554d70 copy plus actual children.
+
 Run557:6entries990B(5full+1partial)/1029Bloaderzero;80884nativecases/972332events/
 23controls/767pins PASS.312TUs/132names139refs/noEXE,registry857;4close/5truechildren.
 Activation4ae010PARTIAL:descriptor22/23unwritten/physicallytransported;known26B+
