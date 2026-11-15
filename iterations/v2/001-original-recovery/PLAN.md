@@ -1,33 +1,31 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-16. Run580 shared acceptance passes for frozen579004 on578.
-Build001 compiles325 TUs across8 projects with127 unresolved names/132refs.
-Comparator54310 closes. Registry900 adds two PARTIAL originals567B. README580
-owns exact commands, measured native/production evidence and remaining domains.
-Nativeproof1606new scenes/3912events/7controls,802pins/854canonicalproviders.
-884B original writable data and25host relocations match independent PE/COFF
-checks. Actual577 selector and359bindings compose. FreshREA6.9 dossiers are pinned.
-Frozenpre-proof579PLAN remains a receipt input, currenthandoff is README580.
+Current2026-11-16. Run582 shared audit passes for frozen581005 on580.
+Build001 compiles326TUs/8projects,126names131refs,noEXE. Two namesclose and
+real540500enters. Registry905 adds5PARTIAL originals200B. README582ownscommands,
+measuredproof andbounds. 22native scenes/24transport comparisons/4controls,
+805pins/862canonicalproviders. Exact72B data/sixpointerrelocations areverified.
+Current580closure593files hasno body/data overlap. Missing550/590 indexentries
+have fullrawCFG supplements andregistry body_ranges, which futureaudits mustuse.
 
-Active581 targets five reachable driver-state bodies200B and mutable72B table.
-Luna/medium owns581 scope/source/fixture, root reviews ABI/semantic order and
-will integrate582 afternativeacceptance. Canonical523/359/516950 and69ed0c
-owners are reused. Missing540550/540590 index entries have rawCFG supplements.
-Actual540500 x87handler remains a true unresolved child, adjacent540660/537890
-are deferred. Source rollback/RET4 transport fixes are complete, nativefixture
-review/preflight remains pending. Current581 is unaccepted localwork.
+Run583 native001 nowpasses foractual540500/71B,24scenes/4controls, no newdata.
+Rootsource preserves exactx87 instructions andcallerarg2stack write. Luna used
+canonicaldata fixtureviews; actualgame owners remain515ctx/522scale/GameSetup/
+528exports. Next584intake mustcheck productionnormalized71B byte identity and
+canonicalowners, thenonebuild/audit. The separate583source/config/fixture are
+frozen. Rootowns584integration/registry/publication. Workerassignmentsclosed.
 
-User requested continued recovery until availablelimits. Chain readybatches,
-reportactualstatus aftereachpush and keep thishandoff current. Simplerworkers
-own boundedwork, strongroot owns orchestration/acceptance. Passed579/580 inputs
-are immutable. No replay of blocked547/558/537005 or archive-only569 growth.
+User requested continued recovery until availablelimits. Chainreadybatches,
+reportactualstatus aftereachpush. Simpleworkers own boundedwork, strongroot
+owns orchestration/acceptance. Passed581/582inputs remainimmutable.
 
-Real5350e0 conversion remains open. Scout identified shared64-entry function
-and64-byte matrices005de2fc/005de4fc with25targets, seven notindexed. A broader
-packet needs producer/table/scratch ownership and actualreachable-format scope.
-Do notreplaceit with guessedcallbacks. Existingpartial domains include opaque
-record/enum/alias/fault/lifetime/concurrency, realdriver/heap/TLS/nativeAMD,
-startup/display/menus/careers/gameplay. Historicalcheckpoints follow.
+Real5350e0 conversion remains open. Scout found shared64-entry callback and
+64-byte matrices5de2fc/5de4fc,25targets(sevenunindexed), decoderpaths andunproved
+scratch extent. Establishactualreachableformat/tableownership before a broader
+packet. Do notinventcallbacks. Adjacentdriverconsumers540660/537890 aredeferred.
+Oldopaque record/enum/alias/fault/lifetime/concurrency, realdriver/heap/TLS/
+nativeAMD,startup/display/menus/careers/gameplay remainopen. 547/558/537005
+remainblocked/unaccepted,569deferred. Historicalcheckpoints follow.
 
 Current557,2026-11-09: frozen555001+556004 adds6entries990B(5full+1partial)/
 1029Bloaderzero/0readonly;registry857. SharedauditPASS80884nativecomparisons/

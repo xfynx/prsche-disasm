@@ -12,12 +12,18 @@
 - CodeGraph is optional source navigation; verify its callers and definitions
   against the real source closure. Original semantics still require the binary
   index, REA and native comparison. See docs/research/codegraph-evaluation-2026-11-11.md.
+- Include registry `body_ranges` in overlap checks for manually supplemented
+  entries missing from the main index. Their complete CFG evidence lives beside
+  the source in `original-index-supplement.json`.
 - Batch related functions and proven ABI bindings by subsystem; avoid a new run,
   agent, bespoke runner and audit for every small function. Do not enlarge a
   passed batch just to improve its count; put later work in the next batch.
 - Reuse native harnesses, shared manifest/hash caches and manifest-driven REA.
   Add only the new oracle/case logic. New general tooling must replace repeated
   work immediately; do not pause recovery for a broad framework rewrite.
+- Prefer neutral labels for generated test executables. Run581 observed
+  WinError740 with an unmanifested name containing `dispatch`/`patch`.
+  Inspect launch errors separately from antivirus detections and preserve attempts.
 - Keep original comparisons and required checks. Reuse unchanged accepted proof;
   build/audit integration once per batch. Repeat only for changed inputs, failures
   or a specific unresolved concern. Generated JSON is an artifact, not prose to

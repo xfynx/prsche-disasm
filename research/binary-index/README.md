@@ -1,5 +1,10 @@
 # Индекс оригинальных бинарников
 
+Run582 adds [complete raw CFG supplements](../../iterations/v2/001-original-recovery/runs/581-render-driver-state/original-index-supplement.json)
+for callback00540550/49B and00540590/41B, which the main Ghidra inventory missed.
+Their relocation-table provenance, all exits and exact bytes are pinned. Registry
+body_ranges retain their occupied intervals for future interior-overlap checks.
+
 Run557: [pan/weight511B](../../iterations/v2/001-original-recovery/runs/555-audio-backend-finalize/scope-evidence.json)
 and [lifecycle479B](../../iterations/v2/001-original-recovery/runs/556-application-audio-lifecycle/scope-evidence.json)
 pin actual6b181f preceding-byte access/1025Bloaderzero and4B655d30. [Intake](../../iterations/v2/001-original-recovery/runs/557-audio-lifecycle-integration/README.md)

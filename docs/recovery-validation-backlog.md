@@ -1,5 +1,11 @@
 # Отложенные проверки восстановления v2
 
+Run582 accepts five bounded driver-state bodies with controlled359/523 endpoints
+and actual516950 no-op, originalRET4/cdecl transports andlate table changes.
+Real540500 remains unresolved in this build. Its separate583native proof awaits
+584intake. Service/contextproducer, alias/fault/lifetime/concurrency/live-driver
+andfullgame acceptance remainopen. Adjacent540660/537890 staydeferred.
+
 Run580 accepts comparator54310/state-probe54530 within admitted18-format and
 9-palette domains, actual577selector andcontrolleddriver state. Preference
 payload gaps retain rawbytes. Record/enum extensions, arbitraryalias/fault/

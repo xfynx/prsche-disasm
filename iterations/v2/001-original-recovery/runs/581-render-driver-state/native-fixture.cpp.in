@@ -1,0 +1,156 @@
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "render_driver_state_581.hpp"
+#include "render_buffer_523.hpp"
+#include "porsche/game_setup.hpp"
+#include "porsche/render_settings.hpp"
+#include "porsche/render_loader.hpp"
+#include "porsche/startup_service_516950.hpp"
+using U=std::uint32_t; using B=std::uint8_t; using TestCallback=void(__cdecl*)(U,U); using namespace porsche;
+static U state[512],reject_key=0xffffffffu,reject_remaining=0,rollback_overwrite=0,event_count=0;
+struct Event {U kind,a,b;}; static Event events[64];
+static void event(U k,U a,U b){if(event_count<64)events[event_count++]={k,a,b};}
+namespace porsche {
+U render_thrash_exports_006bd910[43]{};
+void* game_setup_movie_service_0069ed0c=nullptr;
+void __cdecl render_driver_x87_handler_00540500(U key,U value){event(5,key,value);}
+U __stdcall render_settings_get_state_006bd984(U key){event(1,key,state[key&511]);return state[key&511];}
+U __stdcall render_settings_set_state_006bd97c(U key,U value){event(2,key,value);if(key==reject_key&&reject_remaining){--reject_remaining;return 0;}if(rollback_overwrite&&key==reject_key){render_driver_state_pairs_005ded30[1]=0xeeeeeeeeu;rollback_overwrite=0;}state[key&511]=value;return 1;}
+U __cdecl render_buffer_state_00540480(U key,U value){return render_settings_set_state_006bd97c(key,value);}
+}
+static U ptr(const void*p){return reinterpret_cast<U>(p);}
+static U word(const void*p,U o=0){U v;std::memcpy(&v,static_cast<const B*>(p)+o,4);return v;}
+static void put(void*p,U o,U v){std::memcpy(static_cast<B*>(p)+o,&v,4);}
+static U cases=0; static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s case=%u\n",why,cases);std::fflush(stdout);ExitProcess(1);}}
+static void* code[5];
+struct Fpu {unsigned short control,status;B tag,padding[3],values[80];unsigned short full_tag;U mxcsr;};
+alignas(16) static B floating[512]; static Fpu current_fpu,saved_fpu; static U saved_state[512];
+static void capture(Fpu& f){B env[28];__asm {
+ fxsave floating
+ fnstenv env
+ fldenv env
+ }
+ f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];std::memset(f.padding,0,3);f.full_tag=*reinterpret_cast<unsigned short*>(env+8);f.mxcsr=*reinterpret_cast<U*>(floating+24);
+ for(U i=0;i<8;i++){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))std::memcpy(f.values+i*10,floating+32+i*16,10);else std::memset(f.values+i*10,0,10);}}
+static void seed_fpu(){unsigned short cw=0x007f;U mxcsr=0x9f80;__asm {
+ fninit
+ fldcw cw
+ ldmxcsr mxcsr
+ fld1
+ fldpi
+ }}
+static U invoke(void* fn,void* receiver,U ambient_edx,const U* args,U count,U cleanup,U& result){U before,frame,fail=0,result_value;__asm {
+ push ebx
+ push esi
+ push edi
+ mov before,esp
+ mov frame,ebp
+ mov eax,count
+ mov edx,args
+ pushargs:test eax,eax
+ jz pushed
+ dec eax
+ push dword ptr [edx+eax*4]
+ jmp pushargs
+pushed:mov ecx,receiver
+ mov edx,ambient_edx
+ mov ebx,13579bdfh
+ mov esi,2468ace0h
+ mov edi,10203040h
+ call fn
+ mov result_value,eax
+ add esp,cleanup
+ cmp esp,before
+ jne bad
+ cmp ebp,frame
+ jne bad
+ cmp ebx,13579bdfh
+ jne bad
+ cmp esi,2468ace0h
+ jne bad
+ cmp edi,10203040h
+ je done
+bad:mov fail,1
+done:mov esp,before
+ pop edi
+ pop esi
+ pop ebx
+ }
+ result=result_value;return fail;}
+static void set_abs(B* p,U n,U old,const void* to,U expected){U found=0;for(U i=0;i+4<=n;i++)if(word(p,i)==old){put(p,i,ptr(to));++found;i+=3;}require(found==expected,"absolute relocation count");}
+static void set_rel(B* p,U n,U va,U target,const void* to,U expected){U found=0;for(U i=0;i+5<=n;i++)if(p[i]==0xe8&&va+i+5+word(p,i+1)==target){put(p,i+1,ptr(to)-ptr(p+i+5));++found;i+=4;}require(found==expected,"relative relocation count");}
+static const B body_538af0[]={@BODY_00538AF0@};
+static const B body_537850[]={@BODY_00537850@};
+static const B body_405c0[]={@BODY_005405C0@};
+static const B body_40550[]={@BODY_00540550@};
+static const B body_40590[]={@BODY_00540590@};
+static const B original_state_packet_005ded30[]={@RAW_STATE_PACKET@};
+static void verify_original_data(){
+ require(std::memcmp(render_driver_state_pairs_005ded30,original_state_packet_005ded30,48)==0,"original pair initializer bytes");
+ const U targets[]={0x005405c0,0x00540480,0x00540550,0x00540590,0x00540500,0x00516950};
+ for(U i=0;i<6;i++)require(word(original_state_packet_005ded30,48+i*4)==targets[i],"original callback raw VA");
+ const TestCallback expected[]={&render_driver_commit_state_005405c0,reinterpret_cast<TestCallback>(&render_buffer_state_00540480),&render_driver_select_state_00540550,&render_driver_set_movie_state_00540590,reinterpret_cast<TestCallback>(&render_driver_x87_handler_00540500),reinterpret_cast<TestCallback>(&startup_service_noop_00516950)};
+ for(U i=0;i<6;i++)require(render_driver_state_callbacks_005ded60[i]==expected[i],"default C++ callback target");
+}
+static void prepare_code(){const B* bodies[]={body_538af0,body_537850,body_405c0,body_40550,body_40590};const U sizes[]={sizeof body_538af0,sizeof body_537850,sizeof body_405c0,sizeof body_40550,sizeof body_40590};
+ require(sizeof original_state_packet_005ded30==72,"original data witness extent");
+ for(U i=0;i<5;i++){code[i]=VirtualAlloc(nullptr,4096,0x3000,0x40);require(code[i]!=nullptr,"executable raw body allocation");std::memcpy(code[i],bodies[i],sizes[i]);}
+ set_abs((B*)code[0],sizes[0],0x5ded30,render_driver_state_pairs_005ded30,1);set_abs((B*)code[0],sizes[0],0x5ded60,render_driver_state_callbacks_005ded60,1);set_abs((B*)code[0],sizes[0],0x5ded78,render_driver_state_callbacks_005ded60+6,1);
+ set_rel((B*)code[1],sizes[1],0x537850,0x540480,(void*)&render_buffer_state_00540480,1);
+ set_abs((B*)code[2],sizes[2],0x6bd984,&render_thrash_exports_006bd910[29],1);set_abs((B*)code[2],sizes[2],0x6bd97c,&render_thrash_exports_006bd910[27],2);set_abs((B*)code[2],sizes[2],0x5ded34,&render_driver_state_pairs_005ded30[1],1);
+ set_abs((B*)code[3],sizes[3],0x6bd97c,&render_thrash_exports_006bd910[27],3);
+ set_abs((B*)code[4],sizes[4],0x6bd97c,&render_thrash_exports_006bd910[27],2);set_abs((B*)code[4],sizes[4],0x69ed0c,&game_setup_movie_service_0069ed0c,1);
+ render_thrash_exports_006bd910[27]=ptr((void*)&render_settings_set_state_006bd97c);render_thrash_exports_006bd910[29]=ptr((void*)&render_settings_get_state_006bd984);
+}
+static void reset(){std::memset(state,0,sizeof state);event_count=0;reject_key=0xffffffffu;reject_remaining=rollback_overwrite=0;for(U i=0;i<12;i++)render_driver_state_pairs_005ded30[i]=0;}
+static void invoke_checked(void* fn,void* ecx,void* edx,const U* a,U n,U clean){U result;seed_fpu();require(invoke(fn,ecx,ptr(edx),a,n,clean,result)==0,"ABI stack/callee-save");capture(current_fpu);}
+static bool invoke_checked_movie_boundary(void* fn,const U* a){__try {invoke_checked(fn,nullptr,nullptr,a,2,8);return true;}__except(EXCEPTION_EXECUTE_HANDLER){return false;}}
+static bool same(const Event* a,U ac,const Event*b,U bc){return ac==bc&&std::memcmp(a,b,ac*sizeof(Event))==0;}
+static void check_events(const Event* old,U n){require(same(old,n,events,event_count),"calls/arguments/order");}
+static TestCallback saved_callbacks[6];
+static Event saved_events[64]; static U saved_count;
+static U oldpairs[12];
+static void snapshot(){saved_count=event_count;std::memcpy(saved_events,events,event_count*sizeof(Event));std::memcpy(saved_state,state,sizeof state);std::memcpy(oldpairs,render_driver_state_pairs_005ded30,48);std::memcpy(saved_callbacks,render_driver_state_callbacks_005ded60,sizeof saved_callbacks);saved_fpu=current_fpu;}
+static void compare_finish(const U* expected_pairs,const Event* oldevents,U oldcount){require(std::memcmp(expected_pairs,render_driver_state_pairs_005ded30,48)==0,"mutable pair state");require(std::memcmp(saved_state,state,sizeof state)==0,"final state array");require(std::memcmp(&saved_fpu,&current_fpu,sizeof current_fpu)==0,"x87/MXCSR seeded-state control");check_events(oldevents,oldcount);}
+static void completed_scene(){++cases;}
+static void __cdecl mutate4(U key,U value);
+static void __cdecl mutate0(U key,U value){event(10,key,value);render_driver_state_pairs_005ded30[4]=0x31;render_driver_state_pairs_005ded30[5]=0x32;render_driver_state_callbacks_005ded60[3]=reinterpret_cast<void(__cdecl*)(U,U)>(&mutate4);}
+static void __cdecl mutate1(U key,U value){event(11,key,value);}
+static void __cdecl mutate2(U key,U value){event(12,key,value);}
+static void __cdecl mutate3(U key,U value){event(13,key,value);}
+static void __cdecl mutate4(U key,U value){event(14,key,value);}
+static void __cdecl mutate5(U key,U value){event(15,key,value);}
+static void test_dispatch(){
+ const U initial[]={1,2,3,4,5,6,7,8,9,10,11,12};
+ const TestCallback callbacks[]={mutate0,mutate1,mutate2,mutate3,mutate4,mutate5};
+ std::memcpy(render_driver_state_pairs_005ded30,initial,sizeof initial);std::memcpy(render_driver_state_callbacks_005ded60,callbacks,sizeof callbacks);reset();std::memcpy(render_driver_state_pairs_005ded30,initial,sizeof initial);std::memcpy(render_driver_state_callbacks_005ded60,callbacks,sizeof callbacks);
+ invoke_checked(code[0],(void*)0x11223344,(void*)0x55667788,nullptr,0,0);snapshot();
+ std::memcpy(render_driver_state_pairs_005ded30,initial,sizeof initial);std::memcpy(render_driver_state_callbacks_005ded60,callbacks,sizeof callbacks);reset();std::memcpy(render_driver_state_pairs_005ded30,initial,sizeof initial);std::memcpy(render_driver_state_callbacks_005ded60,callbacks,sizeof callbacks);
+ invoke_checked((void*)&render_driver_apply_states_00538af0,(void*)0xaabbccdd,(void*)0x88776655,nullptr,0,0);
+ compare_finish(oldpairs,saved_events,saved_count);require(std::memcmp(saved_callbacks,render_driver_state_callbacks_005ded60,sizeof saved_callbacks)==0,"late callback reload");completed_scene();
+}
+static void test_original_table(){
+ const U initial[]={6,1,10,2,56,0,2,0,24,0,0,0};
+ const TestCallback original[]={reinterpret_cast<TestCallback>(code[2]),reinterpret_cast<TestCallback>(&render_buffer_state_00540480),reinterpret_cast<TestCallback>(code[3]),reinterpret_cast<TestCallback>(code[4]),reinterpret_cast<TestCallback>(&render_driver_x87_handler_00540500),reinterpret_cast<TestCallback>(&startup_service_noop_00516950)};
+ B service[8]{},service_node[8]{},service_state[32]{};put(service,0,ptr(service_node));put(service_node,4,ptr(service_state));put(service_state,0x10,0xface1234);game_setup_movie_service_0069ed0c=service;
+ reset();std::memcpy(render_driver_state_pairs_005ded30,initial,sizeof initial);std::memcpy(render_driver_state_callbacks_005ded60,original,sizeof original);state[6]=0x7777;reject_key=6;reject_remaining=1;invoke_checked(code[0],(void*)0x12344321,(void*)0xdeadbeef,nullptr,0,0);snapshot();
+ reset();std::memcpy(render_driver_state_pairs_005ded30,initial,sizeof initial);render_driver_state_callbacks_005ded60[0]=&render_driver_commit_state_005405c0;render_driver_state_callbacks_005ded60[1]=reinterpret_cast<TestCallback>(&render_buffer_state_00540480);render_driver_state_callbacks_005ded60[2]=&render_driver_select_state_00540550;render_driver_state_callbacks_005ded60[3]=&render_driver_set_movie_state_00540590;render_driver_state_callbacks_005ded60[4]=&render_driver_x87_handler_00540500;render_driver_state_callbacks_005ded60[5]=reinterpret_cast<TestCallback>(&startup_service_noop_00516950);state[6]=0x7777;reject_key=6;reject_remaining=1;invoke_checked((void*)&render_driver_apply_states_00538af0,(void*)0xaabbccdd,(void*)0x88776655,nullptr,0,0);compare_finish(oldpairs,saved_events,saved_count);completed_scene();
+}
+int main(){verify_original_data();prepare_code();test_dispatch();test_original_table();
+ // Individual cdecl2 state callback, including rejected-set rollback and final pair write.
+ U args[2]={6,0x1234};reset();state[6]=0x7788;reject_key=6;reject_remaining=1;invoke_checked(code[2],nullptr,nullptr,args,2,8);snapshot();reset();state[6]=0x7788;reject_key=6;reject_remaining=1;invoke_checked((void*)&render_driver_commit_state_005405c0,nullptr,nullptr,args,2,8);compare_finish(oldpairs,saved_events,saved_count);completed_scene();
+ // Successful set does not restore or write the original pair value.
+ reset();render_driver_state_pairs_005ded30[1]=0x9090;state[6]=0x7788;invoke_checked(code[2],nullptr,nullptr,args,2,8);snapshot();reset();render_driver_state_pairs_005ded30[1]=0x9090;state[6]=0x7788;invoke_checked((void*)&render_driver_commit_state_005405c0,nullptr,nullptr,args,2,8);compare_finish(oldpairs,saved_events,saved_count);completed_scene();
+ // Rollback callback overwrites pair[1]; the original final store wins.
+ reset();render_driver_state_pairs_005ded30[1]=0x9090;state[6]=0x7788;reject_key=6;reject_remaining=1;rollback_overwrite=1;invoke_checked(code[2],nullptr,nullptr,args,2,8);snapshot();reset();render_driver_state_pairs_005ded30[1]=0x9090;state[6]=0x7788;reject_key=6;reject_remaining=1;rollback_overwrite=1;invoke_checked((void*)&render_driver_commit_state_005405c0,nullptr,nullptr,args,2,8);compare_finish(oldpairs,saved_events,saved_count);require(render_driver_state_pairs_005ded30[1]==0x7788,"rollback final pair store wins");completed_scene();
+ // Special and ordinary 00540550 branches.
+ for(U i=0;i<2;i++){args[0]=i?0x2a:0xdeadbeef;args[1]=i?9:0xffffffffu;reset();invoke_checked(code[3],nullptr,nullptr,args,2,8);snapshot();reset();invoke_checked((void*)&render_driver_select_state_00540550,nullptr,nullptr,args,2,8);compare_finish(oldpairs,saved_events,saved_count);completed_scene();}
+ // 00540590 false and valid nested-service branches.
+ for(U i=0;i<2;i++){B a[8]{},b[8]{},c[32]{};put(a,0,ptr(b));put(b,4,ptr(c));put(c,16,0xface1234);game_setup_movie_service_0069ed0c=a;args[0]=0;args[1]=i;reset();require(invoke_checked_movie_boundary(code[4],args),"original movie branch fault");snapshot();reset();require(invoke_checked_movie_boundary((void*)&render_driver_set_movie_state_00540590,args),"candidate movie branch fault");compare_finish(oldpairs,saved_events,saved_count);require(state[2]==(i?0xface1234:0),"movie nested value");completed_scene();}
+ args[0]=0;args[1]=0;game_setup_movie_service_0069ed0c=nullptr;reset();require(invoke_checked_movie_boundary(code[4],args),"original null-global disabled branch fault");snapshot();reset();require(invoke_checked_movie_boundary((void*)&render_driver_set_movie_state_00540590,args),"candidate null-global disabled branch fault");compare_finish(oldpairs,saved_events,saved_count);completed_scene();
+ // 00537850 original thiscall/ret4 versus both exact-core and cdecl linker facade.
+ {B old[32]{},cur[32]{},facade[32]{};args[0]=0xaabbccdd;reset();invoke_checked(code[1],old,(void*)0x11223344,args,1,0);snapshot();require(word(old,8)==args[0],"original finish object field");reset();invoke_checked((void*)&render_display_finish_driver_core_00537850,cur,(void*)0x12345678,args,1,0);require(word(cur,8)==args[0],"core finish object field");compare_finish(oldpairs,saved_events,saved_count);U facade_args[2]={ptr(facade),args[0]};reset();invoke_checked((void*)&render_display_finish_driver_00537850,nullptr,nullptr,facade_args,2,8);require(word(facade,8)==args[0],"cdecl facade object field");compare_finish(oldpairs,saved_events,saved_count);completed_scene();}
+ std::printf("render_driver_state_original_x86_vs_cpp=PASS cases=%u\n",cases);return 0;
+}

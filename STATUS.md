@@ -4,24 +4,24 @@ Updated 2026-11-16. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run580](iterations/v2/001-original-recovery/runs/580-texture-comparator-integration/README.md)
-compiles 325 C++ translation units across 8 projects. The link has 127 unresolved names/
-132 references. **There is no recovered playable C++ game executable yet.**
+[Run582](iterations/v2/001-original-recovery/runs/582-driver-state-integration/README.md)
+compiles 326 C++ translation units across 8 projects. The link has 126 unresolved names/
+131 references. **There is no recovered playable C++ game executable yet.**
 
-Run580 integrates two partial comparator/state-probe originals. Its shared audit
-passes 1,606 new scenes and seven mutation controls, with actual selector and
-canonical driver bindings. The comparator name closes. All 884 new data bytes
-and 25 pointer relocations match the original evidence. Registry900 retains partial
-classifications. Real depth conversion, broader driver behavior and earlier
-parent domains remain open.
+Run582 integrates five partial driver-state originals. Its shared audit passes
+22 scenes and four controls, including original RET4 and host calling transports,
+rollback ordering and late mutable table loads. Two names close and real x87
+callback540500 enters. The 72-byte state packet and six relocations are verified.
+Registry905 retains partial classifications. Depth conversion, live driver and
+earlier parent domains remain open.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run579 native004 and Run580 integration are accepted within their stated bounds.
-Run581's reachable driver-state packet is in progress, with five bodies and
-a 72-byte mutable state table. Its native fixture remains unaccepted. Run569 remains unaccepted deferred
+Run581 native005 and Run582 integration are accepted within their stated bounds.
+Run583 has separate native proof for540500 and awaits production integration584.
+Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
 

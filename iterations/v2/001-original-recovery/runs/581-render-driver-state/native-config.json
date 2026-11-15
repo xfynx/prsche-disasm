@@ -1,0 +1,101 @@
+{
+  "run": 581,
+  "experiment": "local/experiments/v2-render-driver-state-581",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/581-render-driver-state/render_driver_state_581.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/startup_service_516950.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/581-render-driver-state/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/581-render-driver-state",
+    "iterations/v2/001-original-recovery/runs/523-render-resource-buffer",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/581-render-driver-state/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/581-render-driver-state/original-index-supplement.json",
+    "iterations/v2/001-original-recovery/runs/581-render-driver-state/scope-inspect.py",
+    "iterations/v2/001-original-recovery/runs/581-render-driver-state/prepare.py",
+    "iterations/v2/001-original-recovery/runs/581-render-driver-state/render_driver_state_581.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "00538af0",
+      "bytes": 41,
+      "sha256": "cc6aae02d0be2b8fd99d764fa8d2f1e5ba5fb9094188058068443169ebfe1b29",
+      "token": "@BODY_00538AF0@"
+    },
+    {
+      "va": "00537850",
+      "bytes": 21,
+      "sha256": "c7fd6aaab774b7d5d773bee7e36897d3963a76bd065f77e0e839a98f20779090",
+      "token": "@BODY_00537850@"
+    },
+    {
+      "va": "005405c0",
+      "bytes": 48,
+      "sha256": "7a117cd597e55d954e116dfb07ca97b7f3db1cabe252997a31989275406a8e5a",
+      "token": "@BODY_005405C0@"
+    },
+    {
+      "va": "00540550",
+      "bytes": 49,
+      "sha256": "fda8f58d9dfa66e036708a487df42456550576bd215e0c012313c319c3783d44",
+      "token": "@BODY_00540550@"
+    },
+    {
+      "va": "00540590",
+      "bytes": 41,
+      "sha256": "8b1abf7f6cbb29052b4d3f4a758046defac6e5c70b6ee32bff1062ab183fbe6e",
+      "token": "@BODY_00540590@"
+    },
+    {
+      "va": "005ded30",
+      "bytes": 72,
+      "sha256": "7963caa7b1ceef02798e3487c94c91c5bbae638c3c9bf38b3fdaefec2d07eae2",
+      "token": "@RAW_STATE_PACKET@",
+      "kind": "original-data-witness"
+    }
+  ],
+  "pass_marker": "render_driver_state_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "omit-rejected-state-rollback",
+      "source": "iterations/v2/001-original-recovery/runs/581-render-driver-state/render_driver_state_581.cpp",
+      "old": "(void)render_buffer_state_00540480(key, previous);",
+      "new": "/* omitted original rejected-state rollback */",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-final-callback",
+      "source": "iterations/v2/001-original-recovery/runs/581-render-driver-state/render_driver_state_581.cpp",
+      "old": "for (U i = 0; i != 6; ++i)",
+      "new": "for (U i = 0; i != 5; ++i)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "invert-movie-enabled-branch",
+      "source": "iterations/v2/001-original-recovery/runs/581-render-driver-state/render_driver_state_581.cpp",
+      "old": "if (enabled == 1)",
+      "new": "if (enabled == 0)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "remove-550-special-branch",
+      "source": "iterations/v2/001-original-recovery/runs/581-render-driver-state/render_driver_state_581.cpp",
+      "old": "if (value == 0xffffffffu)",
+      "new": "if (value != 0xffffffffu)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ],
+  "extra_libraries": [
+    "uuid.lib"
+  ]
+}
