@@ -19,16 +19,17 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run576](iterations/v2/001-original-recovery/runs/576-render-texture-scheduler-integration/README.md).
-Five partial texture scheduler/process originals close two reachable names.
-The shared build compiles321 TUs with128 unresolved names/135 references.
+Latest recovery intake is [Run578](iterations/v2/001-original-recovery/runs/578-texture-transfer-integration/README.md).
+Five partial texture allocation/transfer originals close two reachable names
+and expose the original comparator and depth-conversion children.
+The shared build compiles 323 TUs with 128 unresolved names/133 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are reachable texture allocation00554960 and copy00554d70 with their
-original selector/converter dependencies. Broader
+Next are comparator00554310 and its child00554530, followed by the real
+depth-conversion dependency005350e0. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;
 Run558 periodic transport and external heap-slot

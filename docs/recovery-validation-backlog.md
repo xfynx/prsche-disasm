@@ -1,5 +1,11 @@
 # Отложенные проверки восстановления v2
 
+Run578 accepts frozen577005 allocation/transfer within its bounded proof.
+Real comparator54310, depth conversion5350e0, heap/driver producers and broad
+alias/fault/lifetime/concurrency domains remain open. Expansion includes the
+compiler vector path, all byte values and counts through512 bytes. Next trace
+54310/54530 and establish original preference-table ownership before integration.
+
 Run576 accepted frozen575001 texture scheduler/process integration. The run README
 owns the bounded proof. Remaining domains include count>32 stack behavior,
 arbitrary descriptor aliases/stack identity, indirect return use, invalid node

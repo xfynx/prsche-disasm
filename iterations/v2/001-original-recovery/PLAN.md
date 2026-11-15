@@ -1,40 +1,41 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-13. Run576 shared acceptance PASS integrates frozen575001 on574.
-Build001 compiles321 TUs across8 projects with128 unresolved names/135 references.
-Both reachable texture scheduler/process names close. Registry893 adds five
-PARTIAL originals1111B. Run576 README owns commands, evidence and bounded results.
+Current 2026-11-16. Run578 shared acceptance passes for frozen577005 on576.
+The build compiles 323 TUs across 8 projects with 128 unresolved names and
+133 references. Two reachable names close and real comparator54310/depth
+conversion5350e0 enter. Registry898 adds five PARTIAL originals covering995B.
+Run578 README owns exact commands, measured results and remaining domains.
 
-Run575 native001 passes808 scenes/1032 core-facade comparisons/2898 events and
-10 mutation controls atOd/O2. Actual scheduler/prepare/notify and canonical572
-release/process chains compose. Production retains seven unique definitions,
-nine canonical dependencies, exact120B readonly messages and4B loaderzero
-callback006a3a50. Shared audit verifies792 pins/836 canonical providers.
-Counts0..32, late callback/table/field effects, captured flags, descriptor words,
-used integer returns, ABI and one seeded fullFP state are compared. Broader
-count/alias/fault/lifetime/concurrency, stack descriptor identity, indirect EAX,
-live driver and full startup/gameplay remain open. Parent semantic dependency
-classifications remain partial. Passed575/576 inputs are frozen.
+Native005 passes 698 scenes/332 events and eight controls atOd/O2. Existing546
+allocation and521 format helpers compose with the new selector/conversion
+wrapper/expansion. Long-buffer cases cover the compiler vector loop. Production
+has8 definitions including two4B original state cells and16B compiler readonly
+mask, ten unique canonical dependencies,797 pins and844 listed providers.
+The cached469 REA dossiers and raw PE/ABI evidence are retained. Existing parent
+classifications remain partial. Passed577/578 inputs are frozen.
 
-Next packet targets reachable allocation00554960(363B,cdecl6 pointerEAX) and
-copy00554d70(107B,cdecl3), traced from startup00467cdc and indexed callers.
-Reuse cached469 REA and canonical546 helpers/537/540/543 texture state. Real
-children are selector00554820 and converter005556b0. Before new code, census
-current576 closure/registry for callback-adjacent DWORD006a3a54 and comparator
-pointer005df2c8(original00554310). Preserve original allocation name-write before
-null test and driver-pointer write before dimension checks. Sol read-only scout
-is complete. There are no active worker assignments. Coordinator owns publication.
+The interrupted fixture resumed on Luna/medium. Include/fixture failures in
+001/002/004 are preserved,003 remains the earlier scalar proof,005 is final.
+Production source was unchanged during fixture repair. One shared build and
+one final audit were used. The strong coordinator owns acceptance/publication.
+There are no active worker assignments. The user model policy now defaults
+bounded work to a simpler worker, with strong orchestration in AGENTS/docsagents.
 
-First-executable priority in AGENTS applies. Reuse accepted proof and shared
-native/build/audit tooling. MSBuild uses established elevation with node reuse
-disabled. Stage explicit paths, verify staged/native raw bytes and report status
-after every push. Original local/game and passed inputs remain immutable.
+Next packet traces comparator00554310(529B) and child00554530(38B), reusing577
+pointer owners006a3a54/005df2c8 and current canonical driver settings wrappers.
+Census all original preference pointer/data spans and BSS targets before adding
+owners. The005df15c stride20 record layout includes canonical546 sparse bit-depth
+DWORDs, so preserve that owner while recovering other fields. Actual depth
+conversion005350e0 remains a separate real frontier. Use current578 closure and
+registry before implementation. Bounded aliases/faults/lifetimes/concurrency,
+real driver/heap/comparator/depth, startup/display/menus/careers/gameplay remain open.
 
-Run566 remains unreferenced archive intake. Run569 is unaccepted/deferred with
-15compile receipts/zero nativecases. Draw534540 descriptor5de680 overlaps6ac.
-547/558/537005 remain blocked/unaccepted. Earlier561two-live-slot, descriptor22/23,
-constructor/metric partials, nativeAMD3DNow, realstreams/TLS, startup/display,
-menus/careers/gameplay remain open. Historical checkpoints follow.
+First-executable priority applies. Reuse accepted proof and shared tools. Stage
+explicit paths, verify staged/native raw bytes and report status after every push.
+Original local/game and passed inputs remain immutable. Run566 is unreferenced
+archive intake,569 is unaccepted/deferred,547/558/537005 remain blocked/unaccepted.
+Earlier descriptor22/23,constructor/metric and561two-live-slot domains remain open.
+Historical checkpoints follow.
 
 Current557,2026-11-09: frozen555001+556004 adds6entries990B(5full+1partial)/
 1029Bloaderzero/0readonly;registry857. SharedauditPASS80884nativecomparisons/

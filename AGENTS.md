@@ -28,6 +28,9 @@
 - Usually use 1–2 workers on independent module batches. Start new agents with
   compact context and file ownership, not the full conversation. Use adequate
   model/effort; reserve stronger reasoning for ambiguous reverse engineering.
+- User decision (2026-11-16) keeps orchestration and final acceptance on a strong
+  model. Default bounded execution, fixture repair and routine implementation to
+  a simpler worker model. Escalate a concrete ambiguity after two failed attempts.
 - Prioritize closing real game dependencies and verified subsystem integration.
   Fidelity, provenance, immutable originals and explicit unresolved boundaries
   remain mandatory; reducing paperwork does not permit guessed implementations.

@@ -15,16 +15,16 @@
 Активный клиент может использовать другой формат профилей и способ делегирования.
 Сохранять роли и правила, не требовать совместимости с Codex/OpenAI API.
 
-## Предпочтение проекта: 2026-10-27
+## Current model preference, 2026-11-16
 
-- GPT-6.1 Sol, обычно `high`: координатор, обычный реверс, интеграция и приёмка.
-- GPT-6.1 Terra: визуальные проверки, computer-use и небольшие исправления с
-  ясными входами и проверяемым результатом, когда эти задачи действительно нужны.
-- Сложную неоднозначность после двух неудачных попыток передавать координатору;
-  Astra использовать для конкретного блокера при необходимости.
-- Это распределение по характеру задач, не измеренное преимущество Sol/Terra
-  в этом репозитории. Не обещать скорость, экономию или расход лимита без замера;
-  при недоступности модели выбирать достаточного доступного исполнителя.
+- A strong model coordinates scope, resolves original-code ambiguities and owns
+  final acceptance. Sol/high is sufficient for the established recovery workflow.
+- Use a simpler worker for bounded implementation, fixture repair and execution.
+  The current batch uses GPT-6 Luna/medium with compact context and file ownership.
+- Escalate a concrete ambiguity after two failed attempts. Reserve Astra for a
+  blocker that needs stronger reasoning.
+- Select the smallest adequate available model. Speed and limit savings require
+  measurement before making quantitative claims.
 
 ## Назначать по сложности, а не по названию файла
 

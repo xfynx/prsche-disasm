@@ -1,0 +1,20 @@
+{
+  "status": "PENDING_NATIVE_PROOF",
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "index": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl and calls.jsonl",
+  "raw_body_evidence": "iterations/v2/001-original-recovery/runs/577-render-texture-transfer/scope-evidence.json",
+  "bodies": [
+    {"va": "00554820", "bytes": 255, "sha256": "9bafed20123fa9b7df23a9ab2df5e5c0b4b00289bf8358a9ef3e3c942ed1bda4", "abi": "cdecl two pointer words, signed EAX"},
+    {"va": "005556b0", "bytes": 205, "sha256": "e95433928eb266d7cd54f4f0b0b6325dc36bd6a4d4ec4782c680a4679f714030", "abi": "cdecl nine words, unused EAX"},
+    {"va": "00555780", "bytes": 65, "sha256": "0142d25f13dbc56adb8380f341e38333326130b7d919fe44433536278852d3a6", "abi": "cdecl destination, source, signed byte count; unused EAX"}
+  ],
+  "observations": [
+    "Selector calls mutable slot 005df2c8; original file bytes 10435500 point to 00554310. The host slot is initialized by relocation to the actual unresolved comparator symbol, never an integer VA.",
+    "Selector obtains cached 006a3a54 through 006bd934 when null. It captures palette bound per candidate, reloads cached driver after each comparator, uses signed score and strict less-than against 10000, and writes both selected words when applicable.",
+    "Converter masks bits 8..11 from each format; low 32 bits of byte count times eight undergo signed IDIV by the format bit count. On a zero result from 005350e0 it expands 8 to 7, or copies data and optional 1024-byte palette for equal masked formats.",
+    "00555780 uses arithmetic right shift of signed byte count and emits a word formed by the input byte and its low nibble replicated twice."
+  ],
+  "ownership": "See scope-evidence.json full 576 source/header closure and registry interval census. 006a3a54 is owned by the parent; 005df2c8 is owned here. 546 provides first DWORDs of the original format records for admitted indices 0..13.",
+  "boundaries": ["00554310 and 005350e0 remain true unresolved algorithms, not fixture substitutes in the game graph", "format index outside 0..13, faults, arbitrary aliases and live driver behavior are not proven", "shared native original comparison, ABI and mutation controls are pending"]
+}
