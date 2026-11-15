@@ -1,5 +1,11 @@
 # Отложенные проверки восстановления v2
 
+Run580 accepts comparator54310/state-probe54530 within admitted18-format and
+9-palette domains, actual577selector andcontrolleddriver state. Preference
+payload gaps retain rawbytes. Record/enum extensions, arbitraryalias/fault/
+lifetime/concurrency andlive-driver/startup/gameplay remainopen. Next581 packet
+keeps true540500 x87child and adjacent540660/537890 outside currentacceptance.
+
 Run578 accepts frozen577005 allocation/transfer within its bounded proof.
 Real comparator54310, depth conversion5350e0, heap/driver producers and broad
 alias/fault/lifetime/concurrency domains remain open. Expansion includes the

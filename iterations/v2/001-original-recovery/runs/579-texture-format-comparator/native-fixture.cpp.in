@@ -1,0 +1,426 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "render_slot_reset_543.hpp"
+#include "startup_service_570.hpp"
+#include "startup_lifecycle_572.hpp"
+#include "render_texture_transfer_577.hpp"
+#include "texture_children_577.hpp"
+#include "render_format_comparator_579.hpp"
+#include "format_preferences_579.hpp"
+#include "porsche/render_settings.hpp"
+#include "render_resource_allocation_546.hpp"
+#include "texture_process_575.hpp"
+#include "porsche/render_display.hpp"
+#include "porsche/files.hpp"
+#include "porsche/process_exit.hpp"
+#include <cstdlib>
+#include "porsche/render_loader.hpp"
+#include "porsche/application_heap_state.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/file_device.hpp"
+using U=std::uint32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U word(const void* p,U o=0){U v;memcpy(&v,static_cast<const B*>(p)+o,4);return v;}
+static void put(void* p,U o,U v){memcpy(static_cast<B*>(p)+o,&v,4);}
+static U cases,events_total,kind,flags,offset,value,precision,rounding,depth,initial_status,scene,layout,dirty_mode,initial_count,fill_calls,nesting,input_value;
+static bool cpp_side;static B* code[7];static U virtual_free_target;
+alignas(16) static B floating[512];
+struct Arena {B nodes[32][3][96],storage[2][4096],info[2][128],types[2][128],palettes[2][128],pixels[4096],pal[2][1024],name[32];};
+static Arena arena;static B raw_format_table[280];static B packed_format_flags[360],packed_palette_flags[144];static U raw_get_import,raw_set_import,state_value,state_sets,state_gets,comparator_mutation;static U selector_calls,depth_calls,copy_calls,allocator_calls;
+namespace porsche {
+// Fixture views. Production owners remain537,540 and the canonical loader.
+B render_texture_slots_006a33f8[1536]{};
+U render_texture_count_006a3a40=0;
+U render_thrash_exports_006bd910[43]{};
+}
+struct Fpu {unsigned short control,status;B tag,padding[3],values[80];unsigned short full_tag;U mxcsr;};
+struct State {Arena arena;B slots[1536];U globals[7],exports[43],fill_calls,nesting,service,mode,driver,comparator,selector_calls,depth_calls,copy_calls,allocator_calls,state_value,state_sets,state_gets;};
+struct Event {U tag,argc,args[12];State state;Fpu fpu;};
+struct Trace {U count,abi,exception[3];Event events[80];State final;Fpu fpu;};
+static Trace trace,expected;
+static void require(bool ok,const char* s){if(!ok){printf("divergence %s case=%u kind=%u flags=%x scene=%u layout=%u count=%x dirty=%u value=%x offset=%u cpp=%u\n",s,cases,kind,flags,scene,layout,initial_count,dirty_mode,value,offset,cpp_side);fflush(stdout);ExitProcess(1);}}
+static void snapshot(State& s){s.arena=arena;memcpy(s.slots,render_texture_slots_006a33f8,1536);const U g[]={render_texture_slot_count_006a3a44,render_texture_dirty_006a3a48,render_texture_pending_006a3a58,render_texture_arena_006a3a5c,render_texture_heap_id_006a3a60,render_texture_epoch_006a3a64,render_texture_count_006a3a40};memcpy(s.globals,g,sizeof g);memcpy(s.exports,render_thrash_exports_006bd910,172);s.fill_calls=fill_calls;s.nesting=nesting;s.service=startup_service_active_0069dd1e;s.mode=startup_lifecycle_mode_005de6b8;s.driver=ptr(render_texture_driver_info_006a3a54);s.comparator=ptr(reinterpret_cast<const void*>(render_texture_comparator_005df2c8));if(s.comparator==ptr(code[5])||s.comparator==ptr(reinterpret_cast<const void*>(&render_texture_compare_00554310)))s.comparator=0x00554310u;s.selector_calls=selector_calls;s.depth_calls=depth_calls;s.copy_calls=copy_calls;s.allocator_calls=allocator_calls;s.state_value=state_value;s.state_sets=state_sets;s.state_gets=state_gets;}
+static void capture(Fpu& f){B environment[28];
+ __asm {fxsave floating
+        fnstenv environment
+        fldenv environment}
+ f.control=*reinterpret_cast<unsigned short*>(floating);f.status=*reinterpret_cast<unsigned short*>(floating+2);f.tag=floating[4];memset(f.padding,0,3);
+ f.full_tag=*reinterpret_cast<unsigned short*>(environment+8);f.mxcsr=*reinterpret_cast<U*>(floating+24);
+ for(U i=0;i<8;++i){const U physical=((f.status>>11)+i)&7u;if(f.tag&(1u<<physical))memcpy(f.values+i*10,floating+32+i*16,10);else memset(f.values+i*10,0,10);}
+}
+
+static void seed_fpu(){unsigned short cw=static_cast<unsigned short>(0x7f|(precision<<8)|(rounding<<10));__asm fninit __asm fldcw cw
+    for(U i=0;i<depth;++i){U bits=0x3f800001+i;__asm fld dword ptr bits}
+    B environment[28];__asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment+4)|=static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+static U invoke(void* fn,void* receiver,const U* args,U count,U cleanup,U& result){U before,frame,fail=0,out;__asm {
+    push ebx
+    push esi
+    push edi
+    mov before,esp
+    mov frame,ebp
+    mov eax,count
+    mov edx,args
+pushargs:test eax,eax
+    jz pushed
+    dec eax
+    push dword ptr [edx+eax*4]
+    jmp pushargs
+pushed:mov ecx,receiver
+    mov edx,0deadc0deh
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov out,eax
+    add esp,cleanup
+    cmp esp,before
+    jne bad
+    cmp ebp,frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,before
+    pop edi
+    pop esi
+    pop ebx
+    }
+    result=out;return fail;}
+
+
+static int exception_record(EXCEPTION_POINTERS* e){trace.exception[0]=e->ExceptionRecord->ExceptionCode;trace.exception[1]=static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);trace.exception[2]=static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);return EXCEPTION_EXECUTE_HANDLER;}
+static bool execute(void* fn,void* receiver,const U* args,U count,U& result,U& abi){
+    __try {abi=invoke(fn,receiver,args,count,0,result);return true;}
+    __except(exception_record(GetExceptionInformation())) {return false;}
+}
+
+
+
+static void event(U tag,std::initializer_list<U> args){require(trace.count<80,"bounded event count");auto& e=trace.events[trace.count++];e.tag=tag;e.argc=static_cast<U>(args.size());U i=0;for(U a:args)e.args[i++]=a;while(i<12)e.args[i++]=0;snapshot(e.state);capture(e.fpu);}
+static void control(){if(flags&32){unsigned short cw=static_cast<unsigned short>(0x7f|((precision==0?3u:0u)<<8)|(((rounding+1)%4)<<10));__asm fldcw cw}}
+static void release(){U result=0,abi=invoke(cpp_side?reinterpret_cast<void*>(&render_texture_arena_release_00555400):code[2],nullptr,nullptr,0,0,result);require(abi==0,"nested release ABI");}
+static U __stdcall treset_alternate(){require(false,"alternate reset callback must remain unexecuted");return 0;}
+static U __stdcall treset(){event(0x6bd988,{});
+    if(flags&256){startup_service_active_0069dd1e=0x77;put(arena.storage[0]+offset,8,0x12344321);put(arena.storage[0]+offset,12,0xabcdef01);}
+    if(flags&1)render_texture_slot_count_006a3a44=scene&1?0xffffffff:2;
+    if(flags&2){put(render_texture_slots_006a33f8,0x24,ptr(arena.nodes[31][0]+offset));render_texture_pending_006a3a58=value^0xabcdef01;render_texture_epoch_006a3a64=value^0xa5a5a5a5;render_texture_dirty_006a3a48=0;}
+    if(flags&128)render_thrash_exports_006bd910[30]=ptr(reinterpret_cast<void*>(&treset_alternate));
+    control();return value^0x12345678;
+}
+namespace porsche {
+
+U __cdecl application_heap_destroy_005699f0(U id){event(0x5699f0,{id});
+    if(flags&8){render_texture_arena_006a3a5c=scene&1?0:ptr(arena.storage[1]+offset);render_texture_heap_id_006a3a60=value^0x87654321;}
+    if((flags&16)&&!nesting){++nesting;render_texture_arena_006a3a5c=0;release();--nesting;render_texture_arena_006a3a5c=ptr(arena.storage[1]+offset);}
+    control();return value^0x98765432;
+}
+U __stdcall platform_virtual_free(void* p,U bytes,U mode){event(0x5b2148,{ptr(p),bytes,mode});require(bytes==0&&mode==0x8000,"original MEM_RELEASE ABI");
+    if((flags&16)&&!nesting){++nesting;release();--nesting;}
+    if(flags&8){render_texture_arena_006a3a5c=ptr(arena.storage[0]+offset);render_texture_heap_id_006a3a60=value^0x10203040;}
+    control();return scene&1?0:1;
+}
+}
+static void absolute(B* p,U n,U old,const void* replacement,U expected_count){U found=0;for(U i=0;i+4<=n;++i)if(word(p,i)==old){put(p,i,ptr(replacement));++found;i+=3;}require(found==expected_count,"absolute relocation count");}
+static void relative(B* p,U n,U va,U old,const void* replacement,U expected_count){U found=0;for(U i=0;i+5<=n;++i)if(p[i]==0xe8&&va+i+5+word(p,i+1)==old){put(p,i+1,ptr(replacement)-ptr(p+i+5));++found;i+=4;}require(found==expected_count,"relative relocation count");}
+static void reset(){memset(&trace,0,sizeof trace);fill_calls=nesting=0;memset(&arena,0x65+(value&7),sizeof arena);
+    for(U i=0;i<32;++i){B* record=render_texture_slots_006a33f8+i*48;for(U j=0;j<48;j+=4)put(record,j,value^(i*0x1020304u+j));
+        for(U n=0;n<3;++n){B* p=arena.nodes[i][n]+offset;put(p,0,n<2?ptr(arena.nodes[i][n+1]+offset):0);}
+        if(layout==0)put(record,0x24,0);
+        else if(layout==1){put(record,0x24,ptr(arena.nodes[i][2]+offset));}
+        else if(layout==2)put(record,0x24,ptr(arena.nodes[i][0]+offset));
+        else if(layout==3)put(record,0x24,ptr(arena.nodes[0][0]+offset));
+        else if(layout==4){put(record,0x14,0);put(record,0x24,ptr(record+0x14));}
+        else {if(i<31){put(record,0x24,ptr(record+0x28));put(record,0x28,ptr(arena.nodes[i][0]+offset));}else put(record,0x24,ptr(arena.nodes[i][0]+offset));}
+    }
+    render_texture_slot_count_006a3a44=initial_count;render_texture_dirty_006a3a48=dirty_mode==0?0:dirty_mode==1?1:0x80000000;render_texture_pending_006a3a58=value^0x13579bdf;render_texture_epoch_006a3a64=value;render_texture_count_006a3a40=value^0x2468ace0;render_texture_heap_id_006a3a60=value^0x91827364;render_texture_arena_006a3a5c=scene&2?0:ptr(arena.storage[0]+offset);for(U& x:render_thrash_exports_006bd910)x=0;render_thrash_exports_006bd910[30]=ptr(reinterpret_cast<void*>(&treset));
+}
+// Diagnostic endpoints only; production uses its existing canonical owners.
+static const B raw_comparator[]={@RAW_COMPARATOR@},raw_formats[]={@RAW_FORMAT_TABLE@};
+static U transfer_flags,transfer_scene,depth_mode,input_width,input_format,input_format2,input_format3,input_format4,input_byte,input_bytes;
+namespace porsche {
+// Existing 540 and 537 fixture views; real game graph owns these.
+const char render_texture_cleanup_file_005bc294[30]="\\real\\patch3\\cmn\\dyntexture.c";
+static void __cdecl diagnostic577(const char*){require(false,"unexpected texture diagnostic");}
+void (__cdecl* diagnostic_handler_005debf0)(const char*)=diagnostic577;
+// Unused 521 source dependencies are fail-closed.
+B cursor_snapshot_prefix_005de650[12]{},cursor_snapshot_suffix_005de65e[30]{};
+void* window_shutdown_handle_0069dd18=nullptr;U window_shutdown_state_005de67c=0,window_shutdown_config_005de620[12]{},splash_progress_format_005dead0=0;
+B window_shutdown_source_005de65c=0,window_shutdown_source_005de65d=0;
+void* __cdecl render_descriptor_allocate_00535700(U,U,U,U,U){require(false,"unused 521 allocate");return nullptr;}
+
+void __cdecl window_shutdown_runtime_state_00534430(){require(false,"unused 521 shutdown");}
+void __cdecl heap_fill_0053c290(void* p,U byte,U bytes){event(0x53c290,{ptr(p),byte,bytes});require(byte==0&&(bytes==48||bytes==56),"fill shape");if(!p){RaiseException(0xe0577002,0,0,nullptr);return;}memset(p,0,bytes);++fill_calls;}
+void* __cdecl allocate_00531ca0(const char* name,std::int32_t bytes,U id){event(0x531ca0,{ptr(name),static_cast<U>(bytes),id});++allocator_calls;if(bytes==56)return arena.nodes[0][0];if(bytes==0x400)return arena.pal[0];return arena.storage[0];}
+void* __stdcall platform_virtual_alloc(void* p,U bytes,U mode,U protect){event(0x5b2144,{ptr(p),bytes,mode,protect});return nullptr;}
+U __cdecl application_heap_slot_00569a70(){require(false,"blocked heap slot not executed");return 0;}
+std::int32_t __cdecl heap_init_005697f0(U,const char*,void*,std::int32_t,U,U,std::int32_t,std::int32_t,U,std::int32_t,std::int32_t,void*){require(false,"unused heap init");return 0;}
+void __cdecl render_texture_diagnostic_0055ec50(U,const char*,...){require(false,"unmapped full table");}
+void __cdecl process_exit_005a246e(U){require(false,"unmapped process exit");}
+void __cdecl heap_copy_dispatch_005323e0(void* out,const void* in,U bytes){event(0x5323e0,{ptr(out),ptr(in),bytes});++copy_calls;memmove(out,in,bytes);}
+
+std::int32_t __cdecl render_texture_depth_convert_005350e0(U a,U b,U c,U d,U src,U dst,U sp,U dp,std::int32_t count){
+ event(0x5350e0,{a,b,c,d,src,dst,sp,dp,static_cast<U>(count)});++depth_calls;
+ if(transfer_flags&4){B* node=arena.nodes[0][0];put(node,0x1c,ptr(arena.pal[1]));put(node,0x2c,word(node,0x2c)^0x40000000u);}
+ return static_cast<std::int32_t>(depth_mode);
+}
+}
+static const U* __stdcall about577(){event(0x6bd934,{});return reinterpret_cast<U*>(arena.info[0]);}
+static void comparator_init();
+static void comparator_run();
+static std::int32_t __cdecl comparator_stub(U fmt,U pal,U type,U p){event(0x554310,{fmt,pal,type,p});++selector_calls;if((transfer_flags&2)&&selector_calls==1)render_texture_driver_info_006a3a54=reinterpret_cast<U*>(arena.info[1]);return (transfer_flags&1)?-7:static_cast<std::int32_t>(type*10u+p);}
+// PE-derived evidence is checked before this fixture mutates any owner.
+static const B raw_format_payload_579[]={@RAW_FORMAT_PAYLOAD@};
+static const B raw_palette_payload_579[]={@RAW_PALETTE_PAYLOAD@};
+static const B raw_format_pointers_579[]={@RAW_FORMAT_POINTERS@};
+static const B raw_palette_pointers_579[]={@RAW_PALETTE_POINTERS@};
+static const B raw_format_flags_579[]={@RAW_FORMAT_FLAGS@};
+static const B raw_palette_flags_579[]={@RAW_PALETTE_FLAGS@};
+static U comparator_cases_579,comparator_events_579;
+static U comparator_quality5_579=1;
+static U __stdcall state_set_alt_579(U key,U v);
+static void transfer_setup();
+
+static U __stdcall state_get_579(U key){
+    ++state_gets;event(0x6bd984,{key});return state_value;
+}
+static U __stdcall state_get_alt_579(U key){
+    ++state_gets;event(0x6bd985,{key});return state_value^0x10203040u;
+}
+static U __stdcall state_set_579(U key,U v){
+    ++state_sets;event(0x6bd97c,{key,v});state_value=v;
+    if((comparator_mutation&1u)&&state_sets==1)render_thrash_exports_006bd910[27]=ptr(reinterpret_cast<void*>(&state_set_alt_579));
+    return state_sets==1?0x89abcdefu:0x76543210u;
+}
+static U __stdcall state_set_alt_579(U key,U v){
+    ++state_sets;event(0x6bd97d,{key,v});state_value=v;return 0x13579bdfu;
+}
+
+static void comparator_init(){
+    require(sizeof raw_format_payload_579==460&&memcmp(raw_format_payload_579,render_texture_format_preferences_005dedcc,460)==0,"raw format payload vs host");
+    require(sizeof raw_palette_payload_579==200&&memcmp(raw_palette_payload_579,render_texture_palette_preferences_005defe0,200)==0,"raw palette payload vs host");
+    require(sizeof raw_format_pointers_579==72&&sizeof raw_palette_pointers_579==36,"raw pointer table sizes");
+    for(U i=0;i<18;++i){
+        U raw_va=word(raw_format_pointers_579,i*4);U host=ptr(render_texture_format_preference_table_005def98[i]);U expected=0;
+        if(i==0)expected=0x006a3a28u;
+        else if(i!=10)expected=0x005dedccu+(host-ptr(render_texture_format_preferences_005dedcc));
+        require(raw_va==expected,"format pointer relocation witness");
+    }
+    for(U i=0;i<9;++i){
+        U raw_va=word(raw_palette_pointers_579,i*4);U host=ptr(render_texture_palette_preference_table_005df0a8[i]);U expected=i==0?0x006a3a38u:0x005defe0u+(host-ptr(render_texture_palette_preferences_005defe0));
+        if(i==7)expected=0;
+        require(raw_va==expected,"palette pointer relocation witness");
+    }
+    require(render_texture_format_preference_table_005def98[10]==nullptr,"format null table slot");
+    require(sizeof raw_format_flags_579==360&&sizeof raw_palette_flags_579==144,"raw sparse flag table sizes");
+    memcpy(packed_format_flags,raw_format_flags_579,sizeof packed_format_flags);
+    memcpy(packed_palette_flags,raw_palette_flags_579,sizeof packed_palette_flags);
+    for(U i=0;i<18;++i)require(word(packed_format_flags,i*20)==render_texture_format_flags_005df15c[i],"format sparse first field");
+    for(U i=0;i<9;++i)require(word(packed_palette_flags,i*16)==render_texture_palette_flags_005df0cc[i],"palette sparse first field");
+    require(render_texture_empty_format_006a3a28==0&&render_texture_empty_palette_006a3a38==0,"original PE BSS sentinels");
+    raw_get_import=ptr(reinterpret_cast<void*>(&render_settings_get_state_006bd984));
+    raw_set_import=ptr(reinterpret_cast<void*>(&render_settings_set_state_006bd97c));
+
+    const B body_00554310[]={@BODY_00554310@};code[5]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[5]!=nullptr,"raw comparator allocation");memcpy(code[5],body_00554310,sizeof body_00554310);
+const B body_00554530[]={@BODY_00554530@};code[6]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[6]!=nullptr,"raw comparator allocation");memcpy(code[6],body_00554530,sizeof body_00554530);
+    require(word(code[5],183)==0x00000165,"raw comparator call");put(code[5],183,ptr(code[6])-ptr(code[5]+187));
+require(word(code[5],190)==0x005def98,"raw comparator data");put(code[5],190,ptr(render_texture_format_preference_table_005def98));
+require(word(code[5],265)==0x005df15c,"raw comparator data");put(code[5],265,ptr(packed_format_flags));
+require(word(code[5],284)==0x005df15c,"raw comparator data");put(code[5],284,ptr(packed_format_flags));
+require(word(code[5],294)==0x006a3a54,"raw comparator data");put(code[5],294,ptr(&render_texture_driver_info_006a3a54));
+require(word(code[5],317)==0x006a3a54,"raw comparator data");put(code[5],317,ptr(&render_texture_driver_info_006a3a54));
+require(word(code[5],384)==0x005df0a8,"raw comparator data");put(code[5],384,ptr(render_texture_palette_preference_table_005df0a8));
+require(word(code[5],444)==0x005df0cc,"raw comparator data");put(code[5],444,ptr(packed_palette_flags));
+require(word(code[5],467)==0x005df0cc,"raw comparator data");put(code[5],467,ptr(packed_palette_flags));
+require(word(code[5],476)==0x006a3a54,"raw comparator data");put(code[5],476,ptr(&render_texture_driver_info_006a3a54));
+require(word(code[5],498)==0x006a3a54,"raw comparator data");put(code[5],498,ptr(&render_texture_driver_info_006a3a54));
+require(word(code[6],6)==0x006bd984,"raw comparator data");put(code[6],6,ptr(&raw_get_import));
+require(word(code[6],18)==0x006bd97c,"raw comparator data");put(code[6],18,ptr(&raw_set_import));
+require(word(code[6],29)==0x006bd97c,"raw comparator data");put(code[6],29,ptr(&raw_set_import));
+    for(B* p:{code[5],code[6]})require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"comparator instruction cache");
+}
+
+static void setup_comparator_579(){
+    memset(&trace,0,sizeof trace);memset(&arena,0,sizeof arena);
+    selector_calls=depth_calls=copy_calls=allocator_calls=0;state_gets=state_sets=0;
+    state_value=0x2468ace0u;render_texture_driver_info_006a3a54=reinterpret_cast<const U*>(arena.info[0]);
+    render_thrash_exports_006bd910[27]=ptr(reinterpret_cast<void*>(&state_set_579));
+    render_thrash_exports_006bd910[29]=ptr(reinterpret_cast<void*>(&state_get_579));
+    put(arena.info[0],0x30,ptr(arena.types[0]));put(arena.info[0],0x38,ptr(arena.palettes[0]));
+    for(U i=0;i<32;++i){put(arena.types[0],i*4,i==5?comparator_quality5_579:((i%2)?1u:5u));put(arena.palettes[0],i*4,(i%2)?1u:5u);}
+}
+
+static void compare_comparator_579(U src,U srcpal,U dst,U dstpal,U mutation){
+    Trace& original=expected;U result0=0,complete0=0;comparator_mutation=mutation;
+    for(U side=0;side<2;++side){
+        cpp_side=side!=0;setup_comparator_579();comparator_mutation=mutation;
+        seed_fpu();U args[4]={src,srcpal,dst,dstpal},result=0,abi=0;void* fn=side?reinterpret_cast<void*>(&render_texture_compare_00554310):reinterpret_cast<void*>(code[5]);
+        bool complete=true;__try{abi=invoke(fn,nullptr,args,4,16,result);}__except(exception_record(GetExceptionInformation())){complete=false;}
+        require(abi==0,"comparator callee-saved/stack ABI");trace.abi=abi;snapshot(trace.final);capture(trace.fpu);
+        if(src==1&&srcpal==0&&dst==1&&dstpal==1)require(result==10000u&&trace.count==0,"indexed early reject sentinel/order");
+        if(!side){original=trace;result0=result;complete0=complete;}
+        else{require(complete==static_cast<bool>(complete0),"comparator completion");require(result==result0,"comparator return");require(memcmp(&trace,&original,sizeof trace)==0,"comparator state/events/FPU");comparator_events_579+=trace.count;}
+    }
+    ++comparator_cases_579;
+}
+
+static void compare_state_probe_579(U mutation){
+    Trace& original=expected;U result0=0,complete0=0;comparator_mutation=mutation;
+    for(U side=0;side<2;++side){
+        cpp_side=side!=0;setup_comparator_579();comparator_mutation=mutation;seed_fpu();U result=0,abi=0;
+        void* fn=side?reinterpret_cast<void*>(&render_texture_state_probe_00554530):reinterpret_cast<void*>(code[6]);
+        bool complete=true;__try{abi=invoke(fn,nullptr,nullptr,0,0,result);}__except(exception_record(GetExceptionInformation())){complete=false;}
+        require(abi==0,"stateprobe callee-saved/stack ABI");trace.abi=abi;snapshot(trace.final);capture(trace.fpu);
+        if(!side){original=trace;result0=result;complete0=complete;}
+        else{require(complete==static_cast<bool>(complete0),"stateprobe completion");require(result==result0,"stateprobe first-set EAX");require(memcmp(&trace,&original,sizeof trace)==0,"stateprobe restore/callback state");comparator_events_579+=trace.count;}
+    }
+    ++comparator_cases_579;
+}
+
+static void compare_selector_579(U source,U palette,U mutate){
+    Trace& original=expected;U result0=0,complete0=0;comparator_mutation=mutate;
+    for(U side=0;side<2;++side){
+        cpp_side=side!=0;transfer_setup();comparator_mutation=mutate;state_value=0x31415926u;state_gets=state_sets=0;
+        render_thrash_exports_006bd910[27]=ptr(reinterpret_cast<void*>(&state_set_579));
+        render_thrash_exports_006bd910[29]=ptr(reinterpret_cast<void*>(&state_get_579));
+        render_texture_comparator_005df2c8=side?render_texture_compare_00554310:reinterpret_cast<decltype(render_texture_comparator_005df2c8)>(code[5]);
+        for(U i=0;i<2;++i){
+            put(arena.info[i],0x0c,0x40);put(arena.info[i],0x2c,3);put(arena.info[i],0x30,ptr(arena.types[i]));put(arena.info[i],0x34,3);put(arena.info[i],0x38,ptr(arena.palettes[i]));
+            for(U j=0;j<3;++j){put(arena.types[i],j*4,(i==0)?source:((j==1)?2u:9u));put(arena.palettes[i],j*4,(i==0)?palette:j);}
+        }
+        render_texture_driver_info_006a3a54=reinterpret_cast<const U*>(arena.info[0]);
+        seed_fpu();B* out=arena.storage[0];put(out,0,source);put(out,4,palette);U args[2]={ptr(out),ptr(out+4)},result=0,abi=0;void* fn=side?reinterpret_cast<void*>(&render_texture_select_00554820):reinterpret_cast<void*>(code[2]);
+        bool complete=true;__try{abi=invoke(fn,nullptr,args,2,8,result);}__except(exception_record(GetExceptionInformation())){complete=false;}
+        require(abi==0,"composed selector ABI");trace.abi=abi;snapshot(trace.final);capture(trace.fpu);
+        if(!side){original=trace;result0=result;complete0=complete;}
+        else{require(complete==static_cast<bool>(complete0),"composed selector completion");require(result==result0,"composed selector return");require(memcmp(&trace,&original,sizeof trace)==0,"composed selector state/events/FPU");comparator_events_579+=trace.count;}
+    }
+    ++comparator_cases_579;
+}
+
+static void comparator_run(){
+    // Bounded format-only coverage, including invalid indexed transitions.
+    for(U s=0;s<18;++s)for(U d=0;d<18;++d){
+        U sp=(s==1||s==2||s==9)?1u:0u;U dp=(d==1||d==2||d==9)?1u:0u;
+        if((s*18u+d)%7u==0||s==d)compare_comparator_579(s,sp,d,dp,(s+d)&1u);
+    }
+    // All bounded palette pairs for indexed formats, with score/capability flags.
+    for(U s:{1u,2u,9u})for(U d:{1u,2u,9u})for(U sp=0;sp<9;++sp)for(U dp=0;dp<9;++dp)
+        compare_comparator_579(s,sp,d,dp,(sp+dp)&1u);
+    // Targeted cases for missing ranks, a duplicate rank pair, source bit 8,
+    // the destination quality capability, and the indexed early exit.
+    compare_comparator_579(17,0,0,0,0);
+    compare_comparator_579(1,7,1,1,0);
+    compare_comparator_579(1,0,1,1,0);
+    compare_comparator_579(6,1,5,0,0);
+    compare_comparator_579(0x106,1,5,0,0);
+    comparator_quality5_579=0;compare_comparator_579(0,0,5,0,0);comparator_quality5_579=1;
+    U* duplicate=render_texture_format_preference_table_005def98[3];U saved[5];memcpy(saved,duplicate,sizeof saved);
+    duplicate[0]=6;duplicate[1]=5;duplicate[2]=6;duplicate[3]=5;duplicate[4]=0;
+    compare_comparator_579(0x103,0,5,0,0);
+    memcpy(duplicate,saved,sizeof saved);
+    compare_comparator_579(1,0,1,1,0);
+    compare_state_probe_579(0);compare_state_probe_579(1);
+    compare_selector_579(1,1,0);compare_selector_579(2,2,1);
+}
+
+static void transfer_init(){
+ require(render_texture_driver_info_006a3a54==nullptr,"original driver-info zero before reset");
+ require(render_texture_comparator_005df2c8==render_texture_compare_00554310,"original comparator relocation before override");
+ require(sizeof raw_comparator==4&&word(raw_comparator)==0x00554310,"PE original callback word before relocation");
+ require(sizeof raw_formats==280,"raw sparse format bytes");
+ memcpy(raw_format_table,raw_formats,sizeof raw_format_table);
+ for(U i=0;i<14;++i)require(word(raw_format_table,i*20)==render_texture_format_bits_005df16c[i],"PE versus canonical sparse formats");
+ const B body_00554960[]={@BODY_00554960@};code[0]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[0]!=nullptr,"raw code");memcpy(code[0],body_00554960,sizeof body_00554960);
+ const B body_00554d70[]={@BODY_00554D70@};code[1]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[1]!=nullptr,"raw code");memcpy(code[1],body_00554d70,sizeof body_00554d70);
+ const B body_00554820[]={@BODY_00554820@};code[2]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[2]!=nullptr,"raw code");memcpy(code[2],body_00554820,sizeof body_00554820);
+ const B body_005556b0[]={@BODY_005556B0@};code[3]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[3]!=nullptr,"raw code");memcpy(code[3],body_005556b0,sizeof body_005556b0);
+ const B body_00555780[]={@BODY_00555780@};code[4]=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code[4]!=nullptr,"raw code");memcpy(code[4],body_00555780,sizeof body_00555780);
+ require(word(code[0],3)==0x006bd934,"raw data");put(code[0],3,ptr(render_thrash_exports_006bd910+9));
+ require(word(code[0],12)==0x006a3a54,"raw data");put(code[0],12,ptr(&render_texture_driver_info_006a3a54));
+ require(word(code[0],53)==0x000001f7,"raw call");put(code[0],53,ptr(reinterpret_cast<void*>(&render_texture_node_00554b90))-ptr(code[0]+57));
+ require(word(code[0],127)==0xfffffe3d,"raw call");put(code[0],127,ptr(code[2])-ptr(code[0]+131));
+ require(word(code[0],162)==0x000001ca,"raw call");put(code[0],162,ptr(reinterpret_cast<void*>(&render_texture_slot_00554bd0))-ptr(code[0]+166));
+ require(word(code[0],178)==0x006a340c,"raw data");put(code[0],178,ptr(render_texture_slots_006a33f8+0x14));
+ require(word(code[0],187)==0x00000101,"raw call");put(code[0],187,ptr(reinterpret_cast<void*>(&render_texture_bytes_00554b20))-ptr(code[0]+191));
+ require(word(code[0],220)==0x00000090,"raw call");put(code[0],220,ptr(reinterpret_cast<void*>(&render_texture_header_00554ad0))-ptr(code[0]+224));
+ require(word(code[0],238)==0x006a3400,"raw data");put(code[0],238,ptr(render_texture_slots_006a33f8+8));
+ require(word(code[0],268)==0x000000b0,"raw call");put(code[0],268,ptr(reinterpret_cast<void*>(&render_texture_bytes_00554b20))-ptr(code[0]+272));
+ require(word(code[0],280)==0x006a3a54,"raw data");put(code[0],280,ptr(&render_texture_driver_info_006a3a54));
+ require(word(code[0],302)==0x006a341c,"raw data");put(code[0],302,ptr(render_texture_slots_006a33f8+0x24));
+ require(word(code[0],314)==0x006a341c,"raw data");put(code[0],314,ptr(render_texture_slots_006a33f8+0x24));
+ require(word(code[0],327)==0x006a33f8,"raw data");put(code[0],327,ptr(render_texture_slots_006a33f8));
+ require(word(code[0],337)==0x006a33f8,"raw data");put(code[0],337,ptr(render_texture_slots_006a33f8));
+ require(word(code[0],342)==0x006a3a40,"raw data");put(code[0],342,ptr(&render_texture_count_006a3a40));
+ require(word(code[0],349)==0x006a3a40,"raw data");put(code[0],349,ptr(&render_texture_count_006a3a40));
+ require(word(code[1],33)==0x006a340c,"raw data");put(code[1],33,ptr(render_texture_slots_006a33f8+0x14));
+ require(word(code[1],46)==0x006a3400,"raw data");put(code[1],46,ptr(render_texture_slots_006a33f8+8));
+ require(word(code[1],53)==0x006a3404,"raw data");put(code[1],53,ptr(render_texture_slots_006a33f8+0xc));
+ require(word(code[1],68)==0x000008f8,"raw call");put(code[1],68,ptr(code[3])-ptr(code[1]+72));
+ require(word(code[2],49)==0x006a3a54,"raw data");put(code[2],49,ptr(&render_texture_driver_info_006a3a54));
+ require(word(code[2],59)==0x006bd934,"raw data");put(code[2],59,ptr(render_thrash_exports_006bd910+9));
+ require(word(code[2],64)==0x006a3a54,"raw data");put(code[2],64,ptr(&render_texture_driver_info_006a3a54));
+ require(word(code[2],180)==0x005df2c8,"raw data");put(code[2],180,ptr(&render_texture_comparator_005df2c8));
+ require(word(code[2],202)==0x006a3a54,"raw data");put(code[2],202,ptr(&render_texture_driver_info_006a3a54));
+ require(word(code[3],44)==0x005df16c,"raw data");put(code[3],44,ptr(raw_format_table));
+ require(word(code[3],89)==0xfffdf9d3,"raw call");put(code[3],89,ptr(reinterpret_cast<void*>(&render_texture_depth_convert_005350e0))-ptr(code[3]+93));
+ require(word(code[3],126)==0x0000004e,"raw call");put(code[3],126,ptr(code[4])-ptr(code[3]+130));
+ require(word(code[3],162)==0xfffdcc8a,"raw call");put(code[3],162,ptr(reinterpret_cast<void*>(&heap_copy_dispatch_005323e0))-ptr(code[3]+166));
+ require(word(code[3],193)==0xfffdcc6b,"raw call");put(code[3],193,ptr(reinterpret_cast<void*>(&heap_copy_dispatch_005323e0))-ptr(code[3]+197));
+ for(B* p:code)require(FlushInstructionCache(GetCurrentProcess(),p,4096)!=0,"original instructions");
+}
+static void transfer_setup(){
+ reset();selector_calls=depth_calls=copy_calls=allocator_calls=0;std::memset(render_texture_slots_006a33f8,0,1536);
+ render_texture_slot_count_006a3a44=0;render_texture_count_006a3a40=0;render_texture_dirty_006a3a48=0;
+ render_texture_driver_info_006a3a54=nullptr;render_texture_comparator_005df2c8=comparator_stub;
+ render_thrash_exports_006bd910[9]=ptr(reinterpret_cast<void*>(&about577));
+ render_texture_arena_006a3a5c=ptr(arena.storage[0]);render_texture_heap_id_006a3a60=0;
+ if(transfer_scene==5){render_texture_arena_006a3a5c=0;render_texture_preferred_bytes_005df2c4=0x80000;}
+ for(U k=0;k<2;++k){put(arena.info[k],0xc,0x40);put(arena.info[k],0x2c,k?1:2);put(arena.info[k],0x30,ptr(arena.types[k]));put(arena.info[k],0x34,2);put(arena.info[k],0x38,ptr(arena.palettes[k]));for(U i=0;i<16;++i){put(arena.types[k],i*4,1);put(arena.palettes[k],i*4,1);}}
+ for(U i=0;i<sizeof arena.pixels;++i)arena.pixels[i]=static_cast<B>(i+input_byte);
+ for(U j=0;j<2;++j)for(U i=0;i<1024;++i)arena.pal[j][i]=static_cast<B>(i+j*17);
+ std::memset(arena.name,'X',sizeof arena.name);const U name_length=(transfer_scene==1)?0:(transfer_scene==2)?7:(transfer_scene==3)?8:2;arena.name[name_length]=0;
+}
+static void transfer_compare(){
+ U result0=0,complete0=0;
+ for(U side=0;side<2;++side){
+  cpp_side=side!=0;transfer_setup();seed_fpu();U args[9]={};U argc=0,result=0,abi=0;void* fn=nullptr;
+  B* node=arena.nodes[0][0];B* src=arena.pixels;B* dest=arena.storage[0];
+  if(kind==0){fn=side?reinterpret_cast<void*>(&render_display_texture_alloc_00554960):code[0];args[0]=input_width;args[1]=input_format2;args[2]=input_format3;args[3]=input_format4;args[4]=value;args[5]=ptr(arena.name);argc=6;}
+  if(kind==1){fn=side?reinterpret_cast<void*>(&render_display_texture_copy_00554d70):code[1];put(node,4,0);put(node,0x18,ptr(dest));put(node,0x1c,ptr(arena.pal[0]));put(node,0x24,input_format);put(node,0x28,input_format2);put(node,0x2c,0x87650002u);put(render_texture_slots_006a33f8,8,input_format3);put(render_texture_slots_006a33f8,0xc,input_format4);put(render_texture_slots_006a33f8,0x14,input_bytes);args[0]=ptr(node);args[1]=(transfer_scene&1)?0:ptr(src);args[2]=(transfer_scene&2)?0:ptr(arena.pal[1]);argc=3;}
+  if(kind==2){fn=side?reinterpret_cast<void*>(&render_texture_select_00554820):code[2];put(arena.storage[0],0,input_format);put(arena.storage[0],4,input_format2);args[0]=ptr(arena.storage[0]);args[1]=(transfer_scene&1)?args[0]:ptr(arena.storage[0]+4);if(transfer_scene&2)args[1]=0;if(transfer_scene&4)args[0]=0;argc=2;}
+  if(kind==3){fn=side?reinterpret_cast<void*>(&render_texture_convert_005556b0):code[3];args[0]=input_format;args[1]=input_format2;args[2]=input_format3;args[3]=input_format4;args[4]=ptr(src);args[5]=ptr(dest);args[6]=ptr(arena.pal[0]);args[7]=ptr(arena.pal[1]);args[8]=input_bytes;argc=9;}
+  if(kind==4){fn=side?reinterpret_cast<void*>(&render_texture_expand_00555780):code[4];args[0]=ptr(dest);args[1]=ptr(src);args[2]=input_bytes;argc=3;}
+  bool complete=true;__try{abi=invoke(fn,nullptr,args,argc,argc*4,result);}__except(exception_record(GetExceptionInformation())){complete=false;}
+  require(abi==0,"callee-saved/stack ABI");trace.abi=abi;snapshot(trace.final);capture(trace.fpu);
+  if(side==0){expected=trace;result0=result;complete0=complete;}else{require(complete==static_cast<bool>(complete0),"completion/fault boundary");require(memcmp(&trace,&expected,sizeof trace)==0,"state/events/FPU/fault");if((kind==0||kind==2)&&complete)require(result==result0,"used return");events_total+=trace.count;}
+ }
+ ++cases;
+}
+int main(){
+ comparator_init();transfer_init();precision=2;rounding=1;depth=5;initial_status=0x25;offset=0;initial_count=0;layout=0;dirty_mode=0;value=0x44000008;
+ // Driver/global write occurs even when dimensions are rejected; null name/node
+ // fail behavior is covered by the controlled allocation-reserve failure scene.
+ kind=0;for(U f: {0u,1u,2u})for(U s: {0u,1u,2u,3u,5u})for(U w: {0u,3u,8u}){transfer_flags=f;transfer_scene=s;input_width=w;input_format2=(s==3)?4:w;input_format3=0x101;input_format4=0x202;depth_mode=1;transfer_compare();}
+ // Direct selector: output alias, nullable output, strict equal/negative scores,
+ // and a callback that swaps the cached device pointer during traversal.
+ kind=2;for(U f: {0u,1u,2u})for(U s: {0u,1u,2u,4u}){transfer_flags=f;transfer_scene=s;input_format=1;input_format2=2;transfer_compare();}
+ // Parent copy with captured palette, callback mutation and flag preservation.
+ kind=1;for(U f: {0u,4u})for(U s: {0u,1u,2u}){transfer_flags=f;transfer_scene=s;input_format=1;input_format2=1;input_format3=1;input_format4=1;input_bytes=8;depth_mode=1;transfer_compare();}
+ // Converter preserves masked formats and signed wrapped byte-count ratio.
+ kind=3;transfer_scene=0;transfer_flags=0;for(U mode: {0u,1u})for(U b: {0u,1u,3u,8u,0x10000000u}){depth_mode=mode;input_format=0x108;input_format2=0x101;input_format3=0x107;input_format4=0x101;input_bytes=b;if(!mode&&b>8)continue;transfer_compare();}
+ // All 256 original byte/nibble combinations plus odd, negative and SIMD-edge counts.
+ kind=4;transfer_flags=0;transfer_scene=0;for(input_byte=0;input_byte<256;++input_byte){input_bytes=2;transfer_compare();}for(U b: {0u,1u,3u,0xffffffffu,0x80000000u}){input_bytes=b;transfer_compare();}for(U byte: {0u,0xffu})for(U b: {30u,32u,34u,62u,64u,66u,128u,512u}){input_byte=byte;input_bytes=b;transfer_compare();}
+ comparator_run();
+ __asm fninit
+ printf("render_texture_transfer_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);printf("render_texture_format_comparator_original_x86_vs_cpp=PASS cases=%u events=%u\n",comparator_cases_579,comparator_events_579);return 0;
+}

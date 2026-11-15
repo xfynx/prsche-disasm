@@ -4,25 +4,24 @@ Updated 2026-11-16. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run578](iterations/v2/001-original-recovery/runs/578-texture-transfer-integration/README.md)
-compiles 323 C++ translation units across 8 projects. The link has 128 unresolved names/
-133 references. **There is no recovered playable C++ game executable yet.**
+[Run580](iterations/v2/001-original-recovery/runs/580-texture-comparator-integration/README.md)
+compiles 325 C++ translation units across 8 projects. The link has 127 unresolved names/
+132 references. **There is no recovered playable C++ game executable yet.**
 
-Run578 integrates five partial texture allocation/transfer originals. Its shared
-audit passes 698 scenes and eight mutation controls, including the compiler's
-vectorized expansion path. Existing allocation/format helpers compose with the
-new bodies. Two names close and real comparator54310/depth conversion5350e0
-enter. Both original pointer-state cells are verified. Registry898 retains partial
-classifications. Real comparator/depth/driver behavior and earlier parent domains
-remain open.
+Run580 integrates two partial comparator/state-probe originals. Its shared audit
+passes 1,606 new scenes and seven mutation controls, with actual selector and
+canonical driver bindings. The comparator name closes. All 884 new data bytes
+and 25 pointer relocations match the original evidence. Registry900 retains partial
+classifications. Real depth conversion, broader driver behavior and earlier
+parent domains remain open.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run577 native005 and Run578 integration are accepted within their stated bounds.
-Next are comparator00554310 and its child00554530, with original preference
-table ownership to establish. Run569 remains unaccepted deferred
+Run579 native004 and Run580 integration are accepted within their stated bounds.
+Run581's reachable driver-state packet is in progress, with five bodies and
+a 72-byte mutable state table. Its native fixture remains unaccepted. Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
 

@@ -1,41 +1,33 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-16. Run578 shared acceptance passes for frozen577005 on576.
-The build compiles 323 TUs across 8 projects with 128 unresolved names and
-133 references. Two reachable names close and real comparator54310/depth
-conversion5350e0 enter. Registry898 adds five PARTIAL originals covering995B.
-Run578 README owns exact commands, measured results and remaining domains.
+Current 2026-11-16. Run580 shared acceptance passes for frozen579004 on578.
+Build001 compiles325 TUs across8 projects with127 unresolved names/132refs.
+Comparator54310 closes. Registry900 adds two PARTIAL originals567B. README580
+owns exact commands, measured native/production evidence and remaining domains.
+Nativeproof1606new scenes/3912events/7controls,802pins/854canonicalproviders.
+884B original writable data and25host relocations match independent PE/COFF
+checks. Actual577 selector and359bindings compose. FreshREA6.9 dossiers are pinned.
+Frozenpre-proof579PLAN remains a receipt input, currenthandoff is README580.
 
-Native005 passes 698 scenes/332 events and eight controls atOd/O2. Existing546
-allocation and521 format helpers compose with the new selector/conversion
-wrapper/expansion. Long-buffer cases cover the compiler vector loop. Production
-has8 definitions including two4B original state cells and16B compiler readonly
-mask, ten unique canonical dependencies,797 pins and844 listed providers.
-The cached469 REA dossiers and raw PE/ABI evidence are retained. Existing parent
-classifications remain partial. Passed577/578 inputs are frozen.
+Active581 targets five reachable driver-state bodies200B and mutable72B table.
+Luna/medium owns581 scope/source/fixture, root reviews ABI/semantic order and
+will integrate582 afternativeacceptance. Canonical523/359/516950 and69ed0c
+owners are reused. Missing540550/540590 index entries have rawCFG supplements.
+Actual540500 x87handler remains a true unresolved child, adjacent540660/537890
+are deferred. Source rollback/RET4 transport fixes are complete, nativefixture
+review/preflight remains pending. Current581 is unaccepted localwork.
 
-The interrupted fixture resumed on Luna/medium. Include/fixture failures in
-001/002/004 are preserved,003 remains the earlier scalar proof,005 is final.
-Production source was unchanged during fixture repair. One shared build and
-one final audit were used. The strong coordinator owns acceptance/publication.
-There are no active worker assignments. The user model policy now defaults
-bounded work to a simpler worker, with strong orchestration in AGENTS/docsagents.
+User requested continued recovery until availablelimits. Chain readybatches,
+reportactualstatus aftereachpush and keep thishandoff current. Simplerworkers
+own boundedwork, strongroot owns orchestration/acceptance. Passed579/580 inputs
+are immutable. No replay of blocked547/558/537005 or archive-only569 growth.
 
-Next packet traces comparator00554310(529B) and child00554530(38B), reusing577
-pointer owners006a3a54/005df2c8 and current canonical driver settings wrappers.
-Census all original preference pointer/data spans and BSS targets before adding
-owners. The005df15c stride20 record layout includes canonical546 sparse bit-depth
-DWORDs, so preserve that owner while recovering other fields. Actual depth
-conversion005350e0 remains a separate real frontier. Use current578 closure and
-registry before implementation. Bounded aliases/faults/lifetimes/concurrency,
-real driver/heap/comparator/depth, startup/display/menus/careers/gameplay remain open.
-
-First-executable priority applies. Reuse accepted proof and shared tools. Stage
-explicit paths, verify staged/native raw bytes and report status after every push.
-Original local/game and passed inputs remain immutable. Run566 is unreferenced
-archive intake,569 is unaccepted/deferred,547/558/537005 remain blocked/unaccepted.
-Earlier descriptor22/23,constructor/metric and561two-live-slot domains remain open.
-Historical checkpoints follow.
+Real5350e0 conversion remains open. Scout identified shared64-entry function
+and64-byte matrices005de2fc/005de4fc with25targets, seven notindexed. A broader
+packet needs producer/table/scratch ownership and actualreachable-format scope.
+Do notreplaceit with guessedcallbacks. Existingpartial domains include opaque
+record/enum/alias/fault/lifetime/concurrency, realdriver/heap/TLS/nativeAMD,
+startup/display/menus/careers/gameplay. Historicalcheckpoints follow.
 
 Current557,2026-11-09: frozen555001+556004 adds6entries990B(5full+1partial)/
 1029Bloaderzero/0readonly;registry857. SharedauditPASS80884nativecomparisons/
