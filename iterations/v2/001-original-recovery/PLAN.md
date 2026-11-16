@@ -1,23 +1,23 @@
 # v2 / 001 - original source recovery plan
 
-Current2026-11-16. Run582 shared audit passes for frozen581005 on580.
-Build001 compiles326TUs/8projects,126names131refs,noEXE. Two namesclose and
-real540500enters. Registry905 adds5PARTIAL originals200B. README582ownscommands,
-measuredproof andbounds. 22native scenes/24transport comparisons/4controls,
-805pins/862canonicalproviders. Exact72B data/sixpointerrelocations areverified.
-Current580closure593files hasno body/data overlap. Missing550/590 indexentries
-have fullrawCFG supplements andregistry body_ranges, which futureaudits mustuse.
+Current2026-11-16. Run584 shared audit passes for frozen583001 on582.
+Build001 compiles327TUs/8projects,125names130refs,noEXE. One real540500 name
+closes with no new names or original state. Registry906 adds one PARTIAL71B
+body. README584 owns commands and bounds:24 native scenes/4 controls atOd/O2,
+808pins/863canonicalproviders. Production71B equal original after four DIR32
+normalizations; all four canonical data owners verified. Fresh582 closure595
+files/326roots/805pins has no overlap, including registry body_ranges.
 
-Run583 native001 nowpasses foractual540500/71B,24scenes/4controls, no newdata.
-Rootsource preserves exactx87 instructions andcallerarg2stack write. Luna used
-canonicaldata fixtureviews; actualgame owners remain515ctx/522scale/GameSetup/
-528exports. Next584intake mustcheck productionnormalized71B byte identity and
-canonicalowners, thenonebuild/audit. The separate583source/config/fixture are
-frozen. Rootowns584integration/registry/publication. Workerassignmentsclosed.
+Active workers Luna/medium: release_585 owns585-frame-interface-release source,
+scope and native fixture; splash_587 owns587-splash-command-dispatch source,
+scope and native fixture. Root owns review, registry, common integration and
+publication. Neither worker may change frozen583/584. Both must provide scratch
+preflight and root review before numbered native proof. Next integrate only
+ready accepted packets in a fresh shared batch; no enlargement of passed584.
 
-User requested continued recovery until availablelimits. Chainreadybatches,
-reportactualstatus aftereachpush. Simpleworkers own boundedwork, strongroot
-owns orchestration/acceptance. Passed581/582inputs remainimmutable.
+User requested continued recovery until available limits. Chain ready batches,
+report actual status after each push. Simple workers own bounded work; strong
+root owns orchestration/acceptance. Passed inputs remain immutable.
 
 Real5350e0 conversion remains open. Scout found shared64-entry callback and
 64-byte matrices5de2fc/5de4fc,25targets(sevenunindexed), decoderpaths andunproved

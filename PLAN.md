@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run582](iterations/v2/001-original-recovery/runs/582-driver-state-integration/README.md).
-Five partial driver-state originals close two names and expose the real x87 child.
-The shared build compiles 326 TUs with 126 unresolved names/131 references.
+Latest recovery intake is [Run584](iterations/v2/001-original-recovery/runs/584-driver-x87-integration/README.md).
+The partial x87 callback closes one real dependency with normalized71-byte identity.
+The shared build compiles327 TUs with125 unresolved names/130 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next is the production intake of Run583's proved x87 callback. The real depth-conversion
+Next are the reachable frame-interface release and splash command dependencies. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;

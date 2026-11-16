@@ -1,5 +1,10 @@
 # Индекс оригинальных бинарников
 
+Run584 adds the [complete71-byte raw CFG supplement](../../iterations/v2/001-original-recovery/runs/583-render-driver-x87/original-index-supplement.json)
+for missing540500. Both RETs, exact bytes and canonical data bindings are pinned;
+production instructions match after four relocation normalizations. Registry
+body_ranges preserve540500..540546 for future overlap checks.
+
 Run582 adds [complete raw CFG supplements](../../iterations/v2/001-original-recovery/runs/581-render-driver-state/original-index-supplement.json)
 for callback00540550/49B and00540590/41B, which the main Ghidra inventory missed.
 Their relocation-table provenance, all exits and exact bytes are pinned. Registry

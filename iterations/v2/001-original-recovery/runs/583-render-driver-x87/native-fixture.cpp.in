@@ -1,0 +1,149 @@
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "render_driver_x87_583.hpp"
+#include "porsche/game_setup.hpp"
+#include "porsche/render_loader.hpp"
+#include "../515-render-driver-constructors/render_driver_515.hpp"
+#include "../522-audio-stream-transform/audio_stream_transform_522.hpp"
+using U=std::uint32_t; using B=std::uint8_t; using namespace porsche;
+namespace porsche {
+std::uint32_t render_thrash_exports_006bd910[43]{};
+void* game_setup_movie_service_0069ed0c=nullptr;
+void* render_driver_context_0069e0d4=nullptr;
+// Native oracle view of the original read-only scalar; raw PE bytes are pinned below.
+const float audio_stream_s16_scale_005b3e10=0x1.0p-15f;
+U __stdcall render_settings_set_state_006bd97c(U key,U value);
+}
+static constexpr U context_size=0x11810, context_flag=0x117e4, context_output=0x1180c;
+alignas(16) static B context_memory[context_size];
+static B service_root[16],service_mid[16],service_node[64];
+static U event_count=0; struct Event{U key,value;}; static Event observed[4];
+static U total_events=0;
+namespace porsche { U __stdcall render_settings_set_state_006bd97c(U key,U value){
+ ++total_events;if(event_count<4) observed[event_count++]={key,value}; return 0xface0000u^key^value;
+}}
+static U ptr(const void*p){return reinterpret_cast<U>(p);}
+static U word(const void*p,U at=0){U x;std::memcpy(&x,static_cast<const B*>(p)+at,4);return x;}
+static void put(void*p,U at,U x){std::memcpy(static_cast<B*>(p)+at,&x,4);}
+static U cases=0;
+static void require(bool ok,const char* what){if(!ok){std::printf("divergence %s case=%u\n",what,cases);std::fflush(stdout);ExitProcess(1);}}
+static const B body_540500[]={@BODY_00540500@};
+static const B raw_s16_scale[]={@RAW_S16_SCALE@};
+static void* original_code=nullptr;
+static U patch_abs(B* code,U count,U original_va,const void* host,U expected){
+ U found=0;for(U i=0;i+4<=count;i++)if(word(code,i)==original_va){put(code,i,ptr(host));++found;i+=3;}
+ require(found==expected,"raw body absolute relocation count");return found;
+}
+static void verify_initial_data(){
+ const B exact_scale[4]={0,0,0,0x38};
+ require(sizeof raw_s16_scale==4&&std::memcmp(raw_s16_scale,exact_scale,4)==0,"raw scale PE bytes");
+ require(word(&audio_stream_s16_scale_005b3e10)==0x38000000u,"canonical scale owner bits");
+ require(game_setup_movie_service_0069ed0c==nullptr,"service global initial BSS value");
+ require(render_driver_context_0069e0d4==nullptr,"context global initial BSS value");
+ for(U x:render_thrash_exports_006bd910)require(x==0,"render export table initial BSS value");
+}
+static void prepare_original(){
+ require(sizeof body_540500==71,"original body extent");
+ original_code=VirtualAlloc(nullptr,4096,0x3000,0x40);require(original_code!=nullptr,"raw body allocation");
+ std::memcpy(original_code,body_540500,sizeof body_540500);B* p=static_cast<B*>(original_code);
+ patch_abs(p,sizeof body_540500,0x0069ed0c,&game_setup_movie_service_0069ed0c,1);
+ patch_abs(p,sizeof body_540500,0x0069e0d4,&render_driver_context_0069e0d4,1);
+ patch_abs(p,sizeof body_540500,0x005b3e10,&audio_stream_s16_scale_005b3e10,1);
+ patch_abs(p,sizeof body_540500,0x006bd97c,&render_thrash_exports_006bd910[27],1);
+ FlushInstructionCache(GetCurrentProcess(),original_code,sizeof body_540500);
+}
+struct Fpu{U mxcsr;unsigned short control,status,full_tag;B abridged;B reg[80];};
+alignas(16) static B fp_save[512];static Fpu fp_result;
+static void seed_fpu(){unsigned short cw=0x027f;U mxcsr=0x9f80;__asm{
+ fninit
+ fldcw cw
+ ldmxcsr mxcsr
+ fldpi
+ }}
+static void capture_fpu(){B env[28]{};std::memset(fp_save,0,sizeof fp_save);__asm{
+ fxsave fp_save
+ fnstenv env
+ fldenv env
+ }
+ std::memset(&fp_result,0,sizeof fp_result);fp_result.control=*reinterpret_cast<unsigned short*>(fp_save);
+ fp_result.status=*reinterpret_cast<unsigned short*>(fp_save+2);fp_result.abridged=fp_save[4];
+ fp_result.full_tag=*reinterpret_cast<unsigned short*>(env+8);fp_result.mxcsr=word(fp_save,24);
+ for(U i=0;i<8;i++){U physical=((fp_result.status>>11)+i)&7u;
+  if(fp_result.abridged&(1u<<physical))std::memcpy(fp_result.reg+i*10,fp_save+32+i*16,10);
+  else std::memset(fp_result.reg+i*10,0,10);}}
+static U invoke(void* fn,const U args[2],U* result_arg2,U* abi_failed){U before,frame=0,failed=0,result=0;__asm{
+ push ebx
+ push esi
+ push edi
+ mov before,esp
+ mov frame,ebp
+ mov eax,args
+ push dword ptr [eax+4]
+ push dword ptr [eax]
+ mov ebx,13579bdfh
+ mov esi,2468ace0h
+ mov edi,10203040h
+ call fn
+ mov result,eax
+ mov ecx,result_arg2
+ mov eax,dword ptr [esp+4]
+ mov dword ptr [ecx],eax
+ add esp,8
+ cmp esp,before
+ jne bad
+ cmp ebp,frame
+ jne bad
+ cmp ebx,13579bdfh
+ jne bad
+ cmp esi,2468ace0h
+ jne bad
+ cmp edi,10203040h
+ je done
+bad:mov failed,1
+done:mov esp,before
+ pop edi
+ pop esi
+ pop ebx
+ }*abi_failed=failed;return result;}
+struct Result{U eax,arg2,events;Event event;B context[context_size];Fpu fp;};
+static Result oracle_result,cpp_result;static U baseline_context_word;
+static void setup_case(U enabled,U base){
+ std::memset(service_root,0,sizeof service_root);std::memset(service_mid,0,sizeof service_mid);std::memset(service_node,0,sizeof service_node);
+ put(service_root,0,ptr(service_mid));put(service_mid,4,ptr(service_node));put(service_node,0x30,base);
+ game_setup_movie_service_0069ed0c=service_root;
+ std::memset(context_memory,0xa5,sizeof context_memory);put(context_memory,context_flag,enabled?0x20000u:0u);
+ put(context_memory,context_output,0x76543210u);baseline_context_word=word(context_memory,context_output);
+ render_driver_context_0069e0d4=context_memory;std::memset(observed,0,sizeof observed);event_count=0;
+ render_thrash_exports_006bd910[27]=ptr(reinterpret_cast<void*>(&render_settings_set_state_006bd97c));
+}
+static void run(void* fn,U enabled,U base,U key,U input,Result& out){
+ setup_case(enabled,base);U args[2]={key,input},arg2=0,abi_failed=0;seed_fpu();
+ out.eax=invoke(fn,args,&arg2,&abi_failed);require(abi_failed==0,"ABI stack/callee-save");out.arg2=arg2;capture_fpu();out.fp=fp_result;
+ out.events=event_count;out.event=event_count?observed[0]:Event{0,0};
+ std::memcpy(out.context,context_memory,sizeof context_memory);
+}
+static bool same_result(const Result&a,const Result&b){
+ return a.eax==b.eax&&a.arg2==b.arg2&&a.events==b.events&&
+  std::memcmp(&a.event,&b.event,sizeof(Event))==0&&
+  std::memcmp(a.context,b.context,context_size)==0&&std::memcmp(&a.fp,&b.fp,sizeof(Fpu))==0;
+}
+static void test_cases(){
+ const U inputs[]={0u,1u,0xffffffffu,0x80000000u,0x7fffffffu,0x20u};
+ const U keys[]={0u,1u,0xffffffffu,0x80000000u,0x7fffffffu,0x5a5a1234u};
+ const U bases[]={0u,0u,0u,0u,0u,0x7ffffffeu};
+ for(U enabled=0;enabled!=2;++enabled)for(U i=0;i<6;++i){
+  run(original_code,enabled,bases[i],keys[i],inputs[i],oracle_result);
+  run(reinterpret_cast<void*>(&render_driver_x87_handler_00540500),enabled,bases[i],keys[i],inputs[i],cpp_result);
+  require(same_result(oracle_result,cpp_result),"result/arg2/callback/context/x87 comparison");
+  require(cpp_result.arg2==static_cast<U>(bases[i]+inputs[i]),"caller-owned second argument writeback");
+  if(enabled)require(cpp_result.events==0,"enabled branch avoids callback");
+  else require(cpp_result.events==1&&cpp_result.event.key==keys[i]&&cpp_result.event.value==static_cast<U>(bases[i]+inputs[i]),"disabled branch callback ABI/order");
+  if(enabled)require(word(cpp_result.context,context_output)!=baseline_context_word,"enabled branch output field");
+  else require(word(cpp_result.context,context_output)==baseline_context_word,"disabled branch preserves output field");
+  ++cases;
+ }
+}
+int main(){verify_initial_data();prepare_original();test_cases();
+ std::printf("render_driver_x87_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,total_events);return 0;}

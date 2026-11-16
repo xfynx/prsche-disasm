@@ -4,23 +4,22 @@ Updated 2026-11-16. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run582](iterations/v2/001-original-recovery/runs/582-driver-state-integration/README.md)
-compiles 326 C++ translation units across 8 projects. The link has 126 unresolved names/
-131 references. **There is no recovered playable C++ game executable yet.**
+[Run584](iterations/v2/001-original-recovery/runs/584-driver-x87-integration/README.md)
+compiles327 C++ translation units across8 projects. The link has125 unresolved names/
+130 references. **There is no recovered playable C++ game executable yet.**
 
-Run582 integrates five partial driver-state originals. Its shared audit passes
-22 scenes and four controls, including original RET4 and host calling transports,
-rollback ordering and late mutable table loads. Two names close and real x87
-callback540500 enters. The 72-byte state packet and six relocations are verified.
-Registry905 retains partial classifications. Depth conversion, live driver and
-earlier parent domains remain open.
+Run584 integrates the partial540500 x87 callback. Native comparison passes24
+scenes/four controls atOd/O2, and all71 production instruction bytes equal the
+original after relocation normalization. Four existing canonical data owners
+are reused. Shared audit verifies808 pins/863 providers; registry906 retains
+partial domains. Live driver/context producers and parent semantics remain open.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run581 native005 and Run582 integration are accepted within their stated bounds.
-Run583 has separate native proof for540500 and awaits production integration584.
+Run583 native001 and Run584 integration are accepted within their stated bounds.
+Run585 frame-interface release and587 splash writes are independent pending packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
