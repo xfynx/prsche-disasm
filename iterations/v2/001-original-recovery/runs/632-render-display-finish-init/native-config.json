@@ -1,0 +1,90 @@
+{
+  "run": 632,
+  "experiment": "local/experiments/v2-render-display-finish-init-632",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/632-render-display-finish-init/render_display_finish_init_632.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/632-render-display-finish-init/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/632-render-display-finish-init",
+    "iterations/v2/001-original-recovery/runs/628-render-window-initialize",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/632-render-display-finish-init/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0053a780",
+      "bytes": 101,
+      "sha256": "2a9c038efccffeb385082a7c622c4baeca4ec8c78ea50c40ba520c88c3cfc75f",
+      "token": "@BODY_0053A780@"
+    },
+    {
+      "va": "0053bf20",
+      "bytes": 46,
+      "sha256": "a99c7bf907b79c01cb46b9128ef44af038be5563b48bf14d66a7db004e0b903b",
+      "token": "@BODY_0053BF20@"
+    },
+    {
+      "va": "004b0eb0",
+      "bytes": 39,
+      "sha256": "883fc5a48d9638bc283a8f2f9aadf0a72ed6e64375ccc18efbc779498f86e5bb",
+      "token": "@BODY_004B0EB0@"
+    }
+  ],
+  "pass_marker": "render_display_finish_init_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "omit-lock-create",
+      "source": "iterations/v2/001-original-recovery/runs/632-render-display-finish-init/render_display_finish_init_632.cpp",
+      "old": "    if (class_lock_0069e59c == nullptr) {\n        class_lock_0069e59c = heap_lock_create_005321f0();\n    }",
+      "new": "    if (class_lock_0069e59c != nullptr) {\n        class_lock_0069e59c = heap_lock_create_005321f0();\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-find-return-zero",
+      "source": "iterations/v2/001-original-recovery/runs/632-render-display-finish-init/render_display_finish_init_632.cpp",
+      "old": "    const std::uint32_t handler = entry != nullptr\n        ? static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entry->handler))\n        : 0u;",
+      "new": "    const std::uint32_t handler = entry != nullptr ? 0u : 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-hook-fullscreen-guard",
+      "source": "iterations/v2/001-original-recovery/runs/632-render-display-finish-init/render_display_finish_init_632.cpp",
+      "old": "    if (window_fullscreen_006b7c01 != 0u && window_keyboard_hook_handle_0069e584 != nullptr) {",
+      "new": "    if (window_fullscreen_006b7c01 == 0u && window_keyboard_hook_handle_0069e584 != nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-hook-enabled-clear",
+      "source": "iterations/v2/001-original-recovery/runs/632-render-display-finish-init/render_display_finish_init_632.cpp",
+      "old": "        window_keyboard_hook_enabled_0069e588 = 0u;",
+      "new": "        window_keyboard_hook_enabled_0069e588 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finish-prev-guard",
+      "source": "iterations/v2/001-original-recovery/runs/632-render-display-finish-init/render_display_finish_init_632.cpp",
+      "old": "    if (previous_handler == 0u) {",
+      "new": "    if (previous_handler != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finish-message-id",
+      "source": "iterations/v2/001-original-recovery/runs/632-render-display-finish-init/render_display_finish_init_632.cpp",
+      "old": "        previous_handler = window_handler_find_0053a780(0x1cu);",
+      "new": "        previous_handler = window_handler_find_0053a780(0x1du);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

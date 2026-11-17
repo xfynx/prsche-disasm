@@ -1,0 +1,694 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "render_display_finish_init_632.hpp"
+#include "porsche/frame_pump.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/window_create.hpp"
+#include "porsche/window_handlers.hpp"
+#include "porsche/window_keys.hpp"
+#include "porsche/window_procedure.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kMaxEvents = 24u,
+};
+
+enum EventTag : U {
+    kEvHeapLockCreate = 1u,
+    kEvHeapEnter = 2u,
+    kEvBinarySearch = 3u,
+    kEvHeapLeave = 4u,
+    kEvUnhookHook = 5u,
+    kEvRegisterHandler = 6u,
+};
+
+struct StateSnapshot {
+    U class_lock;
+    U handler_count;
+    U fullscreen;
+    U hook_handle;
+    U hook_enabled;
+    U prev_activate_handler;
+    U first_entry_msg;
+    U first_entry_fn;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    StateSnapshot state;
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U events_total = 0u;
+
+alignas(16) static B floating[512];
+static B* code = nullptr;
+static B* slot_53a780 = nullptr;
+static B* slot_53bf20 = nullptr;
+static B* slot_4b0eb0 = nullptr;
+static const void* iat_unhook_windows_hook_ex = nullptr;
+
+static B test_fullscreen_byte = 0u;
+alignas(4) static std::array<std::uint32_t, 12> test_frame_pump_storage{};
+
+static U cfg_lock_ret = 0x44440000u;
+static U cfg_enter_mutate_lock = 0u;
+static U cfg_unhook_ret = 1u;
+static U cfg_register_ret = 1u;
+static bool cfg_register_inserts_entry = false;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    s.class_lock = address(porsche::class_lock_0069e59c);
+    s.handler_count = porsche::window_handler_count_0069e570;
+    s.fullscreen = static_cast<U>(porsche::window_fullscreen_006b7c01);
+    s.hook_handle = address(porsche::window_keyboard_hook_handle_0069e584);
+    s.hook_enabled = porsche::window_keyboard_hook_enabled_0069e588;
+    s.prev_activate_handler = word(porsche::frame_pump_storage_bytes_006573b8() + 0x24u);
+    s.first_entry_msg = porsche::window_handler_count_0069e570 > 0u
+        ? porsche::window_handlers_0069e0e0[0].message
+        : 0u;
+    s.first_entry_fn = porsche::window_handler_count_0069e570 > 0u
+        ? address(reinterpret_cast<const void*>(porsche::window_handlers_0069e0e0[0].handler))
+        : 0u;
+}
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = 0x027fu;
+    U mxcsr = 0x9f80u;
+    __asm {
+        fninit
+        fldcw cw
+        ldmxcsr mxcsr
+        fld1
+    }
+}
+
+static void record_event(U tag, U arg0 = 0u, U arg1 = 0u, U arg2 = 0u) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    capture_state(e.state);
+}
+
+namespace porsche {
+
+void* class_lock_0069e59c = nullptr;
+std::uint8_t& window_fullscreen_006b7c01 = test_fullscreen_byte;
+WindowHandlerEntry window_handlers_0069e0e0[128]{};
+std::uint32_t window_handler_count_0069e570 = 0u;
+void* window_keyboard_hook_handle_0069e584 = nullptr;
+std::uint32_t window_keyboard_hook_enabled_0069e588 = 0u;
+
+std::uint8_t* frame_pump_storage_bytes_006573b8() noexcept {
+    return reinterpret_cast<std::uint8_t*>(test_frame_pump_storage.data());
+}
+
+void* __cdecl heap_lock_create_005321f0() {
+    record_event(kEvHeapLockCreate, cfg_lock_ret, 0u, 0u);
+    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(cfg_lock_ret));
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    record_event(kEvHeapEnter, address(lock), 0u, 0u);
+    if (cfg_enter_mutate_lock != 0u) {
+        class_lock_0069e59c = reinterpret_cast<void*>(static_cast<std::uintptr_t>(cfg_enter_mutate_lock));
+    }
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    record_event(kEvHeapLeave, address(lock), 0u, 0u);
+}
+
+std::int32_t __cdecl window_message_compare_0053a7f0(const void* a, const void* b) {
+    std::uint32_t x = 0u;
+    std::uint32_t y = 0u;
+    std::memcpy(&x, a, 4u);
+    std::memcpy(&y, b, 4u);
+    return static_cast<std::int32_t>(x - y);
+}
+
+void* __cdecl original_binary_search_005a2f23(
+    const void* key,
+    void* base,
+    std::uint32_t count,
+    std::uint32_t width,
+    SearchCompare compare) {
+    std::uint32_t key_msg = 0u;
+    std::memcpy(&key_msg, key, 4u);
+    record_event(
+        kEvBinarySearch,
+        key_msg,
+        (base == &window_handlers_0069e0e0[0]) ? 1u : 0u,
+        (count << 16) | (width & 0xffffu));
+    require(compare == &window_message_compare_0053a7f0, "exact comparator 0053a7f0");
+    require(width == sizeof(WindowHandlerEntry), "exact 8-byte width");
+
+    auto low = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(base));
+    auto high = low + (count - 1u) * width;
+    while (low <= high) {
+        const auto half = count >> 1u;
+        if (half == 0u) {
+            if (count == 0u) {
+                return nullptr;
+            }
+            return compare(key, reinterpret_cast<void*>(low)) != 0
+                ? nullptr
+                : reinterpret_cast<void*>(low);
+        }
+        const auto middle = low + ((count & 1u) != 0u ? half : half - 1u) * width;
+        const auto cmp = compare(key, reinterpret_cast<void*>(middle));
+        if (cmp == 0) {
+            return reinterpret_cast<void*>(middle);
+        }
+        if (cmp < 0) {
+            high = middle - width;
+            count = (count & 1u) != 0u ? half : half - 1u;
+        } else {
+            low = middle + width;
+            count = half;
+        }
+    }
+    return nullptr;
+}
+
+std::int32_t __stdcall window_keys_unhook_windows_hook(void* hook) {
+    record_event(kEvUnhookHook, address(hook), cfg_unhook_ret, 0u);
+    return static_cast<std::int32_t>(cfg_unhook_ret);
+}
+
+std::uint32_t __stdcall window_handler_register_0053a800(std::uint32_t message, std::uint32_t handler_value) {
+    record_event(kEvRegisterHandler, message, handler_value, 0u);
+    if (cfg_register_inserts_entry) {
+        const WindowHandler handler = reinterpret_cast<WindowHandler>(
+            static_cast<std::uintptr_t>(handler_value));
+        bool found = false;
+        for (U i = 0u; i < window_handler_count_0069e570; ++i) {
+            if (window_handlers_0069e0e0[i].message == message) {
+                window_handlers_0069e0e0[i].handler = handler;
+                found = true;
+                break;
+            }
+        }
+        if (!found && window_handler_count_0069e570 < 128u) {
+            window_handlers_0069e0e0[window_handler_count_0069e570].message = message;
+            window_handlers_0069e0e0[window_handler_count_0069e570].handler = handler;
+            ++window_handler_count_0069e570;
+        }
+    }
+    return cfg_register_ret;
+}
+
+std::uint32_t __stdcall render_display_activate_callback_004b0ee0(
+    void*,
+    void*,
+    std::uint32_t,
+    std::uint32_t,
+    std::int32_t,
+    std::int32_t*) {
+    volatile U tag = 0x4b0ee0u;
+    return tag;
+}
+
+} // namespace porsche
+
+static U invoke_call(void* fn, const U* args, U argc, bool is_stdcall, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    const U cleanup = is_stdcall ? 0u : (argc * 4u);
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, argc
+        mov edx, args
+    push_loop:
+        test eax, eax
+        jz pushed
+        dec eax
+        push dword ptr [edx + eax * 4]
+        jmp push_loop
+    pushed:
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        add esp, cleanup
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && slot[off - 1u] == 0xe8u, "exact relative call opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    // Assert production initial state before fixture resets.
+    require(porsche::class_lock_0069e59c == nullptr, "initial 0069e59c");
+    require(porsche::window_handler_count_0069e570 == 0u, "initial 0069e570");
+    require(porsche::window_fullscreen_006b7c01 == 0u, "initial 006b7c01");
+    require(porsche::window_keyboard_hook_handle_0069e584 == nullptr, "initial 0069e584");
+    require(porsche::window_keyboard_hook_enabled_0069e588 == 0u, "initial 0069e588");
+    require(word(porsche::frame_pump_storage_bytes_006573b8() + 0x24u) == 0u, "initial 006573dc");
+
+    iat_unhook_windows_hook_ex = reinterpret_cast<const void*>(&porsche::window_keys_unhook_windows_hook);
+
+    static const B body_53a780[] = {@BODY_0053A780@};
+    static const B body_53bf20[] = {@BODY_0053BF20@};
+    static const B body_4b0eb0[] = {@BODY_004B0EB0@};
+    require(sizeof body_53a780 == 101u, "101-byte original body 0053a780");
+    require(sizeof body_53bf20 == 46u, "46-byte original body 0053bf20");
+    require(sizeof body_4b0eb0 == 39u, "39-byte original body 004b0eb0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_53a780 = code + 0x000u;
+    slot_53bf20 = code + 0x080u;
+    slot_4b0eb0 = code + 0x0c0u;
+
+    std::memcpy(slot_53a780, body_53a780, sizeof body_53a780);
+    std::memcpy(slot_53bf20, body_53bf20, sizeof body_53bf20);
+    std::memcpy(slot_4b0eb0, body_4b0eb0, sizeof body_4b0eb0);
+
+    // Relocate 0053a780 (10 relocations).
+    relocate_abs32(slot_53a780, 0x001u, 0x0069e59cu, address(&porsche::class_lock_0069e59c));
+    relocate_rel32(slot_53a780, 0x0053a780u, 0x010u, 0x005321f0u,
+                   reinterpret_cast<const void*>(&porsche::heap_lock_create_005321f0));
+    relocate_abs32(slot_53a780, 0x015u, 0x0069e59cu, address(&porsche::class_lock_0069e59c));
+    relocate_rel32(slot_53a780, 0x0053a780u, 0x01bu, 0x005322b0u,
+                   reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    relocate_abs32(slot_53a780, 0x021u, 0x0069e570u, address(&porsche::window_handler_count_0069e570));
+    relocate_abs32(slot_53a780, 0x02au, 0x0053a7f0u, address(reinterpret_cast<const void*>(&porsche::window_message_compare_0053a7f0)));
+    relocate_abs32(slot_53a780, 0x036u, 0x0069e0e0u, address(&porsche::window_handlers_0069e0e0[0]));
+    relocate_rel32(slot_53a780, 0x0053a780u, 0x040u, 0x005a2f23u,
+                   reinterpret_cast<const void*>(&porsche::original_binary_search_005a2f23));
+    relocate_abs32(slot_53a780, 0x04fu, 0x0069e59cu, address(&porsche::class_lock_0069e59c));
+    relocate_rel32(slot_53a780, 0x0053a780u, 0x055u, 0x005322c0u,
+                   reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+
+    // Relocate 0053bf20 (5 relocations).
+    relocate_abs32(slot_53bf20, 0x001u, 0x006b7c01u, address(&porsche::window_fullscreen_006b7c01));
+    relocate_abs32(slot_53bf20, 0x00au, 0x0069e584u, address(&porsche::window_keyboard_hook_handle_0069e584));
+    relocate_abs32(slot_53bf20, 0x015u, 0x005b2304u, address(&iat_unhook_windows_hook_ex));
+    relocate_abs32(slot_53bf20, 0x01bu, 0x0069e584u, address(&porsche::window_keyboard_hook_handle_0069e584));
+    relocate_abs32(slot_53bf20, 0x025u, 0x0069e588u, address(&porsche::window_keyboard_hook_enabled_0069e588));
+
+    // Relocate 004b0eb0 (6 relocations).
+    const U slot_6573dc = address(porsche::frame_pump_storage_bytes_006573b8() + 0x24u);
+    relocate_rel32(slot_4b0eb0, 0x004b0eb0u, 0x001u, 0x0053bf20u, slot_53bf20);
+    relocate_abs32(slot_4b0eb0, 0x006u, 0x006573dcu, slot_6573dc);
+    relocate_rel32(slot_4b0eb0, 0x004b0eb0u, 0x011u, 0x0053a780u, slot_53a780);
+    relocate_abs32(slot_4b0eb0, 0x016u, 0x004b0ee0u,
+                   address(reinterpret_cast<const void*>(&porsche::render_display_activate_callback_004b0ee0)));
+    relocate_abs32(slot_4b0eb0, 0x01du, 0x006573dcu, slot_6573dc);
+    relocate_rel32(slot_4b0eb0, 0x004b0eb0u, 0x022u, 0x0053a800u,
+                   reinterpret_cast<const void*>(&porsche::window_handler_register_0053a800));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+struct HandlerSeed {
+    U message;
+    U handler_addr;
+};
+
+struct CaseConfig {
+    U class_lock;
+    U lock_ret;
+    U enter_mutate_lock;
+    U handler_count;
+    HandlerSeed entries[8];
+    B fullscreen;
+    U hook_handle;
+    U hook_enabled;
+    U unhook_ret;
+    U prev_activate_handler;
+    U register_ret;
+    bool register_inserts_entry;
+};
+
+static void apply_config(const CaseConfig& cfg) {
+    porsche::class_lock_0069e59c = reinterpret_cast<void*>(static_cast<std::uintptr_t>(cfg.class_lock));
+    porsche::window_handler_count_0069e570 = cfg.handler_count;
+    for (U i = 0u; i < 128u; ++i) {
+        porsche::window_handlers_0069e0e0[i].message = 0u;
+        porsche::window_handlers_0069e0e0[i].handler = nullptr;
+    }
+    for (U i = 0u; i < cfg.handler_count && i < 8u; ++i) {
+        porsche::window_handlers_0069e0e0[i].message = cfg.entries[i].message;
+        porsche::window_handlers_0069e0e0[i].handler = reinterpret_cast<porsche::WindowHandler>(
+            static_cast<std::uintptr_t>(cfg.entries[i].handler_addr));
+    }
+
+    porsche::window_fullscreen_006b7c01 = cfg.fullscreen;
+    porsche::window_keyboard_hook_handle_0069e584 = reinterpret_cast<void*>(
+        static_cast<std::uintptr_t>(cfg.hook_handle));
+    porsche::window_keyboard_hook_enabled_0069e588 = cfg.hook_enabled;
+
+    std::memset(test_frame_pump_storage.data(), 0, sizeof(test_frame_pump_storage));
+    put(porsche::frame_pump_storage_bytes_006573b8() + 0x24u, 0u, cfg.prev_activate_handler);
+
+    cfg_lock_ret = cfg.lock_ret;
+    cfg_enter_mutate_lock = cfg.enter_mutate_lock;
+    cfg_unhook_ret = cfg.unhook_ret;
+    cfg_register_ret = cfg.register_ret;
+    cfg_register_inserts_entry = cfg.register_inserts_entry;
+}
+
+static void compare_traces(bool check_return) {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    if (!check_return) {
+        trace.ret_eax = 0u;
+        expected.ret_eax = 0u;
+    }
+    require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0,
+                "event mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0,
+            "x87/MXCSR state mismatch");
+}
+
+static void run_pair(
+    void* orig_fn,
+    void* cpp_fn,
+    const U* args,
+    U argc,
+    bool is_stdcall,
+    bool check_return,
+    const CaseConfig& cfg) {
+    ++cases;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_call(orig_fn, args, argc, is_stdcall, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_call(cpp_fn, args, argc, is_stdcall, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    events_total += trace.count;
+    compare_traces(check_return);
+}
+
+static void run_finish_twice(const CaseConfig& cfg) {
+    ++cases;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_call(slot_4b0eb0, nullptr, 0u, false, trace.ret_eax);
+        if (trace.abi_fail == 0u && trace.exception[0] == 0u) {
+            trace.abi_fail = invoke_call(slot_4b0eb0, nullptr, 0u, false, trace.ret_eax);
+        }
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_call(
+            reinterpret_cast<void*>(&porsche::render_display_finish_init_004b0eb0),
+            nullptr, 0u, false, trace.ret_eax);
+        if (trace.abi_fail == 0u && trace.exception[0] == 0u) {
+            trace.abi_fail = invoke_call(
+                reinterpret_cast<void*>(&porsche::render_display_finish_init_004b0eb0),
+                nullptr, 0u, false, trace.ret_eax);
+        }
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    events_total += trace.count;
+    compare_traces(false);
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    // 1. Direct checks for 0053a780 (window_handler_find_0053a780, stdcall1).
+    {
+        // 1a. Null lock -> creates lock, empty table -> returns 0.
+        const U msg = 0x1cu;
+        CaseConfig cfg{};
+        cfg.class_lock = 0u;
+        cfg.lock_ret = 0x12340000u;
+        cfg.handler_count = 0u;
+        run_pair(slot_53a780, reinterpret_cast<void*>(&porsche::window_handler_find_0053a780),
+                 &msg, 1u, true, true, cfg);
+    }
+
+    {
+        // 1b. Non-null lock, 1-entry hit and miss, plus callback lock mutation.
+        CaseConfig cfg{};
+        cfg.class_lock = 0x22220000u;
+        cfg.lock_ret = 0x99990000u;
+        cfg.handler_count = 1u;
+        cfg.entries[0] = {0x1cu, 0x0053b040u};
+
+        const U hit_msg = 0x1cu;
+        run_pair(slot_53a780, reinterpret_cast<void*>(&porsche::window_handler_find_0053a780),
+                 &hit_msg, 1u, true, true, cfg);
+
+        const U miss_msg = 0x1du;
+        cfg.enter_mutate_lock = 0x33330000u;
+        run_pair(slot_53a780, reinterpret_cast<void*>(&porsche::window_handler_find_0053a780),
+                 &miss_msg, 1u, true, true, cfg);
+    }
+
+    {
+        // 1c. Multi-entry sorted table: first, middle, last, null-handler entry, miss, wraparound key.
+        CaseConfig cfg{};
+        cfg.class_lock = 0x55550000u;
+        cfg.handler_count = 5u;
+        cfg.entries[0] = {0x00000006u, 0x0053b050u};
+        cfg.entries[1] = {0x0000001cu, 0x0053b040u};
+        cfg.entries[2] = {0x00000100u, 0x00000000u};
+        cfg.entries[3] = {0x00000218u, 0x0053b8b0u};
+        cfg.entries[4] = {0x80000001u, 0x00778899u};
+
+        const U keys[] = {0x00000006u, 0x0000001cu, 0x00000100u, 0x00000218u, 0x80000001u, 0x000000ffu};
+        for (const U key : keys) {
+            run_pair(slot_53a780, reinterpret_cast<void*>(&porsche::window_handler_find_0053a780),
+                     &key, 1u, true, true, cfg);
+        }
+    }
+
+    // 2. Direct checks for 0053bf20 (window_keyboard_hook_disable_0053bf20, cdecl0).
+    {
+        // 2a. fullscreen == 0 with active hook -> no-op.
+        CaseConfig cfg{};
+        cfg.fullscreen = 0u;
+        cfg.hook_handle = 0x778899aau;
+        cfg.hook_enabled = 1u;
+        cfg.unhook_ret = 1u;
+        run_pair(slot_53bf20, reinterpret_cast<void*>(&porsche::window_keyboard_hook_disable_0053bf20),
+                 nullptr, 0u, false, false, cfg);
+
+        // 2b. fullscreen != 0 with null hook -> no-op.
+        cfg.fullscreen = 1u;
+        cfg.hook_handle = 0u;
+        cfg.hook_enabled = 1u;
+        run_pair(slot_53bf20, reinterpret_cast<void*>(&porsche::window_keyboard_hook_disable_0053bf20),
+                 nullptr, 0u, false, false, cfg);
+
+        // 2c. fullscreen == 1 with active hook -> unhooks and clears both globals.
+        cfg.fullscreen = 1u;
+        cfg.hook_handle = 0x778899aau;
+        cfg.hook_enabled = 1u;
+        cfg.unhook_ret = 1u;
+        run_pair(slot_53bf20, reinterpret_cast<void*>(&porsche::window_keyboard_hook_disable_0053bf20),
+                 nullptr, 0u, false, false, cfg);
+
+        // 2d. High-bit nonzero fullscreen (0x80), UnhookWindowsHookEx returns 0 -> still clears both globals.
+        cfg.fullscreen = 0x80u;
+        cfg.hook_handle = 0x11223344u;
+        cfg.hook_enabled = 7u;
+        cfg.unhook_ret = 0u;
+        run_pair(slot_53bf20, reinterpret_cast<void*>(&porsche::window_keyboard_hook_disable_0053bf20),
+                 nullptr, 0u, false, false, cfg);
+    }
+
+    // 3. Direct checks for 004b0eb0 (render_display_finish_init_004b0eb0, cdecl0).
+    {
+        // 3a. 006573dc != 0 -> still runs 0053bf20, skips find and register.
+        CaseConfig cfg{};
+        cfg.fullscreen = 1u;
+        cfg.hook_handle = 0xdead0001u;
+        cfg.hook_enabled = 1u;
+        cfg.unhook_ret = 1u;
+        cfg.prev_activate_handler = 0x0053b040u;
+        run_pair(slot_4b0eb0, reinterpret_cast<void*>(&porsche::render_display_finish_init_004b0eb0),
+                 nullptr, 0u, false, false, cfg);
+
+        // 3b. 006573dc == 0, 0x1c missing from table -> stores 0 into 006573dc and registers 004b0ee0.
+        cfg.class_lock = 0u;
+        cfg.lock_ret = 0xaa001100u;
+        cfg.handler_count = 1u;
+        cfg.entries[0] = {0x00000006u, 0x0053b050u};
+        cfg.fullscreen = 0u;
+        cfg.hook_handle = 0xdead0002u;
+        cfg.hook_enabled = 1u;
+        cfg.prev_activate_handler = 0u;
+        cfg.register_ret = 1u;
+        cfg.register_inserts_entry = true;
+        run_pair(slot_4b0eb0, reinterpret_cast<void*>(&porsche::render_display_finish_init_004b0eb0),
+                 nullptr, 0u, false, false, cfg);
+
+        // 3c. 006573dc == 0, 0x1c present (0x0053b040), fullscreen hook active ->
+        //     unhooks, finds 0x0053b040, stores into 006573dc, registers 004b0ee0;
+        //     second call sees 006573dc != 0 and skips find/register.
+        cfg.class_lock = 0xbb002200u;
+        cfg.handler_count = 3u;
+        cfg.entries[0] = {0x00000006u, 0x0053b050u};
+        cfg.entries[1] = {0x0000001cu, 0x0053b040u};
+        cfg.entries[2] = {0x00000100u, 0x0053b450u};
+        cfg.fullscreen = 1u;
+        cfg.hook_handle = 0xdead0003u;
+        cfg.hook_enabled = 1u;
+        cfg.prev_activate_handler = 0u;
+        cfg.register_ret = 1u;
+        cfg.register_inserts_entry = true;
+        run_finish_twice(cfg);
+    }
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("render_display_finish_init_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

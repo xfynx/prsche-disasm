@@ -1,0 +1,127 @@
+{
+  "run": 631,
+  "experiment": "local/experiments/v2-render-window-callbacks-631",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/render_window_callbacks_631.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/631-render-window-callbacks",
+    "iterations/v2/001-original-recovery/runs/628-render-window-initialize",
+    "iterations/v2/001-original-recovery/runs/549-render-diagnostic",
+    "iterations/v2/001-original-recovery/runs/345-diagnostic-devices",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/original-index-supplement.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005756d0",
+      "bytes": 11,
+      "sha256": "3f08780f124dbb553fa004fc946d0368c7d1d11152b7aac7ea272f70ffeca0c2",
+      "token": "@BODY_005756D0@"
+    },
+    {
+      "va": "005756e0",
+      "bytes": 71,
+      "sha256": "f06045d33aaf8c6f3c671b657bf6cc6c0106e60ae2dc65a593e23b9f3663c5c1",
+      "token": "@BODY_005756E0@"
+    },
+    {
+      "va": "00575730",
+      "bytes": 61,
+      "sha256": "35938a0660a9ce0fe452465f22076ba794138c54f2960d61b1a96023f9e7261a",
+      "token": "@BODY_00575730@"
+    },
+    {
+      "va": "00575770",
+      "bytes": 84,
+      "sha256": "1044c197f77692670e35b440eb5f6d07783e00c1566d145f38621a2b7494eb41",
+      "token": "@BODY_00575770@"
+    },
+    {
+      "va": "005757d0",
+      "bytes": 23,
+      "sha256": "02a16a5f5019d09026e72e6893a1cdd520ec39503e3b71f8695edf29ffa5376e",
+      "token": "@BODY_005757D0@"
+    },
+    {
+      "va": "005bef50",
+      "bytes": 16,
+      "sha256": "eed8d6675a93dbd48b7f456da84b927303c118613a957f9ccd38aa2e2c4c5c1b",
+      "token": "@RDATA_005BEF50@"
+    }
+  ],
+  "pass_marker": "render_window_callbacks_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-timed-callback-arg",
+      "source": "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/render_window_callbacks_631.cpp",
+      "old": "    (void)timed_callbacks_005366e0(0u);",
+      "new": "    (void)timed_callbacks_005366e0(1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-ddraw2-iid-byte",
+      "source": "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/render_window_callbacks_631.cpp",
+      "old": "    0xe0u, 0xf3u, 0xa6u, 0xb3u, 0x43u, 0x2bu, 0xcfu, 0x11u,",
+      "new": "    0xe1u, 0xf3u, 0xa6u, 0xb3u, 0x43u, 0x2bu, 0xcfu, 0x11u,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-qi-counter-skip",
+      "source": "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/render_window_callbacks_631.cpp",
+      "old": "        if (hr != 0u) {\n            return hr;\n        }",
+      "new": "        if (hr == 0u) {\n            return hr;\n        }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-release-clear-omit",
+      "source": "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/render_window_callbacks_631.cpp",
+      "old": "    void* const null_obj = nullptr;\n    std::memcpy(storage, &null_obj, sizeof(null_obj));",
+      "new": "    std::memcpy(storage, &obj, sizeof(obj));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-lock-opaque-value",
+      "source": "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/render_window_callbacks_631.cpp",
+      "old": "        window_support_opaque_value_006a64a0 = 1u;",
+      "new": "        window_support_opaque_value_006a64a0 = 2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-diag-channel-case2",
+      "source": "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/render_window_callbacks_631.cpp",
+      "old": "    case 2u:\n        render_texture_diagnostic_0055ec50(2u, text);",
+      "new": "    case 2u:\n        render_texture_diagnostic_0055ec50(6u, text);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-diag-channel-default",
+      "source": "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/render_window_callbacks_631.cpp",
+      "old": "    default:\n        render_texture_diagnostic_0055ec50(6u, text);",
+      "new": "    default:\n        render_texture_diagnostic_0055ec50(2u, text);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-resize-arg0-guard",
+      "source": "iterations/v2/001-original-recovery/runs/631-render-window-callbacks/render_window_callbacks_631.cpp",
+      "old": "    if (arg0 == 2u && window_resize_notification_pointer_005df9b8 != nullptr) {",
+      "new": "    if (arg0 == 1u && window_resize_notification_pointer_005df9b8 != nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

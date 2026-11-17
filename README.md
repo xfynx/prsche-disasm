@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run630](iterations/v2/001-original-recovery/runs/630-render-window-codec-create-integration/README.md)
-  integrates the partial render window init and audio stream codec create chain.
-  The shared build has 96 unresolved names across 357 TUs.
+  [Run633](iterations/v2/001-original-recovery/runs/633-render-callbacks-finish-init-integration/README.md)
+  integrates the partial `005e1960` window callbacks and `004b0eb0` finish-init chain.
+  The shared build has 90 unresolved names across 359 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

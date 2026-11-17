@@ -1,17 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-18. Run630 shared audit (`001`) passes for frozen `628/001`+`629/001` on `627`.
-Build `001` compiles 357 TUs / 8 projects, 96 names / 99 refs, no EXE. Two real names
-(`render_initialize_window_00575820`, `audio_stream_codec_create_0056aff0`)
-close, while `005e1960` adds six real callback frontier names (`0053a780`,
-`005756d0`, `005756e0`, `00575730`, `00575770`, `005757d0`), 36B `.data`
-(`005e1960`, `006a64bc`), and 248B `.rdata`.
-Registry 960 adds four PARTIAL bodies (869B total). README 630 owns
-commands and bounds: 148 native cases / 13 controls at `/Od`/`/O2`, 884 pins.
+Current 2026-11-18. Run633 shared audit (`001`) passes for frozen `631/001`+`632/001` on `630`.
+Build `001` compiles 359 TUs / 8 projects, 90 names / 93 refs, no EXE. All seven
+targeted names (`004b0eb0`, `0053a780`, five `005e1960` callbacks) close while
+`004b0ee0` enters; 0B new `.data`, 16B `.rdata` (`005bef50`).
+Registry 968 adds eight PARTIAL bodies (436B total). README 633 owns
+commands and bounds: 68 native cases / 14 controls at `/Od`/`/O2`, 889 pins.
 
-Active flash workers: `631` (five `005e1960` callbacks, 248B) and `632`
-(`0053a780` + `0053bf20` + `004b0eb0`, 186B). Next integrate `631`+`632` in
-shared batch `633` to close all seven names.
+Active flash workers: `634` (`00563d30`..`00592590`, 623B) and `635`
+(`005360d0` + `004b0ee0`, 182B). Next integrate `634`+`635` in shared batch
+`636`.
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

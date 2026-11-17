@@ -1,0 +1,596 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "render_window_callbacks_631.hpp"
+#include "../549-render-diagnostic/render_diagnostic_549.hpp"
+#include "../628-render-window-initialize/render_window_initialize_628.hpp"
+#include "porsche/file_threads.hpp"
+#include "porsche/files.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/window_input_bindings.hpp"
+#include "porsche/window_runtime.hpp"
+#include "porsche/window_state.hpp"
+#include "porsche/window_support.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kMaxEvents = 16u,
+    kMsgCap = 64u,
+};
+
+enum EventTag : U {
+    kEvTimedCallbacks = 1u,
+    kEvQueryInterface = 2u,
+    kEvAddRef = 3u,
+    kEvRelease = 4u,
+    kEvHeapEnter = 5u,
+    kEvHeapLeave = 6u,
+    kEvDiagHandler = 7u,
+    kEvRenderDiag = 8u,
+    kEvResizeNotify = 9u,
+};
+
+struct StateSnapshot {
+    U thread_lock;
+    U opaque_6a64a0;
+    U diag_handler;
+    U resize_notify;
+    B window_config[sizeof(porsche::OriginalWindowConfiguration)];
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    B bytes[16];
+    char text[kMsgCap];
+    StateSnapshot state;
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U events_total = 0u;
+
+alignas(16) static B floating[512];
+static B* code = nullptr;
+static B* slot_5756d0 = nullptr;
+static B* slot_5756e0 = nullptr;
+static B* slot_575730 = nullptr;
+static B* slot_575770 = nullptr;
+static B* slot_5757d0 = nullptr;
+
+static const B raw_iid_005bef50[] = {@RDATA_005BEF50@};
+
+static U cfg_timed_ret = 0u;
+static U cfg_qi_hr = 0u;
+static bool cfg_qi_writes_ppv = true;
+static U cfg_qi_out_obj = 0u;
+static U cfg_release_ret = 0u;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    s.thread_lock = address(porsche::thread_start_lock_006a57d8);
+    s.opaque_6a64a0 = porsche::window_support_opaque_value_006a64a0;
+    s.diag_handler = address(reinterpret_cast<const void*>(porsche::diagnostic_handler_005debf0));
+    s.resize_notify = address(reinterpret_cast<const void*>(porsche::window_resize_notification_pointer_005df9b8));
+    std::memcpy(s.window_config, &porsche::window_configuration_storage_006b77a0, sizeof s.window_config);
+}
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = 0x027fu;
+    U mxcsr = 0x9f80u;
+    __asm {
+        fninit
+        fldcw cw
+        ldmxcsr mxcsr
+        fld1
+    }
+}
+
+static Event& next_event(U tag, U arg0 = 0u, U arg1 = 0u, U arg2 = 0u) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    capture_state(e.state);
+    return e;
+}
+
+static void copy_cstr(char* dst, U cap, const char* src) {
+    std::memset(dst, 0, cap);
+    if (src == nullptr) {
+        std::memcpy(dst, "<null>", 7u);
+        return;
+    }
+    for (U i = 0u; i + 1u < cap && src[i] != '\0'; ++i) {
+        dst[i] = src[i];
+    }
+}
+
+struct MockComObject {
+    void* const* vtable;
+    U tag;
+};
+
+static U __stdcall mock_qi(void* self, const void* riid, void** ppv) {
+    Event& e = next_event(kEvQueryInterface, address(self), address(ppv), cfg_qi_hr);
+    if (riid != nullptr) {
+        std::memcpy(e.bytes, riid, 16u);
+    }
+    if (cfg_qi_writes_ppv && ppv != nullptr) {
+        *ppv = reinterpret_cast<void*>(static_cast<std::uintptr_t>(cfg_qi_out_obj));
+    }
+    return cfg_qi_hr;
+}
+
+static U __stdcall mock_addref(void* self) {
+    (void)next_event(kEvAddRef, address(self), 0u, 0u);
+    return 1u;
+}
+
+static U __stdcall mock_release(void* self) {
+    const auto* const cfg = reinterpret_cast<const B*>(&porsche::window_configuration_storage_006b77a0);
+    (void)next_event(kEvRelease, address(self), word(cfg, 0u), word(cfg, 0x470u));
+    return cfg_release_ret;
+}
+
+static void* const mock_vtable[3] = {
+    reinterpret_cast<void*>(&mock_qi),
+    reinterpret_cast<void*>(&mock_addref),
+    reinterpret_cast<void*>(&mock_release),
+};
+
+static MockComObject mock_com_primary{mock_vtable, 0x11111111u};
+static MockComObject mock_com_stored{mock_vtable, 0x22222222u};
+
+static void __cdecl mock_diag_handler(const char* text) {
+    Event& e = next_event(kEvDiagHandler, address(text), 0u, 0u);
+    copy_cstr(e.text, kMsgCap, text);
+}
+
+static void __cdecl mock_resize_notify() {
+    (void)next_event(kEvResizeNotify, 0u, 0u, 0u);
+}
+
+namespace porsche {
+
+OriginalWindowConfiguration window_configuration_storage_006b77a0{};
+void* thread_start_lock_006a57d8 = nullptr;
+std::uint32_t window_support_opaque_value_006a64a0 = 0u;
+void (__cdecl* diagnostic_handler_005debf0)(const char*) = nullptr;
+WindowResizeNotification window_resize_notification_pointer_005df9b8 = nullptr;
+
+std::uint32_t __cdecl timed_callbacks_005366e0(std::uint32_t argument) {
+    (void)next_event(kEvTimedCallbacks, argument, cfg_timed_ret, 0u);
+    return cfg_timed_ret;
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    (void)next_event(kEvHeapEnter, address(lock), 0u, 0u);
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    (void)next_event(kEvHeapLeave, address(lock), 0u, 0u);
+}
+
+void __cdecl render_texture_diagnostic_0055ec50(std::uint32_t channel, const char* format, ...) {
+    Event& e = next_event(kEvRenderDiag, channel, address(format), 0u);
+    copy_cstr(e.text, kMsgCap, format);
+}
+
+} // namespace porsche
+
+static U invoke_fn(void* fn, const U* args, U argc, bool is_stdcall, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    const U cleanup = is_stdcall ? 0u : (argc * 4u);
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, argc
+        mov edx, args
+    push_loop:
+        test eax, eax
+        jz pushed
+        dec eax
+        push dword ptr [edx + eax * 4]
+        jmp push_loop
+    pushed:
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        add esp, cleanup
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && slot[off - 1u] == 0xe8u, "exact relative call opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    require(sizeof raw_iid_005bef50 == 16u, "16-byte original 005bef50 IID");
+    require(sizeof porsche::render_window_ddraw2_iid_005bef50 == sizeof raw_iid_005bef50 &&
+            std::memcmp(porsche::render_window_ddraw2_iid_005bef50, raw_iid_005bef50, 16u) == 0,
+            "rdata_005bef50_bytes");
+
+    static const B body_5756d0[] = {@BODY_005756D0@};
+    static const B body_5756e0[] = {@BODY_005756E0@};
+    static const B body_575730[] = {@BODY_00575730@};
+    static const B body_575770[] = {@BODY_00575770@};
+    static const B body_5757d0[] = {@BODY_005757D0@};
+
+    require(sizeof body_5756d0 == 11u, "11-byte original body 005756d0");
+    require(sizeof body_5756e0 == 71u, "71-byte original body 005756e0");
+    require(sizeof body_575730 == 61u, "61-byte original body 00575730");
+    require(sizeof body_575770 == 84u, "84-byte original body 00575770");
+    require(sizeof body_5757d0 == 23u, "23-byte original body 005757d0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_5756d0 = code + 0x000u;
+    slot_5756e0 = code + 0x020u;
+    slot_575730 = code + 0x080u;
+    slot_575770 = code + 0x0e0u;
+    slot_5757d0 = code + 0x160u;
+
+    std::memcpy(slot_5756d0, body_5756d0, sizeof body_5756d0);
+    std::memcpy(slot_5756e0, body_5756e0, sizeof body_5756e0);
+    std::memcpy(slot_575730, body_575730, sizeof body_575730);
+    std::memcpy(slot_575770, body_575770, sizeof body_575770);
+    std::memcpy(slot_5757d0, body_5757d0, sizeof body_5757d0);
+
+    const U storage_base = address(&porsche::window_configuration_storage_006b77a0);
+    const U storage_470 = storage_base + 0x470u;
+
+    // Relocate 005756d0 (1 relocation).
+    relocate_rel32(slot_5756d0, 0x005756d0u, 0x003u, 0x005366e0u,
+                   reinterpret_cast<const void*>(&porsche::timed_callbacks_005366e0));
+
+    // Relocate 005756e0 (7 relocations; original x86 side reads pinned raw_iid_005bef50).
+    relocate_abs32(slot_5756e0, 0x00bu, 0x006b77a0u, storage_base);
+    relocate_abs32(slot_5756e0, 0x010u, 0x005bef50u, address(raw_iid_005bef50));
+    relocate_abs32(slot_5756e0, 0x01du, 0x006b7c10u, storage_470);
+    relocate_abs32(slot_5756e0, 0x025u, 0x006b77a0u, storage_base);
+    relocate_abs32(slot_5756e0, 0x030u, 0x006b7c10u, storage_470);
+    relocate_abs32(slot_5756e0, 0x036u, 0x006b77a0u, storage_base);
+    relocate_abs32(slot_5756e0, 0x040u, 0x006b7c10u, storage_470);
+
+    // Relocate 00575730 (6 relocations).
+    relocate_abs32(slot_575730, 0x009u, 0x006a57d8u, address(&porsche::thread_start_lock_006a57d8));
+    relocate_rel32(slot_575730, 0x00575730u, 0x00fu, 0x005322b0u,
+                   reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    relocate_abs32(slot_575730, 0x018u, 0x006a64a0u, address(&porsche::window_support_opaque_value_006a64a0));
+    relocate_abs32(slot_575730, 0x025u, 0x006a57d8u, address(&porsche::thread_start_lock_006a57d8));
+    relocate_abs32(slot_575730, 0x02bu, 0x006a64a0u, address(&porsche::window_support_opaque_value_006a64a0));
+    relocate_rel32(slot_575730, 0x00575730u, 0x035u, 0x005322c0u,
+                   reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+
+    // Relocate 00575770 (4 relocations).
+    relocate_rel32(slot_575770, 0x00575770u, 0x017u, 0x0055ec50u,
+                   reinterpret_cast<const void*>(&porsche::render_texture_diagnostic_0055ec50));
+    relocate_rel32(slot_575770, 0x00575770u, 0x029u, 0x0055ec50u,
+                   reinterpret_cast<const void*>(&porsche::render_texture_diagnostic_0055ec50));
+    relocate_rel32(slot_575770, 0x00575770u, 0x03bu, 0x0055ec50u,
+                   reinterpret_cast<const void*>(&porsche::render_texture_diagnostic_0055ec50));
+    relocate_abs32(slot_575770, 0x04cu, 0x005debf0u, address(&porsche::diagnostic_handler_005debf0));
+
+    // Relocate 005757d0 (1 relocation).
+    relocate_abs32(slot_5757d0, 0x00au, 0x005df9b8u, address(&porsche::window_resize_notification_pointer_005df9b8));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+struct CaseConfig {
+    U initial_obj;
+    U initial_counter;
+    U thread_lock;
+    U opaque_6a64a0;
+    void (__cdecl* diag_handler)(const char*);
+    porsche::WindowResizeNotification resize_notify;
+    U timed_ret;
+    U qi_hr;
+    bool qi_writes_ppv;
+    U qi_out_obj;
+    U release_ret;
+};
+
+static void apply_config(const CaseConfig& cfg) {
+    std::memset(&porsche::window_configuration_storage_006b77a0, 0xa5,
+                sizeof porsche::window_configuration_storage_006b77a0);
+    auto* const storage = reinterpret_cast<B*>(&porsche::window_configuration_storage_006b77a0);
+    put(storage, 0u, cfg.initial_obj);
+    put(storage, 0x470u, cfg.initial_counter);
+
+    porsche::thread_start_lock_006a57d8 =
+        reinterpret_cast<void*>(static_cast<std::uintptr_t>(cfg.thread_lock));
+    porsche::window_support_opaque_value_006a64a0 = cfg.opaque_6a64a0;
+    porsche::diagnostic_handler_005debf0 = cfg.diag_handler;
+    porsche::window_resize_notification_pointer_005df9b8 = cfg.resize_notify;
+
+    cfg_timed_ret = cfg.timed_ret;
+    cfg_qi_hr = cfg.qi_hr;
+    cfg_qi_writes_ppv = cfg.qi_writes_ppv;
+    cfg_qi_out_obj = cfg.qi_out_obj;
+    cfg_release_ret = cfg.release_ret;
+}
+
+static void compare_traces(bool check_return) {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    if (!check_return) {
+        trace.ret_eax = 0u;
+        expected.ret_eax = 0u;
+    }
+    require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0,
+                "event mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0,
+            "x87/MXCSR state mismatch");
+}
+
+static void run_pair(void* orig_fn, void* cpp_fn, const U* args, U argc,
+                     bool is_stdcall, bool check_return, const CaseConfig& cfg) {
+    ++cases;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_fn(orig_fn, args, argc, is_stdcall, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_fn(cpp_fn, args, argc, is_stdcall, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    events_total += trace.count;
+    compare_traces(check_return);
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    // 1. 005756d0 (__cdecl, 0 args, void): calls timed_callbacks_005366e0(0).
+    {
+        CaseConfig cfg{};
+        cfg.timed_ret = 0u;
+        run_pair(slot_5756d0, reinterpret_cast<void*>(&porsche::render_window_callback_005756d0),
+                 nullptr, 0u, false, false, cfg);
+        cfg.timed_ret = 0x77u;
+        run_pair(slot_5756d0, reinterpret_cast<void*>(&porsche::render_window_callback_005756d0),
+                 nullptr, 0u, false, false, cfg);
+    }
+
+    // 2. 005756e0 (__stdcall, 1 arg, uint32_t return): QueryInterface / Release on 006b77a0 & counter at 006b7c10.
+    {
+        const U com_arg = address(&mock_com_primary);
+        const U zero_arg = 0u;
+        CaseConfig cfg{};
+
+        // 2a. arg != 0, QueryInterface succeeds (S_OK = 0), writes ppv, increments counter 0 -> 1.
+        cfg.initial_obj = 0xdeadbeefu;
+        cfg.initial_counter = 0u;
+        cfg.qi_hr = 0u;
+        cfg.qi_writes_ppv = true;
+        cfg.qi_out_obj = address(&mock_com_stored);
+        run_pair(slot_5756e0, reinterpret_cast<void*>(&porsche::render_window_callback_005756e0),
+                 &com_arg, 1u, true, true, cfg);
+
+        // 2b. arg != 0, QueryInterface fails (E_NOINTERFACE), counter NOT incremented, returns HRESULT.
+        cfg.initial_obj = address(&mock_com_stored);
+        cfg.initial_counter = 5u;
+        cfg.qi_hr = 0x80004002u;
+        cfg.qi_writes_ppv = false;
+        cfg.qi_out_obj = 0u;
+        run_pair(slot_5756e0, reinterpret_cast<void*>(&porsche::render_window_callback_005756e0),
+                 &com_arg, 1u, true, true, cfg);
+
+        // 2c. arg == 0: Release stored object, clear +0 to nullptr, increment counter 1 -> 2, return 2 (ignore Release ret).
+        cfg.initial_obj = address(&mock_com_stored);
+        cfg.initial_counter = 1u;
+        cfg.release_ret = 0x12345678u;
+        run_pair(slot_5756e0, reinterpret_cast<void*>(&porsche::render_window_callback_005756e0),
+                 &zero_arg, 1u, true, true, cfg);
+
+        // 2d. arg == 0 with 32-bit counter wraparound (0xffffffff -> 0).
+        cfg.initial_obj = address(&mock_com_primary);
+        cfg.initial_counter = 0xffffffffu;
+        cfg.release_ret = 0u;
+        run_pair(slot_5756e0, reinterpret_cast<void*>(&porsche::render_window_callback_005756e0),
+                 &zero_arg, 1u, true, true, cfg);
+    }
+
+    // 3. 00575730 (__stdcall, 1 arg, void): enter lock + set opaque=1 / set opaque=0 + leave lock.
+    {
+        CaseConfig cfg{};
+        cfg.thread_lock = 0x33445566u;
+        cfg.opaque_6a64a0 = 0x99u;
+        const U arg_1 = 1u;
+        const U arg_hi = 0x80000001u;
+        const U arg_0 = 0u;
+        run_pair(slot_575730, reinterpret_cast<void*>(&porsche::render_window_callback_00575730),
+                 &arg_1, 1u, true, false, cfg);
+        run_pair(slot_575730, reinterpret_cast<void*>(&porsche::render_window_callback_00575730),
+                 &arg_hi, 1u, true, false, cfg);
+        cfg.opaque_6a64a0 = 1u;
+        run_pair(slot_575730, reinterpret_cast<void*>(&porsche::render_window_callback_00575730),
+                 &arg_0, 1u, true, false, cfg);
+    }
+
+    // 4. 00575770 (__stdcall, 2 args, void): switch on arg0 (0 -> handler, 2 -> diag(2), 1/default -> diag(6)).
+    {
+        static const char msg0[] = "fatal-msg-0";
+        static const char msg1[] = "warn-msg-1";
+        static const char msg2[] = "info-msg-2";
+        static const char msg3[] = "default-msg-3";
+        CaseConfig cfg{};
+        cfg.diag_handler = &mock_diag_handler;
+
+        const U args_0[2] = {0u, address(msg0)};
+        const U args_1[2] = {1u, address(msg1)};
+        const U args_2[2] = {2u, address(msg2)};
+        const U args_3[2] = {3u, address(msg3)};
+        const U args_neg[2] = {0xffffffffu, address(msg3)};
+
+        run_pair(slot_575770, reinterpret_cast<void*>(&porsche::render_window_callback_00575770),
+                 args_0, 2u, true, false, cfg);
+        run_pair(slot_575770, reinterpret_cast<void*>(&porsche::render_window_callback_00575770),
+                 args_1, 2u, true, false, cfg);
+        run_pair(slot_575770, reinterpret_cast<void*>(&porsche::render_window_callback_00575770),
+                 args_2, 2u, true, false, cfg);
+        run_pair(slot_575770, reinterpret_cast<void*>(&porsche::render_window_callback_00575770),
+                 args_3, 2u, true, false, cfg);
+        run_pair(slot_575770, reinterpret_cast<void*>(&porsche::render_window_callback_00575770),
+                 args_neg, 2u, true, false, cfg);
+    }
+
+    // 5. 005757d0 (__stdcall, 2 args, void): if arg0 == 2 && resize_notify != nullptr -> call resize_notify().
+    {
+        CaseConfig cfg{};
+        const U args_2[2] = {2u, 0x12345678u};
+        const U args_0[2] = {0u, 0x12345678u};
+        const U args_1[2] = {1u, 0x12345678u};
+
+        cfg.resize_notify = &mock_resize_notify;
+        run_pair(slot_5757d0, reinterpret_cast<void*>(&porsche::render_window_callback_005757d0),
+                 args_2, 2u, true, false, cfg);
+        run_pair(slot_5757d0, reinterpret_cast<void*>(&porsche::render_window_callback_005757d0),
+                 args_0, 2u, true, false, cfg);
+        run_pair(slot_5757d0, reinterpret_cast<void*>(&porsche::render_window_callback_005757d0),
+                 args_1, 2u, true, false, cfg);
+
+        cfg.resize_notify = nullptr;
+        run_pair(slot_5757d0, reinterpret_cast<void*>(&porsche::render_window_callback_005757d0),
+                 args_2, 2u, true, false, cfg);
+    }
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("render_window_callbacks_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}
