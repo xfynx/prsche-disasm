@@ -1,0 +1,506 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "render_driver_context_mode_605.hpp"
+
+namespace porsche {
+std::uint32_t render_thrash_exports_006bd910[43] = {};
+void* game_setup_movie_service_0069ed0c = nullptr;
+const float audio_mixer_gain_scale_005b246c = 1.5f;
+} // namespace porsche
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0) {
+    U v;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4); }
+
+static U cases = 0u;
+static U events = 0u;
+static U mode_cfg = 0u;
+static I shift_cfg = 0;
+static I seed_exp_bias = 0x00800000;
+static U seed_exp_dirty = 0xffffffffu;
+static U seed_self_flags = 0u;
+static U seed_self_scale_bits = 0u;
+static U set_state_ok_cfg = 0u;
+static float set_state_limits_cfg[4] = {};
+static B about_buf[0x80] = {};
+static U precision = 2u, rounding = 0u, depth = 1u, initial_status = 0u;
+
+struct ModeEntry {
+    I w;
+    I h;
+    U pad[8];
+};
+static_assert(sizeof(ModeEntry) == 40u, "mode stride 40 bytes");
+
+struct MovieInner {
+    U pad[2];
+    void* modes;
+};
+
+static ModeEntry mode_entries[4] = {};
+static MovieInner movie_inner = {{0u, 0u}, mode_entries};
+static void* movie_outer = &movie_inner;
+
+static B self_buf[0x11800] = {};
+static B self_seed[0x11800] = {};
+
+static B* code = nullptr;
+static B* slot_549220 = nullptr;
+static B* slot_5381d0 = nullptr;
+alignas(16) static B floating[512];
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+struct State {
+    U exp_bias;
+    U exp_dirty;
+    U self_flags;
+    U self_scale_bits;
+};
+struct Event {
+    U tag;
+    U argc;
+    U args[6];
+    State state;
+    Fpu fpu;
+};
+struct Trace {
+    U abi;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[4];
+    State final;
+    Fpu fpu;
+};
+static Trace trace, expected;
+
+static void require(bool ok, const char* s) {
+    if (!ok) {
+        std::printf("divergence %s case=%u mode=%u shift=%d ok=%u\n",
+                    s, cases, mode_cfg, shift_cfg, set_state_ok_cfg);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void snapshot(State& s) {
+    s.exp_bias = static_cast<U>(render_driver_exp_bias_005dea60);
+    s.exp_dirty = render_driver_exp_dirty_005dea78;
+    s.self_flags = word(self_buf, 0x117e4u);
+    s.self_scale_bits = word(self_buf, 0x117e8u);
+}
+
+static void capture(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B environment[28];
+    __asm {
+        fxsave floating
+        fnstenv environment
+        fldenv environment
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(environment + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = static_cast<unsigned short>(0x7fu | (precision << 8) | (rounding << 10));
+    __asm fninit
+    __asm fldcw cw
+    for (U i = 0u; i < depth; ++i) {
+        U bits = 0x3f800001u + i;
+        __asm fld dword ptr bits
+    }
+    B environment[28];
+    __asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment + 4) |= static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+
+static void record_event(U tag, std::initializer_list<U> args) {
+    require(trace.count < 4u, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.argc = static_cast<U>(args.size());
+    U i = 0u;
+    for (U a : args) {
+        e.args[i++] = a;
+    }
+    while (i < 6u) {
+        e.args[i++] = 0u;
+    }
+    snapshot(e.state);
+    capture(e.fpu);
+}
+
+static U __stdcall set_state_cb(U key, float* out_limits) {
+    record_event(1u, {key, out_limits != nullptr ? 1u : 0u});
+    if (out_limits != nullptr && set_state_ok_cfg != 0u) {
+        std::memcpy(out_limits, set_state_limits_cfg, sizeof(float) * 4u);
+    }
+    return set_state_ok_cfg;
+}
+
+static const B* __stdcall about_cb() {
+    record_event(2u, {});
+    return about_buf;
+}
+
+static U invoke_cdecl_1arg(void* fn, U arg0, U& ret_eax) {
+    U before, frame, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_fastcall_1arg(void* fn, void* self, U mode) {
+    U before, frame, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push mode
+        mov ecx, self
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void patch_abs32(B* p, U off, U orig, U replacement) {
+    require(word(p, off) == orig, "exact absolute relocation offset");
+    put(p, off, replacement);
+}
+
+static void patch_rel32(B* p, U off, U orig_rel, std::uintptr_t target) {
+    require(word(p, off) == orig_rel, "exact relative relocation offset");
+    const std::uintptr_t next_ip = reinterpret_cast<std::uintptr_t>(p + off + 4u);
+    put(p, off, static_cast<U>(target - next_ip));
+}
+
+static void init() {
+    require(render_driver_exp_bias_005dea60 == 0x00800000, "PE initial 005dea60");
+    require(render_driver_exp_dirty_005dea78 == 0xffffffffu, "PE initial 005dea78");
+    require(audio_mixer_gain_scale_005b246c == 1.5f, "PE initial 005b246c");
+
+    static const B body_549220[] = {@BODY_00549220@};
+    static const B body_5381d0[] = {@BODY_005381D0@};
+    require(sizeof body_549220 == 206u, "206-byte original body 00549220");
+    require(sizeof body_5381d0 == 83u, "83-byte original body 005381d0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw allocation");
+    slot_549220 = code + 0u;
+    slot_5381d0 = code + 256u;
+
+    std::memcpy(slot_549220, body_549220, sizeof body_549220);
+    std::memcpy(slot_5381d0, body_5381d0, sizeof body_5381d0);
+
+    patch_abs32(slot_549220, 0x12u, 0x006bd97cu, address(&porsche::render_thrash_exports_006bd910[27]));
+    patch_abs32(slot_549220, 0x1cu, 0x0069ed0cu, address(&porsche::game_setup_movie_service_0069ed0c));
+    patch_abs32(slot_549220, 0x34u, 0x005b246cu, address(&porsche::audio_mixer_gain_scale_005b246c));
+    patch_abs32(slot_549220, 0x48u, 0x005b246cu, address(&porsche::audio_mixer_gain_scale_005b246c));
+    patch_rel32(slot_549220, 0x70u, 0xfffeef3cu, reinterpret_cast<std::uintptr_t>(slot_5381d0));
+    patch_abs32(slot_549220, 0x90u, 0x006bd934u, address(&porsche::render_thrash_exports_006bd910[9]));
+
+    patch_abs32(slot_5381d0, 0x01u, 0x005dea60u, address(&porsche::render_driver_exp_bias_005dea60));
+    patch_abs32(slot_5381d0, 0x12u, 0x005dea60u, address(&porsche::render_driver_exp_bias_005dea60));
+    patch_abs32(slot_5381d0, 0x1cu, 0x005dea78u, address(&porsche::render_driver_exp_dirty_005dea78));
+    patch_abs32(slot_5381d0, 0x2cu, 0x005dea60u, address(&porsche::render_driver_exp_bias_005dea60));
+    patch_abs32(slot_5381d0, 0x36u, 0x005dea78u, address(&porsche::render_driver_exp_dirty_005dea78));
+    patch_abs32(slot_5381d0, 0x44u, 0x005dea60u, address(&porsche::render_driver_exp_bias_005dea60));
+    patch_abs32(slot_5381d0, 0x4au, 0x005dea78u, address(&porsche::render_driver_exp_dirty_005dea78));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+
+    for (U i = 0u; i < sizeof self_seed; ++i) {
+        self_seed[i] = static_cast<B>((i * 17u + 5u) & 0xffu);
+    }
+    game_setup_movie_service_0069ed0c = &movie_outer;
+}
+
+static void reset() {
+    std::memset(&trace, 0, sizeof trace);
+    render_driver_exp_bias_005dea60 = seed_exp_bias;
+    render_driver_exp_dirty_005dea78 = seed_exp_dirty;
+    render_thrash_exports_006bd910[27] = address(reinterpret_cast<const void*>(&set_state_cb));
+    render_thrash_exports_006bd910[9] = address(reinterpret_cast<const void*>(&about_cb));
+    game_setup_movie_service_0069ed0c = &movie_outer;
+    put(self_seed, 0x117e4u, seed_self_flags);
+    put(self_seed, 0x117e8u, seed_self_scale_bits);
+    std::memcpy(self_buf, self_seed, sizeof self_buf);
+}
+
+static void compare_shift_bias() {
+    Trace& original = expected;
+    for (U side = 0u; side < 2u; ++side) {
+        reset();
+        seed_fpu();
+        bool complete = true;
+        U ret_eax = 0u;
+        void* fn = (side == 0u) ? static_cast<void*>(slot_5381d0)
+                                : reinterpret_cast<void*>(&render_driver_shift_bias_005381d0);
+        __try {
+            trace.abi = invoke_cdecl_1arg(fn, static_cast<U>(shift_cfg), ret_eax);
+        } __except (exception_record(GetExceptionInformation())) {
+            complete = false;
+        }
+        require(complete && trace.abi == 0u, "shift_bias ABI");
+        trace.ret_eax = ret_eax;
+        snapshot(trace.final);
+        capture(trace.fpu);
+        if (side == 0u) {
+            original = trace;
+        } else {
+            require(std::memcmp(&trace, &original, sizeof trace) == 0, "shift_bias return/state/FPU");
+        }
+    }
+    ++cases;
+}
+
+static void compare_context_mode() {
+    Trace& original = expected;
+    for (U side = 0u; side < 2u; ++side) {
+        reset();
+        seed_fpu();
+        bool complete = true;
+        void* fn = (side == 0u) ? static_cast<void*>(slot_549220)
+                                : reinterpret_cast<void*>(&render_driver_context_mode_00549220);
+        __try {
+            trace.abi = invoke_fastcall_1arg(fn, self_buf, mode_cfg);
+        } __except (exception_record(GetExceptionInformation())) {
+            complete = false;
+        }
+        require(complete && trace.abi == 0u, "context_mode ABI");
+        require(std::memcmp(self_buf, self_seed, 0x117e4u) == 0, "context_mode self prefix untouched");
+        require(std::memcmp(self_buf + 0x117ecu, self_seed + 0x117ecu, sizeof(self_buf) - 0x117ecu) == 0,
+                "context_mode self suffix untouched");
+        snapshot(trace.final);
+        capture(trace.fpu);
+        if (side == 0u) {
+            original = trace;
+        } else {
+            require(std::memcmp(&trace, &original, sizeof trace) == 0, "context_mode events/state/FPU");
+            events += trace.count;
+        }
+    }
+    ++cases;
+}
+
+static void set_about(const char* tag3) {
+    for (U i = 0u; i < sizeof about_buf; ++i) {
+        about_buf[i] = static_cast<B>((i * 7u + 1u) & 0x7fu);
+    }
+    about_buf[0x4c] = static_cast<B>(tag3[0]);
+    about_buf[0x4d] = static_cast<B>(tag3[1]);
+    about_buf[0x4e] = static_cast<B>(tag3[2]);
+}
+
+static float bits_to_float(U bits) {
+    float v = 0.0f;
+    std::memcpy(&v, &bits, sizeof(v));
+    return v;
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+    precision = 2u;
+    rounding = 0u;
+    depth = 1u;
+    initial_status = 0u;
+
+    // 1. Direct tests of 005381d0 across shift < 0, 0..16, > 16 and varied initial 005dea60 / 005dea78.
+    static const I initial_biases[] = {
+        0x00800000,
+        0,
+        0x08000000,
+        static_cast<I>(0xff800000u),
+        0x12345678,
+        static_cast<I>(0x80000000u)
+    };
+    static const U initial_dirties[] = {0xffffffffu, 0u, 0x12345678u};
+    static const I shifts[] = {
+        -100, -1, 0, 1, 2, 8, 15, 16, 17, 100, 0x7fffffff, static_cast<I>(0x80000000u)
+    };
+    for (I ib : initial_biases) {
+        seed_exp_bias = ib;
+        for (U id : initial_dirties) {
+            seed_exp_dirty = id;
+            for (I sh : shifts) {
+                shift_cfg = sh;
+                compare_shift_bias();
+            }
+        }
+    }
+
+    // 2. Tests of 00549220.
+    mode_entries[0] = {640, 480, {}};
+    mode_entries[1] = {800, 600, {}};
+    mode_entries[2] = {1024, 768, {}};
+    mode_entries[3] = {3, 5, {}};
+
+    static const char* const about_tags[] = {"DX7", "DX6", "DX8", "GL1", "AX7", "DY7", "DX\0"};
+    static const U initial_flags_list[] = {0u, 0x12340000u, 0x00010000u, 0x00020000u, 0xffffffffu};
+
+    // 2a. [0x6bd97c] returns 0 (query failed): shift=0, scale=1.0f, DX7 flag still checked.
+    set_state_ok_cfg = 0u;
+    seed_exp_bias = 0x04000000;
+    seed_exp_dirty = 0u;
+    seed_self_scale_bits = 0xdeadbeefu;
+    for (const char* tag : about_tags) {
+        set_about(tag);
+        for (U fl : initial_flags_list) {
+            seed_self_flags = fl;
+            mode_cfg = 1u;
+            compare_context_mode();
+        }
+    }
+
+    // 2b. [0x6bd97c] returns 1: test mode indices 0..3 and < / == / > boundary pairs for both limits.
+    set_state_ok_cfg = 1u;
+    for (U m = 0u; m < 4u; ++m) {
+        mode_cfg = m;
+        const float s0 = static_cast<float>(mode_entries[m].w) * 1.5f;
+        const float s1 = static_cast<float>(mode_entries[m].h) * 1.5f;
+        const float lim0_cases[] = {s0 + 1.0f, s0, s0 - 1.0f};
+        const float lim1_cases[] = {s1 + 1.0f, s1, s1 - 1.0f};
+        for (float l0 : lim0_cases) {
+            for (float l1 : lim1_cases) {
+                set_state_limits_cfg[0] = 0.0f;
+                set_state_limits_cfg[1] = l0;
+                set_state_limits_cfg[2] = 0.0f;
+                set_state_limits_cfg[3] = l1;
+                for (const char* tag : {"DX7", "DX6", "GL1"}) {
+                    set_about(tag);
+                    seed_exp_bias = 0x01000000;
+                    seed_exp_dirty = 0x11223344u;
+                    seed_self_flags = 0x0000abcd;
+                    seed_self_scale_bits = 0x0u;
+                    compare_context_mode();
+                }
+            }
+        }
+    }
+
+    // 2c. Negative mode values, NaN limits, and alternate x87 rounding/precision controls.
+    mode_entries[0] = {-10, 5, {}};
+    mode_cfg = 0u;
+    set_about("DX7");
+    seed_self_flags = 0u;
+    seed_exp_bias = 0x00800000;
+    seed_exp_dirty = 0xffffffffu;
+    for (U prec : {0u, 2u}) {
+        for (U rnd : {0u, 1u, 3u}) {
+            precision = prec;
+            rounding = rnd;
+            set_state_limits_cfg[1] = -14.0f;
+            set_state_limits_cfg[3] = 8.0f;
+            compare_context_mode();
+
+            set_state_limits_cfg[1] = -15.0f;
+            set_state_limits_cfg[3] = 7.5f;
+            compare_context_mode();
+
+            set_state_limits_cfg[1] = bits_to_float(0x7fc00000u);
+            set_state_limits_cfg[3] = 8.0f;
+            compare_context_mode();
+        }
+    }
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("render_driver_context_mode_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events);
+    return 0;
+}

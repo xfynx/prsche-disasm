@@ -16883,6 +16883,74 @@
           "00586d0e"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "005759f0",
+      "source": "iterations/v2/001-original-recovery/runs/604-render-initialize-callbacks/render_initialize_callbacks_604.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 void RET0; calls thrash set_state(0x27, 0x00575a20) via 006bd97c and hooks 006bd9b0 to 0x00575980 saving prior hook in 006a64c0",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/606-render-callbacks-mode-integration/validation.json",
+      "verification_boundary": "Shared606 PASS:68 native cases (34 per optimization at Od/O2) and4 material controls. SHA9d035527fbf1e5fd9be53dccc97879658db1d8f64fd206f18975d251f5b348f2. Owns 4B loader-zero .data 006a64c0 and reuses render_thrash_exports_006bd910. Build341TUs/111names116refs/noEXE.",
+      "partial_reason": "Bounded mapped thrash export table and controlled 006bd97c callback; callback targets 00575a20/00575980 and live DLL exports remain open.",
+      "body_bytes": 43,
+      "body_ranges": [
+        [
+          "005759f0",
+          "00575a1a"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "005381d0",
+      "source": "iterations/v2/001-original-recovery/runs/605-render-driver-context-mode/render_driver_context_mode_605.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 int32 RET0; clamps shift to 0..16, updates exponent bias 005dea60 (shift<<23) and marks 005dea78=0xffffffff, returning prior bias>>23",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/606-render-callbacks-mode-integration/validation.json",
+      "verification_boundary": "Shared606 PASS:754 native cases (377 per optimization at Od/O2) and4 material controls. SHAf4af57344683d0fa91792730db76c6f0f56a82700a5b535ec9ccd9ebfe85ae96. Owns 8B file-backed .data 005dea60/005dea78. Build341TUs/111names116refs/noEXE.",
+      "partial_reason": "Bounded mapped exponent bias/dirty globals; downstream render state consumers remain open.",
+      "body_bytes": 83,
+      "body_ranges": [
+        [
+          "005381d0",
+          "00538222"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00549220",
+      "source": "iterations/v2/001-original-recovery/runs/605-render-driver-context-mode/render_driver_context_mode_605.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "thiscall2 void RET4; queries 006bd97c(0x3f), compares 1.5x mode dimensions from 0069ed0c, calls 005381d0, writes self+0x117e4/+0x117e8 and checks 006bd934 for DX7",
+      "recovered_dependencies": [
+        "005381d0"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/606-render-callbacks-mode-integration/validation.json",
+      "verification_boundary": "Shared606 PASS:754 native cases (377 per optimization at Od/O2) and4 material controls. SHA7b7b61e0e3be7e2f30dddf2272d1aa8e804b5ab1bbd31f16d305a8655b01154a. Reuses render_thrash_exports_006bd910, game_setup_movie_service_0069ed0c and audio_mixer_gain_scale_005b246c. Build341TUs/111names116refs/noEXE.",
+      "partial_reason": "Bounded mapped driver context, mode table and controlled thrash 006bd97c/006bd934 endpoints; live driver objects and broader callers remain open.",
+      "body_bytes": 206,
+      "body_ranges": [
+        [
+          "00549220",
+          "005492ed"
+        ]
+      ]
     }
   ]
 }

@@ -1,0 +1,69 @@
+{
+  "run": 605,
+  "experiment": "local/experiments/v2-render-driver-context-mode-605",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/605-render-driver-context-mode/render_driver_context_mode_605.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/605-render-driver-context-mode/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/605-render-driver-context-mode",
+    "iterations/v2/001-original-recovery/runs/479-audio-mixer-ramp-stop",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/605-render-driver-context-mode/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00549220",
+      "bytes": 206,
+      "sha256": "7b7b61e0e3be7e2f30dddf2272d1aa8e804b5ab1bbd31f16d305a8655b01154a",
+      "token": "@BODY_00549220@"
+    },
+    {
+      "va": "005381d0",
+      "bytes": 83,
+      "sha256": "f4af57344683d0fa91792730db76c6f0f56a82700a5b535ec9ccd9ebfe85ae96",
+      "token": "@BODY_005381D0@"
+    }
+  ],
+  "pass_marker": "render_driver_context_mode_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-negative-shift-limit",
+      "source": "iterations/v2/001-original-recovery/runs/605-render-driver-context-mode/render_driver_context_mode_605.cpp",
+      "old": "    if (shift < 0) {",
+      "new": "    if (shift < -1) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-flag-10000",
+      "source": "iterations/v2/001-original-recovery/runs/605-render-driver-context-mode/render_driver_context_mode_605.cpp",
+      "old": "            flags |= 0x10000u;",
+      "new": "            flags |= 0x40000u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx7-char",
+      "source": "iterations/v2/001-original-recovery/runs/605-render-driver-context-mode/render_driver_context_mode_605.cpp",
+      "old": "    if (about[0x4c] == 'D' && about[0x4d] == 'X' && about[0x4e] == '7') {",
+      "new": "    if (about[0x4c] == 'D' && about[0x4d] == 'X' && about[0x4e] == '6') {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-shift-float-power",
+      "source": "iterations/v2/001-original-recovery/runs/605-render-driver-context-mode/render_driver_context_mode_605.cpp",
+      "old": "    x87_store_int_float_605(1 << shift, static_cast<std::uint8_t*>(self) + 0x117e8);",
+      "new": "    x87_store_int_float_605(shift, static_cast<std::uint8_t*>(self) + 0x117e8);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

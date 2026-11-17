@@ -1,0 +1,61 @@
+{
+  "run": 604,
+  "experiment": "local/experiments/v2-render-initialize-callbacks-604",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/604-render-initialize-callbacks/render_initialize_callbacks_604.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/604-render-initialize-callbacks/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/604-render-initialize-callbacks",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/604-render-initialize-callbacks/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005759f0",
+      "bytes": 43,
+      "sha256": "9d035527fbf1e5fd9be53dccc97879658db1d8f64fd206f18975d251f5b348f2",
+      "token": "@BODY_005759F0@"
+    }
+  ],
+  "pass_marker": "render_initialize_callbacks_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "omit-set-state-call",
+      "source": "iterations/v2/001-original-recovery/runs/604-render-initialize-callbacks/render_initialize_callbacks_604.cpp",
+      "old": "    reinterpret_cast<ThrashSetState_604>(render_thrash_exports_006bd910[27])(0x27u, 0x00575a20u);",
+      "new": "    if (false) { reinterpret_cast<ThrashSetState_604>(render_thrash_exports_006bd910[27])(0x27u, 0x00575a20u); }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-set-state-key",
+      "source": "iterations/v2/001-original-recovery/runs/604-render-initialize-callbacks/render_initialize_callbacks_604.cpp",
+      "old": "(0x27u, 0x00575a20u);",
+      "new": "(0x26u, 0x00575a20u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-hook-guard-polarity",
+      "source": "iterations/v2/001-original-recovery/runs/604-render-initialize-callbacks/render_initialize_callbacks_604.cpp",
+      "old": "    if (render_saved_display_hook_006a64c0 == 0u) {",
+      "new": "    if (render_saved_display_hook_006a64c0 != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-display-hook-constant",
+      "source": "iterations/v2/001-original-recovery/runs/604-render-initialize-callbacks/render_initialize_callbacks_604.cpp",
+      "old": "        render_thrash_exports_006bd910[40] = 0x00575980u;",
+      "new": "        render_thrash_exports_006bd910[40] = 0x00575981u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

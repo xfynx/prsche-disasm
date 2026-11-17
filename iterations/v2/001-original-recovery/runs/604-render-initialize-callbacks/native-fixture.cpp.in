@@ -1,0 +1,339 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "render_initialize_callbacks_604.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0) {
+    U v;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4); }
+
+static U cases = 0u;
+static U events = 0u;
+static U seed_hook_cfg = 0u;
+static U seed_slot40_cfg = 0u;
+static U callback_mode_cfg = 0u;
+static U callback_hook_write_cfg = 0u;
+static U callback_slot40_write_cfg = 0u;
+static U seed_exports[43] = {};
+static U precision, rounding, depth, initial_status;
+static B* code = nullptr;
+static B* slot_5759f0 = nullptr;
+alignas(16) static B floating[512];
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+struct State {
+    U exports[43];
+    U saved_display_hook;
+};
+struct Event {
+    U tag;
+    U argc;
+    U args[6];
+    State state;
+    Fpu fpu;
+};
+struct Trace {
+    U abi;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[4];
+    State final;
+    Fpu fpu;
+};
+static Trace trace, expected;
+
+static void require(bool ok, const char* s) {
+    if (!ok) {
+        std::printf("divergence %s case=%u hook=%08x slot40=%08x mode=%u\n",
+                    s, cases, seed_hook_cfg, seed_slot40_cfg, callback_mode_cfg);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void snapshot(State& s) {
+    std::memset(&s, 0, sizeof s);
+    std::memcpy(s.exports, render_thrash_exports_006bd910, sizeof s.exports);
+    s.saved_display_hook = render_saved_display_hook_006a64c0;
+}
+
+static void capture(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B environment[28];
+    __asm {
+        fxsave floating
+        fnstenv environment
+        fldenv environment
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(environment + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = static_cast<unsigned short>(0x7fu | (precision << 8) | (rounding << 10));
+    __asm fninit
+    __asm fldcw cw
+    for (U i = 0u; i < depth; ++i) {
+        U bits = 0x3f800001u + i;
+        __asm fld dword ptr bits
+    }
+    B environment[28];
+    __asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment + 4) |= static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+
+static void record_event(U tag, std::initializer_list<U> args) {
+    require(trace.count < 4u, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.argc = static_cast<U>(args.size());
+    U i = 0u;
+    for (U a : args) {
+        e.args[i++] = a;
+    }
+    while (i < 6u) {
+        e.args[i++] = 0u;
+    }
+    snapshot(e.state);
+    capture(e.fpu);
+}
+
+namespace porsche {
+std::uint32_t render_thrash_exports_006bd910[43] = {};
+} // namespace porsche
+
+static __declspec(noinline) void __stdcall test_set_state_6bd97c(U key, U value) {
+    record_event(0x6bd97cu, {key, value});
+    if ((callback_mode_cfg & 1u) != 0u) {
+        render_saved_display_hook_006a64c0 = callback_hook_write_cfg;
+    }
+    if ((callback_mode_cfg & 2u) != 0u) {
+        render_thrash_exports_006bd910[40] = callback_slot40_write_cfg;
+    }
+}
+
+static U invoke_0arg(void* fn, U& ret_eax) {
+    U before, frame, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void patch_abs32(B* p, U off, U target) {
+    put(p, off, target);
+}
+
+static void init() {
+    require(render_saved_display_hook_006a64c0 == 0u, "loader-zero 006a64c0");
+
+    static const B body_5759f0[] = {@BODY_005759F0@};
+    require(sizeof body_5759f0 == 43u, "43-byte original body 005759f0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw allocation");
+    slot_5759f0 = code + 0u;
+
+    std::memcpy(slot_5759f0, body_5759f0, sizeof body_5759f0);
+    require(word(slot_5759f0, 0x01u) == 0x00575a20u, "original 00575a20 literal");
+    require(word(slot_5759f0, 0x09u) == 0x006bd97cu, "original 006bd97c ref");
+    require(word(slot_5759f0, 0x0eu) == 0x006a64c0u, "original 006a64c0 ref");
+    require(word(slot_5759f0, 0x17u) == 0x006bd9b0u, "original 006bd9b0 load ref");
+    require(word(slot_5759f0, 0x1du) == 0x006bd9b0u, "original 006bd9b0 store ref");
+    require(word(slot_5759f0, 0x21u) == 0x00575980u, "original 00575980 literal");
+    require(word(slot_5759f0, 0x26u) == 0x006a64c0u, "original 006a64c0 store ref");
+
+    patch_abs32(slot_5759f0, 0x09u, address(&porsche::render_thrash_exports_006bd910[27]));
+    patch_abs32(slot_5759f0, 0x0eu, address(&porsche::render_saved_display_hook_006a64c0));
+    patch_abs32(slot_5759f0, 0x17u, address(&porsche::render_thrash_exports_006bd910[40]));
+    patch_abs32(slot_5759f0, 0x1du, address(&porsche::render_thrash_exports_006bd910[40]));
+    patch_abs32(slot_5759f0, 0x26u, address(&porsche::render_saved_display_hook_006a64c0));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void seed_background_exports() {
+    for (U i = 0u; i < 43u; ++i) {
+        seed_exports[i] = 0xa0000000u + (i * 0x01010101u);
+    }
+    seed_exports[27] = reinterpret_cast<U>(&test_set_state_6bd97c);
+    seed_exports[40] = seed_slot40_cfg;
+}
+
+static void reset() {
+    std::memset(&trace, 0, sizeof trace);
+    std::memcpy(render_thrash_exports_006bd910, seed_exports, sizeof seed_exports);
+    render_saved_display_hook_006a64c0 = seed_hook_cfg;
+}
+
+static void compare() {
+    Trace& original = expected;
+    for (U side = 0u; side < 2u; ++side) {
+        reset();
+        seed_fpu();
+        bool complete = true;
+        U ret_eax = 0u;
+        void* fn = (side == 0u) ? static_cast<void*>(slot_5759f0)
+                                : reinterpret_cast<void*>(&render_initialize_callbacks_005759f0);
+        __try {
+            trace.abi = invoke_0arg(fn, ret_eax);
+        } __except (exception_record(GetExceptionInformation())) {
+            complete = false;
+        }
+        require(complete && trace.abi == 0u, "mapped input/stack/nonvolatile ABI");
+        trace.ret_eax = 0u;
+        snapshot(trace.final);
+        capture(trace.fpu);
+        if (side == 0u) {
+            original = trace;
+        } else {
+            require(std::memcmp(&trace, &original, sizeof trace) == 0, "callback/state/FPU");
+            events += trace.count;
+        }
+    }
+    ++cases;
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+    precision = 2u;
+    rounding = 0u;
+    depth = 1u;
+    initial_status = 0u;
+
+    static const U slot40_values[] = {0u, 0x00575980u, 0x12345678u, 0xdeadbeefu, 0xffffffffu};
+    static const U nonzero_hooks[] = {1u, 0x00575980u, 0xabcdef01u, 0xffffffffu};
+
+    // 1. Initial hook == 0: callback runs, slot[40] saved into hook, slot[40] becomes 0x00575980.
+    callback_mode_cfg = 0u;
+    callback_hook_write_cfg = 0u;
+    callback_slot40_write_cfg = 0u;
+    seed_hook_cfg = 0u;
+    for (U s40 : slot40_values) {
+        seed_slot40_cfg = s40;
+        seed_background_exports();
+        compare();
+    }
+
+    // 2. Nonzero hook: callback runs, neither hook nor slot[40] is modified.
+    for (U hk : nonzero_hooks) {
+        seed_hook_cfg = hk;
+        for (U s40 : slot40_values) {
+            seed_slot40_cfg = s40;
+            seed_background_exports();
+            compare();
+        }
+    }
+
+    // 3. Callback mutates hook during set_state: proves hook is loaded AFTER slot[27] call.
+    callback_mode_cfg = 1u;
+    seed_hook_cfg = 0u;
+    seed_slot40_cfg = 0x13572468u;
+    callback_hook_write_cfg = 0x11223344u;
+    seed_background_exports();
+    compare();
+
+    seed_hook_cfg = 0x11223344u;
+    seed_slot40_cfg = 0x24681357u;
+    callback_hook_write_cfg = 0u;
+    seed_background_exports();
+    compare();
+
+    // 4. Callback mutates slot[40] during set_state: proves slot[40] is loaded AFTER slot[27] call.
+    callback_mode_cfg = 2u;
+    seed_hook_cfg = 0u;
+    seed_slot40_cfg = 0x11112222u;
+    for (U s40_write : slot40_values) {
+        callback_slot40_write_cfg = s40_write;
+        seed_background_exports();
+        compare();
+    }
+
+    // 5. Callback mutates both hook and slot[40] during set_state.
+    callback_mode_cfg = 3u;
+    seed_hook_cfg = 0u;
+    seed_slot40_cfg = 0x33334444u;
+    callback_hook_write_cfg = 0x99aabbccu;
+    callback_slot40_write_cfg = 0x55667788u;
+    seed_background_exports();
+    compare();
+
+    seed_hook_cfg = 0x99aabbccu;
+    seed_slot40_cfg = 0x33334444u;
+    callback_hook_write_cfg = 0u;
+    callback_slot40_write_cfg = 0x55667788u;
+    seed_background_exports();
+    compare();
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("render_initialize_callbacks_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events);
+    return 0;
+}

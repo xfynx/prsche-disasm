@@ -1,0 +1,65 @@
+{
+  "run": 604,
+  "functions": [
+    "render_initialize_callbacks_005759f0"
+  ],
+  "originals": [
+    {
+      "function": "render_initialize_callbacks_005759f0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (0 args, RET 0)",
+      "entry": "005759f0",
+      "body_ranges_inclusive": [["005759f0", "00575a1a"]],
+      "body_bytes": 43,
+      "body_sha256": "9d035527fbf1e5fd9be53dccc97879658db1d8f64fd206f18975d251f5b348f2",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl"
+    }
+  ],
+  "direct_callers": [
+    {
+      "caller": "00556bb0",
+      "callsite": "00556c54",
+      "callee": "005759f0",
+      "header": "iterations/v2/001-original-recovery/runs/521-render-initialize/render_initialize_521.hpp"
+    }
+  ],
+  "reused_canonical_symbols": [
+    {
+      "name": "render_thrash_exports_006bd910",
+      "va": "006bd910",
+      "slots_used": [
+        {"index": 27, "va": "006bd97c"},
+        {"index": 40, "va": "006bd9b0"}
+      ],
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/render_loader.hpp"
+    }
+  ],
+  "owned_globals": [
+    {
+      "name": "render_saved_display_hook_006a64c0",
+      "va": "006a64c0",
+      "type": "std::uint32_t",
+      "bytes": 4,
+      "initial": "loader-zero (.data virtual tail)"
+    }
+  ],
+  "relocations": {
+    "005759f0": {
+      "absolute": [
+        {"offset": "0x09", "va": "005759f9", "original": "006bd97c", "target": "&render_thrash_exports_006bd910[27]"},
+        {"offset": "0x0e", "va": "005759fe", "original": "006a64c0", "target": "&render_saved_display_hook_006a64c0"},
+        {"offset": "0x17", "va": "00575a07", "original": "006bd9b0", "target": "&render_thrash_exports_006bd910[40]"},
+        {"offset": "0x1d", "va": "00575a0d", "original": "006bd9b0", "target": "&render_thrash_exports_006bd910[40]"},
+        {"offset": "0x26", "va": "00575a16", "original": "006a64c0", "target": "&render_saved_display_hook_006a64c0"}
+      ],
+      "unpatched_literals": [
+        {"offset": "0x01", "va": "005759f1", "original": "00575a20", "note": "callback literal passed to slot[27]"},
+        {"offset": "0x21", "va": "00575a11", "original": "00575980", "note": "callback literal stored in slot[40]"}
+      ]
+    }
+  },
+  "scope_boundary": "Bounded 005759f0 native x86-vs-C++ proof with a controlled __stdcall callback stub in render_thrash_exports_006bd910[27] across zero and nonzero render_saved_display_hook_006a64c0, varied slot[40] values, and callback-time mutations proving post-call load order. Real THRASH DLL set_state implementation, invocations of callback literals 0x00575a20 and 0x00575980, external readers/writers of 0x006a64c0 (such as 005759b2), null/invalid slot[27] faults, and production CMake/registry integration remain open."
+}

@@ -4,22 +4,22 @@ Updated 2026-11-17. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run603](iterations/v2/001-original-recovery/runs/603-render-display-input-integration/README.md)
-compiles339 C++ translation units across8 projects. The link has113 unresolved names/
-118 references. **There is no recovered playable C++ game executable yet.**
+[Run606](iterations/v2/001-original-recovery/runs/606-render-callbacks-mode-integration/README.md)
+compiles341 C++ translation units across8 projects. The link has111 unresolved names/
+116 references. **There is no recovered playable C++ game executable yet.**
 
-Run603 integrates partial `0056a680` (38B), `004b70d0` (112B) and `00586cd0` (63B)
-from frozen601001 and602001 plus 12B file-backed and 808B loader-zero `.data`.
-Native comparisons pass1240 cases/eight controls atOd/O2. Canonical startup
-noop, x87 `_ftol`, display texture height and window tick owners are reused.
-Shared audit verifies838 pins/913 providers; registry923 retains partial domains.
+Run606 integrates partial `005759f0` (43B), `005381d0` (83B) and `00549220` (206B)
+from frozen604001 and605001 plus 8B file-backed and 4B loader-zero `.data`.
+Native comparisons pass822 cases/eight controls atOd/O2. Canonical THRASH
+export table, movie service and `1.5f` scalar owners are reused. Shared audit
+verifies843 pins/919 providers; registry926 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run601 native001, Run602 native001 and Run603 integration are accepted within their stated bounds.
-Run604 render initialize callbacks and605 render driver context mode are active pending packets.
+Run604 native001, Run605 native001 and Run606 integration are accepted within their stated bounds.
+Run607 frame audio stream ramp and608 frame audio channel volume are active pending packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
