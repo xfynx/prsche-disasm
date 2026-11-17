@@ -1,0 +1,67 @@
+{
+  "run": 613,
+  "experiment": "local/experiments/v2-render-display-member-trees-613",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/613-render-display-member-trees/render_display_member_trees_613.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/613-render-display-member-trees/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/613-render-display-member-trees",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/613-render-display-member-trees/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00466380",
+      "bytes": 372,
+      "sha256": "8e0f96c472cc39f82c45d00b7f652363e4ae972c45514e4bd7d370589a02b06a",
+      "token": "@BODY_00466380@"
+    },
+    {
+      "va": "0044b1d0",
+      "bytes": 119,
+      "sha256": "1893c427a2ba7baf2e21914445e8d71a23d1941638d07989f77e2a0617ff31cd",
+      "token": "@BODY_0044B1D0@"
+    }
+  ],
+  "pass_marker": "render_display_member_trees_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-pool-slot-arg",
+      "source": "iterations/v2/001-original-recovery/runs/613-render-display-member-trees/render_display_member_trees_613.cpp",
+      "old": "        application_context_new_head_0059eeb0(3u, 0u);",
+      "new": "        application_context_new_head_0059eeb0(2u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tree-flag-copy",
+      "source": "iterations/v2/001-original-recovery/runs/613-render-display-member-trees/render_display_member_trees_613.cpp",
+      "old": "    tree[0x08u] = *flag_ptr;",
+      "new": "    tree[0x08u] = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-node-sentinel-link",
+      "source": "iterations/v2/001-original-recovery/runs/613-render-display-member-trees/render_display_member_trees_613.cpp",
+      "old": "    store_ptr(head, 0x0cu, head);",
+      "new": "    store_ptr(head, 0x0cu, nullptr);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-member-offset-order",
+      "source": "iterations/v2/001-original-recovery/runs/613-render-display-member-trees/render_display_member_trees_613.cpp",
+      "old": "        0x14u, 0x0cu, 0x08u, 0x04u, 0x18u, 0x1cu, 0x10u",
+      "new": "        0x14u, 0x0cu, 0x08u, 0x04u, 0x18u, 0x10u, 0x1cu",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

@@ -17370,6 +17370,86 @@
           "0056343d"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0044b1d0",
+      "source": "iterations/v2/001-original-recovery/runs/613-render-display-member-trees/render_display_member_trees_613.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "thiscall3 void* RET8; initializes 0x10-byte red-black tree header, copies flag at +0x0c, allocates sentinel from pool slot[3] (refilling via 0059eeb0(0x18)) under heap lock 005322b0/005322c0",
+      "recovered_dependencies": [
+        "005322b0",
+        "005322c0",
+        "0059eeb0"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/615-display-trees-release-stack-integration/validation.json",
+      "verification_boundary": "Shared615 PASS:1140 native cases (570 per optimization at Od/O2) and4 material controls; attempt001 preserved. SHA1893c427a2ba7baf2e21914445e8d71a23d1941638d07989f77e2a0617ff31cd. Zero new data. Build347TUs/104names109refs/noEXE.",
+      "partial_reason": "Bounded mapped tree headers and pool slot[3] refill; null self/flag pointers and allocation failures remain open.",
+      "body_bytes": 119,
+      "body_ranges": [
+        [
+          "0044b1d0",
+          "0044b246"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00466380",
+      "source": "iterations/v2/001-original-recovery/runs/613-render-display-member-trees/render_display_member_trees_613.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "thiscall1 void* RET0 + cdecl1 bridge; zeroes self+0x00/+0x04 and allocates/initializes eight 0x10-byte display member trees at +0x08..+0x24 via 0059ef90/00423610/0044b1d0",
+      "recovered_dependencies": [
+        "00423610",
+        "0044b1d0",
+        "005322b0",
+        "005322c0",
+        "0059eeb0",
+        "0059ef90"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/615-display-trees-release-stack-integration/validation.json",
+      "verification_boundary": "Shared615 PASS:1140 native cases (570 per optimization at Od/O2) and4 material controls; attempt001 preserved. SHA8e0f96c472cc39f82c45d00b7f652363e4ae972c45514e4bd7d370589a02b06a. Zero new data. Build347TUs/104names109refs/noEXE.",
+      "partial_reason": "Bounded mapped display member object and 256 allocation masks; SEH unwind and full display lifecycle remain open.",
+      "body_bytes": 372,
+      "body_ranges": [
+        [
+          "00466380",
+          "004664f3"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0048d550",
+      "source": "iterations/v2/001-original-recovery/runs/614-splash-release-stack/splash_release_stack_614.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 void RET0; pops records from stack (+0x04/+0x08/+0x0c), packs words via 004b4cd0 into 0xf4-byte packet and flushes via startup_network_00628c70 vtbl[0] before freeing records via 005323e0",
+      "recovered_dependencies": [
+        "004b4cd0",
+        "005323e0"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/615-display-trees-release-stack-integration/validation.json",
+      "verification_boundary": "Shared615 PASS:200 native cases (100 per optimization at Od/O2) and4 material controls. SHA8f8080be41157bdfca4d2fc4acd538761b8e2178617eef084a3d16d4128ad02d. Zero new data. Build347TUs/104names109refs/noEXE.",
+      "partial_reason": "Bounded mapped stack records and controlled transport vtable slot 0; null stack/network pointers and oversized record words remain open.",
+      "body_bytes": 322,
+      "body_ranges": [
+        [
+          "0048d550",
+          "0048d691"
+        ]
+      ]
     }
   ]
 }

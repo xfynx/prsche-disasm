@@ -1,0 +1,529 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "render_display_member_trees_613.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U word(const void* p, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + off, sizeof v);
+    return v;
+}
+
+static void put(void* p, U off, U v) {
+    std::memcpy(static_cast<B*>(p) + off, &v, sizeof v);
+}
+
+enum : U {
+    kMgrSize = 0x100u,
+    kPoolNodeCount = 16u,
+    kPoolNodeWords = 4u,
+    kTreeSlotCount = 8u,
+    kTreeSlotBytes = 0x0cu,
+    kMemberBytes = 0x20u,
+    kMaxEvents = 64u,
+};
+
+enum EventTag : U {
+    kEvAlloc = 1u,
+    kEvIdentity = 2u,
+    kEvHeapEnter = 3u,
+    kEvPoolRefill = 4u,
+    kEvHeapLeave = 5u,
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    U lock_word;
+    U free_head;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    B mgr[kMgrSize];
+    U pool_nodes[kPoolNodeCount][kPoolNodeWords];
+    B tree_arena[kTreeSlotCount][kTreeSlotBytes];
+    B member[kMemberBytes];
+    B direct_tree[kTreeSlotBytes];
+};
+
+static B mgr_buf[kMgrSize]{};
+static void* fixture_heap_ptr = mgr_buf;
+static U pool_nodes[kPoolNodeCount][kPoolNodeWords]{};
+static B tree_arena[kTreeSlotCount][kTreeSlotBytes]{};
+static B direct_tree_buf[kTreeSlotBytes]{};
+static B* member_region = nullptr;
+static B* member_ptr_a = nullptr;
+static B* member_ptr_b = nullptr;
+static B* active_member = nullptr;
+
+static U alloc_mask = 0u;
+static U alloc_cursor = 0u;
+static U enter_mutation_mode = 0u;
+static U cases = 0u;
+static U events = 0u;
+
+static Trace trace{};
+static Trace expected{};
+static Trace expected_cdecl{};
+
+static B* code = nullptr;
+static B* slot_466380 = nullptr;
+static B* slot_44b1d0 = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U canonical_pool_ptr(const void* p) {
+    const U a = address(p);
+    if (a == 0u) {
+        return 0u;
+    }
+    const U base = address(pool_nodes);
+    if (a >= base && a < base + sizeof pool_nodes) {
+        return 0x10000000u + (a - base);
+    }
+    return a;
+}
+
+static void record_event(U tag, U arg0, U arg1, U arg2) {
+    require(trace.count < kMaxEvents, "event capacity");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    e.lock_word = word(mgr_buf, 0x28u);
+    e.free_head = canonical_pool_ptr(reinterpret_cast<const void*>(
+        static_cast<std::uintptr_t>(word(mgr_buf, 0x28u + 0x18u))));
+}
+
+namespace porsche {
+
+void* __cdecl application_context_heap_state_005e4fe8() {
+    return fixture_heap_ptr;
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    record_event(kEvHeapEnter, address(lock), 0u, 0u);
+    if (enter_mutation_mode == 1u) {
+        put(mgr_buf, 0x28u, 0xdeadbeefu);
+    } else if (enter_mutation_mode == 2u) {
+        put(mgr_buf, 0x28u + 0x18u, 0u);
+    }
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    record_event(kEvHeapLeave, address(lock), 0u, 0u);
+}
+
+void __cdecl application_context_new_head_0059eeb0(std::uint32_t kind, std::uint32_t slot) {
+    record_event(kEvPoolRefill, kind, slot, 0u);
+    require(kind == 3u && slot == 0u, "pool refill args");
+    for (U i = 8u; i < 16u; ++i) {
+        pool_nodes[i][0] = 0xbb000000u + i;
+        pool_nodes[i][1] = (i + 1u < 16u) ? address(pool_nodes[i + 1u]) : 0u;
+        pool_nodes[i][2] = 0xccccccccu;
+        pool_nodes[i][3] = 0xddddddddu;
+    }
+    put(mgr_buf, 0x28u + 0x18u, address(pool_nodes[8]));
+}
+
+void* __cdecl render_allocate_0059ef90(std::uint32_t size) {
+    require(size == kTreeSlotBytes, "alloc size 12");
+    require(alloc_cursor < kTreeSlotCount, "alloc cursor bounds");
+    const U idx = alloc_cursor++;
+    const bool ok = ((alloc_mask >> idx) & 1u) != 0u;
+    record_event(kEvAlloc, size, idx, ok ? 1u : 0u);
+    return ok ? static_cast<void*>(tree_arena[idx]) : nullptr;
+}
+
+void* __fastcall context_identity_00423610(void* object, void* unused_edx) {
+    (void)unused_edx;
+    const B observed = *static_cast<const B*>(object);
+    record_event(kEvIdentity, observed, 0u, 0u);
+    return object;
+}
+
+} // namespace porsche
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B body_466380[] = {@BODY_00466380@};
+    static const B body_44b1d0[] = {@BODY_0044B1D0@};
+    require(sizeof body_466380 == 372u, "372-byte original body 00466380");
+    require(sizeof body_44b1d0 == 119u, "119-byte original body 0044b1d0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_466380 = code + 0u;
+    slot_44b1d0 = code + 512u;
+
+    std::memcpy(slot_466380, body_466380, sizeof body_466380);
+    std::memcpy(slot_44b1d0, body_44b1d0, sizeof body_44b1d0);
+
+    static const U kAllocOffsets[] = {
+        0x08u, 0x2fu, 0x5cu, 0x89u, 0xb6u, 0xe3u, 0x110u, 0x13du
+    };
+    static const U kIdentityOffsets[] = {
+        0x41u, 0x6eu, 0x9bu, 0xc8u, 0xf5u, 0x122u, 0x14fu
+    };
+    static const U kTreeCtorOffsets[] = {
+        0x22u, 0x4eu, 0x7bu, 0xa8u, 0xd5u, 0x102u, 0x12fu, 0x15cu
+    };
+
+    for (U off : kAllocOffsets) {
+        relocate_rel32(slot_466380, 0x00466380u, off, 0x0059ef90u,
+                       reinterpret_cast<const void*>(&porsche::render_allocate_0059ef90));
+    }
+    for (U off : kIdentityOffsets) {
+        relocate_rel32(slot_466380, 0x00466380u, off, 0x00423610u,
+                       reinterpret_cast<const void*>(&porsche::context_identity_00423610));
+    }
+    for (U off : kTreeCtorOffsets) {
+        relocate_rel32(slot_466380, 0x00466380u, off, 0x0044b1d0u, slot_44b1d0);
+    }
+
+    relocate_abs32(slot_44b1d0, 0x0cu, 0x005e4fe8u, address(&fixture_heap_ptr));
+    relocate_rel32(slot_44b1d0, 0x0044b1d0u, 0x18u, 0x005322b0u,
+                   reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    relocate_rel32(slot_44b1d0, 0x0044b1d0u, 0x2bu, 0x0059eeb0u,
+                   reinterpret_cast<const void*>(&porsche::application_context_new_head_0059eeb0));
+    relocate_rel32(slot_44b1d0, 0x0044b1d0u, 0x3fu, 0x005322c0u,
+                   reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+
+    member_region = static_cast<B*>(VirtualAlloc(
+        reinterpret_cast<void*>(static_cast<std::uintptr_t>(0x21340000u)),
+        0x20000u, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+    if (member_region == nullptr) {
+        member_region = static_cast<B*>(VirtualAlloc(
+            nullptr, 0x20000u, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+    }
+    require(member_region != nullptr, "member region allocation");
+    member_ptr_a = member_region + 0x0040u;
+    member_ptr_b = member_region + 0x10080u;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static U invoke_fastcall_1arg(void* fn, U ecx_self, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, ecx_self
+        mov edx, 0deadc0deh
+        mov eax, 0cafe1234h
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl_1arg(void* fn, U arg0, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_fastcall_3arg_ret8(void* fn, U ecx_self, U arg1, U arg2, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg2
+        push arg1
+        mov ecx, ecx_self
+        mov edx, 0deadc0deh
+        mov eax, 0cafe1234h
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static void seed_arenas(U initial_nodes, U mask, U mut_mode, B* member, U seed) {
+    for (U i = 0u; i < kMgrSize; ++i) {
+        mgr_buf[i] = static_cast<B>((i * 29u + seed * 7u + 3u) & 0xffu);
+    }
+    put(mgr_buf, 0x28u, 0x11223344u);
+    put(mgr_buf, 0x28u + 0x18u, 0u);
+
+    std::memset(pool_nodes, 0, sizeof pool_nodes);
+    for (U i = 0u; i < initial_nodes; ++i) {
+        pool_nodes[i][0] = 0xaa000000u + i;
+        pool_nodes[i][1] = (i + 1u < initial_nodes) ? address(pool_nodes[i + 1u]) : 0u;
+        pool_nodes[i][2] = 0x55555555u;
+        pool_nodes[i][3] = 0x66666666u;
+    }
+    if (initial_nodes > 0u) {
+        put(mgr_buf, 0x28u + 0x18u, address(pool_nodes[0]));
+    }
+
+    for (U s = 0u; s < kTreeSlotCount; ++s) {
+        for (U b = 0u; b < kTreeSlotBytes; ++b) {
+            tree_arena[s][b] = static_cast<B>((s * 17u + b * 11u + seed + 1u) & 0xffu);
+        }
+    }
+    for (U b = 0u; b < kTreeSlotBytes; ++b) {
+        direct_tree_buf[b] = static_cast<B>((b * 13u + seed + 9u) & 0xffu);
+    }
+    active_member = member;
+    for (U b = 0u; b < kMemberBytes; ++b) {
+        active_member[b] = static_cast<B>((b * 31u + seed + 5u) & 0xffu);
+    }
+
+    fixture_heap_ptr = mgr_buf;
+    alloc_mask = mask;
+    alloc_cursor = 0u;
+    enter_mutation_mode = mut_mode;
+}
+
+static void capture_state() {
+    std::memcpy(trace.mgr, mgr_buf, sizeof trace.mgr);
+    std::memcpy(trace.pool_nodes, pool_nodes, sizeof trace.pool_nodes);
+    std::memcpy(trace.tree_arena, tree_arena, sizeof trace.tree_arena);
+    std::memcpy(trace.member, active_member, sizeof trace.member);
+    std::memcpy(trace.direct_tree, direct_tree_buf, sizeof trace.direct_tree);
+}
+
+static void compare_traces(const Trace& a, const Trace& b, bool check_eax) {
+    require(a.abi_fail == 0u && b.abi_fail == 0u, "ABI check");
+    require(a.exception[0] == 0u && b.exception[0] == 0u, "no exceptions");
+    if (check_eax) {
+        require(a.ret_eax == b.ret_eax, "return value mismatch");
+    }
+    require(a.count == b.count, "event count mismatch");
+    for (U i = 0u; i < a.count; ++i) {
+        require(a.events[i].tag == b.events[i].tag, "event tag mismatch");
+        require(a.events[i].arg0 == b.events[i].arg0, "event arg0 mismatch");
+        require(a.events[i].arg1 == b.events[i].arg1, "event arg1 mismatch");
+        require(a.events[i].arg2 == b.events[i].arg2, "event arg2 mismatch");
+        require(a.events[i].lock_word == b.events[i].lock_word, "event lock word mismatch");
+        require(a.events[i].free_head == b.events[i].free_head, "event free head mismatch");
+    }
+    require(std::memcmp(a.mgr, b.mgr, sizeof a.mgr) == 0, "mgr state mismatch");
+    require(std::memcmp(a.pool_nodes, b.pool_nodes, sizeof a.pool_nodes) == 0, "pool nodes mismatch");
+    require(std::memcmp(a.tree_arena, b.tree_arena, sizeof a.tree_arena) == 0, "tree arena mismatch");
+    require(std::memcmp(a.member, b.member, sizeof a.member) == 0, "member buffer mismatch");
+    require(std::memcmp(a.direct_tree, b.direct_tree, sizeof a.direct_tree) == 0, "direct tree mismatch");
+}
+
+static void test_tree_ctor(U initial_nodes, B flag_val, U unused_val, U mut_mode, U seed) {
+    ++cases;
+    B flag_byte = flag_val;
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_arenas(initial_nodes, 0u, mut_mode, member_ptr_a, seed);
+    __try {
+        trace.abi_fail = invoke_fastcall_3arg_ret8(
+            slot_44b1d0, address(direct_tree_buf), address(&flag_byte), unused_val, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state();
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_arenas(initial_nodes, 0u, mut_mode, member_ptr_a, seed);
+    __try {
+        trace.abi_fail = invoke_fastcall_3arg_ret8(
+            reinterpret_cast<void*>(&porsche::render_display_tree_ctor_0044b1d0),
+            address(direct_tree_buf), address(&flag_byte), unused_val, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state();
+    events += trace.count;
+    compare_traces(expected, trace, true);
+    require(trace.ret_eax == address(direct_tree_buf), "tree ctor return self");
+    require(trace.direct_tree[0x08u] == flag_val, "tree ctor flag byte");
+}
+
+static void test_member_trees(U initial_nodes, U mask, B* member, U seed) {
+    ++cases;
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_arenas(initial_nodes, mask, 0u, member, seed);
+    __try {
+        trace.abi_fail = invoke_fastcall_1arg(slot_466380, address(member), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state();
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_arenas(initial_nodes, mask, 0u, member, seed);
+    __try {
+        trace.abi_fail = invoke_fastcall_1arg(
+            reinterpret_cast<void*>(&porsche::render_display_member_raw_00466380),
+            address(member), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state();
+    events += trace.count;
+    compare_traces(expected, trace, true);
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_arenas(initial_nodes, mask, 0u, member, seed);
+    __try {
+        trace.abi_fail = invoke_cdecl_1arg(
+            reinterpret_cast<void*>(&porsche::render_display_member_00466380),
+            address(member), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state();
+    expected_cdecl = trace;
+    events += expected_cdecl.count;
+    compare_traces(expected, expected_cdecl, false);
+}
+
+int main() {
+    init();
+
+    // 1. Direct coverage of 0044b1d0 (render_display_tree_ctor_0044b1d0).
+    U seed = 1u;
+    for (U initial_nodes : {0u, 1u, 2u, 8u}) {
+        for (B flag_val : {B(0x00u), B(0x01u), B(0x5au), B(0xffu)}) {
+            for (U mut_mode : {0u, 1u, 2u}) {
+                test_tree_ctor(initial_nodes, flag_val, 0x12345678u + seed, mut_mode, seed++);
+            }
+        }
+    }
+
+    // 2. Exhaustive 256 allocation masks for 00466380 with non-empty pool, empty pool (refill), and partial pool.
+    for (U mask = 0u; mask < 256u; ++mask) {
+        test_member_trees(8u, mask, member_ptr_a, seed++);
+        test_member_trees(0u, mask, member_ptr_b, seed++);
+    }
+    for (U mask : {0x00u, 0x01u, 0x55u, 0xaau, 0xffu}) {
+        test_member_trees(2u, mask, member_ptr_a, seed++);
+        test_member_trees(2u, mask, member_ptr_b, seed++);
+    }
+
+    std::printf("render_display_member_trees_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events);
+    return 0;
+}

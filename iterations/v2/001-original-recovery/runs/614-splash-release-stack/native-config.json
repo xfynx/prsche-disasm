@@ -1,0 +1,61 @@
+{
+  "run": 614,
+  "experiment": "local/experiments/v2-splash-release-stack-614",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/614-splash-release-stack/splash_release_stack_614.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/614-splash-release-stack/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/614-splash-release-stack",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/614-splash-release-stack/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0048d550",
+      "bytes": 322,
+      "sha256": "8f8080be41157bdfca4d2fc4acd538761b8e2178617eef084a3d16d4128ad02d",
+      "token": "@BODY_0048D550@"
+    }
+  ],
+  "pass_marker": "splash_release_stack_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-overflow-limit",
+      "source": "iterations/v2/001-original-recovery/runs/614-splash-release-stack/splash_release_stack_614.cpp",
+      "old": "                if (static_cast<std::int32_t>(used + byte_len) > 0xf0) {",
+      "new": "                if (static_cast<std::int32_t>(used + byte_len) > 0xf4) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-pre-send-min",
+      "source": "iterations/v2/001-original-recovery/runs/614-splash-release-stack/splash_release_stack_614.cpp",
+      "old": "                        if (t2 != nullptr && net[0xbfu] == 0u && used > 4) {",
+      "new": "                        if (t2 != nullptr && net[0xbfu] == 0u && used > 8) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-post-send-min",
+      "source": "iterations/v2/001-original-recovery/runs/614-splash-release-stack/splash_release_stack_614.cpp",
+      "old": "                    if (used2 > 4) {",
+      "new": "                    if (used2 > 8) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-byte-len-shift",
+      "source": "iterations/v2/001-original-recovery/runs/614-splash-release-stack/splash_release_stack_614.cpp",
+      "old": "                const std::uint32_t byte_len = static_cast<std::uint32_t>(fe_record_words_004b4cd0(cur)) << 2u;",
+      "new": "                const std::uint32_t byte_len = static_cast<std::uint32_t>(fe_record_words_004b4cd0(cur)) << 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

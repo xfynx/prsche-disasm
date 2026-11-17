@@ -1,0 +1,419 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "splash_release_stack_614.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kNetBufSize = 0x300u,
+    kStackWords = 256u,
+    kMaxEvents = 32u,
+};
+
+enum EventTag : U {
+    kEvRecordWords = 1u,
+    kEvHeapCopy = 2u,
+    kEvTransportSend = 3u,
+};
+
+enum HookKind : U {
+    kHookNone = 0u,
+    kHookSetBusy = 1u,
+    kHookClearTransport = 2u,
+    kHookSwapNetwork = 3u,
+};
+
+struct TransportObj {
+    const void* const* vtable;
+};
+
+static B net_buf0[kNetBufSize] = {};
+static B net_buf1[kNetBufSize] = {};
+static U stack_buf[kStackWords] = {};
+
+static U send_call_seq = 0u;
+static U copy_call_seq = 0u;
+static HookKind send_hook_kind = kHookNone;
+static U send_hook_call = 0u;
+static HookKind copy_hook_kind = kHookNone;
+static U copy_hook_call = 0u;
+
+struct StateSnapshot {
+    B net0[kNetBufSize];
+    B net1[kNetBufSize];
+    U net_ptr_id;
+    U copy_seq;
+    U send_seq;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    U arg3;
+    StateSnapshot state;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events = 0u;
+
+static B* code = nullptr;
+static B* slot_48d550 = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U net_id(const void* p) {
+    if (p == nullptr) {
+        return 0u;
+    }
+    if (p == net_buf0) {
+        return 1u;
+    }
+    if (p == net_buf1) {
+        return 2u;
+    }
+    return 0xffffffffu;
+}
+
+static U net_offset(const void* p) {
+    const U ptr = address(p);
+    const U b0 = address(net_buf0);
+    if (ptr >= b0 && ptr < b0 + kNetBufSize) {
+        return 0x1000u + (ptr - b0);
+    }
+    const U b1 = address(net_buf1);
+    if (ptr >= b1 && ptr < b1 + kNetBufSize) {
+        return 0x2000u + (ptr - b1);
+    }
+    return 0xffffffffu;
+}
+
+static U stack_word_index(const void* p) {
+    const U ptr = address(p);
+    const U base = address(stack_buf);
+    if (ptr >= base && ptr < base + sizeof(stack_buf) && ((ptr - base) & 3u) == 0u) {
+        return (ptr - base) >> 2u;
+    }
+    return 0xffffffffu;
+}
+
+static void capture_state(StateSnapshot& s) {
+    std::memcpy(s.net0, net_buf0, sizeof s.net0);
+    std::memcpy(s.net1, net_buf1, sizeof s.net1);
+    s.net_ptr_id = net_id(porsche::startup_network_00628c70);
+    s.copy_seq = copy_call_seq;
+    s.send_seq = send_call_seq;
+}
+
+static void record_event(U tag, U arg0, U arg1, U arg2, U arg3) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    e.arg3 = arg3;
+    capture_state(e.state);
+}
+
+static void apply_hook(HookKind kind) {
+    auto* cur_net = static_cast<B*>(porsche::startup_network_00628c70);
+    if (kind == kHookSetBusy && cur_net != nullptr) {
+        cur_net[0xbfu] = 1u;
+    } else if (kind == kHookClearTransport && cur_net != nullptr) {
+        put(cur_net, 0x08u, 0u);
+    } else if (kind == kHookSwapNetwork) {
+        porsche::startup_network_00628c70 = net_buf1;
+    }
+}
+
+static void __fastcall transport_send_slot0(void* self, void* edx, U zero, const void* data, U bytes) {
+    (void)edx;
+    ++send_call_seq;
+    record_event(kEvTransportSend, address(self) != 0u ? 1u : 0u, zero, net_offset(data), bytes);
+    if (send_hook_kind != kHookNone && send_call_seq == send_hook_call) {
+        apply_hook(send_hook_kind);
+    }
+}
+
+static const void* const kTransportVtable[1] = {
+    reinterpret_cast<const void*>(&transport_send_slot0)
+};
+static TransportObj transport_obj0 = { kTransportVtable };
+static TransportObj transport_obj1 = { kTransportVtable };
+
+namespace porsche {
+
+void* startup_network_00628c70 = nullptr;
+
+std::int32_t __cdecl fe_record_words_004b4cd0(const std::uint32_t* record) {
+    const I words = static_cast<I>(*record & 0xffu);
+    record_event(kEvRecordWords, stack_word_index(record), static_cast<U>(words), *record, 0u);
+    return words;
+}
+
+void __cdecl heap_copy_dispatch_005323e0(void* destination, const void* source, std::uint32_t byte_count) {
+    ++copy_call_seq;
+    record_event(kEvHeapCopy, net_offset(destination), stack_word_index(source), byte_count, 0u);
+    std::memmove(destination, source, byte_count);
+    if (copy_hook_kind != kHookNone && copy_call_seq == copy_hook_call) {
+        apply_hook(copy_hook_kind);
+    }
+}
+
+} // namespace porsche
+
+static U invoke_cdecl_1arg(void* fn, U arg0, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B body_48d550[] = {@BODY_0048D550@};
+    require(sizeof body_48d550 == 322u, "322-byte original body 0048d550");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_48d550 = code + 0u;
+    std::memcpy(slot_48d550, body_48d550, sizeof body_48d550);
+
+    const U net_addr = address(&porsche::startup_network_00628c70);
+    relocate_abs32(slot_48d550, 0x01u, 0x00628c70u, net_addr);
+    relocate_abs32(slot_48d550, 0x41u, 0x00628c70u, net_addr);
+    relocate_rel32(slot_48d550, 0x0048d550u, 0x68u, 0x004b4cd0u,
+                   reinterpret_cast<const void*>(&porsche::fe_record_words_004b4cd0));
+    relocate_abs32(slot_48d550, 0x6fu, 0x00628c70u, net_addr);
+    relocate_abs32(slot_48d550, 0xb2u, 0x00628c70u, net_addr);
+    relocate_abs32(slot_48d550, 0xbdu, 0x00628c70u, net_addr);
+    relocate_rel32(slot_48d550, 0x0048d550u, 0xd2u, 0x005323e0u,
+                   reinterpret_cast<const void*>(&porsche::heap_copy_dispatch_005323e0));
+    relocate_abs32(slot_48d550, 0xd7u, 0x00628c70u, net_addr);
+    relocate_abs32(slot_48d550, 0xedu, 0x00628c70u, net_addr);
+    relocate_abs32(slot_48d550, 0x11eu, 0x00628c70u, net_addr);
+    relocate_rel32(slot_48d550, 0x0048d550u, 0x12au, 0x004b4cd0u,
+                   reinterpret_cast<const void*>(&porsche::fe_record_words_004b4cd0));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void seed_net_buf(B* buf, void* transport, B busy, I used, U seed) {
+    for (U i = 0u; i < kNetBufSize; ++i) {
+        buf[i] = static_cast<B>((i * 29u + seed * 17u + 3u) & 0xffu);
+    }
+    put(buf, 0x08u, address(transport));
+    buf[0xbfu] = busy;
+    put(buf, 0x250u, static_cast<U>(used));
+}
+
+static void seed_stack(std::initializer_list<U> word_counts, U seed) {
+    std::memset(stack_buf, 0, sizeof stack_buf);
+    U pos = 0u;
+    U rec_idx = 0u;
+    for (U wc : word_counts) {
+        require(wc > 0u && wc < 0x40u && pos + wc < kStackWords, "valid test stack");
+        stack_buf[pos] = ((rec_idx + 1u + seed) << 16u) | wc;
+        for (U j = 1u; j < wc; ++j) {
+            stack_buf[pos + j] = 0xa0000000u + (rec_idx << 8u) + j + seed * 7u;
+        }
+        pos += wc;
+        ++rec_idx;
+    }
+    stack_buf[pos] = 0u;
+}
+
+static void setup_case(bool null_net, void* transport0, B busy0, I used0,
+                       std::initializer_list<U> word_counts, U seed,
+                       HookKind s_kind = kHookNone, U s_call = 0u,
+                       HookKind c_kind = kHookNone, U c_call = 0u) {
+    seed_net_buf(net_buf0, transport0, busy0, used0, seed);
+    seed_net_buf(net_buf1, &transport_obj1, 0u, 12, seed + 51u);
+    seed_stack(word_counts, seed);
+    porsche::startup_network_00628c70 = null_net ? nullptr : static_cast<void*>(net_buf0);
+    send_call_seq = 0u;
+    copy_call_seq = 0u;
+    send_hook_kind = s_kind;
+    send_hook_call = s_call;
+    copy_hook_kind = c_kind;
+    copy_hook_call = c_call;
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag mismatch");
+        require(trace.events[i].arg0 == expected.events[i].arg0, "event arg0 mismatch");
+        require(trace.events[i].arg1 == expected.events[i].arg1, "event arg1 mismatch");
+        require(trace.events[i].arg2 == expected.events[i].arg2, "event arg2 mismatch");
+        require(trace.events[i].arg3 == expected.events[i].arg3, "event arg3 mismatch");
+        require(std::memcmp(&trace.events[i].state, &expected.events[i].state,
+                            sizeof(StateSnapshot)) == 0,
+                "event state mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+}
+
+template <typename SetupFn>
+static void run_case(SetupFn setup) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_1arg(slot_48d550, address(stack_buf), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_1arg(
+            reinterpret_cast<void*>(&porsche::splash_progress_release_stack_0048d550),
+            address(stack_buf), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces();
+}
+
+int main() {
+    init();
+
+    // 1. Entry guard early-exit cases.
+    run_case([=]() { setup_case(true, &transport_obj0, 0u, 8, {1u, 2u}, 1u); });
+    run_case([=]() { setup_case(true, &transport_obj0, 0u, 8, {}, 2u); });
+    run_case([=]() { setup_case(false, nullptr, 0u, 16, {1u, 2u}, 3u); });
+    run_case([=]() { setup_case(false, &transport_obj0, 1u, 16, {1u, 2u}, 4u); });
+    run_case([=]() { setup_case(false, &transport_obj0, 0xffu, 16, {1u}, 5u); });
+    run_case([=]() { setup_case(false, &transport_obj0, 0u, 16, {}, 6u); });
+
+    // 2. Single-record stacks across initial used and overflow thresholds.
+    U seed = 10u;
+    for (I used : {0, 4, 8, 16, 0x20, 0xd8, 0xe0, 0xe8, 0xf0, 0xf4}) {
+        for (U wc : {1u, 2u, 4u, 8u, 0x3au, 0x3bu, 0x3cu}) {
+            const U s = seed++;
+            run_case([=]() { setup_case(false, &transport_obj0, 0u, used, {wc}, s); });
+        }
+    }
+
+    // 3. Multi-record stacks (2 and 3 records before terminal 0 word).
+    for (I used : {0, 4, 8, 0xe0, 0xec}) {
+        const U s1 = seed++;
+        run_case([=]() { setup_case(false, &transport_obj0, 0u, used, {1u, 2u}, s1); });
+        const U s2 = seed++;
+        run_case([=]() { setup_case(false, &transport_obj0, 0u, used, {2u, 0x3bu, 1u}, s2); });
+        const U s3 = seed++;
+        run_case([=]() { setup_case(false, &transport_obj0, 0u, used, {3u, 5u, 2u}, s3); });
+    }
+
+    // 4. Mid-loop mutations inside transport vtbl[0] (pre-flush and post-flush).
+    run_case([=]() { setup_case(false, &transport_obj0, 0u, 8, {0x3bu, 2u}, 201u, kHookSetBusy, 1u); });
+    run_case([=]() { setup_case(false, &transport_obj0, 0u, 8, {0x3bu, 2u}, 202u, kHookClearTransport, 1u); });
+    run_case([=]() { setup_case(false, &transport_obj0, 0u, 8, {0x3bu, 2u}, 203u, kHookSwapNetwork, 1u); });
+    run_case([=]() { setup_case(false, &transport_obj0, 0u, 4, {1u, 2u, 3u}, 204u, kHookSetBusy, 1u); });
+    run_case([=]() { setup_case(false, &transport_obj0, 0u, 4, {1u, 2u, 3u}, 205u, kHookClearTransport, 1u); });
+    run_case([=]() { setup_case(false, &transport_obj0, 0u, 4, {1u, 2u, 3u}, 206u, kHookSwapNetwork, 1u); });
+
+    // 5. Mid-loop mutations inside heap_copy_dispatch_005323e0.
+    run_case([=]() { setup_case(false, &transport_obj0, 0u, 4, {1u, 2u, 3u}, 301u, kHookNone, 0u, kHookSetBusy, 1u); });
+    run_case([=]() { setup_case(false, &transport_obj0, 0u, 4, {1u, 2u, 3u}, 302u, kHookNone, 0u, kHookClearTransport, 1u); });
+    run_case([=]() { setup_case(false, &transport_obj0, 0u, 4, {1u, 2u, 3u}, 303u, kHookNone, 0u, kHookSwapNetwork, 1u); });
+
+    std::printf("splash_release_stack_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events);
+    return 0;
+}

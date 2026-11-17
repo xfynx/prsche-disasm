@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run612](iterations/v2/001-original-recovery/runs/612-frame-send-sprite-integration/README.md).
-Frame audio send level565cd0/5902a0/589d70/598eb0 and splash sprite horizflip563320/56e2a8/5712f0 close two real dependencies.
-The shared build compiles345 TUs with106 unresolved names/111 references.
+Latest recovery intake is [Run615](iterations/v2/001-original-recovery/runs/615-display-trees-release-stack-integration/README.md).
+Render display member trees466380/44b1d0 and splash release stack48d550 close two real dependencies.
+The shared build compiles347 TUs with104 unresolved names/109 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are the reachable render display member trees466380/44b1d0 and splash release stack48d550 dependencies. The real depth-conversion
+Next are the reachable frame surface setup568f30 and file backend open568900 dependencies. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;
