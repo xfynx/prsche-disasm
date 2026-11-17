@@ -1,0 +1,327 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "startup_quality_tier_596.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+static U ptr(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0) { U v; std::memcpy(&v, static_cast<const B*>(p) + o, 4); return v; }
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4); }
+
+static U cases, events_total, family_cfg, time_cfg, state0_cfg, phys_cfg, mode_cfg;
+static U precision, rounding, depth, initial_status;
+static B* code_e370;
+static B* code_dfb0;
+alignas(16) static B floating[512];
+
+namespace porsche {
+std::uint32_t render_mode_time_value_005ce908 = 0u;
+std::uint8_t render_mode_state_00619790[0x71]{};
+std::uint32_t render_display_actual_mode_0061978c = 0u;
+} // namespace porsche
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+struct State {
+    U time_val;
+    B mode_state[0x71];
+    B pad[3];
+    U actual_mode;
+    U arena_tier_word;
+    U quality_selected;
+};
+struct Event {
+    U tag, argc, args[6];
+    State state;
+    Fpu fpu;
+};
+struct Trace {
+    U count, abi, ret_eax, exception[3];
+    Event events[4];
+    State final;
+    Fpu fpu;
+};
+static Trace trace, expected;
+
+static void require(bool ok, const char* s) {
+    if (!ok) {
+        std::printf("divergence %s case=%u fam=%u time=%d state0=%08x phys=%d mode=%u\n",
+                    s, cases, family_cfg, static_cast<I>(time_cfg), state0_cfg,
+                    static_cast<I>(phys_cfg), mode_cfg);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void snapshot(State& s) {
+    s.time_val = render_mode_time_value_005ce908;
+    std::memcpy(s.mode_state, render_mode_state_00619790, sizeof s.mode_state);
+    std::memset(s.pad, 0, sizeof s.pad);
+    s.actual_mode = render_display_actual_mode_0061978c;
+    s.arena_tier_word = application_state_006573e8.word(0x00657d88u);
+    s.quality_selected = render_quality_selected_00619770;
+}
+
+static void capture(Fpu& f) {
+    B environment[28];
+    __asm {
+        fxsave floating
+        fnstenv environment
+        fldenv environment
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(environment + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0; i < 8; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10, floating + 32 + i * 16, 10);
+        } else {
+            std::memset(f.values + i * 10, 0, 10);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = static_cast<unsigned short>(0x7f | (precision << 8) | (rounding << 10));
+    __asm fninit
+    __asm fldcw cw
+    for (U i = 0; i < depth; ++i) {
+        U bits = 0x3f800001 + i;
+        __asm fld dword ptr bits
+    }
+    B environment[28];
+    __asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment + 4) |= static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+
+static U invoke(void* fn, U& ret_eax) {
+    U before, frame, fail = 0, eax_out = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void event(U tag, std::initializer_list<U> args) {
+    require(trace.count < 4, "bounded event count");
+    auto& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.argc = static_cast<U>(args.size());
+    U i = 0;
+    for (U a : args) {
+        e.args[i++] = a;
+    }
+    while (i < 6) {
+        e.args[i++] = 0;
+    }
+    snapshot(e.state);
+    capture(e.fpu);
+}
+
+namespace porsche {
+std::uint32_t __cdecl render_resource_total_phys_0053c3d0() {
+    event(0x53c3d0u, {phys_cfg});
+    return phys_cfg;
+}
+} // namespace porsche
+
+static void absolute_at(B* p, U off, U old, const void* replacement) {
+    require(word(p, off) == old, "exact absolute relocation offset");
+    put(p, off, ptr(replacement));
+}
+
+static void relative(B* p, U n, U va, U old, const void* replacement, U expected_count) {
+    U found = 0;
+    for (U i = 0; i + 5 <= n; ++i) {
+        if (p[i] == 0xe8 && va + i + 5 + word(p, i + 1) == old) {
+            put(p, i + 1, ptr(replacement) - ptr(p + i + 5));
+            ++found;
+            i += 4;
+        }
+    }
+    require(found == expected_count, "relative relocation count");
+}
+
+static void init() {
+    require(render_quality_selected_00619770 == 0u, "loader-zero initial quality");
+
+    static const B body_e370[] = {@BODY_0044E370@};
+    static const B body_dfb0[] = {@BODY_0044DFB0@};
+    require(sizeof body_e370 == 150, "150-byte original body 0044e370");
+    require(sizeof body_dfb0 == 35, "35-byte original body 0044dfb0");
+
+    code_e370 = static_cast<B*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    code_dfb0 = static_cast<B*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code_e370 != nullptr && code_dfb0 != nullptr, "raw allocations");
+
+    std::memcpy(code_e370, body_e370, sizeof body_e370);
+    absolute_at(code_e370, 0x02u, 0x005ce908u, &render_mode_time_value_005ce908);
+    absolute_at(code_e370, 0x15u, 0x00619790u, &render_mode_state_00619790[0]);
+    absolute_at(code_e370, 0x75u, 0x0061978cu, &render_display_actual_mode_0061978c);
+    relative(code_e370, sizeof body_e370, 0x0044e370u, 0x0053c3d0u,
+             reinterpret_cast<void*>(&render_resource_total_phys_0053c3d0), 1u);
+
+    std::memcpy(code_dfb0, body_dfb0, sizeof body_dfb0);
+    relative(code_dfb0, sizeof body_dfb0, 0x0044dfb0u, 0x0044e370u, code_e370, 1u);
+    absolute_at(code_dfb0, 0x09u, 0x00657d88u, &application_state_006573e8.word(0x00657d88u));
+    absolute_at(code_dfb0, 0x11u, 0x0061978cu, &render_display_actual_mode_0061978c);
+    absolute_at(code_dfb0, 0x1eu, 0x00619770u, &render_quality_selected_00619770);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code_e370, 4096) != 0, "instruction cache e370");
+    require(FlushInstructionCache(GetCurrentProcess(), code_dfb0, 4096) != 0, "instruction cache dfb0");
+}
+
+static void reset() {
+    std::memset(&trace, 0, sizeof trace);
+    render_mode_time_value_005ce908 = time_cfg;
+    std::memset(render_mode_state_00619790, 0xa5, sizeof render_mode_state_00619790);
+    std::memcpy(render_mode_state_00619790, &state0_cfg, sizeof state0_cfg);
+    render_display_actual_mode_0061978c = mode_cfg;
+    application_state_006573e8.words().fill(0x5a5a5a5au);
+    application_state_006573e8.word(0x00657d88u) = 0x11223344u;
+    render_quality_selected_00619770 = 0x55667788u;
+}
+
+static void verify_arena_untouched() {
+    const U target_idx = (0x00657d88u - application_state_base_va) / sizeof(U);
+    const auto& words = application_state_006573e8.words();
+    for (U i = 0; i < words.size(); ++i) {
+        if (i != target_idx) {
+            require(words[i] == 0x5a5a5a5au, "unrelated arena words untouched");
+        }
+    }
+}
+
+static void compare() {
+    Trace& original = expected;
+    for (U side = 0; side < 2; ++side) {
+        reset();
+        seed_fpu();
+        void* fn = nullptr;
+        if (family_cfg == 0u) {
+            fn = (side == 0u) ? static_cast<void*>(code_e370)
+                              : reinterpret_cast<void*>(&render_quality_tier_0044e370);
+        } else {
+            fn = (side == 0u) ? static_cast<void*>(code_dfb0)
+                              : reinterpret_cast<void*>(&startup_sequence_call_0044dfb0);
+        }
+        bool complete = true;
+        U ret_eax = 0u;
+        __try {
+            trace.abi = invoke(fn, ret_eax);
+        } __except (exception_record(GetExceptionInformation())) {
+            complete = false;
+        }
+        require(complete && trace.abi == 0u, "mapped input/stack/nonvolatile ABI");
+        trace.ret_eax = (family_cfg == 0u) ? ret_eax : 0u;
+        verify_arena_untouched();
+        snapshot(trace.final);
+        capture(trace.fpu);
+        if (side == 0u) {
+            original = trace;
+        } else {
+            require(std::memcmp(&trace, &original, sizeof trace) == 0, "state/return/callback/FPU");
+            events_total += trace.count;
+        }
+    }
+    ++cases;
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+    precision = 2;
+    rounding = 0;
+    depth = 1;
+    initial_status = 0;
+
+    static const U time_values[] = {
+        0x80000000u, static_cast<U>(-1000000), static_cast<U>(-1), 0u,
+        234999999u, 235000000u, 449999999u, 450000000u, 0x7fffffffu
+    };
+    static const U state_hi_values[] = {0u, 2u, 3u, 8u, 9u, 13u, 14u, 0xfffu};
+    static const U phys_values[] = {
+        0x80000000u, static_cast<U>(-35 * 1024 * 1024), static_cast<U>(-1), 0u,
+        33u * 1024u * 1024u - 1u, 33u * 1024u * 1024u,
+        65u * 1024u * 1024u - 1u, 65u * 1024u * 1024u,
+        85u * 1024u * 1024u - 1u, 85u * 1024u * 1024u,
+        0x7fffffffu
+    };
+    static const U mode_values[] = {0u, 16u, 17u, 31u, 32u, 0xffffffffu};
+
+    for (U fam : {0u, 1u}) {
+        family_cfg = fam;
+        for (U tv : time_values) {
+            time_cfg = tv;
+            for (U shi : state_hi_values) {
+                const U slo = ((cases & 1u) != 0u) ? 0xfffffu : 0xa5a5au;
+                state0_cfg = (shi << 20u) | slo;
+                for (U pv : phys_values) {
+                    phys_cfg = pv;
+                    for (U mv : mode_values) {
+                        mode_cfg = mv;
+                        compare();
+                    }
+                }
+            }
+        }
+    }
+
+    require(VirtualFree(code_e370, 0, MEM_RELEASE) != 0, "raw cleanup e370");
+    require(VirtualFree(code_dfb0, 0, MEM_RELEASE) != 0, "raw cleanup dfb0");
+    __asm fninit
+    std::printf("startup_quality_tier_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events_total);
+    return 0;
+}

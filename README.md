@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run594](iterations/v2/001-original-recovery/runs/594-context-prevideo-integration/README.md)
-  integrates the partial context-base destroy and render-display prevideo.
-  The shared build has119 unresolved names across333 TUs.
+  [Run597](iterations/v2/001-original-recovery/runs/597-startup-transfer-quality-integration/README.md)
+  integrates the partial startup transfer end and render quality tier classification.
+  The shared build has117 unresolved names across335 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

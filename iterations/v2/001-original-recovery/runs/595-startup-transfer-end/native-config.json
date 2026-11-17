@@ -1,0 +1,60 @@
+{
+  "run": 595,
+  "experiment": "local/experiments/v2-startup-transfer-end-595",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/595-startup-transfer-end/startup_transfer_end_595.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/595-startup-transfer-end/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/595-startup-transfer-end",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/595-startup-transfer-end/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/595-startup-transfer-end/startup_transfer_end_595.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "004691c0",
+      "bytes": 11,
+      "sha256": "611feffed93f6a3f80fa1c77d856e92f5bade0bf69e5531b2a4189e907913d90",
+      "token": "@BODY_004691C0@"
+    },
+    {
+      "va": "00468100",
+      "bytes": 8,
+      "sha256": "c7eb9fa091e6c7322d0fb94ea902913506561139a707ee74638bd57af08357e4",
+      "token": "@BODY_00468100@"
+    }
+  ],
+  "pass_marker": "startup_transfer_end_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-display-field-offset",
+      "source": "iterations/v2/001-original-recovery/runs/595-startup-transfer-end/startup_transfer_end_595.cpp",
+      "old": "mov ecx, dword ptr [ecx + 74h]",
+      "new": "mov ecx, dword ptr [ecx + 70h]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "bypass-transfer-end",
+      "source": "iterations/v2/001-original-recovery/runs/595-startup-transfer-end/startup_transfer_end_595.cpp",
+      "old": "jmp render_display_transfer_end_00468100",
+      "new": "jmp startup_lifecycle_end_raw_00536050",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "clear-display-global",
+      "source": "iterations/v2/001-original-recovery/runs/595-startup-transfer-end/startup_transfer_end_595.cpp",
+      "old": "mov ecx, render_display_00628130",
+      "new": "xor ecx, ecx",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

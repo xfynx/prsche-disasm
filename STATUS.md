@@ -4,22 +4,22 @@ Updated 2026-11-17. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run594](iterations/v2/001-original-recovery/runs/594-context-prevideo-integration/README.md)
-compiles333 C++ translation units across8 projects. The link has119 unresolved names/
-124 references. **There is no recovered playable C++ game executable yet.**
+[Run597](iterations/v2/001-original-recovery/runs/597-startup-transfer-quality-integration/README.md)
+compiles335 C++ translation units across8 projects. The link has117 unresolved names/
+122 references. **There is no recovered playable C++ game executable yet.**
 
-Run594 integrates partial `00525ec0` (124B) and `0044e2c0` (165B) from frozen592001
-and593002 (`593001` preserved) with zero new original data. Native comparisons
-pass1304 cases/eight controls atOd/O2. Canonical context-base/allocator and
-display/mode owners are reused. Shared audit verifies823 pins/874 providers;
-registry912 retains partial domains.
+Run597 integrates partial `00468100` (8B), `004691c0` (11B), `0044e370` (150B) and
+`0044dfb0` (35B) from frozen595001 and596001 plus 4B loader-zero `.data` `00619770`.
+Native comparisons pass20032 cases/seven controls atOd/O2. Canonical display,
+mode, application-state and lifecycle owners are reused. Shared audit verifies828
+pins/879 providers; registry916 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run592 native001, Run593 native002 and Run594 integration are accepted within their stated bounds.
-Run595 startup transfer end and596 quality tier are ready for next integration.
+Run595 native001, Run596 native001 and Run597 integration are accepted within their stated bounds.
+Run598 startup clock callback and599 render misc cleanup are active pending packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.

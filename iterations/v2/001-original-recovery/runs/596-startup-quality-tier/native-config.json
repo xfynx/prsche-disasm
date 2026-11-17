@@ -1,0 +1,68 @@
+{
+  "run": 596,
+  "experiment": "local/experiments/v2-startup-quality-tier-596",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/596-startup-quality-tier/startup_quality_tier_596.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/596-startup-quality-tier/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/596-startup-quality-tier",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/596-startup-quality-tier/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0044dfb0",
+      "bytes": 35,
+      "sha256": "d522b7537756b3933f2ae53933abf93ee439e98952c830423ba32a15ffc82628",
+      "token": "@BODY_0044DFB0@"
+    },
+    {
+      "va": "0044e370",
+      "bytes": 150,
+      "sha256": "f4fee5f73afda6f1ff395d60f11e1e3bcd6a3ec1c127761bf639debafdf5ec50",
+      "token": "@BODY_0044E370@"
+    }
+  ],
+  "pass_marker": "startup_quality_tier_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-time-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/596-startup-quality-tier/startup_quality_tier_596.cpp",
+      "old": "if (esi < 3 || mb < 0x21 || edi < 0xeb) {",
+      "new": "if (esi < 3 || mb < 0x21 || edi <= 0xeb) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-phys-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/596-startup-quality-tier/startup_quality_tier_596.cpp",
+      "old": "if (esi < 9 || mb < 0x41) {",
+      "new": "if (esi < 9 || mb < 0x42) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-mode-clamp",
+      "source": "iterations/v2/001-original-recovery/runs/596-startup-quality-tier/startup_quality_tier_596.cpp",
+      "old": "if (tier == 3u && render_display_actual_mode_0061978c < 0x20u) {",
+      "new": "if (tier == 3u && render_display_actual_mode_0061978c <= 0x20u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-arena-tier-write",
+      "source": "iterations/v2/001-original-recovery/runs/596-startup-quality-tier/startup_quality_tier_596.cpp",
+      "old": "application_state_006573e8.word(0x00657d88u) = tier;",
+      "new": "application_state_006573e8.word(0x00657d88u) = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

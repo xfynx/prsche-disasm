@@ -1,0 +1,383 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "startup_transfer_end_595.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+static U ptr(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U word(const void* p, U off = 0) {
+    U v = 0;
+    std::memcpy(&v, static_cast<const B*>(p) + off, sizeof v);
+    return v;
+}
+static void put(void* p, U off, U v) {
+    std::memcpy(static_cast<B*>(p) + off, &v, sizeof v);
+}
+
+static U cases = 0;
+static U events_total = 0;
+static U mode = 0;
+static U disp_offset = 0;
+static U svc_kind = 0;
+static U svc_offset = 0;
+static U flags = 0;
+static U seed_edx = 0;
+static U precision = 2;
+static U rounding = 0;
+static U depth = 1;
+static B* orig_4691c0 = nullptr;
+static B* orig_468100 = nullptr;
+alignas(16) static B floating[512];
+
+struct Arena {
+    B pre_canary[16];
+    B display_storage[0x90];
+    B mid_canary_a[16];
+    B decoy_display[0x90];
+    B mid_canary_b[16];
+    B service_storage[0x30];
+    B mid_canary_c[16];
+    B decoy_service[0x30];
+    B post_canary[16];
+};
+static Arena arena;
+
+namespace porsche {
+RenderDisplay* render_display_00628130 = nullptr;
+}
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+struct Event {
+    U tag, argc, args[4];
+    Arena arena;
+    Fpu fpu;
+};
+struct Trace {
+    U count, abi, exception[3];
+    Event events[4];
+    Arena final_arena;
+    Fpu fpu;
+};
+static Trace trace, expected;
+
+static void require(bool ok, const char* s) {
+    if (!ok) {
+        std::printf("divergence %s case=%u mode=%u disp_off=%u svc_kind=%u svc_off=%u flags=%x\n",
+                    s, cases, mode, disp_offset, svc_kind, svc_offset, flags);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture(Fpu& f) {
+    B environment[28];
+    __asm {
+        fxsave floating
+        fnstenv environment
+        fldenv environment
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(environment + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0; i < 8; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10, floating + 32 + i * 16, 10);
+        } else {
+            std::memset(f.values + i * 10, 0, 10);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = static_cast<unsigned short>(0x7fu | (precision << 8) | (rounding << 10));
+    U mxcsr = 0x1f80u;
+    __asm {
+        fninit
+        fldcw cw
+        ldmxcsr mxcsr
+    }
+    for (U i = 0; i < depth; ++i) {
+        U bits = 0x3f800001u + i;
+        __asm fld dword ptr bits
+    }
+}
+
+static void event(U tag, std::initializer_list<U> args) {
+    require(trace.count < 4u, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.argc = static_cast<U>(args.size());
+    U i = 0;
+    for (U a : args) {
+        e.args[i++] = a;
+    }
+    while (i < 4u) {
+        e.args[i++] = 0u;
+    }
+    e.arena = arena;
+    capture(e.fpu);
+}
+
+static void maybe_alter_fpu() {
+    if (flags & 2u) {
+        unsigned short cw = static_cast<unsigned short>(
+            0x7fu | ((precision == 0 ? 3u : 0u) << 8) | (((rounding + 1u) % 4u) << 10));
+        __asm fldcw cw
+    }
+}
+
+namespace porsche {
+void __fastcall startup_lifecycle_end_raw_00536050(void* receiver, void* unused_edx) {
+    event(0x00536050u, {ptr(receiver), ptr(unused_edx)});
+    const U r = ptr(receiver);
+    const U lo = ptr(arena.service_storage);
+    const U hi = ptr(arena.service_storage + sizeof(arena.service_storage) - 0x10u);
+    if ((flags & 1u) && r >= lo && r <= hi) {
+        put(receiver, 0x08u, 0x11223344u);
+        put(receiver, 0x0cu, 0x55667788u);
+    }
+    maybe_alter_fpu();
+}
+} // namespace porsche
+
+static U invoke_cdecl(void* fn, U initial_ecx, U initial_edx) {
+    U before = 0, frame = 0, fail = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, initial_ecx
+        mov edx, initial_edx
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_fastcall(void* fn, void* display, U initial_edx) {
+    U before = 0, frame = 0, fail = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, display
+        mov edx, initial_edx
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void init() {
+    static const B body_4691c0[] = {@BODY_004691C0@};
+    static const B body_468100[] = {@BODY_00468100@};
+    require(sizeof body_4691c0 == 11u, "11-byte 004691c0 original body");
+    require(sizeof body_468100 == 8u, "8-byte 00468100 original body");
+
+    B* page = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(page != nullptr, "executable allocation");
+    orig_4691c0 = page;
+    orig_468100 = page + 0x40u;
+
+    std::memcpy(orig_4691c0, body_4691c0, sizeof body_4691c0);
+    std::memcpy(orig_468100, body_468100, sizeof body_468100);
+
+    // Relocate 004691c0: DIR32 [00628130] at offset 2, E9 jmp to 00468100 at offset 6.
+    require(orig_4691c0[0] == 0x8bu && orig_4691c0[1] == 0x0du, "004691c0 mov ecx opcode");
+    require(word(orig_4691c0, 2u) == 0x00628130u, "004691c0 absolute display ptr");
+    put(orig_4691c0, 2u, ptr(&render_display_00628130));
+    require(orig_4691c0[6] == 0xe9u, "004691c0 jmp opcode");
+    require(0x004691c0u + 11u + word(orig_4691c0, 7u) == 0x00468100u, "004691c0 jmp target");
+    put(orig_4691c0, 7u, ptr(orig_468100) - ptr(orig_4691c0 + 11u));
+
+    // Relocate 00468100: E9 jmp to 00536050 at offset 3.
+    require(orig_468100[0] == 0x8bu && orig_468100[1] == 0x49u && orig_468100[2] == 0x74u,
+            "00468100 mov ecx,[ecx+74h] opcode");
+    require(orig_468100[3] == 0xe9u, "00468100 jmp opcode");
+    require(0x00468100u + 8u + word(orig_468100, 4u) == 0x00536050u, "00468100 jmp target");
+    put(orig_468100, 4u,
+        ptr(reinterpret_cast<const void*>(&porsche::startup_lifecycle_end_raw_00536050)) -
+            ptr(orig_468100 + 8u));
+
+    require(FlushInstructionCache(GetCurrentProcess(), page, 4096) != 0, "instruction cache");
+}
+
+static U expected_service_ptr() {
+    if (svc_kind == 0u) {
+        return ptr(arena.service_storage + svc_offset);
+    }
+    if (svc_kind == 1u) {
+        return 0u;
+    }
+    if (svc_kind == 2u) {
+        return 0x00000010u + svc_offset;
+    }
+    return 0xa5a50000u + svc_offset;
+}
+
+static void reset(U* out_target_svc) {
+    std::memset(&trace, 0, sizeof trace);
+    B* raw = reinterpret_cast<B*>(&arena);
+    for (U i = 0; i < sizeof arena; ++i) {
+        raw[i] = static_cast<B>((i * 31u + 0x3du) & 0xffu);
+    }
+
+    B* active_disp = arena.display_storage + disp_offset;
+    B* decoy_disp = arena.decoy_display + disp_offset;
+    const U target_svc = expected_service_ptr();
+    const U decoy_svc = ptr(arena.decoy_service + svc_offset);
+
+    // Distinct neighbors at +0x70 and +0x78 so wrong field offsets diverge immediately.
+    put(active_disp, 0x70u, decoy_svc);
+    put(active_disp, 0x74u, target_svc);
+    put(active_disp, 0x78u, 0x78787878u);
+
+    put(decoy_disp, 0x70u, 0x70707070u);
+    put(decoy_disp, 0x74u, decoy_svc);
+    put(decoy_disp, 0x78u, 0x78787879u);
+
+    if (mode == 0u) {
+        // Direct 00468100 call passes active_disp in ECX; global 00628130 holds decoy_disp.
+        render_display_00628130 = reinterpret_cast<RenderDisplay*>(decoy_disp);
+    } else {
+        // 004691c0 reads global 00628130; incoming ECX is a decoy.
+        render_display_00628130 = reinterpret_cast<RenderDisplay*>(active_disp);
+    }
+    *out_target_svc = target_svc;
+}
+
+static void compare() {
+    U target_svc = 0;
+    for (U side = 0; side < 2u; ++side) {
+        reset(&target_svc);
+        seed_fpu();
+        bool complete = true;
+        if (mode == 0u) {
+            void* fn = (side == 0u)
+                ? static_cast<void*>(orig_468100)
+                : reinterpret_cast<void*>(&porsche::render_display_transfer_end_00468100);
+            void* disp = arena.display_storage + disp_offset;
+            __try {
+                trace.abi = invoke_fastcall(fn, disp, seed_edx);
+            } __except (exception_record(GetExceptionInformation())) {
+                complete = false;
+            }
+        } else {
+            void* fn = (side == 0u)
+                ? static_cast<void*>(orig_4691c0)
+                : reinterpret_cast<void*>(&porsche::startup_sequence_transfer_004691c0);
+            __try {
+                trace.abi = invoke_cdecl(fn, 0x01234567u + disp_offset, seed_edx);
+            } __except (exception_record(GetExceptionInformation())) {
+                complete = false;
+            }
+        }
+        require(complete && trace.abi == 0u, "mapped input/stack/nonvolatile ABI");
+        trace.final_arena = arena;
+        capture(trace.fpu);
+        if (side == 0u) {
+            expected = trace;
+        } else {
+            require(std::memcmp(&trace, &expected, sizeof trace) == 0,
+                    "state/endpoint/FPU parity");
+            events_total += trace.count;
+        }
+    }
+    require(expected.count == 1u, "single tail-jump endpoint call");
+    require(expected.events[0].tag == 0x00536050u, "endpoint tag 00536050");
+    require(expected.events[0].args[0] == target_svc, "incoming ECX equals [display+0x74]");
+    require(expected.events[0].args[1] == seed_edx, "incoming EDX preserved across tail jump");
+    ++cases;
+}
+
+int main() {
+    init();
+    for (mode = 0u; mode < 2u; ++mode) {
+        for (disp_offset = 0u; disp_offset < 4u; ++disp_offset) {
+            for (svc_kind = 0u; svc_kind < 4u; ++svc_kind) {
+                for (svc_offset = 0u; svc_offset < 4u; ++svc_offset) {
+                    for (U f : {0u, 1u, 2u, 3u}) {
+                        flags = f;
+                        precision = (disp_offset + svc_kind) % 3u;
+                        rounding = (svc_offset + f) % 4u;
+                        depth = (svc_kind + f) % 3u;
+                        seed_edx = 0xdeadc000u ^ (mode * 0x11111111u) ^ (disp_offset << 4) ^
+                                   (svc_kind << 8) ^ (svc_offset << 12) ^ f;
+                        compare();
+                    }
+                }
+            }
+        }
+    }
+    __asm fninit
+    std::printf("startup_transfer_end_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

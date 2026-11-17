@@ -1,0 +1,92 @@
+{
+  "run": 595,
+  "functions": [
+    "startup_sequence_transfer_004691c0",
+    "render_display_transfer_end_00468100"
+  ],
+  "originals": [
+    {
+      "name": "startup_sequence_transfer_004691c0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (0 args, loads ECX=[00628130] and tail-jumps to 00468100)",
+      "entry": "004691c0",
+      "body_ranges_inclusive": [["004691c0", "004691ca"]],
+      "body_bytes": 11,
+      "body_sha256": "611feffed93f6a3f80fa1c77d856e92f5bade0bf69e5531b2a4189e907913d90",
+      "rea_receipt": "local/experiments/v2-frontier-469-rea/001/receipt.json",
+      "rea_function_json": "local/experiments/v2-frontier-469-rea/001/function-004691c0.json",
+      "rea_evidence_id": "ev_a08f18f7461bf74ccb0508d25b9d34962b5a212a70e02e05b86875cc549a2efb"
+    },
+    {
+      "name": "render_display_transfer_end_00468100",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__fastcall (ECX=RenderDisplay*, EDX=passthrough, loads ECX=[ECX+0x74] and tail-jumps to 00536050)",
+      "entry": "00468100",
+      "body_ranges_inclusive": [["00468100", "00468107"]],
+      "body_bytes": 8,
+      "body_sha256": "c7eb9fa091e6c7322d0fb94ea902913506561139a707ee74638bd57af08357e4"
+    }
+  ],
+  "direct_callers": [
+    {
+      "caller": "004b67b0",
+      "callsite": "004b68e2",
+      "target": "004691c0",
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/startup_sequence.hpp"
+    },
+    {
+      "caller": "004691c0",
+      "callsite": "004691c6",
+      "target": "00468100"
+    }
+  ],
+  "reused_canonical_symbols": [
+    {
+      "name": "startup_sequence_transfer_004691c0",
+      "va": "004691c0",
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/startup_sequence.hpp"
+    },
+    {
+      "name": "render_display_00628130",
+      "va": "00628130",
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/render_startup.hpp"
+    },
+    {
+      "name": "startup_lifecycle_end_raw_00536050",
+      "va": "00536050",
+      "header": "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle/startup_lifecycle_572.hpp"
+    }
+  ],
+  "relocations": {
+    "absolute": [
+      {
+        "entry": "004691c0",
+        "offset": "0x02",
+        "va": "004691c2",
+        "original": "00628130",
+        "target": "&render_display_00628130"
+      }
+    ],
+    "relative_jmp_e9": [
+      {
+        "entry": "004691c0",
+        "offset": "0x06",
+        "va": "004691c6",
+        "original": "00468100",
+        "target": "relocated_00468100"
+      },
+      {
+        "entry": "00468100",
+        "offset": "0x03",
+        "va": "00468103",
+        "original": "00536050",
+        "target": "&startup_lifecycle_end_raw_00536050"
+      }
+    ]
+  },
+  "scope_boundary": "Bounded 004691c0/00468100 native x86-vs-C++ proof with controlled test storage and endpoint for 00536050; malformed pointers/faults, arbitrary aliases, and production CMake/registry integration remain open."
+}
