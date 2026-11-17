@@ -1,0 +1,73 @@
+{
+  "run": 623,
+  "experiment": "local/experiments/v2-audio-stream-service-consumed-623",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/623-audio-stream-service-consumed/audio_stream_service_consumed_623.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/623-audio-stream-service-consumed/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/623-audio-stream-service-consumed",
+    "iterations/v2/001-original-recovery/runs/561-audio-stream-creation",
+    "iterations/v2/001-original-recovery/runs/559-audio-stream-service",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/623-audio-stream-service-consumed/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00566d80",
+      "bytes": 131,
+      "sha256": "3e88637509337eaac214314428172a1c6ea781e4a9cd1757071abd8d6be0c5e7",
+      "token": "@BODY_00566D80@"
+    },
+    {
+      "va": "00566e40",
+      "bytes": 95,
+      "sha256": "f7d3672e95dbf6fe7ea4e521874e9fc8fa2607145be2be9a412041c947d06970",
+      "token": "@BODY_00566E40@"
+    }
+  ],
+  "pass_marker": "audio_stream_service_consumed_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-cursor-clamp",
+      "source": "iterations/v2/001-original-recovery/runs/623-audio-stream-service-consumed/audio_stream_service_consumed_623.cpp",
+      "old": "    if (static_cast<std::int8_t>(entry[0x17u]) > static_cast<std::int8_t>(entry[0x16u])) {",
+      "new": "    if (static_cast<std::int8_t>(entry[0x17u]) >= static_cast<std::int8_t>(entry[0x16u])) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-record-stride",
+      "source": "iterations/v2/001-original-recovery/runs/623-audio-stream-service-consumed/audio_stream_service_consumed_623.cpp",
+      "old": "            src += 0x2cu;",
+      "new": "            src += 0x28u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-compact-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/623-audio-stream-service-consumed/audio_stream_service_consumed_623.cpp",
+      "old": "        if (cur_offset >= limit) {",
+      "new": "        if (cur_offset > limit) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-cursor-match-write",
+      "source": "iterations/v2/001-original-recovery/runs/623-audio-stream-service-consumed/audio_stream_service_consumed_623.cpp",
+      "old": "                    entry[0x17u] = static_cast<std::uint8_t>(write_idx);",
+      "new": "                    entry[0x17u] = static_cast<std::uint8_t>(read_idx);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

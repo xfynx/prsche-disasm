@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run621](iterations/v2/001-original-recovery/runs/621-network-destroy-consume-integration/README.md).
-Shutdown network destroy48ff30 and engine service consume resource48cb50/490420 close two real dependencies.
-The shared build compiles351 TUs with100 unresolved names/104 references.
+Latest recovery intake is [Run624](iterations/v2/001-original-recovery/runs/624-frame-begin-audio-consumed-integration/README.md).
+Render frame begin/texture state534540/535a90 and audio stream service consumed566e40/566d80 close four real dependencies.
+The shared build compiles353 TUs with96 unresolved names/100 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are the reachable render frame begin/texture state534540/535a90 and audio stream service release/consumed566e10/566e40 dependencies. The real depth-conversion
+Next are the reachable application audio probe initialize4a66b0 and diagnostic abort handler565340 dependencies. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;

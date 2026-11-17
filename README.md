@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run621](iterations/v2/001-original-recovery/runs/621-network-destroy-consume-integration/README.md)
-  integrates the partial shutdown network destroy and engine service consume resource chain.
-  The shared build has100 unresolved names across351 TUs.
+  [Run624](iterations/v2/001-original-recovery/runs/624-frame-begin-audio-consumed-integration/README.md)
+  integrates the partial render frame begin/texture state and audio stream service consumed chain.
+  The shared build has96 unresolved names across353 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

@@ -1,0 +1,84 @@
+{
+  "run": 622,
+  "experiment": "local/experiments/v2-render-frame-begin-state-622",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state/render_frame_begin_state_622.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state",
+    "iterations/v2/001-original-recovery/runs/374-render-descriptor",
+    "iterations/v2/001-original-recovery/runs/527-render-state-flush",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00534540",
+      "bytes": 12,
+      "sha256": "a24b8810ee0261f826f3539727ca897e3f3fd094c494fa4cb88eabb9bfbc4c15",
+      "token": "@BODY_00534540@"
+    },
+    {
+      "va": "005de680",
+      "bytes": 44,
+      "sha256": "220c387157e14d3be6c2715c7a6a737fbc0e32f0d1f11763ea4db572f1b5f69c",
+      "token": "@DATA_005DE680@"
+    },
+    {
+      "va": "00535a90",
+      "bytes": 104,
+      "sha256": "79cb8e354813241bd94bcf84855d3a7f8039c7b1a1a30680c164a5931d39c174",
+      "token": "@BODY_00535A90@"
+    }
+  ],
+  "pass_marker": "render_frame_begin_state_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-tail-sync",
+      "source": "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state/render_frame_begin_state_622.cpp",
+      "old": "    if (staging[11] != pre_ac) {",
+      "new": "    if (staging[11] == pre_ac) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-fallback-bypass",
+      "source": "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state/render_frame_begin_state_622.cpp",
+      "old": "    if (render_resource_texture_fallback_0069dd1c == 0u) {",
+      "new": "    if (render_resource_texture_fallback_0069dd1c != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-key-mask",
+      "source": "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state/render_frame_begin_state_622.cpp",
+      "old": "    const std::uint32_t remapped_key = (key & 0x000f0000u) | 0x0du;",
+      "new": "    const std::uint32_t remapped_key = key | 0x0du;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-stage-stride",
+      "source": "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state/render_frame_begin_state_622.cpp",
+      "old": "    const std::uint32_t base = static_cast<std::uint32_t>(stage) * 14u;",
+      "new": "    const std::uint32_t base = static_cast<std::uint32_t>(stage) * 12u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-record-offset",
+      "source": "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state/render_frame_begin_state_622.cpp",
+      "old": "        render_state_flush_records_005de6bc[base + 13u] == 1u) {",
+      "new": "        render_state_flush_records_005de6bc[base + 12u] == 1u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

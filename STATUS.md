@@ -4,24 +4,23 @@ Updated 2026-11-17. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run621](iterations/v2/001-original-recovery/runs/621-network-destroy-consume-integration/README.md)
-compiles351 C++ translation units across8 projects. The link has100 unresolved names/
-104 references. **There is no recovered playable C++ game executable yet.**
+[Run624](iterations/v2/001-original-recovery/runs/624-frame-begin-audio-consumed-integration/README.md)
+compiles353 C++ translation units across8 projects. The link has96 unresolved names/
+100 references. **There is no recovered playable C++ game executable yet.**
 
-Run621 integrates partial `0048ff30` (522B), `00490420` (170B) and `0048cb50`
-(361B) from frozen619001 and620001 plus 12B `.rdata` (`005d072c`, 0B new
-writable `.data`). Native comparisons pass138 cases/eight controls atOd/O2.
-Canonical startup network, network lifecycle/callback drain, heap/context
-allocation, splash network queries and network member list owners are reused.
-Shared audit verifies868 pins/960 providers; registry950 retains partial
-domains.
+Run624 integrates partial `00534540` (12B), `00535a90` (104B), `00566d80`
+(131B) and `00566e40` (95B) from frozen622001 and623001 plus 44B file-backed
+`.data` (`005de680..005de6ab`, 0B new `.rdata`). Native comparisons pass3820
+cases/nine controls atOd/O2. Canonical render descriptor, window shutdown state,
+render state flush and audio stream storage owners are reused. Shared audit
+verifies873 pins/966 providers; registry954 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run619 native001, Run620 native001 and Run621 integration are accepted within their stated bounds.
-Run622 render frame begin/texture state and623 audio stream service release/consumed are active pending packets.
+Run622 native001, Run623 native001 and Run624 integration are accepted within their stated bounds.
+Run625 application audio probe initialize and626 diagnostic abort handler are active pending packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.

@@ -1,0 +1,428 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "render_frame_begin_state_622.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kMaxEvents = 16u,
+};
+
+enum EventTag : U {
+    kEvBindDescriptor = 1u,
+    kEvSetState = 2u,
+};
+
+enum BindMode : U {
+    kBindReadOnly = 0u,
+    kBindMutateBody = 1u,
+    kBindMutateBodyAndTail = 2u,
+    kBindReturnZero = 3u,
+    kBindMutateTailOnly = 4u,
+};
+
+static U orig_block_005de680[12] = {};
+static BindMode active_bind_mode = kBindReadOnly;
+static bool active_is_original = false;
+
+using SetStateFn = std::uint32_t (__stdcall *)(std::uint32_t key, std::uint32_t value);
+static SetStateFn iat_slot_006bd97c = nullptr;
+
+struct StateSnapshot {
+    U desc_words[11];
+    U tail_word_ac;
+    U flush_records[28];
+    B fallback;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U words[12];
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events = 0u;
+
+static B* code = nullptr;
+static B* slot_534540 = nullptr;
+static B* slot_535a90 = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    if (active_is_original) {
+        std::memcpy(s.desc_words, orig_block_005de680, sizeof s.desc_words);
+        s.tail_word_ac = orig_block_005de680[11];
+    } else {
+        std::memcpy(s.desc_words, porsche::render_frame_begin_descriptor_005de680, sizeof s.desc_words);
+        s.tail_word_ac = porsche::window_shutdown_state_005de6ac;
+    }
+    std::memcpy(s.flush_records, porsche::render_state_flush_records_005de6bc, sizeof s.flush_records);
+    s.fallback = porsche::render_resource_texture_fallback_0069dd1c;
+}
+
+namespace porsche {
+
+std::uint32_t window_shutdown_state_005de6ac = 0u;
+std::uint32_t render_state_flush_records_005de6bc[28] = {};
+std::uint8_t render_resource_texture_fallback_0069dd1c = 0u;
+
+std::uint32_t __cdecl render_descriptor_bind_00534480(void* descriptor) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = kEvBindDescriptor;
+    e.arg0 = descriptor != nullptr ? 1u : 0u;
+    e.arg1 = active_bind_mode;
+    if (descriptor != nullptr) {
+        std::memcpy(e.words, descriptor, sizeof e.words);
+    } else {
+        std::memset(e.words, 0, sizeof e.words);
+    }
+    if (descriptor != nullptr) {
+        auto* w = static_cast<U*>(descriptor);
+        if (active_bind_mode == kBindMutateBody || active_bind_mode == kBindMutateBodyAndTail) {
+            w[0] = 0x57494e44u;
+            w[1] = 0x320u;
+            w[2] = 0x258u;
+            w[3] = 0x01020304u;
+            w[9] = 0x11112222u;
+            w[10] = 0x33334444u;
+        }
+        if (active_bind_mode == kBindMutateBodyAndTail || active_bind_mode == kBindMutateTailOnly) {
+            w[11] = w[11] ^ 0x5a5a1234u;
+        }
+    }
+    return active_bind_mode == kBindReturnZero ? 0u : 1u;
+}
+
+std::uint32_t __stdcall render_settings_set_state_006bd97c(std::uint32_t key, std::uint32_t value) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = kEvSetState;
+    e.arg0 = key;
+    e.arg1 = value;
+    std::memset(e.words, 0, sizeof e.words);
+    return (key * 0x45d9f3bu) ^ (value * 0x119de1f3u) ^ 0xa5a55a5au;
+}
+
+} // namespace porsche
+
+static U invoke_cdecl_0arg(void* fn) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_cdecl_2arg(void* fn, U arg0, U arg1, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg1
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 8
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B orig_data_005de680[] = {@DATA_005DE680@};
+    require(sizeof orig_data_005de680 == 44u, "44-byte original data 005de680");
+    require(std::memcmp(porsche::render_frame_begin_descriptor_005de680, orig_data_005de680, 44u) == 0,
+            "initial render_frame_begin_descriptor_005de680");
+
+    static const B body_534540[] = {@BODY_00534540@};
+    static const B body_535a90[] = {@BODY_00535A90@};
+    require(sizeof body_534540 == 12u, "12-byte original body 00534540");
+    require(sizeof body_535a90 == 104u, "104-byte original body 00535a90");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_534540 = code + 0u;
+    slot_535a90 = code + 64u;
+    std::memcpy(slot_534540, body_534540, sizeof body_534540);
+    std::memcpy(slot_535a90, body_535a90, sizeof body_535a90);
+
+    relocate_abs32(slot_534540, 0x01u, 0x005de680u, address(orig_block_005de680));
+    relocate_rel32(slot_534540, 0x00534540u, 0x06u, 0x00534480u,
+                   reinterpret_cast<const void*>(&porsche::render_descriptor_bind_00534480));
+
+    iat_slot_006bd97c = &porsche::render_settings_set_state_006bd97c;
+    relocate_abs32(slot_535a90, 0x01u, 0x0069dd1cu,
+                   address(&porsche::render_resource_texture_fallback_0069dd1c));
+    relocate_abs32(slot_535a90, 0x2du, 0x005de6e8u,
+                   address(&porsche::render_state_flush_records_005de6bc[11]));
+    relocate_abs32(slot_535a90, 0x35u, 0x005de6f0u,
+                   address(&porsche::render_state_flush_records_005de6bc[13]));
+    relocate_abs32(slot_535a90, 0x46u, 0x006bd97cu, address(&iat_slot_006bd97c));
+    relocate_abs32(slot_535a90, 0x52u, 0x006bd97cu, address(&iat_slot_006bd97c));
+    relocate_abs32(slot_535a90, 0x63u, 0x006bd97cu, address(&iat_slot_006bd97c));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void compare_traces(bool check_ret) {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    if (check_ret) {
+        require(trace.ret_eax == expected.ret_eax, "return eax mismatch");
+    }
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag mismatch");
+        require(trace.events[i].arg0 == expected.events[i].arg0, "event arg0 mismatch");
+        require(trace.events[i].arg1 == expected.events[i].arg1, "event arg1 mismatch");
+        require(std::memcmp(trace.events[i].words, expected.events[i].words,
+                            sizeof trace.events[i].words) == 0,
+                "event words mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+}
+
+static void seed_begin_state(bool use_initial_data, U seed, U tail_val, BindMode mode) {
+    active_bind_mode = mode;
+    std::memset(porsche::render_state_flush_records_005de6bc, 0,
+                sizeof porsche::render_state_flush_records_005de6bc);
+    porsche::render_resource_texture_fallback_0069dd1c = 0u;
+    if (!use_initial_data) {
+        for (U i = 0u; i < 11u; ++i) {
+            porsche::render_frame_begin_descriptor_005de680[i] =
+                (seed * 0x01010101u) ^ (i * 0x1111u + 3u);
+        }
+    }
+    std::memcpy(orig_block_005de680, porsche::render_frame_begin_descriptor_005de680, 44u);
+    orig_block_005de680[11] = tail_val;
+    porsche::window_shutdown_state_005de6ac = tail_val;
+}
+
+static void run_begin_case(bool use_initial_data, U seed, U tail_val, BindMode mode, void* cpp_fn) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    seed_begin_state(use_initial_data, seed, tail_val, mode);
+    active_is_original = true;
+    __try {
+        trace.abi_fail = invoke_cdecl_0arg(slot_534540);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_begin_state(use_initial_data, seed, tail_val, mode);
+    active_is_original = false;
+    __try {
+        trace.abi_fail = invoke_cdecl_0arg(cpp_fn);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces(false);
+}
+
+static void seed_texture_state(B fallback, U stage, U w11, U w12, U w13, U seed) {
+    for (U i = 0u; i < 28u; ++i) {
+        porsche::render_state_flush_records_005de6bc[i] = 0x90000000u + seed * 31u + i;
+    }
+    const U base = stage * 14u;
+    porsche::render_state_flush_records_005de6bc[base + 11u] = w11;
+    porsche::render_state_flush_records_005de6bc[base + 12u] = w12;
+    porsche::render_state_flush_records_005de6bc[base + 13u] = w13;
+    porsche::render_resource_texture_fallback_0069dd1c = fallback;
+    std::memset(orig_block_005de680, 0, sizeof orig_block_005de680);
+    std::memset(porsche::render_frame_begin_descriptor_005de680, 0,
+                sizeof porsche::render_frame_begin_descriptor_005de680);
+    porsche::window_shutdown_state_005de6ac = 0u;
+}
+
+static void run_texture_case(B fallback, U stage, U w11, U w12, U w13, U key, U value, U seed) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    seed_texture_state(fallback, stage, w11, w12, w13, seed);
+    active_is_original = true;
+    __try {
+        trace.abi_fail = invoke_cdecl_2arg(slot_535a90, key, value, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_texture_state(fallback, stage, w11, w12, w13, seed);
+    active_is_original = false;
+    __try {
+        trace.abi_fail = invoke_cdecl_2arg(
+            reinterpret_cast<void*>(&porsche::render_resource_texture_state_00535a90),
+            key, value, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces(true);
+}
+
+int main() {
+    init();
+
+    // 1. Untouched initial 44-byte .data 005de680..005de6ab for both exported entry points.
+    run_begin_case(true, 0u, 0u, kBindReadOnly,
+                   reinterpret_cast<void*>(&porsche::game_setup_draw_begin_00534540));
+    run_begin_case(true, 0u, 0xaabbccddu, kBindReadOnly,
+                   reinterpret_cast<void*>(&porsche::splash_progress_driver_frame_begin_00534540));
+
+    // 2. 00534540 across all descriptor bind modes and both exported symbols.
+    U seed = 1u;
+    for (U tail : {0u, 1u, 0x11223344u, 0xffffffffu}) {
+        for (BindMode mode : {kBindReadOnly, kBindMutateBody, kBindMutateBodyAndTail,
+                              kBindReturnZero, kBindMutateTailOnly}) {
+            run_begin_case(false, seed++, tail, mode,
+                           reinterpret_cast<void*>(&porsche::game_setup_draw_begin_00534540));
+            run_begin_case(false, seed++, tail, mode,
+                           reinterpret_cast<void*>(&porsche::splash_progress_driver_frame_begin_00534540));
+        }
+    }
+
+    // 3. 00535a90 fallback == 0 passthrough across arbitrary keys and values.
+    for (U key : {0u, 0x0000000du, 0x00010005u, 0x000f00ffu, 0x80021234u, 0xffffffffu}) {
+        for (U value : {0u, 1u, 2u, 0x12345678u, 0xffffffffu}) {
+            run_texture_case(0u, 0u, 1u, 1u, 1u, key, value, seed++);
+        }
+    }
+
+    // 4. 00535a90 fallback != 0 across stage 0 and stage 1, record[+11/+12/+13] combinations,
+    //    key low bits, (key & 0xf0000), and values.
+    for (B fallback : {B(1u), B(2u), B(0xffu)}) {
+        for (U stage : {0u, 1u}) {
+            for (U w11 : {0u, 1u, 2u}) {
+                for (U w12 : {0u, 1u}) {
+                    for (U w13 : {0u, 1u, 0xffffffffu}) {
+                        for (U low : {0x0000u, 0x000du, 0x0010u, 0xffffu}) {
+                            const U key = (stage << 16u) | low;
+                            for (U value : {0u, 1u, 7u, 0xffffffffu}) {
+                                run_texture_case(fallback, stage, w11, w12, w13, key, value, seed++);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    std::printf("render_frame_begin_state_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events);
+    return 0;
+}

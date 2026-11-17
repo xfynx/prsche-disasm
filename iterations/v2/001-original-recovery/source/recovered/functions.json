@@ -17593,6 +17593,98 @@
           "0048ccb8"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00534540",
+      "source": "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state/render_frame_begin_state_622.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 void RET0 (game_setup_draw_begin_00534540 and splash_progress_driver_frame_begin_00534540); passes 48-byte frame descriptor (005de680..005de6ab + window_shutdown_state_005de6ac) to 00534480",
+      "recovered_dependencies": [
+        "00534480"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/624-frame-begin-audio-consumed-integration/validation.json",
+      "verification_boundary": "Shared624 PASS:3600 native cases (1800 per optimization at Od/O2) and5 material controls. SHAa24b8810ee0261f826f3539727ca897e3f3fd094c494fa4cb88eabb9bfbc4c15. Owns 44B .data (005de680..005de6ab); stages 12th DWORD 005de6ac. Build353TUs/96names100refs/noEXE.",
+      "partial_reason": "Bounded descriptor staging for 005de6ac without unguarded aliasing from 00534430 mode==2 clears; live startup/splash consumers remain open.",
+      "body_bytes": 12,
+      "body_ranges": [
+        [
+          "00534540",
+          "0053454b"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00535a90",
+      "source": "iterations/v2/001-original-recovery/runs/622-render-frame-begin-state/render_frame_begin_state_622.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl2 uint32 RET0; when 0069dd1c!=0 remaps key to (key&0xf0000)|0xd and forces value=1 if flush_records[stage*14+11]==1 or [stage*14+13]==1 before calling 006bd97c",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/624-frame-begin-audio-consumed-integration/validation.json",
+      "verification_boundary": "Shared624 PASS:3600 native cases (1800 per optimization at Od/O2) and5 material controls. SHA79cb8e354813241bd94bcf84855d3a7f8039c7b1a1a30680c164a5931d39c174. Reuses 0069dd1c/005de6bc/006bd97c; zero new data. Build353TUs/96names100refs/noEXE.",
+      "partial_reason": "Bounded stage in 0..1 when 0069dd1c!=0; negative/out-of-range sar(key,16) stages remain open.",
+      "body_bytes": 104,
+      "body_ranges": [
+        [
+          "00535a90",
+          "00535af7"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00566d80",
+      "source": "iterations/v2/001-original-recovery/runs/623-audio-stream-service-consumed/audio_stream_service_consumed_623.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 void RET0; compacts 0x2c-byte records matching handle_word inside slots[handle_word&0xff], updates cursor byte +0x17 and decrements/clamps signed count +0x16",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/624-frame-begin-audio-consumed-integration/validation.json",
+      "verification_boundary": "Shared624 PASS:220 native cases (110 per optimization at Od/O2) and4 material controls. SHA3e88637509337eaac214314428172a1c6ea781e4a9cd1757071abd8d6be0c5e7. Reuses 006b7740; zero new data. Build353TUs/96names100refs/noEXE.",
+      "partial_reason": "Bounded mapped audio stream slot records; null slot/record pointers remain open.",
+      "body_bytes": 131,
+      "body_ranges": [
+        [
+          "00566d80",
+          "00566e02"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00566e40",
+      "source": "iterations/v2/001-original-recovery/runs/623-audio-stream-service-consumed/audio_stream_service_consumed_623.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl2 void RET0; advances state +0x14 and decrements +0x1c up to available bytes in *slots[index_map[service_id]], calling 00566d80 when +0x14 >= +0x18 across carry iterations",
+      "recovered_dependencies": [
+        "00566d80"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/624-frame-begin-audio-consumed-integration/validation.json",
+      "verification_boundary": "Shared624 PASS:220 native cases (110 per optimization at Od/O2) and4 material controls. SHAf7d3672e95dbf6fe7ea4e521874e9fc8fa2607145be2be9a412041c947d06970. Reuses 006b7740; zero new data. Build353TUs/96names100refs/noEXE.",
+      "partial_reason": "Bounded 0..15 service_id slots and carry domain where compaction shifts a subsequent positive-remaining record into slot 0.",
+      "body_bytes": 95,
+      "body_ranges": [
+        [
+          "00566e40",
+          "00566e9e"
+        ]
+      ]
     }
   ]
 }

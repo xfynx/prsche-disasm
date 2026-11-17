@@ -1,0 +1,72 @@
+{
+  "run": 623,
+  "functions": [
+    "audio_stream_service_compact_00566d80",
+    "audio_stream_service_consumed_00566e40"
+  ],
+  "originals": [
+    {
+      "function": "audio_stream_service_compact_00566d80",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (1 arg: stack, RET 0)",
+      "entry": "00566d80",
+      "body_ranges_inclusive": [["00566d80", "00566e02"]],
+      "body_bytes": 131,
+      "body_sha256": "3e88637509337eaac214314428172a1c6ea781e4a9cd1757071abd8d6be0c5e7",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl"
+    },
+    {
+      "function": "audio_stream_service_consumed_00566e40",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (2 args: stack, RET 0)",
+      "entry": "00566e40",
+      "body_ranges_inclusive": [["00566e40", "00566e9e"]],
+      "body_bytes": 95,
+      "body_sha256": "f7d3672e95dbf6fe7ea4e521874e9fc8fa2607145be2be9a412041c947d06970",
+      "binary_index_functions": null,
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "notes": "Referenced by callback address at 0056745c inside application_audio_stream_create_005673d0; missed as a function entry in Ghidra functions.jsonl."
+    }
+  ],
+  "direct_callers": [
+    {"caller": "00566e40", "callsite": "00566e8a", "callee": "00566d80", "kind": "UNCONDITIONAL_CALL"},
+    {"caller": "005673d0", "callsite": "0056745c", "callee": "00566e40", "kind": "DATA"}
+  ],
+  "reused_canonical_symbols": [
+    {
+      "name": "audio_stream_service_storage_006b7740",
+      "va": "006b7740",
+      "header": "iterations/v2/001-original-recovery/runs/561-audio-stream-creation/audio_stream_creation_561.hpp"
+    },
+    {
+      "name": "audio_stream_service_consumed_00566e40",
+      "va": "00566e40",
+      "header": "iterations/v2/001-original-recovery/runs/561-audio-stream-creation/audio_stream_creation_561.hpp"
+    }
+  ],
+  "owned_data": [],
+  "owned_rdata": [],
+  "relocations": {
+    "00566d80": {
+      "absolute": [
+        {"offset": "0x14", "va": "00566d94", "original": "006b7740", "target": "&audio_stream_service_storage_006b7740.slots[0]"}
+      ],
+      "relative_call_e8": []
+    },
+    "00566e40": {
+      "absolute": [
+        {"offset": "0x0b", "va": "00566e4b", "original": "006b7780", "target": "&audio_stream_service_storage_006b7740.index_map[0]"},
+        {"offset": "0x12", "va": "00566e52", "original": "006b7740", "target": "&audio_stream_service_storage_006b7740.slots[0]"}
+      ],
+      "relative_call_e8": [
+        {"offset": "0x4b", "va": "00566e8b", "original": "00566d80", "target": "relocated_00566d80"}
+      ]
+    }
+  },
+  "scope_boundary": "Bounded 00566d80 and 00566e40 native x86-vs-C++ proof with test-only definition of audio_stream_service_storage_006b7740. In 00566e40, cases where consumed_bytes > *(state + 0x1c) require compaction at *(state + 0x14) >= *(state + 0x18) to shift a subsequent record with positive *(state + 0x1c) into state, otherwise the carry loop does not terminate on either original x86 or C++; out-of-range service_id/slot_index, null slot/record pointers, and production CMake/registry integration remain open."
+}

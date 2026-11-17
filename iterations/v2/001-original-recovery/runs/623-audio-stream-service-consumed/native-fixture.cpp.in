@@ -1,0 +1,416 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "audio_stream_service_consumed_623.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using SB = std::int8_t;
+
+namespace porsche {
+AudioStreamServiceStorage561 audio_stream_service_storage_006b7740{};
+} // namespace porsche
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kNumSlots = 16u,
+    kEntryBytes = 0x40u,
+    kRecordBytes = 0x2cu,
+    kRecordsPerSlot = 8u,
+};
+
+static B entry_buf[kNumSlots][kEntryBytes] = {};
+static B record_buf[kNumSlots][kRecordsPerSlot * kRecordBytes] = {};
+
+struct StateSnapshot {
+    porsche::AudioStreamServiceStorage561 storage;
+    B entries[kNumSlots][kEntryBytes];
+    B records[kNumSlots][kRecordsPerSlot * kRecordBytes];
+};
+
+struct RunResult {
+    U abi_fail;
+    U exception[3];
+    StateSnapshot state;
+};
+
+static RunResult orig_res{};
+static RunResult cpp_res{};
+
+static U cases = 0u;
+static B* code = nullptr;
+static B* slot_566d80 = nullptr;
+static B* slot_566e40 = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    std::memcpy(&s.storage, &porsche::audio_stream_service_storage_006b7740, sizeof s.storage);
+    std::memcpy(s.entries, entry_buf, sizeof s.entries);
+    std::memcpy(s.records, record_buf, sizeof s.records);
+}
+
+static U invoke_cdecl_1arg(void* fn, U arg0) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_cdecl_2arg(void* fn, U arg0, U arg1) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg1
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(RunResult* dst, EXCEPTION_POINTERS* e) {
+    dst->exception[0] = e->ExceptionRecord->ExceptionCode;
+    dst->exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    dst->exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B body_566d80[] = {@BODY_00566D80@};
+    static const B body_566e40[] = {@BODY_00566E40@};
+    require(sizeof body_566d80 == 131u, "131-byte original body 00566d80");
+    require(sizeof body_566e40 == 95u, "95-byte original body 00566e40");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_566d80 = code + 0u;
+    slot_566e40 = code + 256u;
+    std::memcpy(slot_566d80, body_566d80, sizeof body_566d80);
+    std::memcpy(slot_566e40, body_566e40, sizeof body_566e40);
+
+    const U slots_addr = address(&porsche::audio_stream_service_storage_006b7740.slots[0]);
+    const U map_addr = address(&porsche::audio_stream_service_storage_006b7740.index_map[0]);
+
+    relocate_abs32(slot_566d80, 0x14u, 0x006b7740u, slots_addr);
+
+    relocate_abs32(slot_566e40, 0x0bu, 0x006b7780u, map_addr);
+    relocate_abs32(slot_566e40, 0x12u, 0x006b7740u, slots_addr);
+    relocate_rel32(slot_566e40, 0x00566e40u, 0x4bu, 0x00566d80u, slot_566d80);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+struct RecSpec {
+    U id;
+    U offset;
+    U limit;
+    U remaining;
+};
+
+static void seed_base(U seed) {
+    for (U s = 0u; s < kNumSlots; ++s) {
+        porsche::audio_stream_service_storage_006b7740.slots[s] = address(entry_buf[s]);
+        porsche::audio_stream_service_storage_006b7740.index_map[s] = static_cast<SB>((s * 7u + 3u) & 0x0fu);
+        for (U i = 0u; i < kEntryBytes; ++i) {
+            entry_buf[s][i] = static_cast<B>((s * 31u + i * 17u + seed * 13u + 5u) & 0xffu);
+        }
+        put(entry_buf[s], 0u, address(record_buf[s]));
+        entry_buf[s][0x16u] = 0u;
+        entry_buf[s][0x17u] = 0u;
+        for (U r = 0u; r < kRecordsPerSlot; ++r) {
+            B* rec = record_buf[s] + r * kRecordBytes;
+            for (U j = 0u; j < kRecordBytes; ++j) {
+                rec[j] = static_cast<B>((s * 19u + r * 43u + j * 11u + seed * 7u + 1u) & 0xffu);
+            }
+        }
+    }
+}
+
+static void seed_compact_slot(U slot_idx, B count_val, B cursor_val,
+                              std::initializer_list<U> rec_ids, U seed) {
+    seed_base(seed);
+    entry_buf[slot_idx][0x16u] = count_val;
+    entry_buf[slot_idx][0x17u] = cursor_val;
+    U r = 0u;
+    for (U id : rec_ids) {
+        require(r < kRecordsPerSlot, "bounded compact records");
+        put(record_buf[slot_idx] + r * kRecordBytes, 4u, id);
+        ++r;
+    }
+}
+
+static void seed_consumed_service(U service_id, U slot_idx, B count_val, B cursor_val,
+                                  std::initializer_list<RecSpec> recs, U seed) {
+    seed_base(seed);
+    porsche::audio_stream_service_storage_006b7740.index_map[service_id] = static_cast<SB>(slot_idx);
+    entry_buf[slot_idx][0x16u] = count_val;
+    entry_buf[slot_idx][0x17u] = cursor_val;
+    U r = 0u;
+    for (const RecSpec& spec : recs) {
+        require(r < kRecordsPerSlot, "bounded consumed records");
+        B* rec = record_buf[slot_idx] + r * kRecordBytes;
+        put(rec, 0x04u, spec.id);
+        put(rec, 0x14u, spec.offset);
+        put(rec, 0x18u, spec.limit);
+        put(rec, 0x1cu, spec.remaining);
+        ++r;
+    }
+}
+
+static void compare_results() {
+    require(orig_res.abi_fail == 0u, "original ABI");
+    require(cpp_res.abi_fail == 0u, "cpp ABI");
+    require(orig_res.exception[0] == 0u && cpp_res.exception[0] == 0u, "no exceptions");
+    require(std::memcmp(&orig_res.state, &cpp_res.state, sizeof(StateSnapshot)) == 0,
+            "state mismatch");
+}
+
+template <typename SetupFn>
+static void run_compact_case(SetupFn setup, U handle_word) {
+    ++cases;
+    std::memset(&orig_res, 0, sizeof orig_res);
+    setup();
+    __try {
+        orig_res.abi_fail = invoke_cdecl_1arg(slot_566d80, handle_word);
+    } __except (exception_record(&orig_res, GetExceptionInformation())) {
+    }
+    capture_state(orig_res.state);
+
+    std::memset(&cpp_res, 0, sizeof cpp_res);
+    setup();
+    __try {
+        cpp_res.abi_fail = invoke_cdecl_1arg(
+            reinterpret_cast<void*>(&porsche::audio_stream_service_compact_00566d80),
+            handle_word);
+    } __except (exception_record(&cpp_res, GetExceptionInformation())) {
+    }
+    capture_state(cpp_res.state);
+    compare_results();
+}
+
+template <typename SetupFn>
+static void run_consumed_case(SetupFn setup, U service_id, U consumed_bytes) {
+    ++cases;
+    std::memset(&orig_res, 0, sizeof orig_res);
+    setup();
+    __try {
+        orig_res.abi_fail = invoke_cdecl_2arg(slot_566e40, service_id, consumed_bytes);
+    } __except (exception_record(&orig_res, GetExceptionInformation())) {
+    }
+    capture_state(orig_res.state);
+
+    std::memset(&cpp_res, 0, sizeof cpp_res);
+    setup();
+    __try {
+        cpp_res.abi_fail = invoke_cdecl_2arg(
+            reinterpret_cast<void*>(&porsche::audio_stream_service_consumed_00566e40),
+            service_id, consumed_bytes);
+    } __except (exception_record(&cpp_res, GetExceptionInformation())) {
+    }
+    capture_state(cpp_res.state);
+    compare_results();
+}
+
+int main() {
+    init();
+
+    // 1. Direct compact (00566d80): empty and negative signed counts + signed cursor clamp.
+    U seed = 1u;
+    for (B cnt : {B(0u), B(0xffu), B(0x80u)}) {
+        for (B cur : {B(0u), B(1u), B(0xffu), B(0x7fu), B(0x80u)}) {
+            const U s = seed++;
+            run_compact_case([=]() {
+                seed_compact_slot(3u, cnt, cur, {0x00010003u, 0x00020003u}, s);
+            }, 0x00010003u);
+        }
+    }
+
+    // 2. Direct compact (00566d80): 1..5 entries across match positions, cursor positions, and upper handle bits.
+    run_compact_case([=]() { seed_compact_slot(0u, 1u, 0u, {0x11220000u}, 101u); }, 0x11220000u);
+    run_compact_case([=]() { seed_compact_slot(0u, 1u, 0u, {0x99880000u}, 102u); }, 0x11220000u);
+    run_compact_case([=]() { seed_compact_slot(0u, 1u, 1u, {0x99880000u}, 103u); }, 0x11220000u);
+
+    // Match first, middle, last, none, and multiple across count = 2..5 and cursors -1..count.
+    const U id_a = 0xabcd0005u;
+    const U id_b = 0x11110005u;
+    const U id_c = 0x22220005u;
+    const U id_d = 0x33330005u;
+    const U id_e = 0x44440005u;
+
+    for (B cur : {B(0xffu), B(0u), B(1u), B(2u), B(3u), B(4u)}) {
+        const U s1 = seed++;
+        run_compact_case([=]() { seed_compact_slot(5u, 3u, cur, {id_a, id_b, id_c}, s1); }, id_a);
+        const U s2 = seed++;
+        run_compact_case([=]() { seed_compact_slot(5u, 3u, cur, {id_b, id_a, id_c}, s2); }, id_a);
+        const U s3 = seed++;
+        run_compact_case([=]() { seed_compact_slot(5u, 3u, cur, {id_b, id_c, id_a}, s3); }, id_a);
+        const U s4 = seed++;
+        run_compact_case([=]() { seed_compact_slot(5u, 3u, cur, {id_b, id_c, id_d}, s4); }, id_a);
+        const U s5 = seed++;
+        run_compact_case([=]() { seed_compact_slot(5u, 4u, cur, {id_a, id_b, id_a, id_c}, s5); }, id_a);
+        const U s6 = seed++;
+        run_compact_case([=]() { seed_compact_slot(5u, 5u, cur, {id_b, id_a, id_c, id_d, id_e}, s6); }, id_a);
+    }
+    // Verify high byte differences don't match when low byte (slot index) is the same.
+    run_compact_case([=]() { seed_compact_slot(15u, 3u, 1u, {0x0001000fu, 0x0002000fu, 0x0003000fu}, 201u); },
+                     0x0004000fu);
+    run_compact_case([=]() { seed_compact_slot(15u, 3u, 2u, {0x0001000fu, 0x0002000fu, 0x0003000fu}, 202u); },
+                     0x0003000fu);
+
+    // 3. Consumed (00566e40): all 16 service_ids with non-identity index_map and boundary offsets.
+    for (U svc = 0u; svc < 16u; ++svc) {
+        const U slot = (svc * 5u + 3u) & 0x0fu;
+        const U hw0 = 0x10000000u | (svc << 16u) | slot;
+        const U hw1 = 0x20000000u | (svc << 16u) | slot;
+        const U s1 = seed++;
+        // < limit (no compaction)
+        run_consumed_case([=]() {
+            seed_consumed_service(svc, slot, 2u, 0u,
+                                  {{hw0, 10u, 100u, 90u}, {hw1, 0u, 80u, 80u}}, s1);
+        }, svc, 25u);
+        const U s2 = seed++;
+        // == limit (exact compaction threshold)
+        run_consumed_case([=]() {
+            seed_consumed_service(svc, slot, 2u, 1u,
+                                  {{hw0, 40u, 100u, 60u}, {hw1, 0u, 80u, 80u}}, s2);
+        }, svc, 60u);
+        const U s3 = seed++;
+        // > limit (compaction triggered with remaining >= consumed)
+        run_consumed_case([=]() {
+            seed_consumed_service(svc, slot, 2u, 0u,
+                                  {{hw0, 70u, 100u, 50u}, {hw1, 0u, 80u, 80u}}, s3);
+        }, svc, 40u);
+    }
+
+    // 4. Consumed (00566e40): zero consumption, exact boundary without compaction, and multi-record carry.
+    run_consumed_case([=]() {
+        seed_consumed_service(2u, 7u, 2u, 0u,
+                              {{0x01000007u, 10u, 50u, 40u}, {0x02000007u, 0u, 60u, 60u}}, 301u);
+    }, 2u, 0u);
+    run_consumed_case([=]() {
+        seed_consumed_service(2u, 7u, 2u, 0u,
+                              {{0x01000007u, 50u, 50u, 10u}, {0x02000007u, 0u, 60u, 60u}}, 302u);
+    }, 2u, 0u);
+    run_consumed_case([=]() {
+        seed_consumed_service(2u, 7u, 2u, 0u,
+                              {{0x01000007u, 49u, 50u, 40u}, {0x02000007u, 0u, 60u, 60u}}, 303u);
+    }, 2u, 0u);
+
+    // 2-record carry: record 0 finishes (offset+rem == limit) and compacts out, carry hits record 1 (< limit).
+    run_consumed_case([=]() {
+        seed_consumed_service(4u, 9u, 3u, 1u,
+                              {{0x01000009u, 80u, 100u, 20u},
+                               {0x02000009u, 0u, 50u, 50u},
+                               {0x03000009u, 0u, 70u, 70u}}, 304u);
+    }, 4u, 35u);
+
+    // 2-record carry where record 1 ALSO hits exact limit and compacts into record 2.
+    run_consumed_case([=]() {
+        seed_consumed_service(4u, 9u, 3u, 2u,
+                              {{0x01000009u, 80u, 100u, 20u},
+                               {0x02000009u, 10u, 50u, 40u},
+                               {0x03000009u, 0u, 70u, 70u}}, 305u);
+    }, 4u, 60u);
+
+    // 3-record carry chaining across two compactions into record 2.
+    run_consumed_case([=]() {
+        seed_consumed_service(4u, 9u, 4u, 3u,
+                              {{0x01000009u, 80u, 100u, 20u},
+                               {0x02000009u, 15u, 50u, 35u},
+                               {0x03000009u, 5u, 70u, 65u},
+                               {0x04000009u, 0u, 90u, 90u}}, 306u);
+    }, 4u, 72u);
+
+    std::printf("audio_stream_service_consumed_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

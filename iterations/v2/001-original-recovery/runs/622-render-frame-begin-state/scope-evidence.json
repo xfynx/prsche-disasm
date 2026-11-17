@@ -1,0 +1,119 @@
+{
+  "run": 622,
+  "functions": [
+    "game_setup_draw_begin_00534540",
+    "splash_progress_driver_frame_begin_00534540",
+    "render_resource_texture_state_00535a90"
+  ],
+  "originals": [
+    {
+      "function": "game_setup_draw_begin_00534540 / splash_progress_driver_frame_begin_00534540",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (0 args, RET 0)",
+      "entry": "00534540",
+      "body_ranges_inclusive": [["00534540", "0053454b"]],
+      "body_bytes": 12,
+      "body_sha256": "a24b8810ee0261f826f3539727ca897e3f3fd094c494fa4cb88eabb9bfbc4c15",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl"
+    },
+    {
+      "function": "render_resource_texture_state_00535a90",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (2 args: key, value; RET 0, EAX returned)",
+      "entry": "00535a90",
+      "body_ranges_inclusive": [["00535a90", "00535af7"]],
+      "body_bytes": 104,
+      "body_sha256": "79cb8e354813241bd94bcf84855d3a7f8039c7b1a1a30680c164a5931d39c174",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "prior_evidence": "iterations/v2/001-original-recovery/runs/527-render-state-flush/original-evidence.json"
+    }
+  ],
+  "direct_callers": [
+    {"caller": "004a4a70", "callsite": "004a5371", "callee": "00534540"},
+    {"caller": null, "callsite": "004d2adf", "callee": "00534540"},
+    {"caller": "004dd600", "callsite": "004dd786", "callee": "00534540"},
+    {"caller": "004dda00", "callsite": "004ddad3", "callee": "00534540"}
+  ],
+  "table_references": [
+    {"address": "005de740", "target": "00535a90", "table": "render_state_flush_callbacks_005de72c[5]"},
+    {"address": "005de744", "target": "00535a90", "table": "render_state_flush_callbacks_005de72c[6]"}
+  ],
+  "reused_canonical_symbols": [
+    {
+      "name": "game_setup_draw_begin_00534540",
+      "va": "00534540",
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/game_setup.hpp"
+    },
+    {
+      "name": "splash_progress_driver_frame_begin_00534540",
+      "va": "00534540",
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/splash_progress.hpp"
+    },
+    {
+      "name": "window_shutdown_state_005de6ac",
+      "va": "005de6ac",
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/window_shutdown.hpp"
+    },
+    {
+      "name": "render_descriptor_bind_00534480",
+      "va": "00534480",
+      "header": "iterations/v2/001-original-recovery/runs/374-render-descriptor/render_descriptor.hpp"
+    },
+    {
+      "name": "render_state_flush_records_005de6bc",
+      "va": "005de6bc",
+      "header": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.hpp"
+    },
+    {
+      "name": "render_resource_texture_state_00535a90",
+      "va": "00535a90",
+      "header": "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.hpp"
+    },
+    {
+      "name": "render_resource_texture_fallback_0069dd1c",
+      "va": "0069dd1c",
+      "header": "iterations/v2/001-original-recovery/runs/533-render-resource-factories/render_resource_533.hpp"
+    },
+    {
+      "name": "render_settings_set_state_006bd97c",
+      "va": "006bd97c",
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/render_settings.hpp"
+    }
+  ],
+  "owned_data": [
+    {
+      "name": "render_frame_begin_descriptor_005de680",
+      "va": "005de680",
+      "range_inclusive": ["005de680", "005de6ab"],
+      "bytes": 44,
+      "sha256": "220c387157e14d3be6c2715c7a6a737fbc0e32f0d1f11763ea4db572f1b5f69c"
+    }
+  ],
+  "owned_rdata": [],
+  "relocations": {
+    "00534540": {
+      "absolute": [
+        {"offset": "0x01", "va": "00534541", "original": "005de680", "target": "&orig_block_005de680 (48B staging [0..10] + [11]=005de6ac)"}
+      ],
+      "relative_call_e8": [
+        {"offset": "0x06", "va": "00534546", "original": "00534480", "target": "&render_descriptor_bind_00534480"}
+      ]
+    },
+    "00535a90": {
+      "absolute": [
+        {"offset": "0x01", "va": "00535a91", "original": "0069dd1c", "target": "&render_resource_texture_fallback_0069dd1c"},
+        {"offset": "0x2d", "va": "00535abd", "original": "005de6e8", "target": "&render_state_flush_records_005de6bc[11]"},
+        {"offset": "0x35", "va": "00535ac5", "original": "005de6f0", "target": "&render_state_flush_records_005de6bc[13]"},
+        {"offset": "0x46", "va": "00535ad6", "original": "006bd97c", "target": "&iat_slot_006bd97c"},
+        {"offset": "0x52", "va": "00535ae2", "original": "006bd97c", "target": "&iat_slot_006bd97c"},
+        {"offset": "0x63", "va": "00535af3", "original": "006bd97c", "target": "&iat_slot_006bd97c"}
+      ]
+    }
+  },
+  "scope_boundary": "PARTIAL for 00535a90 outside stage 0..1: bounded native x86-vs-C++ proof covers stage in 0..1 (indices strictly inside render_state_flush_records_005de6bc[0..27]) and fallback == 0 passthrough across arbitrary keys/values, plus bounded 00534540 proof with 44B owned .data 005de680..005de6ab and 12th-DWORD window_shutdown_state_005de6ac staging. Out-of-range/negative stage values for 00535a90, test-only providers for 00534480/006bd97c, and production CMake/registry integration remain open."
+}

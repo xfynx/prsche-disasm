@@ -1,16 +1,16 @@
 # v2 / 001 - original source recovery plan
 
-Current2026-11-17. Run621 shared audit passes for frozen619001+620001 on618.
-Build001 (`configure-002`, `configure-001` preserved) compiles351TUs/8projects,
-100names104refs,noEXE. Two real names (`ShutdownNetwork311::destroy_0048ff30`,
-`engine_service_consume_resource_0048cb50`) close with no new names and 12B
-`.rdata` (`005d072c`, 0B new writable `.data`). Registry950 adds three PARTIAL
-bodies (1053B total). README621 owns commands and bounds:138 native cases/8
-controls atOd/O2,868pins/960canonicalproviders.
+Current2026-11-18. Run624 shared audit passes for frozen622001+623001 on621.
+Build001 compiles353TUs/8projects,96names100refs,noEXE. Four real names
+(`game_setup_draw_begin_00534540`, `splash_progress_driver_frame_begin_00534540`,
+`render_resource_texture_state_00535a90`, `audio_stream_service_consumed_00566e40`)
+close with no new names and 44B file-backed `.data` (`005de680..005de6ab`, 0B
+new `.rdata`). Registry954 adds four PARTIAL bodies (342B total). README624 owns
+commands and bounds:3820 native cases/9 controls atOd/O2,873pins/966canonicalproviders.
 
-Active flash workers:622 (`00534540` + `00535a90`) and623 (`00566e10` +
-`00566e40`). Next integrate622+623 in shared batch624 and dispatch the next
-frontier workers.
+Active flash workers:625 (`004a66b0` 398B) and626 (`00565340` 381B, closes 3
+names). Next integrate625+626 in shared batch627 and dispatch the next frontier
+workers.
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.
