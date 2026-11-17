@@ -1,0 +1,90 @@
+{
+  "run": 638,
+  "experiment": "local/experiments/v2-render-seed-prng-638",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/638-render-seed-prng/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/638-render-seed-prng"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/638-render-seed-prng/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00538040",
+      "bytes": 193,
+      "sha256": "a3c4b3764536d7f285c16f5cd5ad470a2bdf7baef3a67215206d1ff359172c13",
+      "token": "@BODY_00538040@"
+    },
+    {
+      "va": "005de910",
+      "bytes": 24,
+      "sha256": "13eb516294955f2da4796105e1ecbea3780d3effefe20f5d2ae69aabcad79bde",
+      "token": "@BODY_005DE910@"
+    }
+  ],
+  "pass_marker": "render_seed_prng_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-s4-s5-carry",
+      "source": "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.cpp",
+      "old": "    std::uint32_t carry = (acc < s5 || acc < s4) ? 1u : 0u;",
+      "new": "    std::uint32_t carry = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-s3-carry",
+      "source": "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.cpp",
+      "old": "    carry = (acc < s3) ? 1u : 0u;",
+      "new": "    carry = (acc <= s3) ? 1u : 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-s2-carry",
+      "source": "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.cpp",
+      "old": "    carry = (acc < s2) ? 1u : 0u;",
+      "new": "    carry = (acc <= s2) ? 1u : 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-s1-carry",
+      "source": "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.cpp",
+      "old": "    carry = (acc < s1) ? 1u : 0u;",
+      "new": "    carry = (acc <= s1) ? 1u : 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-s5-zero-cascade-guard",
+      "source": "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.cpp",
+      "old": "    if (s5 == 0u) {",
+      "new": "    if (s5 != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-s1-to-s0-cascade",
+      "source": "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.cpp",
+      "old": "                    if (++render_seed_prng_state_005de910[1] == 0u) {",
+      "new": "                    if (++render_seed_prng_state_005de910[1] != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-return-state-word",
+      "source": "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.cpp",
+      "old": "    return acc;",
+      "new": "    return render_seed_prng_state_005de910[4];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

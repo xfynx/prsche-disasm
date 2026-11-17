@@ -1,0 +1,110 @@
+{
+  "run": 637,
+  "experiment": "local/experiments/v2-audio-stream-channel-status-637",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status",
+    "iterations/v2/001-original-recovery/runs/561-audio-stream-creation",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00567810",
+      "bytes": 64,
+      "sha256": "3de16d2b4c489ecfe4d745626df141a55b789b4119960fcd8912a781fb3ba9a1",
+      "token": "@BODY_00567810@"
+    },
+    {
+      "va": "00567850",
+      "bytes": 68,
+      "sha256": "cd1370530c5f9be45cce0af175ed88cd1cd22968c918b6605dbccf780d5b94a1",
+      "token": "@BODY_00567850@"
+    },
+    {
+      "va": "00591320",
+      "bytes": 83,
+      "sha256": "78e8298a6550549ec14a007e8300da151c9eff76f4808396bd6d3a36c26f78ec",
+      "token": "@BODY_00591320@"
+    }
+  ],
+  "pass_marker": "audio_stream_channel_status_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-volume-inactive-device-return",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "old": "std::int32_t __cdecl audio_stream_service_volume_00567810(\n    std::int32_t slot, std::uint32_t volume) {\n    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -10;\n    }",
+      "new": "std::int32_t __cdecl audio_stream_service_volume_00567810(\n    std::int32_t slot, std::uint32_t volume) {\n    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -8;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-volume-target-byte-store",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "old": "    obj_bytes[0xe4u] = static_cast<std::uint8_t>(volume);",
+      "new": "    obj_bytes[0xe5u] = static_cast<std::uint8_t>(volume);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-volume-discard-return",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "old": "    (void)frame_services_boundary_00566340(handle, volume);\n    return 0;",
+      "new": "    return static_cast<std::int32_t>(frame_services_boundary_00566340(handle, volume));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-status-negative-fallback-guard",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "old": "    if (status >= 0) {\n        return status;\n    }",
+      "new": "    if (status > 0) {\n        return status;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-status-fallback-sign-extension",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "old": "    return static_cast<std::int32_t>(static_cast<std::int8_t>(obj_bytes[0xe4u]));",
+      "new": "    return static_cast<std::int32_t>(obj_bytes[0xe4u]);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-channel-status-missing-return",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "old": "    if (idx < 0) {\n        return -8;\n    }",
+      "new": "    if (idx < 0) {\n        return -10;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-channel-status-stride",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "old": "        ptr_from_va(audio_backend_channels_006b4a00) + static_cast<std::uint32_t>(idx) * 0x70u;",
+      "new": "        ptr_from_va(audio_backend_channels_006b4a00) + static_cast<std::uint32_t>(idx) * 0x74u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-channel-status-sign-extension",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "old": "    return static_cast<std::int32_t>(static_cast<std::int8_t>(rec[0x3du]));",
+      "new": "    return static_cast<std::int32_t>(rec[0x3du]);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

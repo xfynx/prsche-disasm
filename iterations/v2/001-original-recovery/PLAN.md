@@ -1,14 +1,14 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-18. Run636 shared audit (`001`) passes for frozen `634/003` (`634/001`–`002` preserved)+`635/001` on `633`.
-Build `001` compiles 361 TUs / 8 projects, 88 names / 91 refs, no EXE. Two real
-names (`application_main_function_00563d30`, `render_display_activate_callback_004b0ee0`)
-close with zero new unresolved names and 0B new `.data`/`.rdata`.
-Registry 975 adds seven PARTIAL bodies (815B total). README 636 owns
-commands and bounds: 108 native cases / 16 controls at `/Od`/`/O2`, 894 pins.
+Current 2026-11-18. Run639 shared audit (`001`) passes for frozen `637/001`+`638/001` on `636`.
+Build `001` compiles 363 TUs / 8 projects, 88 names / 91 refs, no EXE. Adds
+24B `.data` (`005de910..005de927`) and 0B `.rdata`, supplying four verified
+dependencies for `004ae4d0`/`004ae8c0`.
+Registry 979 adds four PARTIAL bodies (408B total). README 639 owns
+commands and bounds: 1160 native cases / 15 controls at `/Od`/`/O2`, 899 pins.
 
-Active flash workers: `637` (`00567810`+`00567850`+`00591320`, 215B) and `638`
-(`00538040`, 193B). Next integrate `637`+`638` in shared batch `639`.
+Active flash workers: `640` (`004a5f90`, 464B) and `641` (`0056bce0`..`0056c540`,
+493B). Next integrate `640`+`641` in shared batch `642`, then close `004ae4d0`+`004ae8c0`.
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

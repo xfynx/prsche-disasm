@@ -18221,6 +18221,104 @@
           "004b0f99"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00567810",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl2 int32 RET0 (audio_stream_service_volume_00567810); returns -10 if active byte 006b499c==0, -8 if 00566d60(slot)==0, writes byte[obj+0xe4]=volume and calls frame_services_boundary_00566340(obj[+8], volume)",
+      "recovered_dependencies": [
+        "00566340",
+        "00566d60"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/639-audio-status-prng-integration/validation.json",
+      "verification_boundary": "Shared639(001) PASS:1026 native cases (513 per optimization in 637/001 at Od/O2) and 8 material controls. SHAc4bea375bec1a094e808b862f679dc71d8a1964d35f41d0b0410ce04af007d7c. Reuses 006b48c0[0xdc], 00566d60, 00566340; 0B new data. Build363TUs/88names91refs/noEXE.",
+      "partial_reason": "Controlled stream lookup/volume boundaries and test device state.",
+      "body_bytes": 64,
+      "body_ranges": [
+        [
+          "00567810",
+          "0056784f"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00567850",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 int32 RET0 (audio_stream_service_status_00567850); checks 006b499c and 00566d60(slot), calls 00591320(obj[+8]) falling back to sign-extended byte[obj+0xe4] when <0",
+      "recovered_dependencies": [
+        "00566d60",
+        "00591320"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/639-audio-status-prng-integration/validation.json",
+      "verification_boundary": "Shared639(001) PASS:1026 native cases (513 per optimization in 637/001 at Od/O2) and 8 material controls. SHAc4bea375bec1a094e808b862f679dc71d8a1964d35f41d0b0410ce04af007d7c. Zero new data. Build363TUs/88names91refs/noEXE.",
+      "partial_reason": "Controlled stream lookup/channel status mocks.",
+      "body_bytes": 68,
+      "body_ranges": [
+        [
+          "00567850",
+          "00567893"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00591320",
+      "source": "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status/audio_stream_channel_status_637.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 int32 RET0 (audio_channel_status_00591320); locks audio backend, resolves channel index via 00589d20, unlocks, returns sign-extended byte[rec+0x3d] across 0x70-stride table 006b4a00 or -8/-10",
+      "recovered_dependencies": [
+        "005896d0",
+        "005896f0",
+        "00589d20"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/639-audio-status-prng-integration/validation.json",
+      "verification_boundary": "Shared639(001) PASS:1026 native cases (513 per optimization in 637/001 at Od/O2) and 8 material controls. SHAc4bea375bec1a094e808b862f679dc71d8a1964d35f41d0b0410ce04af007d7c. Reuses audio_canonical_434; 0B new data. Build363TUs/88names91refs/noEXE.",
+      "partial_reason": "Controlled lock/channel lookup mocks without live audio backend threads.",
+      "body_bytes": 83,
+      "body_ranges": [
+        [
+          "00591320",
+          "00591372"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00538040",
+      "source": "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 uint32 RET0 (render_seed_prng_next_00538040); advances 6-word .data seed state 005de910..005de927 with unsigned carry-out cascade and s5==0 increment cascade, returning state[0]",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/639-audio-status-prng-integration/validation.json",
+      "verification_boundary": "Shared639(001) PASS:134 native cases (67 per optimization in 638/001 at Od/O2) and 7 material controls. SHA86c4c316fa01557b15ebba02b3f60356164075883dcd3a0a0bf70f793b9f6f4b. Owns 24B .data (005de910..005de927). Build363TUs/88names91refs/noEXE.",
+      "partial_reason": "Companion seed writer 00538110, caller integration (004ae4d0 etc.), and concurrency remain open.",
+      "body_bytes": 193,
+      "body_ranges": [
+        [
+          "00538040",
+          "00538100"
+        ]
+      ]
     }
   ]
 }

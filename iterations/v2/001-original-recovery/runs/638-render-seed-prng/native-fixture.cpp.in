@@ -1,0 +1,303 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "render_seed_prng_638.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::render_seed_prng_state_005de910) == 24u, "24-byte PRNG state block");
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+struct StateSnapshot {
+    std::array<U, 6> words;
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    StateSnapshot final_state;
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+
+alignas(16) static B floating[512];
+static B* code = nullptr;
+static B* slot_538040 = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    for (U i = 0u; i < 6u; ++i) {
+        s.words[i] = porsche::render_seed_prng_state_005de910[i];
+    }
+}
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static U invoke_cdecl0(void* fn, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void init() {
+    // Assert production initial .data state against raw PE bytes before any fixture reset.
+    static const B orig_data_5de910[] = {@BODY_005DE910@};
+    require(sizeof orig_data_5de910 == 24u, "24-byte original .data 005de910..005de927");
+    require(std::memcmp(porsche::render_seed_prng_state_005de910, orig_data_5de910, 24u) == 0,
+            "initial .data 005de910..005de927");
+
+    static const B body_538040[] = {@BODY_00538040@};
+    require(sizeof body_538040 == 193u, "193-byte original body 00538040");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_538040 = code;
+    std::memcpy(slot_538040, body_538040, sizeof body_538040);
+
+    const U base_ptr = address(porsche::render_seed_prng_state_005de910);
+    struct RelocEntry {
+        U off;
+        U orig_va;
+    };
+    static const RelocEntry kRelocs[] = {
+        {0x002u, 0x005de920u},
+        {0x009u, 0x005de924u},
+        {0x023u, 0x005de91cu},
+        {0x028u, 0x005de920u},
+        {0x032u, 0x005de918u},
+        {0x039u, 0x005de91cu},
+        {0x049u, 0x005de914u},
+        {0x050u, 0x005de918u},
+        {0x05du, 0x005de914u},
+        {0x069u, 0x005de910u},
+        {0x072u, 0x005de924u},
+        {0x077u, 0x005de910u},
+        {0x080u, 0x005de920u},
+        {0x087u, 0x005de920u},
+        {0x08fu, 0x005de91cu},
+        {0x096u, 0x005de91cu},
+        {0x09eu, 0x005de918u},
+        {0x0a5u, 0x005de918u},
+        {0x0adu, 0x005de914u},
+        {0x0b4u, 0x005de914u},
+        {0x0bcu, 0x005de910u},
+    };
+    for (const RelocEntry& r : kRelocs) {
+        const U delta = r.orig_va - 0x005de910u;
+        relocate_abs32(slot_538040, r.off, r.orig_va, base_ptr + delta);
+    }
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void apply_state(const std::array<U, 6>& words) {
+    for (U i = 0u; i < 6u; ++i) {
+        porsche::render_seed_prng_state_005de910[i] = words[i];
+    }
+}
+
+static void run_pair(const std::array<U, 6>& init_words) {
+    ++cases;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_state(init_words);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl0(slot_538040, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_state(init_words);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl0(
+            reinterpret_cast<void*>(&porsche::render_seed_prng_next_00538040),
+            trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0,
+            "x87/MXCSR state mismatch");
+}
+
+static void run_sequence(std::array<U, 6> words, U steps) {
+    for (U step = 0u; step < steps; ++step) {
+        run_pair(words);
+        words = trace.final_state.words;
+    }
+}
+
+static std::array<U, 6> seeded_state_from(U seed) {
+    std::array<U, 6> s{};
+    U acc = seed + 0xf22d0e56u;
+    s[0] = acc;
+    acc -= 0x69fbe76du;
+    s[1] = acc;
+    acc += 0x3df3b646u;
+    s[2] = acc;
+    acc += 0x40dde76du;
+    s[3] = acc;
+    acc -= 0x68cd851fu;
+    s[4] = acc;
+    acc += 0xd1a9fbe7u;
+    s[5] = acc;
+    return s;
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    // 1. Multi-step sequence from exact production .data initial state (32 calls).
+    run_sequence(seeded_state_from(0u), 32u);
+
+    // 2. Multi-step sequences from representative seeded states (8 calls each).
+    run_sequence(seeded_state_from(1u), 8u);
+    run_sequence(seeded_state_from(0xffffffffu), 8u);
+
+    // 3. Carry and equality boundary cases (exercises each stage carry < vs <= and 0/max wrap).
+    run_pair({0u, 0u, 0u, 0u, 0u, 0u});
+    run_pair({0u, 0u, 0u, 0x12345678u, 0u, 0u});
+    run_pair({0u, 0u, 0u, 0x12345678u, 0xffffffffu, 1u});
+    run_pair({0u, 0u, 0x12345678u, 0u, 0u, 0u});
+    run_pair({0u, 0u, 0x12345678u, 0xffffffffu, 0xffffffffu, 1u});
+    run_pair({0u, 0x12345678u, 0u, 0u, 0u, 0u});
+    run_pair({0u, 0x12345678u, 0xffffffffu, 0xffffffffu, 0xffffffffu, 1u});
+    run_pair({0x11111111u, 0x22222222u, 0x33333333u, 0x44444444u, 0x80000000u, 0x80000000u});
+    run_pair({0x12345678u, 0xffffffffu, 0xffffffffu, 0xffffffffu, 0x80000000u, 0x80000001u});
+    run_pair({0xffffffffu, 0xffffffffu, 0xffffffffu, 0xffffffffu, 0xffffffffu, 0x80000000u});
+
+    // 4. Post-loop s5 == 0 increment cascade across all 6 words.
+    run_pair({1u, 2u, 3u, 4u, 5u, 0xfffffffeu});                       // s5 != 0 -> no cascade
+    run_pair({1u, 2u, 3u, 4u, 5u, 0xffffffffu});                       // s5 == 0 -> stops at s4
+    run_pair({1u, 2u, 3u, 4u, 0u, 0xffffffffu});                       // s5 == 0 -> s4 wraps, stops at s3
+    run_pair({1u, 2u, 1u, 0u, 0u, 0xffffffffu});                       // s5 == 0 -> s4..s3 wrap, stops at s2
+    run_pair({1u, 1u, 0u, 0u, 0u, 0xffffffffu});                       // s5 == 0 -> s4..s2 wrap, stops at s1
+    run_pair({1u, 0u, 0u, 0u, 0u, 0xffffffffu});                       // s5 == 0 -> cascades all the way to s0 (=1)
+    run_pair({0u, 0u, 0u, 0u, 0u, 0xffffffffu});                       // s5 == 0 -> cascades to s0, s0 wraps to 0
+    run_pair({0x12345678u, 0u, 0u, 0u, 0u, 0xffffffffu});              // s5 == 0 -> cascades to s0 (=0x12345678)
+    run_pair({0xffffffffu, 0xffffffffu, 0xffffffffu, 0xffffffffu, 0xffffffffu, 0xffffffffu});
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("render_seed_prng_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}
