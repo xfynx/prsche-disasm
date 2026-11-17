@@ -1,23 +1,20 @@
 # v2 / 001 - original source recovery plan
 
-Current2026-11-16. Run584 shared audit passes for frozen583001 on582.
-Build001 compiles327TUs/8projects,125names130refs,noEXE. One real540500 name
-closes with no new names or original state. Registry906 adds one PARTIAL71B
-body. README584 owns commands and bounds:24 native scenes/4 controls atOd/O2,
-808pins/863canonicalproviders. Production71B equal original after four DIR32
-normalizations; all four canonical data owners verified. Fresh582 closure595
-files/326roots/805pins has no overlap, including registry body_ranges.
+Current2026-11-17. Run588 shared audit passes for frozen585002+587002 on584.
+Build001 compiles329TUs/8projects,123names128refs,noEXE. Two real names
+(`frame_pump_boundary_005693e0`, `splash_progress_dispatch_004edc00`) close with
+no new names and12B loader-zero `.data` (`006a5ca0..006a5cab`). Registry908 adds
+two PARTIAL bodies (101B total). README588 owns commands and bounds:42 native
+executions/7 controls atOd/O2,813pins/868canonicalproviders. Production53B of
+`005693e0` equal original after five DIR32 normalizations; attempts585001 and587001
+preserved.
 
-Active workers Luna/medium: release_585 owns585-frame-interface-release source,
-scope and native fixture; splash_587 owns587-splash-command-dispatch source,
-scope and native fixture. Root owns review, registry, common integration and
-publication. Neither worker may change frozen583/584. Both must provide scratch
-preflight and root review before numbered native proof. Next integrate only
-ready accepted packets in a fresh shared batch; no enlargement of passed584.
+Ready next packets:589 (`005363a0` frame-state release, 178B, native001 PASS) and
+590 (`00403520` game-setup object init, 184B, native001 PASS). Next integrate589+590
+in shared batch591 and dispatch the next frontier workers.
 
-User requested continued recovery until available limits. Chain ready batches,
-report actual status after each push. Simple workers own bounded work; strong
-root owns orchestration/acceptance. Passed inputs remain immutable.
+User requested continued recovery until available limits with simple worker models
+and strong root orchestration/acceptance. Passed inputs remain immutable.
 
 Real5350e0 conversion remains open. Scout found shared64-entry callback and
 64-byte matrices5de2fc/5de4fc,25targets(sevenunindexed), decoderpaths andunproved

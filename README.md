@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run584](iterations/v2/001-original-recovery/runs/584-driver-x87-integration/README.md)
-  integrates the partial x87 callback with normalized71-byte original identity.
-  The shared build has125 unresolved names across327 TUs.
+  [Run588](iterations/v2/001-original-recovery/runs/588-frame-splash-integration/README.md)
+  integrates the partial frame-interface release and splash command writes.
+  The shared build has123 unresolved names across329 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

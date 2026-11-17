@@ -1,0 +1,57 @@
+{
+  "run": 587,
+  "experiment": "local/experiments/v2-splash-command-writes-587",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/587-splash-command-dispatch/splash_command_dispatch_587.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/587-splash-command-dispatch/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/587-splash-command-dispatch",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/587-splash-command-dispatch/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/587-splash-command-dispatch/splash_command_dispatch_587.cpp",
+    "iterations/v2/001-original-recovery/runs/587-splash-command-dispatch/splash_command_dispatch_587.hpp",
+    "iterations/v2/001-original-recovery/runs/587-splash-command-dispatch/native-fixture.cpp.in"
+  ],
+  "original_bodies": [
+    {
+      "va": "004edc00",
+      "bytes": 48,
+      "sha256": "7afecd805ef81d036e77b3e28f580d7c17f023abc55b82cfedc8d540dd9058fc",
+      "token": "@BODY_004EDC00@"
+    }
+  ],
+  "pass_marker": "splash_command_dispatch_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "omit-first-store",
+      "source": "iterations/v2/001-original-recovery/runs/587-splash-command-dispatch/splash_command_dispatch_587.cpp",
+      "old": "store32(load_cursor(cursor_storage),record);",
+      "new": "(void)record;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-source-store",
+      "source": "iterations/v2/001-original-recovery/runs/587-splash-command-dispatch/splash_command_dispatch_587.cpp",
+      "old": "store32(load_cursor(cursor_storage),source);",
+      "new": "(void)source;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-phase-store",
+      "source": "iterations/v2/001-original-recovery/runs/587-splash-command-dispatch/splash_command_dispatch_587.cpp",
+      "old": "store32(load_cursor(cursor_storage),phase_bits);",
+      "new": "(void)phase_bits;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

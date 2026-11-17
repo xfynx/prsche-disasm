@@ -1,0 +1,37 @@
+{
+  "status": "scratch preflight; awaiting root review before numbered native attempt",
+  "original": {
+    "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+    "function_va": "005693e0",
+    "body_bytes": 53,
+    "body_sha256": "734800d99678e5cb84f53799de69ab25a28ca1262dbdf30c825f404da7459f8d",
+    "global_span": ["006a5ca0", "006a5cac"],
+    "global_span_bytes": 12,
+    "loader_initialization": "writable .data virtual tail beyond raw size; full span loader-zero"
+  },
+  "source_proposal": {
+    "function": "frame_pump_boundary_005693e0",
+    "implementation": "MSVC x86 naked cdecl exact instruction sequence; preserve ESI; slot globals have independent 32-bit zero-initialized storage; no guessed return value, class or fields",
+    "release_abi": "stdcall vtable slot +8, receiver passed as sole argument",
+    "must_preserve": [
+      "first release happens before first-slot clear",
+      "clear first slot after callback",
+      "reload second slot after first callback",
+      "second release then clear second slot",
+      "clear final flag",
+      "return second release EAX, or second-slot null-load EAX=0"
+    ]
+  },
+  "native_cases": [
+    "both slots null: no calls, flag cleared, EAX zero",
+    "first only: release and clear first; second null; EAX zero",
+    "second only: release and clear second; EAX is callback result",
+    "both distinct: call order first then second; EAX is second result",
+    "first callback replaces second slot: replacement is reloaded and released",
+    "first callback nulls second slot: no stale release; EAX zero",
+    "aliased receiver in both slots: callback invoked twice unless first callback mutates second slot",
+    "callback observes pre-clear state and mutates slots to verify exact clear/reload order",
+    "cdecl caller stack/register ABI and full x87/MMX/SSE state comparison under controlled callbacks"
+  ],
+  "preflight_status": "root reviewed; ready for native 001"
+}

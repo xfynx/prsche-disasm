@@ -1,0 +1,108 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "splash_command_dispatch_587.hpp"
+using U=std::uint32_t;
+using namespace porsche;
+static constexpr U arena_size=0x1000;
+alignas(16) static std::uint8_t* arena=nullptr;
+static std::uint8_t initial[arena_size];
+static U cases=0;
+static void require(bool ok,const char* what){
+ if(!ok){std::printf("divergence %s case=%u\n",what,cases);std::fflush(stdout);ExitProcess(1);}
+}
+static U address(U offset){return reinterpret_cast<U>(arena+offset);}
+static U read32(U address_value){U value;std::memcpy(&value,reinterpret_cast<const void*>(address_value),4);return value;}
+static void write32(U address_value,U value){std::memcpy(reinterpret_cast<void*>(address_value),&value,4);}
+static const std::uint8_t original_body[]={@BODY_004EDC00@};
+static void* original_code=nullptr;
+static void prepare_original(){
+ require(sizeof original_body==48,"original body extent");
+ original_code=VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE);
+ require(original_code!=nullptr,"original allocation");
+ std::memcpy(original_code,original_body,sizeof original_body);
+ FlushInstructionCache(GetCurrentProcess(),original_code,sizeof original_body);
+}
+static U invoke(void* fn,const U args[4],U* abi_failed){
+ U before=0,frame=0,failed=0;
+ __asm {
+  push ebx
+  push esi
+  push edi
+  mov before,esp
+  mov frame,ebp
+  mov eax,args
+  push dword ptr [eax+0ch]
+  push dword ptr [eax+8]
+  push dword ptr [eax+4]
+  push dword ptr [eax]
+  mov ebx,13579bdfh
+  mov esi,2468ace0h
+  mov edi,10203040h
+  call fn
+  add esp,10h
+  cmp esp,before
+  jne bad
+  cmp ebp,frame
+  jne bad
+  cmp ebx,13579bdfh
+  jne bad
+  cmp esi,2468ace0h
+  jne bad
+  cmp edi,10203040h
+  jne bad
+  mov failed,0
+  jmp done
+ bad: mov failed,1
+ done: mov esp,before
+  pop edi
+  pop esi
+  pop ebx
+ }
+ *abi_failed=failed;return 0;
+}
+struct Case{U cursor_offset,initial_offset,record,source;std::int32_t phase;const char* name;};
+struct Result{std::uint8_t memory[arena_size];U final_cursor;U abi_failed;};
+static Result original_result,candidate_result;
+static void run_one(void* fn,const Case& item,Result& out){
+ std::memcpy(arena,initial,arena_size);
+ write32(address(item.cursor_offset),address(item.initial_offset));
+ U args[4]={item.record,address(item.cursor_offset),item.source,0};
+ std::memcpy(&args[3],&item.phase,4);
+ out.abi_failed=0;invoke(fn,args,&out.abi_failed);
+ out.final_cursor=read32(address(item.cursor_offset));
+ std::memcpy(out.memory,arena,arena_size);
+}
+static void verify_cases(){
+ const Case list[]={
+  {0x100,0x300,0x256,0x65741cu,0,"aligned ordinary call"},
+  {0x111,0x321,0x256,0x65741cu,-1,"unaligned cursor and output, negative phase"},
+  {0x128,0x348,0x256,0x65741cu,static_cast<std::int32_t>(0x80000000u),"high phase bit"},
+  {0x140,0x140,0x500,0x680u,0x7fffffff,"cursor cell is first destination"},
+  {0x204,0x200,0x256,0x700u,static_cast<std::int32_t>(0x80000000u),"source store overwrites cursor cell"}
+ };
+ for(U i=0;i<sizeof(list)/sizeof(list[0]);++i){
+  Case item=list[i];
+  if(i==3){item.record=address(item.record);item.source=address(item.source);}
+  if(i==4)item.source=address(item.source);
+  run_one(original_code,item,original_result);
+  run_one(reinterpret_cast<void*>(&splash_progress_dispatch_004edc00),item,candidate_result);
+  require(original_result.abi_failed==0&&candidate_result.abi_failed==0,"cdecl stack/nonvolatile ABI");
+  require(original_result.final_cursor==candidate_result.final_cursor,"final cursor");
+  require(std::memcmp(original_result.memory,candidate_result.memory,arena_size)==0,"complete mapped memory");
+  if(i<3)require(candidate_result.final_cursor==address(item.initial_offset)+12u,"ordinary three-word advance");
+  if(i==3)require(candidate_result.final_cursor==item.record+12u,"cursor reload after aliased first store");
+  if(i==4)require(candidate_result.final_cursor==item.source+8u,"cursor reload after aliased source store");
+  ++cases;
+ }
+}
+int main(int argc,char**argv){
+ (void)argc;(void)argv;
+ arena=static_cast<std::uint8_t*>(VirtualAlloc(nullptr,arena_size,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));
+ require(arena!=nullptr,"arena allocation");
+ for(U i=0;i<arena_size;++i)initial[i]=static_cast<std::uint8_t>((i*37u+0x5bu)&0xffu);
+ prepare_original();verify_cases();
+ std::printf("splash_command_dispatch_original_x86_vs_cpp=PASS cases=%u\n",cases);return 0;
+}

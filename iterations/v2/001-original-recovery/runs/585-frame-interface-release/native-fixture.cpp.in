@@ -1,0 +1,108 @@
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "frame_interface_release_585.hpp"
+using U=std::uint32_t; using B=std::uint8_t; using namespace porsche;
+static constexpr B body[]={@BODY_005693E0@};
+static U vt_a[3]{},vt_b[3]{},obj_a[1]{},obj_b[1]{};
+static U calls, events[8], seen_first[8], seen_second[8], seen_flag[8], mutate_mode;
+static U* raw_code; static U cases;
+static U ptr(const void*p){return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));}
+static U fnptr(U(__stdcall*p)(U)){return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));}
+static U word(const void*p){U x;std::memcpy(&x,p,4);return x;}
+static void put(void*p,U x){std::memcpy(p,&x,4);}
+static void require(bool ok,const char*s){if(!ok){std::printf("divergence %s case=%u\n",s,cases);std::fflush(stdout);ExitProcess(1);}}
+static U __stdcall release_stub(U receiver){
+ U n=calls++;require(n<8,"callback log capacity");
+ events[n]=receiver;seen_first[n]=frame_interface_first_006a5ca8;
+ seen_second[n]=frame_interface_second_006a5ca4;seen_flag[n]=frame_interface_final_flag_006a5ca0;
+ if(n==0&&mutate_mode==1)frame_interface_second_006a5ca4=ptr(obj_b);
+ if(n==0&&mutate_mode==2)frame_interface_second_006a5ca4=0;
+ if(n==0&&mutate_mode==3)frame_interface_first_006a5ca8=ptr(obj_b);
+ return receiver==ptr(obj_a)?0xa11ce001u:0xb0bce002u;
+}
+static U patch_abs(B*p,U n,U va,const void*host,U expected){
+ U found=0;for(U i=0;i+4<=n;i++)if(word(p+i)==va){put(p+i,ptr(host));++found;i+=3;}
+ require(found==expected,"absolute relocation count");return found;
+}
+static void prepare_raw(){
+ require(sizeof body==53,"original extent");
+ raw_code=static_cast<U*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+ require(raw_code!=nullptr,"original allocation");std::memcpy(raw_code,body,sizeof body);
+ auto*p=reinterpret_cast<B*>(raw_code);
+ patch_abs(p,sizeof body,0x006a5ca0,&frame_interface_final_flag_006a5ca0,1);
+ patch_abs(p,sizeof body,0x006a5ca4,&frame_interface_second_006a5ca4,2);
+ patch_abs(p,sizeof body,0x006a5ca8,&frame_interface_first_006a5ca8,2);
+ FlushInstructionCache(GetCurrentProcess(),raw_code,sizeof body);
+}
+struct Trace{U eax,abi,calls,events[8],first[8],second[8],flag[8],slots[3];B fp[512];};
+static void invoke_capture(void(__cdecl*fn)(),U*result,U*failed){U before=0,frame=0,bad=0,out=0;__asm{
+ push ebx
+ push esi
+ push edi
+ mov before,esp
+ mov frame,ebp
+ mov ebx,13579bdfh
+ mov esi,2468ace0h
+ mov edi,10203040h
+ call fn
+ mov out,eax
+ cmp esp,before
+ jne bad_abi
+ cmp ebp,frame
+ jne bad_abi
+ cmp ebx,13579bdfh
+ jne bad_abi
+ cmp esi,2468ace0h
+ jne bad_abi
+ cmp edi,10203040h
+ jne bad_abi
+ jmp done_abi
+ bad_abi: mov bad,1
+ done_abi:
+ pop edi
+ pop esi
+ pop ebx
+ }
+ *result=out;*failed=bad;
+}
+__declspec(align(16)) static B fp_save[512];
+static void seed_fp(){unsigned short cw=0x027f;U mxcsr=0x9f80;__asm{
+ fninit
+ fldcw cw
+ ldmxcsr mxcsr
+ fldpi
+ }}
+static void capture_fp(B*out){std::memset(fp_save,0,sizeof fp_save);__asm{fxsave fp_save}std::memcpy(out,fp_save,sizeof fp_save);}
+static Trace run(void(__cdecl*fn)(),U first,U second,U flag,U mutation){
+ Trace t{};cases++;calls=0;mutate_mode=mutation;
+ frame_interface_first_006a5ca8=first;frame_interface_second_006a5ca4=second;frame_interface_final_flag_006a5ca0=flag;
+ seed_fp();invoke_capture(fn,&t.eax,&t.abi);capture_fp(t.fp);
+ t.calls=calls;std::memcpy(t.events,events,sizeof events);std::memcpy(t.first,seen_first,sizeof seen_first);
+ std::memcpy(t.second,seen_second,sizeof seen_second);std::memcpy(t.flag,seen_flag,sizeof seen_flag);
+ t.slots[0]=frame_interface_final_flag_006a5ca0;t.slots[1]=frame_interface_second_006a5ca4;t.slots[2]=frame_interface_first_006a5ca8;
+ return t;
+}
+static void compare(const char*name,U first,U second,U flag,U mutation){
+ Trace a=run(reinterpret_cast<void(__cdecl*)()>(raw_code),first,second,flag,mutation);
+ Trace b=run(reinterpret_cast<void(__cdecl*)()>(frame_pump_boundary_005693e0),first,second,flag,mutation);
+ require(a.eax==b.eax,"EAX return");require(!a.abi&&!b.abi,"cdecl ABI");
+ require(a.calls==b.calls&&std::memcmp(a.events,b.events,sizeof a.events)==0,"release call order/receivers");
+ require(std::memcmp(a.first,b.first,sizeof a.first)==0&&std::memcmp(a.second,b.second,sizeof a.second)==0&&std::memcmp(a.flag,b.flag,sizeof a.flag)==0,"callback mutation and clear/reload order");
+ require(std::memcmp(a.slots,b.slots,sizeof a.slots)==0,"final slots");require(std::memcmp(a.fp,b.fp,sizeof a.fp)==0,"full FXSAVE state");
+ std::printf("case %u %s PASS\n",cases,name);std::fflush(stdout);
+}
+int main(){
+ vt_a[2]=fnptr(release_stub);vt_b[2]=fnptr(release_stub);
+ obj_a[0]=ptr(vt_a);obj_b[0]=ptr(vt_b);prepare_raw();
+ compare("both-null",0,0,0x11111111,0);
+ compare("first-only",ptr(obj_a),0,0x22222222,0);
+ compare("second-only",0,ptr(obj_b),0x33333333,0);
+ compare("both-distinct",ptr(obj_a),ptr(obj_b),0x44444444,0);
+ compare("aliased-handles",ptr(obj_a),ptr(obj_a),0x55555555,0);
+ compare("first-replaces-second",ptr(obj_a),ptr(obj_a),0x66666666,1);
+ compare("first-nulls-second",ptr(obj_a),ptr(obj_b),0x77777777,2);
+ compare("first-replaces-itself-before-clear",ptr(obj_a),0,0x88888888,3);
+ std::printf("frame_interface_release_original_x86_vs_cpp=PASS cases=%u\n",cases);return 0;
+}

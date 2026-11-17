@@ -1,25 +1,25 @@
 # Current project status
 
-Updated 2026-11-16. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-17. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run584](iterations/v2/001-original-recovery/runs/584-driver-x87-integration/README.md)
-compiles327 C++ translation units across8 projects. The link has125 unresolved names/
-130 references. **There is no recovered playable C++ game executable yet.**
+[Run588](iterations/v2/001-original-recovery/runs/588-frame-splash-integration/README.md)
+compiles329 C++ translation units across8 projects. The link has123 unresolved names/
+128 references. **There is no recovered playable C++ game executable yet.**
 
-Run584 integrates the partial540500 x87 callback. Native comparison passes24
-scenes/four controls atOd/O2, and all71 production instruction bytes equal the
-original after relocation normalization. Four existing canonical data owners
-are reused. Shared audit verifies808 pins/863 providers; registry906 retains
-partial domains. Live driver/context producers and parent semantics remain open.
+Run588 integrates partial `005693e0` (53B + 12B loader-zero `.data`) and `004edc00`
+(48B, 0B data) from frozen585002 and587002. Native comparisons pass42 executions/
+seven controls atOd/O2, and all53 instruction bytes of `005693e0` equal the original
+after relocation normalization. Shared audit verifies813 pins/868 providers;
+registry908 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run583 native001 and Run584 integration are accepted within their stated bounds.
-Run585 frame-interface release and587 splash writes are independent pending packets.
+Run585 native002, Run587 native002 and Run588 integration are accepted within their stated bounds.
+Run589 frame-state release and590 object init are ready for next integration.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
