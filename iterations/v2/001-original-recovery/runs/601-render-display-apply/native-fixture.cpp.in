@@ -1,0 +1,435 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <intrin.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "render_display_apply_601.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U address(const volatile std::uint32_t& v) { return reinterpret_cast<U>(&v); }
+static U word(const void* p, U o = 0) { U v; std::memcpy(&v, static_cast<const B*>(p) + o, 4); return v; }
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4); }
+
+static U cases = 0u, events_total = 0u;
+static U family_cfg = 0u, field7c_cfg = 0u, field74_cfg = 0u;
+static U tick_cfg = 0u, step_base_cfg = 0x80u, texture_height_cfg = 480u;
+static U precision = 2u, rounding = 0u, depth = 1u, initial_status = 0u;
+static B* code = nullptr;
+static B* slot_4b70d0 = nullptr;
+static B* slot_56a680 = nullptr;
+alignas(16) static B floating[512];
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+struct State {
+    U scale_x;
+    U scale_y;
+    U step_base;
+    U offset_x;
+    U offset_y;
+    U teardown_state;
+    U timer_word_dd4;
+    U timer_word_dd8;
+    U timer_tick_ddc;
+    U timer_word_de0;
+    U timer_word_de4;
+    U timer_word_de8;
+    U current_tick;
+    U texture_height;
+};
+struct Event {
+    U tag, argc, args[6];
+    State state;
+    Fpu fpu;
+};
+struct Trace {
+    U count, abi, ret_eax, exception[3];
+    Event events[4];
+    State final;
+    Fpu fpu;
+};
+static Trace trace, expected;
+
+static void require(bool ok, const char* s) {
+    if (!ok) {
+        std::printf("divergence %s case=%u fam=%u f7c=%08x f74=%08x tick=%08x base=%08x h=%08x\n",
+                    s, cases, family_cfg, field7c_cfg, field74_cfg,
+                    tick_cfg, step_base_cfg, texture_height_cfg);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void snapshot(State& s) {
+    s.scale_x = render_display_scale_x_005e517c;
+    s.scale_y = render_display_scale_y_005e5180;
+    s.step_base = render_display_step_base_005e5184;
+    s.offset_x = render_display_offset_x_006afc7c;
+    s.offset_y = render_display_offset_y_006afc80;
+    s.teardown_state = render_teardown_state_0065b398;
+    s.timer_word_dd4 = render_frame_timer_word_006a5dd4;
+    s.timer_word_dd8 = render_frame_timer_word_006a5dd8;
+    s.timer_tick_ddc = render_frame_timer_tick_006a5ddc;
+    s.timer_word_de0 = render_frame_timer_word_006a5de0;
+    s.timer_word_de4 = render_frame_timer_word_006a5de4;
+    s.timer_word_de8 = render_frame_timer_word_006a5de8;
+    s.current_tick = current_tick_006b7c40;
+    s.texture_height = render_display_texture_height_005deacc;
+}
+
+static void capture(Fpu& f) {
+    B environment[28];
+    __asm {
+        fxsave floating
+        fnstenv environment
+        fldenv environment
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(environment + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0; i < 8; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10, floating + 32 + i * 16, 10);
+        } else {
+            std::memset(f.values + i * 10, 0, 10);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = static_cast<unsigned short>(0x7f | (precision << 8) | (rounding << 10));
+    __asm fninit
+    __asm fldcw cw
+    for (U i = 0; i < depth; ++i) {
+        U bits = 0x3f800001 + i;
+        __asm fld dword ptr bits
+    }
+    B environment[28];
+    __asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment + 4) |= static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+
+static U invoke_0arg(void* fn, U& ret_eax) {
+    U before, frame, fail = 0, eax_out = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_2arg(void* fn, U arg0, U arg1, U& ret_eax) {
+    U before, frame, fail = 0, eax_out = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg1
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 8
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void event(U tag, std::initializer_list<U> args) {
+    require(trace.count < 4, "bounded event count");
+    auto& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.argc = static_cast<U>(args.size());
+    U i = 0;
+    for (U a : args) {
+        e.args[i++] = a;
+    }
+    while (i < 6) {
+        e.args[i++] = 0;
+    }
+    snapshot(e.state);
+    capture(e.fpu);
+}
+
+namespace porsche {
+std::uint32_t current_tick_006b7c40 = 0u;
+std::uint32_t render_display_texture_height_005deacc = 0u;
+
+__declspec(noinline) void __cdecl startup_service_noop_00516950() {
+    const auto* const stack = static_cast<const U*>(_AddressOfReturnAddress());
+    event(0x516950u, {stack[1], stack[2], stack[3]});
+}
+
+std::int64_t __cdecl audio_stream_ftol_005a0f98() {
+    std::uint16_t saved, chop;
+    std::int64_t result;
+    __asm fstcw saved
+    __asm fwait
+    chop = static_cast<std::uint16_t>(saved | 0x0c00u);
+    __asm fldcw chop
+    __asm fistp qword ptr result
+    __asm fldcw saved
+    return result;
+}
+} // namespace porsche
+
+static void patch_abs32(B* p, U off, U target) {
+    put(p, off, target);
+}
+
+static void patch_rel32(B* p, U off, std::uintptr_t target) {
+    require(off >= 1u && p[off - 1u] == 0xe8u, "expected call opcode before rel32");
+    put(p, off, static_cast<U>(target - reinterpret_cast<std::uintptr_t>(p + off + 4u)));
+}
+
+static void init() {
+    require(render_display_scale_x_005e517c == 0x3f800000u, "pe initial scale_x");
+    require(render_display_scale_y_005e5180 == 0x3f800000u, "pe initial scale_y");
+    require(render_display_step_base_005e5184 == 0x00000080u, "pe initial step_base");
+    require(render_display_offset_x_006afc7c == 0u, "loader-zero initial offset_x");
+    require(render_display_offset_y_006afc80 == 0u, "loader-zero initial offset_y");
+    require(render_teardown_state_0065b398 == 0u, "loader-zero initial teardown_state");
+    require(render_frame_timer_word_006a5dd4 == 0u, "loader-zero initial dd4");
+    require(render_frame_timer_word_006a5dd8 == 0u, "loader-zero initial dd8");
+    require(render_frame_timer_tick_006a5ddc == 0u, "loader-zero initial ddc");
+    require(render_frame_timer_word_006a5de0 == 0u, "loader-zero initial de0");
+    require(render_frame_timer_word_006a5de4 == 0u, "loader-zero initial de4");
+    require(render_frame_timer_word_006a5de8 == 0u, "loader-zero initial de8");
+
+    static const B body_4b70d0[] = {@BODY_004B70D0@};
+    static const B body_56a680[] = {@BODY_0056A680@};
+    require(sizeof body_4b70d0 == 112, "112-byte original body 004b70d0");
+    require(sizeof body_56a680 == 38, "38-byte original body 0056a680");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable buffer");
+    slot_4b70d0 = code + 0;
+    slot_56a680 = code + 160;
+
+    std::memcpy(slot_4b70d0, body_4b70d0, sizeof body_4b70d0);
+    std::memcpy(slot_56a680, body_56a680, sizeof body_56a680);
+
+    require(0x004b70d0u + 0x17u + word(slot_4b70d0, 0x13) == 0x00516950u, "original 00516950 call");
+    require(word(slot_4b70d0, 0x19) == 0x005e517cu, "original 005e517c ref");
+    require(word(slot_4b70d0, 0x23) == 0x005e5180u, "original 005e5180 ref 1");
+    require(0x004b70d0u + 0x30u + word(slot_4b70d0, 0x2c) == 0x0056a680u, "original 0056a680 call");
+    require(word(slot_4b70d0, 0x32) == 0x005e5184u, "original 005e5184 ref");
+    require(word(slot_4b70d0, 0x45) == 0x006afc7cu, "original 006afc7c ref");
+    require(word(slot_4b70d0, 0x4b) == 0x005e5180u, "original 005e5180 ref 2");
+    require(0x004b70d0u + 0x54u + word(slot_4b70d0, 0x50) == 0x005a0f98u, "original 005a0f98 call");
+    require(word(slot_4b70d0, 0x56) == 0x005deaccu, "original 005deacc ref");
+    require(word(slot_4b70d0, 0x5c) == 0x0065b398u, "original 0065b398 ref");
+    require(word(slot_4b70d0, 0x68) == 0x006afc80u, "original 006afc80 ref");
+
+    patch_rel32(slot_4b70d0, 0x13, reinterpret_cast<std::uintptr_t>(&porsche::startup_service_noop_00516950));
+    patch_abs32(slot_4b70d0, 0x19, address(porsche::render_display_scale_x_005e517c));
+    patch_abs32(slot_4b70d0, 0x23, address(porsche::render_display_scale_y_005e5180));
+    patch_rel32(slot_4b70d0, 0x2c, reinterpret_cast<std::uintptr_t>(slot_56a680));
+    patch_abs32(slot_4b70d0, 0x32, address(porsche::render_display_step_base_005e5184));
+    patch_abs32(slot_4b70d0, 0x45, address(porsche::render_display_offset_x_006afc7c));
+    patch_abs32(slot_4b70d0, 0x4b, address(porsche::render_display_scale_y_005e5180));
+    patch_rel32(slot_4b70d0, 0x50, reinterpret_cast<std::uintptr_t>(&porsche::audio_stream_ftol_005a0f98));
+    patch_abs32(slot_4b70d0, 0x56, address(porsche::render_display_texture_height_005deacc));
+    patch_abs32(slot_4b70d0, 0x5c, address(porsche::render_teardown_state_0065b398));
+    patch_abs32(slot_4b70d0, 0x68, address(porsche::render_display_offset_y_006afc80));
+
+    require(word(slot_56a680, 0x03) == 0x006a5dd4u, "original 006a5dd4 ref");
+    require(word(slot_56a680, 0x08) == 0x006a5dd8u, "original 006a5dd8 ref");
+    require(word(slot_56a680, 0x0d) == 0x006a5de0u, "original 006a5de0 ref");
+    require(word(slot_56a680, 0x12) == 0x006a5de4u, "original 006a5de4 ref");
+    require(word(slot_56a680, 0x17) == 0x006a5de8u, "original 006a5de8 ref");
+    require(word(slot_56a680, 0x1c) == 0x006b7c40u, "original 006b7c40 ref");
+    require(word(slot_56a680, 0x21) == 0x006a5ddcu, "original 006a5ddc ref");
+
+    patch_abs32(slot_56a680, 0x03, address(porsche::render_frame_timer_word_006a5dd4));
+    patch_abs32(slot_56a680, 0x08, address(porsche::render_frame_timer_word_006a5dd8));
+    patch_abs32(slot_56a680, 0x0d, address(porsche::render_frame_timer_word_006a5de0));
+    patch_abs32(slot_56a680, 0x12, address(porsche::render_frame_timer_word_006a5de4));
+    patch_abs32(slot_56a680, 0x17, address(porsche::render_frame_timer_word_006a5de8));
+    patch_abs32(slot_56a680, 0x1c, address(porsche::current_tick_006b7c40));
+    patch_abs32(slot_56a680, 0x21, address(porsche::render_frame_timer_tick_006a5ddc));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096) != 0, "instruction cache");
+}
+
+static void reset() {
+    std::memset(&trace, 0, sizeof trace);
+    render_display_scale_x_005e517c = 0x11111111u;
+    render_display_scale_y_005e5180 = 0x22222222u;
+    render_display_step_base_005e5184 = step_base_cfg;
+    render_display_offset_x_006afc7c = 0x33333333u;
+    render_display_offset_y_006afc80 = 0x44444444u;
+    render_teardown_state_0065b398 = 0x55555555u;
+    render_frame_timer_word_006a5dd4 = 0xdead0001u;
+    render_frame_timer_word_006a5dd8 = 0xdead0002u;
+    render_frame_timer_tick_006a5ddc = 0xdead0003u;
+    render_frame_timer_word_006a5de0 = 0xdead0004u;
+    render_frame_timer_word_006a5de4 = 0xdead0005u;
+    render_frame_timer_word_006a5de8 = 0xdead0006u;
+    current_tick_006b7c40 = tick_cfg;
+    render_display_texture_height_005deacc = texture_height_cfg;
+}
+
+static void compare() {
+    Trace& original = expected;
+    for (U side = 0; side < 2; ++side) {
+        reset();
+        seed_fpu();
+        void* fn = nullptr;
+        bool complete = true;
+        U ret_eax = 0u;
+        if (family_cfg == 0u) {
+            fn = (side == 0u) ? static_cast<void*>(slot_56a680)
+                              : reinterpret_cast<void*>(&render_frame_timer_reset_0056a680);
+            __try {
+                trace.abi = invoke_0arg(fn, ret_eax);
+            } __except (exception_record(GetExceptionInformation())) {
+                complete = false;
+            }
+        } else {
+            fn = (side == 0u) ? static_cast<void*>(slot_4b70d0)
+                              : reinterpret_cast<void*>(&render_display_apply_004b70d0);
+            __try {
+                trace.abi = invoke_2arg(fn, field7c_cfg, field74_cfg, ret_eax);
+            } __except (exception_record(GetExceptionInformation())) {
+                complete = false;
+            }
+        }
+        require(complete && trace.abi == 0u, "mapped input/stack/nonvolatile ABI");
+        trace.ret_eax = 0u;
+        snapshot(trace.final);
+        capture(trace.fpu);
+        if (side == 0u) {
+            original = trace;
+        } else {
+            require(std::memcmp(&trace, &original, sizeof trace) == 0, "state/events/FPU");
+            events_total += trace.count;
+        }
+    }
+    ++cases;
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    static const U ticks[] = {0u, 1u, 0x12345678u, 0x80000000u, 0xffffffffu};
+    static const U field7c_vals[] = {0u, 0x00000280u, 0xdeadbeefu};
+    static const U field74_vals[] = {0u, 0x000001e0u, 0xcafebabeu};
+    static const U step_bases[] = {0u, 1u, 0x80u, 0x100u, 0x7fffffffu, 0x80000000u, 0xffffffffu};
+    static const U tex_heights[] = {0u, 0x80u, 480u, 768u, 0xffffffffu};
+
+    family_cfg = 0u;
+    precision = 2u;
+    rounding = 0u;
+    depth = 1u;
+    initial_status = 0u;
+    field7c_cfg = 0u;
+    field74_cfg = 0u;
+    step_base_cfg = 0x80u;
+    texture_height_cfg = 480u;
+    for (U t : ticks) {
+        tick_cfg = t;
+        compare();
+    }
+
+    family_cfg = 1u;
+    for (U p : {2u, 3u}) {
+        precision = p;
+        for (U r : {0u, 1u}) {
+            rounding = r;
+            for (U d : {0u, 1u}) {
+                depth = d;
+                for (U sb : step_bases) {
+                    step_base_cfg = sb;
+                    for (U h : tex_heights) {
+                        texture_height_cfg = h;
+                        tick_cfg = ticks[(sb ^ h) % 5u];
+                        field7c_cfg = field7c_vals[(sb + p) % 3u];
+                        field74_cfg = field74_vals[(h + r) % 3u];
+                        compare();
+                    }
+                }
+            }
+        }
+    }
+
+    require(VirtualFree(code, 0, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("render_display_apply_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events_total);
+    return 0;
+}

@@ -1,0 +1,360 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include <utility>
+#include "render_input_route_602.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+static U ptr(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0) {
+    U v;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4); }
+
+static U cases = 0u;
+static U events = 0u;
+static U event_arg_cfg = 0u;
+static B seed_low_map[256] = {};
+static B seed_high_map[256] = {};
+static RenderInputHandler_602 seed_handlers[65] = {};
+static U precision, rounding, depth, initial_status;
+static B* code = nullptr;
+static B* slot_586cd0 = nullptr;
+alignas(16) static B floating[512];
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+struct State {
+    U handlers[65];
+    B low_map[256];
+    B high_map[256];
+};
+struct Event {
+    U tag;
+    U argc;
+    U args[6];
+    State state;
+    Fpu fpu;
+};
+struct Trace {
+    U abi;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[4];
+    State final;
+    Fpu fpu;
+};
+static Trace trace, expected;
+
+static void require(bool ok, const char* s) {
+    if (!ok) {
+        std::printf("divergence %s case=%u event=%08x\n", s, cases, event_arg_cfg);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void snapshot(State& s) {
+    std::memset(&s, 0, sizeof s);
+    for (U i = 0u; i < 65u; ++i) {
+        s.handlers[i] = reinterpret_cast<U>(render_input_handlers_006ad440[i]);
+    }
+    std::memcpy(s.low_map, render_input_low_map_006ad544, sizeof s.low_map);
+    std::memcpy(s.high_map, render_input_high_map_006ad644, sizeof s.high_map);
+}
+
+static void capture(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B environment[28];
+    __asm {
+        fxsave floating
+        fnstenv environment
+        fldenv environment
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(environment + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = static_cast<unsigned short>(0x7fu | (precision << 8) | (rounding << 10));
+    __asm fninit
+    __asm fldcw cw
+    for (U i = 0u; i < depth; ++i) {
+        U bits = 0x3f800001u + i;
+        __asm fld dword ptr bits
+    }
+    B environment[28];
+    __asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment + 4) |= static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+
+static void record_event(U tag, std::initializer_list<U> args) {
+    require(trace.count < 4u, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.argc = static_cast<U>(args.size());
+    U i = 0u;
+    for (U a : args) {
+        e.args[i++] = a;
+    }
+    while (i < 6u) {
+        e.args[i++] = 0u;
+    }
+    snapshot(e.state);
+    capture(e.fpu);
+}
+
+template <U SlotId>
+static void __cdecl test_handler() {
+    record_event(SlotId, {});
+}
+
+template <std::size_t... Is>
+static std::array<RenderInputHandler_602, 65> build_handlers(std::index_sequence<Is...>) {
+    return {nullptr, &test_handler<static_cast<U>(Is + 1u)>...};
+}
+
+static const std::array<RenderInputHandler_602, 65>& test_handlers() {
+    static const std::array<RenderInputHandler_602, 65> table =
+        build_handlers(std::make_index_sequence<64>{});
+    return table;
+}
+
+static U invoke_1arg(void* fn, U arg0, U& ret_eax) {
+    U before, frame, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* p, U off, U old, const void* replacement) {
+    require(word(p, off) == old, "exact absolute relocation offset");
+    put(p, off, ptr(replacement));
+}
+
+static void init() {
+    for (U i = 0u; i < 65u; ++i) {
+        require(render_input_handlers_006ad440[i] == nullptr, "loader-zero 006ad440");
+    }
+    for (U i = 0u; i < 256u; ++i) {
+        require(render_input_low_map_006ad544[i] == 0u, "loader-zero 006ad544");
+        require(render_input_high_map_006ad644[i] == 0u, "loader-zero 006ad644");
+    }
+
+    static const B body_586cd0[] = {@BODY_00586CD0@};
+    require(sizeof body_586cd0 == 63u, "63-byte original body 00586cd0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw allocation");
+    slot_586cd0 = code + 0u;
+
+    std::memcpy(slot_586cd0, body_586cd0, sizeof body_586cd0);
+    relocate_abs32(slot_586cd0, 0x0fu, 0x006ad544u, &render_input_low_map_006ad544[0]);
+    relocate_abs32(slot_586cd0, 0x25u, 0x006ad644u, &render_input_high_map_006ad644[0]);
+    relocate_abs32(slot_586cd0, 0x32u, 0x006ad440u, &render_input_handlers_006ad440[0]);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void reset() {
+    std::memset(&trace, 0, sizeof trace);
+    std::memcpy(render_input_handlers_006ad440, seed_handlers, sizeof seed_handlers);
+    std::memcpy(render_input_low_map_006ad544, seed_low_map, sizeof seed_low_map);
+    std::memcpy(render_input_high_map_006ad644, seed_high_map, sizeof seed_high_map);
+}
+
+static void seed_background_tables() {
+    const auto& handlers = test_handlers();
+    seed_handlers[0] = nullptr;
+    for (U i = 1u; i < 65u; ++i) {
+        seed_handlers[i] = handlers[i];
+    }
+    for (U i = 0u; i < 256u; ++i) {
+        seed_low_map[i] = static_cast<B>(((i * 17u + 3u) % 64u) + 1u);
+        seed_high_map[i] = static_cast<B>(((i * 29u + 7u) % 64u) + 1u);
+    }
+}
+
+static void compare() {
+    Trace& original = expected;
+    for (U side = 0u; side < 2u; ++side) {
+        reset();
+        seed_fpu();
+        bool complete = true;
+        U ret_eax = 0u;
+        void* fn = (side == 0u) ? static_cast<void*>(slot_586cd0)
+                                : reinterpret_cast<void*>(&render_input_dispatch_00586cd0);
+        __try {
+            trace.abi = invoke_1arg(fn, event_arg_cfg, ret_eax);
+        } __except (exception_record(GetExceptionInformation())) {
+            complete = false;
+        }
+        require(complete && trace.abi == 0u, "mapped input/stack/nonvolatile ABI");
+        trace.ret_eax = ret_eax;
+        snapshot(trace.final);
+        capture(trace.fpu);
+        if (side == 0u) {
+            original = trace;
+        } else {
+            require(std::memcmp(&trace, &original, sizeof trace) == 0, "return/handler/state/FPU");
+            events += trace.count;
+        }
+    }
+    ++cases;
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+    precision = 2u;
+    rounding = 0u;
+    depth = 1u;
+    initial_status = 0u;
+
+    const auto& handlers = test_handlers();
+    static const U low_events[] = {0u, 1u, 0x1bu, 0x7fu, 0x80u, 0xfeu, 0xffu};
+    static const U high_events[] = {0x100u, 0x101u, 0x1ffu, 0x200u, 0x7f00u, 0x80ffu, 0xfe00u, 0xffffu};
+    static const U out_of_range_events[] = {0x10000u, 0x10001u, 0x12345u, 0x7fffffffu};
+
+    // 1. Low range 0 <= event < 0x100: unmapped slot 0, null handler slot, and active handler slot.
+    for (U ev : low_events) {
+        event_arg_cfg = ev;
+
+        seed_background_tables();
+        seed_low_map[ev] = 0u;
+        compare();
+
+        for (U slot : {1u, 64u}) {
+            seed_background_tables();
+            seed_low_map[ev] = static_cast<B>(slot);
+            seed_handlers[slot] = nullptr;
+            compare();
+
+            seed_background_tables();
+            seed_low_map[ev] = static_cast<B>(slot);
+            seed_handlers[slot] = handlers[slot];
+            compare();
+        }
+    }
+
+    // 2. High range 0x100 <= event < 0x10000: unmapped slot 0, null handler slot, and active handler slot.
+    for (U ev : high_events) {
+        event_arg_cfg = ev;
+        const U idx = ev >> 8u;
+
+        seed_background_tables();
+        seed_high_map[idx] = 0u;
+        compare();
+
+        for (U slot : {1u, 64u}) {
+            seed_background_tables();
+            seed_high_map[idx] = static_cast<B>(slot);
+            seed_handlers[slot] = nullptr;
+            compare();
+
+            seed_background_tables();
+            seed_high_map[idx] = static_cast<B>(slot);
+            seed_handlers[slot] = handlers[slot];
+            compare();
+        }
+    }
+
+    // 3. Exhaustive slot coverage across 1..64 in both low_map and high_map.
+    for (U slot = 1u; slot <= 64u; ++slot) {
+        event_arg_cfg = slot;
+        seed_background_tables();
+        seed_low_map[slot] = static_cast<B>(slot);
+        seed_handlers[slot] = nullptr;
+        compare();
+
+        seed_handlers[slot] = handlers[slot];
+        compare();
+
+        event_arg_cfg = (slot << 8u) | 0x5au;
+        seed_background_tables();
+        seed_high_map[slot] = static_cast<B>(slot);
+        seed_handlers[slot] = nullptr;
+        compare();
+
+        seed_handlers[slot] = handlers[slot];
+        compare();
+    }
+
+    // 4. Out-of-range signed positive event >= 0x10000: returns event without touching maps or handlers.
+    for (U ev : out_of_range_events) {
+        event_arg_cfg = ev;
+        seed_background_tables();
+        compare();
+    }
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("render_input_route_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events);
+    return 0;
+}

@@ -1,14 +1,14 @@
 # v2 / 001 - original source recovery plan
 
-Current2026-11-17. Run600 shared audit passes for frozen598002+599001 on597.
-Build001 compiles337TUs/8projects,115names120refs,noEXE. Two real names
-(`startup_sequence_call_004a4700`, `render_misc_00449b40`) close with no new
-names and 300B loader-zero `.data`. Registry920 adds four PARTIAL bodies (284B
-total). README600 owns commands and bounds:428 native cases/8 controls atOd/O2,
-833pins/895canonicalproviders.
+Current2026-11-17. Run603 shared audit passes for frozen601001+602001 on600.
+Build001 compiles339TUs/8projects,113names118refs,noEXE. Two real names
+(`render_display_apply_004b70d0`, `render_input_dispatch_00586cd0`) close with
+no new names and 820B `.data` (12B file-backed, 808B loader-zero). Registry923
+adds three PARTIAL bodies (213B total). README603 owns commands and bounds:
+1240 native cases/8 controls atOd/O2,838pins/913canonicalproviders.
 
-Active flash workers:601 (`004b70d0` 112B + `0056a680` 38B) and602 (`00586cd0`
-63B). Next integrate601+602 in shared batch603 and dispatch the next frontier
+Active flash workers:604 (`005759f0` 43B) and605 (`00549220` 206B + `005381d0`
+83B). Next integrate604+605 in shared batch606 and dispatch the next frontier
 workers.
 
 User requested continued recovery until available limits with simple worker models

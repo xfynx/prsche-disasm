@@ -1,0 +1,60 @@
+{
+  "run": 602,
+  "experiment": "local/experiments/v2-render-input-route-602",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/602-render-input-route/render_input_route_602.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/602-render-input-route/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/602-render-input-route"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/602-render-input-route/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00586cd0",
+      "bytes": 63,
+      "sha256": "4652d9a2bcf3728612a4d51f475b8136e751fc40648f5102352dfdbc9517db52",
+      "token": "@BODY_00586CD0@"
+    }
+  ],
+  "pass_marker": "render_input_route_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-low-range-limit",
+      "source": "iterations/v2/001-original-recovery/runs/602-render-input-route/render_input_route_602.cpp",
+      "old": "if (signed_event < 0x100) {",
+      "new": "if (signed_event < 0xff) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-high-range-limit",
+      "source": "iterations/v2/001-original-recovery/runs/602-render-input-route/render_input_route_602.cpp",
+      "old": "} else if (signed_event < 0x10000) {",
+      "new": "} else if (signed_event < 0xff00) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-zero-return",
+      "source": "iterations/v2/001-original-recovery/runs/602-render-input-route/render_input_route_602.cpp",
+      "old": "    if (slot == 0u) {\n        return event;\n    }",
+      "new": "    if (slot == 0u) {\n        return 0u;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-handler-invoke",
+      "source": "iterations/v2/001-original-recovery/runs/602-render-input-route/render_input_route_602.cpp",
+      "old": "    if (handler != nullptr) {\n        handler();\n    }",
+      "new": "    if (false && handler != nullptr) {\n        handler();\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

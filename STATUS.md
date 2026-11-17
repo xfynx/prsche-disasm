@@ -4,22 +4,22 @@ Updated 2026-11-17. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run600](iterations/v2/001-original-recovery/runs/600-startup-clock-misc-integration/README.md)
-compiles337 C++ translation units across8 projects. The link has115 unresolved names/
-120 references. **There is no recovered playable C++ game executable yet.**
+[Run603](iterations/v2/001-original-recovery/runs/603-render-display-input-integration/README.md)
+compiles339 C++ translation units across8 projects. The link has113 unresolved names/
+118 references. **There is no recovered playable C++ game executable yet.**
 
-Run600 integrates partial `00560140` (55B), `004a4700` (90B), `0053f0b0` (99B) and
-`00449b40` (40B) from frozen598002 (`598001` preserved) and599001 plus 300B
-loader-zero `.data`. Native comparisons pass428 cases/eight controls atOd/O2.
-Canonical clock-worker, frame-pump and render-allocator owners are reused.
-Shared audit verifies833 pins/895 providers; registry920 retains partial domains.
+Run603 integrates partial `0056a680` (38B), `004b70d0` (112B) and `00586cd0` (63B)
+from frozen601001 and602001 plus 12B file-backed and 808B loader-zero `.data`.
+Native comparisons pass1240 cases/eight controls atOd/O2. Canonical startup
+noop, x87 `_ftol`, display texture height and window tick owners are reused.
+Shared audit verifies838 pins/913 providers; registry923 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run598 native002, Run599 native001 and Run600 integration are accepted within their stated bounds.
-Run601 render display apply and602 render input route are active pending packets.
+Run601 native001, Run602 native001 and Run603 integration are accepted within their stated bounds.
+Run604 render initialize callbacks and605 render driver context mode are active pending packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.

@@ -16813,6 +16813,76 @@
           "00449b67"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0056a680",
+      "source": "iterations/v2/001-original-recovery/runs/601-render-display-apply/render_display_apply_601.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 void RET0; clears five frame-timer words 006a5dd4..006a5de8 and snapshots current_tick_006b7c40 into 006a5ddc",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/603-render-display-input-integration/validation.json",
+      "verification_boundary": "Shared603 PASS:570 native cases (285 per optimization at Od/O2) and4 material controls. SHAbc9d060f3142e5d9c77ac11fd7ab813c7024df413694c2aa55e4e8381aa28cd8. Owns 24B loader-zero .data 006a5dd4..006a5deb and reuses current_tick_006b7c40. Build339TUs/113names118refs/noEXE.",
+      "partial_reason": "Bounded mapped timer globals; downstream frame-timer consumers and broader callers remain open.",
+      "body_bytes": 38,
+      "body_ranges": [
+        [
+          "0056a680",
+          "0056a6a5"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "004b70d0",
+      "source": "iterations/v2/001-original-recovery/runs/601-render-display-apply/render_display_apply_601.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl2 void RET0; invokes 00516950(field7c, field74, 0x80), sets 005e517c/005e5180, resets frame timer 0056a680, scales 005e5184 via x87/005a0f98 and updates 006afc7c/006afc80/0065b398",
+      "recovered_dependencies": [
+        "00516950",
+        "0056a680",
+        "005a0f98"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/603-render-display-input-integration/validation.json",
+      "verification_boundary": "Shared603 PASS:570 native cases (285 per optimization at Od/O2) and4 material controls. SHAf66b33262c7e8c7359db1375edf07762afb70f3a097fc2a7f7c2e386538635d2. Owns 12B file-backed .data 005e517c..005e5187 and 12B loader-zero .data 006afc7c/006afc80/0065b398. Build339TUs/113names118refs/noEXE.",
+      "partial_reason": "Bounded mapped display/timer globals and controlled 00516950/005a0f98 endpoints; broader display/teardown consumers remain open.",
+      "body_bytes": 112,
+      "body_ranges": [
+        [
+          "004b70d0",
+          "004b713f"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00586cd0",
+      "source": "iterations/v2/001-original-recovery/runs/602-render-input-route/render_input_route_602.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 uint32 RET0; routes <0x100 via 006ad544 and 0x100..0xffff via 006ad644 into 006ad440 handler table",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/603-render-display-input-integration/validation.json",
+      "verification_boundary": "Shared603 PASS:670 native cases (335 per optimization at Od/O2) and4 material controls. SHA4652d9a2bcf3728612a4d51f475b8136e751fc40648f5102352dfdbc9517db52. Owns 772B loader-zero .data 006ad440..006ad743. Build339TUs/113names118refs/noEXE.",
+      "partial_reason": "Bounded non-negative events and slots 0..64 with controlled handlers; negative signed event indexing, slot>=65 and external table writers remain open.",
+      "body_bytes": 63,
+      "body_ranges": [
+        [
+          "00586cd0",
+          "00586d0e"
+        ]
+      ]
     }
   ]
 }

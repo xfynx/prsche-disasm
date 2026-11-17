@@ -1,0 +1,90 @@
+{
+  "run": 601,
+  "experiment": "local/experiments/v2-render-display-apply-601",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/601-render-display-apply/render_display_apply_601.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/601-render-display-apply/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/601-render-display-apply",
+    "iterations/v2/001-original-recovery/runs/522-audio-stream-transform",
+    "iterations/v2/001-original-recovery/runs/519-audio-stream-capture-fill",
+    "iterations/v2/001-original-recovery/runs/513-audio-stream-worker-stop",
+    "iterations/v2/001-original-recovery/runs/508-audio-stream-producer-lifecycle",
+    "iterations/v2/001-original-recovery/runs/505-audio-stream-buffer-delivery",
+    "iterations/v2/001-original-recovery/runs/501-audio-pcm-stream-lookup",
+    "iterations/v2/001-original-recovery/runs/493-audio-pcm-constructors",
+    "iterations/v2/001-original-recovery/runs/492-audio-pcm-cpp",
+    "iterations/v2/001-original-recovery/runs/486-audio-mixer-configuration",
+    "iterations/v2/001-original-recovery/runs/473-audio-sample-dispatch",
+    "iterations/v2/001-original-recovery/runs/462-audio-directsound-initialize",
+    "iterations/v2/001-original-recovery/runs/455-audio-device-lifecycle",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/442-audio-initialization",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/runs/439-audio-voice-cleanup",
+    "iterations/v2/001-original-recovery/runs/458-audio-release-chain",
+    "iterations/v2/001-original-recovery/runs/460-audio-thread-worker",
+    "iterations/v2/001-original-recovery/runs/461-audio-filter-kernel",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/601-render-display-apply/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004b70d0",
+      "bytes": 112,
+      "sha256": "f66b33262c7e8c7359db1375edf07762afb70f3a097fc2a7f7c2e386538635d2",
+      "token": "@BODY_004B70D0@"
+    },
+    {
+      "va": "0056a680",
+      "bytes": 38,
+      "sha256": "bc9d060f3142e5d9c77ac11fd7ab813c7024df413694c2aa55e4e8381aa28cd8",
+      "token": "@BODY_0056A680@"
+    }
+  ],
+  "pass_marker": "render_display_apply_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-scale-x-constant",
+      "source": "iterations/v2/001-original-recovery/runs/601-render-display-apply/render_display_apply_601.cpp",
+      "old": "render_display_scale_x_005e517c = 0x3f000000u;",
+      "new": "render_display_scale_x_005e517c = 0x3f800000u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-noop-third-arg",
+      "source": "iterations/v2/001-original-recovery/runs/601-render-display-apply/render_display_apply_601.cpp",
+      "old": "reinterpret_cast<void(__cdecl*)(std::uint32_t, std::uint32_t, std::uint32_t)>(&startup_service_noop_00516950)(field7c, field74, 0x80u);",
+      "new": "reinterpret_cast<void(__cdecl*)(std::uint32_t, std::uint32_t, std::uint32_t)>(&startup_service_noop_00516950)(field7c, field74, 0x40u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-offset-y-sign",
+      "source": "iterations/v2/001-original-recovery/runs/601-render-display-apply/render_display_apply_601.cpp",
+      "old": "render_display_offset_y_006afc80 = height - step;",
+      "new": "render_display_offset_y_006afc80 = height + step;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-timer-tick-clear",
+      "source": "iterations/v2/001-original-recovery/runs/601-render-display-apply/render_display_apply_601.cpp",
+      "old": "render_frame_timer_tick_006a5ddc = current_tick_006b7c40;",
+      "new": "render_frame_timer_tick_006a5ddc = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
