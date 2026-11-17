@@ -1,15 +1,17 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-18. Run627 shared audit (`002`) passes for `625/002`+`626/002` on `624` (`625/001`, `626/001`, `627/001` preserved).
-Build `002` compiles 355 TUs / 8 projects, 92 names / 95 refs, no EXE. Four real names
-(`application_audio_probe_initialize_004a66b0`, `file_diagnostic_00565340`,
-`render_loader_report_00565340`, `window_scheduler_diagnostic_00565340`)
-close with no new unresolved names, 24B loader-zero `.data`, and 179B `.rdata`.
-Registry 956 adds two PARTIAL bodies (779B total). README 627 owns
-commands and bounds: 552 native cases / 8 controls at `/Od`/`/O2`, 879 pins.
+Current 2026-11-18. Run630 shared audit (`001`) passes for frozen `628/001`+`629/001` on `627`.
+Build `001` compiles 357 TUs / 8 projects, 96 names / 99 refs, no EXE. Two real names
+(`render_initialize_window_00575820`, `audio_stream_codec_create_0056aff0`)
+close, while `005e1960` adds six real callback frontier names (`0053a780`,
+`005756d0`, `005756e0`, `00575730`, `00575770`, `005757d0`), 36B `.data`
+(`005e1960`, `006a64bc`), and 248B `.rdata`.
+Registry 960 adds four PARTIAL bodies (869B total). README 630 owns
+commands and bounds: 148 native cases / 13 controls at `/Od`/`/O2`, 884 pins.
 
-Next wave targets: `628` (`00575820` + `005757f0` + `00575810`, 305B) and `629`
-(`0056aff0`, 564B), then integrate in `630`.
+Active flash workers: `631` (five `005e1960` callbacks, 248B) and `632`
+(`0053a780` + `0053bf20` + `004b0eb0`, 186B). Next integrate `631`+`632` in
+shared batch `633` to close all seven names.
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

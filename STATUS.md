@@ -4,22 +4,22 @@ Updated 2026-11-18. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run627](iterations/v2/001-original-recovery/runs/627-audio-init-diagnostic-abort-integration/README.md)
-compiles 355 C++ translation units across 8 projects. The link has 92 unresolved names /
-95 references. **There is no recovered playable C++ game executable yet.**
+[Run630](iterations/v2/001-original-recovery/runs/630-render-window-codec-create-integration/README.md)
+compiles 357 C++ translation units across 8 projects. The link has 96 unresolved names /
+99 references (closing `00575820` and `0056aff0` while exposing 6 real `005e1960` callback frontier symbols). **There is no recovered playable C++ game executable yet.**
 
-Run627 integrates partial `004a66b0` (398B) and `00565340` (381B) from `625/002` and
-`626/002` (`625/001`, `626/001`, `627/001` preserved), plus 24B loader-zero `.data` and
-179B `.rdata`. Native comparisons pass 552 measured cases / 8 material controls at `/Od`/`/O2`.
-Canonical audio init, diagnostic, lock, window shutdown and exit owners are reused.
-Shared audit verifies 879 source pins; registry 956 retains partial domains.
+Run630 integrates partial `005757f0` (26B), `00575810` (9B), `00575820` (270B), and
+`0056aff0` (564B) from frozen `628/001` and `629/001`, plus 36B `.data` (`005e1960`, `006a64bc`)
+and 248B `.rdata`. Native comparisons pass 148 measured cases / 13 material controls at `/Od`/`/O2`.
+Canonical thread, heap lock, display, window, render lifecycle, abort cleanup, and diagnostic owners
+are reused. Shared audit verifies 884 source pins; registry 960 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run625 (`002`), Run626 (`002`), and Run627 (`002`) integration are accepted within their stated bounds.
-Run628 (`00575820`) and Run629 (`0056aff0`) are queued next recovery packets.
+Run628 (`001`), Run629 (`001`), and Run630 (`001`) integration are accepted within their stated bounds.
+Run631 (`005e1960` callbacks) and Run632 (`0053a780` + `0053bf20` + `004b0eb0`) are active pending packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.

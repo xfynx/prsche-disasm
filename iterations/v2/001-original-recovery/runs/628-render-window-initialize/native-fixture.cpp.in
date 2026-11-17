@@ -1,0 +1,634 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "render_window_initialize_628.hpp"
+#include "porsche/file_threads.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/render_display.hpp"
+#include "porsche/render_loader.hpp"
+#include "porsche/startup_input.hpp"
+#include "porsche/window_create.hpp"
+#include "porsche/window_scheduler.hpp"
+#include "../528-render-library-lifecycle/render_library_lifecycle_528.hpp"
+#include "../626-diagnostic-abort-handler/diagnostic_abort_handler_626.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kMaxEvents = 16u,
+    kCanonicalExitCleanup = 0x00575810u,
+    kCanonicalAbortCleanup = 0x005757f0u,
+};
+
+enum EventTag : U {
+    kEvHeapLockCreate = 1u,
+    kEvWindowPrepare = 2u,
+    kEvWindowInit = 3u,
+    kEvSetState = 4u,
+    kEvSetStateAlt = 5u,
+    kEvStartupWindowHandle = 6u,
+    kEvThrashInit = 7u,
+    kEvSchedulerRegister = 8u,
+    kEvThreadExitRegister = 9u,
+    kEvRenderShutdown = 10u,
+};
+
+struct StateSnapshot {
+    U tex_width;
+    U tex_height;
+    U thread_lock;
+    U hwnd;
+    U library_started;
+    U exit_registered;
+    U abort_cleanup;
+    U thrash_slot19;
+    U thrash_slot27;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    StateSnapshot state;
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U events_total = 0u;
+static U active_side = 0u;
+
+alignas(16) static B floating[512];
+static B* code = nullptr;
+static B* slot_575820 = nullptr;
+static B* slot_5757f0 = nullptr;
+static B* slot_575810 = nullptr;
+
+static void* test_hwnd_cell = nullptr;
+static U cfg_lock_ret = 0u;
+static bool cfg_prepare_clears_hwnd = false;
+static U cfg_prepare_sets_started = 0u;
+static U cfg_window_init_ret = 1u;
+static U cfg_window_init_hwnd = 0u;
+static U cfg_thrash_init_ret = 1u;
+static U cfg_setstate_25_ret = 1u;
+static bool cfg_setstate_swap_slot27 = false;
+static U cfg_shutdown_ret = 0u;
+static bool cfg_shutdown_mutates_cleanup = false;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U normalize_abort_cleanup(U raw) {
+    if (active_side == 0u) {
+        if (raw == address(slot_5757f0)) {
+            return kCanonicalAbortCleanup;
+        }
+        require(raw != address(reinterpret_cast<const void*>(&porsche::render_window_abort_cleanup_005757f0)),
+                "x86 side must not hold cpp abort cleanup address");
+    } else {
+        if (raw == address(reinterpret_cast<const void*>(&porsche::render_window_abort_cleanup_005757f0))) {
+            return kCanonicalAbortCleanup;
+        }
+        require(raw != address(slot_5757f0),
+                "cpp side must not hold x86 slot_5757f0 address");
+    }
+    return raw;
+}
+
+static void capture_state(StateSnapshot& s) {
+    s.tex_width = porsche::render_display_texture_width_005deac8;
+    s.tex_height = porsche::render_display_texture_height_005deacc;
+    s.thread_lock = address(porsche::thread_start_lock_006a57d8);
+    s.hwnd = address(porsche::window_hwnd_006b7bf8);
+    s.library_started = porsche::render_library_started_006a64b8;
+    s.exit_registered = porsche::render_window_exit_registered_006a64bc;
+    s.abort_cleanup = normalize_abort_cleanup(porsche::diagnostic_abort_cleanup_005deb8c);
+    s.thrash_slot19 = porsche::render_thrash_exports_006bd910[19];
+    s.thrash_slot27 = porsche::render_thrash_exports_006bd910[27];
+}
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = 0x027fu;
+    U mxcsr = 0x9f80u;
+    __asm {
+        fninit
+        fldcw cw
+        ldmxcsr mxcsr
+        fld1
+    }
+}
+
+static void record_event(U tag, U arg0 = 0u, U arg1 = 0u, U arg2 = 0u) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    capture_state(e.state);
+}
+
+static U __stdcall mock_thrash_setstate_alt(U key, U value) {
+    record_event(kEvSetStateAlt, key, value, 0u);
+    return (key == 0x25u) ? cfg_setstate_25_ret : 1u;
+}
+
+static U __stdcall mock_thrash_setstate(U key, U value) {
+    record_event(kEvSetState, key, value, 0u);
+    if (cfg_setstate_swap_slot27 && key == 0x12u) {
+        porsche::render_thrash_exports_006bd910[27] =
+            address(reinterpret_cast<const void*>(&mock_thrash_setstate_alt));
+    }
+    return (key == 0x25u) ? cfg_setstate_25_ret : 1u;
+}
+
+static U __stdcall mock_thrash_init() {
+    record_event(kEvThrashInit, cfg_thrash_init_ret, 0u, 0u);
+    return cfg_thrash_init_ret;
+}
+
+namespace porsche {
+
+std::uint32_t render_display_texture_width_005deac8 = 0u;
+std::uint32_t render_display_texture_height_005deacc = 0u;
+void* thread_start_lock_006a57d8 = nullptr;
+void*& window_hwnd_006b7bf8 = test_hwnd_cell;
+std::uint32_t render_thrash_exports_006bd910[43] = {};
+std::uint32_t render_library_started_006a64b8 = 0u;
+std::uint32_t diagnostic_abort_cleanup_005deb8c = 0u;
+
+void* __cdecl heap_lock_create_005321f0() {
+    record_event(kEvHeapLockCreate, cfg_lock_ret, 0u, 0u);
+    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(cfg_lock_ret));
+}
+
+void __cdecl window_prepare_0053bcb0() {
+    record_event(kEvWindowPrepare, cfg_prepare_clears_hwnd ? 1u : 0u, cfg_prepare_sets_started, 0u);
+    if (cfg_prepare_clears_hwnd) {
+        window_hwnd_006b7bf8 = nullptr;
+    }
+    if (cfg_prepare_sets_started != 0u) {
+        render_library_started_006a64b8 = cfg_prepare_sets_started;
+    }
+}
+
+std::uint32_t __cdecl window_init_0053ac20(std::uint32_t width, std::uint32_t height, std::uint32_t fullscreen) {
+    record_event(kEvWindowInit, width, height, fullscreen);
+    if (cfg_window_init_ret != 0u && cfg_window_init_hwnd != 0u) {
+        window_hwnd_006b7bf8 = reinterpret_cast<void*>(static_cast<std::uintptr_t>(cfg_window_init_hwnd));
+    }
+    return cfg_window_init_ret;
+}
+
+void* __cdecl startup_window_handle_00557460() {
+    record_event(kEvStartupWindowHandle, address(window_hwnd_006b7bf8), 0u, 0u);
+    return window_hwnd_006b7bf8;
+}
+
+std::uint32_t __stdcall window_handler_register_0053a800(std::uint32_t message, std::uint32_t handler) {
+    return message ^ handler ^ 0x53a800u;
+}
+
+std::uint32_t __cdecl render_library_disable_state_005756c0(std::uint32_t a, std::uint32_t b) {
+    return a + b + 0x5756c0u;
+}
+
+std::uint32_t __cdecl window_scheduler_register_005365e0(TimedCallback callback, std::uint32_t period, std::uint32_t initial_delay) {
+    record_event(kEvSchedulerRegister, address(reinterpret_cast<const void*>(callback)), period, initial_delay);
+    return 1u;
+}
+
+void __cdecl thread_exit_register_00557380(void(__cdecl* callback)()) {
+    const U raw = address(reinterpret_cast<const void*>(callback));
+    U normalized = raw;
+    if (active_side == 0u) {
+        require(raw == address(slot_575810), "x86 side must register slot_575810");
+        normalized = kCanonicalExitCleanup;
+    } else {
+        require(raw == address(reinterpret_cast<const void*>(&render_window_exit_cleanup_00575810)),
+                "cpp side must register render_window_exit_cleanup_00575810");
+        normalized = kCanonicalExitCleanup;
+    }
+    record_event(kEvThreadExitRegister, normalized, 0u, 0u);
+}
+
+std::uint32_t __cdecl render_initialize_shutdown_00575930(std::uint32_t cleanup) {
+    record_event(kEvRenderShutdown, cleanup, cfg_shutdown_ret, 0u);
+    if (cfg_shutdown_mutates_cleanup) {
+        diagnostic_abort_cleanup_005deb8c = 0xfeedbeefu;
+    }
+    return cfg_shutdown_ret;
+}
+
+// Distinct test-only stubs for the 6 unrecovered callbacks in 005e1960
+// (distinct bodies prevent linker COMDAT folding).
+void __cdecl render_window_callback_005756d0() { volatile U tag = 0x5756d0u; (void)tag; }
+std::uint32_t __stdcall window_handler_find_0053a780(std::uint32_t m) { return m ^ 0x53a780u; }
+std::uint32_t __stdcall render_window_callback_005756e0(std::uint32_t a) { return a ^ 0x5756e0u; }
+void __stdcall render_window_callback_00575730(std::uint32_t a) { volatile U tag = a ^ 0x575730u; (void)tag; }
+void __stdcall render_window_callback_00575770(std::uint32_t a, std::uint32_t b) { volatile U tag = (a + b) ^ 0x575770u; (void)tag; }
+void __stdcall render_window_callback_005757d0(std::uint32_t a, std::uint32_t b) { volatile U tag = (a ^ b) ^ 0x5757d0u; (void)tag; }
+
+} // namespace porsche
+
+static U invoke_cdecl(void* fn, const U* args, U argc, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    const U cleanup = argc * 4u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, argc
+        mov edx, args
+    push_loop:
+        test eax, eax
+        jz pushed
+        dec eax
+        push dword ptr [edx + eax * 4]
+        jmp push_loop
+    pushed:
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        add esp, cleanup
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && slot[off - 1u] == 0xe8u, "exact relative call opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    // Verify initial loader-zero and static .data callback table before any resets.
+    require(porsche::render_window_exit_registered_006a64bc == 0u, "initial loader-zero 006a64bc");
+
+    static const B raw_table_5e1960[] = {@DATA_005E1960@};
+    require(sizeof raw_table_5e1960 == 32u, "32-byte original 005e1960 table");
+    const U expected_raw_vas[8] = {
+        0x005756d0u, 0x00557460u, 0x0053a800u, 0x0053a780u,
+        0x005756e0u, 0x00575730u, 0x00575770u, 0x005757d0u
+    };
+    const porsche::RenderWindowCallbackEntry expected_entries[8] = {
+        reinterpret_cast<porsche::RenderWindowCallbackEntry>(&porsche::render_window_callback_005756d0),
+        reinterpret_cast<porsche::RenderWindowCallbackEntry>(&porsche::startup_window_handle_00557460),
+        reinterpret_cast<porsche::RenderWindowCallbackEntry>(&porsche::window_handler_register_0053a800),
+        reinterpret_cast<porsche::RenderWindowCallbackEntry>(&porsche::window_handler_find_0053a780),
+        reinterpret_cast<porsche::RenderWindowCallbackEntry>(&porsche::render_window_callback_005756e0),
+        reinterpret_cast<porsche::RenderWindowCallbackEntry>(&porsche::render_window_callback_00575730),
+        reinterpret_cast<porsche::RenderWindowCallbackEntry>(&porsche::render_window_callback_00575770),
+        reinterpret_cast<porsche::RenderWindowCallbackEntry>(&porsche::render_window_callback_005757d0),
+    };
+    for (U i = 0u; i < 8u; ++i) {
+        require(word(raw_table_5e1960, i * 4u) == expected_raw_vas[i], "raw 005e1960 VA entry");
+        require(porsche::render_window_callbacks_005e1960[i] == expected_entries[i], "initial cpp 005e1960 entry");
+    }
+
+    static const B body_575820[] = {@BODY_00575820@};
+    static const B body_5757f0[] = {@BODY_005757F0@};
+    static const B body_575810[] = {@BODY_00575810@};
+    require(sizeof body_575820 == 270u, "270-byte original body 00575820");
+    require(sizeof body_5757f0 == 26u, "26-byte original body 005757f0");
+    require(sizeof body_575810 == 9u, "9-byte original body 00575810");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_575820 = code + 0x000u;
+    slot_5757f0 = code + 0x120u;
+    slot_575810 = code + 0x140u;
+
+    std::memcpy(slot_575820, body_575820, sizeof body_575820);
+    std::memcpy(slot_5757f0, body_5757f0, sizeof body_5757f0);
+    std::memcpy(slot_575810, body_575810, sizeof body_575810);
+
+    // Relocate 005757f0 (2 relocations).
+    relocate_rel32(slot_5757f0, 0x005757f0u, 0x003u, 0x00575930u,
+                   reinterpret_cast<const void*>(&porsche::render_initialize_shutdown_00575930));
+    relocate_abs32(slot_5757f0, 0x00cu, 0x005deb8cu, address(&porsche::diagnostic_abort_cleanup_005deb8c));
+
+    // Relocate 00575810 (1 relocation).
+    relocate_rel32(slot_575810, 0x00575810u, 0x003u, 0x00575930u,
+                   reinterpret_cast<const void*>(&porsche::render_initialize_shutdown_00575930));
+
+    // Relocate 00575820 (32 relocations).
+    relocate_abs32(slot_575820, 0x001u, 0x005deac8u, address(&porsche::render_display_texture_width_005deac8));
+    relocate_abs32(slot_575820, 0x00bu, 0x005deac8u, address(&porsche::render_display_texture_width_005deac8));
+    relocate_abs32(slot_575820, 0x014u, 0x005deaccu, address(&porsche::render_display_texture_height_005deacc));
+    relocate_abs32(slot_575820, 0x01eu, 0x005deaccu, address(&porsche::render_display_texture_height_005deacc));
+    relocate_abs32(slot_575820, 0x027u, 0x006a57d8u, address(&porsche::thread_start_lock_006a57d8));
+    relocate_rel32(slot_575820, 0x00575820u, 0x030u, 0x005321f0u,
+                   reinterpret_cast<const void*>(&porsche::heap_lock_create_005321f0));
+    relocate_abs32(slot_575820, 0x035u, 0x006a57d8u, address(&porsche::thread_start_lock_006a57d8));
+    relocate_abs32(slot_575820, 0x043u, 0x006b7bf8u, address(&porsche::window_hwnd_006b7bf8));
+    relocate_rel32(slot_575820, 0x00575820u, 0x04cu, 0x0053bcb0u,
+                   reinterpret_cast<const void*>(&porsche::window_prepare_0053bcb0));
+    relocate_abs32(slot_575820, 0x051u, 0x006b7bf8u, address(&porsche::window_hwnd_006b7bf8));
+    relocate_abs32(slot_575820, 0x05bu, 0x005deaccu, address(&porsche::render_display_texture_height_005deacc));
+    relocate_abs32(slot_575820, 0x061u, 0x005deac8u, address(&porsche::render_display_texture_width_005deac8));
+    relocate_rel32(slot_575820, 0x00575820u, 0x070u, 0x0053ac20u,
+                   reinterpret_cast<const void*>(&porsche::window_init_0053ac20));
+    relocate_abs32(slot_575820, 0x084u, 0x006bd97cu, address(&porsche::render_thrash_exports_006bd910[27]));
+    relocate_rel32(slot_575820, 0x00575820u, 0x089u, 0x00557460u,
+                   reinterpret_cast<const void*>(&porsche::startup_window_handle_00557460));
+    relocate_abs32(slot_575820, 0x092u, 0x006bd97cu, address(&porsche::render_thrash_exports_006bd910[27]));
+    relocate_abs32(slot_575820, 0x097u, 0x005e1960u, address(&porsche::render_window_callbacks_005e1960[0]));
+    relocate_abs32(slot_575820, 0x09fu, 0x006bd97cu, address(&porsche::render_thrash_exports_006bd910[27]));
+    relocate_abs32(slot_575820, 0x0a5u, 0x006bd95cu, address(&porsche::render_thrash_exports_006bd910[19]));
+    relocate_abs32(slot_575820, 0x0acu, 0x006a64b8u, address(&porsche::render_library_started_006a64b8));
+    relocate_abs32(slot_575820, 0x0b8u, 0x006bd97cu, address(&porsche::render_thrash_exports_006bd910[27]));
+    relocate_abs32(slot_575820, 0x0c5u, 0x005756c0u, address(&porsche::render_library_disable_state_005756c0));
+    relocate_rel32(slot_575820, 0x00575820u, 0x0cau, 0x005365e0u,
+                   reinterpret_cast<const void*>(&porsche::window_scheduler_register_005365e0));
+    relocate_abs32(slot_575820, 0x0d2u, 0x006a64bcu, address(&porsche::render_window_exit_registered_006a64bc));
+    relocate_abs32(slot_575820, 0x0dbu, 0x00575810u, address(slot_575810));
+    relocate_rel32(slot_575820, 0x00575820u, 0x0e0u, 0x00557380u,
+                   reinterpret_cast<const void*>(&porsche::thread_exit_register_00557380));
+    relocate_abs32(slot_575820, 0x0e9u, 0x006a64bcu, address(&porsche::render_window_exit_registered_006a64bc));
+    relocate_abs32(slot_575820, 0x0f2u, 0x006a64b8u, address(&porsche::render_library_started_006a64b8));
+    relocate_abs32(slot_575820, 0x0f8u, 0x005deb8cu, address(&porsche::diagnostic_abort_cleanup_005deb8c));
+    relocate_abs32(slot_575820, 0x0fcu, 0x005757f0u, address(slot_5757f0));
+    relocate_rel32(slot_575820, 0x00575820u, 0x103u, 0x0053bcb0u,
+                   reinterpret_cast<const void*>(&porsche::window_prepare_0053bcb0));
+    relocate_abs32(slot_575820, 0x108u, 0x006a64b8u, address(&porsche::render_library_started_006a64b8));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+struct CaseConfig {
+    U width;
+    U height;
+    U thread_lock;
+    U lock_ret;
+    U hwnd;
+    U library_started;
+    U exit_registered;
+    U abort_cleanup;
+    bool prepare_clears_hwnd;
+    U prepare_sets_started;
+    U window_init_ret;
+    U window_init_hwnd;
+    U thrash_init_ret;
+    U setstate_25_ret;
+    bool setstate_swap_slot27;
+    U shutdown_ret;
+    bool shutdown_mutates_cleanup;
+};
+
+static void apply_config(const CaseConfig& cfg) {
+    porsche::render_display_texture_width_005deac8 = cfg.width;
+    porsche::render_display_texture_height_005deacc = cfg.height;
+    porsche::thread_start_lock_006a57d8 = reinterpret_cast<void*>(static_cast<std::uintptr_t>(cfg.thread_lock));
+    porsche::window_hwnd_006b7bf8 = reinterpret_cast<void*>(static_cast<std::uintptr_t>(cfg.hwnd));
+    porsche::render_library_started_006a64b8 = cfg.library_started;
+    porsche::render_window_exit_registered_006a64bc = cfg.exit_registered;
+    porsche::diagnostic_abort_cleanup_005deb8c = cfg.abort_cleanup;
+
+    for (U i = 0u; i < 43u; ++i) {
+        porsche::render_thrash_exports_006bd910[i] = 0xa0000000u + (i * 0x01010101u);
+    }
+    porsche::render_thrash_exports_006bd910[19] = address(reinterpret_cast<const void*>(&mock_thrash_init));
+    porsche::render_thrash_exports_006bd910[27] = address(reinterpret_cast<const void*>(&mock_thrash_setstate));
+
+    cfg_lock_ret = cfg.lock_ret;
+    cfg_prepare_clears_hwnd = cfg.prepare_clears_hwnd;
+    cfg_prepare_sets_started = cfg.prepare_sets_started;
+    cfg_window_init_ret = cfg.window_init_ret;
+    cfg_window_init_hwnd = cfg.window_init_hwnd;
+    cfg_thrash_init_ret = cfg.thrash_init_ret;
+    cfg_setstate_25_ret = cfg.setstate_25_ret;
+    cfg_setstate_swap_slot27 = cfg.setstate_swap_slot27;
+    cfg_shutdown_ret = cfg.shutdown_ret;
+    cfg_shutdown_mutates_cleanup = cfg.shutdown_mutates_cleanup;
+}
+
+static void compare_traces(bool check_return) {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    if (!check_return) {
+        trace.ret_eax = 0u;
+        expected.ret_eax = 0u;
+    }
+    require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0,
+                "event mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0,
+            "x87/MXCSR state mismatch");
+}
+
+static void run_pair(void* orig_fn, void* cpp_fn, const U* args, U argc, bool check_return, const CaseConfig& cfg) {
+    ++cases;
+
+    active_side = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl(orig_fn, args, argc, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    active_side = 1u;
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl(cpp_fn, args, argc, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    events_total += trace.count;
+    compare_traces(check_return);
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    // 1. Direct checks for 005757f0 (render_window_abort_cleanup_005757f0).
+    CaseConfig base_cfg{};
+    base_cfg.abort_cleanup = 0x11223344u;
+    base_cfg.shutdown_ret = 0u;
+    base_cfg.shutdown_mutates_cleanup = false;
+    run_pair(slot_5757f0, reinterpret_cast<void*>(&porsche::render_window_abort_cleanup_005757f0),
+             nullptr, 0u, true, base_cfg);
+
+    base_cfg.abort_cleanup = 0u;
+    base_cfg.shutdown_ret = 7u;
+    base_cfg.shutdown_mutates_cleanup = true;
+    run_pair(slot_5757f0, reinterpret_cast<void*>(&porsche::render_window_abort_cleanup_005757f0),
+             nullptr, 0u, true, base_cfg);
+
+    // 2. Direct checks for 00575810 (render_window_exit_cleanup_00575810, void return).
+    base_cfg.abort_cleanup = 0x55667788u;
+    base_cfg.shutdown_ret = 1u;
+    base_cfg.shutdown_mutates_cleanup = false;
+    run_pair(slot_575810, reinterpret_cast<void*>(&porsche::render_window_exit_cleanup_00575810),
+             nullptr, 0u, false, base_cfg);
+
+    // 3. Comprehensive cases for 00575820 (render_initialize_window_00575820).
+    const U first_0 = 0u;
+    const U first_1 = 1u;
+    const U first_high = 0xff000001u;
+
+    // 3a. Defaults (width=0, height=0 -> 640x480), lock=null -> heap_lock_create,
+    //     first=0 -> fullscreen=1, hwnd=null -> window_init succeeds,
+    //     thrash_init=0x1234, setstate(0x25,0)=1 -> scheduler_register,
+    //     exit_registered=0 -> thread_exit_register + set to 1, abort_cleanup=&005757f0.
+    run_pair(slot_575820, reinterpret_cast<void*>(&porsche::render_initialize_window_00575820),
+             &first_0, 1u, true,
+             {0u, 0u, 0u, 0x44556600u, 0u, 0u, 0u, 0u, false, 0u, 1u, 0x00aa1100u, 0x1234u, 1u, false, 0u, false});
+
+    // 3b. Explicit 800x600, lock!=null, first=1, hwnd!=null, prepare clears hwnd -> window_init(800,600,0),
+    //     setstate(0x25,0)=0 (skips scheduler), exit_registered=1 (skips thread_exit_register).
+    run_pair(slot_575820, reinterpret_cast<void*>(&porsche::render_initialize_window_00575820),
+             &first_1, 1u, true,
+             {800u, 600u, 0x99887700u, 0u, 0x00bb2200u, 0x99u, 1u, 0x2222u, true, 0u, 1u, 0x00cc3300u, 0xabcd0001u, 0u, false, 0u, false});
+
+    // 3c. first=1, hwnd!=null, prepare does NOT clear hwnd -> skips window_init, continues to THRASH init.
+    run_pair(slot_575820, reinterpret_cast<void*>(&porsche::render_initialize_window_00575820),
+             &first_1, 1u, true,
+             {1024u, 768u, 0x11112222u, 0u, 0x00dd4400u, 0u, 0u, 0u, false, 0u, 1u, 0u, 1u, 1u, false, 0u, false});
+
+    // 3d. first=0, hwnd!=null -> skips both window_prepare and window_init; arbitrary high nonzero first test too.
+    run_pair(slot_575820, reinterpret_cast<void*>(&porsche::render_initialize_window_00575820),
+             &first_0, 1u, true,
+             {640u, 480u, 0x33334444u, 0u, 0x00ee5500u, 0u, 0u, 0u, false, 0u, 1u, 0u, 0x7fu, 1u, false, 0u, false});
+
+    run_pair(slot_575820, reinterpret_cast<void*>(&porsche::render_initialize_window_00575820),
+             &first_high, 1u, true,
+             {0u, 480u, 0u, 0x12345678u, 0u, 0u, 0u, 0u, false, 0u, 1u, 0x00ff6600u, 42u, 1u, false, 0u, false});
+
+    // 3e. window_init failure (returns 0) -> immediate return of render_library_started_006a64b8 without THRASH calls.
+    run_pair(slot_575820, reinterpret_cast<void*>(&porsche::render_initialize_window_00575820),
+             &first_0, 1u, true,
+             {0u, 0u, 0u, 0x10101010u, 0u, 0x5555u, 0u, 0x7777u, false, 0u, 0u, 0u, 1u, 1u, false, 0u, false});
+
+    // 3f. THRASH_init failure (returns 0) -> calls window_prepare_0053bcb0 and re-reads render_library_started_006a64b8.
+    run_pair(slot_575820, reinterpret_cast<void*>(&porsche::render_initialize_window_00575820),
+             &first_0, 1u, true,
+             {640u, 0u, 0x42424242u, 0u, 0u, 0x1111u, 0u, 0x2222u, false, 0x7777u, 1u, 0x00aa7700u, 0u, 1u, false, 0u, false});
+
+    // 3g. Callback-time mutation of render_thrash_exports_006bd910[27] during setstate(0x12, first)
+    //     proving subsequent calls reload slot[27] from memory.
+    run_pair(slot_575820, reinterpret_cast<void*>(&porsche::render_initialize_window_00575820),
+             &first_1, 1u, true,
+             {800u, 600u, 0x51515151u, 0u, 0u, 0u, 0u, 0u, false, 0u, 1u, 0x00bb8800u, 0x900du, 1u, true, 0u, false});
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("render_window_initialize_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

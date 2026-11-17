@@ -1,0 +1,117 @@
+{
+  "run": 628,
+  "experiment": "local/experiments/v2-render-window-initialize-628",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/628-render-window-initialize",
+    "iterations/v2/001-original-recovery/runs/528-render-library-lifecycle",
+    "iterations/v2/001-original-recovery/runs/626-diagnostic-abort-handler",
+    "iterations/v2/001-original-recovery/runs/353-diagnostic-mono",
+    "iterations/v2/001-original-recovery/runs/549-render-diagnostic",
+    "iterations/v2/001-original-recovery/runs/345-diagnostic-devices",
+    "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/628-render-window-initialize/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005757f0",
+      "bytes": 26,
+      "sha256": "b203a001842b1c1815979614230876eda37e674213928f3d20fa0f84aa3a2f86",
+      "token": "@BODY_005757F0@"
+    },
+    {
+      "va": "00575810",
+      "bytes": 9,
+      "sha256": "6b8ae2b332a7ff0893cd61b88ee0b620d42a233d732ede333d07027ff0a867ad",
+      "token": "@BODY_00575810@"
+    },
+    {
+      "va": "00575820",
+      "bytes": 270,
+      "sha256": "a1c198173ba759040c35a248016f8b370c26dc62cbc27a82b1b09e14842c943a",
+      "token": "@BODY_00575820@"
+    },
+    {
+      "va": "005e1960",
+      "bytes": 32,
+      "sha256": "8d2949ce5fe961541d7d1287c3c38a5eb75c6214bca2c735a14274a100be28e8",
+      "token": "@DATA_005E1960@"
+    }
+  ],
+  "pass_marker": "render_window_initialize_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-default-width",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "old": "        render_display_texture_width_005deac8 = 0x280u;",
+      "new": "        render_display_texture_width_005deac8 = 0x281u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-default-height",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "old": "        render_display_texture_height_005deacc = 0x1e0u;",
+      "new": "        render_display_texture_height_005deacc = 0x1e1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-prepare-guard",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "old": "    if (first != 0u && window_hwnd_006b7bf8 != nullptr) {",
+      "new": "    if (first == 0u && window_hwnd_006b7bf8 != nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-fullscreen-flag",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "old": "                first == 0u ? 1u : 0u) == 0u) {",
+      "new": "                first != 0u ? 1u : 0u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scheduler-guard",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "old": "    if (thrash_set_state(0x25u, 0u) != 0u) {",
+      "new": "    if (thrash_set_state(0x25u, 0u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-exit-flag",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "old": "        render_window_exit_registered_006a64bc = 1u;",
+      "new": "        render_window_exit_registered_006a64bc = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-abort-cleanup-clear",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "old": "    diagnostic_abort_cleanup_005deb8c = 0u;",
+      "new": "    diagnostic_abort_cleanup_005deb8c = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-exit-cleanup-arg",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "old": "void __cdecl render_window_exit_cleanup_00575810() {\n    (void)render_initialize_shutdown_00575930(1u);\n}",
+      "new": "void __cdecl render_window_exit_cleanup_00575810() {\n    (void)render_initialize_shutdown_00575930(0u);\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

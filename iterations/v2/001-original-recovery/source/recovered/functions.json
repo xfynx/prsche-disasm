@@ -17736,6 +17736,117 @@
           "005654bc"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "005757f0",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 uint32 RET0 (render_window_abort_cleanup_005757f0); calls render_initialize_shutdown_00575930(1), clears diagnostic_abort_cleanup_005deb8c, returns 1",
+      "recovered_dependencies": [
+        "00575930"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/630-render-window-codec-create-integration/validation.json",
+      "verification_boundary": "Shared630(001) PASS:22 native cases (11 per optimization at Od/O2) and 8 material controls. SHAdd509617bbb2d7ef258924c7843370445586397359ef7c90c36b949484d829f3. Reuses 00575930 and 005deb8c; shares 005e1960/006a64bc in 628. Build357TUs/96names99refs/noEXE.",
+      "partial_reason": "Bounded native callback comparison with controlled render shutdown provider.",
+      "body_bytes": 26,
+      "body_ranges": [
+        [
+          "005757f0",
+          "00575809"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00575810",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 void RET0 (render_window_exit_cleanup_00575810); calls render_initialize_shutdown_00575930(1)",
+      "recovered_dependencies": [
+        "00575930"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/630-render-window-codec-create-integration/validation.json",
+      "verification_boundary": "Shared630(001) PASS:22 native cases (11 per optimization at Od/O2) and 8 material controls. SHAdd509617bbb2d7ef258924c7843370445586397359ef7c90c36b949484d829f3. Reuses 00575930; zero new data. Build357TUs/96names99refs/noEXE.",
+      "partial_reason": "Bounded exit-handler wrapper with controlled render shutdown provider.",
+      "body_bytes": 9,
+      "body_ranges": [
+        [
+          "00575810",
+          "00575818"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00575820",
+      "source": "iterations/v2/001-original-recovery/runs/628-render-window-initialize/render_window_initialize_628.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 uint32 RET0 (render_initialize_window_00575820); defaults 640x480 width/height, lazily creates thread_start_lock_006a57d8, prepares/initializes Win32 window, configures THRASH [27]/[19] and 005e1960 callback table, registers disable state / atexit cleanup / abort hook",
+      "recovered_dependencies": [
+        "005321f0",
+        "005365e0",
+        "0053ac20",
+        "0053bcb0",
+        "00557380",
+        "00557460",
+        "005757f0",
+        "00575810"
+      ],
+      "unrecovered_dependencies": [
+        "0053a780",
+        "005756d0",
+        "005756e0",
+        "00575730",
+        "00575770",
+        "005757d0"
+      ],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/630-render-window-codec-create-integration/validation.json",
+      "verification_boundary": "Shared630(001) PASS:22 native cases (11 per optimization at Od/O2) and 8 material controls. SHAdd509617bbb2d7ef258924c7843370445586397359ef7c90c36b949484d829f3. Owns 32B .data table (005e1960..005e197f) + 4B loader-zero (006a64bc); adds 6 unrecovered 005e1960 callback frontier symbols. Build357TUs/96names99refs/noEXE.",
+      "partial_reason": "Controlled THRASH [19]/[27] exports and test-only callee/global providers; real THRASH DLL and the six 005e1960 callback implementations remain open.",
+      "body_bytes": 270,
+      "body_ranges": [
+        [
+          "00575820",
+          "0057592d"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0056aff0",
+      "source": "iterations/v2/001-original-recovery/runs/629-audio-stream-codec-create/audio_stream_codec_create_629.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl5 uint32 RET0 (audio_stream_codec_create_0056aff0); validates buffer slack >=0x6000 past 0056afc0 and bounds requests/filters/taps via 005deb74/005deb78/005debf0, initializes 'STRM' header + heap lock + linked requests/filters/taps/ring",
+      "recovered_dependencies": [
+        "005321f0",
+        "0056afc0"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/630-render-window-codec-create-integration/validation.json",
+      "verification_boundary": "Shared630(001) PASS:126 native cases (63 per optimization at Od/O2) and 5 material controls. SHA91e0b6fd88e164eb862615adc150a4dad39455732b830f228070b1f32ad6fe8c. Owns 248B .rdata (005bd8b8..005bd9b4); zero new .data. Build357TUs/96names99refs/noEXE.",
+      "partial_reason": "Bounded 80 KiB mapped buffer arena with controlled heap_lock_create/diagnostic_handler endpoints; unmapped stream_buf pointers and downstream stream consumers remain open.",
+      "body_bytes": 564,
+      "body_ranges": [
+        [
+          "0056aff0",
+          "0056b223"
+        ]
+      ]
     }
   ]
 }

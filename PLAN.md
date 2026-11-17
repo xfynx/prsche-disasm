@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run627](iterations/v2/001-original-recovery/runs/627-audio-init-diagnostic-abort-integration/README.md).
-Application audio init `004a66b0` and diagnostic abort handler `00565340` close four real dependencies.
-The shared build compiles 355 TUs with 92 unresolved names / 95 references.
+Latest recovery intake is [Run630](iterations/v2/001-original-recovery/runs/630-render-window-codec-create-integration/README.md).
+Render window init `00575820` (`005757f0`/`00575810`) and audio stream codec create `0056aff0` close two frontier dependencies and expose six real `005e1960` callback symbols.
+The shared build compiles 357 TUs with 96 unresolved names / 99 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are the reachable render window init `00575820`/`005757f0`/`00575810` and audio stream codec create `0056aff0` dependencies. The real depth-conversion
+Next are the six `005e1960` callbacks (`005756d0`/`005756e0`/`00575730`/`00575770`/`005757d0` and `0053a780`) plus `0053bf20`/`004b0eb0`. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;
