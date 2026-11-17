@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run615](iterations/v2/001-original-recovery/runs/615-display-trees-release-stack-integration/README.md)
-  integrates the partial render display member trees and splash release stack.
-  The shared build has104 unresolved names across347 TUs.
+  [Run618](iterations/v2/001-original-recovery/runs/618-frame-surface-file-open-integration/README.md)
+  integrates the partial frame surface setup and file backend open.
+  The shared build has102 unresolved names across349 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

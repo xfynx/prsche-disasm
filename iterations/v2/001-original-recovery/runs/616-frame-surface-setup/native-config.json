@@ -1,0 +1,62 @@
+{
+  "run": 616,
+  "experiment": "local/experiments/v2-frame-surface-setup-616",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/616-frame-surface-setup/frame_surface_setup_616.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/616-frame-surface-setup/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/616-frame-surface-setup",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/616-frame-surface-setup/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/585-frame-interface-release/frame_interface_release_585.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "00568f30",
+      "bytes": 324,
+      "sha256": "5e6b1d75fd6acadf6f6d18a792fc14c961c3e15f768f610d53e1c32a8642c40e",
+      "token": "@BODY_00568F30@"
+    }
+  ],
+  "pass_marker": "frame_surface_setup_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-surface-state-final",
+      "source": "iterations/v2/001-original-recovery/runs/616-frame-surface-setup/frame_surface_setup_616.cpp",
+      "old": "    frame_surface_state_006a5c84 = 1u;",
+      "new": "    frame_surface_state_006a5c84 = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-about-magic-seven",
+      "source": "iterations/v2/001-original-recovery/runs/616-frame-surface-setup/frame_surface_setup_616.cpp",
+      "old": "    if (about[0x7cu / 4u] == 7u &&",
+      "new": "    if (about[0x7cu / 4u] == 6u &&",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-ddsd-fourcc",
+      "source": "iterations/v2/001-original-recovery/runs/616-frame-surface-setup/frame_surface_setup_616.cpp",
+      "old": "    ddsd[20] = 0x32595559u;",
+      "new": "    ddsd[20] = 0x32595558u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-ddsd-caps",
+      "source": "iterations/v2/001-original-recovery/runs/616-frame-surface-setup/frame_surface_setup_616.cpp",
+      "old": "    ddsd[26] = 0x4098u;",
+      "new": "    ddsd[26] = 0x4090u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

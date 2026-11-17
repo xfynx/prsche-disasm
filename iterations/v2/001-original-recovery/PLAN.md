@@ -1,14 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current2026-11-17. Run615 shared audit passes for frozen613002+614001 on612.
-Build001 compiles347TUs/8projects,104names109refs,noEXE. Two real names
-(`render_display_member_00466380`, `splash_progress_release_stack_0048d550`)
-close with no new names and zero new data bytes. Registry945 adds three PARTIAL
-bodies (813B total). README615 owns commands and bounds:1340 native cases/8
-controls atOd/O2,858pins/947canonicalproviders.
+Current2026-11-17. Run618 shared audit passes for frozen616001+617001 on615.
+Build001 compiles349TUs/8projects,102names107refs,noEXE. Two real names
+(`frame_pump_boundary_00568f30`, `file_backend_open_00568900`) close with no new
+names and 28B loader-zero `.data` (0B file-backed `.data`/`.rdata`). Registry947
+adds two PARTIAL bodies (494B total). README618 owns commands and bounds:318
+native cases/8 controls atOd/O2,863pins/956canonicalproviders.
 
-Active flash workers:616 (`00568f30` 324B) and617 (`00568900` 170B). Next
-integrate616+617 in shared batch618 and dispatch the next frontier workers.
+Active flash workers:619 (`0048ff30` 522B) and620 (`0048cb50` 361B + `00490420`
+170B). Next integrate619+620 in shared batch621 and dispatch the next frontier
+workers.
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

@@ -17450,6 +17450,61 @@
           "0048d691"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00568f30",
+      "source": "iterations/v2/001-original-recovery/runs/616-frame-surface-setup/frame_surface_setup_616.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl6 void RET0; releases frame interfaces via 005693e0, stores surface setup parameters in 006a5c84..006a5c9c, queries thrash export[9]/export[27] and DirectDraw vtbl[9]/vtbl[6] for YUY2 surface",
+      "recovered_dependencies": [
+        "005693e0"
+      ],
+      "unrecovered_dependencies": [
+        "00569080"
+      ],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/618-frame-surface-file-open-integration/validation.json",
+      "verification_boundary": "Shared618 PASS:78 native cases (39 per optimization at Od/O2) and4 material controls. SHA5e6b1d75fd6acadf6f6d18a792fc14c961c3e15f768f610d53e1c32a8642c40e. Owns 28B loader-zero .data (006a5c84..006a5c9f); 0B file-backed .data. Build349TUs/102names107refs/noEXE.",
+      "partial_reason": "Bounded mapped thrash exports and DirectDraw vtable slots 6/9; callback 00569080 body and live DirectDraw surfaces remain open.",
+      "body_bytes": 324,
+      "body_ranges": [
+        [
+          "00568f30",
+          "00569073"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00568900",
+      "source": "iterations/v2/001-original-recovery/runs/617-file-backend-open/file_backend_open_617.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl3 void* RET0; splits path at '|' via 005a2780/005a28a0 or opens physical file via 005919a0 and enumerates auxiliary callbacks via 00580e60 with visitor 005689b0",
+      "recovered_dependencies": [
+        "00580e60",
+        "005919a0",
+        "005a2780",
+        "005a28a0"
+      ],
+      "unrecovered_dependencies": [
+        "005689b0"
+      ],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/618-frame-surface-file-open-integration/validation.json",
+      "verification_boundary": "Shared618 PASS:240 native cases (120 per optimization at Od/O2) and4 material controls. SHA22c0e608b84a8d6c56614a4dbd829fd386348103e2a099a8a2072dfd2b9b205c. Zero new data. Build349TUs/102names107refs/noEXE.",
+      "partial_reason": "Bounded mapped path strings (<260B prefix) and controlled callback enumeration; visitor 005689b0 body and live archive mounts remain open.",
+      "body_bytes": 170,
+      "body_ranges": [
+        [
+          "00568900",
+          "005689a9"
+        ]
+      ]
     }
   ]
 }

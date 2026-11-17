@@ -1,0 +1,61 @@
+{
+  "run": 617,
+  "experiment": "local/experiments/v2-file-backend-open-617",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/617-file-backend-open/file_backend_open_617.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/617-file-backend-open/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/617-file-backend-open",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/617-file-backend-open/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00568900",
+      "bytes": 170,
+      "sha256": "22c0e608b84a8d6c56614a4dbd829fd386348103e2a099a8a2072dfd2b9b205c",
+      "token": "@BODY_00568900@"
+    }
+  ],
+  "pass_marker": "file_backend_open_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-pipe-delimiter",
+      "source": "iterations/v2/001-original-recovery/runs/617-file-backend-open/file_backend_open_617.cpp",
+      "old": "    const char* const pipe = formatter_search_character_005a2780(path, 0x7c);",
+      "new": "    const char* const pipe = formatter_search_character_005a2780(path, 0x2f);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-zero-block-arg",
+      "source": "iterations/v2/001-original-recovery/runs/617-file-backend-open/file_backend_open_617.cpp",
+      "old": "        ctx.status = disk_physical_open_005919a0(path, mode, 0u, &ctx.handle_or_tail);",
+      "new": "        ctx.status = disk_physical_open_005919a0(path, mode, 1u, &ctx.handle_or_tail);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tail-slot",
+      "source": "iterations/v2/001-original-recovery/runs/617-file-backend-open/file_backend_open_617.cpp",
+      "old": "        ctx.full_path = pipe + 1;",
+      "new": "        ctx.handle_or_tail = const_cast<char*>(pipe + 1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-status-guard",
+      "source": "iterations/v2/001-original-recovery/runs/617-file-backend-open/file_backend_open_617.cpp",
+      "old": "    if (flags != 0u && ctx.status == 0u) {",
+      "new": "    if (flags != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

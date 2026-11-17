@@ -1,0 +1,500 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "frame_surface_setup_616.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kMaxEvents = 16u,
+};
+
+enum EventTag : U {
+    kEvReleaseBoundary = 1u,
+    kEvThrashAbout = 2u,
+    kEvThrashGetState = 3u,
+    kEvEnumModesSlot9 = 4u,
+    kEvCreateSurfaceSlot6 = 5u,
+};
+
+struct DDObj {
+    const void* const* vtable;
+};
+
+struct StateSnapshot {
+    U state;
+    U width;
+    U arg1;
+    U arg0;
+    U arg4;
+    U sentinel;
+    U height;
+    U final_flag;
+    U second;
+    U first;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    U arg3;
+    U arg4;
+    U ddsd[31];
+    StateSnapshot state;
+};
+
+struct Trace {
+    U abi_fail;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events = 0u;
+
+static B* code = nullptr;
+static B* slot_568f30 = nullptr;
+
+static U about_buf[64] = {};
+static U release_calls = 0u;
+static bool cfg_entry_preserve = false;
+static U cfg_get_state_ret = 1u;
+static bool cfg_get_state_write = true;
+static U cfg_get_state_dd_id = 1u;
+static I cfg_enum_ret = 0;
+static U cfg_enum_second = 0x55aa1122u;
+static bool cfg_enum_swap_dd = false;
+static I cfg_create_ret = 0;
+static U cfg_create_surface_val = 0x77cc3344u;
+static bool cfg_create_write_surface = true;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    s.state = porsche::frame_surface_state_006a5c84;
+    s.width = porsche::frame_surface_width_006a5c88;
+    s.arg1 = porsche::frame_surface_arg1_006a5c8c;
+    s.arg0 = porsche::frame_surface_arg0_006a5c90;
+    s.arg4 = porsche::frame_surface_arg4_006a5c94;
+    s.sentinel = porsche::frame_surface_sentinel_006a5c98;
+    s.height = porsche::frame_surface_height_006a5c9c;
+    s.final_flag = porsche::frame_interface_final_flag_006a5ca0;
+    s.second = porsche::frame_interface_second_006a5ca4;
+    s.first = porsche::frame_interface_first_006a5ca8;
+}
+
+static Event& push_event(U tag, U arg0, U arg1, U arg2, U arg3, U arg4) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    e.arg3 = arg3;
+    e.arg4 = arg4;
+    capture_state(e.state);
+    return e;
+}
+
+static DDObj dd_obj0 = {};
+static DDObj dd_obj1 = {};
+
+static U dd_id(U ptr_val) {
+    if (ptr_val == 0u) {
+        return 0u;
+    }
+    if (ptr_val == address(&dd_obj0)) {
+        return 1u;
+    }
+    if (ptr_val == address(&dd_obj1)) {
+        return 2u;
+    }
+    return 0xffffffffu;
+}
+
+static const U* __stdcall thrash_about_stub() {
+    push_event(kEvThrashAbout, about_buf[0x7cu / 4u], 0u, 0u, 0u, 0u);
+    return about_buf;
+}
+
+static U __stdcall thrash_get_state_stub(U key, U* out_val) {
+    const U is_flag_ptr = (out_val == &porsche::frame_interface_final_flag_006a5ca0) ? 1u : 0u;
+    push_event(kEvThrashGetState, key, is_flag_ptr, 0u, 0u, 0u);
+    if (cfg_get_state_write && out_val != nullptr) {
+        if (cfg_get_state_dd_id == 1u) {
+            *out_val = address(&dd_obj0);
+        } else if (cfg_get_state_dd_id == 2u) {
+            *out_val = address(&dd_obj1);
+        } else {
+            *out_val = 0u;
+        }
+    }
+    return cfg_get_state_ret;
+}
+
+static I __stdcall enum_modes_slot9_stub(
+    U self, U flags, void* desc, U* ctx, U callback_va) {
+    const U is_second_ptr = (ctx == &porsche::frame_interface_second_006a5ca4) ? 1u : 0u;
+    push_event(kEvEnumModesSlot9, dd_id(self), flags, address(desc), is_second_ptr, callback_va);
+    if (ctx != nullptr) {
+        *ctx = cfg_enum_second;
+    }
+    if (cfg_enum_swap_dd) {
+        porsche::frame_interface_final_flag_006a5ca0 = address(&dd_obj1);
+    }
+    return cfg_enum_ret;
+}
+
+static I __stdcall create_surface_slot6_stub(
+    U self, const U* desc, U* out_surface, void* unk) {
+    const U is_first_ptr = (out_surface == &porsche::frame_interface_first_006a5ca8) ? 1u : 0u;
+    Event& e = push_event(kEvCreateSurfaceSlot6, dd_id(self), is_first_ptr, address(unk), 0u, 0u);
+    if (desc != nullptr) {
+        std::memcpy(e.ddsd, desc, sizeof(e.ddsd));
+    }
+    if (cfg_create_write_surface && out_surface != nullptr) {
+        *out_surface = cfg_create_surface_val;
+    }
+    return cfg_create_ret;
+}
+
+static const void* const kDDVtable[10] = {
+    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    reinterpret_cast<const void*>(&create_surface_slot6_stub),
+    nullptr, nullptr,
+    reinterpret_cast<const void*>(&enum_modes_slot9_stub),
+};
+
+namespace porsche {
+
+std::uint32_t render_thrash_exports_006bd910[43] = {};
+std::uint32_t frame_interface_final_flag_006a5ca0 = 0u;
+std::uint32_t frame_interface_second_006a5ca4 = 0u;
+std::uint32_t frame_interface_first_006a5ca8 = 0u;
+
+std::uint32_t __cdecl frame_pump_boundary_005693e0() {
+    const U seq = release_calls++;
+    push_event(kEvReleaseBoundary, seq, 0u, 0u, 0u, 0u);
+    if (seq > 0u || !cfg_entry_preserve) {
+        frame_interface_first_006a5ca8 = 0u;
+        frame_interface_second_006a5ca4 = 0u;
+        frame_interface_final_flag_006a5ca0 = 0u;
+    }
+    return 0x5693e000u + seq;
+}
+
+} // namespace porsche
+
+static U invoke_cdecl_6arg(void* fn, U a0, U a1, U a2, U a3, U a4, U a5) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a5
+        push a4
+        push a3
+        push a2
+        push a1
+        push a0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 24
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B body_568f30[] = {@BODY_00568F30@};
+    require(sizeof body_568f30 == 324u, "324-byte original body 00568f30");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_568f30 = code + 0u;
+    std::memcpy(slot_568f30, body_568f30, sizeof body_568f30);
+
+    const void* const release_fn = reinterpret_cast<const void*>(&porsche::frame_pump_boundary_005693e0);
+    relocate_rel32(slot_568f30, 0x00568f30u, 0x04u, 0x005693e0u, release_fn);
+    relocate_abs32(slot_568f30, 0x1eu, 0x006a5c90u, address(&porsche::frame_surface_arg0_006a5c90));
+    relocate_abs32(slot_568f30, 0x2bu, 0x006a5c8cu, address(&porsche::frame_surface_arg1_006a5c8c));
+    relocate_abs32(slot_568f30, 0x37u, 0x006a5c9cu, address(&porsche::frame_surface_height_006a5c9c));
+    relocate_abs32(slot_568f30, 0x44u, 0x006a5c98u, address(&porsche::frame_surface_sentinel_006a5c98));
+    relocate_abs32(slot_568f30, 0x50u, 0x006a5c88u, address(&porsche::frame_surface_width_006a5c88));
+    relocate_abs32(slot_568f30, 0x56u, 0x006a5c94u, address(&porsche::frame_surface_arg4_006a5c94));
+    relocate_abs32(slot_568f30, 0x5cu, 0x006a5c84u, address(&porsche::frame_surface_state_006a5c84));
+    relocate_abs32(slot_568f30, 0x6cu, 0x006bd934u, address(&porsche::render_thrash_exports_006bd910[9]));
+    relocate_abs32(slot_568f30, 0x77u, 0x006a5ca0u, address(&porsche::frame_interface_final_flag_006a5ca0));
+    relocate_abs32(slot_568f30, 0x7fu, 0x006bd97cu, address(&porsche::render_thrash_exports_006bd910[27]));
+    relocate_abs32(slot_568f30, 0x89u, 0x006a5ca0u, address(&porsche::frame_interface_final_flag_006a5ca0));
+    require(word(slot_568f30, 0x94u) == 0x00569080u, "unrelocated callback VA 0x00569080");
+    relocate_abs32(slot_568f30, 0x99u, 0x006a5ca4u, address(&porsche::frame_interface_second_006a5ca4));
+    relocate_abs32(slot_568f30, 0xa7u, 0x006a5ca0u, address(&porsche::frame_interface_final_flag_006a5ca0));
+    relocate_abs32(slot_568f30, 0xacu, 0x006a5ca4u, address(&porsche::frame_interface_second_006a5ca4));
+    relocate_rel32(slot_568f30, 0x00568f30u, 0xb5u, 0x005693e0u, release_fn);
+    relocate_abs32(slot_568f30, 0xccu, 0x006a5c9cu, address(&porsche::frame_surface_height_006a5c9c));
+    relocate_abs32(slot_568f30, 0xd2u, 0x006a5c88u, address(&porsche::frame_surface_width_006a5c88));
+    relocate_abs32(slot_568f30, 0x11fu, 0x006a5ca8u, address(&porsche::frame_interface_first_006a5ca8));
+    relocate_rel32(slot_568f30, 0x00568f30u, 0x12eu, 0x005693e0u, release_fn);
+    relocate_abs32(slot_568f30, 0x138u, 0x006a5c84u, address(&porsche::frame_surface_state_006a5c84));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+
+    dd_obj0.vtable = kDDVtable;
+    dd_obj1.vtable = kDDVtable;
+    porsche::render_thrash_exports_006bd910[9] = address(reinterpret_cast<const void*>(&thrash_about_stub));
+    porsche::render_thrash_exports_006bd910[27] = address(reinterpret_cast<const void*>(&thrash_get_state_stub));
+}
+
+struct CaseSpec {
+    U a0, a1, a2, a3, a4, a5;
+    U init_state, init_w, init_a1, init_a0, init_a4, init_sent, init_h;
+    U init_flag, init_second, init_first;
+    bool entry_preserve;
+    U about_type;
+    U get_state_ret;
+    bool get_state_write;
+    U get_state_dd_id;
+    I enum_ret;
+    U enum_second;
+    bool enum_swap_dd;
+    I create_ret;
+    U create_surface_val;
+    bool create_write_surface;
+};
+
+static void apply_case(const CaseSpec& s) {
+    release_calls = 0u;
+    std::memset(about_buf, 0, sizeof about_buf);
+    about_buf[0x7cu / 4u] = s.about_type;
+
+    porsche::frame_surface_state_006a5c84 = s.init_state;
+    porsche::frame_surface_width_006a5c88 = s.init_w;
+    porsche::frame_surface_arg1_006a5c8c = s.init_a1;
+    porsche::frame_surface_arg0_006a5c90 = s.init_a0;
+    porsche::frame_surface_arg4_006a5c94 = s.init_a4;
+    porsche::frame_surface_sentinel_006a5c98 = s.init_sent;
+    porsche::frame_surface_height_006a5c9c = s.init_h;
+
+    porsche::frame_interface_final_flag_006a5ca0 = s.init_flag;
+    porsche::frame_interface_second_006a5ca4 = s.init_second;
+    porsche::frame_interface_first_006a5ca8 = s.init_first;
+
+    cfg_entry_preserve = s.entry_preserve;
+    cfg_get_state_ret = s.get_state_ret;
+    cfg_get_state_write = s.get_state_write;
+    cfg_get_state_dd_id = s.get_state_dd_id;
+    cfg_enum_ret = s.enum_ret;
+    cfg_enum_second = s.enum_second;
+    cfg_enum_swap_dd = s.enum_swap_dd;
+    cfg_create_ret = s.create_ret;
+    cfg_create_surface_val = s.create_surface_val;
+    cfg_create_write_surface = s.create_write_surface;
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag mismatch");
+        require(trace.events[i].arg0 == expected.events[i].arg0, "event arg0 mismatch");
+        require(trace.events[i].arg1 == expected.events[i].arg1, "event arg1 mismatch");
+        require(trace.events[i].arg2 == expected.events[i].arg2, "event arg2 mismatch");
+        require(trace.events[i].arg3 == expected.events[i].arg3, "event arg3 mismatch");
+        require(trace.events[i].arg4 == expected.events[i].arg4, "event arg4 mismatch");
+        require(std::memcmp(trace.events[i].ddsd, expected.events[i].ddsd,
+                            sizeof(trace.events[i].ddsd)) == 0,
+                "event ddsd mismatch");
+        require(std::memcmp(&trace.events[i].state, &expected.events[i].state,
+                            sizeof(StateSnapshot)) == 0,
+                "event state mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+}
+
+static void run_case(const CaseSpec& spec) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    apply_case(spec);
+    __try {
+        trace.abi_fail = invoke_cdecl_6arg(slot_568f30, spec.a0, spec.a1, spec.a2, spec.a3, spec.a4, spec.a5);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_case(spec);
+    __try {
+        trace.abi_fail = invoke_cdecl_6arg(
+            reinterpret_cast<void*>(&porsche::frame_pump_boundary_00568f30),
+            spec.a0, spec.a1, spec.a2, spec.a3, spec.a4, spec.a5);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces();
+}
+
+int main() {
+    init();
+
+    // 1. a5 != 0 early returns (entry release + 7 global writes, state=2).
+    run_case({0x11111111u, 0x22222222u, 640u, 480u, 0x44444444u, 1u,
+              9u, 10u, 20u, 30u, 40u, 50u, 60u,
+              0xaaaa0001u, 0xbbbb0002u, 0xcccc0003u,
+              false, 7u, 1u, true, 1u, 0, 0x55aa1122u, false, 0, 0x77cc3344u, true});
+    run_case({0u, 0xffffffffu, 0u, 0u, 0x80000000u, 0xffffffffu,
+              1u, 800u, 1u, 2u, 3u, 4u, 600u,
+              address(&dd_obj0), 0x1234u, 0x5678u,
+              true, 6u, 0u, false, 0u, 0, 0u, false, 0, 0u, false});
+
+    // 2. a5 == 0, about[0x7c/4] != 7 -> skips GetState and EnumModesSlot9.
+    run_case({1u, 2u, 320u, 240u, 3u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              0u, 0u, 0u,
+              false, 6u, 1u, true, 1u, 0, 0x11111111u, false, 0, 0x22222222u, true});
+    run_case({4u, 5u, 640u, 480u, 6u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              address(&dd_obj0), 0xdeadbeefu, 0x10203040u,
+              true, 0u, 1u, true, 1u, 0, 0u, false, 0, 0x33445566u, true});
+    run_case({7u, 8u, 800u, 600u, 9u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              address(&dd_obj1), 0xfeedfaceu, 0x01020304u,
+              true, 8u, 1u, true, 1u, 0, 0u, false, -1, 0x99887766u, true});
+
+    // 3. a5 == 0, about[0x7c/4] == 7, GetState returns 0 -> skips EnumModesSlot9.
+    run_case({10u, 11u, 512u, 384u, 12u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              0u, 0u, 0u,
+              false, 7u, 0u, true, 1u, 0, 0x12345678u, false, 0, 0x87654321u, true});
+    run_case({13u, 14u, 1024u, 768u, 15u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              address(&dd_obj0), 0x42424242u, 0u,
+              true, 7u, 0u, true, 2u, 0, 0u, false, 0, 0xaabbccddu, true});
+
+    // 4. a5 == 0, about[0x7c/4] == 7, GetState != 0, dd_ptr == 0 -> skips EnumModesSlot9.
+    run_case({16u, 17u, 640u, 480u, 18u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              0u, 0u, 0u,
+              false, 7u, 1u, true, 0u, 0, 0x99999999u, false, 0, 0x88888888u, true});
+    run_case({19u, 20u, 640u, 480u, 21u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              0u, 0u, 0u,
+              false, 7u, 0xffffffffu, false, 0u, 0, 0x99999999u, false, 0, 0x88888888u, true});
+
+    // 5. Full path through EnumModesSlot9: second == 0 -> exit release, state=2.
+    run_case({22u, 23u, 640u, 480u, 24u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              0u, 0u, 0u,
+              false, 7u, 1u, true, 1u, 0, 0u, false, 0, 0x11223344u, true});
+    run_case({25u, 26u, 320u, 200u, 27u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              0u, 0u, 0u,
+              false, 7u, 1u, true, 1u, -1, 0u, true, 0, 0x11223344u, true});
+
+    // 6. Full path through EnumModesSlot9 -> CreateSurfaceSlot6 success (ret == 0 -> state=1).
+    for (U w : {0u, 320u, 640u, 800u, 1280u}) {
+        for (U h : {0u, 240u, 480u, 600u, 1024u}) {
+            run_case({w ^ 0x10101u, h ^ 0x20202u, w, h, w + h, 0u,
+                      3u, 1u, 2u, 3u, 4u, 5u, 6u,
+                      0x11u, 0x22u, 0x33u,
+                      false, 7u, 1u, true, 1u, 0, 0x55aa0001u + w, false, 0, 0x77cc0002u + h, true});
+        }
+    }
+
+    // 7. EnumModesSlot9 swaps frame_interface_final_flag_006a5ca0 to dd_obj1 (tests dd_ptr reload).
+    run_case({0xabcdef01u, 0x12345678u, 640u, 480u, 0x0f0e0d0cu, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              0u, 0u, 0u,
+              false, 7u, 1u, true, 1u, 0, 0x66778899u, true, 0, 0x99887766u, true});
+
+    // 8. CreateSurfaceSlot6 failure (negative and positive non-zero returns -> release boundary, state=2).
+    run_case({100u, 200u, 640u, 480u, 300u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              0u, 0u, 0u,
+              false, 7u, 1u, true, 1u, 0, 0x44556677u, false, static_cast<I>(0x80004005u), 0x11112222u, true});
+    run_case({101u, 201u, 800u, 600u, 301u, 0u,
+              0u, 0u, 0u, 0u, 0u, 0u, 0u,
+              0u, 0u, 0u,
+              false, 7u, 1u, true, 2u, 1, 0x55667788u, false, 1, 0x0u, false});
+
+    std::printf("frame_surface_setup_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events);
+    return 0;
+}

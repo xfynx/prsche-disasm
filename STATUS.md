@@ -4,23 +4,23 @@ Updated 2026-11-17. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run615](iterations/v2/001-original-recovery/runs/615-display-trees-release-stack-integration/README.md)
-compiles347 C++ translation units across8 projects. The link has104 unresolved names/
-109 references. **There is no recovered playable C++ game executable yet.**
+[Run618](iterations/v2/001-original-recovery/runs/618-frame-surface-file-open-integration/README.md)
+compiles349 C++ translation units across8 projects. The link has102 unresolved names/
+107 references. **There is no recovered playable C++ game executable yet.**
 
-Run615 integrates partial `0044b1d0` (119B), `00466380` (372B) and `0048d550`
-(322B) from frozen613002 (`613001` preserved) and614001 with zero new data.
-Native comparisons pass1340 cases/eight controls atOd/O2. Canonical render
-allocation, context heap state, heap lock/copy, FE record word count and
-startup network owners are reused. Shared audit verifies858 pins/947 providers;
-registry945 retains partial domains.
+Run618 integrates partial `00568f30` (324B) and `00568900` (170B) from
+frozen616001 and617001 plus 28B loader-zero `.data` (0B file-backed `.data`/
+`.rdata`). Native comparisons pass318 cases/eight controls atOd/O2. Canonical
+frame interface release, render thrash exports, formatter search/copy, physical
+disk open and network callback enumeration owners are reused. Shared audit
+verifies863 pins/956 providers; registry947 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run613 native002, Run614 native001 and Run615 integration are accepted within their stated bounds.
-Run616 frame surface setup and617 file backend open are active pending packets.
+Run616 native001, Run617 native001 and Run618 integration are accepted within their stated bounds.
+Run619 shutdown network destroy and620 engine service consume resource are active pending packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
