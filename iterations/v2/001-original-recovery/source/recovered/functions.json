@@ -18042,6 +18042,185 @@
           "004b0ed6"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00592590",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 uint32 RET0 (physical_file_clear_flag_00592590); indexes ~handle in physical_files_006af084, clears PhysicalFile::padding[0] (+2) when active and nonzero, else calls platform_disk_set_last_error(6) and returns 0; supplement CFG in 634",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/636-async-pool-shutdown-activate-integration/validation.json",
+      "verification_boundary": "Shared636(001) PASS:78 native cases (39 per optimization in 634/003 at Od/O2) and 8 material controls. SHA77897f5d2e72e0f0255917b3aa642cde3a3cb54a3cdd8788715b094f8a6ba3f2. Reuses files/file_disk; 0B new data. Build361TUs/88names91refs/noEXE.",
+      "partial_reason": "Controlled physical_files_006af084 storage and SetLastError stub.",
+      "body_bytes": 63,
+      "body_ranges": [
+        [
+          "00592590",
+          "005925ce"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00567cf0",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 void RET0 (file_operation_cancel_00567cf0); locks device queue via 00580ea0, looks up op via 00567b80, switches on FileOperation::type (0..9, 00567dc0 jump table), clears physical flag via 00592590 for current ops {2,3}, moves {0,2,3,4,6,8,9} to completed and invokes callback(-1); supplement CFG in 634",
+      "recovered_dependencies": [
+        "00567b80",
+        "005806e0",
+        "005808f0",
+        "00580ea0",
+        "00580ec0",
+        "00592590"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/636-async-pool-shutdown-activate-integration/validation.json",
+      "verification_boundary": "Shared636(001) PASS:78 native cases (39 per optimization in 634/003 at Od/O2) and 8 material controls. SHA77897f5d2e72e0f0255917b3aa642cde3a3cb54a3cdd8788715b094f8a6ba3f2. Reuses devices_006a5c7c/file_worker; 0B new data. Build361TUs/88names91refs/noEXE.",
+      "partial_reason": "Controlled file device/io queue mocks and non-blocking callback harness.",
+      "body_bytes": 207,
+      "body_ranges": [
+        [
+          "00567cf0",
+          "00567dbe"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00564750",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 uint32* RET0 (async_slot_resolve_00564750); validates signed handle>=0x100 and (handle&0xff)<async_pool_capacity_006a5be0 and slot id match in 0x2c-stride async_pool_base_006a5bc0; supplement CFG in 634",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/636-async-pool-shutdown-activate-integration/validation.json",
+      "verification_boundary": "Shared636(001) PASS:78 native cases (39 per optimization in 634/003 at Od/O2) and 8 material controls. SHA77897f5d2e72e0f0255917b3aa642cde3a3cb54a3cdd8788715b094f8a6ba3f2. Reuses startup_pool globals; 0B new data. Build361TUs/88names91refs/noEXE.",
+      "partial_reason": "Bounded test async pool backing buffer.",
+      "body_bytes": 61,
+      "body_ranges": [
+        [
+          "00564750",
+          "0056478c"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00564700",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 void RET0 (async_slot_cancel_00564700); resolves slot via 00564750, marks state +0x0c=1, cancels operation +0x18 via 00567cf0, and finalizes via async_dispatch_00563cc0 when op==0 && callback==0; supplement CFG in 634",
+      "recovered_dependencies": [
+        "00563cc0",
+        "00564750",
+        "00567cf0"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/636-async-pool-shutdown-activate-integration/validation.json",
+      "verification_boundary": "Shared636(001) PASS:78 native cases (39 per optimization in 634/003 at Od/O2) and 8 material controls. SHA77897f5d2e72e0f0255917b3aa642cde3a3cb54a3cdd8788715b094f8a6ba3f2. Reuses async_callbacks/startup_pool; 0B new data. Build361TUs/88names91refs/noEXE.",
+      "partial_reason": "Controlled async pool and callback stubs.",
+      "body_bytes": 70,
+      "body_ranges": [
+        [
+          "00564700",
+          "00564745"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00563d30",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 void RET0 (application_main_function_00563d30); cancels all async pool slots via 00564700, pumps/sleeps via 0055f780/005366e0/0055f740 until operations drain, closes active handle 006a5be4 via 00533da0, removes/runs 00563bd0, destroys lock and frees pool 006a5bc0; supplement CFG in 634",
+      "recovered_dependencies": [
+        "00531f90",
+        "005322d0",
+        "00533da0",
+        "005366a0",
+        "005366e0",
+        "0055f740",
+        "0055f780",
+        "00563bd0",
+        "00564700"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/636-async-pool-shutdown-activate-integration/validation.json",
+      "verification_boundary": "Shared636(001) PASS:78 native cases (39 per optimization in 634/003 at Od/O2) and 8 material controls. SHA77897f5d2e72e0f0255917b3aa642cde3a3cb54a3cdd8788715b094f8a6ba3f2. Zero new .data/.rdata. Build361TUs/88names91refs/noEXE.",
+      "partial_reason": "Controlled worker/wait/heap/scheduler stubs and finite drain loop; live worker threads and OS handles remain open.",
+      "body_bytes": 222,
+      "body_ranges": [
+        [
+          "00563d30",
+          "00563e0d"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "005360d0",
+      "source": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "fastcall1 uint8 RET0 (startup_service_active_get_005360d0); reads startup_service_active_0069dd1e",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/636-async-pool-shutdown-activate-integration/validation.json",
+      "verification_boundary": "Shared636(001) PASS:30 native cases (15 per optimization in 635/001 at Od/O2) and 8 material controls. SHAf6b3df01cf72b3a51921595118e818c352ef47f5c0153c74e446b41efb44b48e. Reuses startup_service_570; 0B new data. Build361TUs/88names91refs/noEXE.",
+      "partial_reason": "Bounded state byte getter.",
+      "body_bytes": 6,
+      "body_ranges": [
+        [
+          "005360d0",
+          "005360d5"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "004b0ee0",
+      "source": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "stdcall6 uint32 RET24 (render_display_activate_callback_004b0ee0); updates 006573e0..e3, hides cursor via render_window_show_cursor(0) on activate or calls 005360d0/005360a0 on movie service frame_object when deactivating, clears *result=0 and chains 006573dc handler else returns 0",
+      "recovered_dependencies": [
+        "005360a0",
+        "005360d0",
+        "00557460"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/636-async-pool-shutdown-activate-integration/validation.json",
+      "verification_boundary": "Shared636(001) PASS:30 native cases (15 per optimization in 635/001 at Od/O2) and 8 material controls. SHAf6b3df01cf72b3a51921595118e818c352ef47f5c0153c74e446b41efb44b48e. Zero new .data/.rdata. Build361TUs/88names91refs/noEXE.",
+      "partial_reason": "Controlled ShowCursor/movie-service/handler stubs without live Win32 WM_ACTIVATEAPP delivery or null result pointer.",
+      "body_bytes": 186,
+      "body_ranges": [
+        [
+          "004b0ee0",
+          "004b0f99"
+        ]
+      ]
     }
   ]
 }

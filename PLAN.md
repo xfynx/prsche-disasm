@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run633](iterations/v2/001-original-recovery/runs/633-render-callbacks-finish-init-integration/README.md).
-The six `005e1960` callbacks (`005756d0`/`005756e0`/`00575730`/`00575770`/`005757d0` and `0053a780`) plus `0053bf20`/`004b0eb0` close seven frontier dependencies while exposing `004b0ee0`.
-The shared build compiles 359 TUs with 90 unresolved names / 93 references.
+Latest recovery intake is [Run636](iterations/v2/001-original-recovery/runs/636-async-pool-shutdown-activate-integration/README.md).
+Async pool shutdown `00563d30`..`00592590` and render activate callback `004b0ee0`/`005360d0` close two frontier dependencies with zero new unresolved names.
+The shared build compiles 361 TUs with 88 unresolved names / 91 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are the reachable async pool shutdown chain `00563d30`..`00592590` and render activate callback `004b0ee0`/`005360d0`. The real depth-conversion
+Next are the reachable audio stream channel status leaves (`00567810`/`00567850`/`00591320`) and render seed PRNG (`00538040`). The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;

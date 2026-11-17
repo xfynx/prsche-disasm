@@ -1,0 +1,652 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "render_display_activate_callback_635.hpp"
+#include "../570-startup-service-bindings/startup_service_570.hpp"
+#include "porsche/frame_pump.hpp"
+#include "porsche/game_setup.hpp"
+#include "porsche/render_window.hpp"
+#include "porsche/startup_input.hpp"
+#include "porsche/window_procedure.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kMaxEvents = 24u,
+};
+
+enum EventTag : U {
+    kEvWindowHandle = 1u,
+    kEvShowCursor = 2u,
+    kEvFrameBoundary5360a0 = 3u,
+    kEvPreviousHandler = 4u,
+};
+
+enum ReturnCheck : U {
+    kRetNone = 0u,
+    kRetByte = 1u,
+    kRetU32 = 2u,
+};
+
+struct StateSnapshot {
+    U service_active_69dd1e;
+    U movie_service_69ed0c;
+    U prev_handler_6573dc;
+    B byte_6573e0;
+    B byte_6573e1;
+    B byte_6573e2;
+    B byte_6573e3;
+    std::int32_t result_slot;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    U arg3;
+    U arg4;
+    U arg5;
+    StateSnapshot state;
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U events_total = 0u;
+
+alignas(16) static B floating[512];
+static B* code = nullptr;
+static B* slot_5360d0 = nullptr;
+static B* slot_4b0ee0 = nullptr;
+static const void* iat_show_cursor = nullptr;
+
+alignas(4) static std::array<std::uint32_t, 12> test_frame_pump_storage{};
+static std::uint8_t* test_frame_pump_storage_bytes() noexcept {
+    return reinterpret_cast<std::uint8_t*>(test_frame_pump_storage.data());
+}
+
+struct MockMovieService {
+    void* base;
+    void* frame_object;
+};
+
+static MockMovieService test_movie_service{};
+static std::uint32_t test_dummy_config = 0x11223344u;
+static std::uint32_t test_dummy_hwnd = 0x55667788u;
+static std::uint32_t test_dummy_hwnd_other = 0x99aabbccu;
+static std::uint32_t test_dummy_frame_obj = 0xabcdef01u;
+static std::int32_t test_result_slot = 0;
+
+static U cfg_hwnd_ret = 0u;
+static std::int32_t cfg_cursor_count = -1;
+static U cfg_prev_ret = 0u;
+static bool cfg_prev_sets_result = false;
+static std::int32_t cfg_prev_result_val = 0;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    const B* const bytes = test_frame_pump_storage_bytes();
+    s.service_active_69dd1e = static_cast<U>(porsche::startup_service_active_0069dd1e);
+    s.movie_service_69ed0c = address(porsche::game_setup_movie_service_0069ed0c);
+    s.prev_handler_6573dc = word(bytes + 0x24u);
+    s.byte_6573e0 = porsche::frame_pump_byte_006573e0;
+    s.byte_6573e1 = porsche::frame_pump_byte_006573e1;
+    s.byte_6573e2 = porsche::frame_pump_byte_006573e2;
+    s.byte_6573e3 = bytes[0x2bu];
+    s.result_slot = test_result_slot;
+}
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = 0x027fu;
+    U mxcsr = 0x9f80u;
+    __asm {
+        fninit
+        fldcw cw
+        ldmxcsr mxcsr
+        fld1
+    }
+}
+
+static void record_event(
+    U tag,
+    U arg0 = 0u,
+    U arg1 = 0u,
+    U arg2 = 0u,
+    U arg3 = 0u,
+    U arg4 = 0u,
+    U arg5 = 0u) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    e.arg3 = arg3;
+    e.arg4 = arg4;
+    e.arg5 = arg5;
+    capture_state(e.state);
+}
+
+static std::uint32_t __stdcall mock_previous_handler(
+    void* configuration,
+    void* hwnd,
+    std::uint32_t message,
+    std::uint32_t wparam,
+    std::int32_t lparam,
+    std::int32_t* result) {
+    record_event(
+        kEvPreviousHandler,
+        address(configuration),
+        address(hwnd),
+        message,
+        wparam,
+        static_cast<U>(lparam),
+        address(result));
+    if (cfg_prev_sets_result && result != nullptr) {
+        *result = cfg_prev_result_val;
+    }
+    return cfg_prev_ret;
+}
+
+namespace porsche {
+
+std::uint8_t startup_service_active_0069dd1e = 0u;
+void* game_setup_movie_service_0069ed0c = nullptr;
+std::uint8_t& frame_pump_byte_006573e0 = test_frame_pump_storage_bytes()[0x28u];
+std::uint8_t& frame_pump_byte_006573e1 = test_frame_pump_storage_bytes()[0x29u];
+std::uint8_t& frame_pump_byte_006573e2 = test_frame_pump_storage_bytes()[0x2au];
+
+std::uint8_t* frame_pump_storage_bytes_006573b8() noexcept {
+    return test_frame_pump_storage_bytes();
+}
+
+void* __cdecl startup_window_handle_00557460() {
+    record_event(kEvWindowHandle, cfg_hwnd_ret);
+    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(cfg_hwnd_ret));
+}
+
+std::int32_t __stdcall render_window_show_cursor(std::int32_t show) {
+    if (show == 0) {
+        --cfg_cursor_count;
+    } else {
+        ++cfg_cursor_count;
+    }
+    record_event(kEvShowCursor, static_cast<U>(show), static_cast<U>(cfg_cursor_count));
+    return cfg_cursor_count;
+}
+
+void __cdecl frame_pump_boundary_005360a0(void* self, std::uint32_t one) {
+    record_event(kEvFrameBoundary5360a0, address(self), one);
+}
+
+} // namespace porsche
+
+static void __fastcall orig_call_005360a0(void* self, void*, std::uint32_t one) {
+    porsche::frame_pump_boundary_005360a0(self, one);
+}
+
+static U invoke_call(
+    void* fn,
+    U ecx_arg,
+    const U* args,
+    U argc,
+    bool is_stdcall,
+    U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    const U cleanup = is_stdcall ? 0u : (argc * 4u);
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, argc
+        mov edx, args
+    push_loop:
+        test eax, eax
+        jz pushed
+        dec eax
+        push dword ptr [edx + eax * 4]
+        jmp push_loop
+    pushed:
+        mov eax, 0cafe1234h
+        mov ecx, ecx_arg
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        add esp, cleanup
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && slot[off - 1u] == 0xe8u, "exact relative call opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    // Assert production initial state before fixture resets.
+    require(porsche::startup_service_active_0069dd1e == 0u, "initial 0069dd1e");
+    require(porsche::game_setup_movie_service_0069ed0c == nullptr, "initial 0069ed0c");
+    require(porsche::frame_pump_byte_006573e0 == 0u, "initial 006573e0");
+    require(porsche::frame_pump_byte_006573e1 == 0u, "initial 006573e1");
+    require(porsche::frame_pump_byte_006573e2 == 0u, "initial 006573e2");
+    require(test_frame_pump_storage_bytes()[0x2bu] == 0u, "initial 006573e3");
+    require(word(test_frame_pump_storage_bytes() + 0x24u) == 0u, "initial 006573dc");
+
+    iat_show_cursor = reinterpret_cast<const void*>(&porsche::render_window_show_cursor);
+
+    static const B body_5360d0[] = {@BODY_005360D0@};
+    static const B body_4b0ee0[] = {@BODY_004B0EE0@};
+    require(sizeof body_5360d0 == 6u, "6-byte original body 005360d0");
+    require(sizeof body_4b0ee0 == 186u, "186-byte original body 004b0ee0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_5360d0 = code + 0x000u;
+    slot_4b0ee0 = code + 0x040u;
+
+    std::memcpy(slot_5360d0, body_5360d0, sizeof body_5360d0);
+    std::memcpy(slot_4b0ee0, body_4b0ee0, sizeof body_4b0ee0);
+
+    // Relocate 005360d0 (1 relocation).
+    relocate_abs32(slot_5360d0, 0x001u, 0x0069dd1eu, address(&porsche::startup_service_active_0069dd1e));
+
+    // Relocate 004b0ee0 (12 relocations).
+    B* const storage_bytes = test_frame_pump_storage_bytes();
+    relocate_rel32(slot_4b0ee0, 0x004b0ee0u, 0x010u, 0x00557460u,
+                   reinterpret_cast<const void*>(&porsche::startup_window_handle_00557460));
+    relocate_abs32(slot_4b0ee0, 0x026u, 0x006573e0u, address(&porsche::frame_pump_byte_006573e0));
+    relocate_abs32(slot_4b0ee0, 0x02du, 0x005b2278u, address(&iat_show_cursor));
+    relocate_abs32(slot_4b0ee0, 0x044u, 0x006573e0u, address(&porsche::frame_pump_byte_006573e0));
+    relocate_abs32(slot_4b0ee0, 0x04du, 0x0069ed0cu, address(&porsche::game_setup_movie_service_0069ed0c));
+    relocate_rel32(slot_4b0ee0, 0x004b0ee0u, 0x05fu, 0x005360d0u, slot_5360d0);
+    relocate_abs32(slot_4b0ee0, 0x064u, 0x006573e3u, address(storage_bytes + 0x2bu));
+    relocate_rel32(slot_4b0ee0, 0x004b0ee0u, 0x06du, 0x005360a0u,
+                   reinterpret_cast<const void*>(&orig_call_005360a0));
+    relocate_abs32(slot_4b0ee0, 0x074u, 0x006573e0u, address(&porsche::frame_pump_byte_006573e0));
+    relocate_abs32(slot_4b0ee0, 0x079u, 0x006573e1u, address(&porsche::frame_pump_byte_006573e1));
+    relocate_abs32(slot_4b0ee0, 0x07fu, 0x006573e2u, address(&porsche::frame_pump_byte_006573e2));
+    relocate_abs32(slot_4b0ee0, 0x090u, 0x006573dcu, address(storage_bytes + 0x24u));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+struct CaseConfig {
+    B service_active_69dd1e;
+    bool use_movie_service;
+    U movie_frame_object;
+    U prev_handler_6573dc;
+    B byte_6573e0;
+    B byte_6573e1;
+    B byte_6573e2;
+    B byte_6573e3;
+    std::int32_t initial_result;
+    U hwnd_ret;
+    std::int32_t cursor_count;
+    U prev_ret;
+    bool prev_sets_result;
+    std::int32_t prev_result_val;
+};
+
+static void apply_config(const CaseConfig& cfg) {
+    std::memset(test_frame_pump_storage.data(), 0, sizeof(test_frame_pump_storage));
+    B* const bytes = test_frame_pump_storage_bytes();
+    put(bytes, 0x24u, cfg.prev_handler_6573dc);
+    porsche::frame_pump_byte_006573e0 = cfg.byte_6573e0;
+    porsche::frame_pump_byte_006573e1 = cfg.byte_6573e1;
+    porsche::frame_pump_byte_006573e2 = cfg.byte_6573e2;
+    bytes[0x2bu] = cfg.byte_6573e3;
+
+    porsche::startup_service_active_0069dd1e = cfg.service_active_69dd1e;
+    test_movie_service.base = nullptr;
+    test_movie_service.frame_object = reinterpret_cast<void*>(
+        static_cast<std::uintptr_t>(cfg.movie_frame_object));
+    porsche::game_setup_movie_service_0069ed0c = cfg.use_movie_service ? &test_movie_service : nullptr;
+
+    test_result_slot = cfg.initial_result;
+    cfg_hwnd_ret = cfg.hwnd_ret;
+    cfg_cursor_count = cfg.cursor_count;
+    cfg_prev_ret = cfg.prev_ret;
+    cfg_prev_sets_result = cfg.prev_sets_result;
+    cfg_prev_result_val = cfg.prev_result_val;
+}
+
+static void compare_traces(ReturnCheck ret_check) {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    if (ret_check == kRetNone) {
+        trace.ret_eax = 0u;
+        expected.ret_eax = 0u;
+    } else if (ret_check == kRetByte) {
+        trace.ret_eax &= 0xffu;
+        expected.ret_eax &= 0xffu;
+    }
+    require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0,
+                "event mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0,
+            "x87/MXCSR state mismatch");
+}
+
+static void run_pair(
+    void* orig_fn,
+    void* cpp_fn,
+    U ecx_arg,
+    const U* args,
+    U argc,
+    bool is_stdcall,
+    ReturnCheck ret_check,
+    const CaseConfig& cfg) {
+    ++cases;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_call(orig_fn, ecx_arg, args, argc, is_stdcall, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_call(cpp_fn, ecx_arg, args, argc, is_stdcall, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    events_total += trace.count;
+    compare_traces(ret_check);
+}
+
+static void run_callback(
+    void* configuration,
+    void* hwnd,
+    U message,
+    U wparam,
+    std::int32_t lparam,
+    std::int32_t* result,
+    const CaseConfig& cfg) {
+    const U args[6] = {
+        address(configuration),
+        address(hwnd),
+        message,
+        wparam,
+        static_cast<U>(lparam),
+        address(result),
+    };
+    run_pair(
+        slot_4b0ee0,
+        reinterpret_cast<void*>(&porsche::render_display_activate_callback_004b0ee0),
+        0x01234567u,
+        args,
+        6u,
+        true,
+        kRetU32,
+        cfg);
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    // 1. Direct checks for 005360d0 (startup_service_active_get_005360d0, fastcall1/thiscall uint8_t).
+    {
+        CaseConfig cfg{};
+        for (B val : {B{0u}, B{1u}, B{0xa5u}}) {
+            cfg.service_active_69dd1e = val;
+            const U self_arg = (val == 0u) ? 0u : address(&test_dummy_frame_obj);
+            run_pair(
+                slot_5360d0,
+                reinterpret_cast<void*>(&porsche::startup_service_active_get_005360d0),
+                self_arg,
+                nullptr,
+                0u,
+                true,
+                kRetByte,
+                cfg);
+        }
+    }
+
+    // 2. Direct checks for 004b0ee0 (render_display_activate_callback_004b0ee0, stdcall6 uint32_t).
+    const U prev_fn = address(reinterpret_cast<const void*>(&mock_previous_handler));
+
+    // 2a. configuration == nullptr: skips startup_window_handle_00557460, sets *result = 0, returns 0 when no prev handler.
+    {
+        CaseConfig cfg{};
+        cfg.byte_6573e0 = 1u;
+        cfg.byte_6573e1 = 0x22u;
+        cfg.byte_6573e2 = 0x33u;
+        cfg.byte_6573e3 = 0x44u;
+        cfg.initial_result = static_cast<std::int32_t>(0xdeadbeefu);
+        cfg.hwnd_ret = address(&test_dummy_hwnd);
+        cfg.prev_handler_6573dc = 0u;
+        run_callback(nullptr, &test_dummy_hwnd, 0x1cu, 1u, -7, &test_result_slot, cfg);
+    }
+
+    // 2b. configuration != nullptr, hwnd mismatch: calls startup_window_handle_00557460, skips state change, forwards to prev handler.
+    {
+        CaseConfig cfg{};
+        cfg.byte_6573e0 = 0u;
+        cfg.byte_6573e1 = 0x11u;
+        cfg.byte_6573e2 = 0x22u;
+        cfg.byte_6573e3 = 0x33u;
+        cfg.initial_result = 77;
+        cfg.hwnd_ret = address(&test_dummy_hwnd);
+        cfg.prev_handler_6573dc = prev_fn;
+        cfg.prev_ret = 0x13572468u;
+        run_callback(&test_dummy_config, &test_dummy_hwnd_other, 0x1cu, 0u, 123, &test_result_slot, cfg);
+    }
+
+    // 2c. configuration != nullptr, hwnd == nullptr and startup_window_handle_00557460() == nullptr:
+    //     calls startup_window_handle_00557460, fails non-null hwnd guard, writes *result = 0, returns 0.
+    {
+        CaseConfig cfg{};
+        cfg.byte_6573e0 = 0u;
+        cfg.initial_result = -1;
+        cfg.hwnd_ret = 0u;
+        cfg.prev_handler_6573dc = 0u;
+        run_callback(&test_dummy_config, nullptr, 0x1cu, 1u, 0, &test_result_slot, cfg);
+    }
+
+    // 2d. Activating (wparam != 0): clears 006573e0, loops ShowCursor(0) while >= 0, writes *result = 0, forwards.
+    for (std::int32_t init_cursor : {0, 1, 3}) {
+        CaseConfig cfg{};
+        cfg.byte_6573e0 = 1u;
+        cfg.byte_6573e1 = 0x55u;
+        cfg.byte_6573e2 = 0x66u;
+        cfg.byte_6573e3 = 0x77u;
+        cfg.initial_result = 999;
+        cfg.hwnd_ret = address(&test_dummy_hwnd);
+        cfg.cursor_count = init_cursor;
+        cfg.prev_handler_6573dc = prev_fn;
+        cfg.prev_ret = 0x24681357u;
+        cfg.prev_sets_result = (init_cursor == 3);
+        cfg.prev_result_val = static_cast<std::int32_t>(0x55667788u);
+        const U wparam = (init_cursor == 3) ? 0x80000001u : 1u;
+        run_callback(&test_dummy_config, &test_dummy_hwnd, 0x1cu, wparam, 42, &test_result_slot, cfg);
+    }
+
+    // 2e. Deactivating (wparam == 0) when 006573e0 != 0: skips movie service and flag writes.
+    {
+        CaseConfig cfg{};
+        cfg.service_active_69dd1e = 1u;
+        cfg.use_movie_service = true;
+        cfg.movie_frame_object = address(&test_dummy_frame_obj);
+        cfg.byte_6573e0 = 1u;
+        cfg.byte_6573e1 = 0x55u;
+        cfg.byte_6573e2 = 0x66u;
+        cfg.byte_6573e3 = 0x77u;
+        cfg.initial_result = 12345;
+        cfg.hwnd_ret = address(&test_dummy_hwnd);
+        cfg.prev_handler_6573dc = prev_fn;
+        cfg.prev_ret = 0x99887766u;
+        run_callback(&test_dummy_config, &test_dummy_hwnd, 0x1cu, 0u, 0, &test_result_slot, cfg);
+    }
+
+    // 2f. Deactivating (wparam == 0, 006573e0 == 0), game_setup_movie_service_0069ed0c == nullptr:
+    //     skips 005360d0/005360a0, preserves 006573e3, sets 006573e0=1, 006573e1=1, 006573e2=0.
+    {
+        CaseConfig cfg{};
+        cfg.use_movie_service = false;
+        cfg.byte_6573e0 = 0u;
+        cfg.byte_6573e1 = 0u;
+        cfg.byte_6573e2 = 1u;
+        cfg.byte_6573e3 = 0x3au;
+        cfg.initial_result = -99;
+        cfg.hwnd_ret = address(&test_dummy_hwnd);
+        cfg.prev_handler_6573dc = 0u;
+        run_callback(&test_dummy_config, &test_dummy_hwnd, 0x1cu, 0u, -1, &test_result_slot, cfg);
+    }
+
+    // 2g. Deactivating (wparam == 0, 006573e0 == 0), movie service non-null but frame_object == nullptr:
+    //     skips 005360d0/005360a0, preserves 006573e3, sets 006573e0=1, 006573e1=1, 006573e2=0.
+    {
+        CaseConfig cfg{};
+        cfg.use_movie_service = true;
+        cfg.movie_frame_object = 0u;
+        cfg.byte_6573e0 = 0u;
+        cfg.byte_6573e1 = 0u;
+        cfg.byte_6573e2 = 1u;
+        cfg.byte_6573e3 = 0x4bu;
+        cfg.initial_result = 777;
+        cfg.hwnd_ret = address(&test_dummy_hwnd);
+        cfg.prev_handler_6573dc = prev_fn;
+        cfg.prev_ret = 0x11112222u;
+        run_callback(&test_dummy_config, &test_dummy_hwnd, 0x1cu, 0u, 88, &test_result_slot, cfg);
+    }
+
+    // 2h. Deactivating (wparam == 0, 006573e0 == 0), movie service + frame_object non-null:
+    //     reads 0069dd1e via 005360d0 into 006573e3, calls 005360a0(frame_object, 0),
+    //     sets 006573e0=1, 006573e1=1, 006573e2=0, clears *result=0, forwards.
+    for (B active_val : {B{0u}, B{1u}, B{0xa5u}}) {
+        CaseConfig cfg{};
+        cfg.service_active_69dd1e = active_val;
+        cfg.use_movie_service = true;
+        cfg.movie_frame_object = address(&test_dummy_frame_obj);
+        cfg.byte_6573e0 = 0u;
+        cfg.byte_6573e1 = 0u;
+        cfg.byte_6573e2 = 1u;
+        cfg.byte_6573e3 = 0x5cu;
+        cfg.initial_result = static_cast<std::int32_t>(0xcafebabeu);
+        cfg.hwnd_ret = address(&test_dummy_hwnd);
+        cfg.prev_handler_6573dc = (active_val == 0u) ? 0u : prev_fn;
+        cfg.prev_ret = 0xfeedfaceu;
+        run_callback(&test_dummy_config, &test_dummy_hwnd, 0x1cu, 0u, -4096, &test_result_slot, cfg);
+    }
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("render_display_activate_callback_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

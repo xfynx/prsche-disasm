@@ -1,0 +1,126 @@
+{
+  "run": 634,
+  "experiment": "local/experiments/v2-async-pool-shutdown-634",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown",
+    "iterations/v2/001-original-recovery/runs/372-async-callbacks",
+    "iterations/v2/001-original-recovery/runs/361-startup-device-pool",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/original-index-supplement.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00592590",
+      "bytes": 63,
+      "sha256": "30406284f379cf9102f60a0a38b2afe6e7cf2d974b69992ac918dcd998cb2322",
+      "token": "@BODY_00592590@"
+    },
+    {
+      "va": "00567cf0",
+      "bytes": 207,
+      "sha256": "f805890daf0a698729cac0fbd03d9424f95ea9c30ee6f4ec0929b9a238f6b903",
+      "token": "@BODY_00567CF0@"
+    },
+    {
+      "va": "00567dc0",
+      "bytes": 40,
+      "sha256": "9f6977ba445a511b2cb59be9582856ca9b6a6e8acd52655ebe84cb6ad97aad77",
+      "token": "@JUMPTABLE_00567DC0@"
+    },
+    {
+      "va": "00564750",
+      "bytes": 61,
+      "sha256": "46d3223f870f6f715239e362090199e1986c018613281110e53325865c521c2b",
+      "token": "@BODY_00564750@"
+    },
+    {
+      "va": "00564700",
+      "bytes": 70,
+      "sha256": "f541725d0cb1a6a3d9adb9234310797f9181ff7141f9c0f358eaafce9efae0be",
+      "token": "@BODY_00564700@"
+    },
+    {
+      "va": "00563d30",
+      "bytes": 222,
+      "sha256": "6cc7c7a6e7cfa89af46daddfc60efa1169c8ec4746711eba5164add41d2c3069",
+      "token": "@BODY_00563D30@"
+    }
+  ],
+  "pass_marker": "async_pool_shutdown_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-physical-padding-offset",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "old": "            const std::uint32_t previous = file->padding[0];\n            if (previous != 0u) {\n                file->padding[0] = 0u;\n            }",
+      "new": "            const std::uint32_t previous = file->padding[1];\n            if (previous != 0u) {\n                file->padding[1] = 0u;\n            }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-physical-error-code",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "old": "    platform_disk_set_last_error(6u);",
+      "new": "    platform_disk_set_last_error(5u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-cancel-type-case2",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "old": "            if (dev->current == op) {",
+      "new": "            if (dev->current != op) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-cancel-callback-flag",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "old": "                    op->flags |= 8u;",
+      "new": "                    op->flags |= 4u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-resolve-signed-handle",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "old": "    if (static_cast<std::int32_t>(handle) < 0x100 ||",
+      "new": "    if (handle < 0x100u ||",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-finalize-guard",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "old": "        if (op == 0u && slot[5] == 0u) {",
+      "new": "        if (op == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-shutdown-close-mode",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "old": "        (void)close_00533da0(\n            reinterpret_cast<void*>(static_cast<std::uintptr_t>(async_pool_active_006a5be4)),\n            0x64u);",
+      "new": "        (void)close_00533da0(\n            reinterpret_cast<void*>(static_cast<std::uintptr_t>(async_pool_active_006a5be4)),\n            0x63u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-shutdown-thread-pump",
+      "source": "iterations/v2/001-original-recovery/runs/634-async-pool-shutdown/async_pool_shutdown_634.cpp",
+      "old": "        if (file_current_thread_0055f780(0u) != 0) {",
+      "new": "        if (file_current_thread_0055f780(0u) == 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

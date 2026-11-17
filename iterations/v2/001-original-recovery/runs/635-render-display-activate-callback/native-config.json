@@ -1,0 +1,101 @@
+{
+  "run": 635,
+  "experiment": "local/experiments/v2-render-display-activate-callback-635",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback",
+    "iterations/v2/001-original-recovery/runs/632-render-display-finish-init",
+    "iterations/v2/001-original-recovery/runs/570-startup-service-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005360d0",
+      "bytes": 6,
+      "sha256": "365a3085ba2da542e58e4a06bb523c0027d1ef57cbe9268513bef59b0b270d72",
+      "token": "@BODY_005360D0@"
+    },
+    {
+      "va": "004b0ee0",
+      "bytes": 186,
+      "sha256": "39f05a07399f92bf4a5647dfba824687a43da9516c7d561d0633021c8163caf5",
+      "token": "@BODY_004B0EE0@"
+    }
+  ],
+  "pass_marker": "render_display_activate_callback_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-active-getter-value",
+      "source": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp",
+      "old": "    return startup_service_active_0069dd1e;",
+      "new": "    return static_cast<std::uint8_t>(startup_service_active_0069dd1e ^ 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-config-null-guard",
+      "source": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp",
+      "old": "    if (configuration != nullptr && startup_window_handle_00557460() == hwnd && hwnd != nullptr) {",
+      "new": "    if (configuration == nullptr && startup_window_handle_00557460() == hwnd && hwnd != nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-hwnd-match-guard",
+      "source": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp",
+      "old": "    if (configuration != nullptr && startup_window_handle_00557460() == hwnd && hwnd != nullptr) {",
+      "new": "    if (configuration != nullptr && startup_window_handle_00557460() != hwnd && hwnd != nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-show-cursor-loop-bound",
+      "source": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp",
+      "old": "            while (render_window_show_cursor(0) >= 0) {",
+      "new": "            while (render_window_show_cursor(0) > 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-inactive-guard-byte",
+      "source": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp",
+      "old": "        } else if (frame_pump_byte_006573e0 == 0u) {",
+      "new": "        } else if (frame_pump_byte_006573e0 != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-movie-service-deactivation",
+      "source": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp",
+      "old": "                if (frame_object != nullptr) {",
+      "new": "                if (frame_object == nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-result-zero-write",
+      "source": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp",
+      "old": "    *result = 0;",
+      "new": "    *result = 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-previous-handler-forward",
+      "source": "iterations/v2/001-original-recovery/runs/635-render-display-activate-callback/render_display_activate_callback_635.cpp",
+      "old": "    if (previous_handler != nullptr) {",
+      "new": "    if (previous_handler == nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

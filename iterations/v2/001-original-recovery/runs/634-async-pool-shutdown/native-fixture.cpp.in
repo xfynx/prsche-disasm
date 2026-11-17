@@ -1,0 +1,833 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "async_pool_shutdown_634.hpp"
+#include "../361-startup-device-pool/startup_pool.hpp"
+#include "../372-async-callbacks/async_callbacks.hpp"
+#include "porsche/application_main.hpp"
+#include "porsche/fe_stream.hpp"
+#include "porsche/file_disk.hpp"
+#include "porsche/file_wait.hpp"
+#include "porsche/file_worker.hpp"
+#include "porsche/files.hpp"
+#include "porsche/heap_locks.hpp"
+#include "porsche/window_scheduler.hpp"
+
+using U = std::uint32_t;
+using S = std::int32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void put(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+enum : U {
+    kMaxEvents = 32u,
+    kTrackedDevices = 4u,
+    kTrackedOps = 4u,
+    kTrackedPhys = 4u,
+    kPoolSlots = 4u,
+};
+
+enum EventTag : U {
+    kEvSetLastError = 1u,
+    kEvIoLock = 2u,
+    kEvIoUnlock = 3u,
+    kEvOpFind = 4u,
+    kEvIoRemove = 5u,
+    kEvIoPrepend = 6u,
+    kEvOpCallback = 7u,
+    kEvAsyncAction = 8u,
+    kEvCurrentThread = 9u,
+    kEvFilePump = 10u,
+    kEvFileSleep = 11u,
+    kEvClose = 12u,
+    kEvSchedRemove = 13u,
+    kEvPoolCallback = 14u,
+    kEvLockDestroy = 15u,
+    kEvFree = 16u,
+};
+
+static porsche::PhysicalFile mock_phys[kTrackedPhys]{};
+static porsche::FileDevice mock_devices[32]{};
+static porsche::FileOperation mock_ops[kTrackedOps]{};
+alignas(16) static U mock_pool[kPoolSlots][11]{};
+
+struct StateSnapshot {
+    U phys_ptr;
+    S phys_count;
+    porsche::PhysicalFile phys[kTrackedPhys];
+    U devices_ptr;
+    porsche::FileDevice devices[kTrackedDevices];
+    porsche::FileOperation ops[kTrackedOps];
+    U pool_base;
+    U pool_capacity;
+    U pool_active;
+    U pool_lock;
+    U pool[kPoolSlots][11];
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    StateSnapshot state;
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U events_total = 0u;
+
+alignas(16) static B floating[512];
+static B* code = nullptr;
+static B* slot_592590 = nullptr;
+static B* slot_567cf0 = nullptr;
+static B* jt_567dc0 = nullptr;
+static B* slot_564750 = nullptr;
+static B* slot_564700 = nullptr;
+static B* slot_563d30 = nullptr;
+
+static U cfg_lock_token = 0u;
+static porsche::FileOperation* cfg_find_op = nullptr;
+static S cfg_find_state = 0;
+static U cfg_remove_ret = 0u;
+static U cfg_thread_ret_seq[4]{};
+static U cfg_thread_idx = 0u;
+static U cfg_sleep_clear_step = 0u;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    s.phys_ptr = address(porsche::physical_files_006af084);
+    s.phys_count = porsche::physical_count_006af080;
+    std::memcpy(s.phys, mock_phys, sizeof s.phys);
+    s.devices_ptr = address(porsche::devices_006a5c7c);
+    std::memcpy(s.devices, mock_devices, sizeof s.devices);
+    std::memcpy(s.ops, mock_ops, sizeof s.ops);
+    s.pool_base = address(porsche::async_pool_base_006a5bc0);
+    s.pool_capacity = porsche::async_pool_capacity_006a5be0;
+    s.pool_active = porsche::async_pool_active_006a5be4;
+    s.pool_lock = address(porsche::async_pool_lock_006a5be8);
+    std::memcpy(s.pool, mock_pool, sizeof s.pool);
+}
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = 0x027fu;
+    U mxcsr = 0x9f80u;
+    __asm {
+        fninit
+        fldcw cw
+        ldmxcsr mxcsr
+        fld1
+    }
+}
+
+static void record_event(U tag, U arg0 = 0u, U arg1 = 0u, U arg2 = 0u) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    capture_state(e.state);
+}
+
+static void __stdcall mock_set_last_error(U err) {
+    record_event(kEvSetLastError, err, 0u, 0u);
+}
+
+static void __cdecl mock_op_callback(U id, S status, void* context) {
+    record_event(kEvOpCallback, id, static_cast<U>(status), address(context));
+}
+
+namespace porsche {
+
+PhysicalFile* physical_files_006af084 = nullptr;
+std::int32_t physical_count_006af080 = 0;
+FileDevice* devices_006a5c7c = nullptr;
+DiskSetLastError platform_disk_set_last_error = &mock_set_last_error;
+
+void* async_pool_base_006a5bc0 = nullptr;
+std::uint32_t async_pool_capacity_006a5be0 = 0u;
+std::uint32_t async_pool_active_006a5be4 = 0u;
+void* async_pool_lock_006a5be8 = nullptr;
+
+std::uint32_t __cdecl io_lock_00580ea0(IoList* list) {
+    record_event(kEvIoLock, address(list), cfg_lock_token, 0u);
+    return cfg_lock_token;
+}
+
+void __cdecl io_unlock_00580ec0(IoList* list, std::uint32_t token) {
+    record_event(kEvIoUnlock, address(list), token, 0u);
+}
+
+FileOperation* __cdecl operation_find_00567b80(FileDevice* dev, std::uint32_t id, std::int32_t* state) {
+    if (state != nullptr) {
+        *state = cfg_find_state;
+    }
+    record_event(kEvOpFind, address(dev), id, static_cast<U>(cfg_find_state));
+    return cfg_find_op;
+}
+
+std::uint32_t __cdecl io_locked_remove_005808f0(IoList* list, IoNode* node) {
+    record_event(kEvIoRemove, address(list), address(node), cfg_remove_ret);
+    return cfg_remove_ret;
+}
+
+void __cdecl io_prepend_005806e0(IoList* list, IoNode* node) {
+    record_event(kEvIoPrepend, address(list), address(node), 0u);
+}
+
+void __cdecl async_dispatch_00563cc0(std::uint32_t* record) {
+    record_event(kEvAsyncAction, address(record), 0u, 0u);
+}
+
+std::int32_t __cdecl file_current_thread_0055f780(std::uint32_t identity) {
+    const U ret = cfg_thread_ret_seq[cfg_thread_idx < 4u ? cfg_thread_idx++ : 3u];
+    record_event(kEvCurrentThread, identity, ret, 0u);
+    return static_cast<S>(ret);
+}
+
+std::uint32_t __cdecl file_pump_005366e0(std::uint32_t arg) {
+    record_event(kEvFilePump, arg, 0u, 0u);
+    return 0u;
+}
+
+std::uint32_t __cdecl file_sleep_0055f740(std::uint32_t ms) {
+    record_event(kEvFileSleep, ms, cfg_sleep_clear_step, 0u);
+    if (cfg_sleep_clear_step == 0u) {
+        mock_pool[0][6] = 0u;
+    } else if (cfg_sleep_clear_step == 1u) {
+        mock_pool[2][6] = 0u;
+    }
+    ++cfg_sleep_clear_step;
+    return 0u;
+}
+
+std::uint32_t __cdecl close_00533da0(void* handle, std::uint32_t group) {
+    record_event(kEvClose, address(handle), group, 0u);
+    return 1u;
+}
+
+TimedCallbackSlot* __cdecl window_scheduler_remove_005366a0(TimedCallback callback) {
+    record_event(kEvSchedRemove, address(reinterpret_cast<const void*>(callback)), 0u, 0u);
+    return nullptr;
+}
+
+std::uint32_t __cdecl async_pool_callback_00563bd0(std::uint32_t a, std::uint32_t b) {
+    record_event(kEvPoolCallback, a, b, 0u);
+    return 0u;
+}
+
+void __cdecl heap_lock_destroy_005322d0(void* lock) {
+    record_event(kEvLockDestroy, address(lock), 0u, 0u);
+}
+
+std::uint32_t __cdecl free_00531f90(void* ptr) {
+    record_event(kEvFree, address(ptr), 0u, 0u);
+    return 0u;
+}
+
+} // namespace porsche
+
+static U invoke_fn(void* fn, const U* args, U argc, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    const U cleanup = argc * 4u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, argc
+        mov edx, args
+    push_loop:
+        test eax, eax
+        jz pushed
+        dec eax
+        push dword ptr [edx + eax * 4]
+        jmp push_loop
+    pushed:
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        add esp, cleanup
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && slot[off - 1u] == 0xe8u, "exact relative call opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B body_592590[] = {@BODY_00592590@};
+    static const B body_567cf0[] = {@BODY_00567CF0@};
+    static const B jt_567dc0_raw[] = {@JUMPTABLE_00567DC0@};
+    static const B body_564750[] = {@BODY_00564750@};
+    static const B body_564700[] = {@BODY_00564700@};
+    static const B body_563d30[] = {@BODY_00563D30@};
+
+    require(sizeof body_592590 == 63u, "63-byte original body 00592590");
+    require(sizeof body_567cf0 == 207u, "207-byte original body 00567cf0");
+    require(sizeof jt_567dc0_raw == 40u, "40-byte original jump table 00567dc0");
+    require(sizeof body_564750 == 61u, "61-byte original body 00564750");
+    require(sizeof body_564700 == 70u, "70-byte original body 00564700");
+    require(sizeof body_563d30 == 222u, "222-byte original body 00563d30");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_592590 = code + 0x000u;
+    slot_567cf0 = code + 0x060u;
+    jt_567dc0   = code + 0x160u;
+    slot_564750 = code + 0x1a0u;
+    slot_564700 = code + 0x200u;
+    slot_563d30 = code + 0x260u;
+
+    std::memcpy(slot_592590, body_592590, sizeof body_592590);
+    std::memcpy(slot_567cf0, body_567cf0, sizeof body_567cf0);
+    std::memcpy(jt_567dc0, jt_567dc0_raw, sizeof jt_567dc0_raw);
+    std::memcpy(slot_564750, body_564750, sizeof body_564750);
+    std::memcpy(slot_564700, body_564700, sizeof body_564700);
+    std::memcpy(slot_563d30, body_563d30, sizeof body_563d30);
+
+    // Relocate 00592590 (3 relocations).
+    relocate_abs32(slot_592590, 0x002u, 0x006af084u, address(&porsche::physical_files_006af084));
+    relocate_abs32(slot_592590, 0x016u, 0x006af080u, address(&porsche::physical_count_006af080));
+    relocate_abs32(slot_592590, 0x038u, 0x005b21a4u, address(&porsche::platform_disk_set_last_error));
+
+    // Relocate 00567dc0 jump table (10 entries).
+    for (U i = 0u; i < 10u; ++i) {
+        const U target_va = word(jt_567dc0, i * 4u);
+        require(target_va >= 0x00567cf0u && target_va <= 0x00567dbeu, "jump table target in 00567cf0");
+        put(jt_567dc0, i * 4u, address(slot_567cf0 + (target_va - 0x00567cf0u)));
+    }
+
+    // Relocate 00567cf0 (8 relocations).
+    relocate_abs32(slot_567cf0, 0x00bu, 0x006a5c7cu, address(&porsche::devices_006a5c7c));
+    relocate_rel32(slot_567cf0, 0x00567cf0u, 0x02au, 0x00580ea0u,
+                   reinterpret_cast<const void*>(&porsche::io_lock_00580ea0));
+    relocate_rel32(slot_567cf0, 0x00567cf0u, 0x03fu, 0x00567b80u,
+                   reinterpret_cast<const void*>(&porsche::operation_find_00567b80));
+    relocate_abs32(slot_567cf0, 0x05fu, 0x00567dc0u, address(jt_567dc0));
+    relocate_rel32(slot_567cf0, 0x00567cf0u, 0x06du, 0x00592590u, slot_592590);
+    relocate_rel32(slot_567cf0, 0x00567cf0u, 0x082u, 0x005808f0u,
+                   reinterpret_cast<const void*>(&porsche::io_locked_remove_005808f0));
+    relocate_rel32(slot_567cf0, 0x00567cf0u, 0x093u, 0x005806e0u,
+                   reinterpret_cast<const void*>(&porsche::io_prepend_005806e0));
+    relocate_rel32(slot_567cf0, 0x00567cf0u, 0x0c4u, 0x00580ec0u,
+                   reinterpret_cast<const void*>(&porsche::io_unlock_00580ec0));
+
+    // Relocate 00564750 (2 relocations).
+    relocate_abs32(slot_564750, 0x015u, 0x006a5be0u, address(&porsche::async_pool_capacity_006a5be0));
+    relocate_abs32(slot_564750, 0x024u, 0x006a5bc0u, address(&porsche::async_pool_base_006a5bc0));
+
+    // Relocate 00564700 (3 relocations).
+    relocate_rel32(slot_564700, 0x00564700u, 0x007u, 0x00564750u, slot_564750);
+    relocate_rel32(slot_564700, 0x00564700u, 0x028u, 0x00567cf0u, slot_567cf0);
+    relocate_rel32(slot_564700, 0x00564700u, 0x03du, 0x00563cc0u,
+                   reinterpret_cast<const void*>(&porsche::async_dispatch_00563cc0));
+
+    // Relocate 00563d30 (21 relocations).
+    const U base_addr = address(&porsche::async_pool_base_006a5bc0);
+    const U cap_addr = address(&porsche::async_pool_capacity_006a5be0);
+    const U active_addr = address(&porsche::async_pool_active_006a5be4);
+    const U lock_addr = address(&porsche::async_pool_lock_006a5be8);
+    const void* const cb_addr = reinterpret_cast<const void*>(&porsche::async_pool_callback_00563bd0);
+
+    relocate_abs32(slot_563d30, 0x001u, 0x006a5bc0u, base_addr);
+    relocate_abs32(slot_563d30, 0x00eu, 0x006a5be0u, cap_addr);
+    relocate_abs32(slot_563d30, 0x01du, 0x006a5bc0u, base_addr);
+    relocate_rel32(slot_563d30, 0x00563d30u, 0x026u, 0x00564700u, slot_564700);
+    relocate_abs32(slot_563d30, 0x02bu, 0x006a5be0u, cap_addr);
+    relocate_abs32(slot_563d30, 0x043u, 0x006a5bc0u, base_addr);
+    relocate_rel32(slot_563d30, 0x00563d30u, 0x061u, 0x0055f780u,
+                   reinterpret_cast<const void*>(&porsche::file_current_thread_0055f780));
+    relocate_rel32(slot_563d30, 0x00563d30u, 0x06fu, 0x005366e0u,
+                   reinterpret_cast<const void*>(&porsche::file_pump_005366e0));
+    relocate_rel32(slot_563d30, 0x00563d30u, 0x079u, 0x0055f740u,
+                   reinterpret_cast<const void*>(&porsche::file_sleep_0055f740));
+    relocate_abs32(slot_563d30, 0x07eu, 0x006a5be0u, cap_addr);
+    relocate_abs32(slot_563d30, 0x088u, 0x006a5be4u, active_addr);
+    relocate_rel32(slot_563d30, 0x00563d30u, 0x095u, 0x00533da0u,
+                   reinterpret_cast<const void*>(&porsche::close_00533da0));
+    relocate_abs32(slot_563d30, 0x09eu, 0x006a5be4u, active_addr);
+    relocate_abs32(slot_563d30, 0x0a7u, 0x00563bd0u, address(cb_addr));
+    relocate_rel32(slot_563d30, 0x00563d30u, 0x0acu, 0x005366a0u,
+                   reinterpret_cast<const void*>(&porsche::window_scheduler_remove_005366a0));
+    relocate_rel32(slot_563d30, 0x00563d30u, 0x0b5u, 0x00563bd0u, cb_addr);
+    relocate_abs32(slot_563d30, 0x0bbu, 0x006a5be8u, lock_addr);
+    relocate_rel32(slot_563d30, 0x00563d30u, 0x0c1u, 0x005322d0u,
+                   reinterpret_cast<const void*>(&porsche::heap_lock_destroy_005322d0));
+    relocate_abs32(slot_563d30, 0x0c6u, 0x006a5bc0u, base_addr);
+    relocate_rel32(slot_563d30, 0x00563d30u, 0x0ccu, 0x00531f90u,
+                   reinterpret_cast<const void*>(&porsche::free_00531f90));
+    relocate_abs32(slot_563d30, 0x0d5u, 0x006a5bc0u, base_addr);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+struct CaseConfig {
+    porsche::PhysicalFile* phys_ptr;
+    S phys_count;
+    porsche::PhysicalFile phys[kTrackedPhys];
+    porsche::FileDevice* devices_ptr;
+    porsche::FileDevice devices[kTrackedDevices];
+    porsche::FileOperation ops[kTrackedOps];
+    void* pool_base;
+    U pool_capacity;
+    U pool_active;
+    void* pool_lock;
+    U pool[kPoolSlots][11];
+    U lock_token;
+    porsche::FileOperation* find_op;
+    S find_state;
+    U remove_ret;
+    U thread_ret_seq[4];
+};
+
+static void apply_config(const CaseConfig& cfg) {
+    std::memset(mock_phys, 0, sizeof mock_phys);
+    std::memset(mock_devices, 0, sizeof mock_devices);
+    std::memset(mock_ops, 0, sizeof mock_ops);
+    std::memset(mock_pool, 0, sizeof mock_pool);
+
+    std::memcpy(mock_phys, cfg.phys, sizeof cfg.phys);
+    std::memcpy(mock_devices, cfg.devices, sizeof cfg.devices);
+    std::memcpy(mock_ops, cfg.ops, sizeof cfg.ops);
+    std::memcpy(mock_pool, cfg.pool, sizeof cfg.pool);
+
+    porsche::physical_files_006af084 = cfg.phys_ptr;
+    porsche::physical_count_006af080 = cfg.phys_count;
+    porsche::devices_006a5c7c = cfg.devices_ptr;
+    porsche::platform_disk_set_last_error = &mock_set_last_error;
+
+    porsche::async_pool_base_006a5bc0 = cfg.pool_base;
+    porsche::async_pool_capacity_006a5be0 = cfg.pool_capacity;
+    porsche::async_pool_active_006a5be4 = cfg.pool_active;
+    porsche::async_pool_lock_006a5be8 = cfg.pool_lock;
+
+    cfg_lock_token = cfg.lock_token;
+    cfg_find_op = cfg.find_op;
+    cfg_find_state = cfg.find_state;
+    cfg_remove_ret = cfg.remove_ret;
+    std::memcpy(cfg_thread_ret_seq, cfg.thread_ret_seq, sizeof cfg_thread_ret_seq);
+    cfg_thread_idx = 0u;
+    cfg_sleep_clear_step = 0u;
+}
+
+static void compare_traces(bool check_return) {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    if (!check_return) {
+        trace.ret_eax = 0u;
+        expected.ret_eax = 0u;
+    }
+    require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0,
+                "event mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0,
+            "x87/MXCSR state mismatch");
+}
+
+static void run_pair(void* orig_fn, void* cpp_fn, const U* args, U argc,
+                     bool check_return, const CaseConfig& cfg) {
+    ++cases;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_fn(orig_fn, args, argc, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    apply_config(cfg);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_fn(cpp_fn, args, argc, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    capture_fpu(trace.fpu);
+    events_total += trace.count;
+    compare_traces(check_return);
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    // 1. 00592590: physical_file_clear_flag_00592590
+    {
+        CaseConfig cfg{};
+        // 1a. null physical_files_006af084 -> SetLastError(6), return 0.
+        cfg.phys_ptr = nullptr;
+        cfg.phys_count = 3;
+        U h = ~0u;
+        run_pair(slot_592590, reinterpret_cast<void*>(&porsche::physical_file_clear_flag_00592590),
+                 &h, 1u, true, cfg);
+
+        // 1b. ~handle < 0 (handle == 0 and handle == 0x7fffffff).
+        cfg.phys_ptr = mock_phys;
+        cfg.phys[0].active = 1u;
+        cfg.phys[0].padding[0] = 0x33u;
+        h = 0u;
+        run_pair(slot_592590, reinterpret_cast<void*>(&porsche::physical_file_clear_flag_00592590),
+                 &h, 1u, true, cfg);
+        h = 0x7fffffffu;
+        run_pair(slot_592590, reinterpret_cast<void*>(&porsche::physical_file_clear_flag_00592590),
+                 &h, 1u, true, cfg);
+
+        // 1c. slot >= physical_count_006af080 (boundary slot == count, and count == 0).
+        h = ~3u;
+        run_pair(slot_592590, reinterpret_cast<void*>(&porsche::physical_file_clear_flag_00592590),
+                 &h, 1u, true, cfg);
+        cfg.phys_count = 0;
+        h = ~0u;
+        run_pair(slot_592590, reinterpret_cast<void*>(&porsche::physical_file_clear_flag_00592590),
+                 &h, 1u, true, cfg);
+
+        // 1d. active == 0 -> SetLastError(6), padding[0] preserved.
+        cfg.phys_count = 3;
+        cfg.phys[1].active = 0u;
+        cfg.phys[1].padding[0] = 0x44u;
+        h = ~1u;
+        run_pair(slot_592590, reinterpret_cast<void*>(&porsche::physical_file_clear_flag_00592590),
+                 &h, 1u, true, cfg);
+
+        // 1e. active != 0, padding[0] == 0 -> returns 0 without SetLastError.
+        cfg.phys[1].active = 1u;
+        cfg.phys[1].padding[0] = 0u;
+        cfg.phys[1].padding[1] = 0x77u;
+        run_pair(slot_592590, reinterpret_cast<void*>(&porsche::physical_file_clear_flag_00592590),
+                 &h, 1u, true, cfg);
+
+        // 1f. active != 0, padding[0] == 0x5au, padding[1] == 0x77u -> clears padding[0], keeps padding[1], returns 0x5a.
+        cfg.phys[2].active = 1u;
+        cfg.phys[2].padding[0] = 0x5au;
+        cfg.phys[2].padding[1] = 0x77u;
+        h = ~2u;
+        run_pair(slot_592590, reinterpret_cast<void*>(&porsche::physical_file_clear_flag_00592590),
+                 &h, 1u, true, cfg);
+    }
+
+    // 2. 00567cf0: file_operation_cancel_00567cf0
+    {
+        CaseConfig cfg{};
+        cfg.phys_ptr = mock_phys;
+        cfg.phys_count = 3;
+        cfg.devices_ptr = mock_devices;
+        cfg.lock_token = 0xdeadbeefu;
+
+        // 2a. dev->initialized == 0: skips lock/unlock, still calls operation_find.
+        U op_id = 0x00000043u; // dev index 3
+        cfg.devices[3].initialized = 0u;
+        cfg.find_op = nullptr;
+        cfg.find_state = 1;
+        run_pair(slot_567cf0, reinterpret_cast<void*>(&porsche::file_operation_cancel_00567cf0),
+                 &op_id, 1u, false, cfg);
+
+        // 2b. dev->initialized != 0, op == nullptr -> locks and unlocks.
+        cfg.devices[3].initialized = 1u;
+        run_pair(slot_567cf0, reinterpret_cast<void*>(&porsche::file_operation_cancel_00567cf0),
+                 &op_id, 1u, false, cfg);
+
+        // 2c. dev->initialized != 0, op != nullptr, state == 0 -> skips switch, unlocks.
+        cfg.find_op = &mock_ops[0];
+        cfg.find_state = 0;
+        cfg.ops[0].id = op_id;
+        cfg.ops[0].type = 2u;
+        cfg.ops[0].flags = 0x10u;
+        run_pair(slot_567cf0, reinterpret_cast<void*>(&porsche::file_operation_cancel_00567cf0),
+                 &op_id, 1u, false, cfg);
+
+        // 2d. type == 2, dev->current == op -> clears physical padding[0], flags |= 2, remove=1, prepend, flags |= 8, callback(-1).
+        cfg.find_state = 1;
+        cfg.remove_ret = 1u;
+        cfg.phys[1].active = 1u;
+        cfg.phys[1].padding[0] = 0x22u;
+        cfg.phys[1].padding[1] = 0x88u;
+        cfg.devices[3].current = &mock_ops[0];
+        cfg.ops[0].handle = ~1u;
+        cfg.ops[0].context = reinterpret_cast<void*>(static_cast<std::uintptr_t>(0x11223344u));
+        cfg.ops[0].callback = &mock_op_callback;
+        run_pair(slot_567cf0, reinterpret_cast<void*>(&porsche::file_operation_cancel_00567cf0),
+                 &op_id, 1u, false, cfg);
+
+        // 2e. type == 3, dev->current != op -> does NOT clear physical padding[0], still cancels & invokes callback.
+        cfg.devices[3].current = &mock_ops[1];
+        cfg.ops[0].type = 3u;
+        run_pair(slot_567cf0, reinterpret_cast<void*>(&porsche::file_operation_cancel_00567cf0),
+                 &op_id, 1u, false, cfg);
+
+        // 2f. type in {0, 4, 6, 8, 9} -> cancel path (also test callback == nullptr for one, remove_ret == 0 for one).
+        const U cancel_types[] = {0u, 4u, 6u, 8u, 9u};
+        for (U i = 0u; i < 5u; ++i) {
+            cfg.ops[0].type = cancel_types[i];
+            cfg.ops[0].flags = 0x10u;
+            cfg.ops[0].callback = (i == 1u) ? nullptr : &mock_op_callback;
+            cfg.remove_ret = (i == 2u) ? 0u : 1u;
+            run_pair(slot_567cf0, reinterpret_cast<void*>(&porsche::file_operation_cancel_00567cf0),
+                     &op_id, 1u, false, cfg);
+        }
+
+        // 2g. type in {1, 5, 7, 10, 0xffffffff} -> break cleanly without modifying flags or removing.
+        cfg.remove_ret = 1u;
+        cfg.ops[0].callback = &mock_op_callback;
+        const U break_types[] = {1u, 5u, 7u, 10u, 0xffffffffu};
+        for (U i = 0u; i < 5u; ++i) {
+            cfg.ops[0].type = break_types[i];
+            cfg.ops[0].flags = 0x10u;
+            run_pair(slot_567cf0, reinterpret_cast<void*>(&porsche::file_operation_cancel_00567cf0),
+                     &op_id, 1u, false, cfg);
+        }
+    }
+
+    // 3. 00564750: async_slot_resolve_00564750
+    {
+        CaseConfig cfg{};
+        cfg.pool_base = mock_pool;
+        cfg.pool_capacity = 3u;
+        cfg.pool[0][0] = 0x100u;
+        cfg.pool[1][0] = 0x101u;
+        cfg.pool[2][0] = 0x7fffff02u;
+
+        const U invalid_handles[] = {0xffu, 0x80000100u, 0x103u, 0x201u};
+        for (U h : invalid_handles) {
+            run_pair(slot_564750, reinterpret_cast<void*>(&porsche::async_slot_resolve_00564750),
+                     &h, 1u, true, cfg);
+        }
+
+        // signed handle < 0x100 even when slot[0].id matches 0x80000100u
+        cfg.pool[0][0] = 0x80000100u;
+        U neg_h = 0x80000100u;
+        run_pair(slot_564750, reinterpret_cast<void*>(&porsche::async_slot_resolve_00564750),
+                 &neg_h, 1u, true, cfg);
+        cfg.pool[0][0] = 0x100u;
+
+        // capacity == 0 -> null even for valid handle 0x100
+        cfg.pool_capacity = 0u;
+        U h = 0x100u;
+        run_pair(slot_564750, reinterpret_cast<void*>(&porsche::async_slot_resolve_00564750),
+                 &h, 1u, true, cfg);
+
+        // valid matches
+        cfg.pool_capacity = 3u;
+        h = 0x101u;
+        run_pair(slot_564750, reinterpret_cast<void*>(&porsche::async_slot_resolve_00564750),
+                 &h, 1u, true, cfg);
+        h = 0x7fffff02u;
+        run_pair(slot_564750, reinterpret_cast<void*>(&porsche::async_slot_resolve_00564750),
+                 &h, 1u, true, cfg);
+    }
+
+    // 4. 00564700: async_slot_cancel_00564700
+    {
+        CaseConfig cfg{};
+        cfg.devices_ptr = mock_devices;
+        cfg.pool_base = mock_pool;
+        cfg.pool_capacity = 3u;
+        cfg.pool[0][0] = 0x100u;
+        cfg.pool[1][0] = 0x101u;
+        cfg.pool[2][0] = 0x102u;
+
+        // 4a. invalid handle -> no-op
+        U h = 0xffu;
+        run_pair(slot_564700, reinterpret_cast<void*>(&porsche::async_slot_cancel_00564700),
+                 &h, 1u, false, cfg);
+
+        // 4b. slot[3] != 0 -> no-op
+        cfg.pool[0][3] = 1u;
+        h = 0x100u;
+        run_pair(slot_564700, reinterpret_cast<void*>(&porsche::async_slot_cancel_00564700),
+                 &h, 1u, false, cfg);
+
+        // 4c. slot[3] == 0, op != 0, slot[5] == 0 -> sets slot[3]=1, calls 00567cf0(op), skips async_dispatch.
+        cfg.pool[0][3] = 0u;
+        cfg.pool[0][6] = 0x42u;
+        cfg.pool[0][5] = 0u;
+        run_pair(slot_564700, reinterpret_cast<void*>(&porsche::async_slot_cancel_00564700),
+                 &h, 1u, false, cfg);
+
+        // 4d. slot[3] == 0, op == 0, slot[5] != 0 -> sets slot[3]=1, calls 00567cf0(0), skips async_dispatch.
+        cfg.pool[1][3] = 0u;
+        cfg.pool[1][6] = 0u;
+        cfg.pool[1][5] = 0x55667788u;
+        h = 0x101u;
+        run_pair(slot_564700, reinterpret_cast<void*>(&porsche::async_slot_cancel_00564700),
+                 &h, 1u, false, cfg);
+
+        // 4e. slot[3] == 0, op == 0, slot[5] == 0 -> sets slot[3]=1, calls 00567cf0(0), calls async_dispatch(slot).
+        cfg.pool[2][3] = 0u;
+        cfg.pool[2][6] = 0u;
+        cfg.pool[2][5] = 0u;
+        h = 0x102u;
+        run_pair(slot_564700, reinterpret_cast<void*>(&porsche::async_slot_cancel_00564700),
+                 &h, 1u, false, cfg);
+    }
+
+    // 5. 00563d30: application_main_function_00563d30
+    {
+        CaseConfig cfg{};
+        // 5a. async_pool_base_006a5bc0 == nullptr -> immediate return.
+        cfg.pool_base = nullptr;
+        cfg.pool_capacity = 3u;
+        cfg.pool_active = 0x1234u;
+        run_pair(slot_563d30, reinterpret_cast<void*>(&porsche::application_main_function_00563d30),
+                 nullptr, 0u, false, cfg);
+
+        // 5b. pool_base != nullptr, capacity == 0, pool_active == 0 -> skips loops and close, cleans up scheduler/lock/base.
+        cfg.pool_base = mock_pool;
+        cfg.pool_capacity = 0u;
+        cfg.pool_active = 0u;
+        cfg.pool_lock = reinterpret_cast<void*>(static_cast<std::uintptr_t>(0xfeedfaceu));
+        run_pair(slot_563d30, reinterpret_cast<void*>(&porsche::application_main_function_00563d30),
+                 nullptr, 0u, false, cfg);
+
+        // 5c. full shutdown: 3 slots, cancel + 2-iteration wait loop (thread=1 then thread=0) + close(active, 0x64) + teardown.
+        cfg.devices_ptr = mock_devices;
+        cfg.pool_base = mock_pool;
+        cfg.pool_capacity = 3u;
+        cfg.pool_active = 0x44556677u;
+        cfg.pool_lock = reinterpret_cast<void*>(static_cast<std::uintptr_t>(0xabcdef01u));
+        cfg.thread_ret_seq[0] = 1u;
+        cfg.thread_ret_seq[1] = 0u;
+
+        cfg.pool[0][0] = 0x100u;
+        cfg.pool[0][3] = 0u;
+        cfg.pool[0][5] = 0u;
+        cfg.pool[0][6] = 0x20u; // pending op cleared on sleep step 0
+
+        cfg.pool[1][0] = 0x101u;
+        cfg.pool[1][3] = 0u;
+        cfg.pool[1][5] = 0u;
+        cfg.pool[1][6] = 0u;   // triggers async_dispatch during cancel loop
+
+        cfg.pool[2][0] = 0x202u;
+        cfg.pool[2][3] = 1u;   // skipped in cancel loop
+        cfg.pool[2][5] = 0x99999999u;
+        cfg.pool[2][6] = 0x21u; // pending op cleared on sleep step 1
+
+        run_pair(slot_563d30, reinterpret_cast<void*>(&porsche::application_main_function_00563d30),
+                 nullptr, 0u, false, cfg);
+    }
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("async_pool_shutdown_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}
