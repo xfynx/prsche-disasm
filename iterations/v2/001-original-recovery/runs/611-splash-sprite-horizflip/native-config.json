@@ -1,0 +1,91 @@
+{
+  "run": 611,
+  "experiment": "local/experiments/v2-splash-sprite-horizflip-611",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/611-splash-sprite-horizflip/splash_sprite_horizflip_611.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/611-splash-sprite-horizflip/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/611-splash-sprite-horizflip",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/611-splash-sprite-horizflip/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00563320",
+      "bytes": 286,
+      "sha256": "48483524cca2ef9a8bbd29364a1054ab3fd3594f4d7e43bf4e1b285504e3dace",
+      "token": "@BODY_00563320@"
+    },
+    {
+      "va": "0056e2a8",
+      "bytes": 24,
+      "sha256": "a9c10bb3ae44528ab961d3026ab3f81c24f5a1b670d66e610ffe5202323c337f",
+      "token": "@BODY_0056E2A8@"
+    },
+    {
+      "va": "005712f0",
+      "bytes": 49,
+      "sha256": "4f8f9547765a6535b98a0d3292121df2a8b5113e237b22ea120ce78653d39fa2",
+      "token": "@BODY_005712F0@"
+    },
+    {
+      "va": "005bced8",
+      "bytes": 47,
+      "sha256": "23a24cb9ec8abab1f0d0608dc95a0973223dc61e7916e9638327ae2bdc37ac0e",
+      "token": "@STR_005BCED8@"
+    },
+    {
+      "va": "005bcf08",
+      "bytes": 61,
+      "sha256": "aa4f15791f96f436f2603f0227fc4dc49f62ca5c0f9f322c8acf065ec3dcf4b7",
+      "token": "@STR_005BCF08@"
+    },
+    {
+      "va": "005bcf48",
+      "bytes": 18,
+      "sha256": "487ccf7fcc96e523bf96ec6eb2df42af45f5525ead417ad3ea347459e558249d",
+      "token": "@STR_005BCF48@"
+    }
+  ],
+  "pass_marker": "splash_sprite_horizflip_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-read-word-shift",
+      "source": "iterations/v2/001-original-recovery/runs/611-splash-sprite-horizflip/splash_sprite_horizflip_611.cpp",
+      "old": "    const std::uint32_t shift = static_cast<std::uint32_t>((-bytes) * 8 + 32) & 0x1fu;",
+      "new": "    const std::uint32_t shift = static_cast<std::uint32_t>((-bytes) * 8 + 24) & 0x1fu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-stride-15bpp-check",
+      "source": "iterations/v2/001-original-recovery/runs/611-splash-sprite-horizflip/splash_sprite_horizflip_611.cpp",
+      "old": "    if (bpp == 15) {",
+      "new": "    if (bpp == 14) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-packed-flag-mask",
+      "source": "iterations/v2/001-original-recovery/runs/611-splash-sprite-horizflip/splash_sprite_horizflip_611.cpp",
+      "old": "    if ((head0 & 0x80u) != 0u) {",
+      "new": "    if ((head0 & 0x40u) != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-anchor-x-sign",
+      "source": "iterations/v2/001-original-recovery/runs/611-splash-sprite-horizflip/splash_sprite_horizflip_611.cpp",
+      "old": "    const std::int16_t new_x16 = static_cast<std::int16_t>(static_cast<std::uint16_t>(width) - static_cast<std::uint16_t>(x16));",
+      "new": "    const std::int16_t new_x16 = static_cast<std::int16_t>(static_cast<std::uint16_t>(width) + static_cast<std::uint16_t>(x16));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

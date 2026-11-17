@@ -1,0 +1,472 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "splash_sprite_horizflip_611.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+static void put16(void* p, U o, std::int16_t v) { std::memcpy(static_cast<B*>(p) + o, &v, 2u); }
+
+enum : U {
+    kShapeBufSize = 512u,
+    kMaxEvents = 64u,
+};
+
+enum EventTag : U {
+    kEvDiagnostic = 1u,
+    kEvDescriptorBits = 2u,
+    kEvBufferWord = 3u,
+};
+
+static B shape_buf[kShapeBufSize] = {};
+
+struct StateSnapshot {
+    B shape[kShapeBufSize];
+    U diag_file;
+    U diag_line;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    StateSnapshot state;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events = 0u;
+
+static B* code = nullptr;
+static B* slot_563320 = nullptr;
+static B* slot_56e2a8 = nullptr;
+static B* slot_5712f0 = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U buf_offset(const void* p) {
+    const U ptr = address(p);
+    const U base = address(shape_buf);
+    if (ptr >= base && ptr < base + kShapeBufSize) {
+        return ptr - base;
+    }
+    return 0xffffffffu;
+}
+
+static void capture_state(StateSnapshot& s) {
+    std::memcpy(s.shape, shape_buf, sizeof s.shape);
+    s.diag_file = porsche::shared_runtime_word_005deb74;
+    s.diag_line = porsche::shared_runtime_word_005deb78;
+}
+
+static void record_event(U tag, U arg0, U arg1, U arg2) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    capture_state(e.state);
+}
+
+static void __cdecl test_diagnostic_cb(const char* fmt, U arg) {
+    record_event(kEvDiagnostic, address(fmt), arg, 0u);
+}
+
+static const B kDescriptorBits[128] = {
+    0, 4, 8, 15, 24, 32, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    15, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    15, 32, 24, 0, 24, 0, 0, 0, 0, 16, 32, 0, 32, 15, 32, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    4, 8, 15, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 16, 1, 4, 8, 0, 32, 15, 24
+};
+
+namespace porsche {
+
+std::uint32_t shared_runtime_word_005deb74 = 0u;
+std::uint32_t shared_runtime_word_005deb78 = 0u;
+void (__cdecl* diagnostic_handler_005debf0)(const char*) =
+    reinterpret_cast<void(__cdecl*)(const char*)>(&test_diagnostic_cb);
+
+std::uint32_t __cdecl render_descriptor_bits_00537f90(const void* descriptor_format) {
+    const U word0 = word(descriptor_format, 0u);
+    const U bpp = kDescriptorBits[word0 & 0x7fu];
+    record_event(kEvDescriptorBits, buf_offset(descriptor_format), bpp, word0);
+    return bpp;
+}
+
+void* __cdecl render_buffer_word_0056e301(void* destination, std::uint32_t pixel, std::int32_t bytes) {
+    record_event(kEvBufferWord, buf_offset(destination), pixel, static_cast<U>(bytes));
+    auto* out = static_cast<B*>(destination);
+    if (bytes >= 3) {
+        if (bytes == 3) {
+            const auto low = static_cast<std::uint16_t>(pixel);
+            std::memcpy(out, &low, 2u);
+            out[0] = static_cast<B>(pixel >> 16u);
+            return out + 3;
+        }
+        std::memcpy(out, &pixel, 4u);
+        return out + 4;
+    }
+    if (bytes < 1) {
+        return out;
+    }
+    if (bytes == 1) {
+        out[0] = static_cast<B>(pixel);
+        return out + 1;
+    }
+    const auto low = static_cast<std::uint16_t>(pixel);
+    std::memcpy(out, &low, 2u);
+    return out + 2;
+}
+
+} // namespace porsche
+
+static U invoke_cdecl_1arg(void* fn, U arg0, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl_2arg(void* fn, U arg0, U arg1, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg1
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 8
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B raw_bits_fmt[] = {@STR_005BCED8@};
+    static const B raw_packed_fmt[] = {@STR_005BCF08@};
+    static const B raw_file[] = {@STR_005BCF48@};
+    require(sizeof raw_bits_fmt == sizeof porsche::splash_hflip_bits_fmt_005bced8 &&
+            std::memcmp(raw_bits_fmt, porsche::splash_hflip_bits_fmt_005bced8, sizeof raw_bits_fmt) == 0,
+            "exact 005bced8 string bytes");
+    require(sizeof raw_packed_fmt == sizeof porsche::splash_hflip_packed_fmt_005bcf08 &&
+            std::memcmp(raw_packed_fmt, porsche::splash_hflip_packed_fmt_005bcf08, sizeof raw_packed_fmt) == 0,
+            "exact 005bcf08 string bytes");
+    require(sizeof raw_file == sizeof porsche::splash_hflip_file_005bcf48 &&
+            std::memcmp(raw_file, porsche::splash_hflip_file_005bcf48, sizeof raw_file) == 0,
+            "exact 005bcf48 string bytes");
+
+    static const B body_563320[] = {@BODY_00563320@};
+    static const B body_56e2a8[] = {@BODY_0056E2A8@};
+    static const B body_5712f0[] = {@BODY_005712F0@};
+
+    require(sizeof body_563320 == 286u, "286-byte original body 00563320");
+    require(sizeof body_56e2a8 == 24u, "24-byte original body 0056e2a8");
+    require(sizeof body_5712f0 == 49u, "49-byte original body 005712f0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_563320 = code + 0u;
+    slot_56e2a8 = code + 320u;
+    slot_5712f0 = code + 384u;
+
+    std::memcpy(slot_563320, body_563320, sizeof body_563320);
+    std::memcpy(slot_56e2a8, body_56e2a8, sizeof body_56e2a8);
+    std::memcpy(slot_5712f0, body_5712f0, sizeof body_5712f0);
+
+    relocate_abs32(slot_563320, 0x0cu, 0x005bcf48u, address(&porsche::splash_hflip_file_005bcf48[0]));
+    relocate_abs32(slot_563320, 0x1eu, 0x005deb74u, address(&porsche::shared_runtime_word_005deb74));
+    relocate_abs32(slot_563320, 0x24u, 0x005bcf08u, address(&porsche::splash_hflip_packed_fmt_005bcf08[0]));
+    relocate_abs32(slot_563320, 0x2au, 0x005deb78u, address(&porsche::shared_runtime_word_005deb78));
+    relocate_abs32(slot_563320, 0x34u, 0x005debf0u, address(&porsche::diagnostic_handler_005debf0));
+    relocate_rel32(slot_563320, 0x00563320u, 0x4du, 0x00537f90u,
+                   reinterpret_cast<const void*>(&porsche::render_descriptor_bits_00537f90));
+    relocate_rel32(slot_563320, 0x00563320u, 0x55u, 0x005712f0u, slot_5712f0);
+    relocate_abs32(slot_563320, 0x67u, 0x005bced8u, address(&porsche::splash_hflip_bits_fmt_005bced8[0]));
+    relocate_abs32(slot_563320, 0x6du, 0x005deb74u, address(&porsche::shared_runtime_word_005deb74));
+    relocate_abs32(slot_563320, 0x73u, 0x005deb78u, address(&porsche::shared_runtime_word_005deb78));
+    relocate_abs32(slot_563320, 0x7du, 0x005debf0u, address(&porsche::diagnostic_handler_005debf0));
+    relocate_rel32(slot_563320, 0x00563320u, 0xbbu, 0x0056e2a8u, slot_56e2a8);
+    relocate_rel32(slot_563320, 0x00563320u, 0xc4u, 0x0056e2a8u, slot_56e2a8);
+    relocate_rel32(slot_563320, 0x00563320u, 0xccu, 0x0056e301u,
+                   reinterpret_cast<const void*>(&porsche::render_buffer_word_0056e301));
+    relocate_rel32(slot_563320, 0x00563320u, 0xd4u, 0x0056e301u,
+                   reinterpret_cast<const void*>(&porsche::render_buffer_word_0056e301));
+
+    relocate_rel32(slot_5712f0, 0x005712f0u, 0x15u, 0x00537f90u,
+                   reinterpret_cast<const void*>(&porsche::render_descriptor_bits_00537f90));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void seed_shape(U head0, I width, I height, I x16, U seed) {
+    for (U i = 0u; i < kShapeBufSize; ++i) {
+        shape_buf[i] = static_cast<B>((i * 37u + seed * 13u + 5u) & 0xffu);
+    }
+    put(shape_buf, 0u, head0);
+    put16(shape_buf, 4u, static_cast<std::int16_t>(width));
+    put16(shape_buf, 6u, static_cast<std::int16_t>(height));
+    put16(shape_buf, 8u, static_cast<std::int16_t>(x16));
+    porsche::shared_runtime_word_005deb74 = 0u;
+    porsche::shared_runtime_word_005deb78 = 0u;
+}
+
+static void compare_traces(bool check_eax) {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    if (check_eax) {
+        require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    }
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag mismatch");
+        require(trace.events[i].arg0 == expected.events[i].arg0, "event arg0 mismatch");
+        require(trace.events[i].arg1 == expected.events[i].arg1, "event arg1 mismatch");
+        require(trace.events[i].arg2 == expected.events[i].arg2, "event arg2 mismatch");
+        require(std::memcmp(&trace.events[i].state, &expected.events[i].state,
+                            sizeof(StateSnapshot)) == 0,
+                "event state mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+}
+
+template <typename SetupFn>
+static void run_1arg(void* orig_fn, void* cpp_fn, U arg0, bool check_eax, SetupFn setup) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_1arg(orig_fn, arg0, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_1arg(cpp_fn, arg0, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces(check_eax);
+}
+
+template <typename SetupFn>
+static void run_2arg(void* orig_fn, void* cpp_fn, U arg0, U arg1, bool check_eax, SetupFn setup) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_2arg(orig_fn, arg0, arg1, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_2arg(cpp_fn, arg0, arg1, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces(check_eax);
+}
+
+int main() {
+    init();
+
+    // 1. Direct checks for 0056e2a8 (render_buffer_read_word_0056e2a8).
+    for (U off : {4u, 5u, 6u, 7u, 16u, 17u}) {
+        for (I bytes : {1, 2, 3, 4}) {
+            run_2arg(slot_56e2a8,
+                     reinterpret_cast<void*>(&porsche::render_buffer_read_word_0056e2a8),
+                     address(shape_buf + off), static_cast<U>(bytes), true, [=]() {
+                         seed_shape(0x11223344u, 8, 4, 0, off * 17u + static_cast<U>(bytes));
+                     });
+        }
+    }
+
+    // 2. Direct checks for 005712f0 (splash_shape_row_stride_005712f0).
+    for (U head0 : {0x0000007bu, 0x1234567bu, 0x00000000u, 0x00000044u, 0x00000001u,
+                    0x00000002u, 0x00000003u, 0x00000006u, 0x00000004u, 0x00000005u}) {
+        for (I width : {0, 1, 2, 3, 4, 5, 7, 13}) {
+            run_1arg(slot_5712f0,
+                     reinterpret_cast<void*>(&porsche::splash_shape_row_stride_005712f0),
+                     address(shape_buf), true, [=]() {
+                         seed_shape(head0, width, 2, 0, head0 + static_cast<U>(width));
+                     });
+        }
+    }
+
+    // 3. Direct checks for 00563320 (splash_progress_update_sprite_00563320).
+    const U shape_heads[] = {
+        0x00000000u, // 0 bpp (< 8 diagnostic)
+        0x00000044u, // 1 bpp (< 8 diagnostic)
+        0x00000001u, // 4 bpp (< 8 diagnostic)
+        0x00000002u, // 8 bpp (1 B/px)
+        0x0000007bu, // 8 bpp + type 0x7b stride fast path
+        0x1234567bu, // 8 bpp + type 0x7b with non-zero upper bytes
+        0x00000003u, // 15 bpp (even_bpp=16 -> 2 B/px, 15->16 stride)
+        0x00000006u, // 16 bpp (2 B/px)
+        0x00000004u, // 24 bpp (3 B/px)
+        0x00000005u, // 32 bpp (4 B/px)
+        0x00000082u, // packed (0x80 set) + 8 bpp
+        0xabcdef80u, // packed (0x80 set) + 0 bpp (both diagnostics)
+        0x000000ffu, // packed (0x80 set) + 24 bpp (0xff & 0x7f = 0x7f)
+    };
+    const I widths[] = {0, 1, 2, 3, 4, 5};
+    const I heights[] = {0, 1, 2, 3};
+    const I anchors[] = {0, 1, -2, 5, 123, -300};
+
+    U seed_counter = 1u;
+    for (U head0 : shape_heads) {
+        for (I width : widths) {
+            for (I height : heights) {
+                const I x16 = anchors[seed_counter % (sizeof anchors / sizeof anchors[0])];
+                const U cur_seed = seed_counter++;
+                run_1arg(slot_563320,
+                         reinterpret_cast<void*>(&porsche::splash_progress_update_sprite_00563320),
+                         address(shape_buf), false, [=]() {
+                             seed_shape(head0, width, height, x16, cur_seed);
+                         });
+            }
+        }
+    }
+
+    // Extra anchor coverage on fixed 8/15/24/32 bpp shapes.
+    for (U head0 : {0x00000002u, 0x00000003u, 0x00000004u, 0x00000005u}) {
+        for (I x16 : anchors) {
+            const U cur_seed = seed_counter++;
+            run_1arg(slot_563320,
+                     reinterpret_cast<void*>(&porsche::splash_progress_update_sprite_00563320),
+                     address(shape_buf), false, [=]() {
+                         seed_shape(head0, 4, 2, x16, cur_seed);
+                     });
+        }
+    }
+
+    std::printf("splash_sprite_horizflip_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events);
+    return 0;
+}

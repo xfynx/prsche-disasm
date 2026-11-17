@@ -1,0 +1,589 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "frame_audio_send_level_610.hpp"
+
+namespace porsche {
+ApplicationAudioDeviceStateStorage application_audio_device_state_006b48c0{};
+std::int16_t& audio_backend_channel_count_006b49a4 =
+    *reinterpret_cast<std::int16_t*>(application_audio_device_state_006b48c0.data() + 0xe4);
+std::uint32_t& audio_backend_channels_006b4a00 =
+    *reinterpret_cast<std::uint32_t*>(application_audio_device_state_006b48c0.data() + 0x140);
+std::uint32_t audio_backend_voice_table_006b489c = 0u;
+} // namespace porsche
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kNumVoiceSlots = 6u,
+    kNumChannels = 4u,
+    kMaxVoicesPerChannel = 4u,
+    kMaxEvents = 64u,
+};
+
+enum EventTag : U {
+    kEvLock = 1u,
+    kEvUnlock = 2u,
+    kEvFindChannel = 3u,
+    kEvNextVoice = 4u,
+    kEvHwApplySend = 5u,
+};
+
+static B channel_records[kNumVoiceSlots * 0x70u] = {};
+static B hw_records[kNumVoiceSlots * 0xf8u] = {};
+
+struct StateSnapshot {
+    B device_backing[0x18cu];
+    B channels[kNumVoiceSlots * 0x70u];
+    B hw[kNumVoiceSlots * 0xf8u];
+    U voice_table;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    StateSnapshot state;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events = 0u;
+
+struct Scenario {
+    U map_count;
+    U map_handles[4];
+    I map_channels[4];
+    U ch_voice_count[kNumChannels];
+    U ch_voices[kNumChannels][kMaxVoicesPerChannel];
+};
+static Scenario scenario{};
+
+static B* code = nullptr;
+static B* slot_565cd0 = nullptr;
+static B* slot_590290 = nullptr;
+static B* slot_5902a0 = nullptr;
+static B* slot_589d70 = nullptr;
+static B* slot_598eb0 = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    std::memcpy(s.device_backing, application_audio_device_state_006b48c0.backing.data(),
+                sizeof s.device_backing);
+    std::memcpy(s.channels, channel_records, sizeof s.channels);
+    std::memcpy(s.hw, hw_records, sizeof s.hw);
+    s.voice_table = audio_backend_voice_table_006b489c;
+}
+
+static void record_event(U tag, U arg0, U arg1) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    capture_state(e.state);
+}
+
+static void __cdecl hw_apply_send_cb(U arg0, I val) {
+    record_event(kEvHwApplySend, arg0, static_cast<U>(val));
+}
+
+namespace porsche {
+
+void __cdecl audio_backend_lock_005896d0() {
+    record_event(kEvLock, 0u, 0u);
+    application_audio_device_state_006b48c0[0xdfu] =
+        static_cast<B>(application_audio_device_state_006b48c0[0xdfu] + 1u);
+}
+
+void __cdecl audio_backend_unlock_005896f0() {
+    record_event(kEvUnlock, 0u, 0u);
+    application_audio_device_state_006b48c0[0xdfu] =
+        static_cast<B>(application_audio_device_state_006b48c0[0xdfu] - 1u);
+}
+
+std::int32_t __cdecl audio_backend_find_channel_00589d20(std::uint32_t handle) {
+    record_event(kEvFindChannel, handle, 0u);
+    for (U i = 0u; i < scenario.map_count; ++i) {
+        if (scenario.map_handles[i] == handle) {
+            return scenario.map_channels[i];
+        }
+    }
+    return -1;
+}
+
+std::uint32_t __cdecl audio_backend_next_voice_00590340(std::int32_t channel,
+                                                         std::uint32_t* voice_slot) {
+    const U prev_slot = voice_slot != nullptr ? *voice_slot : 0xeeeeeeeeu;
+    record_event(kEvNextVoice, static_cast<U>(channel), prev_slot);
+    if (channel < 0 || static_cast<U>(channel) >= kNumChannels || voice_slot == nullptr) {
+        return 0u;
+    }
+    const U count = scenario.ch_voice_count[channel];
+    if (count == 0u) {
+        return 0u;
+    }
+    if (*voice_slot == 0xffffffffu) {
+        *voice_slot = scenario.ch_voices[channel][0];
+        return 1u;
+    }
+    for (U i = 0u; i + 1u < count; ++i) {
+        if (scenario.ch_voices[channel][i] == *voice_slot) {
+            *voice_slot = scenario.ch_voices[channel][i + 1u];
+            return 1u;
+        }
+    }
+    return 0u;
+}
+
+} // namespace porsche
+
+static U invoke_cdecl_2arg(void* fn, U arg0, U arg1, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg1
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 8
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl_3arg(void* fn, U arg0, U arg1, U arg2, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg2
+        push arg1
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 12
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B body_565cd0[] = {@BODY_00565CD0@};
+    static const B body_590290[] = {@BODY_00590290@};
+    static const B body_5902a0[] = {@BODY_005902A0@};
+    static const B body_589d70[] = {@BODY_00589D70@};
+    static const B body_598eb0[] = {@BODY_00598EB0@};
+
+    require(sizeof body_565cd0 == 137u, "137-byte original body 00565cd0");
+    require(sizeof body_590290 == 3u, "3-byte original body 00590290");
+    require(sizeof body_5902a0 == 157u, "157-byte original body 005902a0");
+    require(sizeof body_589d70 == 121u, "121-byte original body 00589d70");
+    require(sizeof body_598eb0 == 99u, "99-byte original body 00598eb0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_565cd0 = code + 0u;
+    slot_590290 = code + 256u;
+    slot_5902a0 = code + 512u;
+    slot_589d70 = code + 768u;
+    slot_598eb0 = code + 1024u;
+
+    std::memcpy(slot_565cd0, body_565cd0, sizeof body_565cd0);
+    std::memcpy(slot_590290, body_590290, sizeof body_590290);
+    std::memcpy(slot_5902a0, body_5902a0, sizeof body_5902a0);
+    std::memcpy(slot_589d70, body_589d70, sizeof body_589d70);
+    std::memcpy(slot_598eb0, body_598eb0, sizeof body_598eb0);
+
+    relocate_abs32(slot_565cd0, 0x22u, 0x006b4a0cu, address(&porsche::application_audio_device_state_006b48c0[0x14cu]));
+    relocate_abs32(slot_565cd0, 0x31u, 0x006b4a0du, address(&porsche::application_audio_device_state_006b48c0[0x14du]));
+    relocate_rel32(slot_565cd0, 0x00565cd0u, 0x38u, 0x00590290u, slot_590290);
+    relocate_abs32(slot_565cd0, 0x44u, 0x006b499cu, address(&porsche::application_audio_device_state_006b48c0[0xdcu]));
+    relocate_abs32(slot_565cd0, 0x52u, 0x006b49a4u, address(&porsche::audio_backend_channel_count_006b49a4));
+    relocate_abs32(slot_565cd0, 0x5cu, 0x006b4a00u, address(&porsche::audio_backend_channels_006b4a00));
+    relocate_rel32(slot_565cd0, 0x00565cd0u, 0x6du, 0x005902a0u, slot_5902a0);
+    relocate_abs32(slot_565cd0, 0x74u, 0x006b49a4u, address(&porsche::audio_backend_channel_count_006b49a4));
+
+    relocate_abs32(slot_5902a0, 0x02u, 0x006b499cu, address(&porsche::application_audio_device_state_006b48c0[0xdcu]));
+    relocate_rel32(slot_5902a0, 0x005902a0u, 0x13u, 0x005896d0u,
+                   reinterpret_cast<const void*>(&porsche::audio_backend_lock_005896d0));
+    relocate_rel32(slot_5902a0, 0x005902a0u, 0x1du, 0x00589d20u,
+                   reinterpret_cast<const void*>(&porsche::audio_backend_find_channel_00589d20));
+    relocate_rel32(slot_5902a0, 0x005902a0u, 0x39u, 0x00590340u,
+                   reinterpret_cast<const void*>(&porsche::audio_backend_next_voice_00590340));
+    relocate_abs32(slot_5902a0, 0x5cu, 0x006b4a00u, address(&porsche::audio_backend_channels_006b4a00));
+    relocate_rel32(slot_5902a0, 0x005902a0u, 0x70u, 0x00589d70u, slot_589d70);
+    relocate_rel32(slot_5902a0, 0x005902a0u, 0x7bu, 0x00598eb0u, slot_598eb0);
+    relocate_rel32(slot_5902a0, 0x005902a0u, 0x86u, 0x00590340u,
+                   reinterpret_cast<const void*>(&porsche::audio_backend_next_voice_00590340));
+    relocate_rel32(slot_5902a0, 0x005902a0u, 0x94u, 0x005896f0u,
+                   reinterpret_cast<const void*>(&porsche::audio_backend_unlock_005896f0));
+
+    relocate_abs32(slot_589d70, 0x09u, 0x006b4a00u, address(&porsche::audio_backend_channels_006b4a00));
+    relocate_abs32(slot_589d70, 0x3au, 0x006b4a0cu, address(&porsche::application_audio_device_state_006b48c0[0x14cu]));
+    relocate_abs32(slot_589d70, 0x44u, 0x006b4a0du, address(&porsche::application_audio_device_state_006b48c0[0x14du]));
+
+    relocate_abs32(slot_598eb0, 0x06u, 0x006b4a00u, address(&porsche::audio_backend_channels_006b4a00));
+    relocate_abs32(slot_598eb0, 0x21u, 0x006b489cu, address(&porsche::audio_backend_voice_table_006b489c));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void seed_tables_default() {
+    std::memset(application_audio_device_state_006b48c0.backing.data(), 0x5au,
+                application_audio_device_state_006b48c0.backing.size());
+    application_audio_device_state_006b48c0[0xdcu] = 1u;
+    application_audio_device_state_006b48c0[0xdfu] = 0u;
+    audio_backend_channel_count_006b49a4 = 0;
+    audio_backend_channels_006b4a00 = address(channel_records);
+    audio_backend_voice_table_006b489c = address(hw_records);
+    application_audio_device_state_006b48c0[0x14cu] = 0x7fu;
+    application_audio_device_state_006b48c0[0x14du] = static_cast<B>(-64);
+    application_audio_device_state_006b48c0[0x15cu] = static_cast<B>(-95);
+    application_audio_device_state_006b48c0[0x15du] = 0x55u;
+
+    for (U s = 0u; s < kNumVoiceSlots; ++s) {
+        B* ch = channel_records + s * 0x70u;
+        for (U j = 0u; j < 0x70u; ++j) {
+            ch[j] = static_cast<B>((s * 31u + j * 3u + 1u) & 0xffu);
+        }
+        put(ch, 0x00u, 0x100u + s);
+        ch[0x44u] = static_cast<B>((s & 1u) != 0u ? -80 : 96);
+        ch[0x45u] = static_cast<B>((s & 1u) != 0u ? 110 : -45);
+        ch[0x46u] = static_cast<B>((s & 1u) != 0u ? -100 : 75);
+        ch[0x47u] = static_cast<B>((s & 1u) != 0u ? 63 : -120);
+        ch[0x48u] = static_cast<B>((s & 1u) != 0u ? -33 : 44);
+
+        B* hw = hw_records + s * 0xf8u;
+        for (U j = 0u; j < 0xf8u; ++j) {
+            hw[j] = static_cast<B>((s * 19u + j * 5u + 2u) & 0xffu);
+        }
+        hw[0x00u] = static_cast<B>((s & 1u) != 0u ? 0x10u : 0x00u);
+        put(hw, 0xa4u, 0x71000000u + s * 0x111u);
+        put(hw, 0xd8u, address(reinterpret_cast<const void*>(&hw_apply_send_cb)));
+    }
+
+    std::memset(&scenario, 0, sizeof scenario);
+}
+
+static void compare_traces(bool check_eax) {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    if (check_eax) {
+        require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    }
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag mismatch");
+        require(trace.events[i].arg0 == expected.events[i].arg0, "event arg0 mismatch");
+        require(trace.events[i].arg1 == expected.events[i].arg1, "event arg1 mismatch");
+        require(std::memcmp(&trace.events[i].state, &expected.events[i].state,
+                            sizeof(StateSnapshot)) == 0,
+                "event state mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+}
+
+template <typename SetupFn>
+static void run_2arg(void* orig_fn, void* cpp_fn, U arg0, U arg1, bool check_eax, SetupFn setup) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_2arg(orig_fn, arg0, arg1, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_2arg(cpp_fn, arg0, arg1, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces(check_eax);
+}
+
+template <typename SetupFn>
+static void run_3arg(void* orig_fn, void* cpp_fn, U arg0, U arg1, U arg2, bool check_eax, SetupFn setup) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_3arg(orig_fn, arg0, arg1, arg2, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_3arg(cpp_fn, arg0, arg1, arg2, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces(check_eax);
+}
+
+int main() {
+    init();
+
+    // 1. Direct checks for 00590290 (audio_send_validate_00590290).
+    for (U flags : {0x00u, 0x20u, 0x80u, 0xe1u}) {
+        for (U level : {0u, 127u, 0xffffffffu}) {
+            run_2arg(slot_590290,
+                     reinterpret_cast<void*>(&porsche::audio_send_validate_00590290),
+                     flags, level, true, []() { seed_tables_default(); });
+        }
+    }
+
+    // 2. Direct checks for 00589d70 (audio_voice_recompute_send_00589d70).
+    for (U bus : {0u, 1u}) {
+        for (U slot : {0u, 3u, 5u}) {
+            for (I v44 : {0, 127, -1, -128}) {
+                for (I v45 : {0, 80, -64, -128}) {
+                    for (I b0c : {0, 127, -128}) {
+                        for (I b0d : {0, 95, -90}) {
+                            run_2arg(slot_589d70,
+                                     reinterpret_cast<void*>(&porsche::audio_voice_recompute_send_00589d70),
+                                     bus, slot, false, [=]() {
+                                         seed_tables_default();
+                                         B* ch = channel_records + slot * 0x70u;
+                                         ch[bus + 0x44u] = static_cast<B>(v44);
+                                         ch[bus + 0x45u] = static_cast<B>(v45);
+                                         application_audio_device_state_006b48c0[0x14cu + (bus << 4u)] =
+                                             static_cast<B>(b0c);
+                                         application_audio_device_state_006b48c0[0x14du + (bus << 4u)] =
+                                             static_cast<B>(b0d);
+                                     });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Direct checks for 00598eb0 (audio_voice_apply_send_00598eb0).
+    for (U bus : {0u, 1u}) {
+        for (U slot : {0u, 2u, 5u}) {
+            for (B hw0 : {0x00u, 0x10u, 0xefu, 0xffu}) {
+                for (I v46 : {0, 127, -128}) {
+                    const I v47 = (v46 == 127) ? -45 : ((v46 == 0) ? 64 : 111);
+                    run_2arg(slot_598eb0,
+                             reinterpret_cast<void*>(&porsche::audio_voice_apply_send_00598eb0),
+                             slot, bus, true, [=]() {
+                                 seed_tables_default();
+                                 B* ch = channel_records + slot * 0x70u;
+                                 ch[bus + 0x46u] = static_cast<B>(v46);
+                                 ch[bus + 0x47u] = static_cast<B>(v47);
+                                 hw_records[slot * 0xf8u] = hw0;
+                             });
+                }
+            }
+        }
+    }
+
+    // 4. Direct checks for 005902a0 (audio_channel_send_level_005902a0).
+    // 4a. Inactive audio returns -10 without locking.
+    for (U bus : {0u, 1u}) {
+        run_3arg(slot_5902a0,
+                 reinterpret_cast<void*>(&porsche::audio_channel_send_level_005902a0),
+                 0x100u, bus, 77u, true, []() {
+                     seed_tables_default();
+                     application_audio_device_state_006b48c0[0xdcu] = 0u;
+                 });
+    }
+    // 4b. Active audio: missing channel (< 0) and empty channel (0 voices).
+    for (I ret_ch : {-1, -4}) {
+        run_3arg(slot_5902a0,
+                 reinterpret_cast<void*>(&porsche::audio_channel_send_level_005902a0),
+                 0x201u, 0u, 55u, true, [=]() {
+                     seed_tables_default();
+                     scenario.map_count = 1u;
+                     scenario.map_handles[0] = 0x201u;
+                     scenario.map_channels[0] = ret_ch;
+                 });
+    }
+    run_3arg(slot_5902a0,
+             reinterpret_cast<void*>(&porsche::audio_channel_send_level_005902a0),
+             0x202u, 1u, 55u, true, []() {
+                 seed_tables_default();
+                 scenario.map_count = 1u;
+                 scenario.map_handles[0] = 0x202u;
+                 scenario.map_channels[0] = 2;
+                 scenario.ch_voice_count[2] = 0u;
+             });
+    // 4c. Active audio with 1 and 3 voices across bus in {0, 1}, hw_rec[0] & 0x10 in {0, 0x10},
+    // and signed byte levels.
+    for (U bus : {0u, 1u}) {
+        for (I level : {0, 90, -1, -128}) {
+            for (B hw0 : {0x00u, 0x10u}) {
+                run_3arg(slot_5902a0,
+                         reinterpret_cast<void*>(&porsche::audio_channel_send_level_005902a0),
+                         0x203u, bus, static_cast<U>(level), true, [=]() {
+                             seed_tables_default();
+                             application_audio_device_state_006b48c0[0xdcu] = 0xffu;
+                             scenario.map_count = 1u;
+                             scenario.map_handles[0] = 0x203u;
+                             scenario.map_channels[0] = 1;
+                             scenario.ch_voice_count[1] = 3u;
+                             scenario.ch_voices[1][0] = 0u;
+                             scenario.ch_voices[1][1] = 2u;
+                             scenario.ch_voices[1][2] = 5u;
+                             hw_records[0u * 0xf8u] = hw0;
+                             hw_records[2u * 0xf8u] = static_cast<B>(hw0 ^ 0x10u);
+                             hw_records[5u * 0xf8u] = hw0;
+                         });
+            }
+        }
+    }
+
+    // 5. Direct checks for 00565cd0 (frame_services_boundary_00565cd0).
+    for (U bus : {0u, 1u}) {
+        for (U mask : {0x00u, 0x20u, 0x80u, 0xa0u, 0xe0u}) {
+            for (B active : {0u, 1u}) {
+                for (std::int16_t ch_count : {static_cast<std::int16_t>(-1),
+                                              static_cast<std::int16_t>(0),
+                                              static_cast<std::int16_t>(1),
+                                              static_cast<std::int16_t>(2)}) {
+                    for (U level : {0x5au, 0x80u}) {
+                        run_2arg(slot_565cd0,
+                                 reinterpret_cast<void*>(&porsche::frame_services_boundary_00565cd0),
+                                 bus | mask, level, false, [=]() {
+                                     seed_tables_default();
+                                     application_audio_device_state_006b48c0[0xdcu] = active;
+                                     audio_backend_channel_count_006b49a4 = ch_count;
+                                     scenario.map_count = 2u;
+                                     scenario.map_handles[0] = 0x100u;
+                                     scenario.map_channels[0] = 0;
+                                     scenario.map_handles[1] = 0x101u;
+                                     scenario.map_channels[1] = 1;
+                                     scenario.ch_voice_count[0] = 1u;
+                                     scenario.ch_voices[0][0] = 0u;
+                                     scenario.ch_voice_count[1] = 2u;
+                                     scenario.ch_voices[1][0] = 1u;
+                                     scenario.ch_voices[1][1] = 4u;
+                                 });
+                    }
+                }
+            }
+        }
+    }
+
+    std::printf("frame_audio_send_level_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events);
+    return 0;
+}

@@ -4,23 +4,24 @@ Updated 2026-11-17. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run609](iterations/v2/001-original-recovery/runs/609-frame-audio-ramp-volume-integration/README.md)
-compiles343 C++ translation units across8 projects. The link has108 unresolved names/
-113 references. **There is no recovered playable C++ game executable yet.**
+[Run612](iterations/v2/001-original-recovery/runs/612-frame-send-sprite-integration/README.md)
+compiles345 C++ translation units across8 projects. The link has106 unresolved names/
+111 references. **There is no recovered playable C++ game executable yet.**
 
-Run609 integrates partial `00565dd0` (159B), `00566ae0` (88B), `004ae3c0` (165B),
-`00589df0` (140B), `00590d10` (62B), `005662b0` (141B), `00566340` (50B) and
-`004af900` (112B) from frozen607001 and608001 plus 21B loader-zero `.data`.
-Native comparisons pass2540 cases/eight controls atOd/O2. Canonical audio
-device/backend (`434`, `435`, `478`, `561`) owners are reused. Shared audit
-verifies848 pins/932 providers; registry934 retains partial domains.
+Run612 integrates partial `00590290` (3B), `00589d70` (121B), `00598eb0` (99B),
+`005902a0` (157B), `00565cd0` (137B), `0056e2a8` (24B), `005712f0` (49B) and
+`00563320` (286B) from frozen610001 and611002 (`611001` preserved) plus 126B
+`.rdata` strings. Native comparisons pass3138 cases/eight controls atOd/O2.
+Canonical audio device/backend, render descriptor, pixel buffer and diagnostic
+owners are reused. Shared audit verifies853 pins/943 providers; registry942
+retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run607 native001, Run608 native001 and Run609 integration are accepted within their stated bounds.
-Run610 frame audio send level and611 splash sprite horizflip are active pending packets.
+Run610 native001, Run611 native002 and Run612 integration are accepted within their stated bounds.
+Run613 render display member trees and614 splash release stack are active pending packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
