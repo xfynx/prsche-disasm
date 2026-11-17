@@ -1,0 +1,79 @@
+{
+  "run": 607,
+  "experiment": "local/experiments/v2-frame-audio-stream-ramp-607",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/607-frame-audio-stream-ramp/frame_audio_stream_ramp_607.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/607-frame-audio-stream-ramp/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/607-frame-audio-stream-ramp",
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls",
+    "iterations/v2/001-original-recovery/runs/561-audio-stream-creation",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/607-frame-audio-stream-ramp/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004ae3c0",
+      "bytes": 165,
+      "sha256": "5a830abdc012cff5c0047770e3600566fdd7ff32434942aebd6952010ba49ab1",
+      "token": "@BODY_004AE3C0@"
+    },
+    {
+      "va": "00566ae0",
+      "bytes": 88,
+      "sha256": "8824374bc7b6abd7085028e9464bb1eea95a3f7d28e99117d09aa97553565f24",
+      "token": "@BODY_00566AE0@"
+    },
+    {
+      "va": "00565dd0",
+      "bytes": 159,
+      "sha256": "b3b76f0e2fbd62511e3209d964eea4fe11d2024a362242bdfa68a9116c246293",
+      "token": "@BODY_00565DD0@"
+    }
+  ],
+  "pass_marker": "frame_audio_stream_ramp_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-channel-step-clamp",
+      "source": "iterations/v2/001-original-recovery/runs/607-frame-audio-stream-ramp/frame_audio_stream_ramp_607.cpp",
+      "old": "const std::int32_t div = (steps > 0) ? steps : 1;",
+      "new": "const std::int32_t div = (steps > 0) ? steps : 2;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-ramp-scale-shift",
+      "source": "iterations/v2/001-original-recovery/runs/607-frame-audio-stream-ramp/frame_audio_stream_ramp_607.cpp",
+      "old": "static_cast<std::int32_t>(static_cast<std::uint32_t>(target) << 16u);",
+      "new": "static_cast<std::int32_t>(static_cast<std::uint32_t>(target) << 15u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-stream-ms-divisor",
+      "source": "iterations/v2/001-original-recovery/runs/607-frame-audio-stream-ramp/frame_audio_stream_ramp_607.cpp",
+      "old": "const std::int32_t steps = ms / 10;",
+      "new": "const std::int32_t steps = ms / 8;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-boundary-pending-flag",
+      "source": "iterations/v2/001-original-recovery/runs/607-frame-audio-stream-ramp/frame_audio_stream_ramp_607.cpp",
+      "old": "if (*reinterpret_cast<const std::uint32_t*>(ptr_from_va(root) + 0x14u) == 0u) {",
+      "new": "if (*reinterpret_cast<const std::uint32_t*>(ptr_from_va(root) + 0x14u) != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

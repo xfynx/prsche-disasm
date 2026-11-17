@@ -1,0 +1,87 @@
+{
+  "run": 608,
+  "experiment": "local/experiments/v2-frame-audio-channel-volume-608",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/608-frame-audio-channel-volume/frame_audio_channel_volume_608.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/608-frame-audio-channel-volume/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/608-frame-audio-channel-volume",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/608-frame-audio-channel-volume/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004af900",
+      "bytes": 112,
+      "sha256": "952dcbe96c15902c7e429038640ecbec7c2c2cac5820bc4444abba0b064261fd",
+      "token": "@BODY_004AF900@"
+    },
+    {
+      "va": "00566340",
+      "bytes": 50,
+      "sha256": "5c68e6e28b7b603a2ab29ff76062a7e6886ebfb9018d1e19a2b0f4f67d58ca99",
+      "token": "@BODY_00566340@"
+    },
+    {
+      "va": "005662b0",
+      "bytes": 141,
+      "sha256": "5f3ca5b7f89d16fc1fe668eda3d67508504711d16ee60e474c0bb8ac80b7bcea",
+      "token": "@BODY_005662B0@"
+    },
+    {
+      "va": "00589df0",
+      "bytes": 140,
+      "sha256": "0d231a017eb74cdeb3fa399a75d1e4261c974bed5c6ea0d80eb6a5c1909f3a8b",
+      "token": "@BODY_00589DF0@"
+    },
+    {
+      "va": "00590d10",
+      "bytes": 62,
+      "sha256": "c1f7496256814cbfc7e853b578fdf63897783d1891b7fb94e687a0efd47b6bdf",
+      "token": "@BODY_00590D10@"
+    }
+  ],
+  "pass_marker": "frame_audio_channel_volume_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-inactive-device-return",
+      "source": "iterations/v2/001-original-recovery/runs/608-frame-audio-channel-volume/frame_audio_channel_volume_608.cpp",
+      "old": "        return 0xfffffff6u;",
+      "new": "        return 0xfffffff7u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-unchanged-volume-early-return",
+      "source": "iterations/v2/001-original-recovery/runs/608-frame-audio-channel-volume/frame_audio_channel_volume_608.cpp",
+      "old": "        if (*reinterpret_cast<const std::uint32_t*>(rec + 0x2cu) == scaled_vol) {\n            return 0;\n        }",
+      "new": "        if (*reinterpret_cast<const std::uint32_t*>(rec + 0x2cu) == scaled_vol) {\n            return ch;\n        }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-envelope-divisor-shift",
+      "source": "iterations/v2/001-original-recovery/runs/608-frame-audio-channel-volume/frame_audio_channel_volume_608.cpp",
+      "old": "        const std::int32_t sar2 = hi2 >> 6;",
+      "new": "        const std::int32_t sar2 = hi2 >> 5;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-mode-tag-guard",
+      "source": "iterations/v2/001-original-recovery/runs/608-frame-audio-channel-volume/frame_audio_channel_volume_608.cpp",
+      "old": "        if (tag != frame_audio_tag_00657388) {",
+      "new": "        if (tag == frame_audio_tag_00657388) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

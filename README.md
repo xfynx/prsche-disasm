@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run606](iterations/v2/001-original-recovery/runs/606-render-callbacks-mode-integration/README.md)
-  integrates the partial render initialize callbacks and driver context mode.
-  The shared build has111 unresolved names across341 TUs.
+  [Run609](iterations/v2/001-original-recovery/runs/609-frame-audio-ramp-volume-integration/README.md)
+  integrates the partial frame audio stream ramp and channel volume chains.
+  The shared build has108 unresolved names across343 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

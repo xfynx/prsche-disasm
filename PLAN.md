@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run606](iterations/v2/001-original-recovery/runs/606-render-callbacks-mode-integration/README.md).
-Render initialize callbacks5759f0 and driver context mode549220/5381d0 close two real dependencies.
-The shared build compiles341 TUs with111 unresolved names/116 references.
+Latest recovery intake is [Run609](iterations/v2/001-original-recovery/runs/609-frame-audio-ramp-volume-integration/README.md).
+Frame audio stream ramp4ae3c0/566ae0/565dd0 and channel volume4af900/566340/5662b0/589df0/590d10 close three real dependencies.
+The shared build compiles343 TUs with108 unresolved names/113 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are the reachable frame audio stream ramp4ae3c0/566ae0/565dd0 and channel volume4af900/566340/5662b0/589df0/590d10 dependencies. The real depth-conversion
+Next are the reachable frame audio send level565cd0/5902a0/589d70/598eb0 and splash sprite horizflip563320/56e2a8/5712f0 dependencies. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;
