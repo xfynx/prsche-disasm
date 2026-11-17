@@ -1,0 +1,67 @@
+{
+  "run": 625,
+  "experiment": "local/experiments/v2-application-audio-probe-init-625",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/625-application-audio-probe-init/application_audio_init_625.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/625-application-audio-probe-init/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/625-application-audio-probe-init",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/625-application-audio-probe-init/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004a66b0",
+      "bytes": 398,
+      "sha256": "a9ac30a2e2c2ddb8191cf4198eaf8c3932d6f3f4f2bbc5e7238cf3ce3b297e91",
+      "token": "@BODY_004A66B0@"
+    },
+    {
+      "va": "005b4ac0",
+      "bytes": 128,
+      "sha256": "1971f9131f19a90589aa38b61716f75b521469ab8ef7799874f5de89f991ef01",
+      "token": "@RDATA_005B4AC0@"
+    }
+  ],
+  "pass_marker": "application_audio_probe_init_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-create-failure-guard",
+      "source": "iterations/v2/001-original-recovery/runs/625-application-audio-probe-init/application_audio_init_625.cpp",
+      "old": "    if (result < 0) {",
+      "new": "    if (result <= 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-mode-three-cutoff",
+      "source": "iterations/v2/001-original-recovery/runs/625-application-audio-probe-init/application_audio_init_625.cpp",
+      "old": "    if (mode < 3) {",
+      "new": "    if (mode <= 3) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-interval-rounding",
+      "source": "iterations/v2/001-original-recovery/runs/625-application-audio-probe-init/application_audio_init_625.cpp",
+      "old": "            const std::int32_t interval = rate / 2;",
+      "new": "            const std::int32_t interval = rate >> 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-max-rate-clamp",
+      "source": "iterations/v2/001-original-recovery/runs/625-application-audio-probe-init/application_audio_init_625.cpp",
+      "old": "        if (maximum <= requested) {",
+      "new": "        if (maximum >= requested) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

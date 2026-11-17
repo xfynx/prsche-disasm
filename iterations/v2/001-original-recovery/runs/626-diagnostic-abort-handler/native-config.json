@@ -1,0 +1,89 @@
+{
+  "run": 626,
+  "experiment": "local/experiments/v2-diagnostic-abort-handler-626",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/626-diagnostic-abort-handler/diagnostic_abort_handler_626.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/626-diagnostic-abort-handler/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/626-diagnostic-abort-handler",
+    "iterations/v2/001-original-recovery/runs/353-diagnostic-mono",
+    "iterations/v2/001-original-recovery/runs/549-render-diagnostic",
+    "iterations/v2/001-original-recovery/runs/345-diagnostic-devices",
+    "iterations/v2/001-original-recovery/runs/457-startup-win32-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/626-diagnostic-abort-handler/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00565340",
+      "bytes": 381,
+      "sha256": "33d1703a90eedbf8824059487bb2a994f3450a56a838fd58ac036a0e11e24672",
+      "token": "@BODY_00565340@"
+    },
+    {
+      "va": "005bd4c4",
+      "bytes": 5,
+      "sha256": "9ea6e06fce7ece13ebfd5dfefbeb7fd5024d14f4ae9d5e67e4c339fe2e88bd13",
+      "token": "@STR_005BD4C4@"
+    },
+    {
+      "va": "005bd4cc",
+      "bytes": 14,
+      "sha256": "35d0957e01075c5d2b7bf89cec21ed4cfb6888bef1d65305507a30f2ebeb1485",
+      "token": "@STR_005BD4CC@"
+    },
+    {
+      "va": "005bd4dc",
+      "bytes": 30,
+      "sha256": "0c1f3708243c3b6bf72ba5e6983e3d29281711d4e0d51563181838bd88eb51d0",
+      "token": "@STR_005BD4DC@"
+    },
+    {
+      "va": "005d0b1c",
+      "bytes": 2,
+      "sha256": "102b51b9765a56a3e899f7cf0ee38e5251f9c503b357b330a49183eb7b155604",
+      "token": "@STR_005D0B1C@"
+    }
+  ],
+  "pass_marker": "diagnostic_abort_handler_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-reentrancy-guard",
+      "source": "iterations/v2/001-original-recovery/runs/626-diagnostic-abort-handler/diagnostic_abort_handler_626.cpp",
+      "old": "    if (diagnostic_abort_active_006a5c24 != 0u) {",
+      "new": "    if (diagnostic_abort_active_006a5c24 == 12345u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-filter-clear",
+      "source": "iterations/v2/001-original-recovery/runs/626-diagnostic-abort-handler/diagnostic_abort_handler_626.cpp",
+      "old": "            diagnostic_abort_active_006a5c24 = 0u;",
+      "new": "            diagnostic_abort_active_006a5c24 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-messagebox-flags",
+      "source": "iterations/v2/001-original-recovery/runs/626-diagnostic-abort-handler/diagnostic_abort_handler_626.cpp",
+      "old": "    render_message_box_005b2270(0u, message, title, 0x11011u);",
+      "new": "    render_message_box_005b2270(0u, message, title, 0x11010u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-lock-cleanup-guard",
+      "source": "iterations/v2/001-original-recovery/runs/626-diagnostic-abort-handler/diagnostic_abort_handler_626.cpp",
+      "old": "    if (lock_handle != 0u) {",
+      "new": "    if (lock_handle == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

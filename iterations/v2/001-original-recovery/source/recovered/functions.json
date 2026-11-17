@@ -17685,6 +17685,57 @@
           "00566e9e"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "004a66b0",
+      "source": "iterations/v2/001-original-recovery/runs/625-application-audio-probe-init/application_audio_init_625.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 uint8 RET0 (application_audio_probe_initialize_004a66b0); queries audio capabilities via 00565950, scans format pairs, clamps/opens device via 00565680/005656d0/00565720/0053c380 without retry on <0 (004a680b: jl 004a66db), and calls 004ab470 on success",
+      "recovered_dependencies": [
+        "004ab470",
+        "0053c380",
+        "00565680",
+        "005656d0",
+        "00565720",
+        "00565950"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/627-audio-init-diagnostic-abort-integration/validation.json",
+      "verification_boundary": "Shared627(002) PASS:498 native cases (249 per optimization at Od/O2) and 4 material controls. SHA037191c99ef4f75c82c826ea1cb5fdf50a5216f68cf83c7c2bc1c50609f87a54. Owns 128B .rdata (005b4ac0..005b4b3f); reuses 00655d40/006573e8/00655d44/005deb48. Build355TUs/92names95refs/noEXE.",
+      "partial_reason": "Bounded mode in [-8, 5] and descriptor format counts inside the 124-byte AudioInitDescriptor; out-of-bounds descriptor counts and live audio hardware remain open.",
+      "body_bytes": 398,
+      "body_ranges": [
+        [
+          "004a66b0",
+          "004a683d"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00565340",
+      "source": "iterations/v2/001-original-recovery/runs/626-diagnostic-abort-handler/diagnostic_abort_handler_626.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl varargs void RET0 (diagnostic_report_varargs_00565340 exporting file_diagnostic_00565340, render_loader_report_00565340, window_scheduler_diagnostic_00565340 via naked jmps); formats fatal diagnostic, runs optional cleanup hook 005deb8c and filter 005deb94, shows MessageBoxA-wrapper 005b2270, then releases lock/exits",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/627-audio-init-diagnostic-abort-integration/validation.json",
+      "verification_boundary": "Shared627(002) PASS:54 native cases (27 per optimization at Od/O2) and 4 material controls. SHA75c8dad53555e12cdf2c3ac9b16884d0e7e5ca98950e957c63c02a10417158ed. Owns 24B loader-zero .data (006a5c24, 005deb6c, 005deb84, 005deb8c, 005deb90, 005deb94) and 51B .rdata (005bd4c4/cc/dc, 005d0b1c). Build355TUs/92names95refs/noEXE.",
+      "partial_reason": "Bounded 512-byte message / 128-byte title formatting with returning exit mocks; buffer overflow and real process termination remain open.",
+      "body_bytes": 381,
+      "body_ranges": [
+        [
+          "00565340",
+          "005654bc"
+        ]
+      ]
     }
   ]
 }

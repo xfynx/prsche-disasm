@@ -1,0 +1,535 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+#include "diagnostic_abort_handler_626.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kMaxEvents = 16u,
+    kMsgCap = 512u,
+    kTitleCap = 128u,
+};
+
+enum EventTag : U {
+    kEvVsprintf = 1u,
+    kEvFilter = 2u,
+    kEvFormatTitle = 3u,
+    kEvCleanup = 4u,
+    kEvHook = 5u,
+    kEvShowCursor = 6u,
+    kEvMessageBox = 7u,
+    kEvTexDiag = 8u,
+    kEvFinish = 9u,
+    kEvHeapLeave = 10u,
+    kEvCurrentThread = 11u,
+    kEvAppExit = 12u,
+    kEvExitProcess = 13u,
+};
+
+struct StateSnapshot {
+    U active;
+    U finish;
+    U has_location;
+    U cleanup;
+    U hook;
+    U filter;
+    U file_word;
+    U line_word;
+    U tex_errors;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    StateSnapshot state;
+    char text0[kMsgCap];
+    char text1[kTitleCap];
+};
+
+struct Trace {
+    U abi_fail;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events_total = 0u;
+
+static B* code = nullptr;
+static B* slot_565340 = nullptr;
+
+static I mock_filter_ret = 1;
+static bool mock_filter_mutate = false;
+static U mock_cleanup_ret = 0u;
+static I mock_current_thread_ret = 0;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void copy_bounded(char* dst, U cap, const char* src) {
+    std::memset(dst, 0, cap);
+    if (src == nullptr) {
+        return;
+    }
+    for (U i = 0u; i + 1u < cap && src[i] != '\0'; ++i) {
+        dst[i] = src[i];
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    s.active = porsche::diagnostic_abort_active_006a5c24;
+    s.finish = porsche::diagnostic_abort_finish_005deb6c;
+    s.has_location = porsche::diagnostic_abort_has_location_005deb84;
+    s.cleanup = porsche::diagnostic_abort_cleanup_005deb8c;
+    s.hook = porsche::diagnostic_abort_hook_005deb90;
+    s.filter = porsche::diagnostic_abort_filter_005deb94;
+    s.file_word = porsche::shared_runtime_word_005deb74;
+    s.line_word = porsche::shared_runtime_word_005deb78;
+    s.tex_errors = porsche::texture_create_errors_005deb80;
+}
+
+static void record_event(U tag, U arg0, U arg1, U arg2, const char* t0 = nullptr, const char* t1 = nullptr) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    capture_state(e.state);
+    copy_bounded(e.text0, sizeof e.text0, t0);
+    copy_bounded(e.text1, sizeof e.text1, t1);
+}
+
+static I __cdecl mock_filter_fn(char* msg) {
+    record_event(kEvFilter, static_cast<U>(mock_filter_ret), mock_filter_mutate ? 1u : 0u, 0u, msg);
+    if (mock_filter_mutate && msg != nullptr) {
+        const std::size_t len = std::strlen(msg);
+        if (len + 6u < kMsgCap) {
+            std::memcpy(msg + len, " [ok]", 6u);
+        }
+    }
+    return mock_filter_ret;
+}
+
+static U __cdecl mock_cleanup_fn() {
+    record_event(kEvCleanup, mock_cleanup_ret, 0u, 0u);
+    return mock_cleanup_ret;
+}
+
+static void __cdecl mock_hook_fn() {
+    record_event(kEvHook, 0u, 0u, 0u);
+}
+
+static void __cdecl mock_finish_fn() {
+    record_event(kEvFinish, 0u, 0u, 0u);
+}
+
+static void __stdcall iat_message_box_fn(U window, const char* text, const char* title, U flags) {
+    porsche::render_message_box_005b2270(window, text, title, flags);
+}
+
+static void __stdcall iat_exit_process_fn(U code_val) {
+    porsche::exit_shutdown_exit_process(code_val);
+}
+
+static const void* iat_show_cursor_slot = nullptr;
+static const void* iat_message_box_slot = nullptr;
+static const void* iat_exit_process_slot = nullptr;
+
+namespace porsche {
+
+std::uint32_t shared_runtime_word_005deb74 = 0u;
+std::uint32_t shared_runtime_word_005deb78 = 0u;
+std::uint32_t texture_create_errors_005deb80 = 0u;
+
+int __cdecl application_diagnostic_mono_vsprintf_005a299e(char* out, const char* format, const std::uint32_t* args) {
+    const int n = std::vsnprintf(
+        out, kMsgCap, format, reinterpret_cast<va_list>(const_cast<std::uint32_t*>(args)));
+    record_event(kEvVsprintf, address(format), static_cast<U>(n), 0u, out);
+    return n;
+}
+
+void __cdecl render_loader_format_005a0fbf(char* out, const char* format, ...) {
+    std::va_list ap;
+    va_start(ap, format);
+    const char* file = va_arg(ap, const char*);
+    const U line = va_arg(ap, U);
+    va_end(ap);
+    std::snprintf(out, kTitleCap, format, file, line);
+    record_event(kEvFormatTitle, address(format), address(file), line, nullptr, out);
+}
+
+std::int32_t __stdcall render_window_show_cursor(std::int32_t show) {
+    record_event(kEvShowCursor, static_cast<U>(show), 0u, 0u);
+    return 1;
+}
+
+void __cdecl render_message_box_005b2270(std::uint32_t window, const char* text, const char* title, std::uint32_t flags) {
+    record_event(kEvMessageBox, window, flags, 0u, text, title);
+}
+
+void __cdecl render_texture_diagnostic_0055ec50(std::uint32_t channel, const char* format, ...) {
+    char buf[kMsgCap] = {};
+    U fmt_kind = 0u;
+    if (format == diagnostic_newline_005d0b1c) {
+        fmt_kind = 1u;
+        copy_bounded(buf, sizeof buf, format);
+    } else if (format == diagnostic_indent_fmt_005bd4c4) {
+        fmt_kind = 2u;
+        std::va_list ap;
+        va_start(ap, format);
+        const char* msg = va_arg(ap, const char*);
+        va_end(ap);
+        std::snprintf(buf, sizeof buf, format, msg);
+    } else {
+        copy_bounded(buf, sizeof buf, format);
+    }
+    record_event(kEvTexDiag, channel, fmt_kind, fmt_kind ? address(format) : 0u, buf);
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    record_event(kEvHeapLeave, address(lock), 0u, 0u);
+}
+
+std::int32_t __cdecl file_current_thread_0055f780(std::uint32_t arg) {
+    record_event(kEvCurrentThread, arg, static_cast<U>(mock_current_thread_ret), 0u);
+    return mock_current_thread_ret;
+}
+
+void __cdecl application_instance_exit_005a246e(std::uint32_t code_val) {
+    record_event(kEvAppExit, code_val, 0u, 0u);
+}
+
+void __cdecl exit_shutdown_exit_process(std::uint32_t code_val) {
+    record_event(kEvExitProcess, code_val, 0u, 0u);
+}
+
+} // namespace porsche
+
+static U invoke_cdecl_varargs(void* fn, const U* args, U argc) {
+    U before = 0u, frame = 0u, fail = 0u;
+    const U cleanup = argc * 4u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, argc
+        mov edx, args
+    push_loop:
+        test eax, eax
+        jz pushed
+        dec eax
+        push dword ptr [edx + eax * 4]
+        jmp push_loop
+    pushed:
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, cleanup
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && slot[off - 1u] == 0xe8u, "exact relative call opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B raw_indent[] = {@STR_005BD4C4@};
+    static const B raw_title[] = {@STR_005BD4CC@};
+    static const B raw_file_line[] = {@STR_005BD4DC@};
+    static const B raw_newline[] = {@STR_005D0B1C@};
+
+    require(sizeof raw_indent == sizeof porsche::diagnostic_indent_fmt_005bd4c4 &&
+            std::memcmp(raw_indent, porsche::diagnostic_indent_fmt_005bd4c4, sizeof raw_indent) == 0,
+            "exact 005bd4c4 string bytes");
+    require(sizeof raw_title == sizeof porsche::diagnostic_abort_title_005bd4cc &&
+            std::memcmp(raw_title, porsche::diagnostic_abort_title_005bd4cc, sizeof raw_title) == 0,
+            "exact 005bd4cc string bytes");
+    require(sizeof raw_file_line == sizeof porsche::diagnostic_abort_file_line_fmt_005bd4dc &&
+            std::memcmp(raw_file_line, porsche::diagnostic_abort_file_line_fmt_005bd4dc, sizeof raw_file_line) == 0,
+            "exact 005bd4dc string bytes");
+    require(sizeof raw_newline == sizeof porsche::diagnostic_newline_005d0b1c &&
+            std::memcmp(raw_newline, porsche::diagnostic_newline_005d0b1c, sizeof raw_newline) == 0,
+            "exact 005d0b1c string bytes");
+
+    iat_show_cursor_slot = reinterpret_cast<const void*>(&porsche::render_window_show_cursor);
+    iat_message_box_slot = reinterpret_cast<const void*>(&iat_message_box_fn);
+    iat_exit_process_slot = reinterpret_cast<const void*>(&iat_exit_process_fn);
+
+    static const B body_565340[] = {@BODY_00565340@};
+    require(sizeof body_565340 == 381u, "381-byte original body 00565340");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_565340 = code;
+    std::memcpy(slot_565340, body_565340, sizeof body_565340);
+
+    relocate_abs32(slot_565340, 0x01u, 0x006a5c24u, address(&porsche::diagnostic_abort_active_006a5c24));
+    relocate_abs32(slot_565340, 0x1fu, 0x006a5c24u, address(&porsche::diagnostic_abort_active_006a5c24));
+    relocate_rel32(slot_565340, 0x00565340u, 0x3du, 0x005a299eu,
+                   reinterpret_cast<const void*>(&porsche::application_diagnostic_mono_vsprintf_005a299e));
+    relocate_abs32(slot_565340, 0x4fu, 0x005deb94u, address(&porsche::diagnostic_abort_filter_005deb94));
+    relocate_abs32(slot_565340, 0x69u, 0x006a5c24u, address(&porsche::diagnostic_abort_active_006a5c24));
+    relocate_abs32(slot_565340, 0x76u, 0x005deb84u, address(&porsche::diagnostic_abort_has_location_005deb84));
+    relocate_abs32(slot_565340, 0x7fu, 0x005deb74u, address(&porsche::shared_runtime_word_005deb74));
+    relocate_abs32(slot_565340, 0x89u, 0x005deb78u, address(&porsche::shared_runtime_word_005deb78));
+    relocate_abs32(slot_565340, 0x94u, 0x005bd4dcu, address(&porsche::diagnostic_abort_file_line_fmt_005bd4dc[0]));
+    relocate_rel32(slot_565340, 0x00565340u, 0x9au, 0x005a0fbfu,
+                   reinterpret_cast<const void*>(&porsche::render_loader_format_005a0fbf));
+    relocate_abs32(slot_565340, 0xa5u, 0x005bd4ccu, address(&porsche::diagnostic_abort_title_005bd4cc[0]));
+    relocate_abs32(slot_565340, 0xabu, 0x005bd4d0u, address(&porsche::diagnostic_abort_title_005bd4cc[4]));
+    relocate_abs32(slot_565340, 0xb0u, 0x005bd4d4u, address(&porsche::diagnostic_abort_title_005bd4cc[8]));
+    relocate_abs32(slot_565340, 0xbbu, 0x005bd4d8u, address(&porsche::diagnostic_abort_title_005bd4cc[12]));
+    relocate_abs32(slot_565340, 0xcdu, 0x005deb8cu, address(&porsche::diagnostic_abort_cleanup_005deb8c));
+    relocate_abs32(slot_565340, 0xdau, 0x005deb90u, address(&porsche::diagnostic_abort_hook_005deb90));
+    relocate_abs32(slot_565340, 0xe8u, 0x005b2278u, address(&iat_show_cursor_slot));
+    relocate_abs32(slot_565340, 0x102u, 0x005b2270u, address(&iat_message_box_slot));
+    relocate_abs32(slot_565340, 0x107u, 0x005deb80u, address(&porsche::texture_create_errors_005deb80));
+    relocate_abs32(slot_565340, 0x110u, 0x005deb6cu, address(&porsche::diagnostic_abort_finish_005deb6c));
+    relocate_rel32(slot_565340, 0x00565340u, 0x120u, 0x0055ec50u,
+                   reinterpret_cast<const void*>(&porsche::render_texture_diagnostic_0055ec50));
+    relocate_abs32(slot_565340, 0x125u, 0x005d0b1cu, address(&porsche::diagnostic_newline_005d0b1c[0]));
+    relocate_rel32(slot_565340, 0x00565340u, 0x12cu, 0x0055ec50u,
+                   reinterpret_cast<const void*>(&porsche::render_texture_diagnostic_0055ec50));
+    relocate_abs32(slot_565340, 0x139u, 0x005bd4c4u, address(&porsche::diagnostic_indent_fmt_005bd4c4[0]));
+    relocate_rel32(slot_565340, 0x00565340u, 0x140u, 0x0055ec50u,
+                   reinterpret_cast<const void*>(&porsche::render_texture_diagnostic_0055ec50));
+    relocate_abs32(slot_565340, 0x149u, 0x005deb6cu, address(&porsche::diagnostic_abort_finish_005deb6c));
+    relocate_rel32(slot_565340, 0x00565340u, 0x153u, 0x005322c0u,
+                   reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+    relocate_rel32(slot_565340, 0x00565340u, 0x15du, 0x0055f780u,
+                   reinterpret_cast<const void*>(&porsche::file_current_thread_0055f780));
+    relocate_rel32(slot_565340, 0x00565340u, 0x16bu, 0x005a246eu,
+                   reinterpret_cast<const void*>(&porsche::application_instance_exit_005a246e));
+    relocate_abs32(slot_565340, 0x171u, 0x005b21a8u, address(&iat_exit_process_slot));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0,
+                "event mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+}
+
+template <typename SetupFn>
+static void run_case(void* cpp_fn, const U* args, U argc, SetupFn setup) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_varargs(slot_565340, args, argc);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_varargs(cpp_fn, args, argc);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events_total += trace.count;
+    compare_traces();
+}
+
+struct CaseConfig {
+    U active;
+    U has_filter;
+    I filter_ret;
+    bool filter_mutate;
+    U has_loc;
+    const char* file_str;
+    U line;
+    U has_cleanup;
+    U cleanup_ret;
+    U has_hook;
+    U tex_errors;
+    U has_finish;
+    I thread_ret;
+};
+
+static void apply_config(const CaseConfig& cfg) {
+    porsche::diagnostic_abort_active_006a5c24 = cfg.active;
+    porsche::diagnostic_abort_filter_005deb94 = cfg.has_filter ? address(reinterpret_cast<void*>(&mock_filter_fn)) : 0u;
+    mock_filter_ret = cfg.filter_ret;
+    mock_filter_mutate = cfg.filter_mutate;
+    porsche::diagnostic_abort_has_location_005deb84 = cfg.has_loc;
+    porsche::shared_runtime_word_005deb74 = cfg.file_str ? address(cfg.file_str) : 0u;
+    porsche::shared_runtime_word_005deb78 = cfg.line;
+    porsche::diagnostic_abort_cleanup_005deb8c = cfg.has_cleanup ? address(reinterpret_cast<void*>(&mock_cleanup_fn)) : 0u;
+    mock_cleanup_ret = cfg.cleanup_ret;
+    porsche::diagnostic_abort_hook_005deb90 = cfg.has_hook ? address(reinterpret_cast<void*>(&mock_hook_fn)) : 0u;
+    porsche::texture_create_errors_005deb80 = cfg.tex_errors;
+    porsche::diagnostic_abort_finish_005deb6c = cfg.has_finish ? address(reinterpret_cast<void*>(&mock_finish_fn)) : 0u;
+    mock_current_thread_ret = cfg.thread_ret;
+}
+
+int main() {
+    init();
+
+    // Verify loader-zero initial values of the 6 owned .data globals.
+    require(porsche::diagnostic_abort_active_006a5c24 == 0u, "initial 006a5c24");
+    require(porsche::diagnostic_abort_finish_005deb6c == 0u, "initial 005deb6c");
+    require(porsche::diagnostic_abort_has_location_005deb84 == 0u, "initial 005deb84");
+    require(porsche::diagnostic_abort_cleanup_005deb8c == 0u, "initial 005deb8c");
+    require(porsche::diagnostic_abort_hook_005deb90 == 0u, "initial 005deb90");
+    require(porsche::diagnostic_abort_filter_005deb94 == 0u, "initial 005deb94");
+
+    void* const exports[3] = {
+        reinterpret_cast<void*>(&porsche::file_diagnostic_00565340),
+        reinterpret_cast<void*>(&porsche::render_loader_report_00565340),
+        reinterpret_cast<void*>(&porsche::window_scheduler_diagnostic_00565340),
+    };
+
+    static const char kFile[] = "src/render.cpp";
+    static const char kFmtVar[] = "Error %s #%d (0x%x)";
+    static const char kArgStr[] = "bad_surface";
+    static const char kFmtPlain[] = "Simple abort";
+
+    const U args_null[1] = {0u};
+    const U args_plain[1] = {address(kFmtPlain)};
+    const U args_var[4] = {address(kFmtVar), address(kArgStr), 42u, 0x1234u};
+
+    for (void* exp_fn : exports) {
+        // 1. Reentrancy guard active != 0 -> immediate return, no calls.
+        run_case(exp_fn, args_var, 4u, []() {
+            apply_config({1u, 1u, 1, false, 1u, kFile, 99u, 1u, 0x1111u, 1u, 1u, 1u, 1});
+        });
+
+        // 2. Null format, no filter, default title, no callbacks, thread_ret == 0.
+        run_case(exp_fn, args_null, 1u, []() {
+            apply_config({0u, 0u, 0, false, 0u, nullptr, 0u, 0u, 0u, 0u, 0u, 0u, 0});
+        });
+
+        // 3. Filter returns 0 -> clears 006a5c24 and returns early.
+        run_case(exp_fn, args_var, 4u, []() {
+            apply_config({0u, 1u, 0, false, 1u, kFile, 77u, 1u, 0x2222u, 1u, 1u, 1u, 1});
+        });
+
+        // 4. Filter returns nonzero + mutates message, has_location=1 but file_word=0 -> default title.
+        run_case(exp_fn, args_var, 4u, []() {
+            apply_config({0u, 1u, 7, true, 1u, nullptr, 77u, 0u, 0u, 0u, 0u, 0u, 0});
+        });
+
+        // 5. has_location=0 but file_word!=0 -> default title, cleanup returns 0 (no heap_leave).
+        run_case(exp_fn, args_plain, 1u, []() {
+            apply_config({0u, 0u, 0, false, 0u, kFile, 12u, 1u, 0u, 1u, 1u, 0u, 0});
+        });
+
+        // 6. has_location=1 & file_word!=0 -> formatted title, tex_errors=0 & finish!=0 (no tex diag).
+        run_case(exp_fn, args_var, 4u, []() {
+            apply_config({0u, 0u, 0, false, 1u, kFile, 314u, 1u, 0xabcd0001u, 1u, 0u, 1u, 1});
+        });
+
+        // 7. Full path: filter!=0 (returns 1), formatted title, cleanup!=0, hook!=0,
+        //    tex_errors!=0 & finish!=0, lock_handle!=0, current_thread!=0 -> app_exit(0) + ExitProcess(0).
+        run_case(exp_fn, args_var, 4u, []() {
+            apply_config({0u, 1u, 1, true, 1u, kFile, 555u, 1u, 0xdead0002u, 1u, 3u, 1u, 1});
+        });
+
+        // 8. Full path with current_thread==0 (skips app_exit, reaches ExitProcess(0)).
+        run_case(exp_fn, args_null, 1u, []() {
+            apply_config({0u, 1u, 1, false, 1u, kFile, 888u, 1u, 0xdead0003u, 1u, 1u, 1u, 0});
+        });
+    }
+
+    // Direct C++ varargs call verification through indirect function pointer cast on all 3 exports.
+    for (void* exp_fn : exports) {
+        ++cases;
+        std::memset(&trace, 0, sizeof trace);
+        apply_config({0u, 1u, 1, false, 1u, kFile, 101u, 1u, 0x10203040u, 1u, 2u, 1u, 1});
+        reinterpret_cast<void(__cdecl*)(const char*, const char*, I, U)>(slot_565340)(
+            kFmtVar, kArgStr, 42, 0x1234u);
+        capture_state(trace.final_state);
+        expected = trace;
+
+        std::memset(&trace, 0, sizeof trace);
+        apply_config({0u, 1u, 1, false, 1u, kFile, 101u, 1u, 0x10203040u, 1u, 2u, 1u, 1});
+        reinterpret_cast<void(__cdecl*)(const char*, const char*, I, U)>(exp_fn)(
+            kFmtVar, kArgStr, 42, 0x1234u);
+        capture_state(trace.final_state);
+        events_total += trace.count;
+        compare_traces();
+    }
+
+    std::printf("diagnostic_abort_handler_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

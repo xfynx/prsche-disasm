@@ -1,26 +1,25 @@
 # Current project status
 
-Updated 2026-11-17. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-18. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run624](iterations/v2/001-original-recovery/runs/624-frame-begin-audio-consumed-integration/README.md)
-compiles353 C++ translation units across8 projects. The link has96 unresolved names/
-100 references. **There is no recovered playable C++ game executable yet.**
+[Run627](iterations/v2/001-original-recovery/runs/627-audio-init-diagnostic-abort-integration/README.md)
+compiles 355 C++ translation units across 8 projects. The link has 92 unresolved names /
+95 references. **There is no recovered playable C++ game executable yet.**
 
-Run624 integrates partial `00534540` (12B), `00535a90` (104B), `00566d80`
-(131B) and `00566e40` (95B) from frozen622001 and623001 plus 44B file-backed
-`.data` (`005de680..005de6ab`, 0B new `.rdata`). Native comparisons pass3820
-cases/nine controls atOd/O2. Canonical render descriptor, window shutdown state,
-render state flush and audio stream storage owners are reused. Shared audit
-verifies873 pins/966 providers; registry954 retains partial domains.
+Run627 integrates partial `004a66b0` (398B) and `00565340` (381B) from `625/002` and
+`626/002` (`625/001`, `626/001`, `627/001` preserved), plus 24B loader-zero `.data` and
+179B `.rdata`. Native comparisons pass 552 measured cases / 8 material controls at `/Od`/`/O2`.
+Canonical audio init, diagnostic, lock, window shutdown and exit owners are reused.
+Shared audit verifies 879 source pins; registry 956 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run622 native001, Run623 native001 and Run624 integration are accepted within their stated bounds.
-Run625 application audio probe initialize and626 diagnostic abort handler are active pending packets.
+Run625 (`002`), Run626 (`002`), and Run627 (`002`) integration are accepted within their stated bounds.
+Run628 (`00575820`) and Run629 (`0056aff0`) are queued next recovery packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.

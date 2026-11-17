@@ -1,0 +1,477 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "application_audio_init_625.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kMaxFormats = 16u,
+    kMaxEvents = 16u,
+};
+
+enum EventTag : U {
+    kEvPrepare = 1u,
+    kEvQueryConfig = 2u,
+    kEvApplyConfig = 3u,
+    kEvCreateDevice = 4u,
+    kEvWait = 5u,
+    kEvPostSetup = 6u,
+};
+
+enum HookKind : U {
+    kHookNone = 0u,
+    kHookMutateModeInPrepare = 1u,
+    kHookToggleGateInQuery = 2u,
+    kHookSwapBufferInApply = 3u,
+    kHookMutatePostCreate = 4u,
+    kHookSetConfiguredInQuery = 5u,
+};
+
+struct StateSnapshot {
+    U configured;
+    U buffer;
+    U timer_rate;
+    U mode_word;
+    U gate_word;
+    U applied_seen;
+    B applied_desc[0x7cu];
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    StateSnapshot state;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events = 0u;
+
+static B* code = nullptr;
+static B* slot_4a66b0 = nullptr;
+static B orig_rdata_005b4ac0[0x80u] = {};
+
+static U case_desc_seed = 0u;
+static I case_query_ret = 0;
+static I case_create_ret = 0;
+static std::uint16_t case_requested_rate = 0u;
+static B case_sample_count = 0u;
+static B case_fmt_count = 0u;
+static B case_fmts[kMaxFormats] = {};
+static HookKind case_hook = kHookNone;
+
+static U cur_applied_seen = 0u;
+static B cur_applied_desc[0x7cu] = {};
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    s.configured = porsche::application_audio_device_configured_00655d40;
+    s.buffer = porsche::application_audio_buffer_00655d44;
+    s.timer_rate = porsche::timer_rate_005deb48;
+    s.mode_word = porsche::application_state_006573e8.word(0x00657c98u);
+    s.gate_word = porsche::application_state_006573e8.word(0x00657c9cu);
+    s.applied_seen = cur_applied_seen;
+    std::memcpy(s.applied_desc, cur_applied_desc, sizeof(s.applied_desc));
+}
+
+static void record_event(U tag, U arg0, U arg1, U arg2) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    capture_state(e.state);
+}
+
+namespace porsche {
+
+ApplicationStateArena application_state_006573e8{};
+std::uint32_t application_audio_buffer_00655d44 = 0u;
+std::uint32_t application_audio_device_configured_00655d40 = 0u;
+std::uint32_t timer_rate_005deb48 = 0u;
+
+std::size_t ApplicationStateArena::checked_offset(std::uint32_t va,
+    std::size_t length) const {
+    if (va < application_state_base_va) {
+        return 0u;
+    }
+    const auto offset = static_cast<std::size_t>(va - application_state_base_va);
+    if (offset > application_state_bytes || length > application_state_bytes - offset) {
+        return 0u;
+    }
+    return offset;
+}
+
+std::uint32_t& ApplicationStateArena::word(std::uint32_t va) {
+    const auto offset = checked_offset(va, sizeof(std::uint32_t));
+    return words_[offset / sizeof(std::uint32_t)];
+}
+
+const std::uint32_t& ApplicationStateArena::word(std::uint32_t va) const {
+    const auto offset = checked_offset(va, sizeof(std::uint32_t));
+    return words_[offset / sizeof(std::uint32_t)];
+}
+
+void __cdecl application_audio_prepare_00565950() {
+    if (case_hook == kHookMutateModeInPrepare) {
+        application_state_006573e8.word(0x00657c98u) = 4u;
+    }
+    record_event(kEvPrepare, 0u, 0u, 0u);
+}
+
+std::int32_t __cdecl application_audio_query_config_00565680(
+    std::uint8_t* descriptor_124_bytes) {
+    for (U i = 0u; i < 0x7cu; ++i) {
+        descriptor_124_bytes[i] = static_cast<B>((i * 13u + case_desc_seed * 7u + 5u) & 0xffu);
+    }
+    descriptor_124_bytes[0x02u] = static_cast<B>(case_requested_rate & 0xffu);
+    descriptor_124_bytes[0x03u] = static_cast<B>((case_requested_rate >> 8u) & 0xffu);
+    descriptor_124_bytes[0x08u] = case_sample_count;
+    descriptor_124_bytes[0x0au] = case_fmt_count;
+    for (U i = 0u; i < static_cast<U>(case_fmt_count) && i < kMaxFormats; ++i) {
+        descriptor_124_bytes[0x0bu + i] = case_fmts[i];
+    }
+    if (case_hook == kHookToggleGateInQuery) {
+        application_state_006573e8.word(0x00657c9cu) ^= 1u;
+    } else if (case_hook == kHookSetConfiguredInQuery) {
+        application_audio_device_configured_00655d40 = 1u;
+    }
+    record_event(kEvQueryConfig, static_cast<U>(case_query_ret), 0u, 0u);
+    return case_query_ret;
+}
+
+std::uint32_t __cdecl application_audio_apply_config_005656d0(
+    const std::uint8_t* descriptor_124_bytes) {
+    cur_applied_seen = 1u;
+    std::memcpy(cur_applied_desc, descriptor_124_bytes, 0x7cu);
+    if (case_hook == kHookSwapBufferInApply) {
+        application_audio_buffer_00655d44 = 0xdeadbeefu;
+    }
+    record_event(kEvApplyConfig, 0u, 0u, 0u);
+    return 0u;
+}
+
+std::int32_t __cdecl application_audio_create_device_00565720(
+    std::uint32_t buffer_va, std::uint32_t buffer_bytes,
+    std::uint32_t device_flags) {
+    if (case_hook == kHookMutatePostCreate) {
+        application_audio_device_configured_00655d40 ^= 1u;
+        timer_rate_005deb48 = 0xffffffadu;
+    }
+    record_event(kEvCreateDevice, buffer_va, buffer_bytes, device_flags);
+    return case_create_ret;
+}
+
+void __cdecl application_audio_wait_0053c380(std::int32_t interval) {
+    record_event(kEvWait, static_cast<U>(interval), 0u, 0u);
+}
+
+void __cdecl application_audio_post_setup_004ab470() {
+    record_event(kEvPostSetup, application_audio_device_configured_00655d40, 0u, 0u);
+}
+
+} // namespace porsche
+
+static U invoke_cdecl_0arg(void* fn, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B body_4a66b0[] = {@BODY_004A66B0@};
+    static const B rdata_5b4ac0[] = {@RDATA_005B4AC0@};
+    require(sizeof body_4a66b0 == 398u, "398-byte original body 004a66b0");
+    require(sizeof rdata_5b4ac0 == 128u, "128-byte original rdata 005b4ac0");
+    std::memcpy(orig_rdata_005b4ac0, rdata_5b4ac0, 128u);
+
+    require(sizeof(porsche::application_audio_mode_data_005b4ac0) == 128u &&
+            std::memcmp(porsche::application_audio_mode_data_005b4ac0, orig_rdata_005b4ac0, 128u) == 0,
+            "exact rdata 005b4ac0 table bytes");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_4a66b0 = code + 0u;
+    std::memcpy(slot_4a66b0, body_4a66b0, sizeof body_4a66b0);
+
+    const U rdata_base = address(orig_rdata_005b4ac0);
+    const U addr_configured = address(&porsche::application_audio_device_configured_00655d40);
+    const U addr_buffer = address(&porsche::application_audio_buffer_00655d44);
+    const U addr_timer_rate = address(&porsche::timer_rate_005deb48);
+    const U addr_mode = address(&porsche::application_state_006573e8.word(0x00657c98u));
+    const U addr_gate = address(&porsche::application_state_006573e8.word(0x00657c9cu));
+
+    relocate_abs32(slot_4a66b0, 0x007u, 0x00657c98u, addr_mode);
+    relocate_rel32(slot_4a66b0, 0x004a66b0u, 0x00cu, 0x00565950u,
+                   reinterpret_cast<const void*>(&porsche::application_audio_prepare_00565950));
+    relocate_rel32(slot_4a66b0, 0x004a66b0u, 0x016u, 0x00565680u,
+                   reinterpret_cast<const void*>(&porsche::application_audio_query_config_00565680));
+    relocate_abs32(slot_4a66b0, 0x023u, 0x00655d40u, addr_configured);
+    relocate_abs32(slot_4a66b0, 0x03fu, 0x00657c9cu, addr_gate);
+    relocate_abs32(slot_4a66b0, 0x046u, 0x005b4b08u, rdata_base + 0x48u);
+    relocate_abs32(slot_4a66b0, 0x065u, 0x00655d40u, addr_configured);
+    relocate_abs32(slot_4a66b0, 0x08eu, 0x005b4b2cu, rdata_base + 0x6cu);
+    relocate_abs32(slot_4a66b0, 0x0a8u, 0x005b4af0u, rdata_base + 0x30u);
+    relocate_abs32(slot_4a66b0, 0x0c8u, 0x00655d40u, addr_configured);
+    relocate_abs32(slot_4a66b0, 0x0d9u, 0x005b4afcu, rdata_base + 0x3cu);
+    relocate_abs32(slot_4a66b0, 0x0e6u, 0x005b4af0u, rdata_base + 0x30u);
+    relocate_abs32(slot_4a66b0, 0x0fau, 0x005b4b20u, rdata_base + 0x60u);
+    relocate_abs32(slot_4a66b0, 0x101u, 0x005b4ae4u, rdata_base + 0x24u);
+    relocate_abs32(slot_4a66b0, 0x108u, 0x005b4b14u, rdata_base + 0x54u);
+    relocate_rel32(slot_4a66b0, 0x004a66b0u, 0x13fu, 0x005656d0u,
+                   reinterpret_cast<const void*>(&porsche::application_audio_apply_config_005656d0));
+    relocate_abs32(slot_4a66b0, 0x145u, 0x00655d44u, addr_buffer);
+    relocate_rel32(slot_4a66b0, 0x004a66b0u, 0x152u, 0x00565720u,
+                   reinterpret_cast<const void*>(&porsche::application_audio_create_device_00565720));
+    relocate_abs32(slot_4a66b0, 0x168u, 0x00655d40u, addr_configured);
+    relocate_abs32(slot_4a66b0, 0x16fu, 0x005deb48u, addr_timer_rate);
+    relocate_rel32(slot_4a66b0, 0x004a66b0u, 0x17au, 0x0053c380u,
+                   reinterpret_cast<const void*>(&porsche::application_audio_wait_0053c380));
+    relocate_rel32(slot_4a66b0, 0x004a66b0u, 0x182u, 0x004ab470u,
+                   reinterpret_cast<const void*>(&porsche::application_audio_post_setup_004ab470));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void setup_case(I mode, U gate, U init_configured, U buffer_va, U timer_rate,
+                       I query_ret, I create_ret, std::uint16_t requested_rate,
+                       B sample_count, std::initializer_list<B> fmts, U desc_seed,
+                       HookKind hook = kHookNone) {
+    std::memset(&porsche::application_state_006573e8, 0,
+                sizeof(porsche::application_state_006573e8));
+    porsche::application_state_006573e8.word(0x00657c98u) = static_cast<U>(mode);
+    porsche::application_state_006573e8.word(0x00657c9cu) = gate;
+    porsche::application_audio_device_configured_00655d40 = init_configured;
+    porsche::application_audio_buffer_00655d44 = buffer_va;
+    porsche::timer_rate_005deb48 = timer_rate;
+
+    case_desc_seed = desc_seed;
+    case_query_ret = query_ret;
+    case_create_ret = create_ret;
+    case_requested_rate = requested_rate;
+    case_sample_count = sample_count;
+    case_fmt_count = static_cast<B>(fmts.size());
+    require(fmts.size() <= kMaxFormats, "bounded formats");
+    std::memset(case_fmts, 0, sizeof(case_fmts));
+    U idx = 0u;
+    for (B f : fmts) {
+        case_fmts[idx++] = f;
+    }
+    case_hook = hook;
+    cur_applied_seen = 0u;
+    std::memset(cur_applied_desc, 0, sizeof(cur_applied_desc));
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    require((trace.ret_eax & 0xffu) == (expected.ret_eax & 0xffu), "ret_al mismatch");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag mismatch");
+        require(trace.events[i].arg0 == expected.events[i].arg0, "event arg0 mismatch");
+        require(trace.events[i].arg1 == expected.events[i].arg1, "event arg1 mismatch");
+        require(trace.events[i].arg2 == expected.events[i].arg2, "event arg2 mismatch");
+        require(std::memcmp(&trace.events[i].state, &expected.events[i].state,
+                            sizeof(StateSnapshot)) == 0,
+                "event state mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+}
+
+template <typename SetupFn>
+static void run_case(SetupFn setup) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_0arg(slot_4a66b0, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_0arg(
+            reinterpret_cast<void*>(&porsche::application_audio_probe_initialize_004a66b0),
+            trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces();
+}
+
+int main() {
+    init();
+
+    // 1. query_config failures clear 00655d40 and return AL=0 immediately.
+    run_case([=]() { setup_case(0, 1u, 1u, 0x11110000u, 100u, -1, 0, 22050u, 16u, {0x91u}, 1u); });
+    run_case([=]() { setup_case(4, 0u, 0x42u, 0x11110000u, 100u, -10, 0, 22050u, 0u, {}, 2u); });
+    run_case([=]() { setup_case(1, 1u, 0u, 0x11110000u, 100u, -1, 0, 22050u, 8u, {0xffu}, 3u, kHookSetConfiguredInQuery); });
+
+    // 2. Mode sweep across -8..5 with gate 0/1 and hit/miss/empty format scan.
+    U seed = 10u;
+    for (I mode = -8; mode <= 5; ++mode) {
+        for (U gate : {0u, 1u}) {
+            const U s1 = seed++;
+            run_case([=]() {
+                setup_case(mode, gate, 1u, 0x20001000u + s1, 41u, 0, 0, 44100u, 40u,
+                           {0x01u, 0x80u, 0x91u, 0xffu}, s1);
+            });
+            const U s2 = seed++;
+            run_case([=]() {
+                setup_case(mode, gate, 1u, 0x30001000u + s2, static_cast<U>(-7), 0, 0, 8000u, 4u,
+                           {0x00u, 0x04u, 0x11u}, s2);
+            });
+            const U s3 = seed++;
+            run_case([=]() {
+                setup_case(mode, gate, 1u, 0x40001000u + s3, 0u, 0, 0, 22050u, 16u,
+                           {}, s3);
+            });
+        }
+    }
+
+    // 3. Descriptor[8] == 0, sample_count clamp boundaries, and requested-rate clamp boundaries.
+    for (I mode : {0, 1, 2}) {
+        for (B samples : {B{0u}, B{1u}, B{8u}, B{16u}, B{32u}, B{64u}, B{255u}}) {
+            for (std::uint16_t req : {std::uint16_t{11025u}, std::uint16_t{16000u},
+                                      std::uint16_t{22050u}, std::uint16_t{32000u},
+                                      std::uint16_t{48000u}}) {
+                const U s = seed++;
+                run_case([=]() {
+                    setup_case(mode, 0x80000001u, 0u, 0x50000000u + s, 25u, 0, 0, req, samples,
+                               {0x10u, 0x93u}, s);
+                });
+            }
+        }
+    }
+
+    // 4. create_device negative and zero/positive returns (verify 004a680b exits with AL=0 without clearing 00655d40).
+    for (I mode : {-2, 0, 1, 2, 3}) {
+        for (I create_ret : {-5, -1, 0, 1}) {
+            const U s1 = seed++;
+            run_case([=]() {
+                setup_case(mode, 1u, 1u, 0x60000000u + s1, static_cast<U>(-3), 0, create_ret,
+                           24000u, 20u, {0xffu}, s1);
+            });
+            const U s2 = seed++;
+            run_case([=]() {
+                setup_case(mode, 0u, 0u, 0x61000000u + s2, 15u, 0, create_ret,
+                           24000u, 20u, {0xffu}, s2);
+            });
+        }
+    }
+
+    // 5. timer_rate_005deb48 rounding matrix (positive/negative/odd/even/extremes).
+    for (U rate : {0u, 1u, 2u, 3u, 100u, 101u, 0xffffffffu, 0xfffffffeu, 0xfffffffdu,
+                   0xfffffff0u, 0x7fffffffu, 0x80000000u}) {
+        const U s = seed++;
+        run_case([=]() {
+            setup_case(0, 1u, 0u, 0x70000000u + s, rate, 0, 0, 22050u, 12u, {0x91u}, s);
+        });
+    }
+
+    // 6. Mid-call state mutations inside callees.
+    run_case([=]() { setup_case(0, 1u, 0u, 0x80000001u, 11u, 0, 0, 22050u, 10u, {0x91u}, 501u, kHookMutateModeInPrepare); });
+    run_case([=]() { setup_case(1, 0u, 0u, 0x80000002u, 11u, 0, 0, 22050u, 10u, {0x91u}, 502u, kHookToggleGateInQuery); });
+    run_case([=]() { setup_case(1, 1u, 0u, 0x80000003u, 11u, 0, 0, 22050u, 10u, {0x91u}, 503u, kHookSwapBufferInApply); });
+    run_case([=]() { setup_case(0, 0u, 0u, 0x80000004u, 11u, 0, 0, 22050u, 10u, {0x00u}, 504u, kHookMutatePostCreate); });
+    run_case([=]() { setup_case(0, 1u, 0u, 0x80000005u, 11u, 0, 0, 22050u, 10u, {0x91u}, 505u, kHookMutatePostCreate); });
+
+    std::printf("application_audio_probe_init_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events);
+    return 0;
+}
