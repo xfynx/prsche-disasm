@@ -1,0 +1,399 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include "startup_clock_callback_598.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+namespace porsche {
+std::uint32_t frame_pump_word_00655a08 = 0u;
+ClockWorkerCallback clock_worker_callbacks_006b7c20[8] = {};
+} // namespace porsche
+
+static U ptr(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0) { U v; std::memcpy(&v, static_cast<const B*>(p) + o, 4); return v; }
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4); }
+
+static U cases = 0u;
+static U events = 0u;
+static U family_cfg = 0u;
+static U init_cfg = 0u;
+static U callback_arg_cfg = 0u;
+static U seed_callbacks[8] = {};
+static U precision, rounding, depth, initial_status;
+static B* code = nullptr;
+static B* slot_4a4700 = nullptr;
+static B* slot_560140 = nullptr;
+alignas(16) static B floating[512];
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+struct State {
+    U pump_word_00655a08;
+    U word_006559e0;
+    U init_00655a04;
+    U word_006559e8;
+    U word_006559ec;
+    U word_006559f0;
+    U word_00655a00;
+    U word_006559f4;
+    U word_006559fc;
+    U reset_source_005e99b8;
+    U callbacks[8];
+};
+struct Trace {
+    U abi;
+    U exception[3];
+    State final;
+    Fpu fpu;
+};
+static Trace trace, expected;
+
+static void require(bool ok, const char* s) {
+    if (!ok) {
+        std::printf("divergence %s case=%u fam=%u init=%08x cb=%08x\n",
+                    s, cases, family_cfg, init_cfg, callback_arg_cfg);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void snapshot(State& s) {
+    s.pump_word_00655a08 = frame_pump_word_00655a08;
+    s.word_006559e0 = startup_clock_word_006559e0;
+    s.init_00655a04 = startup_clock_initialized_00655a04;
+    s.word_006559e8 = startup_clock_word_006559e8;
+    s.word_006559ec = startup_clock_word_006559ec;
+    s.word_006559f0 = startup_clock_word_006559f0;
+    s.word_00655a00 = startup_clock_word_00655a00;
+    s.word_006559f4 = startup_clock_word_006559f4;
+    s.word_006559fc = startup_clock_word_006559fc;
+    s.reset_source_005e99b8 = frame_reset_source_005e99b8;
+    for (U i = 0u; i < 8u; ++i) {
+        s.callbacks[i] = reinterpret_cast<U>(clock_worker_callbacks_006b7c20[i]);
+    }
+}
+
+static void capture(Fpu& f) {
+    B environment[28];
+    __asm {
+        fxsave floating
+        fnstenv environment
+        fldenv environment
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(environment + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0; i < 8; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10, floating + 32 + i * 16, 10);
+        } else {
+            std::memset(f.values + i * 10, 0, 10);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = static_cast<unsigned short>(0x7f | (precision << 8) | (rounding << 10));
+    __asm fninit
+    __asm fldcw cw
+    for (U i = 0; i < depth; ++i) {
+        U bits = 0x3f800001 + i;
+        __asm fld dword ptr bits
+    }
+    B environment[28];
+    __asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment + 4) |= static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+
+static U invoke_0(void* fn) {
+    U before, frame, fail = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_1(void* fn, U arg0) {
+    U before, frame, fail = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg0
+        call fn
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* p, U off, U old, const void* replacement) {
+    require(word(p, off) == old, "exact absolute relocation offset");
+    put(p, off, ptr(replacement));
+}
+
+static void relocate_rel32(B* p, U off, U old_rel, const void* target) {
+    require(word(p, off) == old_rel, "exact relative relocation offset");
+    put(p, off, ptr(target) - ptr(p + off + 4u));
+}
+
+static void init() {
+    require(startup_clock_word_006559e0 == 0u, "loader-zero 006559e0");
+    require(startup_clock_initialized_00655a04 == 0u, "loader-zero 00655a04");
+    require(startup_clock_word_006559e8 == 0u, "loader-zero 006559e8");
+    require(startup_clock_word_006559ec == 0u, "loader-zero 006559ec");
+    require(startup_clock_word_006559f0 == 0u, "loader-zero 006559f0");
+    require(startup_clock_word_00655a00 == 0u, "loader-zero 00655a00");
+    require(startup_clock_word_006559f4 == 0u, "loader-zero 006559f4");
+    require(startup_clock_word_006559fc == 0u, "loader-zero 006559fc");
+    require(frame_reset_source_005e99b8 == 0u, "loader-zero 005e99b8");
+
+    static const B body_4a4700[] = {@BODY_004A4700@};
+    static const B body_560140[] = {@BODY_00560140@};
+    require(sizeof body_4a4700 == 90u, "90-byte original body 004a4700");
+    require(sizeof body_560140 == 55u, "55-byte original body 00560140");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw allocation");
+    slot_4a4700 = code + 0u;
+    slot_560140 = code + 128u;
+
+    std::memcpy(slot_4a4700, body_4a4700, sizeof body_4a4700);
+    relocate_abs32(slot_4a4700, 0x05u, 0x00655a08u, &frame_pump_word_00655a08);
+    relocate_abs32(slot_4a4700, 0x0bu, 0x006559e0u, &startup_clock_word_006559e0);
+    relocate_abs32(slot_4a4700, 0x11u, 0x00655a04u, &startup_clock_initialized_00655a04);
+    relocate_abs32(slot_4a4700, 0x1eu, 0x00655a04u, &startup_clock_initialized_00655a04);
+    relocate_rel32(slot_4a4700, 0x27u, 0x000bba15u, slot_560140);
+    relocate_abs32(slot_4a4700, 0x30u, 0x006559e8u, &startup_clock_word_006559e8);
+    relocate_abs32(slot_4a4700, 0x36u, 0x006559ecu, &startup_clock_word_006559ec);
+    relocate_abs32(slot_4a4700, 0x3cu, 0x006559f0u, &startup_clock_word_006559f0);
+    relocate_abs32(slot_4a4700, 0x42u, 0x00655a00u, &startup_clock_word_00655a00);
+    relocate_abs32(slot_4a4700, 0x48u, 0x006559f4u, &startup_clock_word_006559f4);
+    relocate_abs32(slot_4a4700, 0x4eu, 0x006559fcu, &startup_clock_word_006559fc);
+    relocate_abs32(slot_4a4700, 0x54u, 0x005e99b8u, &frame_reset_source_005e99b8);
+
+    std::memcpy(slot_560140, body_560140, sizeof body_560140);
+    relocate_abs32(slot_560140, 0x05u, 0x006b7c20u, &clock_worker_callbacks_006b7c20[0]);
+    relocate_abs32(slot_560140, 0x11u, 0x006b7c40u, &clock_worker_callbacks_006b7c20[8]);
+    relocate_abs32(slot_560140, 0x1au, 0x006b7c20u, &clock_worker_callbacks_006b7c20[0]);
+    relocate_abs32(slot_560140, 0x28u, 0x006b7c40u, &clock_worker_callbacks_006b7c20[8]);
+    relocate_abs32(slot_560140, 0x32u, 0x006b7c20u, &clock_worker_callbacks_006b7c20[0]);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096) != 0, "instruction cache");
+}
+
+static void reset() {
+    std::memset(&trace, 0, sizeof trace);
+    frame_pump_word_00655a08 = 0x11000001u;
+    startup_clock_word_006559e0 = 0x22000002u;
+    startup_clock_initialized_00655a04 = init_cfg;
+    startup_clock_word_006559e8 = 0x33000003u;
+    startup_clock_word_006559ec = 0x44000004u;
+    startup_clock_word_006559f0 = 0x55000005u;
+    startup_clock_word_00655a00 = 0x66000006u;
+    startup_clock_word_006559f4 = 0x77000007u;
+    startup_clock_word_006559fc = 0x88000008u;
+    frame_reset_source_005e99b8 = 0x99000009u;
+    for (U i = 0u; i < 8u; ++i) {
+        clock_worker_callbacks_006b7c20[i] =
+            reinterpret_cast<ClockWorkerCallback>(static_cast<std::uintptr_t>(seed_callbacks[i]));
+    }
+}
+
+static void compare() {
+    Trace& original = expected;
+    for (U side = 0u; side < 2u; ++side) {
+        reset();
+        seed_fpu();
+        bool complete = true;
+        __try {
+            if (family_cfg == 0u) {
+                void* fn = (side == 0u) ? static_cast<void*>(slot_560140)
+                                        : reinterpret_cast<void*>(&clock_worker_register_callback_00560140);
+                trace.abi = invoke_1(fn, callback_arg_cfg);
+            } else {
+                void* fn = (side == 0u) ? static_cast<void*>(slot_4a4700)
+                                        : reinterpret_cast<void*>(&startup_sequence_call_004a4700);
+                trace.abi = invoke_0(fn);
+            }
+        } __except (exception_record(GetExceptionInformation())) {
+            complete = false;
+        }
+        require(complete && trace.abi == 0u, "mapped input/stack/nonvolatile ABI");
+        snapshot(trace.final);
+        capture(trace.fpu);
+        if (side == 0u) {
+            original = trace;
+        } else {
+            require(std::memcmp(&trace, &original, sizeof trace) == 0, "state/callback/FPU");
+        }
+    }
+    ++cases;
+}
+
+static void set_seed_fill(U filled_count) {
+    for (U i = 0u; i < 8u; ++i) {
+        seed_callbacks[i] = (i < filled_count) ? (0x00700000u + (i + 1u) * 0x10u) : 0u;
+    }
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+    precision = 2;
+    rounding = 0;
+    depth = 1;
+    initial_status = 0;
+
+    static const U candidate_callbacks[] = {0u, 0x004a45d0u, 0x11223344u};
+
+    // Family 0: direct 00560140 tests.
+    family_cfg = 0u;
+    init_cfg = 0xa5a5a5a5u;
+
+    // 1. Prefix-filled tables (first null at slot 0..7, or full at 8) with distinct and 0 callbacks.
+    for (U filled = 0u; filled <= 8u; ++filled) {
+        set_seed_fill(filled);
+        for (U cb : candidate_callbacks) {
+            callback_arg_cfg = cb;
+            compare();
+        }
+        // Duplicate already present at every populated slot 0..filled-1.
+        for (U dup = 0u; dup < filled; ++dup) {
+            callback_arg_cfg = seed_callbacks[dup];
+            compare();
+        }
+    }
+
+    // 2. Scattered null before an existing duplicate at slot 1..7 (must not write to earlier null slot).
+    for (U dup = 1u; dup < 8u; ++dup) {
+        for (U i = 0u; i < 8u; ++i) {
+            seed_callbacks[i] = (i == 0u) ? 0u : (0x00800000u + i * 0x10u);
+        }
+        callback_arg_cfg = seed_callbacks[dup];
+        compare();
+    }
+
+    // 3. Scattered null slot at slot 0..7 with an absent callback.
+    for (U free_slot = 0u; free_slot < 8u; ++free_slot) {
+        for (U i = 0u; i < 8u; ++i) {
+            seed_callbacks[i] = (i == free_slot) ? 0u : (0x00900000u + (i + 1u) * 0x10u);
+        }
+        callback_arg_cfg = 0x004a45d0u;
+        compare();
+    }
+
+    // Family 1: 004a4700 tests across init guard values and callback table shapes.
+    family_cfg = 1u;
+    callback_arg_cfg = 0u;
+    static const U init_values[] = {0u, 1u, 2u, 0xffffffffu};
+
+    for (U iv : init_values) {
+        init_cfg = iv;
+
+        // Prefix-filled tables 0..8 (absent 0x004a45d0).
+        for (U filled = 0u; filled <= 8u; ++filled) {
+            set_seed_fill(filled);
+            compare();
+        }
+
+        // 0x004a45d0 already present at slot 0..7 (with slot 0 empty when slot > 0).
+        for (U dup = 0u; dup < 8u; ++dup) {
+            for (U i = 0u; i < 8u; ++i) {
+                if (i == dup) {
+                    seed_callbacks[i] = 0x004a45d0u;
+                } else if (i == 0u && dup > 0u) {
+                    seed_callbacks[i] = 0u;
+                } else {
+                    seed_callbacks[i] = 0x00710000u + (i + 1u) * 0x10u;
+                }
+            }
+            compare();
+        }
+
+        // 0x004a45d0 already present in an otherwise full table at slot 0..7.
+        for (U dup = 0u; dup < 8u; ++dup) {
+            for (U i = 0u; i < 8u; ++i) {
+                seed_callbacks[i] = (i == dup) ? 0x004a45d0u : (0x00720000u + (i + 1u) * 0x10u);
+            }
+            compare();
+        }
+    }
+
+    require(VirtualFree(code, 0, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("startup_clock_callback_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events);
+    return 0;
+}

@@ -4,22 +4,22 @@ Updated 2026-11-17. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run597](iterations/v2/001-original-recovery/runs/597-startup-transfer-quality-integration/README.md)
-compiles335 C++ translation units across8 projects. The link has117 unresolved names/
-122 references. **There is no recovered playable C++ game executable yet.**
+[Run600](iterations/v2/001-original-recovery/runs/600-startup-clock-misc-integration/README.md)
+compiles337 C++ translation units across8 projects. The link has115 unresolved names/
+120 references. **There is no recovered playable C++ game executable yet.**
 
-Run597 integrates partial `00468100` (8B), `004691c0` (11B), `0044e370` (150B) and
-`0044dfb0` (35B) from frozen595001 and596001 plus 4B loader-zero `.data` `00619770`.
-Native comparisons pass20032 cases/seven controls atOd/O2. Canonical display,
-mode, application-state and lifecycle owners are reused. Shared audit verifies828
-pins/879 providers; registry916 retains partial domains.
+Run600 integrates partial `00560140` (55B), `004a4700` (90B), `0053f0b0` (99B) and
+`00449b40` (40B) from frozen598002 (`598001` preserved) and599001 plus 300B
+loader-zero `.data`. Native comparisons pass428 cases/eight controls atOd/O2.
+Canonical clock-worker, frame-pump and render-allocator owners are reused.
+Shared audit verifies833 pins/895 providers; registry920 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run595 native001, Run596 native001 and Run597 integration are accepted within their stated bounds.
-Run598 startup clock callback and599 render misc cleanup are active pending packets.
+Run598 native002, Run599 native001 and Run600 integration are accepted within their stated bounds.
+Run601 render display apply and602 render input route are active pending packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.

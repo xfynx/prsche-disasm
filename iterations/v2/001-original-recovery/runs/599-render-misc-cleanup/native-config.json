@@ -1,0 +1,67 @@
+{
+  "run": 599,
+  "experiment": "local/experiments/v2-render-misc-cleanup-599",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup/render_misc_cleanup_599.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00449b40",
+      "bytes": 40,
+      "sha256": "b9b191b8ab6aa45883a6b8f202868d8ec2ff806078ff7bce86b97e5285bf491b",
+      "token": "@BODY_00449B40@"
+    },
+    {
+      "va": "0053f0b0",
+      "bytes": 99,
+      "sha256": "dbc5031bd948c1a13a0b7f3390bea9e048436da2d36e12ed38eb5a1a860d33de",
+      "token": "@BODY_0053F0B0@"
+    }
+  ],
+  "pass_marker": "render_misc_cleanup_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-sentinel-callback",
+      "source": "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup/render_misc_cleanup_599.cpp",
+      "old": "sentinel->callback_va = 0x0053f980u;",
+      "new": "sentinel->callback_va = 0x0053f981u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-first-alloc-size",
+      "source": "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup/render_misc_cleanup_599.cpp",
+      "old": "void* const raw_first = render_allocate_0059ef90(8u);",
+      "new": "void* const raw_first = render_allocate_0059ef90(12u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-lut-byte-mask",
+      "source": "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup/render_misc_cleanup_599.cpp",
+      "old": "render_identity_lut_00618e74[i] = static_cast<std::uint8_t>(i);",
+      "new": "render_identity_lut_00618e74[i] = static_cast<std::uint8_t>(i ^ 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-cleanup-callback-va",
+      "source": "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup/render_misc_cleanup_599.cpp",
+      "old": "render_cleanup_register_0053f0b0(0x00449b70u);",
+      "new": "render_cleanup_register_0053f0b0(0x00449b74u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

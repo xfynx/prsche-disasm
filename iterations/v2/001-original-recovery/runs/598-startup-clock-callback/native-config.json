@@ -1,0 +1,67 @@
+{
+  "run": 598,
+  "experiment": "local/experiments/v2-startup-clock-callback-598",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/598-startup-clock-callback/startup_clock_callback_598.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/598-startup-clock-callback/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/598-startup-clock-callback",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/598-startup-clock-callback/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004a4700",
+      "bytes": 90,
+      "sha256": "85a22a84d0758c82e74af76b08e70eac46414be4b8e9aff443c64955812c2a3f",
+      "token": "@BODY_004A4700@"
+    },
+    {
+      "va": "00560140",
+      "bytes": 55,
+      "sha256": "b45f2346092ef605f5a05368779fdea8df5a7e1efe25c74682033e7a5b446cc4",
+      "token": "@BODY_00560140@"
+    }
+  ],
+  "pass_marker": "startup_clock_callback_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "omit-duplicate-scan",
+      "source": "iterations/v2/001-original-recovery/runs/598-startup-clock-callback/startup_clock_callback_598.cpp",
+      "old": "if (clock_worker_callbacks_006b7c20[i] == callback) {",
+      "new": "if (false && clock_worker_callbacks_006b7c20[i] == callback) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-limit",
+      "source": "iterations/v2/001-original-recovery/runs/598-startup-clock-callback/startup_clock_callback_598.cpp",
+      "old": "for (std::uint32_t i = 0u; i < 8u; ++i) {\n        if (clock_worker_callbacks_006b7c20[i] == nullptr) {",
+      "new": "for (std::uint32_t i = 0u; i < 7u; ++i) {\n        if (clock_worker_callbacks_006b7c20[i] == nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "invert-init-guard",
+      "source": "iterations/v2/001-original-recovery/runs/598-startup-clock-callback/startup_clock_callback_598.cpp",
+      "old": "if (startup_clock_initialized_00655a04 == 0u) {",
+      "new": "if (startup_clock_initialized_00655a04 != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-reset-source-zero",
+      "source": "iterations/v2/001-original-recovery/runs/598-startup-clock-callback/startup_clock_callback_598.cpp",
+      "old": "        frame_reset_source_005e99b8 = 0u;",
+      "new": "        frame_reset_source_005e99b8 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

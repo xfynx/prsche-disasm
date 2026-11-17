@@ -1,0 +1,114 @@
+{
+  "run": 599,
+  "functions": [
+    "render_misc_00449b40",
+    "render_cleanup_register_0053f0b0"
+  ],
+  "originals": [
+    {
+      "function": "render_misc_00449b40",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (0 args, RET 0)",
+      "entry": "00449b40",
+      "body_ranges_inclusive": [["00449b40", "00449b67"]],
+      "body_bytes": 40,
+      "body_sha256": "b9b191b8ab6aa45883a6b8f202868d8ec2ff806078ff7bce86b97e5285bf491b",
+      "rea_receipt": "local/experiments/v2-frontier-469-rea/001/receipt.json",
+      "rea_function_json": "local/experiments/v2-frontier-469-rea/001/function-00449b40.json",
+      "rea_evidence_id": "ev_53ff3aa3cd4ddf01eb26967549388a8d89995d3878165eeb2cf6251802fd15cd"
+    },
+    {
+      "function": "render_cleanup_register_0053f0b0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (1 arg: callback_va, RET 0)",
+      "entry": "0053f0b0",
+      "body_ranges_inclusive": [["0053f0b0", "0053f112"]],
+      "body_bytes": 99,
+      "body_sha256": "dbc5031bd948c1a13a0b7f3390bea9e048436da2d36e12ed38eb5a1a860d33de",
+      "catalog_jsonl": "iterations/v2/001-original-recovery/source/catalog/Porsche.exe-ddd748fdbe6d/functions.jsonl"
+    }
+  ],
+  "direct_callers": [
+    {
+      "caller": "00467470",
+      "callsite": "004676e2",
+      "callee": "00449b40",
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/render_startup.hpp"
+    },
+    {
+      "caller": "00449b40",
+      "callsite": "00449b45",
+      "callee": "0053f0b0",
+      "header": "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup/render_misc_cleanup_599.hpp"
+    }
+  ],
+  "reused_canonical_symbols": [
+    {
+      "name": "render_allocate_0059ef90",
+      "va": "0059ef90",
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/render_startup.hpp"
+    },
+    {
+      "name": "render_misc_00449b40",
+      "va": "00449b40",
+      "header": "iterations/v2/001-original-recovery/source/include/porsche/render_startup.hpp"
+    }
+  ],
+  "owned_globals": [
+    {
+      "name": "render_identity_lut_00618e74",
+      "va": "00618e74",
+      "size_bytes": 256,
+      "type": "std::uint8_t[256]",
+      "initial": "zero-initialized"
+    },
+    {
+      "name": "render_identity_lut_ptr_00619758",
+      "va": "00619758",
+      "size_bytes": 4,
+      "type": "std::uint8_t*",
+      "initial": "nullptr"
+    },
+    {
+      "name": "render_cleanup_head_0069ebb0",
+      "va": "0069ebb0",
+      "size_bytes": 4,
+      "type": "RenderCleanupNode_599*",
+      "initial": "nullptr"
+    }
+  ],
+  "relocations": {
+    "00449b40": {
+      "absolute": [
+        {"offset": "0x11", "va": "00449b51", "original": "00618e74", "target": "&render_identity_lut_00618e74[0]"},
+        {"offset": "0x1f", "va": "00449b5f", "original": "00619758", "target": "&render_identity_lut_ptr_00619758"},
+        {"offset": "0x23", "va": "00449b63", "original": "00618e74", "target": "&render_identity_lut_00618e74[0]"}
+      ],
+      "relative_call_e8": [
+        {"offset": "0x06", "va": "00449b46", "original": "0053f0b0", "target": "slot_53f0b0"}
+      ],
+      "unpatched_literals": [
+        {"offset": "0x01", "va": "00449b41", "value": "00449b70", "note": "literal callback_va passed to 0053f0b0"}
+      ]
+    },
+    "0053f0b0": {
+      "absolute": [
+        {"offset": "0x2a", "va": "0053f0da", "original": "0069ebb0", "target": "&render_cleanup_head_0069ebb0"},
+        {"offset": "0x51", "va": "0053f101", "original": "0069ebb0", "target": "&render_cleanup_head_0069ebb0"},
+        {"offset": "0x5d", "va": "0053f10d", "original": "0069ebb0", "target": "&render_cleanup_head_0069ebb0"}
+      ],
+      "relative_call_e8": [
+        {"offset": "0x04", "va": "0053f0b4", "original": "0059ef90", "target": "&render_allocate_0059ef90"},
+        {"offset": "0x35", "va": "0053f0e5", "original": "0059ef90", "target": "&render_allocate_0059ef90"}
+      ],
+      "unpatched_literals": [
+        {"offset": "0x49", "va": "0053f0f9", "value": "0053f980", "note": "literal sentinel callback_va"}
+      ]
+    }
+  },
+  "scope_boundary": "Bounded 00449b40 and 0053f0b0 native x86-vs-C++ proof with deterministic 8-node test arena for render_allocate_0059ef90; first-allocation null pointer fault at 0053f0b0+0x26, cleanup callback execution (00449b70, 0053f980), arbitrary aliases, and production CMake/registry integration remain open."
+}

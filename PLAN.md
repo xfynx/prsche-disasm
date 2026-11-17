@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run597](iterations/v2/001-original-recovery/runs/597-startup-transfer-quality-integration/README.md).
-Startup transfer4691c0/468100 and quality tier44dfb0/44e370 close two real dependencies.
-The shared build compiles335 TUs with117 unresolved names/122 references.
+Latest recovery intake is [Run600](iterations/v2/001-original-recovery/runs/600-startup-clock-misc-integration/README.md).
+Startup clock callback4a4700/560140 and render misc cleanup449b40/53f0b0 close two real dependencies.
+The shared build compiles337 TUs with115 unresolved names/120 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are the reachable startup clock callback4a4700/560140 and render misc cleanup449b40/53f0b0 dependencies. The real depth-conversion
+Next are the reachable render display apply4b70d0/56a680 and render input route586cd0 dependencies. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;

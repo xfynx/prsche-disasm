@@ -16718,6 +16718,101 @@
           "0044dfd2"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00560140",
+      "source": "iterations/v2/001-original-recovery/runs/598-startup-clock-callback/startup_clock_callback_598.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 void RET0; deduplicates and registers callback in 8-entry table 006b7c20",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/600-startup-clock-misc-integration/validation.json",
+      "verification_boundary": "Shared600 PASS:356 native cases (178 per optimization at Od/O2) and4 material controls; attempt001 preserved. SHAb45f2346092ef605f5a05368779fdea8df5a7e1efe25c74682033e7a5b446cc4. Reuses clock_worker_callbacks_006b7c20[8]. Build337TUs/115names120refs/noEXE.",
+      "partial_reason": "Bounded mapped 8-entry callback table; callback invocation and broader concurrency/caller domains remain open.",
+      "body_bytes": 55,
+      "body_ranges": [
+        [
+          "00560140",
+          "00560176"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "004a4700",
+      "source": "iterations/v2/001-original-recovery/runs/598-startup-clock-callback/startup_clock_callback_598.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 void RET0; clears startup/frame words and registers 004a45d0 in 006b7c20 on first initialization",
+      "recovered_dependencies": [
+        "00560140"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/600-startup-clock-misc-integration/validation.json",
+      "verification_boundary": "Shared600 PASS:356 native cases (178 per optimization at Od/O2) and4 material controls; attempt001 preserved. SHA85a22a84d0758c82e74af76b08e70eac46414be4b8e9aff443c64955812c2a3f. Owns 9 loader-zero .data DWORDs (36B) and reuses frame_pump_word_00655a08. Build337TUs/115names120refs/noEXE.",
+      "partial_reason": "Bounded mapped startup/frame globals and callback table; unrecovered callback body 004a45d0 and live startup callers remain open.",
+      "body_bytes": 90,
+      "body_ranges": [
+        [
+          "004a4700",
+          "004a4759"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0053f0b0",
+      "source": "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup/render_misc_cleanup_599.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 void RET0; allocates 8-byte cleanup node (and optional 0053f980 sentinel) and prepends to 0069ebb0",
+      "recovered_dependencies": [
+        "0059ef90"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/600-startup-clock-misc-integration/validation.json",
+      "verification_boundary": "Shared600 PASS:72 native cases (36 per optimization at Od/O2) and4 material controls. SHAdbc5031bd948c1a13a0b7f3390bea9e048436da2d36e12ed38eb5a1a860d33de. Owns loader-zero 0069ebb0 (4B) and reuses render_allocate_0059ef90. Build337TUs/115names120refs/noEXE.",
+      "partial_reason": "Bounded mapped allocator arena and non-null first allocation; first-allocation null fault and callback execution (0053f980) remain open.",
+      "body_bytes": 99,
+      "body_ranges": [
+        [
+          "0053f0b0",
+          "0053f112"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00449b40",
+      "source": "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup/render_misc_cleanup_599.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 void RET0; registers cleanup callback 00449b70, initializes 256-byte identity LUT 00618e74 and stores LUT pointer at 00619758",
+      "recovered_dependencies": [
+        "0053f0b0",
+        "0059ef90"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/600-startup-clock-misc-integration/validation.json",
+      "verification_boundary": "Shared600 PASS:72 native cases (36 per optimization at Od/O2) and4 material controls. SHAb9b191b8ab6aa45883a6b8f202868d8ec2ff806078ff7bce86b97e5285bf491b. Owns loader-zero LUT 00618e74 (256B) and pointer 00619758 (4B). Build337TUs/115names120refs/noEXE.",
+      "partial_reason": "Bounded mapped cleanup list and LUT globals; unrecovered callback body 00449b70 and downstream LUT consumers remain open.",
+      "body_bytes": 40,
+      "body_ranges": [
+        [
+          "00449b40",
+          "00449b67"
+        ]
+      ]
     }
   ]
 }
