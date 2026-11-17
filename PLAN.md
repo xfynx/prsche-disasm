@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run588](iterations/v2/001-original-recovery/runs/588-frame-splash-integration/README.md).
-Frame-interface release5693e0 and splash command4edc00 close two real dependencies.
-The shared build compiles329 TUs with123 unresolved names/128 references.
+Latest recovery intake is [Run591](iterations/v2/001-original-recovery/runs/591-frame-object-integration/README.md).
+Frame-state release5363a0 and object-init403520 close two real dependencies.
+The shared build compiles331 TUs with121 unresolved names/126 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are the reachable frame-state release5363a0 and object-init403520 dependencies. The real depth-conversion
+Next are the reachable context-base destroy525ec0 and display prevideo44e2c0 dependencies. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;

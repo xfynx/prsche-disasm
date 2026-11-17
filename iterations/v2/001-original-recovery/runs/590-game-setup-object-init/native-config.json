@@ -1,0 +1,65 @@
+{
+  "run": 590,
+  "experiment": "local/experiments/v2-game-setup-object-init-590",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/590-game-setup-object-init/game_setup_object_init_590.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/590-game-setup-object-init/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/590-game-setup-object-init",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/590-game-setup-object-init/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/590-game-setup-object-init/game_setup_object_init_590.cpp",
+    "iterations/v2/001-original-recovery/runs/590-game-setup-object-init/game_setup_object_init_590.hpp",
+    "iterations/v2/001-original-recovery/runs/590-game-setup-object-init/native-fixture.cpp.in"
+  ],
+  "original_bodies": [
+    {
+      "va": "00403520",
+      "bytes": 184,
+      "sha256": "93e8d85755e402fbdae93e54d541b0bdd18359f3cb5c4efe32e015b9a814b4e4",
+      "token": "@BODY_00403520@"
+    }
+  ],
+  "pass_marker": "game_setup_object_init_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "omit-sentinel-guard",
+      "source": "iterations/v2/001-original-recovery/runs/590-game-setup-object-init/game_setup_object_init_590.cpp",
+      "old": "if (bytes > 0xfffffffeu) {",
+      "new": "if (bytes == 0xfffffffeu) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-zero-end",
+      "source": "iterations/v2/001-original-recovery/runs/590-game-setup-object-init/game_setup_object_init_590.cpp",
+      "old": "store32(object, 8u, 0u);",
+      "new": "store32(object, 8u, 4u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-large-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/590-game-setup-object-init/game_setup_object_init_590.cpp",
+      "old": "if (bytes > 0x100u) {",
+      "new": "if (bytes >= 0x100u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-kind-shift",
+      "source": "iterations/v2/001-original-recovery/runs/590-game-setup-object-init/game_setup_object_init_590.cpp",
+      "old": "const U kind = (bytes - 1u) >> 3u;",
+      "new": "const U kind = bytes >> 3u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

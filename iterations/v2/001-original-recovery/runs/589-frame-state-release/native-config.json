@@ -1,0 +1,64 @@
+{
+  "run": 589,
+  "experiment": "local/experiments/v2-frame-state-release-589",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/589-frame-state-release/frame_state_release_589.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/589-frame-state-release/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/589-frame-state-release",
+    "iterations/v2/001-original-recovery/runs/527-render-state-flush",
+    "iterations/v2/001-original-recovery/runs/570-startup-service-bindings",
+    "iterations/v2/001-original-recovery/runs/572-startup-service-lifecycle",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/589-frame-state-release/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005363a0",
+      "bytes": 178,
+      "sha256": "4317a6d2d78522e8b3b4a2b34d39961d5a73ce36fb94972a7510fdae7c7a03bf",
+      "token": "@BODY_005363A0@"
+    }
+  ],
+  "pass_marker": "frame_state_release_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "omit-second-loop-pass",
+      "source": "iterations/v2/001-original-recovery/runs/589-frame-state-release/frame_state_release_589.cpp",
+      "old": "for (U i = 0; i < 2; ++i) {",
+      "new": "for (U i = 0; i < 1; ++i) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-record-stride",
+      "source": "iterations/v2/001-original-recovery/runs/589-frame-state-release/frame_state_release_589.cpp",
+      "old": "const U key = render_state_flush_records_005de6bc[14 * i + 2 * j];",
+      "new": "const U key = render_state_flush_records_005de6bc[14 * i + 2 * j + 1];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "skip-active-gate",
+      "source": "iterations/v2/001-original-recovery/runs/589-frame-state-release/frame_state_release_589.cpp",
+      "old": "if (startup_lifecycle_mode_005de6b8 == 0 || startup_service_active_0069dd1e == 0) {",
+      "new": "if (startup_lifecycle_mode_005de6b8 == 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-second-slot-reload",
+      "source": "iterations/v2/001-original-recovery/runs/589-frame-state-release/frame_state_release_589.cpp",
+      "old": "const U second = load32(receiver, 12);",
+      "new": "const U second = 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

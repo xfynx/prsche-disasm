@@ -1,17 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current2026-11-17. Run588 shared audit passes for frozen585002+587002 on584.
-Build001 compiles329TUs/8projects,123names128refs,noEXE. Two real names
-(`frame_pump_boundary_005693e0`, `splash_progress_dispatch_004edc00`) close with
-no new names and12B loader-zero `.data` (`006a5ca0..006a5cab`). Registry908 adds
-two PARTIAL bodies (101B total). README588 owns commands and bounds:42 native
-executions/7 controls atOd/O2,813pins/868canonicalproviders. Production53B of
-`005693e0` equal original after five DIR32 normalizations; attempts585001 and587001
-preserved.
+Current2026-11-17. Run591 shared audit passes for frozen589001+590001 on588.
+Build001 compiles331TUs/8projects,121names126refs,noEXE. Two real names
+(`frame_pump_boundary_005363a0`, `game_setup_object_init_00403520`) close with
+no new names or original state. Registry910 adds two PARTIAL bodies (362B total).
+README591 owns commands and bounds:6068 native cases/8 controls atOd/O2,818pins/
+872canonicalproviders.
 
-Ready next packets:589 (`005363a0` frame-state release, 178B, native001 PASS) and
-590 (`00403520` game-setup object init, 184B, native001 PASS). Next integrate589+590
-in shared batch591 and dispatch the next frontier workers.
+Active flash workers:592 (`00525ec0` context-base destroy, 124B) and593
+(`0044e2c0` render-display prevideo, 165B). Next integrate592+593 in shared
+batch594 and dispatch the next frontier workers.
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

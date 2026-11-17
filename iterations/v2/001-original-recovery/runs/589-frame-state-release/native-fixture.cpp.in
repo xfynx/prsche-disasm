@@ -1,0 +1,374 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "frame_state_release_589.hpp"
+#include "render_state_flush_527.hpp"
+#include "startup_service_570.hpp"
+#include "startup_lifecycle_572.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+static U ptr(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0) { U v; std::memcpy(&v, static_cast<const B*>(p) + o, 4); return v; }
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4); }
+
+static U cases, events_total, slot_cfg, mode_cfg, active_cfg, flags, offset, scene, release_calls;
+static U precision, rounding, depth, initial_status;
+static B* orig_code;
+alignas(16) static B floating[512];
+
+struct Arena {
+    B receiver[32];
+    B nodes[4][32];
+};
+static Arena arena;
+
+namespace porsche {
+U render_state_flush_records_005de6bc[28]{};
+U render_state_flush_callbacks_005de72c[7]{};
+std::uint8_t startup_service_active_0069dd1e = 0;
+std::uint8_t startup_lifecycle_mode_005de6b8 = 0;
+}
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+struct State {
+    Arena arena;
+    U records[28];
+    U callbacks[7];
+    U release_calls;
+    B mode, active, pad[2];
+};
+struct Event {
+    U tag, argc, args[4];
+    State state;
+    Fpu fpu;
+};
+struct Trace {
+    U count, abi, exception[3];
+    Event events[24];
+    State final;
+    Fpu fpu;
+};
+static Trace trace, expected;
+
+static void require(bool ok, const char* s) {
+    if (!ok) {
+        std::printf("divergence %s case=%u slot_cfg=%u mode=%u active=%u flags=%x scene=%u offset=%u\n",
+                    s, cases, slot_cfg, mode_cfg, active_cfg, flags, scene, offset);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void snapshot(State& s) {
+    s.arena = arena;
+    std::memcpy(s.records, render_state_flush_records_005de6bc, sizeof s.records);
+    std::memcpy(s.callbacks, render_state_flush_callbacks_005de72c, sizeof s.callbacks);
+    s.release_calls = release_calls;
+    s.mode = startup_lifecycle_mode_005de6b8;
+    s.active = startup_service_active_0069dd1e;
+    s.pad[0] = 0;
+    s.pad[1] = 0;
+}
+
+static void capture(Fpu& f) {
+    B environment[28];
+    __asm {
+        fxsave floating
+        fnstenv environment
+        fldenv environment
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(environment + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0; i < 8; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10, floating + 32 + i * 16, 10);
+        } else {
+            std::memset(f.values + i * 10, 0, 10);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = static_cast<unsigned short>(0x7f | (precision << 8) | (rounding << 10));
+    __asm fninit
+    __asm fldcw cw
+    for (U i = 0; i < depth; ++i) {
+        U bits = 0x3f800001 + i;
+        __asm fld dword ptr bits
+    }
+    B environment[28];
+    __asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment + 4) |= static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+
+static U invoke(void* fn, void* receiver, const U* args, U count, U cleanup) {
+    U before, frame, fail = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, count
+        mov edx, args
+    pushargs:
+        test eax, eax
+        jz pushed
+        dec eax
+        push dword ptr [edx + eax * 4]
+        jmp pushargs
+    pushed:
+        mov ecx, receiver
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, cleanup
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void event(U tag, std::initializer_list<U> args) {
+    require(trace.count < 24, "bounded event count");
+    auto& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.argc = static_cast<U>(args.size());
+    U i = 0;
+    for (U a : args) {
+        e.args[i++] = a;
+    }
+    while (i < 4) {
+        e.args[i++] = 0;
+    }
+    snapshot(e.state);
+    capture(e.fpu);
+}
+
+static void maybe_alter_fpu() {
+    if (flags & 4) {
+        unsigned short cw = static_cast<unsigned short>(0x7f | ((precision == 0 ? 3u : 0u) << 8) | (((rounding + 1) % 4) << 10));
+        __asm fldcw cw
+    }
+}
+
+static void __cdecl flush_cb_alt(U key, U val) {
+    event(0x5de7ff, {key, val});
+    maybe_alter_fpu();
+}
+
+static void record_flush_cb(U idx, U key, U val) {
+    event(0x5de72c + idx, {key, val});
+    if ((flags & 1) && idx == 3) {
+        B* receiver = arena.receiver + offset;
+        if (scene & 1) {
+            const U cur1 = word(receiver, 12);
+            put(receiver, 12, cur1 == 0 ? ptr(arena.nodes[2] + offset) : 0);
+        }
+        render_state_flush_records_005de6bc[14 + 12] ^= 0x11223344;
+        render_state_flush_records_005de6bc[14 + 13] ^= 0x55667788;
+        render_state_flush_callbacks_005de72c[6] = ptr(reinterpret_cast<void*>(&flush_cb_alt));
+        if (scene & 2) {
+            startup_lifecycle_mode_005de6b8 = 0;
+        }
+        if (scene & 4) {
+            startup_service_active_0069dd1e = 0;
+        }
+    }
+    maybe_alter_fpu();
+}
+
+static void __cdecl flush_cb_0(U k, U v) { record_flush_cb(0, k, v); }
+static void __cdecl flush_cb_1(U k, U v) { record_flush_cb(1, k, v); }
+static void __cdecl flush_cb_2(U k, U v) { record_flush_cb(2, k, v); }
+static void __cdecl flush_cb_3(U k, U v) { record_flush_cb(3, k, v); }
+static void __cdecl flush_cb_4(U k, U v) { record_flush_cb(4, k, v); }
+static void __cdecl flush_cb_5(U k, U v) { record_flush_cb(5, k, v); }
+static void __cdecl flush_cb_6(U k, U v) { record_flush_cb(6, k, v); }
+
+namespace porsche {
+void __cdecl render_display_texture_release_00555440(void* texture) {
+    event(0x555440, {ptr(texture)});
+    ++release_calls;
+    if ((flags & 2) && release_calls == 1) {
+        B* receiver = arena.receiver + offset;
+        const U cur1 = word(receiver, 12);
+        if (scene & 1) {
+            put(receiver, 12, cur1 == 0 ? ptr(arena.nodes[3] + offset) : 0);
+        } else {
+            put(receiver, 12, ptr(arena.nodes[3] + offset));
+        }
+        put(receiver, 8, 0xbad00008);
+    }
+    maybe_alter_fpu();
+}
+}
+
+static void absolute_at(B* p, U off, U old, const void* replacement) {
+    require(word(p, off) == old, "exact absolute relocation offset");
+    put(p, off, ptr(replacement));
+}
+
+static void relative(B* p, U n, U va, U old, const void* replacement, U expected_count) {
+    U found = 0;
+    for (U i = 0; i + 5 <= n; ++i) {
+        if (p[i] == 0xe8 && va + i + 5 + word(p, i + 1) == old) {
+            put(p, i + 1, ptr(replacement) - ptr(p + i + 5));
+            ++found;
+            i += 4;
+        }
+    }
+    require(found == expected_count, "relative relocation count");
+}
+
+static void init() {
+    static const B body[] = {@BODY_005363A0@};
+    require(sizeof body == 178, "178-byte original body");
+    orig_code = static_cast<B*>(VirtualAlloc(nullptr, 4096, 0x3000, 0x40));
+    require(orig_code != nullptr, "raw allocation");
+    std::memcpy(orig_code, body, sizeof body);
+    absolute_at(orig_code, 0x0a, 0x005de6bc, &render_state_flush_records_005de6bc[0]);
+    absolute_at(orig_code, 0x18, 0x005de72c, &render_state_flush_callbacks_005de72c[0]);
+    absolute_at(orig_code, 0x32, 0x005de748, &render_state_flush_callbacks_005de72c[7]);
+    absolute_at(orig_code, 0x44, 0x005de72c, &render_state_flush_records_005de6bc[28]);
+    absolute_at(orig_code, 0x4b, 0x005de6b8, &startup_lifecycle_mode_005de6b8);
+    absolute_at(orig_code, 0x58, 0x0069dd1e, &startup_service_active_0069dd1e);
+    relative(orig_code, 178, 0x005363a0, 0x00555440,
+             reinterpret_cast<void*>(&render_display_texture_release_00555440), 4);
+    require(FlushInstructionCache(GetCurrentProcess(), orig_code, 4096) != 0, "instruction cache");
+}
+
+static void reset() {
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(&arena, 0x42, sizeof arena);
+    release_calls = 0;
+    for (U i = 0; i < 28; ++i) {
+        render_state_flush_records_005de6bc[i] = 0x1000u + i * 0x11u;
+    }
+    void* cbs[7] = {
+        reinterpret_cast<void*>(&flush_cb_0),
+        reinterpret_cast<void*>(&flush_cb_1),
+        reinterpret_cast<void*>(&flush_cb_2),
+        reinterpret_cast<void*>(&flush_cb_3),
+        reinterpret_cast<void*>(&flush_cb_4),
+        reinterpret_cast<void*>(&flush_cb_5),
+        reinterpret_cast<void*>(&flush_cb_6)
+    };
+    for (U i = 0; i < 7; ++i) {
+        render_state_flush_callbacks_005de72c[i] = ptr(cbs[i]);
+    }
+    for (U n = 0; n < 4; ++n) {
+        put(arena.nodes[n] + offset, 8, 0x70000100u + n * 0x100u);
+    }
+    B* receiver = arena.receiver + offset;
+    put(receiver, 8, (slot_cfg & 1) ? ptr(arena.nodes[0] + offset) : 0);
+    put(receiver, 12, (slot_cfg & 2) ? ptr(arena.nodes[1] + offset) : 0);
+    startup_lifecycle_mode_005de6b8 = static_cast<B>(mode_cfg);
+    startup_service_active_0069dd1e = static_cast<B>(active_cfg);
+}
+
+static void compare() {
+    Trace& original = expected;
+    for (U side = 0; side < 3; ++side) {
+        reset();
+        seed_fpu();
+        B* receiver = arena.receiver + offset;
+        U args[1] = {ptr(receiver)};
+        void* fn = nullptr;
+        U argc = 0, cleanup = 0;
+        if (side == 0) {
+            fn = orig_code;
+        } else if (side == 1) {
+            fn = reinterpret_cast<void*>(&startup_lifecycle_apply_raw_005363a0);
+        } else {
+            fn = reinterpret_cast<void*>(&frame_pump_boundary_005363a0);
+            argc = 1;
+            cleanup = 4;
+        }
+        bool complete = true;
+        __try {
+            trace.abi = invoke(fn, side == 2 ? reinterpret_cast<void*>(0x12345678u) : receiver, args, argc, cleanup);
+        } __except (exception_record(GetExceptionInformation())) {
+            complete = false;
+        }
+        require(complete && trace.abi == 0, "mapped input/stack/nonvolatile ABI");
+        snapshot(trace.final);
+        capture(trace.fpu);
+        if (side == 0) {
+            original = trace;
+        } else {
+            require(std::memcmp(&trace, &original, sizeof trace) == 0, "state/ordered callback/FPU");
+            events_total += trace.count;
+        }
+    }
+    ++cases;
+}
+
+int main() {
+    init();
+    precision = 2;
+    rounding = 0;
+    depth = 1;
+    initial_status = 0;
+    for (slot_cfg = 0; slot_cfg < 4; ++slot_cfg) {
+        for (U m : {0u, 1u, 0x80u}) {
+            for (U a : {0u, 1u, 0x80u}) {
+                for (offset = 0; offset < 4; ++offset) {
+                    for (U f : {0u, 1u, 2u, 3u, 4u, 7u}) {
+                        for (U s : {0u, 1u, 2u, 4u}) {
+                            if (f == 0 && s != 0) continue;
+                            mode_cfg = m;
+                            active_cfg = a;
+                            flags = f;
+                            scene = s;
+                            compare();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    __asm fninit
+    std::printf("frame_state_release_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events_total);
+    return 0;
+}

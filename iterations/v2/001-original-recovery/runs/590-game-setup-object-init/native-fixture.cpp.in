@@ -1,0 +1,366 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "game_setup_object_init_590.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U cases = 0;
+
+static void require(bool ok, const char* what) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", what, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U ptr(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U word(const void* p) {
+    U value;
+    std::memcpy(&value, p, sizeof value);
+    return value;
+}
+
+static void put(void* p, U value) {
+    std::memcpy(p, &value, sizeof value);
+}
+
+static B state_buf[0x100]{};
+static void* fixture_state_ptr = state_buf;
+static U fixture_selector_val = 0;
+static U* fixture_selector_ptr = &fixture_selector_val;
+static U pool_nodes[8][4]{};
+static U object_words[4]{};
+static U large_block_addr = 0;
+static U enter_mutation_mode = 0;
+
+struct Event {
+    U tag;
+    U a0;
+    U a1;
+    U a2;
+    U lock_word;
+};
+
+struct Trace {
+    U count;
+    U abi_failed;
+    Event events[8];
+    U object[4];
+    B state[0x100];
+    B nodes[sizeof pool_nodes];
+};
+
+static Trace trace_current;
+static Trace trace_orig;
+static Trace trace_raw;
+static Trace trace_cdecl;
+
+static void record_event(U tag, U a0, U a1, U a2) {
+    require(trace_current.count < 8u, "event capacity");
+    Event& ev = trace_current.events[trace_current.count++];
+    ev.tag = tag;
+    ev.a0 = a0;
+    ev.a1 = a1;
+    ev.a2 = a2;
+    ev.lock_word = word(state_buf + 0x28u);
+}
+
+namespace porsche {
+void* __cdecl application_context_heap_state_005e4fe8() {
+    return fixture_state_ptr;
+}
+
+U __cdecl application_context_heap_selector_005e4fec() {
+    return *fixture_selector_ptr;
+}
+
+void* __cdecl application_context_member_block_0059ecb0(U bytes, U heap, U source_va) {
+    record_event(0x0059ecb0u, bytes, heap, source_va);
+    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(large_block_addr));
+}
+
+void __cdecl application_context_new_head_0059eeb0(U kind, U slot) {
+    record_event(0x0059eeb0u, kind, slot, 0u);
+    require(kind < 32u, "pool kind bounds");
+    pool_nodes[2][0] = 0x22220000u + kind;
+    pool_nodes[2][1] = ptr(pool_nodes[3]);
+    pool_nodes[3][0] = 0x33330000u + kind;
+    pool_nodes[3][1] = 0xfeedfaceu;
+    put(state_buf + 0x28u + 0xcu + kind * 4u, ptr(pool_nodes[2]));
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    record_event(0x005322b0u, ptr(lock), 0u, 0u);
+    if (enter_mutation_mode == 1u) {
+        put(state_buf + 0x28u, 0xdeadbeefu);
+    } else if (enter_mutation_mode == 2u) {
+        put(state_buf + 0x28u + 0xcu, 0u);
+    }
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    record_event(0x005322c0u, ptr(lock), 0u, 0u);
+}
+} // namespace porsche
+
+static const B original_body[] = {@BODY_00403520@};
+static B* original_code = nullptr;
+
+static void patch_abs_at(B* code, U offset, U expected_va, const void* host) {
+    require(offset + 4u <= sizeof original_body, "abs offset bounds");
+    require(word(code + offset) == expected_va, "abs relocation mismatch");
+    put(code + offset, ptr(host));
+}
+
+static void patch_rel_call(B* code, U offset, U expected_va, U base_va, const void* target) {
+    require(offset + 5u <= sizeof original_body, "call offset bounds");
+    require(code[offset] == 0xe8u, "call opcode mismatch");
+    const std::int32_t orig_rel = static_cast<std::int32_t>(word(code + offset + 1u));
+    const U orig_target = base_va + offset + 5u + static_cast<U>(orig_rel);
+    require(orig_target == expected_va, "call target mismatch");
+    const U next_ip = ptr(code + offset + 5u);
+    put(code + offset + 1u, ptr(target) - next_ip);
+}
+
+static void prepare_original() {
+    require(sizeof original_body == 184u, "original body extent");
+    original_code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(original_code != nullptr, "original allocation");
+    std::memcpy(original_code, original_body, sizeof original_body);
+
+    patch_abs_at(original_code, 0x2du, 0x005e4fe8u, &fixture_state_ptr);
+    patch_abs_at(original_code, 0x3fu, 0x005e4fecu, &fixture_selector_ptr);
+
+    patch_rel_call(original_code, 0x4cu, 0x0059ecb0u, 0x00403520u,
+        reinterpret_cast<const void*>(&porsche::application_context_member_block_0059ecb0));
+    patch_rel_call(original_code, 0x68u, 0x005322b0u, 0x00403520u,
+        reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    patch_rel_call(original_code, 0x81u, 0x0059eeb0u, 0x00403520u,
+        reinterpret_cast<const void*>(&porsche::application_context_new_head_0059eeb0));
+    patch_rel_call(original_code, 0x98u, 0x005322c0u, 0x00403520u,
+        reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+
+    FlushInstructionCache(GetCurrentProcess(), original_code, sizeof original_body);
+}
+
+static U invoke_fastcall(void* fn, void* object, U bytes) {
+    U before = 0, frame = 0, failed = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push bytes
+        mov ecx, object
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        mov failed, 0
+        jmp done
+    bad:
+        mov failed, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return failed;
+}
+
+static U invoke_cdecl(void* fn, void* object, U bytes) {
+    U before = 0, frame = 0, failed = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push bytes
+        push object
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        mov failed, 0
+        jmp done
+    bad:
+        mov failed, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return failed;
+}
+
+struct Case {
+    U bytes;
+    U selector;
+    U large_block;
+    bool populate_head;
+    U mutation_mode;
+    const char* name;
+};
+
+static void setup_state(const Case& c) {
+    std::memset(&trace_current, 0, sizeof trace_current);
+    for (U i = 0; i < sizeof state_buf; ++i) {
+        state_buf[i] = static_cast<B>((i * 19u + 0x33u) & 0xffu);
+    }
+    std::memset(state_buf + 0x28u + 0xcu, 0, 32u * 4u);
+    std::memset(pool_nodes, 0, sizeof pool_nodes);
+    put(state_buf + 0x28u, 0x12345678u);
+
+    pool_nodes[0][0] = 0xaaaa0001u;
+    pool_nodes[0][1] = ptr(pool_nodes[1]);
+    pool_nodes[1][0] = 0xbbbb0002u;
+    pool_nodes[1][1] = 0xcafed00du;
+
+    if (c.populate_head && c.bytes >= 1u && c.bytes <= 0x100u) {
+        const U kind = (c.bytes - 1u) >> 3u;
+        put(state_buf + 0x28u + 0xcu + kind * 4u, ptr(pool_nodes[0]));
+    }
+
+    fixture_state_ptr = state_buf;
+    fixture_selector_val = c.selector;
+    fixture_selector_ptr = &fixture_selector_val;
+    large_block_addr = c.large_block;
+    enter_mutation_mode = c.mutation_mode;
+
+    object_words[0] = 0xaaaa1111u;
+    object_words[1] = 0xbbbb2222u;
+    object_words[2] = 0xcccc3333u;
+    object_words[3] = 0xdddd4444u;
+}
+
+static void run_one(void* fn, bool is_cdecl, const Case& c, Trace& out) {
+    setup_state(c);
+    trace_current.abi_failed = is_cdecl
+        ? invoke_cdecl(fn, object_words, c.bytes)
+        : invoke_fastcall(fn, object_words, c.bytes);
+    std::memcpy(trace_current.object, object_words, sizeof object_words);
+    std::memcpy(trace_current.state, state_buf, sizeof state_buf);
+    std::memcpy(trace_current.nodes, pool_nodes, sizeof pool_nodes);
+    out = trace_current;
+}
+
+static void check_equal(const Trace& a, const Trace& b, const char* label) {
+    require(a.abi_failed == 0u && b.abi_failed == 0u, label);
+    require(a.count == b.count, "event count");
+    require(std::memcmp(a.events, b.events, sizeof a.events) == 0, "event trace");
+    require(std::memcmp(a.object, b.object, sizeof a.object) == 0, "object words");
+    require(std::memcmp(a.state, b.state, sizeof a.state) == 0, "heap state buffer");
+    require(std::memcmp(a.nodes, b.nodes, sizeof a.nodes) == 0, "pool nodes");
+}
+
+static void verify_cases() {
+    const Case list[] = {
+        {0xffffffffu, 3u, 0x40001000u, true, 0u, "sentinel-ffffffff"},
+        {0u, 3u, 0x40001000u, true, 0u, "zero-bytes"},
+        {1u, 5u, 0x40001000u, true, 0u, "pool-1-nonempty"},
+        {8u, 5u, 0x40001000u, false, 0u, "pool-8-empty"},
+        {9u, 5u, 0x40001000u, true, 0u, "pool-9-nonempty"},
+        {0x100u, 7u, 0x40001000u, false, 0u, "pool-256-empty"},
+        {0x101u, 9u, 0x40002000u, true, 0u, "large-257"},
+        {0xfffffffeu, 11u, 0x80001000u, true, 0u, "large-fffffffe-wrap"},
+        {7u, 5u, 0x40001000u, true, 1u, "pool-lock-mutated-on-enter"},
+        {5u, 5u, 0x40001000u, true, 2u, "pool-head-cleared-on-enter"}
+    };
+
+    for (U i = 0; i < sizeof(list) / sizeof(list[0]); ++i) {
+        const Case& c = list[i];
+        run_one(original_code, false, c, trace_orig);
+        run_one(reinterpret_cast<void*>(&porsche::game_setup_object_init_raw_00403520), false, c, trace_raw);
+        run_one(reinterpret_cast<void*>(&porsche::game_setup_object_init_00403520), true, c, trace_cdecl);
+
+        check_equal(trace_orig, trace_raw, "raw fastcall ABI");
+        check_equal(trace_orig, trace_cdecl, "cdecl bridge ABI");
+
+        require(trace_raw.object[3] == 0xdddd4444u, "guard word untouched");
+        if (c.bytes == 0xffffffffu) {
+            require(trace_raw.count == 0u, "sentinel no calls");
+            require(trace_raw.object[0] == 0xaaaa1111u &&
+                    trace_raw.object[1] == 0xbbbb2222u &&
+                    trace_raw.object[2] == 0xcccc3333u, "sentinel object untouched");
+        } else if (c.bytes == 0u) {
+            require(trace_raw.count == 0u, "zero no calls");
+            require(trace_raw.object[0] == 0u &&
+                    trace_raw.object[1] == 0u &&
+                    trace_raw.object[2] == 0u, "zero object fields");
+        } else if (c.bytes > 0x100u) {
+            require(trace_raw.count == 1u && trace_raw.events[0].tag == 0x0059ecb0u, "large single alloc");
+            require(trace_raw.events[0].a0 == c.bytes &&
+                    trace_raw.events[0].a1 == c.selector &&
+                    trace_raw.events[0].a2 == 0x005cbdb4u, "large alloc args");
+            require(trace_raw.object[0] == c.large_block &&
+                    trace_raw.object[1] == c.large_block &&
+                    trace_raw.object[2] == c.large_block + c.bytes, "large object bounds");
+        } else {
+            const U expected_kind = (c.bytes - 1u) >> 3u;
+            const bool expect_new_head = (!c.populate_head) || (c.mutation_mode == 2u);
+            require(trace_raw.events[0].tag == 0x005322b0u &&
+                    trace_raw.events[0].a0 == 0x12345678u, "enter lock");
+            if (expect_new_head) {
+                require(trace_raw.count == 3u, "pool refill event count");
+                require(trace_raw.events[1].tag == 0x0059eeb0u &&
+                        trace_raw.events[1].a0 == expected_kind &&
+                        trace_raw.events[1].a1 == 0u, "new_head args");
+                require(trace_raw.events[2].tag == 0x005322c0u, "leave after refill");
+                require(trace_raw.object[0] == ptr(pool_nodes[2]) &&
+                        trace_raw.object[2] == ptr(pool_nodes[2]) + c.bytes, "refilled block bounds");
+            } else {
+                require(trace_raw.count == 2u, "pool fast event count");
+                require(trace_raw.events[1].tag == 0x005322c0u, "leave after pop");
+                require(trace_raw.object[0] == ptr(pool_nodes[0]) &&
+                        trace_raw.object[2] == ptr(pool_nodes[0]) + c.bytes, "popped block bounds");
+            }
+            const U expected_leave_lock = (c.mutation_mode == 1u) ? 0xdeadbeefu : 0x12345678u;
+            require(trace_raw.events[trace_raw.count - 1u].a0 == expected_leave_lock, "leave lock reload");
+        }
+        ++cases;
+    }
+}
+
+int main() {
+    prepare_original();
+    verify_cases();
+    std::printf("game_setup_object_init_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

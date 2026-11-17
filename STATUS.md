@@ -4,22 +4,22 @@ Updated 2026-11-17. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run588](iterations/v2/001-original-recovery/runs/588-frame-splash-integration/README.md)
-compiles329 C++ translation units across8 projects. The link has123 unresolved names/
-128 references. **There is no recovered playable C++ game executable yet.**
+[Run591](iterations/v2/001-original-recovery/runs/591-frame-object-integration/README.md)
+compiles331 C++ translation units across8 projects. The link has121 unresolved names/
+126 references. **There is no recovered playable C++ game executable yet.**
 
-Run588 integrates partial `005693e0` (53B + 12B loader-zero `.data`) and `004edc00`
-(48B, 0B data) from frozen585002 and587002. Native comparisons pass42 executions/
-seven controls atOd/O2, and all53 instruction bytes of `005693e0` equal the original
-after relocation normalization. Shared audit verifies813 pins/868 providers;
-registry908 retains partial domains.
+Run591 integrates partial `005363a0` (178B) and `00403520` (184B) from frozen589001
+and590001 with zero new original data. Native comparisons pass6068 cases/eight
+controls atOd/O2. Canonical state/callback/release and context/heap owners are
+reused. Shared audit verifies818 pins/872 providers; registry910 retains partial
+domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run585 native002, Run587 native002 and Run588 integration are accepted within their stated bounds.
-Run589 frame-state release and590 object init are ready for next integration.
+Run589 native001, Run590 native001 and Run591 integration are accepted within their stated bounds.
+Run592 context-base destroy and593 display prevideo are active pending packets.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
