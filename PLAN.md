@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run591](iterations/v2/001-original-recovery/runs/591-frame-object-integration/README.md).
-Frame-state release5363a0 and object-init403520 close two real dependencies.
-The shared build compiles331 TUs with121 unresolved names/126 references.
+Latest recovery intake is [Run594](iterations/v2/001-original-recovery/runs/594-context-prevideo-integration/README.md).
+Context-base destroy525ec0 and display prevideo44e2c0 close two real dependencies.
+The shared build compiles333 TUs with119 unresolved names/124 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are the reachable context-base destroy525ec0 and display prevideo44e2c0 dependencies. The real depth-conversion
+Next are the reachable startup transfer4691c0/468100 and quality tier44dfb0/44e370 dependencies. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;

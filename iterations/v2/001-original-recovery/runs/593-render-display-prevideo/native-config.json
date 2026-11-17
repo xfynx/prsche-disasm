@@ -1,0 +1,61 @@
+{
+  "run": 593,
+  "experiment": "local/experiments/v2-render-display-prevideo-593",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/593-render-display-prevideo/render_display_prevideo_593.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/593-render-display-prevideo/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/593-render-display-prevideo",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/593-render-display-prevideo/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0044e2c0",
+      "bytes": 165,
+      "sha256": "31b476817095733dd64d11fbd5ff1de498b1439cccac96ecc4652fc87aac047e",
+      "token": "@BODY_0044E2C0@"
+    }
+  ],
+  "pass_marker": "render_display_prevideo_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "invert-software-flag-branch",
+      "source": "iterations/v2/001-original-recovery/runs/593-render-display-prevideo/render_display_prevideo_593.cpp",
+      "old": "if (display[0x60] == 0u) {",
+      "new": "if (display[0x60] != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-mode-record-offset",
+      "source": "iterations/v2/001-original-recovery/runs/593-render-display-prevideo/render_display_prevideo_593.cpp",
+      "old": "std::memcpy(local_record, modes + 0x28u, sizeof local_record);",
+      "new": "std::memcpy(local_record, modes + 0x00u, sizeof local_record);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-15bit-format-normalize",
+      "source": "iterations/v2/001-original-recovery/runs/593-render-display-prevideo/render_display_prevideo_593.cpp",
+      "old": "if (format == 0x0fu) {",
+      "new": "if (format == 0x0eu) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "omit-mode-flag-byte-write",
+      "source": "iterations/v2/001-original-recovery/runs/593-render-display-prevideo/render_display_prevideo_593.cpp",
+      "old": "render_mode_state_00619790[0x0a] = 1u;",
+      "new": "render_mode_state_00619790[0x0a] = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

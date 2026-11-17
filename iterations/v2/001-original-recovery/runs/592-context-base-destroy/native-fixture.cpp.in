@@ -1,0 +1,359 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "context_base_destroy_592.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+static U ptr(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U word(const void* p, U offset = 0) {
+    U value;
+    std::memcpy(&value, static_cast<const B*>(p) + offset, sizeof value);
+    return value;
+}
+static void put(void* p, U offset, U value) {
+    std::memcpy(static_cast<B*>(p) + offset, &value, sizeof value);
+}
+
+static U cases = 0;
+static U events_total = 0;
+static U unlink_mutation_mode = 0;
+static U release_return_value = 0;
+static U unlink_calls = 0;
+static U release_node_seq = 0;
+static B* orig_code = nullptr;
+alignas(16) static B floating[512];
+
+struct Arena {
+    B pre_canary[16];
+    ApplicationSetupContext context;
+    B mid_canary_a[16];
+    B allocation[32];
+    B mid_canary_b[16];
+    B sentinel[32];
+    B mid_canary_c[16];
+    B sentinel_alt[32];
+    B mid_canary_d[16];
+    B nodes[4][48];
+    B post_canary[16];
+};
+static Arena arena;
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Event {
+    U tag, argc, args[4];
+    Arena arena;
+    Fpu fpu;
+};
+
+struct Trace {
+    U count, abi, eax_out;
+    Event events[24];
+    Arena final_arena;
+    Fpu fpu;
+};
+
+static Trace trace, expected;
+
+static void require(bool ok, const char* what) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", what, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture(Fpu& f) {
+    B environment[28];
+    __asm {
+        fxsave floating
+        fnstenv environment
+        fldenv environment
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(environment + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0; i < 8; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10, floating + 32 + i * 16, 10);
+        } else {
+            std::memset(f.values + i * 10, 0, 10);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = 0x027fu;
+    U mxcsr = 0x1f80u;
+    __asm {
+        fninit
+        fldcw cw
+        ldmxcsr mxcsr
+        fldpi
+    }
+}
+
+static void event(U tag, std::initializer_list<U> args) {
+    require(trace.count < 24u, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.argc = static_cast<U>(args.size());
+    U i = 0;
+    for (U a : args) {
+        e.args[i++] = a;
+    }
+    while (i < 4u) {
+        e.args[i++] = 0u;
+    }
+    e.arena = arena;
+    capture(e.fpu);
+}
+
+namespace porsche {
+
+void __fastcall application_context_unlink_005262e0(
+    void* root, void*, U key) {
+    event(0x005262e0u, {ptr(root), key});
+    ++unlink_calls;
+    if (unlink_calls == 1u) {
+        if (unlink_mutation_mode == 1u) {
+            // Mutate node0->next to splice out node1 and chain node2 -> node3.
+            put(arena.nodes[0], 8u, ptr(arena.nodes[2]));
+        } else if (unlink_mutation_mode == 2u) {
+            // Mutate node0->next to null to stop traversal early.
+            put(arena.nodes[0], 8u, 0u);
+        } else if (unlink_mutation_mode == 3u) {
+            // Mutate allocation[0] (sentinel pointer) to verify live reload on reset/clear.
+            put(arena.allocation, 0u, ptr(arena.sentinel_alt));
+        }
+    }
+}
+
+void* __fastcall application_context_release_node_004e4560(
+    void* member, void*, U flags) {
+    event(0x004e4560u, {ptr(member), flags});
+    ++release_node_seq;
+    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(0x60010000u + release_node_seq));
+}
+
+void __cdecl application_context_notify_node_004d7da0(void* node, U flags) {
+    event(0x004d7da0u, {ptr(node), flags});
+}
+
+void __cdecl application_context_clear_004237d0(void* address, U bytes, U value) {
+    event(0x004237d0u, {ptr(address), bytes, value});
+    if (address == arena.sentinel || address == arena.sentinel_alt) {
+        require(bytes == 0x20u, "sentinel clear size");
+        std::memset(address, static_cast<int>(value), bytes);
+    }
+}
+
+U __cdecl application_release_0059f050(void* address) {
+    event(0x0059f050u, {ptr(address)});
+    return release_return_value;
+}
+
+} // namespace porsche
+
+static void relocate_call(B* code, U offset, U va_base, U expected_target, const void* replacement) {
+    require(offset + 5u <= 124u, "call offset bounds");
+    require(code[offset] == 0xe8u, "call opcode");
+    const std::int32_t orig_rel = static_cast<std::int32_t>(word(code, offset + 1u));
+    const U orig_target = va_base + offset + 5u + static_cast<U>(orig_rel);
+    require(orig_target == expected_target, "call target match");
+    const U next_ip = ptr(code + offset + 5u);
+    put(code, offset + 1u, ptr(replacement) - next_ip);
+}
+
+static void init() {
+    static const B body[] = {@BODY_00525EC0@};
+    require(sizeof body == 124u, "124-byte original body");
+    orig_code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(orig_code != nullptr, "executable allocation");
+    std::memcpy(orig_code, body, sizeof body);
+    relocate_call(orig_code, 0x26u, 0x00525ec0u, 0x005262e0u,
+                  reinterpret_cast<const void*>(&porsche::application_context_unlink_005262e0));
+    relocate_call(orig_code, 0x33u, 0x00525ec0u, 0x004e4560u,
+                  reinterpret_cast<const void*>(&porsche::application_context_release_node_004e4560));
+    relocate_call(orig_code, 0x3bu, 0x00525ec0u, 0x004d7da0u,
+                  reinterpret_cast<const void*>(&porsche::application_context_notify_node_004d7da0));
+    relocate_call(orig_code, 0x6cu, 0x00525ec0u, 0x004237d0u,
+                  reinterpret_cast<const void*>(&porsche::application_context_clear_004237d0));
+    relocate_call(orig_code, 0x72u, 0x00525ec0u, 0x0059f050u,
+                  reinterpret_cast<const void*>(&porsche::application_release_0059f050));
+    require(FlushInstructionCache(GetCurrentProcess(), orig_code, sizeof body) != 0,
+            "instruction cache flush");
+}
+
+static U invoke_fastcall(void* fn, ApplicationSetupContext* ctx, U seed_eax, U* out_eax) {
+    U before = 0, frame = 0, fail = 0, ret_eax = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, seed_eax
+        mov ecx, ctx
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov ret_eax, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    *out_eax = ret_eax;
+    return fail;
+}
+
+struct CaseSpec {
+    bool has_allocation;
+    U count_value;
+    U node_count;
+    U mutation_mode;
+    U seed_eax;
+    U release_ret;
+    const char* name;
+};
+
+static void reset_arena(const CaseSpec& c) {
+    std::memset(&trace, 0, sizeof trace);
+    unlink_calls = 0;
+    release_node_seq = 0;
+    unlink_mutation_mode = c.mutation_mode;
+    release_return_value = c.release_ret;
+
+    B* raw = reinterpret_cast<B*>(&arena);
+    for (U i = 0; i < sizeof arena; ++i) {
+        raw[i] = static_cast<B>((i * 29u + 0x51u) & 0xffu);
+    }
+
+    for (U n = 0; n < 4u; ++n) {
+        put(arena.nodes[n], 0x08u, 0u);
+        put(arena.nodes[n], 0x0cu, 0x1000u + n * 0x111u);
+    }
+
+    if (c.node_count >= 1u) {
+        put(arena.sentinel, 0x04u, ptr(arena.nodes[0]));
+        for (U n = 0; n + 1u < c.node_count; ++n) {
+            put(arena.nodes[n], 0x08u, ptr(arena.nodes[n + 1u]));
+        }
+        if (c.mutation_mode == 1u) {
+            // Prepare sibling chain node2 -> node3 for splice mutation.
+            put(arena.nodes[2], 0x08u, ptr(arena.nodes[3]));
+            put(arena.nodes[3], 0x08u, 0u);
+        }
+    } else {
+        put(arena.sentinel, 0x04u, 0u);
+    }
+    put(arena.sentinel, 0x08u, 0x77770008u);
+    put(arena.sentinel, 0x0cu, 0x7777000cu);
+
+    put(arena.sentinel_alt, 0x04u, 0x88880004u);
+    put(arena.sentinel_alt, 0x08u, 0x88880008u);
+    put(arena.sentinel_alt, 0x0cu, 0x8888000cu);
+
+    put(arena.allocation, 0x00u, ptr(arena.sentinel));
+    put(arena.allocation, 0x04u, c.count_value);
+
+    put(arena.context.bytes, 0x00u, 0x005b683cu);
+    put(arena.context.bytes, 0x04u, c.has_allocation ? ptr(arena.allocation) : 0u);
+}
+
+static void run_case(const CaseSpec& c) {
+    for (U side = 0; side < 2u; ++side) {
+        reset_arena(c);
+        seed_fpu();
+        void* fn = (side == 0u)
+            ? reinterpret_cast<void*>(orig_code)
+            : reinterpret_cast<void*>(&porsche::application_context_base_destroy_00525ec0);
+        trace.abi = invoke_fastcall(fn, &arena.context, c.seed_eax, &trace.eax_out);
+        require(trace.abi == 0u, "fastcall ABI");
+        trace.final_arena = arena;
+        capture(trace.fpu);
+        if (side == 0u) {
+            expected = trace;
+        } else {
+            require(std::memcmp(&trace, &expected, sizeof trace) == 0, "original vs cpp parity");
+            events_total += trace.count;
+        }
+    }
+
+    // Explicit semantic sanity checks on the verified trace.
+    require(word(expected.final_arena.context.bytes, 0x00u) == 0x005bb028u, "base vtable store");
+    if (!c.has_allocation) {
+        require(expected.count == 0u, "null allocation no calls");
+        require(expected.eax_out == c.seed_eax, "null allocation preserves incoming EAX");
+    } else {
+        require(expected.eax_out == c.release_ret, "non-null allocation returns release result");
+        require(expected.count >= 2u, "clear and release called");
+        if (c.count_value == 0u) {
+            require(expected.count == 2u, "zero count skips loop and reset");
+            require(expected.events[0].tag == 0x004237d0u, "zero count goes straight to clear");
+            require(word(expected.events[0].arena.sentinel, 0x08u) == 0x77770008u,
+                    "zero count does not reset sentinel");
+        }
+    }
+    ++cases;
+}
+
+int main() {
+    init();
+    const CaseSpec specs[] = {
+        {false, 0u, 0u, 0u, 0x00000000u, 0x59f05001u, "null-alloc-eax-0"},
+        {false, 0u, 0u, 0u, 0x12345678u, 0x59f05001u, "null-alloc-eax-12345678"},
+        {false, 0u, 0u, 0u, 0xa5a55a5au, 0x59f05001u, "null-alloc-eax-a5a55a5a"},
+        {false, 0u, 0u, 0u, 0xffffffffu, 0x59f05001u, "null-alloc-eax-ffffffff"},
+        {true,  0u, 2u, 0u, 0x22223333u, 0x59f05002u, "count-zero-skips-loop-and-reset"},
+        {true,  3u, 0u, 0u, 0x44445555u, 0x59f05003u, "empty-list-nonzero-count"},
+        {true,  1u, 1u, 0u, 0x66667777u, 0x59f05004u, "one-node-list"},
+        {true,  2u, 2u, 0u, 0x88889999u, 0x59f05005u, "two-node-list"},
+        {true,  3u, 3u, 0u, 0x11112222u, 0x59f05006u, "three-node-list"},
+        {true,  2u, 2u, 1u, 0x33334444u, 0x59f05007u, "unlink-mutates-next-splice"},
+        {true,  2u, 2u, 2u, 0x55556666u, 0x59f05008u, "unlink-mutates-next-null"},
+        {true,  2u, 2u, 3u, 0x77778888u, 0x59f05009u, "unlink-mutates-sentinel-ptr"}
+    };
+
+    for (U i = 0; i < sizeof(specs) / sizeof(specs[0]); ++i) {
+        run_case(specs[i]);
+    }
+    __asm fninit
+    std::printf("context_base_destroy_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

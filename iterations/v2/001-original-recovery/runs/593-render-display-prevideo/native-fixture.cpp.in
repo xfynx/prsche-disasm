@@ -1,0 +1,352 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "render_display_prevideo_593.hpp"
+#include "porsche/render_mode.hpp"
+#include "porsche/render_activate.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+static U ptr(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0) { U v; std::memcpy(&v, static_cast<const B*>(p) + o, 4); return v; }
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4); }
+
+static U cases, events_total, flag60, fmt_cfg, flags, offset;
+static U precision, rounding, depth, initial_status;
+static B* orig_code;
+alignas(16) static B floating[512];
+
+struct Arena {
+    B display[0x88];
+    B driver[0x20];
+    B modes_initial[128];
+    B modes_updated[128];
+};
+static Arena arena;
+static void* driver_vtable[12];
+
+namespace porsche {
+RenderDisplay* render_display_00628130 = nullptr;
+std::uint32_t render_display_mode_index_00619780 = 0;
+std::uint32_t render_display_actual_width_00619784 = 0;
+std::uint32_t render_display_actual_height_00619788 = 0;
+std::uint32_t render_display_actual_mode_0061978c = 0;
+std::uint8_t render_mode_state_00619790[0x71]{};
+}
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+struct State {
+    Arena arena;
+    U mode_index;
+    U actual_width;
+    U actual_height;
+    U actual_mode;
+    B mode_state[0x71];
+    B pad[3];
+};
+struct Event {
+    U tag, argc, args[6];
+    State state;
+    Fpu fpu;
+};
+struct Trace {
+    U count, abi, exception[3];
+    Event events[8];
+    State final;
+    Fpu fpu;
+};
+static Trace trace, expected;
+
+static void require(bool ok, const char* s) {
+    if (!ok) {
+        std::printf("divergence %s case=%u flag60=%u fmt=%u flags=%x offset=%u\n",
+                    s, cases, flag60, fmt_cfg, flags, offset);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void snapshot(State& s) {
+    s.arena = arena;
+    s.mode_index = render_display_mode_index_00619780;
+    s.actual_width = render_display_actual_width_00619784;
+    s.actual_height = render_display_actual_height_00619788;
+    s.actual_mode = render_display_actual_mode_0061978c;
+    std::memcpy(s.mode_state, render_mode_state_00619790, sizeof s.mode_state);
+    std::memset(s.pad, 0, sizeof s.pad);
+}
+
+static void capture(Fpu& f) {
+    B environment[28];
+    __asm {
+        fxsave floating
+        fnstenv environment
+        fldenv environment
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(environment + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0; i < 8; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10, floating + 32 + i * 16, 10);
+        } else {
+            std::memset(f.values + i * 10, 0, 10);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = static_cast<unsigned short>(0x7f | (precision << 8) | (rounding << 10));
+    __asm fninit
+    __asm fldcw cw
+    for (U i = 0; i < depth; ++i) {
+        U bits = 0x3f800001 + i;
+        __asm fld dword ptr bits
+    }
+    B environment[28];
+    __asm fnstenv environment
+    *reinterpret_cast<unsigned short*>(environment + 4) |= static_cast<unsigned short>(initial_status);
+    __asm fldenv environment
+}
+
+static U invoke(void* fn) {
+    U before, frame, fail = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void event(U tag, std::initializer_list<U> args) {
+    require(trace.count < 8, "bounded event count");
+    auto& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.argc = static_cast<U>(args.size());
+    U i = 0;
+    for (U a : args) {
+        e.args[i++] = a;
+    }
+    while (i < 6) {
+        e.args[i++] = 0;
+    }
+    snapshot(e.state);
+    capture(e.fpu);
+}
+
+static void maybe_alter_fpu() {
+    if (flags & 8u) {
+        unsigned short cw = static_cast<unsigned short>(0x7f | ((precision == 0 ? 3u : 0u) << 8) | (((rounding + 1) % 4) << 10));
+        __asm fldcw cw
+    }
+}
+
+namespace porsche {
+void __cdecl render_mode_driver_prepare_vslot9(void* driver) {
+    event(0x44e2e9, {ptr(driver)});
+    if (flags & 1u) {
+        put(driver, 8u, ptr(arena.modes_updated + offset));
+    }
+    maybe_alter_fpu();
+}
+
+void __cdecl render_mode_apply_settings_0044e890() {
+    event(0x44e890, {});
+    if (flags & 2u) {
+        render_display_actual_width_00619784 += 0x111u;
+        render_display_actual_height_00619788 += 0x222u;
+    }
+    maybe_alter_fpu();
+}
+
+void __cdecl render_mode_update_state_0044ed10() {
+    event(0x44ed10, {});
+    if (flags & 4u) {
+        render_display_actual_width_00619784 ^= 0x0f0fu;
+        render_display_actual_height_00619788 ^= 0x0a0au;
+    }
+    maybe_alter_fpu();
+}
+
+void __cdecl render_display_video_base_00537600(U a, U b, U c, U width, U height, U f) {
+    event(0x537600, {a, b, c, width, height, f});
+    maybe_alter_fpu();
+}
+} // namespace porsche
+
+static void __fastcall driver_vslot9_raw(void* self, void*) {
+    render_mode_driver_prepare_vslot9(self);
+}
+
+static void absolute_at(B* p, U off, U old, const void* replacement) {
+    require(word(p, off) == old, "exact absolute relocation offset");
+    put(p, off, ptr(replacement));
+}
+
+static void relative(B* p, U n, U va, U old, const void* replacement, U expected_count) {
+    U found = 0;
+    for (U i = 0; i + 5 <= n; ++i) {
+        if (p[i] == 0xe8 && va + i + 5 + word(p, i + 1) == old) {
+            put(p, i + 1, ptr(replacement) - ptr(p + i + 5));
+            ++found;
+            i += 4;
+        }
+    }
+    require(found == expected_count, "relative relocation count");
+}
+
+static void init() {
+    static const B body[] = {@BODY_0044E2C0@};
+    require(sizeof body == 165, "165-byte original body");
+    orig_code = static_cast<B*>(VirtualAlloc(nullptr, 4096, 0x3000, 0x40));
+    require(orig_code != nullptr, "raw allocation");
+    std::memcpy(orig_code, body, sizeof body);
+    absolute_at(orig_code, 0x01, 0x00628130, &render_display_00628130);
+    absolute_at(orig_code, 0x50, 0x00619780, &render_display_mode_index_00619780);
+    absolute_at(orig_code, 0x5a, 0x00619784, &render_display_actual_width_00619784);
+    absolute_at(orig_code, 0x60, 0x00619788, &render_display_actual_height_00619788);
+    absolute_at(orig_code, 0x65, 0x0061978c, &render_display_actual_mode_0061978c);
+    absolute_at(orig_code, 0x6d, 0x0061978c, &render_display_actual_mode_0061978c);
+    absolute_at(orig_code, 0x77, 0x0061979a, &render_mode_state_00619790[0x0a]);
+    absolute_at(orig_code, 0x88, 0x00619788, &render_display_actual_height_00619788);
+    absolute_at(orig_code, 0x8e, 0x00619784, &render_display_actual_width_00619784);
+    relative(orig_code, 165, 0x0044e2c0, 0x0044e890,
+             reinterpret_cast<void*>(&render_mode_apply_settings_0044e890), 1);
+    relative(orig_code, 165, 0x0044e2c0, 0x0044ed10,
+             reinterpret_cast<void*>(&render_mode_update_state_0044ed10), 1);
+    relative(orig_code, 165, 0x0044e2c0, 0x00537600,
+             reinterpret_cast<void*>(&render_display_video_base_00537600), 1);
+    require(FlushInstructionCache(GetCurrentProcess(), orig_code, 4096) != 0, "instruction cache");
+    std::memset(driver_vtable, 0, sizeof driver_vtable);
+    driver_vtable[9] = reinterpret_cast<void*>(&driver_vslot9_raw);
+}
+
+static void seed_modes(B* buf, U base_w, U base_h) {
+    for (U rec = 0; rec < 3; ++rec) {
+        for (U d = 0; d < 10; ++d) {
+            U val = 0x5000u + rec * 0x100u + d;
+            if (d == 0) val = base_w + rec * 0x100u;
+            if (d == 1) val = base_h + rec * 0x80u;
+            if (d == 2) val = fmt_cfg + rec;
+            put(buf, rec * 0x28u + d * 4u, val);
+        }
+    }
+    put(buf, 0x28u + 8u, fmt_cfg);
+}
+
+static void reset() {
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(&arena, 0x42, sizeof arena);
+    seed_modes(arena.modes_initial + offset, 800u, 600u);
+    seed_modes(arena.modes_updated + offset, 1024u, 768u);
+
+    B* drv = arena.driver + offset;
+    put(drv, 0u, ptr(driver_vtable));
+    put(drv, 8u, ptr(arena.modes_initial + offset));
+
+    B* disp = arena.display + offset;
+    disp[0x60] = static_cast<B>(flag60);
+    put(disp, 0x70u, ptr(drv));
+
+    render_display_00628130 = reinterpret_cast<RenderDisplay*>(disp);
+    render_display_mode_index_00619780 = 0x11111111u;
+    render_display_actual_width_00619784 = 0x22222222u;
+    render_display_actual_height_00619788 = 0x33333333u;
+    render_display_actual_mode_0061978c = 0x44444444u;
+    std::memset(render_mode_state_00619790, 0xa5, sizeof render_mode_state_00619790);
+}
+
+static void compare() {
+    Trace& original = expected;
+    for (U side = 0; side < 2; ++side) {
+        reset();
+        seed_fpu();
+        void* fn = (side == 0) ? static_cast<void*>(orig_code)
+                               : reinterpret_cast<void*>(&render_display_prevideo_0044e2c0);
+        bool complete = true;
+        __try {
+            trace.abi = invoke(fn);
+        } __except (exception_record(GetExceptionInformation())) {
+            complete = false;
+        }
+        require(complete && trace.abi == 0, "mapped input/stack/nonvolatile ABI");
+        snapshot(trace.final);
+        capture(trace.fpu);
+        if (side == 0) {
+            original = trace;
+        } else {
+            require(std::memcmp(&trace, &original, sizeof trace) == 0, "state/ordered callback/FPU");
+            events_total += trace.count;
+        }
+    }
+    ++cases;
+}
+
+int main() {
+    init();
+    precision = 2;
+    rounding = 0;
+    depth = 1;
+    initial_status = 0;
+    for (U fg : {0u, 1u, 0x80u, 0xffu}) {
+        for (U fmt : {8u, 0x0fu, 0x10u, 0x18u, 0x20u}) {
+            for (offset = 0; offset < 4; ++offset) {
+                for (U f : {0u, 1u, 2u, 4u, 6u, 7u, 8u, 15u}) {
+                    flag60 = fg;
+                    fmt_cfg = fmt;
+                    flags = f;
+                    compare();
+                }
+            }
+        }
+    }
+    __asm fninit
+    std::printf("render_display_prevideo_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events_total);
+    return 0;
+}

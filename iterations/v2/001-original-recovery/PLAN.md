@@ -1,15 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current2026-11-17. Run591 shared audit passes for frozen589001+590001 on588.
-Build001 compiles331TUs/8projects,121names126refs,noEXE. Two real names
-(`frame_pump_boundary_005363a0`, `game_setup_object_init_00403520`) close with
-no new names or original state. Registry910 adds two PARTIAL bodies (362B total).
-README591 owns commands and bounds:6068 native cases/8 controls atOd/O2,818pins/
-872canonicalproviders.
+Current2026-11-17. Run594 shared audit passes for frozen592001+593002 on591.
+Build001 compiles333TUs/8projects,119names124refs,noEXE. Two real names
+(`application_context_base_destroy_00525ec0`, `render_display_prevideo_0044e2c0`)
+close with no new names or original state. Registry912 adds two PARTIAL bodies
+(289B total). README594 owns commands and bounds:1304 native cases/8 controls at
+Od/O2,823pins/874canonicalproviders.
 
-Active flash workers:592 (`00525ec0` context-base destroy, 124B) and593
-(`0044e2c0` render-display prevideo, 165B). Next integrate592+593 in shared
-batch594 and dispatch the next frontier workers.
+Ready packets:595 (`004691c0` 11B + `00468100` 8B, native001 PASS) and596
+(`0044dfb0` 35B + `0044e370` 150B + 4B `.data` `00619770`, native001 PASS). Next
+integrate595+596 in shared batch597 and dispatch the next frontier workers.
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.
