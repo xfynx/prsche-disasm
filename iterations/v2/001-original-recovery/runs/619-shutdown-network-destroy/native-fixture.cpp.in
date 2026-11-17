@@ -1,0 +1,473 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdio>
+#include <cstring>
+#include "shutdown_network_destroy_619.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum : U {
+    kThisSize = 0x280u,
+    kHeadCount = 8u,
+    kNodeCount = 24u,
+    kMaxEvents = 64u,
+};
+
+enum EventTag : U {
+    kEvNetworkReset = 1u,
+    kEvHeapLockDestroy = 2u,
+    kEvAppRelease = 3u,
+    kEvCallbacksDrain = 4u,
+    kEvContextClear = 5u,
+};
+
+enum HookKind : U {
+    kHookNone = 0u,
+    kHookResetMutatesFields = 1u,
+    kHookLockDestroyMutates18 = 2u,
+    kHookClearSwapsHead264 = 3u,
+    kHookClearMutatesHead150 = 4u,
+};
+
+static const U kListOffsets[6] = {
+    0x264u, 0x260u, 0x25cu, 0x258u, 0x254u, 0x150u,
+};
+
+alignas(16) static B this_buf[kThisSize] = {};
+alignas(16) static U lock_box_buf[4] = {};
+alignas(16) static U other_obj_buf[4] = {};
+alignas(16) static U head_pool[kHeadCount][4] = {};
+alignas(16) static U node_pool[kNodeCount][4] = {};
+alignas(16) static B startup_net_dummy[16] = {};
+
+static U clear_call_seq = 0u;
+static HookKind active_hook = kHookNone;
+static U hook_target_seq = 0u;
+
+struct StateSnapshot {
+    B this_bytes[kThisSize];
+    U lock_box[4];
+    U other_obj[4];
+    U heads[kHeadCount][4];
+    U nodes[kNodeCount][4];
+    U startup_net_ptr;
+    U missing_file_ptr;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    StateSnapshot state;
+};
+
+struct Trace {
+    U abi_fail;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events = 0u;
+
+static B* code = nullptr;
+static B* slot_48ff30 = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void __cdecl dummy_missing_file_handler(const char*, std::int32_t) {}
+
+static U ptr_id(const void* p) {
+    if (p == nullptr) {
+        return 0u;
+    }
+    if (p == this_buf) {
+        return 0x1000u;
+    }
+    if (p == lock_box_buf) {
+        return 0x2000u;
+    }
+    if (p == other_obj_buf) {
+        return 0x3000u;
+    }
+    for (U i = 0u; i < kHeadCount; ++i) {
+        if (p == head_pool[i]) {
+            return 0x4000u + i;
+        }
+    }
+    for (U i = 0u; i < kNodeCount; ++i) {
+        if (p == node_pool[i]) {
+            return 0x5000u + i;
+        }
+    }
+    return 0xffffffffu;
+}
+
+static void capture_state(StateSnapshot& s) {
+    std::memcpy(s.this_bytes, this_buf, sizeof s.this_bytes);
+    std::memcpy(s.lock_box, lock_box_buf, sizeof s.lock_box);
+    std::memcpy(s.other_obj, other_obj_buf, sizeof s.other_obj);
+    std::memcpy(s.heads, head_pool, sizeof s.heads);
+    std::memcpy(s.nodes, node_pool, sizeof s.nodes);
+    s.startup_net_ptr = address(porsche::startup_network_00628c70);
+    s.missing_file_ptr = address(reinterpret_cast<const void*>(porsche::missing_file_006afbe4));
+}
+
+static void record_event(U tag, U arg0, U arg1, U arg2) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    capture_state(e.state);
+}
+
+static bool writable_12byte_block(const void* p) {
+    for (U i = 0u; i < kHeadCount; ++i) {
+        if (p == head_pool[i]) {
+            return true;
+        }
+    }
+    for (U i = 0u; i < kNodeCount; ++i) {
+        if (p == node_pool[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+namespace porsche {
+
+void* startup_network_00628c70 = nullptr;
+void (__cdecl* missing_file_006afbe4)(const char*, std::int32_t) = nullptr;
+
+std::uint32_t __fastcall network_lifecycle_reset_0048e9c0(void* receiver, void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvNetworkReset, ptr_id(receiver), 0u, 0u);
+    if (active_hook == kHookResetMutatesFields) {
+        put(this_buf, 0x10u, address(lock_box_buf));
+        put(this_buf, 0x18u, address(other_obj_buf));
+        lock_box_buf[0] = 0x55667788u;
+    }
+    return 0x12345678u;
+}
+
+void __cdecl heap_lock_destroy_005322d0(void* lock) {
+    record_event(kEvHeapLockDestroy, address(lock), 0u, 0u);
+    if (active_hook == kHookLockDestroyMutates18) {
+        put(this_buf, 0x18u, address(other_obj_buf));
+    }
+}
+
+std::uint32_t __cdecl application_release_0059f050(void* mem) {
+    record_event(kEvAppRelease, ptr_id(mem), 0u, 0u);
+    return 0u;
+}
+
+void __cdecl network_callbacks_drain_005603b0() {
+    record_event(kEvCallbacksDrain, 0u, 0u, 0u);
+}
+
+void __cdecl application_context_clear_004237d0(
+    void* block, std::uint32_t bytes, std::uint32_t mode) {
+    ++clear_call_seq;
+    record_event(kEvContextClear, ptr_id(block), bytes, mode);
+    if (writable_12byte_block(block) && bytes <= 16u) {
+        std::memset(block, static_cast<int>(0x5au ^ (mode & 0xffu)), bytes);
+    }
+    if (active_hook == kHookClearSwapsHead264 && clear_call_seq == hook_target_seq) {
+        put(this_buf, 0x264u, address(head_pool[6]));
+    } else if (active_hook == kHookClearMutatesHead150 && clear_call_seq == hook_target_seq) {
+        put(this_buf, 0x150u, address(head_pool[7]));
+    }
+}
+
+} // namespace porsche
+
+static U invoke_thiscall_0arg(void* fn, void* self) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, self
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B body_48ff30[] = {@BODY_0048FF30@};
+    require(sizeof body_48ff30 == 522u, "522-byte original body 0048ff30");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_48ff30 = code + 0u;
+    std::memcpy(slot_48ff30, body_48ff30, sizeof body_48ff30);
+
+    relocate_abs32(slot_48ff30, 0x001u, 0x00628c70u, address(&porsche::startup_network_00628c70));
+    relocate_abs32(slot_48ff30, 0x00fu, 0x006afbe4u, address(&porsche::missing_file_006afbe4));
+
+    relocate_rel32(slot_48ff30, 0x0048ff30u, 0x018u, 0x0048e9c0u,
+                   reinterpret_cast<const void*>(&porsche::network_lifecycle_reset_0048e9c0));
+    relocate_rel32(slot_48ff30, 0x0048ff30u, 0x027u, 0x005322d0u,
+                   reinterpret_cast<const void*>(&porsche::heap_lock_destroy_005322d0));
+    relocate_rel32(slot_48ff30, 0x0048ff30u, 0x02du, 0x0059f050u,
+                   reinterpret_cast<const void*>(&porsche::application_release_0059f050));
+    relocate_rel32(slot_48ff30, 0x0048ff30u, 0x039u, 0x0059f050u,
+                   reinterpret_cast<const void*>(&porsche::application_release_0059f050));
+    relocate_rel32(slot_48ff30, 0x0048ff30u, 0x041u, 0x005603b0u,
+                   reinterpret_cast<const void*>(&porsche::network_callbacks_drain_005603b0));
+
+    static const U clear_offsets[12] = {
+        0x05bu, 0x089u, 0x0a6u, 0x0d4u, 0x0f1u, 0x11fu,
+        0x13cu, 0x16au, 0x187u, 0x1b5u, 0x1d2u, 0x200u,
+    };
+    for (U off : clear_offsets) {
+        relocate_rel32(slot_48ff30, 0x0048ff30u, off, 0x004237d0u,
+                       reinterpret_cast<const void*>(&porsche::application_context_clear_004237d0));
+    }
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void setup_case(bool net_nonnull, bool has_missing_handler,
+                       bool has_lock_box, U lock_val, bool has_other_obj,
+                       const std::array<U, 6>& counts, U seed,
+                       HookKind hook = kHookNone, U hook_seq = 0u) {
+    for (U i = 0u; i < kThisSize; ++i) {
+        this_buf[i] = static_cast<B>((i * 19u + seed * 11u + 5u) & 0xffu);
+    }
+    for (U i = 0u; i < 4u; ++i) {
+        lock_box_buf[i] = 0x70000000u + (seed << 8u) + i;
+        other_obj_buf[i] = 0x80000000u + (seed << 8u) + i;
+    }
+    lock_box_buf[0] = lock_val;
+
+    put(this_buf, 0x10u, has_lock_box ? address(lock_box_buf) : 0u);
+    put(this_buf, 0x18u, has_other_obj ? address(other_obj_buf) : 0u);
+
+    std::memset(head_pool, 0, sizeof head_pool);
+    std::memset(node_pool, 0, sizeof node_pool);
+
+    U next_node = 0u;
+    for (U li = 0u; li < 6u; ++li) {
+        U* const head = head_pool[li];
+        put(this_buf, kListOffsets[li], address(head));
+        head[2] = 0x90000000u + (li << 16u) + seed;
+        const U n = counts[li];
+        if (n == 0u) {
+            head[0] = address(head);
+            head[1] = address(head);
+        } else {
+            U* prev = head;
+            for (U ni = 0u; ni < n; ++ni) {
+                require(next_node < kNodeCount, "node pool bounds");
+                U* const node = node_pool[next_node++];
+                node[2] = 0xa0000000u + (li << 16u) + (ni << 8u) + seed;
+                node[3] = 0xb0000000u + next_node;
+                prev[0] = address(node);
+                node[1] = address(prev);
+                prev = node;
+            }
+            prev[0] = address(head);
+            head[1] = address(prev);
+        }
+    }
+    for (U hi = 6u; hi < kHeadCount; ++hi) {
+        head_pool[hi][0] = address(head_pool[hi]);
+        head_pool[hi][1] = address(head_pool[hi]);
+        head_pool[hi][2] = 0xc0000000u + hi;
+        head_pool[hi][3] = 0xd0000000u + hi;
+    }
+
+    porsche::startup_network_00628c70 = net_nonnull ? static_cast<void*>(startup_net_dummy) : nullptr;
+    porsche::missing_file_006afbe4 = has_missing_handler ? &dummy_missing_file_handler : nullptr;
+    clear_call_seq = 0u;
+    active_hook = hook;
+    hook_target_seq = hook_seq;
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag mismatch");
+        require(trace.events[i].arg0 == expected.events[i].arg0, "event arg0 mismatch");
+        require(trace.events[i].arg1 == expected.events[i].arg1, "event arg1 mismatch");
+        require(trace.events[i].arg2 == expected.events[i].arg2, "event arg2 mismatch");
+        require(std::memcmp(&trace.events[i].state, &expected.events[i].state,
+                            sizeof(StateSnapshot)) == 0,
+                "event state mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+}
+
+template <typename SetupFn>
+static void run_case(SetupFn setup) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_thiscall_0arg(slot_48ff30, this_buf);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    void* cpp_fn = nullptr;
+    auto mfp = &porsche::ShutdownNetwork311::destroy_0048ff30;
+    static_assert(sizeof(mfp) == sizeof(cpp_fn), "expected 4-byte non-virtual member pointer");
+    std::memcpy(&cpp_fn, &mfp, sizeof(cpp_fn));
+
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_thiscall_0arg(cpp_fn, this_buf);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces();
+}
+
+int main() {
+    init();
+
+    // 1. startup_network_00628c70 == nullptr (skips reset/lock/drain, still clears all 6 lists).
+    run_case([=]() { setup_case(false, true, true, 0x11223344u, true, {0u, 0u, 0u, 0u, 0u, 0u}, 1u); });
+    run_case([=]() { setup_case(false, true, true, 0x11223344u, true, {1u, 2u, 3u, 0u, 1u, 2u}, 2u); });
+
+    // 2. startup_network_00628c70 != nullptr across lock_box (null vs non-null) and +0x18 (null vs non-null).
+    U seed = 10u;
+    for (bool has_missing : {false, true}) {
+        for (bool has_lock : {false, true}) {
+            for (U lock_val : {0u, 0xdeadbeefu}) {
+                if (!has_lock && lock_val != 0u) {
+                    continue;
+                }
+                for (bool has_other : {false, true}) {
+                    const U s = seed++;
+                    run_case([=]() {
+                        setup_case(true, has_missing, has_lock, lock_val, has_other,
+                                   {0u, 0u, 0u, 0u, 0u, 0u}, s);
+                    });
+                }
+            }
+        }
+    }
+
+    // 3. Each of the 6 list slots (+0x264, +0x260, +0x25c, +0x258, +0x254, +0x150) with 0, 1, 2, 3 nodes.
+    for (U li = 0u; li < 6u; ++li) {
+        for (U n : {0u, 1u, 2u, 3u}) {
+            std::array<U, 6> counts = {0u, 0u, 0u, 0u, 0u, 0u};
+            counts[li] = n;
+            const U s = seed++;
+            run_case([=]() { setup_case(true, true, true, 0x12345678u, true, counts, s); });
+        }
+    }
+
+    // 4. All 6 lists simultaneously populated (varying lengths 1..3).
+    run_case([=]() { setup_case(true, true, true, 0xabcdef01u, true, {3u, 2u, 1u, 2u, 3u, 1u}, 100u); });
+    run_case([=]() { setup_case(false, false, false, 0u, false, {1u, 3u, 2u, 1u, 2u, 3u}, 101u); });
+
+    // 5. Mid-call field mutations by 0048e9c0 and 005322d0.
+    run_case([=]() {
+        setup_case(true, true, false, 0u, false, {1u, 0u, 0u, 0u, 0u, 1u}, 200u,
+                   kHookResetMutatesFields, 0u);
+    });
+    run_case([=]() {
+        setup_case(true, true, true, 0x22334455u, false, {0u, 1u, 0u, 0u, 0u, 1u}, 201u,
+                   kHookLockDestroyMutates18, 0u);
+    });
+
+    // 6. Mid-loop *head_slot sentinel pointer reload mutations inside 004237d0.
+    run_case([=]() {
+        setup_case(true, true, true, 0x33445566u, true, {2u, 1u, 0u, 0u, 0u, 0u}, 202u,
+                   kHookClearSwapsHead264, 1u);
+        // Relink node 1 -> head_pool[6] -> head_pool[0] (head_pool[6] is swapped into *head_slot on clear #1).
+        node_pool[1][0] = address(head_pool[6]);
+    });
+    run_case([=]() {
+        setup_case(false, false, false, 0u, false, {0u, 0u, 0u, 0u, 0u, 2u}, 203u,
+                   kHookClearMutatesHead150, 6u);
+        // Calls 1..5 clear empty heads for +0x264..+0x254; call 6 clears first node of +0x150.
+        node_pool[1][0] = address(head_pool[7]);
+    });
+
+    std::printf("shutdown_network_destroy_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events);
+    return 0;
+}

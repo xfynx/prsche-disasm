@@ -1,0 +1,63 @@
+{
+  "run": 619,
+  "experiment": "local/experiments/v2-shutdown-network-destroy-619",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/619-shutdown-network-destroy/shutdown_network_destroy_619.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/619-shutdown-network-destroy/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/619-shutdown-network-destroy",
+    "iterations/v2/001-original-recovery/runs/311-pr4-shutdown-helpers",
+    "iterations/v2/001-original-recovery/runs/488-network-callback-drain",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/619-shutdown-network-destroy/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0048ff30",
+      "bytes": 522,
+      "sha256": "83cecaa49d7aba951ea94886c3d3f5148acfa5324ca00cefcb268aa8dc6f6c85",
+      "token": "@BODY_0048FF30@"
+    }
+  ],
+  "pass_marker": "shutdown_network_destroy_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-missing-file-reset",
+      "source": "iterations/v2/001-original-recovery/runs/619-shutdown-network-destroy/shutdown_network_destroy_619.cpp",
+      "old": "        missing_file_006afbe4 = nullptr;",
+      "new": "        (void)missing_file_006afbe4;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-lock-box-offset",
+      "source": "iterations/v2/001-original-recovery/runs/619-shutdown-network-destroy/shutdown_network_destroy_619.cpp",
+      "old": "            reinterpret_cast<const std::uint8_t*>(this) + 0x10u);",
+      "new": "            reinterpret_cast<const std::uint8_t*>(this) + 0x14u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-clear-node-size",
+      "source": "iterations/v2/001-original-recovery/runs/619-shutdown-network-destroy/shutdown_network_destroy_619.cpp",
+      "old": "            application_context_clear_004237d0(node, 0xcu, 0u);",
+      "new": "            application_context_clear_004237d0(node, 0x8u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-list-order",
+      "source": "iterations/v2/001-original-recovery/runs/619-shutdown-network-destroy/shutdown_network_destroy_619.cpp",
+      "old": "    clear_list_slot(this, 0x264u);\n    clear_list_slot(this, 0x260u);",
+      "new": "    clear_list_slot(this, 0x260u);\n    clear_list_slot(this, 0x264u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "run": 620,
+  "experiment": "local/experiments/v2-engine-service-consume-resource-620",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/620-engine-service-consume-resource/engine_service_consume_resource_620.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/620-engine-service-consume-resource/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/620-engine-service-consume-resource",
+    "iterations/v2/001-original-recovery/runs/510-splash-network-queries",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/620-engine-service-consume-resource/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00490420",
+      "bytes": 170,
+      "sha256": "2c42d1267e04151a57553731059aec27f6795d7dac1434c38a288e773ca31e7e",
+      "token": "@BODY_00490420@"
+    },
+    {
+      "va": "0048cb50",
+      "bytes": 361,
+      "sha256": "79dedd42e351df5b312758d6828d7e9bf7cf5c3792f0e375cce92dd1d8f2d1f9",
+      "token": "@BODY_0048CB50@"
+    },
+    {
+      "va": "005d072c",
+      "bytes": 12,
+      "sha256": "71bd133fa049d775678a8b595a5e6e4a0b106519ebc858f937054633cd752d60",
+      "token": "@RDATA_005D072C@"
+    }
+  ],
+  "pass_marker": "engine_service_consume_resource_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-entry-count-guard",
+      "source": "iterations/v2/001-original-recovery/runs/620-engine-service-consume-resource/engine_service_consume_resource_620.cpp",
+      "old": "    if (!is_session_active(net) && count > 0) {",
+      "new": "    if (!is_session_active(net) && count > 1) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-item-count-increment",
+      "source": "iterations/v2/001-original-recovery/runs/620-engine-service-consume-resource/engine_service_consume_resource_620.cpp",
+      "old": "                        write_i32(found, 0x0cu, read_i32(found, 0x0cu) + count);",
+      "new": "                        write_i32(found, 0x0cu, read_i32(found, 0x0cu) + count + 1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-copy-value-guard",
+      "source": "iterations/v2/001-original-recovery/runs/620-engine-service-consume-resource/engine_service_consume_resource_620.cpp",
+      "old": "    if (value != nullptr) {",
+      "new": "    if (value != nullptr && count < 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-peer-id-match",
+      "source": "iterations/v2/001-original-recovery/runs/620-engine-service-consume-resource/engine_service_consume_resource_620.cpp",
+      "old": "            if (read_i32(item, 0x40u) == active_id) {",
+      "new": "            if (read_i32(item, 0x40u) == active_id + 1) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

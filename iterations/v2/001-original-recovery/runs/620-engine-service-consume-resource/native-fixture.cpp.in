@@ -1,0 +1,816 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include "engine_service_consume_resource_620.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+static void put16(void* p, U o, std::uint16_t v) { std::memcpy(static_cast<B*>(p) + o, &v, 2u); }
+
+enum : U {
+    kNetBufSize = 0x300u,
+    kMaxItems = 4u,
+    kItemSize = 0x100u,
+    kMaxSentinels = 10u,
+    kMaxNodes = 32u,
+    kMaxPkts = 16u,
+    kPktSize = 16u,
+    kMaxBufs = 16u,
+    kBufStride = 64u,
+    kMaxEvents = 32u,
+};
+
+enum EventTag : U {
+    kEvItemData = 1u,
+    kEvRenderAlloc = 2u,
+    kEvFeAlloc = 3u,
+    kEvHeapCopy = 4u,
+    kEvMemberEnd = 5u,
+    kEvMemberCopy = 6u,
+    kEvMemberInsert = 7u,
+};
+
+enum HookKind : U {
+    kHookNone = 0u,
+    kHookSwapNetwork = 1u,
+};
+
+static B net_buf0[kNetBufSize] = {};
+static B net_buf1[kNetBufSize] = {};
+static B item_pool[kMaxItems][kItemSize] = {};
+static U sentinel_pool[kMaxSentinels][3] = {};
+static U node_pool[kMaxNodes][3] = {};
+static B pkt_pool[kMaxPkts][kPktSize] = {};
+static B buf_pool[kMaxBufs][kBufStride] = {};
+static B src_value_buf[kBufStride] = {};
+
+static U node_used = 0u;
+static U pkt_used = 0u;
+static U buf_used = 0u;
+static U alloc_fail_at = 0u;
+static U alloc_calls = 0u;
+static U copy_calls = 0u;
+static HookKind copy_hook_kind = kHookNone;
+static U copy_hook_call = 0u;
+
+struct StateSnapshot {
+    B net0[kNetBufSize];
+    B net1[kNetBufSize];
+    B items[kMaxItems][kItemSize];
+    U sentinels[kMaxSentinels][3];
+    U nodes[kMaxNodes][3];
+    B pkts[kMaxPkts][kPktSize];
+    B bufs[kMaxBufs][kBufStride];
+    U node_count;
+    U pkt_count;
+    U buf_count;
+    U net_ptr_id;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    U arg3;
+    StateSnapshot state;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events = 0u;
+
+static B* code = nullptr;
+static B* slot_490420 = nullptr;
+static B* slot_48cb50 = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U net_id(const void* p) {
+    if (p == nullptr) {
+        return 0u;
+    }
+    if (p == net_buf0) {
+        return 1u;
+    }
+    if (p == net_buf1) {
+        return 2u;
+    }
+    return 0xffffffffu;
+}
+
+static U item_id(const void* p) {
+    if (p == nullptr) {
+        return 0u;
+    }
+    for (U i = 0u; i < kMaxItems; ++i) {
+        if (p == item_pool[i]) {
+            return i + 1u;
+        }
+    }
+    return 0xffffffffu;
+}
+
+static U pkt_id(const void* p) {
+    if (p == nullptr) {
+        return 0u;
+    }
+    for (U i = 0u; i < kMaxPkts; ++i) {
+        if (p == pkt_pool[i]) {
+            return i + 1u;
+        }
+    }
+    return 0xffffffffu;
+}
+
+static U buf_id(const void* p) {
+    if (p == nullptr) {
+        return 0u;
+    }
+    for (U i = 0u; i < kMaxBufs; ++i) {
+        if (p == buf_pool[i]) {
+            return i + 1u;
+        }
+    }
+    return 0xffffffffu;
+}
+
+static U src_id(const void* p) {
+    if (p == nullptr) {
+        return 0u;
+    }
+    if (p == src_value_buf) {
+        return 1u;
+    }
+    return 0xffffffffu;
+}
+
+static U list_id(const void* p) {
+    const U ptr = address(p);
+    if (ptr == address(net_buf0 + 0x260u)) {
+        return 1u;
+    }
+    if (ptr == address(net_buf0 + 0x264u)) {
+        return 2u;
+    }
+    if (ptr == address(net_buf1 + 0x260u)) {
+        return 3u;
+    }
+    if (ptr == address(net_buf1 + 0x264u)) {
+        return 4u;
+    }
+    for (U i = 0u; i < kMaxItems; ++i) {
+        if (ptr == address(item_pool[i] + 0x5cu)) {
+            return 10u + i;
+        }
+    }
+    return 0xffffffffu;
+}
+
+static U sentinel_or_node_id(U ptr) {
+    if (ptr == 0u) {
+        return 0u;
+    }
+    for (U i = 0u; i < kMaxSentinels; ++i) {
+        if (ptr == address(sentinel_pool[i])) {
+            return 0x100u + i;
+        }
+    }
+    for (U i = 0u; i < kMaxNodes; ++i) {
+        if (ptr == address(node_pool[i])) {
+            return 0x200u + i;
+        }
+    }
+    return 0xffffffffu;
+}
+
+static void capture_state(StateSnapshot& s) {
+    std::memcpy(s.net0, net_buf0, sizeof s.net0);
+    std::memcpy(s.net1, net_buf1, sizeof s.net1);
+    std::memcpy(s.items, item_pool, sizeof s.items);
+    std::memcpy(s.sentinels, sentinel_pool, sizeof s.sentinels);
+    std::memcpy(s.nodes, node_pool, sizeof s.nodes);
+    std::memcpy(s.pkts, pkt_pool, sizeof s.pkts);
+    std::memcpy(s.bufs, buf_pool, sizeof s.bufs);
+    s.node_count = node_used;
+    s.pkt_count = pkt_used;
+    s.buf_count = buf_used;
+    s.net_ptr_id = net_id(porsche::startup_network_00628c70);
+}
+
+static void record_event(U tag, U arg0, U arg1, U arg2, U arg3) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    e.arg3 = arg3;
+    capture_state(e.state);
+}
+
+namespace porsche {
+
+void* startup_network_00628c70 = nullptr;
+
+void* __fastcall network_item_data_004903f0(void* item, void* unused_edx, std::int16_t resource) {
+    (void)unused_edx;
+    const auto* const base = static_cast<const B*>(item);
+    const auto* const head = *reinterpret_cast<const U* const*>(base + 0x5cu);
+    void* found = nullptr;
+    for (const auto* node = reinterpret_cast<const U*>(head[0]);
+         node != head;
+         node = reinterpret_cast<const U*>(node[0])) {
+        const auto* const pkt = reinterpret_cast<const B*>(node[2]);
+        if (pkt != nullptr) {
+            std::int16_t tag = 0;
+            std::memcpy(&tag, pkt, sizeof tag);
+            if (tag == resource) {
+                found = reinterpret_cast<void*>(node[2]);
+                break;
+            }
+        }
+    }
+    record_event(kEvItemData, item_id(item), static_cast<std::uint16_t>(resource), pkt_id(found), 0u);
+    return found;
+}
+
+void* __cdecl render_allocate_0059ef90(std::uint32_t bytes) {
+    ++alloc_calls;
+    void* result = nullptr;
+    if (alloc_calls != alloc_fail_at && bytes <= kPktSize && pkt_used < kMaxPkts) {
+        result = pkt_pool[pkt_used++];
+    }
+    record_event(kEvRenderAlloc, bytes, pkt_id(result), 0u, 0u);
+    return result;
+}
+
+void* __cdecl allocate_00531ca0(const char* tag, std::int32_t size, std::uint32_t flags) {
+    const bool tag_ok = (tag != nullptr) && (std::strcmp(tag, "CDataPacket") == 0);
+    require(tag_ok, "CDataPacket allocation tag");
+    require(buf_used < kMaxBufs, "bounded buffer pool");
+    void* const result = buf_pool[buf_used++];
+    record_event(kEvFeAlloc, tag_ok ? 1u : 0u, static_cast<U>(size), flags, buf_id(result));
+    return result;
+}
+
+void __cdecl heap_copy_dispatch_005323e0(void* destination, const void* source, std::uint32_t byte_count) {
+    ++copy_calls;
+    if (destination != nullptr && source != nullptr && byte_count > 0u && byte_count <= kBufStride) {
+        std::memmove(destination, source, byte_count);
+    }
+    record_event(kEvHeapCopy, buf_id(destination), src_id(source), byte_count, 0u);
+    if (copy_hook_kind == kHookSwapNetwork && copy_calls == copy_hook_call) {
+        startup_network_00628c70 = net_buf1;
+    }
+}
+
+std::uint32_t* __fastcall network_member_end_00529050(void* list, void* unused_edx, std::uint32_t* output) {
+    (void)unused_edx;
+    const U head_word = word(list, 0u);
+    *output = head_word;
+    record_event(kEvMemberEnd, list_id(list), sentinel_or_node_id(head_word), 0u, 0u);
+    return output;
+}
+
+std::uint32_t* __fastcall network_member_copy_0050e140(void* output, void* unused_edx, const std::uint32_t* source) {
+    (void)unused_edx;
+    const U val = *source;
+    *static_cast<U*>(output) = val;
+    record_event(kEvMemberCopy, sentinel_or_node_id(val), 0u, 0u, 0u);
+    return static_cast<U*>(output);
+}
+
+std::uint32_t* __fastcall network_member_insert_004937f0(
+    void* list, void* unused_edx,
+    std::uint32_t* output, std::uint32_t before, const std::uint32_t* value) {
+    (void)unused_edx;
+    require(node_used < kMaxNodes, "bounded node pool");
+    U* const new_node = node_pool[node_used++];
+    U* const before_node = reinterpret_cast<U*>(before);
+    U* const prev_node = reinterpret_cast<U*>(before_node[1]);
+    new_node[0] = before;
+    new_node[1] = before_node[1];
+    new_node[2] = *value;
+    prev_node[0] = address(new_node);
+    before_node[1] = address(new_node);
+    *output = address(new_node);
+    record_event(kEvMemberInsert, list_id(list), sentinel_or_node_id(before),
+                 pkt_id(reinterpret_cast<const void*>(*value)), sentinel_or_node_id(*output));
+    return output;
+}
+
+} // namespace porsche
+
+static U invoke_cdecl_3arg(void* fn, U arg0, U arg1, U arg2, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg2
+        push arg1
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 12
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_thiscall_3arg(void* fn, U ecx_arg, U arg0, U arg1, U arg2, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg2
+        push arg1
+        push arg0
+        mov eax, 0cafe1234h
+        mov ecx, ecx_arg
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va, const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word(slot, off);
+    require(actual_target == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void init() {
+    static const B orig_rdata_005d072c[] = {@RDATA_005D072C@};
+    require(sizeof orig_rdata_005d072c == 12u &&
+            sizeof porsche::data_packet_tag_005d072c == 12u &&
+            std::memcmp(porsche::data_packet_tag_005d072c, orig_rdata_005d072c, 12u) == 0,
+            "exact 005d072c string bytes");
+
+    static const B body_490420[] = {@BODY_00490420@};
+    static const B body_48cb50[] = {@BODY_0048CB50@};
+    require(sizeof body_490420 == 170u, "170-byte original body 00490420");
+    require(sizeof body_48cb50 == 361u, "361-byte original body 0048cb50");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_490420 = code + 0u;
+    slot_48cb50 = code + 256u;
+    std::memcpy(slot_490420, body_490420, sizeof body_490420);
+    std::memcpy(slot_48cb50, body_48cb50, sizeof body_48cb50);
+
+    const U net_addr = address(&porsche::startup_network_00628c70);
+    const U tag_addr = address(&porsche::data_packet_tag_005d072c[0]);
+
+    // Relocate 00490420.
+    relocate_rel32(slot_490420, 0x00490420u, 0x2cu, 0x0059ef90u,
+                   reinterpret_cast<const void*>(&porsche::render_allocate_0059ef90));
+    relocate_abs32(slot_490420, 0x44u, 0x005d072cu, tag_addr);
+    relocate_rel32(slot_490420, 0x00490420u, 0x49u, 0x00531ca0u,
+                   reinterpret_cast<const void*>(&porsche::allocate_00531ca0));
+    relocate_rel32(slot_490420, 0x00490420u, 0x69u, 0x005323e0u,
+                   reinterpret_cast<const void*>(&porsche::heap_copy_dispatch_005323e0));
+    relocate_rel32(slot_490420, 0x00490420u, 0x8bu, 0x00529050u,
+                   reinterpret_cast<const void*>(&porsche::network_member_end_00529050));
+    relocate_rel32(slot_490420, 0x00490420u, 0x94u, 0x0050e140u,
+                   reinterpret_cast<const void*>(&porsche::network_member_copy_0050e140));
+    relocate_rel32(slot_490420, 0x00490420u, 0xa0u, 0x004937f0u,
+                   reinterpret_cast<const void*>(&porsche::network_member_insert_004937f0));
+
+    // Relocate 0048cb50.
+    relocate_abs32(slot_48cb50, 0x01u, 0x00628c70u, net_addr);
+    relocate_rel32(slot_48cb50, 0x0048cb50u, 0xa0u, 0x004903f0u,
+                   reinterpret_cast<const void*>(&porsche::network_item_data_004903f0));
+    relocate_rel32(slot_48cb50, 0x0048cb50u, 0xb2u, 0x00490420u, slot_490420);
+    relocate_rel32(slot_48cb50, 0x0048cb50u, 0xbau, 0x004903f0u,
+                   reinterpret_cast<const void*>(&porsche::network_item_data_004903f0));
+    relocate_abs32(slot_48cb50, 0xc2u, 0x00628c70u, net_addr);
+    relocate_rel32(slot_48cb50, 0x0048cb50u, 0xecu, 0x0059ef90u,
+                   reinterpret_cast<const void*>(&porsche::render_allocate_0059ef90));
+    relocate_abs32(slot_48cb50, 0xfeu, 0x005d072cu, tag_addr);
+    relocate_rel32(slot_48cb50, 0x0048cb50u, 0x106u, 0x00531ca0u,
+                   reinterpret_cast<const void*>(&porsche::allocate_00531ca0));
+    relocate_rel32(slot_48cb50, 0x0048cb50u, 0x122u, 0x005323e0u,
+                   reinterpret_cast<const void*>(&porsche::heap_copy_dispatch_005323e0));
+    relocate_abs32(slot_48cb50, 0x134u, 0x00628c70u, net_addr);
+    relocate_rel32(slot_48cb50, 0x0048cb50u, 0x14bu, 0x00529050u,
+                   reinterpret_cast<const void*>(&porsche::network_member_end_00529050));
+    relocate_rel32(slot_48cb50, 0x0048cb50u, 0x154u, 0x0050e140u,
+                   reinterpret_cast<const void*>(&porsche::network_member_copy_0050e140));
+    relocate_rel32(slot_48cb50, 0x0048cb50u, 0x160u, 0x004937f0u,
+                   reinterpret_cast<const void*>(&porsche::network_member_insert_004937f0));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void init_sentinel(U idx) {
+    U* const s = sentinel_pool[idx];
+    s[0] = address(s);
+    s[1] = address(s);
+    s[2] = 0u;
+}
+
+static void push_list_node(U sentinel_idx, U payload) {
+    require(node_used < kMaxNodes, "bounded seed node pool");
+    U* const head = sentinel_pool[sentinel_idx];
+    U* const tail = reinterpret_cast<U*>(head[1]);
+    U* const n = node_pool[node_used++];
+    n[0] = address(head);
+    n[1] = address(tail);
+    n[2] = payload;
+    tail[0] = address(n);
+    head[1] = address(n);
+}
+
+static void* make_seed_packet(std::uint16_t tag, I count, I extra) {
+    require(pkt_used < kMaxPkts, "bounded seed pkt pool");
+    B* const pkt = pkt_pool[pkt_used++];
+    put16(pkt, 0u, tag);
+    put(pkt, 0x04u, 0u);
+    put(pkt, 0x08u, static_cast<U>(count));
+    put(pkt, 0x0cu, static_cast<U>(extra));
+    return pkt;
+}
+
+static void reset_base(U seed) {
+    std::memset(net_buf0, 0, sizeof net_buf0);
+    std::memset(net_buf1, 0, sizeof net_buf1);
+    std::memset(item_pool, 0, sizeof item_pool);
+    std::memset(sentinel_pool, 0, sizeof sentinel_pool);
+    std::memset(node_pool, 0, sizeof node_pool);
+    std::memset(pkt_pool, 0, sizeof pkt_pool);
+    std::memset(buf_pool, 0, sizeof buf_pool);
+
+    for (U i = 0u; i < kBufStride; ++i) {
+        src_value_buf[i] = static_cast<B>((i * 13u + seed * 7u + 5u) & 0xffu);
+    }
+
+    node_used = 0u;
+    pkt_used = 0u;
+    buf_used = 0u;
+    alloc_fail_at = 0u;
+    alloc_calls = 0u;
+    copy_calls = 0u;
+    copy_hook_kind = kHookNone;
+    copy_hook_call = 0u;
+
+    for (U i = 0u; i < kMaxSentinels; ++i) {
+        init_sentinel(i);
+    }
+
+    // Sentinels: 0=net0.260, 1=net0.264, 2=net1.260, 3=net1.264, 4..7=items[0..3].5c
+    put(net_buf0, 0x260u, address(sentinel_pool[0]));
+    put(net_buf0, 0x264u, address(sentinel_pool[1]));
+    put(net_buf1, 0x260u, address(sentinel_pool[2]));
+    put(net_buf1, 0x264u, address(sentinel_pool[3]));
+    for (U i = 0u; i < kMaxItems; ++i) {
+        put(item_pool[i], 0x5cu, address(sentinel_pool[4u + i]));
+    }
+}
+
+static void configure_net(B* net, U transport, B busy, B active_flag, I active_id) {
+    put(net, 0x08u, transport);
+    net[0xbfu] = busy;
+    net[0xbeu] = active_flag;
+    put(net, 0xdcu, static_cast<U>(active_id));
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag mismatch");
+        require(trace.events[i].arg0 == expected.events[i].arg0, "event arg0 mismatch");
+        require(trace.events[i].arg1 == expected.events[i].arg1, "event arg1 mismatch");
+        require(trace.events[i].arg2 == expected.events[i].arg2, "event arg2 mismatch");
+        require(trace.events[i].arg3 == expected.events[i].arg3, "event arg3 mismatch");
+        require(std::memcmp(&trace.events[i].state, &expected.events[i].state,
+                            sizeof(StateSnapshot)) == 0,
+                "event state mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state, sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+}
+
+template <typename SetupFn>
+static void run_add_packet_case(SetupFn setup, U item_idx, U resource, void* value, I count) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_thiscall_3arg(
+            slot_490420, address(item_pool[item_idx]),
+            resource, address(value), static_cast<U>(count), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_thiscall_3arg(
+            reinterpret_cast<void*>(&porsche::network_item_add_packet_00490420),
+            address(item_pool[item_idx]),
+            resource, address(value), static_cast<U>(count), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces();
+}
+
+template <typename SetupFn>
+static void run_consume_case(SetupFn setup, U resource, void* value, I count) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_3arg(
+            slot_48cb50, resource, address(value), static_cast<U>(count), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    setup();
+    __try {
+        trace.abi_fail = invoke_cdecl_3arg(
+            reinterpret_cast<void*>(&porsche::engine_service_consume_resource_0048cb50),
+            resource, address(value), static_cast<U>(count), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events += trace.count;
+    compare_traces();
+}
+
+int main() {
+    init();
+
+    // 1. Direct 00490420 (network_item_add_packet_00490420) tests.
+    run_add_packet_case([]() { reset_base(1u); }, 0u, 0x0010u, src_value_buf, 12);
+    run_add_packet_case([]() { reset_base(2u); }, 0u, 0x0020u, nullptr, 8);
+    run_add_packet_case([]() {
+        reset_base(3u);
+        push_list_node(4u, address(make_seed_packet(0x1111u, 4, 1)));
+    }, 0u, 0xabcd2222u, src_value_buf, 16);
+    run_add_packet_case([]() {
+        reset_base(4u);
+        push_list_node(4u, address(make_seed_packet(0x2222u, 4, 1)));
+    }, 0u, 0x00002222u, src_value_buf, 16);
+    run_add_packet_case([]() {
+        reset_base(5u);
+        push_list_node(4u, address(make_seed_packet(0x1111u, 4, 1)));
+        push_list_node(4u, address(make_seed_packet(0x2222u, 6, 2)));
+    }, 0u, 0xffff2222u, src_value_buf, 10);
+    run_add_packet_case([]() {
+        reset_base(6u);
+        alloc_fail_at = 1u;
+    }, 0u, 0x0033u, src_value_buf, 12);
+
+    // 2. 0048cb50 entry guard early returns (count > 0).
+    run_consume_case([]() {
+        reset_base(10u);
+        porsche::startup_network_00628c70 = nullptr;
+    }, 0x0010u, src_value_buf, 1);
+    run_consume_case([]() {
+        reset_base(11u);
+        configure_net(net_buf0, 0u, 0u, 1u, 7);
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0010u, src_value_buf, 8);
+    run_consume_case([]() {
+        reset_base(12u);
+        configure_net(net_buf0, 1u, 1u, 1u, 7);
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0010u, src_value_buf, 1);
+    run_consume_case([]() {
+        reset_base(13u);
+        configure_net(net_buf0, 1u, 0u, 0u, 7);
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0010u, src_value_buf, 1);
+    run_consume_case([]() {
+        reset_base(14u);
+        configure_net(net_buf0, 1u, 0u, 1u, -1);
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0010u, src_value_buf, 4);
+
+    // 3. 0048cb50 count <= 0 bypass with inactive/unready network.
+    run_consume_case([]() {
+        reset_base(20u);
+        configure_net(net_buf0, 1u, 0u, 0u, 7);
+        put(item_pool[0], 0x40u, 7u);
+        push_list_node(0u, address(item_pool[0]));
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0041u, src_value_buf, 0);
+    run_consume_case([]() {
+        reset_base(21u);
+        configure_net(net_buf0, 1u, 0u, 1u, -1);
+        put(item_pool[0], 0x40u, static_cast<U>(-1));
+        push_list_node(0u, address(item_pool[0]));
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0042u, nullptr, -4);
+    run_consume_case([]() {
+        reset_base(22u);
+        configure_net(net_buf0, 0u, 0u, 1u, 7);
+        put(item_pool[0], 0x40u, static_cast<U>(-2));
+        push_list_node(0u, address(item_pool[0]));
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0043u, nullptr, 0);
+    run_consume_case([]() {
+        reset_base(23u);
+        configure_net(net_buf0, 1u, 1u, 1u, 7);
+        put(item_pool[0], 0x40u, static_cast<U>(-2));
+        push_list_node(0u, address(item_pool[0]));
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0044u, src_value_buf, 0);
+
+    // 4. 0048cb50 active network with peer +0x260 lookup and +0x264 insertion.
+    // 4a. Empty +0x260, value != nullptr.
+    run_consume_case([]() {
+        reset_base(30u);
+        configure_net(net_buf0, 1u, 0u, 1u, 7);
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0050u, src_value_buf, 12);
+    // 4b. Empty +0x260, value == nullptr.
+    run_consume_case([]() {
+        reset_base(31u);
+        configure_net(net_buf0, 1u, 0u, 1u, 7);
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0051u, nullptr, 12);
+    // 4c. Non-matching peer in +0x260.
+    run_consume_case([]() {
+        reset_base(32u);
+        configure_net(net_buf0, 1u, 0u, 1u, 7);
+        put(item_pool[0], 0x40u, 9u);
+        push_list_node(0u, address(item_pool[0]));
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0052u, src_value_buf, 16);
+    // 4d. Matching peer (2nd in +0x260), packet missing from peer +0x5c -> calls 00490420 + adds count to +0x0c, then inserts into +0x264.
+    run_consume_case([]() {
+        reset_base(33u);
+        configure_net(net_buf0, 1u, 0u, 1u, 7);
+        put(item_pool[0], 0x40u, 9u);
+        put(item_pool[1], 0x40u, 7u);
+        push_list_node(0u, address(item_pool[0]));
+        push_list_node(0u, address(item_pool[1]));
+        push_list_node(5u, address(make_seed_packet(0x1234u, 4, 2)));
+        push_list_node(1u, address(make_seed_packet(0x1234u, 4, 2)));
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0xabcd0053u, src_value_buf, 20);
+    // 4e. Matching peer already has packet in +0x5c -> skips 00490420 and +0x0c add, still inserts into +0x264.
+    run_consume_case([]() {
+        reset_base(34u);
+        configure_net(net_buf0, 1u, 0u, 1u, 7);
+        put(item_pool[0], 0x40u, 7u);
+        push_list_node(0u, address(item_pool[0]));
+        push_list_node(4u, address(make_seed_packet(0x0054u, 8, 5)));
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0054u, src_value_buf, 16);
+
+    // 5. +0x264 already has matching non-null packet -> early return.
+    run_consume_case([]() {
+        reset_base(40u);
+        configure_net(net_buf0, 1u, 0u, 1u, 7);
+        put(item_pool[0], 0x40u, 7u);
+        push_list_node(0u, address(item_pool[0]));
+        push_list_node(1u, address(make_seed_packet(0x0060u, 4, 0)));
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0060u, src_value_buf, 14);
+    run_consume_case([]() {
+        reset_base(41u);
+        configure_net(net_buf0, 1u, 0u, 1u, 7);
+        push_list_node(1u, address(make_seed_packet(0x1111u, 4, 0)));
+        push_list_node(1u, address(make_seed_packet(0x0061u, 4, 0)));
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0xffff0061u, src_value_buf, 14);
+
+    // 6. Allocation failure on +0x264 packet allocation -> inserts nullptr into +0x264.
+    run_consume_case([]() {
+        reset_base(50u);
+        configure_net(net_buf0, 1u, 0u, 1u, 7);
+        alloc_fail_at = 1u;
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0070u, src_value_buf, 12);
+
+    // 7. Mid-call startup_network_00628c70 reload hooks inside heap_copy_dispatch_005323e0.
+    run_consume_case([]() {
+        reset_base(60u);
+        configure_net(net_buf0, 1u, 0u, 1u, 7);
+        configure_net(net_buf1, 1u, 0u, 1u, 8);
+        put(item_pool[0], 0x40u, 7u);
+        push_list_node(0u, address(item_pool[0]));
+        copy_hook_kind = kHookSwapNetwork;
+        copy_hook_call = 1u;
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0080u, src_value_buf, 12);
+    run_consume_case([]() {
+        reset_base(61u);
+        configure_net(net_buf0, 1u, 0u, 1u, 7);
+        configure_net(net_buf1, 1u, 0u, 1u, 8);
+        copy_hook_kind = kHookSwapNetwork;
+        copy_hook_call = 1u;
+        porsche::startup_network_00628c70 = net_buf0;
+    }, 0x0081u, src_value_buf, 12);
+
+    std::printf("engine_service_consume_resource_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events);
+    return 0;
+}
