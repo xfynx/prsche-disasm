@@ -1,0 +1,1338 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <utility>
+
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "bigheader_audio_configure_661.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::audio_probe_viv_fmt_005d1bf0) == 12u);
+static_assert(sizeof(porsche::audio_probe_buffer_name_005d1bfc) == 13u);
+static_assert(sizeof(porsche::audio_probe_globals_name_005d1c0c) == 14u);
+static_assert(sizeof(porsche::file_load_bigheader_open_err_005bcde4) == 45u);
+static_assert(sizeof(porsche::file_load_bigheader_mem_err_005bce14) == 59u);
+static_assert(sizeof(porsche::file_load_bigheader_hdr_err_005bce50) == 57u);
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static B* code = nullptr;
+static B* slot_568b50 = nullptr;
+static B* slot_533d70 = nullptr;
+static B* slot_562100 = nullptr;
+static B* slot_562300 = nullptr;
+static B* slot_59df70 = nullptr;
+static B* slot_4ae100 = nullptr;
+
+static const char orig_str_5d1bf0[12] = {@STR_005D1BF0@};
+static const char orig_str_5d1bfc[13] = {@STR_005D1BFC@};
+static const char orig_str_5d1c0c[14] = {@STR_005D1C0C@};
+static const char orig_str_5bcde4[45] = {@STR_005BCDE4@};
+static const char orig_str_5bce14[59] = {@STR_005BCE14@};
+static const char orig_str_5bce50[57] = {@STR_005BCE50@};
+static const char orig_str_5bcd00[20] = {@STR_005BCD00@};
+static const char orig_str_5cc588[5] = {@STR_005CC588@};
+
+static U cases = 0u;
+alignas(16) static B floating[512] = {};
+
+static porsche::FileOperation op_arena{};
+static B io_buf_arena[0x40] = {};
+static B io_ctx_arena[0x40] = {};
+static B alloc_slot0[0x1000] = {};
+static B alloc_slot1[0x2000] = {};
+static B query_root_arena[0x200] = {};
+static B music_buf_arena[0x100] = {};
+static B str_arena[0x200] = {};
+static B mgr_arena[0x100] = {};
+static B lock_arena[0x20] = {};
+static B fake_handle_a[0x10] = {};
+static void* fixture_heap_state_005e4fe8 = nullptr;
+
+enum EventTag : U {
+    kEvHandleDev = 1u,
+    kEvOpAlloc = 2u,
+    kEvOpQueue = 3u,
+    kEvChunks = 4u,
+    kEvOpen = 5u,
+    kEvAlloc = 6u,
+    kEvRead = 7u,
+    kEvAudioKind = 8u,
+    kEvAudioSize = 9u,
+    kEvCopy = 10u,
+    kEvFree = 11u,
+    kEvClose = 12u,
+    kEvDiag = 13u,
+    kEvDevice = 14u,
+    kEvAtomic = 15u,
+    kEvFormat = 16u,
+    kEvExists = 17u,
+    kEvMissing = 18u,
+    kEvRootReset = 19u,
+    kEvEstimate = 20u,
+    kEvTransCfg = 21u,
+    kEvObjInit = 22u,
+    kEvResOpen = 23u,
+    kEvDataOffset = 24u,
+    kEvRelease = 25u,
+    kEvHeapEnter = 26u,
+    kEvHeapLeave = 27u,
+};
+
+struct Event {
+    U tag;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+    U a4;
+    char text[96];
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U count;
+    Event events[32];
+    porsche::FileOperation final_op;
+    B final_query_root[0x200];
+    B final_alloc0[0x40];
+    B final_alloc1_tail[0x40];
+    B final_mgr[0x100];
+    B final_str[0x40];
+    U final_query_root_ptr;
+    U final_diag_file_ok;
+    U final_diag_line;
+    U final_group;
+    U final_missing_cb;
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+struct StubCfg {
+    U handle_dev_ret;
+    U op_queue_ret;
+    bool op_alloc_null;
+    bool invoke_reader_in_chunks;
+    U chunks_ret;
+    bool open_ok;
+    U handle_val;
+    U alloc_fail_mask;
+    U audio_kind_ret;
+    U audio_size_ret;
+    bool mutate_ctx_in_open;
+    bool invoke_atomic_cb;
+    U atomic_ret;
+    bool mutate_group_in_device;
+    U exists_mask;
+    bool mutate_missing_on_exists;
+    U estimate_ret;
+    U obj_init_cap;
+    const char* res_open_resolved;
+    U res_open_grow_cap;
+    bool res_open_zero_end;
+    U data_offset_ret;
+};
+
+static StubCfg stub_cfg{};
+static U alloc_seq = 0u;
+static porsche::ResourceAtomicContext* last_atomic_ctx = nullptr;
+static void* orig_diagnostic_cell = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U normalize_ptr(U p) {
+    if (p == 0u) return 0u;
+    if (p >= address(&op_arena) && p < address(&op_arena) + sizeof(op_arena)) {
+        return 0xa0000000u + (p - address(&op_arena));
+    }
+    if (p >= address(io_buf_arena) && p < address(io_buf_arena) + sizeof(io_buf_arena)) {
+        return 0xa1000000u + (p - address(io_buf_arena));
+    }
+    if (p >= address(io_ctx_arena) && p < address(io_ctx_arena) + sizeof(io_ctx_arena)) {
+        return 0xa2000000u + (p - address(io_ctx_arena));
+    }
+    if (p >= address(alloc_slot0) && p < address(alloc_slot0) + sizeof(alloc_slot0)) {
+        return 0xa3000000u + (p - address(alloc_slot0));
+    }
+    if (p >= address(alloc_slot1) && p < address(alloc_slot1) + sizeof(alloc_slot1)) {
+        return 0xa4000000u + (p - address(alloc_slot1));
+    }
+    if (p >= address(query_root_arena) && p < address(query_root_arena) + sizeof(query_root_arena)) {
+        return 0xa5000000u + (p - address(query_root_arena));
+    }
+    if (p >= address(music_buf_arena) && p < address(music_buf_arena) + sizeof(music_buf_arena)) {
+        return 0xa6000000u + (p - address(music_buf_arena));
+    }
+    if (p >= address(str_arena) && p < address(str_arena) + sizeof(str_arena)) {
+        return 0xa7000000u + (p - address(str_arena));
+    }
+    if (p >= address(mgr_arena) && p < address(mgr_arena) + sizeof(mgr_arena)) {
+        return 0xa8000000u + (p - address(mgr_arena));
+    }
+    if (p >= address(lock_arena) && p < address(lock_arena) + sizeof(lock_arena)) {
+        return 0xa9000000u + (p - address(lock_arena));
+    }
+    if (p >= address(fake_handle_a) && p < address(fake_handle_a) + sizeof(fake_handle_a)) {
+        return 0xaa000000u + (p - address(fake_handle_a));
+    }
+    if (last_atomic_ctx != nullptr && p == address(last_atomic_ctx)) {
+        return 0xab000000u;
+    }
+    return p;
+}
+
+static void copy_text(char* dst, std::size_t cap, const char* src) {
+    if (src == nullptr) {
+        std::snprintf(dst, cap, "<null>");
+        return;
+    }
+    std::snprintf(dst, cap, "%s", src);
+}
+
+static void push_event(
+    U tag,
+    U a0 = 0u,
+    U a1 = 0u,
+    U a2 = 0u,
+    U a3 = 0u,
+    U a4 = 0u,
+    const char* text = nullptr) {
+    require(trace.count < 32u, "event capacity");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof(e));
+    e.tag = tag;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+    e.a3 = a3;
+    e.a4 = a4;
+    if (text != nullptr) {
+        copy_text(e.text, sizeof(e.text), text);
+    }
+}
+
+static void __cdecl fixture_missing_a(const char* name, std::int32_t code_arg) {
+    push_event(kEvMissing, 1u, static_cast<U>(code_arg), 0u, 0u, 0u, name);
+}
+
+static void __cdecl fixture_missing_b(const char* name, std::int32_t code_arg) {
+    push_event(kEvMissing, 2u, static_cast<U>(code_arg), 0u, 0u, 0u, name);
+}
+
+static U normalize_missing_cb(void(__cdecl* cb)(const char*, std::int32_t)) {
+    if (cb == nullptr) return 0u;
+    if (cb == &fixture_missing_a) return 1u;
+    if (cb == &fixture_missing_b) return 2u;
+    return 0xffu;
+}
+
+extern "C" U __cdecl open_raw_661(const char* path, U mode, U group, void** handle) {
+    push_event(kEvOpen, mode, group, stub_cfg.open_ok ? 1u : 0u, 0u, 0u, path);
+    if (handle != nullptr) {
+        *handle = reinterpret_cast<void*>(static_cast<std::uintptr_t>(stub_cfg.handle_val));
+    }
+    if (stub_cfg.mutate_ctx_in_open && last_atomic_ctx != nullptr) {
+        last_atomic_ctx->opaque_08 += 7u;
+        last_atomic_ctx->callback_diagnostic_flag ^= 1u;
+    }
+    return stub_cfg.open_ok ? 1u : 0u;
+}
+
+extern "C" void __cdecl diagnostic_raw_661(const char* format, const char* path) {
+    U fmt_id = 0u;
+    if (format == orig_str_5bcde4 || format == porsche::file_load_bigheader_open_err_005bcde4) {
+        fmt_id = 1u;
+    } else if (format == orig_str_5bce14 || format == porsche::file_load_bigheader_mem_err_005bce14) {
+        fmt_id = 2u;
+    } else if (format == orig_str_5bce50 || format == porsche::file_load_bigheader_hdr_err_005bce50) {
+        fmt_id = 3u;
+    }
+    const char* const src = porsche::diagnostic_file_005deb74();
+    const U src_ok = (src != nullptr && std::strcmp(src, orig_str_5bcd00) == 0) ? 1u : 0u;
+    push_event(kEvDiag, fmt_id, src_ok, porsche::diagnostic_line_005deb78, 0u, 0u, path);
+}
+
+namespace porsche {
+
+std::uint32_t resource_leaf_group_005df770 = 0x64u;
+char file_root_006af168[260] = {};
+char file_fallback_006af26c[260] = {};
+char file_roots_enabled_006af370 = 0;
+void(__cdecl* missing_file_006afbe4)(const char*, std::int32_t) = nullptr;
+std::uint32_t audio_resource_query_root_00656ab4 = 0u;
+void(__cdecl* diagnostic_handler_005debf0)(const char*) = nullptr;
+
+__declspec(naked) void __cdecl diagnostic_entry_661(const char*) {
+    __asm { jmp diagnostic_raw_661 }
+}
+
+__declspec(naked) bool __cdecl file_open_00533b90(const char*, std::uint32_t, std::uint32_t, void**) {
+    __asm { jmp open_raw_661 }
+}
+
+std::uint32_t __cdecl handle_device_005925d0(void* handle) {
+    push_event(kEvHandleDev, normalize_ptr(address(handle)));
+    return stub_cfg.handle_dev_ret;
+}
+
+FileOperation* __cdecl operation_allocate_005682a0(
+    std::uint32_t type, std::uint8_t group, void* context, std::uint32_t dev) {
+    push_event(kEvOpAlloc, type, static_cast<U>(group), normalize_ptr(address(context)), dev);
+    if (stub_cfg.op_alloc_null) {
+        return nullptr;
+    }
+    std::memset(&op_arena, 0xaa, sizeof(op_arena));
+    op_arena.type = type;
+    op_arena.group = group;
+    op_arena.context = context;
+    op_arena.id = (dev & 31u) | 0x40u;
+    return &op_arena;
+}
+
+std::uint32_t __cdecl operation_queue_00568200(FileOperation* op) {
+    push_event(
+        kEvOpQueue,
+        normalize_ptr(address(op)),
+        op != nullptr ? op->type : 0u,
+        op != nullptr ? op->handle : 0u,
+        op != nullptr ? op->offset : 0u,
+        op != nullptr ? op->count : 0u);
+    if (op != nullptr) {
+        op->handle = normalize_ptr(op->handle);
+        op->context = reinterpret_cast<void*>(static_cast<std::uintptr_t>(normalize_ptr(address(op->context))));
+        op->buffer = reinterpret_cast<void*>(static_cast<std::uintptr_t>(normalize_ptr(address(op->buffer))));
+    }
+    return stub_cfg.op_queue_ret;
+}
+
+std::uint32_t __cdecl file_chunks_00533c20(
+    void* handle, std::uint32_t offset, void* buffer,
+    std::int32_t count, std::uint32_t group, FileReader reader) {
+    const U reader_ok = (address(reinterpret_cast<const void*>(reader)) == address(slot_568b50) ||
+                         reader == &request_read_offset_00568b50)
+                            ? 1u
+                            : 0u;
+    push_event(
+        kEvChunks,
+        normalize_ptr(address(handle)),
+        offset,
+        normalize_ptr(address(buffer)),
+        static_cast<U>(count),
+        (group & 0xffffu) | (reader_ok << 16));
+    if (stub_cfg.invoke_reader_in_chunks && reader != nullptr) {
+        return reader(handle, offset, buffer, count, group, io_ctx_arena);
+    }
+    return stub_cfg.chunks_ret;
+}
+
+void* __cdecl allocate_00531ca0(const char* name, std::int32_t bytes, std::uint32_t flags) {
+    const U idx = alloc_seq++;
+    const bool fail = ((stub_cfg.alloc_fail_mask >> idx) & 1u) != 0u;
+    void* ret = nullptr;
+    if (!fail) {
+        if (name != nullptr && std::strcmp(name, orig_str_5d1c0c) == 0) {
+            ret = query_root_arena;
+            std::memset(query_root_arena, 0x5a, sizeof(query_root_arena));
+        } else if (name != nullptr && std::strcmp(name, orig_str_5d1bfc) == 0) {
+            ret = music_buf_arena;
+        } else if (idx == 0u) {
+            ret = alloc_slot0;
+            std::memset(alloc_slot0, 0x33, sizeof(alloc_slot0));
+        } else {
+            ret = alloc_slot1;
+            std::memset(alloc_slot1, 0x44, sizeof(alloc_slot1));
+        }
+    }
+    push_event(kEvAlloc, idx, static_cast<U>(bytes), flags, normalize_ptr(address(ret)), 0u, name);
+    return ret;
+}
+
+std::uint32_t __cdecl free_00531f90(void* block) {
+    push_event(kEvFree, normalize_ptr(address(block)));
+    return 1u;
+}
+
+void __cdecl heap_copy_dispatch_005323e0(void* dst, const void* src, std::uint32_t bytes) {
+    push_event(kEvCopy, normalize_ptr(address(dst)), normalize_ptr(address(src)), bytes);
+    if (dst != nullptr && src != nullptr && bytes > 0u) {
+        std::memcpy(dst, src, bytes);
+    }
+}
+
+std::uint32_t __cdecl read_00533bf0(
+    void* handle, std::uint32_t offset, void* buffer, std::uint32_t bytes, std::uint32_t group) {
+    push_event(kEvRead, normalize_ptr(address(handle)), offset, normalize_ptr(address(buffer)), bytes, group);
+    if (buffer != nullptr && bytes > 0u) {
+        const U write_len = (bytes < 32u) ? bytes : 32u;
+        for (U i = 0u; i < write_len; ++i) {
+            static_cast<B*>(buffer)[i] = static_cast<B>((offset & 0xffu) + i + 1u);
+        }
+    }
+    return bytes;
+}
+
+std::uint32_t __cdecl close_00533da0(void* handle, std::uint32_t group) {
+    push_event(kEvClose, normalize_ptr(address(handle)), group);
+    return 1u;
+}
+
+std::uint32_t __cdecl audio_resource_kind_00566520(std::uint32_t source) {
+    push_event(kEvAudioKind, normalize_ptr(source));
+    return stub_cfg.audio_kind_ret;
+}
+
+std::uint32_t __cdecl audio_resource_size_00566560(std::uint32_t source) {
+    push_event(kEvAudioSize, normalize_ptr(source));
+    return stub_cfg.audio_size_ret;
+}
+
+std::uint32_t __cdecl file_device_name_00568e90(const char* path) {
+    U dev = 0x10u;
+    if (path != nullptr) {
+        for (const char* p = path; *p != '\0'; ++p) {
+            dev = dev * 33u + static_cast<B>(*p);
+        }
+    }
+    if (stub_cfg.mutate_group_in_device) {
+        resource_leaf_group_005df770 ^= 0x10101u;
+    }
+    push_event(kEvDevice, dev, 0u, 0u, 0u, 0u, path);
+    return dev;
+}
+
+std::int32_t __cdecl resource_leaf_atomic_dispatch_00568d50(
+    ResourceLeafAtomicCallback callback,
+    std::uint32_t device,
+    std::uint32_t group,
+    void* opaque_context) {
+    auto* const ctx = static_cast<ResourceAtomicContext*>(opaque_context);
+    last_atomic_ctx = ctx;
+    const U cb_ok = (address(reinterpret_cast<const void*>(callback)) == address(slot_562100) ||
+                     callback == &file_load_bigheader_callback_00562100)
+                        ? 1u
+                        : 0u;
+    push_event(
+        kEvAtomic,
+        cb_ok,
+        device,
+        group,
+        ctx != nullptr ? ctx->opaque_08 : 0u,
+        ctx != nullptr ? ctx->callback_diagnostic_flag : 0u,
+        ctx != nullptr ? ctx->path : nullptr);
+    if (stub_cfg.invoke_atomic_cb && callback != nullptr) {
+        return callback(group, opaque_context);
+    }
+    return static_cast<std::int32_t>(stub_cfg.atomic_ret);
+}
+
+std::int32_t __cdecl formatter_entry_005a0fbf(char* output, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    const int n = std::vsnprintf(output, 256u, format, args);
+    va_end(args);
+    push_event(kEvFormat, 0u, 0u, 0u, 0u, 0u, output);
+    return static_cast<std::int32_t>(n);
+}
+
+std::int32_t __cdecl file_exists_00561b80(const char* path) {
+    std::int32_t hit = 0;
+    if (path != nullptr) {
+        if (std::strncmp(path, file_root_006af168, std::strlen(file_root_006af168)) == 0 &&
+            (stub_cfg.exists_mask & 1u) != 0u) {
+            hit = 1;
+        } else if (file_fallback_006af26c[0] != '\0' &&
+                   std::strncmp(path, file_fallback_006af26c, std::strlen(file_fallback_006af26c)) == 0 &&
+                   (stub_cfg.exists_mask & 2u) != 0u) {
+            hit = 1;
+        }
+    }
+    if (stub_cfg.mutate_missing_on_exists) {
+        missing_file_006afbe4 = &fixture_missing_b;
+    }
+    push_event(kEvExists, static_cast<U>(hit), 0u, 0u, 0u, 0u, path);
+    return hit;
+}
+
+void __cdecl audio_resource_query_root_reset_004adf50() {
+    push_event(kEvRootReset, normalize_ptr(audio_resource_query_root_00656ab4));
+    if (audio_resource_query_root_00656ab4 != 0u) {
+        void* const root = reinterpret_cast<void*>(static_cast<std::uintptr_t>(audio_resource_query_root_00656ab4));
+        put(root, 0x88u, 0u);
+        put(root, 0x6cu, 0u);
+        put(root, 0x04u, 0u);
+    }
+}
+
+std::uint32_t __cdecl application_audio_stream_estimate_005678c0(std::uint32_t a, std::uint32_t b) {
+    push_event(kEvEstimate, a, b);
+    return stub_cfg.estimate_ret;
+}
+
+void __cdecl application_audio_transition_configure_004ae010(std::uint32_t first, std::uint32_t second) {
+    const U buf_word = (audio_resource_query_root_00656ab4 != 0u)
+                           ? word(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(audio_resource_query_root_00656ab4)), 0x6cu)
+                           : 0u;
+    push_event(kEvTransCfg, first, second, normalize_ptr(buf_word));
+}
+
+void __fastcall game_setup_object_init_raw_00403520(
+    void* object, void* unused_edx, std::uint32_t bytes) {
+    (void)unused_edx;
+    push_event(kEvObjInit, object != nullptr ? 1u : 0u, bytes);
+    const U begin = address(str_arena);
+    put(object, 0x00u, begin);
+    put(object, 0x04u, begin);
+    put(object, 0x08u, begin + stub_cfg.obj_init_cap);
+    str_arena[0] = 0x7fu;
+}
+
+void __cdecl game_setup_resource_open_0059e440(const char* path, void* object) {
+    push_event(kEvResOpen, 0u, 0u, 0u, 0u, 0u, path);
+    const char* const text =
+        stub_cfg.res_open_zero_end ? "" :
+        ((stub_cfg.res_open_resolved != nullptr) ? stub_cfg.res_open_resolved : "resolved.viv");
+    const U len = static_cast<U>(std::strlen(text));
+    std::memcpy(str_arena, text, len + 1u);
+    put(object, 0x00u, address(str_arena));
+    put(object, 0x04u, address(str_arena) + len);
+    if (stub_cfg.res_open_zero_end) {
+        put(object, 0x08u, address(str_arena));
+    } else if (stub_cfg.res_open_grow_cap != 0u) {
+        put(object, 0x08u, address(str_arena) + stub_cfg.res_open_grow_cap);
+    }
+}
+
+std::uint32_t __cdecl audio_resource_data_offset_00566880(std::uint32_t source) {
+    push_event(kEvDataOffset, normalize_ptr(source));
+    return stub_cfg.data_offset_ret;
+}
+
+void* __cdecl application_context_heap_state_005e4fe8() {
+    return fixture_heap_state_005e4fe8;
+}
+
+void __cdecl context_table_release_0059ecd0(void* block) {
+    push_event(kEvRelease, normalize_ptr(address(block)));
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    push_event(kEvHeapEnter, normalize_ptr(address(lock)));
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    push_event(kEvHeapLeave, normalize_ptr(address(lock)));
+}
+
+} // namespace porsche
+
+static void relocate_rel32(B* slot, U base_va, U patch_offset, U target_va, const void* dst) {
+    const std::int32_t expected_rel = static_cast<std::int32_t>(target_va - (base_va + patch_offset + 4u));
+    std::int32_t actual_rel = 0;
+    std::memcpy(&actual_rel, slot + patch_offset, 4u);
+    require(actual_rel == expected_rel, "rel32 check");
+    const std::int32_t rel = static_cast<std::int32_t>(
+        address(dst) - (address(slot) + patch_offset + 4u));
+    std::memcpy(slot + patch_offset, &rel, 4u);
+}
+
+static void relocate_abs32(B* slot, U patch_offset, U expected_va, U new_val) {
+    U actual = 0u;
+    std::memcpy(&actual, slot + patch_offset, 4u);
+    require(actual == expected_va, "abs32 check");
+    std::memcpy(slot + patch_offset, &new_val, 4u);
+}
+
+static void load_originals() {
+    static const B body_568b50[] = {@BODY_00568B50@};
+    static const B body_533d70[] = {@BODY_00533D70@};
+    static const B body_562100[] = {@BODY_00562100@};
+    static const B body_562300[] = {@BODY_00562300@};
+    static const B body_59df70[] = {@BODY_0059DF70@};
+    static const B body_4ae100[] = {@BODY_004AE100@};
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+
+    slot_568b50 = code + 0x000u;
+    slot_533d70 = code + 0x080u;
+    slot_562100 = code + 0x100u;
+    slot_562300 = code + 0x340u;
+    slot_59df70 = code + 0x3c0u;
+    slot_4ae100 = code + 0x4c0u;
+
+    std::memcpy(slot_568b50, body_568b50, sizeof body_568b50);
+    std::memcpy(slot_533d70, body_533d70, sizeof body_533d70);
+    std::memcpy(slot_562100, body_562100, sizeof body_562100);
+    std::memcpy(slot_562300, body_562300, sizeof body_562300);
+    std::memcpy(slot_59df70, body_59df70, sizeof body_59df70);
+    std::memcpy(slot_4ae100, body_4ae100, sizeof body_4ae100);
+
+    orig_diagnostic_cell = reinterpret_cast<void*>(&porsche::diagnostic_entry_661);
+
+    // 00568b50
+    relocate_rel32(slot_568b50, 0x00568b50u, 0x007u, 0x005925d0u,
+                   reinterpret_cast<const void*>(&porsche::handle_device_005925d0));
+    relocate_rel32(slot_568b50, 0x00568b50u, 0x019u, 0x005682a0u,
+                   reinterpret_cast<const void*>(&porsche::operation_allocate_005682a0));
+    relocate_rel32(slot_568b50, 0x00568b50u, 0x037u, 0x00568200u,
+                   reinterpret_cast<const void*>(&porsche::operation_queue_00568200));
+
+    // 00533d70
+    relocate_abs32(slot_533d70, 0x00du, 0x00568b50u, address(slot_568b50));
+    relocate_rel32(slot_533d70, 0x00533d70u, 0x01fu, 0x00533c20u,
+                   reinterpret_cast<const void*>(&porsche::file_chunks_00533c20));
+
+    // 00562100
+    relocate_rel32(slot_562100, 0x00562100u, 0x01fu, 0x00533b90u,
+                   reinterpret_cast<const void*>(&porsche::file_open_00533b90));
+    relocate_rel32(slot_562100, 0x00562100u, 0x03du, 0x00531ca0u,
+                   reinterpret_cast<const void*>(&porsche::allocate_00531ca0));
+    relocate_rel32(slot_562100, 0x00562100u, 0x05eu, 0x00533bf0u,
+                   reinterpret_cast<const void*>(&porsche::read_00533bf0));
+    relocate_rel32(slot_562100, 0x00562100u, 0x064u, 0x00566520u,
+                   reinterpret_cast<const void*>(&porsche::audio_resource_kind_00566520));
+    relocate_abs32(slot_562100, 0x078u, 0x005bce50u, address(orig_str_5bce50));
+    relocate_abs32(slot_562100, 0x07eu, 0x005deb74u, address(&porsche::shared_runtime_word_005deb74));
+    relocate_abs32(slot_562100, 0x082u, 0x005bcd00u, address(orig_str_5bcd00));
+    relocate_abs32(slot_562100, 0x088u, 0x005deb78u, address(&porsche::shared_runtime_word_005deb78));
+    relocate_abs32(slot_562100, 0x092u, 0x005debf0u, address(&orig_diagnostic_cell));
+    relocate_rel32(slot_562100, 0x00562100u, 0x09bu, 0x00531f90u,
+                   reinterpret_cast<const void*>(&porsche::free_00531f90));
+    relocate_rel32(slot_562100, 0x00562100u, 0x0a6u, 0x00533da0u,
+                   reinterpret_cast<const void*>(&porsche::close_00533da0));
+    relocate_rel32(slot_562100, 0x00562100u, 0x0b9u, 0x00566560u,
+                   reinterpret_cast<const void*>(&porsche::audio_resource_size_00566560));
+    relocate_rel32(slot_562100, 0x00562100u, 0x0d2u, 0x00531ca0u,
+                   reinterpret_cast<const void*>(&porsche::allocate_00531ca0));
+    relocate_rel32(slot_562100, 0x00562100u, 0x0e7u, 0x005323e0u,
+                   reinterpret_cast<const void*>(&porsche::heap_copy_dispatch_005323e0));
+    relocate_rel32(slot_562100, 0x00562100u, 0x0edu, 0x00531f90u,
+                   reinterpret_cast<const void*>(&porsche::free_00531f90));
+    relocate_rel32(slot_562100, 0x00562100u, 0x10du, 0x00533bf0u,
+                   reinterpret_cast<const void*>(&porsche::read_00533bf0));
+    relocate_rel32(slot_562100, 0x00562100u, 0x11bu, 0x00533da0u,
+                   reinterpret_cast<const void*>(&porsche::close_00533da0));
+    relocate_abs32(slot_562100, 0x13du, 0x005deb74u, address(&porsche::shared_runtime_word_005deb74));
+    relocate_abs32(slot_562100, 0x141u, 0x005bcd00u, address(orig_str_5bcd00));
+    relocate_abs32(slot_562100, 0x147u, 0x005bce14u, address(orig_str_5bce14));
+    relocate_abs32(slot_562100, 0x14du, 0x005deb78u, address(&porsche::shared_runtime_word_005deb78));
+    relocate_abs32(slot_562100, 0x157u, 0x005debf0u, address(&orig_diagnostic_cell));
+    relocate_rel32(slot_562100, 0x00562100u, 0x160u, 0x00531f90u,
+                   reinterpret_cast<const void*>(&porsche::free_00531f90));
+    relocate_rel32(slot_562100, 0x00562100u, 0x16bu, 0x00533da0u,
+                   reinterpret_cast<const void*>(&porsche::close_00533da0));
+    relocate_abs32(slot_562100, 0x185u, 0x005bce14u, address(orig_str_5bce14));
+    relocate_abs32(slot_562100, 0x18bu, 0x005deb74u, address(&porsche::shared_runtime_word_005deb74));
+    relocate_abs32(slot_562100, 0x18fu, 0x005bcd00u, address(orig_str_5bcd00));
+    relocate_abs32(slot_562100, 0x195u, 0x005deb78u, address(&porsche::shared_runtime_word_005deb78));
+    relocate_abs32(slot_562100, 0x19fu, 0x005debf0u, address(&orig_diagnostic_cell));
+    relocate_rel32(slot_562100, 0x00562100u, 0x1aeu, 0x00533da0u,
+                   reinterpret_cast<const void*>(&porsche::close_00533da0));
+    relocate_abs32(slot_562100, 0x1c8u, 0x005bcde4u, address(orig_str_5bcde4));
+    relocate_abs32(slot_562100, 0x1ceu, 0x005deb74u, address(&porsche::shared_runtime_word_005deb74));
+    relocate_abs32(slot_562100, 0x1d2u, 0x005bcd00u, address(orig_str_5bcd00));
+    relocate_abs32(slot_562100, 0x1d8u, 0x005deb78u, address(&porsche::shared_runtime_word_005deb78));
+    relocate_abs32(slot_562100, 0x1e2u, 0x005debf0u, address(&orig_diagnostic_cell));
+
+    // 00562300
+    relocate_abs32(slot_562300, 0x011u, 0x005df770u, address(&porsche::resource_leaf_group_005df770));
+    relocate_rel32(slot_562300, 0x00562300u, 0x029u, 0x00568e90u,
+                   reinterpret_cast<const void*>(&porsche::file_device_name_00568e90));
+    relocate_abs32(slot_562300, 0x032u, 0x00562100u, address(slot_562100));
+    relocate_rel32(slot_562300, 0x00562300u, 0x037u, 0x00568d50u,
+                   reinterpret_cast<const void*>(&porsche::resource_leaf_atomic_dispatch_00568d50));
+
+    // 0059df70
+    relocate_abs32(slot_59df70, 0x001u, 0x006af370u, address(&porsche::file_roots_enabled_006af370));
+    relocate_rel32(slot_59df70, 0x0059df70u, 0x048u, 0x00562300u, slot_562300);
+    relocate_abs32(slot_59df70, 0x064u, 0x006af168u, address(porsche::file_root_006af168));
+    relocate_abs32(slot_59df70, 0x069u, 0x005cc588u, address(orig_str_5cc588));
+    relocate_rel32(slot_59df70, 0x0059df70u, 0x06fu, 0x005a0fbfu,
+                   reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_rel32(slot_59df70, 0x0059df70u, 0x079u, 0x00561b80u,
+                   reinterpret_cast<const void*>(&porsche::file_exists_00561b80));
+    relocate_abs32(slot_59df70, 0x085u, 0x006af26cu, address(porsche::file_fallback_006af26c));
+    relocate_abs32(slot_59df70, 0x08fu, 0x006af26cu, address(porsche::file_fallback_006af26c));
+    relocate_abs32(slot_59df70, 0x098u, 0x005cc588u, address(orig_str_5cc588));
+    relocate_rel32(slot_59df70, 0x0059df70u, 0x09eu, 0x005a0fbfu,
+                   reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_rel32(slot_59df70, 0x0059df70u, 0x0a8u, 0x00561b80u,
+                   reinterpret_cast<const void*>(&porsche::file_exists_00561b80));
+    relocate_abs32(slot_59df70, 0x0b4u, 0x006afbe4u, address(&porsche::missing_file_006afbe4));
+
+    // 004ae100
+    relocate_abs32(slot_4ae100, 0x001u, 0x00656ab4u, address(&porsche::audio_resource_query_root_00656ab4));
+    relocate_abs32(slot_4ae100, 0x01eu, 0x005d1c0cu, address(orig_str_5d1c0c));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x023u, 0x00531ca0u,
+                   reinterpret_cast<const void*>(&porsche::allocate_00531ca0));
+    relocate_abs32(slot_4ae100, 0x02bu, 0x00656ab4u, address(&porsche::audio_resource_query_root_00656ab4));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x038u, 0x004adf50u,
+                   reinterpret_cast<const void*>(&porsche::audio_resource_query_root_reset_004adf50));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x055u, 0x005678c0u,
+                   reinterpret_cast<const void*>(&porsche::application_audio_stream_estimate_005678c0));
+    relocate_abs32(slot_4ae100, 0x05fu, 0x005d1bfcu, address(orig_str_5d1bfc));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x064u, 0x00531ca0u,
+                   reinterpret_cast<const void*>(&porsche::allocate_00531ca0));
+    relocate_abs32(slot_4ae100, 0x071u, 0x00656ab4u, address(&porsche::audio_resource_query_root_00656ab4));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x07bu, 0x004ae010u,
+                   reinterpret_cast<const void*>(&porsche::application_audio_transition_configure_004ae010));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x0a1u, 0x00403520u,
+                   reinterpret_cast<const void*>(&porsche::game_setup_object_init_raw_00403520));
+    relocate_abs32(slot_4ae100, 0x0b6u, 0x0065b314u, address(&porsche::audio_probe_viv_prefix_0065b314));
+    relocate_abs32(slot_4ae100, 0x0c0u, 0x005d1bf0u, address(orig_str_5d1bf0));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x0c6u, 0x005a0fbfu,
+                   reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x0d5u, 0x0059e440u,
+                   reinterpret_cast<const void*>(&porsche::game_setup_resource_open_0059e440));
+    relocate_abs32(slot_4ae100, 0x0dau, 0x00656ab4u, address(&porsche::audio_resource_query_root_00656ab4));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x10du, 0x0059df70u, slot_59df70);
+    relocate_abs32(slot_4ae100, 0x113u, 0x00656ab4u, address(&porsche::audio_resource_query_root_00656ab4));
+    relocate_abs32(slot_4ae100, 0x121u, 0x00656ab4u, address(&porsche::audio_resource_query_root_00656ab4));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x131u, 0x00566880u,
+                   reinterpret_cast<const void*>(&porsche::audio_resource_data_offset_00566880));
+    relocate_abs32(slot_4ae100, 0x137u, 0x00656ab4u, address(&porsche::audio_resource_query_root_00656ab4));
+    relocate_abs32(slot_4ae100, 0x157u, 0x005e4fe8u, address(&fixture_heap_state_005e4fe8));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x168u, 0x0059ecd0u,
+                   reinterpret_cast<const void*>(&porsche::context_table_release_0059ecd0));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x17du, 0x005322b0u,
+                   reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    relocate_rel32(slot_4ae100, 0x004ae100u, 0x196u, 0x005322c0u,
+                   reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        fldln2
+        faddp st(1), st(0)
+        fsave floating
+        frstor floating
+    }
+}
+
+static void capture_fpu(Fpu& fpu) {
+    B raw[108]{};
+    U mxcsr = 0u;
+    __asm {
+        fsave raw
+        stmxcsr mxcsr
+        frstor raw
+    }
+    fpu.control = static_cast<unsigned short>(raw[0] | (raw[1] << 8));
+    fpu.status = static_cast<unsigned short>(raw[4] | (raw[5] << 8));
+    fpu.full_tag = static_cast<unsigned short>(raw[8] | (raw[9] << 8));
+    fpu.tag = 0;
+    for (int i = 0; i < 8; ++i) {
+        if (((fpu.full_tag >> (i * 2)) & 3) != 3) {
+            fpu.tag |= static_cast<B>(1u << i);
+        }
+    }
+    std::memcpy(fpu.values, raw + 28, 80);
+    fpu.mxcsr = mxcsr & 0xffffffc0u;
+}
+
+static U invoke_cdecl2(void* fn, U a0, U a1, U& out_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        push a1
+        push a0
+        call fn
+        add esp, 8
+        mov eax_out, eax
+        pushfd
+        pop eax
+        and eax, 0x400
+        jne abi_bad
+        cmp esp, before
+        jne abi_bad
+        cmp ebp, frame
+        jne abi_bad
+        cmp ebx, 0x13572468
+        jne abi_bad
+        cmp esi, 0x2468ace0
+        jne abi_bad
+        cmp edi, 0x10203040
+        je abi_ok
+    abi_bad:
+        mov fail, 1
+    abi_ok:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    out_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl3(void* fn, U a0, U a1, U a2, U& out_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        push a2
+        push a1
+        push a0
+        call fn
+        add esp, 12
+        mov eax_out, eax
+        pushfd
+        pop eax
+        and eax, 0x400
+        jne abi_bad
+        cmp esp, before
+        jne abi_bad
+        cmp ebp, frame
+        jne abi_bad
+        cmp ebx, 0x13572468
+        jne abi_bad
+        cmp esi, 0x2468ace0
+        jne abi_bad
+        cmp edi, 0x10203040
+        je abi_ok
+    abi_bad:
+        mov fail, 1
+    abi_ok:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    out_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl5(void* fn, U a0, U a1, U a2, U a3, U a4, U& out_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        push a4
+        push a3
+        push a2
+        push a1
+        push a0
+        call fn
+        add esp, 20
+        mov eax_out, eax
+        pushfd
+        pop eax
+        and eax, 0x400
+        jne abi_bad
+        cmp esp, before
+        jne abi_bad
+        cmp ebp, frame
+        jne abi_bad
+        cmp ebx, 0x13572468
+        jne abi_bad
+        cmp esi, 0x2468ace0
+        jne abi_bad
+        cmp edi, 0x10203040
+        je abi_ok
+    abi_bad:
+        mov fail, 1
+    abi_ok:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    out_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl6(void* fn, U a0, U a1, U a2, U a3, U a4, U a5, U& out_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        push a5
+        push a4
+        push a3
+        push a2
+        push a1
+        push a0
+        call fn
+        add esp, 24
+        mov eax_out, eax
+        pushfd
+        pop eax
+        and eax, 0x400
+        jne abi_bad
+        cmp esp, before
+        jne abi_bad
+        cmp ebp, frame
+        jne abi_bad
+        cmp ebx, 0x13572468
+        jne abi_bad
+        cmp esi, 0x2468ace0
+        jne abi_bad
+        cmp edi, 0x10203040
+        je abi_ok
+    abi_bad:
+        mov fail, 1
+    abi_ok:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    out_eax = eax_out;
+    return fail;
+}
+
+struct CaseEnv {
+    StubCfg stub;
+    const char* root;
+    const char* fallback;
+    char roots_enabled;
+    void(__cdecl* missing_cb)(const char*, std::int32_t);
+    U group;
+    bool preset_query_root;
+    const char* viv_prefix;
+};
+
+static void setup_env(const CaseEnv& c) {
+    stub_cfg = c.stub;
+    alloc_seq = 0u;
+    last_atomic_ctx = nullptr;
+    std::memset(&trace, 0, sizeof(trace));
+    std::memset(&op_arena, 0xee, sizeof(op_arena));
+    std::memset(alloc_slot0, 0x11, sizeof(alloc_slot0));
+    std::memset(alloc_slot1, 0x22, sizeof(alloc_slot1));
+    std::memset(query_root_arena, 0x55, sizeof(query_root_arena));
+    std::memset(music_buf_arena, 0x66, sizeof(music_buf_arena));
+    std::memset(str_arena, 0x77, sizeof(str_arena));
+    std::memset(mgr_arena, 0, sizeof(mgr_arena));
+    put(mgr_arena + 0x28u, 0x00u, address(lock_arena));
+    for (U k = 0u; k < 32u; ++k) {
+        put(mgr_arena + 0x28u, 0x0cu + k * 4u, 0x99000000u + k);
+    }
+    fixture_heap_state_005e4fe8 = mgr_arena;
+
+    porsche::diagnostic_handler_005debf0 = &porsche::diagnostic_entry_661;
+    porsche::diagnostic_file_005deb74_set(nullptr);
+    porsche::diagnostic_line_005deb78 = 0u;
+    porsche::resource_leaf_group_005df770 = c.group;
+    std::memset(porsche::file_root_006af168, 0, sizeof(porsche::file_root_006af168));
+    std::memset(porsche::file_fallback_006af26c, 0, sizeof(porsche::file_fallback_006af26c));
+    if (c.root != nullptr) {
+        std::snprintf(porsche::file_root_006af168, sizeof(porsche::file_root_006af168), "%s", c.root);
+    }
+    if (c.fallback != nullptr) {
+        std::snprintf(porsche::file_fallback_006af26c, sizeof(porsche::file_fallback_006af26c), "%s", c.fallback);
+    }
+    porsche::file_roots_enabled_006af370 = c.roots_enabled;
+    porsche::missing_file_006afbe4 = c.missing_cb;
+    porsche::audio_resource_query_root_00656ab4 = c.preset_query_root ? address(query_root_arena) : 0u;
+    porsche::audio_probe_viv_prefix_0065b314 = c.viv_prefix;
+}
+
+static void capture_state() {
+    trace.final_op = op_arena;
+    std::memcpy(trace.final_query_root, query_root_arena, sizeof(trace.final_query_root));
+    std::memcpy(trace.final_alloc0, alloc_slot0, sizeof(trace.final_alloc0));
+    std::memcpy(trace.final_alloc1_tail, alloc_slot1 + 0xa80u, sizeof(trace.final_alloc1_tail));
+    // Normalize pointers stored in mgr_arena freelist heads & str_arena[4]
+    for (U k = 0u; k < 32u; ++k) {
+        const U head = word(mgr_arena + 0x28u, 0x0cu + k * 4u);
+        put(mgr_arena + 0x28u, 0x0cu + k * 4u, normalize_ptr(head));
+    }
+    put(str_arena, 0x04u, normalize_ptr(word(str_arena, 0x04u)));
+    std::memcpy(trace.final_mgr, mgr_arena, sizeof(trace.final_mgr));
+    std::memcpy(trace.final_str, str_arena, sizeof(trace.final_str));
+    trace.final_query_root_ptr = normalize_ptr(porsche::audio_resource_query_root_00656ab4);
+    const char* const df = porsche::diagnostic_file_005deb74();
+    trace.final_diag_file_ok = (df != nullptr && std::strcmp(df, orig_str_5bcd00) == 0) ? 1u : 0u;
+    trace.final_diag_line = porsche::diagnostic_line_005deb78;
+    trace.final_group = porsche::resource_leaf_group_005df770;
+    trace.final_missing_cb = normalize_missing_cb(porsche::missing_file_006afbe4);
+    // Normalize pointers in query_root_arena (+0x6c, +0x88)
+    put(trace.final_query_root, 0x6cu, normalize_ptr(word(trace.final_query_root, 0x6cu)));
+    put(trace.final_query_root, 0x88u, normalize_ptr(word(trace.final_query_root, 0x88u)));
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "ABI");
+    require(trace.ret_eax == expected.ret_eax, "EAX");
+    require(trace.count == expected.count, "event count");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0, "event");
+    }
+    require(std::memcmp(&trace.final_op, &expected.final_op, sizeof(trace.final_op)) == 0, "FileOperation");
+    require(std::memcmp(trace.final_query_root, expected.final_query_root, sizeof(trace.final_query_root)) == 0, "query_root");
+    require(std::memcmp(trace.final_alloc0, expected.final_alloc0, sizeof(trace.final_alloc0)) == 0, "alloc0");
+    require(std::memcmp(trace.final_alloc1_tail, expected.final_alloc1_tail, sizeof(trace.final_alloc1_tail)) == 0, "alloc1");
+    require(std::memcmp(trace.final_mgr, expected.final_mgr, sizeof(trace.final_mgr)) == 0, "mgr_arena");
+    require(std::memcmp(trace.final_str, expected.final_str, sizeof(trace.final_str)) == 0, "str_arena");
+    require(trace.final_query_root_ptr == expected.final_query_root_ptr, "00656ab4");
+    require(trace.final_diag_file_ok == expected.final_diag_file_ok, "005deb74");
+    require(trace.final_diag_line == expected.final_diag_line, "005deb78");
+    require(trace.final_group == expected.final_group, "005df770");
+    require(trace.final_missing_cb == expected.final_missing_cb, "006afbe4");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(trace.fpu)) == 0, "FPU");
+    ++cases;
+}
+
+static void check_568b50(
+    const CaseEnv& c, void* handle, U offset, void* buf, std::int32_t size, U group, void* ctx) {
+    setup_env(c);
+    seed_fpu();
+    U eax_orig = 0u;
+    trace.abi_fail = invoke_cdecl6(
+        slot_568b50, address(handle), offset, address(buf), static_cast<U>(size), group, address(ctx), eax_orig);
+    trace.ret_eax = eax_orig;
+    capture_state();
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(c);
+    seed_fpu();
+    U eax_cpp = 0u;
+    trace.abi_fail = invoke_cdecl6(
+        reinterpret_cast<void*>(&porsche::request_read_offset_00568b50),
+        address(handle), offset, address(buf), static_cast<U>(size), group, address(ctx), eax_cpp);
+    trace.ret_eax = eax_cpp;
+    capture_state();
+    capture_fpu(trace.fpu);
+    std::swap(trace, expected);
+    compare_traces();
+}
+
+static void check_533d70(
+    const CaseEnv& c, void* handle, U offset, void* buf, std::int32_t size, U group) {
+    setup_env(c);
+    seed_fpu();
+    U eax_orig = 0u;
+    trace.abi_fail = invoke_cdecl5(
+        slot_533d70, address(handle), offset, address(buf), static_cast<U>(size), group, eax_orig);
+    trace.ret_eax = eax_orig;
+    capture_state();
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(c);
+    seed_fpu();
+    U eax_cpp = 0u;
+    trace.abi_fail = invoke_cdecl5(
+        reinterpret_cast<void*>(&porsche::file_read_offset_00533d70),
+        address(handle), offset, address(buf), static_cast<U>(size), group, eax_cpp);
+    trace.ret_eax = eax_cpp;
+    capture_state();
+    capture_fpu(trace.fpu);
+    std::swap(trace, expected);
+    compare_traces();
+}
+
+static void check_562100(const CaseEnv& c, U group, const char* path, U alloc_flags, U diag_flag) {
+    porsche::ResourceAtomicContext ctx{path, 0xdeadbeefu, alloc_flags, diag_flag};
+    setup_env(c);
+    last_atomic_ctx = &ctx;
+    seed_fpu();
+    U eax_orig = 0u;
+    trace.abi_fail = invoke_cdecl2(slot_562100, group, address(&ctx), eax_orig);
+    trace.ret_eax = normalize_ptr(eax_orig);
+    capture_state();
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    ctx = {path, 0xdeadbeefu, alloc_flags, diag_flag};
+    setup_env(c);
+    last_atomic_ctx = &ctx;
+    seed_fpu();
+    U eax_cpp = 0u;
+    trace.abi_fail = invoke_cdecl2(
+        reinterpret_cast<void*>(&porsche::file_load_bigheader_callback_00562100),
+        group, address(&ctx), eax_cpp);
+    trace.ret_eax = normalize_ptr(eax_cpp);
+    capture_state();
+    capture_fpu(trace.fpu);
+    std::swap(trace, expected);
+    compare_traces();
+}
+
+static void check_562300(const CaseEnv& c, const char* path, U flags) {
+    setup_env(c);
+    seed_fpu();
+    U eax_orig = 0u;
+    trace.abi_fail = invoke_cdecl2(slot_562300, address(path), flags, eax_orig);
+    trace.ret_eax = normalize_ptr(eax_orig);
+    capture_state();
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(c);
+    seed_fpu();
+    U eax_cpp = 0u;
+    trace.abi_fail = invoke_cdecl2(
+        reinterpret_cast<void*>(&porsche::file_load_bigheader_quiet_00562300),
+        address(path), flags, eax_cpp);
+    trace.ret_eax = normalize_ptr(eax_cpp);
+    capture_state();
+    capture_fpu(trace.fpu);
+    std::swap(trace, expected);
+    compare_traces();
+}
+
+static void check_59df70(const CaseEnv& c, const char* name, U flags) {
+    setup_env(c);
+    seed_fpu();
+    U eax_orig = 0u;
+    trace.abi_fail = invoke_cdecl2(slot_59df70, address(name), flags, eax_orig);
+    trace.ret_eax = normalize_ptr(eax_orig);
+    capture_state();
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(c);
+    seed_fpu();
+    U eax_cpp = 0u;
+    trace.abi_fail = invoke_cdecl2(
+        reinterpret_cast<void*>(&porsche::resource_load_bigheader_quiet_0059df70),
+        address(name), flags, eax_cpp);
+    trace.ret_eax = normalize_ptr(eax_cpp);
+    capture_state();
+    capture_fpu(trace.fpu);
+    std::swap(trace, expected);
+    compare_traces();
+}
+
+static void check_4ae100(const CaseEnv& c, std::int32_t first, U second, const char* cfg_name) {
+    setup_env(c);
+    seed_fpu();
+    U eax_orig = 0u;
+    trace.abi_fail = invoke_cdecl3(slot_4ae100, static_cast<U>(first), second, address(cfg_name), eax_orig);
+    trace.ret_eax = 0u;
+    capture_state();
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(c);
+    seed_fpu();
+    U eax_cpp = 0u;
+    trace.abi_fail = invoke_cdecl3(
+        reinterpret_cast<void*>(&porsche::application_audio_probe_configure_004ae100),
+        static_cast<U>(first), second, address(cfg_name), eax_cpp);
+    trace.ret_eax = 0u;
+    capture_state();
+    capture_fpu(trace.fpu);
+    std::swap(trace, expected);
+    compare_traces();
+}
+
+int main() {
+    // Verify production initial state BEFORE fixture resets.
+    require(porsche::audio_probe_viv_prefix_0065b314 == nullptr, "initial 0065b314");
+    require(std::memcmp(porsche::audio_probe_viv_fmt_005d1bf0, orig_str_5d1bf0, sizeof orig_str_5d1bf0) == 0, "005d1bf0");
+    require(std::memcmp(porsche::audio_probe_buffer_name_005d1bfc, orig_str_5d1bfc, sizeof orig_str_5d1bfc) == 0, "005d1bfc");
+    require(std::memcmp(porsche::audio_probe_globals_name_005d1c0c, orig_str_5d1c0c, sizeof orig_str_5d1c0c) == 0, "005d1c0c");
+    require(std::memcmp(porsche::file_load_bigheader_open_err_005bcde4, orig_str_5bcde4, sizeof orig_str_5bcde4) == 0, "005bcde4");
+    require(std::memcmp(porsche::file_load_bigheader_mem_err_005bce14, orig_str_5bce14, sizeof orig_str_5bce14) == 0, "005bce14");
+    require(std::memcmp(porsche::file_load_bigheader_hdr_err_005bce50, orig_str_5bce50, sizeof orig_str_5bce50) == 0, "005bce50");
+
+    load_originals();
+
+    const CaseEnv base_env{
+        {2u, 0x99887766u, false, false, 0x44332211u, true, address(fake_handle_a), 0u, 1u, 0x500u,
+         false, false, 0x12345678u, false, 1u, false, 0x120u, 8u, "C:\\music\\zzz.viv", 0u, false, 0x40u},
+        "R:\\", "F:\\", 0, nullptr, 0x64u, false, "audio/"
+    };
+
+    // 1. request_read_offset_00568b50
+    check_568b50(base_env, fake_handle_a, 0x1234u, io_buf_arena, 0x200, 0x123400ffu, io_ctx_arena);
+    check_568b50(base_env, fake_handle_a + 4, 0u, io_buf_arena + 8, -1, 0x01u, nullptr);
+
+    // 2. file_read_offset_00533d70 (both stub-return and invoking reader -> 00568b50)
+    check_533d70(base_env, fake_handle_a, 0x5500u, io_buf_arena, 0x800, 0x33u);
+    {
+        CaseEnv env = base_env;
+        env.stub.invoke_reader_in_chunks = true;
+        check_533d70(env, fake_handle_a, 0x6600u, io_buf_arena + 4, 0x400, 0x44u);
+    }
+
+    // 3. file_load_bigheader_callback_00562100
+    // 3a. open fail (quiet & loud)
+    {
+        CaseEnv env = base_env;
+        env.stub.open_ok = false;
+        check_562100(env, 10u, "missing.viv", 1u, 0u);
+        check_562100(env, 10u, "missing.viv", 1u, 1u);
+    }
+    // 3b. alloc 0xa90 fail (quiet & loud)
+    {
+        CaseEnv env = base_env;
+        env.stub.alloc_fail_mask = 1u;
+        check_562100(env, 10u, "oom1.viv", 2u, 0u);
+        check_562100(env, 10u, "oom1.viv", 2u, 1u);
+    }
+    // 3c. invalid header kind == 0 (quiet & loud)
+    {
+        CaseEnv env = base_env;
+        env.stub.audio_kind_ret = 0u;
+        check_562100(env, 10u, "badhdr.viv", 3u, 0u);
+        check_562100(env, 10u, "badhdr.viv", 3u, 1u);
+    }
+    // 3d. size <= 0xa90 (0x500 and exact boundary 0xa90)
+    {
+        CaseEnv env = base_env;
+        env.stub.audio_size_ret = 0x500u;
+        check_562100(env, 10u, "small.viv", 4u, 1u);
+        env.stub.audio_size_ret = 0xa90u;
+        check_562100(env, 10u, "exact_a90.viv", 4u, 1u);
+    }
+    // 3e. size > 0xa90 (0xa91 and 0x1400) success + mutate ctx in open
+    {
+        CaseEnv env = base_env;
+        env.stub.audio_size_ret = 0xa91u;
+        check_562100(env, 10u, "grow_1.viv", 5u, 1u);
+        env.stub.audio_size_ret = 0x1400u;
+        env.stub.mutate_ctx_in_open = true;
+        check_562100(env, 10u, "grow_big.viv", 5u, 1u);
+    }
+    // 3f. second alloc fail (quiet & loud)
+    {
+        CaseEnv env = base_env;
+        env.stub.audio_size_ret = 0x1200u;
+        env.stub.alloc_fail_mask = 2u;
+        check_562100(env, 10u, "oom2.viv", 6u, 0u);
+        check_562100(env, 10u, "oom2.viv", 6u, 1u);
+    }
+
+    // 4. file_load_bigheader_quiet_00562300
+    check_562300(base_env, "header_a.viv", 0u);
+    {
+        CaseEnv env = base_env;
+        env.stub.mutate_group_in_device = true;
+        check_562300(env, "header_b.viv", 7u);
+    }
+    {
+        CaseEnv env = base_env;
+        env.stub.invoke_atomic_cb = true;
+        env.stub.audio_size_ret = 0x1000u;
+        check_562300(env, "header_end2end.viv", 9u);
+    }
+
+    // 5. resource_load_bigheader_quiet_0059df70
+    check_59df70(base_env, "unrooted.viv", 0u);
+    {
+        CaseEnv env = base_env;
+        env.roots_enabled = 1;
+        env.stub.exists_mask = 1u;
+        check_59df70(env, "primary.viv", 2u);
+        env.stub.exists_mask = 2u;
+        check_59df70(env, "fallback.viv", 3u);
+        env.stub.exists_mask = 0u;
+        env.missing_cb = &fixture_missing_a;
+        check_59df70(env, "missing_a.viv", 4u);
+        env.stub.mutate_missing_on_exists = true;
+        env.missing_cb = nullptr;
+        check_59df70(env, "missing_mut.viv", 5u);
+        env.fallback = "";
+        env.stub.mutate_missing_on_exists = false;
+        env.missing_cb = &fixture_missing_a;
+        check_59df70(env, "no_fallback.viv", 6u);
+    }
+
+    // 6. application_audio_probe_configure_004ae100
+    // 6a. already initialized (00656ab4 != 0) -> immediate return
+    {
+        CaseEnv env = base_env;
+        env.preset_query_root = true;
+        check_4ae100(env, 0x4000, 1u, "main");
+    }
+    // 6b. globals allocation fails -> stores 0 and returns
+    {
+        CaseEnv env = base_env;
+        env.stub.alloc_fail_mask = 1u;
+        check_4ae100(env, 0x4000, 1u, "main");
+    }
+    // 6c. signed division cases and hdr == 0 vs hdr != 0 and freelist cleanup sizes
+    {
+        CaseEnv env = base_env;
+        env.stub.invoke_atomic_cb = true;
+        env.stub.audio_size_ret = 0x800u;
+        // first = 0x4000, hdr != 0, bytes = 8 (bucket 0)
+        check_4ae100(env, 0x4000, 2u, "race");
+        // first = -1 -> (-1)/1024 == 0 (vs wrong >> 10 == -1)
+        check_4ae100(env, -1, 3u, "neg1");
+        // first = -1025 -> (-1025)/1024 == -1 (vs wrong >> 10 == -2)
+        check_4ae100(env, -1025, 4u, "neg1025");
+        // first = -1024 -> -1
+        check_4ae100(env, -1024, 5u, "neg1024");
+        // hdr == 0 (missing bigheader) -> skips 00566880
+        env.stub.invoke_atomic_cb = false;
+        env.stub.atomic_ret = 0u;
+        check_4ae100(env, 1023, 6u, "nohdr");
+        // freelist boundary: str_bytes == 0x100 (uses pool bucket 31 = 0x88)
+        env.stub.res_open_grow_cap = 0x100u;
+        check_4ae100(env, 1024, 7u, "cap100");
+        // freelist boundary: str_bytes == 0x101 (uses context_table_release_0059ecd0)
+        env.stub.res_open_grow_cap = 0x101u;
+        check_4ae100(env, 2048, 8u, "cap101");
+        // bytes == 0 -> skips cleanup
+        env.stub.res_open_zero_end = true;
+        check_4ae100(env, 0, 9u, "empty");
+    }
+
+    std::printf("bigheader_audio_configure_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

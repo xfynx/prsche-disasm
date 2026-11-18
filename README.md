@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run660](iterations/v2/001-original-recovery/runs/660-loadat-and-stream-advance-integration/README.md)
-  integrates the partial resource loadat/reset and audio stream codec advance providers.
-  The shared build has 77 unresolved names across 377 TUs.
+  [Run663](iterations/v2/001-original-recovery/runs/663-bigheader-configure-and-stream-start-integration/README.md)
+  integrates the partial bigheader/audio probe configure and audio service stream start providers.
+  The shared build has 75 unresolved names across 379 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

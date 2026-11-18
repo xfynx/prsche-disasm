@@ -1,0 +1,219 @@
+{
+  "run": 662,
+  "experiment": "local/experiments/v2-audio-service-stream-start-662",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+    "iterations/v2/001-original-recovery/runs/629-audio-stream-codec-create/audio_stream_codec_create_629.cpp",
+    "iterations/v2/001-original-recovery/runs/565-audio-stream-codec-lifecycle/audio_codec_access_565.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/shared_runtime_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start",
+    "iterations/v2/001-original-recovery/runs/656-audio-stream-codec-refill",
+    "iterations/v2/001-original-recovery/runs/641-audio-stream-codec-leaves",
+    "iterations/v2/001-original-recovery/runs/629-audio-stream-codec-create",
+    "iterations/v2/001-original-recovery/runs/565-audio-stream-codec-lifecycle",
+    "iterations/v2/001-original-recovery/runs/568-audio-greedy-transition",
+    "iterations/v2/001-original-recovery/runs/561-audio-stream-creation",
+    "iterations/v2/001-original-recovery/runs/559-audio-stream-service",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0056b790",
+      "bytes": 105,
+      "sha256": "34f012e052cf9303930d6d75fa23fa7a7ece0b13b24dcf3f9f729288f7d7bfa0",
+      "token": "@BODY_0056B790@"
+    },
+    {
+      "va": "0056b800",
+      "bytes": 91,
+      "sha256": "4aadac1dcbfd0f90cbaea291eda7441848f0a09dc29a99da5bcfeb6889981b5e",
+      "token": "@BODY_0056B800@"
+    },
+    {
+      "va": "0056b690",
+      "bytes": 250,
+      "sha256": "3bf0f6a00ddb6c9fd46f1910c7ef9f5de003e3dc2c5e1bbc503a399c3f22e9eb",
+      "token": "@BODY_0056B690@"
+    },
+    {
+      "va": "0056c040",
+      "bytes": 242,
+      "sha256": "3be6197e4425e92db0b9bf9c6f13c12d7f15baff5d3281c556a3aca77054daef",
+      "token": "@BODY_0056C040@"
+    },
+    {
+      "va": "00567550",
+      "bytes": 267,
+      "sha256": "b9eeaa6a11b9823aee36d503f54fdf85d06b29c71c5f18d423f6f98b4a64e76c",
+      "token": "@BODY_00567550@"
+    },
+    {
+      "va": "005a28a0",
+      "bytes": 254,
+      "sha256": "0318574df8288c6fc0e543c779d4c1098344731f9acf2a7c790c2176ab7bdf4c",
+      "token": "@BODY_005A28A0@"
+    },
+    {
+      "va": "005bdbd0",
+      "bytes": 42,
+      "sha256": "f16642d8073b00a3dd33119252b5800e743e347af8475723b1d6093c952a1301",
+      "token": "@STR_005BDBD0@"
+    },
+    {
+      "va": "005bdd04",
+      "bytes": 41,
+      "sha256": "084a9d1dd6854d67d9fadeb9107ee274e94b6005e833dfb0e1fea220db513089",
+      "token": "@STR_005BDD04@"
+    },
+    {
+      "va": "005bd978",
+      "bytes": 19,
+      "sha256": "4a87a432224df5a492d35a98ba89e025b801e4b1689c7d6555884b6d00829034",
+      "token": "@STR_005BD978@"
+    }
+  ],
+  "pass_marker": "audio_service_stream_start_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-alloc-serial-wrap",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "    if (audio_stream_request_serial_006a5df0 == 0u) {\n        audio_stream_request_serial_006a5df0 = 0x100u;\n    }",
+      "new": "    if (audio_stream_request_serial_006a5df0 == 0u) {\n        audio_stream_request_serial_006a5df0 = 0x200u;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-mask-lowbyte",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "    const U id_word = (read_u32(req_va + 0x00u) & 0xffu) | audio_stream_request_serial_006a5df0;",
+      "new": "    const U id_word = (read_u32(req_va + 0x00u) & 0xf0u) | audio_stream_request_serial_006a5df0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-enqueue-empty-tail",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "        write_u32(codec_va + 0x50u, req_va);",
+      "new": "        write_u32(codec_va + 0x50u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-enqueue-nonempty-next",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "        write_u32(tail_va + 0x0cu, req_va);",
+      "new": "        write_u32(tail_va + 0x08u, req_va);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-queuefile-diag-line",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "        report_stream_error(0x617u, stream_err_queuefile_invalid_005bdbd0);",
+      "new": "        report_stream_error(0x616u, stream_err_queuefile_invalid_005bdbd0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-queuefile-strncpy-pad",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "    for (; i < 0x103u; ++i) {\n        dst[i] = '\\0';\n    }",
+      "new": "    for (; i < 0x102u; ++i) {\n        dst[i] = '\\0';\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-queuefile-state28-guard",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "    if (prev_state28 == 0u) {\n        const U advance_offset =",
+      "new": "    if (prev_state28 != 0u) {\n        const U advance_offset =",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-queuefile-offset-branch",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "        const U advance_offset = (read_u32(codec_va + 0x38u) != 0u)",
+      "new": "        const U advance_offset = (read_u32(codec_va + 0x38u) == 0u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-queuemem-diag-line",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "        report_stream_error(0x677u, stream_err_queuemem_invalid_005bdd04);",
+      "new": "        report_stream_error(0x676u, stream_err_queuemem_invalid_005bdd04);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-queuemem-size0-scan",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "        resolved_size += read_u32(cursor_va + 0x04u);",
+      "new": "        resolved_size += 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-queuemem-advance-offset",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "        audio_stream_codec_advance_0056b860(ptr_from_va(codec_va), 0u);",
+      "new": "        audio_stream_codec_advance_0056b860(ptr_from_va(codec_va), 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-start-inactive-ret",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "        return -10;",
+      "new": "        return -8;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-start-max-slots-ret",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "        return -13;",
+      "new": "        return -1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-start-signed-slots",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "    const std::int8_t cur_slots = static_cast<std::int8_t>(read_u8(chan_va + 0x16u));\n    if (cur_slots >= max_slots) {",
+      "new": "    const std::uint8_t cur_slots = read_u8(chan_va + 0x16u);\n    if (static_cast<I>(cur_slots) >= static_cast<I>(max_slots)) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-start-entry-stride",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "        static_cast<U>(static_cast<I>(slot_idx) * 0x2c);",
+      "new": "        static_cast<U>(static_cast<I>(slot_idx) * 0x28);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-start-serial-clamp",
+      "source": "iterations/v2/001-original-recovery/runs/662-audio-service-stream-start/audio_service_stream_start_662.cpp",
+      "old": "    write_u32(chan_va + 0x10u, (static_cast<I>(next_serial) < 0) ? 0u : next_serial);",
+      "new": "    write_u32(chan_va + 0x10u, next_serial);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
