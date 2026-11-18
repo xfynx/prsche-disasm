@@ -1,0 +1,130 @@
+{
+  "run": 680,
+  "functions": [
+    "input_effect_download_005337a0",
+    "frame_control_slot_unload_005337e0",
+    "frame_control_slot_find_free_00533730",
+    "frame_control_slot_download_00533760",
+    "input_slot_reset_ff_00533120",
+    "render_pixel_offset_00574080"
+  ],
+  "originals": [
+    {
+      "function": "input_effect_download_005337a0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (InputDevice* device, void* effect; ret 0; returns std::uint32_t HRESULT in EAX)",
+      "entry": "005337a0",
+      "body_ranges_inclusive": [["005337a0", "005337d5"]],
+      "body_bytes": 54,
+      "body_sha256": "13ffa3575fa1d624aec46646897b1603ecd0414b7ddadff186fecb88382fb8b8",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 1 site in references.jsonl (00533797 in 00533760); pure leaf calling effect->vtable+0x28(effect) __stdcall, and on HRESULT 0x8007000c / 0x8007001e / 0x80040205 calling device->vtable+0x1c(device) __stdcall and retrying effect->vtable+0x28 if Acquire returns 0."
+    },
+    {
+      "function": "frame_control_slot_unload_005337e0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (std::int32_t slot; ret 0; void)",
+      "entry": "005337e0",
+      "body_ranges_inclusive": [["005337e0", "00533808"]],
+      "body_bytes": 41,
+      "body_sha256": "729e54831f5b08e458efe17a371a89948d7e24810e5ffb33554be36dcd2ecfbc",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 2 sites in references.jsonl (00533427 in 005333a0, 005336d7 in 005334e0); checks signed 0 <= slot < 32 and frame_control_slot_fields_494[slot].state (0069cb9c+0x90*slot) != -1, then calls effect->vtable+0x2c(effect) __stdcall with frame_control_slot_fields_494[slot].device (0069cb98+0x90*slot)."
+    },
+    {
+      "function": "frame_control_slot_find_free_00533730",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (void; ret 0; returns std::int32_t slot 0..31 or -1 in EAX)",
+      "entry": "00533730",
+      "body_ranges_inclusive": [["00533730", "00533757"]],
+      "body_bytes": 40,
+      "body_sha256": "69fb99b3f22fb589c6536b7d5413982e8f6f51a7f354d7c2d198c09430fac004",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 1 site in references.jsonl (005334e7 in 005334e0); scans 0069cb9c..0069dd9c stride 0x90 (frame_control_slot_fields_494[0..31].state) and returns the first index whose state == 0xffffffffu (-1), or -1 if none."
+    },
+    {
+      "function": "frame_control_slot_download_00533760",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (std::int32_t slot; ret 0; void)",
+      "entry": "00533760",
+      "body_ranges_inclusive": [["00533760", "0053379f"]],
+      "body_bytes": 64,
+      "body_sha256": "f1246a45e78d67fe871c523e64374004887a7dc6f4f4a8c0770fac08952ceb67",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 3 sites in references.jsonl (0053345d in 005333a0, 00533acf and 00533afb in 00533910); checks signed 0 <= slot < 32 and frame_control_slot_fields_494[slot].state != -1, then calls input_effect_download_005337a0(input_slots_006be040[state].device, effect)."
+    },
+    {
+      "function": "input_slot_reset_ff_00533120",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (std::int32_t slot_index; ret 0; returns std::uint32_t HRESULT in EAX)",
+      "entry": "00533120",
+      "body_ranges_inclusive": [["00533120", "0053315b"]],
+      "body_bytes": 60,
+      "body_sha256": "e6ef39a088246bf5a9cf19083ab22b119035194f24aeccef74855a4d4b55ee04",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 2 sites in references.jsonl (005330ef in 005330a0 checking EAX == 0, and 005331d1 in 005331a0); clears frame_control_slot_fields_494[i].state = 0xffffffffu across all 32 slots matching slot_index, then returns input_device_ff_command_00533160(input_slots_006be040[slot_index].device, 1u)."
+    },
+    {
+      "function": "render_pixel_offset_00574080",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (std::int32_t x, std::int32_t y; ret 0; returns std::int32_t byte offset in EAX)",
+      "entry": "00574080",
+      "body_ranges_inclusive": [["00574080", "0057409c"]],
+      "body_bytes": 29,
+      "body_sha256": "ba6fc95f4e370e8f4706ebf4d0a5dca0b24336a29e6e1afc0e7d51769ddce706",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 3 sites in references.jsonl (00562aab in 00562810, 00563707 in 00563440, 00571805 in 00571630); pure leaf computing (sar(uint8(005de62e) * x, 3) + dword(005de644) * y) inside existing 48B zero-initialized .data descriptor window_shutdown_config_005de620[12] (005de620..005de64f)."
+    }
+  ],
+  "owned_rdata": [],
+  "owned_data": [],
+  "owned_bss": [],
+  "reused_canonical_symbols": [
+    {
+      "name": "frame_control_slot_fields_494",
+      "va": "0069cb90",
+      "declaration_header": "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/render_resource_494.hpp",
+      "provider_source": "iterations/v2/001-original-recovery/runs/494-render-resource-leaves/render_resource_494.cpp"
+    },
+    {
+      "name": "input_slots_006be040",
+      "va": "006be040",
+      "declaration_header": "iterations/v2/001-original-recovery/source/include/porsche/input_state.hpp",
+      "provider_source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/input_state.cpp"
+    },
+    {
+      "name": "input_device_ff_command_00533160",
+      "va": "00533160",
+      "declaration_header": "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves/startup_input_slot_math_676.hpp",
+      "provider_source": "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves/startup_input_slot_math_676.cpp"
+    },
+    {
+      "name": "window_shutdown_config_005de620",
+      "va": "005de620",
+      "range_inclusive": ["005de620", "005de64f"],
+      "bytes": 48,
+      "initial_value_note": "Raw .data bytes 005de620..005de64f (including 005de62e and 005de644) are all 0x00 in Porsche.exe; already owned by window_shutdown_config_005de620[12].",
+      "declaration_header": "iterations/v2/001-original-recovery/source/include/porsche/window_shutdown.hpp",
+      "provider_source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/window_shutdown.cpp"
+    }
+  ],
+  "scope_boundary": "PARTIAL: Bounded native x86-vs-C++ proof for 005337a0, 005337e0, 00533730, 00533760, 00533120, and 00574080, exercising COM effect Download/Unload and device Acquire retry with dynamic vtable swaps, frame_control_slot_fields_494 slot bounds and state scans with padding/active/device preservation, 00533120 pre-call state clearing and controlled 00533160 transport, and 00574080 signed arithmetic shift and wraparound offset arithmetic on window_shutdown_config_005de620; out-of-bounds input slot indices (< 0 or >= 32 in 00533120 or via unguarded frame_control_slot_fields_494[slot].state in 00533760), null/unmapped COM object pointers, live DirectInput hardware devices, real 00533160 body chaining, concurrent mutation, and production CMake/registry integration remain open."
+}

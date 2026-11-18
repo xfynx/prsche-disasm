@@ -1,0 +1,690 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "render_clock_calibration_679.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using I64 = std::int64_t;
+using U64 = std::uint64_t;
+using B = std::uint8_t;
+
+namespace porsche {
+std::uint32_t copy_flag_005deb10 = 1u;
+std::uint32_t timer_rate_005deb48 = 0u;
+std::uint32_t clock_worker_iterations_006b7c7c = 0u;
+} // namespace porsche
+
+enum : U {
+    kMaxEvents = 64u,
+};
+
+enum EventKind : U {
+    kEvQpf = 1u,
+    kEvQpc = 2u,
+    kEvWait = 3u,
+    kEvClock = 4u,
+};
+
+struct Event {
+    U kind;
+    U a0;
+    U a1;
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U df_nonzero;
+    I ret_i32;
+    U qpf_calls;
+    U qpc_calls;
+    U qpc_null_seen;
+    U count;
+    Event events[kMaxEvents];
+    U flag_p6;
+    U flag_rdtsc;
+    U flag_pentium;
+    U flag_cyrix;
+    U flag_amd;
+    U timer_rate;
+    U clock_iter;
+    FpuSnapshot fp;
+};
+
+enum QpcMode : U {
+    kQpcStepEveryCall = 0u,
+    kQpcScriptedPerIter = 1u,
+    kQpcTimeoutLoop1Iter0 = 2u,
+    kQpcTimeoutLoop2Iter0 = 3u,
+};
+
+struct StubCfg {
+    I64 qpf_freq;
+    I qpf_ret;
+    U qpc_mode;
+    U qpc_step;
+    U qpc_equal_polls;
+    U qpc_neg_polls;
+    U log_qpc;
+};
+
+alignas(16) static B fp_area[512] = {};
+static B fp_env[28] = {};
+
+static B* code = nullptr;
+static B* slot_555a10 = nullptr;
+static B* slot_555fa0 = nullptr;
+static B* slot_5560b0 = nullptr;
+
+static void* iat_qpf = nullptr;
+static void* iat_qpc = nullptr;
+
+alignas(16) static B rdata_5b3f30[4] = {@RDATA_005B3F30@};
+alignas(16) static B rdata_5b2468[4] = {@RDATA_005B2468@};
+alignas(16) static B rdata_5b2408[4] = {@RDATA_005B2408@};
+alignas(16) static B rdata_5bc374[4] = {@RDATA_005BC374@};
+alignas(16) static B rdata_5bc370[4] = {@RDATA_005BC370@};
+alignas(16) static B rdata_5b27a4[4] = {@RDATA_005B27A4@};
+alignas(16) static B rdata_5b24a8[4] = {@RDATA_005B24A8@};
+alignas(16) static B rdata_5b24c0[8] = {@RDATA_005B24C0@};
+alignas(16) static B rdata_5bc368[8] = {@RDATA_005BC368@};
+alignas(16) static B rdata_5bc3d8[4] = {@RDATA_005BC3D8@};
+alignas(16) static B rdata_5bc3dc[4] = {@RDATA_005BC3DC@};
+alignas(16) static B rdata_5bc3e0[4] = {@RDATA_005BC3E0@};
+alignas(16) static B rdata_5bc3e4[4] = {@RDATA_005BC3E4@};
+alignas(16) static B rdata_5bc3e8[4] = {@RDATA_005BC3E8@};
+alignas(16) static B rdata_5bc3ec[4] = {@RDATA_005BC3EC@};
+
+static StubCfg cfg{};
+static U qpc_counter_val = 0u;
+static U qpc_base_val = 0u;
+static U qpc_phase = 0u;
+static U qpc_iter_polls = 0u;
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu() {
+    const unsigned short cw = 0x037fu;
+    const U mx = 0x1f80u;
+    __asm {
+        fninit
+        fldcw cw
+        ldmxcsr mx
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    std::memset(fp_area, 0, sizeof fp_area);
+    __asm {
+        fxsave fp_area
+        fnstenv fp_env
+        fldenv fp_env
+    }
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((static_cast<U>(fp.status) >> 11u) + i) & 7u;
+        if ((fp_area[4u] & (1u << physical)) != 0u) {
+            std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        }
+    }
+}
+
+static void push_event(U kind, U a0 = 0u, U a1 = 0u) {
+    if (trace.count < kMaxEvents) {
+        Event& ev = trace.events[trace.count++];
+        ev.kind = kind;
+        ev.a0 = a0;
+        ev.a1 = a1;
+    }
+}
+
+static I __stdcall stub_qpf(I64* frequency) {
+    ++trace.qpf_calls;
+    require(frequency != nullptr, "qpf frequency nonnull");
+    *frequency = cfg.qpf_freq;
+    push_event(kEvQpf, static_cast<U>(cfg.qpf_freq), static_cast<U>(cfg.qpf_ret));
+    return cfg.qpf_ret;
+}
+
+static I __stdcall stub_qpc(I64* performance_count) {
+    ++trace.qpc_calls;
+    if (performance_count == nullptr) {
+        trace.qpc_null_seen = 1u;
+        return 0;
+    }
+
+    U out_low = 0u;
+    if (cfg.qpc_mode == kQpcStepEveryCall) {
+        qpc_counter_val += cfg.qpc_step;
+        out_low = qpc_counter_val;
+    } else if (cfg.qpc_mode == kQpcScriptedPerIter) {
+        // Phase 0: initial start_qpc
+        // Phase 1: poll loop 1 (equal_polls equal, neg_polls negative, then +1)
+        // Phase 2: t0_qpc
+        // Phase 3: poll loop 2 (equal_polls equal, neg_polls negative, then +step)
+        if (qpc_phase == 0u) {
+            qpc_counter_val += 100u;
+            qpc_base_val = qpc_counter_val;
+            out_low = qpc_base_val;
+            qpc_iter_polls = 0u;
+            qpc_phase = 1u;
+        } else if (qpc_phase == 1u) {
+            if (qpc_iter_polls < cfg.qpc_equal_polls) {
+                out_low = qpc_base_val;
+                ++qpc_iter_polls;
+            } else if (qpc_iter_polls < cfg.qpc_equal_polls + cfg.qpc_neg_polls) {
+                out_low = qpc_base_val - 2u;
+                ++qpc_iter_polls;
+            } else {
+                qpc_counter_val = qpc_base_val + 1u;
+                out_low = qpc_counter_val;
+                qpc_phase = 2u;
+            }
+        } else if (qpc_phase == 2u) {
+            qpc_counter_val += 10u;
+            qpc_base_val = qpc_counter_val;
+            out_low = qpc_base_val;
+            qpc_iter_polls = 0u;
+            qpc_phase = 3u;
+        } else {
+            if (qpc_iter_polls < cfg.qpc_equal_polls) {
+                out_low = qpc_base_val;
+                ++qpc_iter_polls;
+            } else if (qpc_iter_polls < cfg.qpc_equal_polls + cfg.qpc_neg_polls) {
+                out_low = qpc_base_val - 3u;
+                ++qpc_iter_polls;
+            } else {
+                qpc_counter_val = qpc_base_val + cfg.qpc_step;
+                out_low = qpc_counter_val;
+                qpc_phase = 0u;
+            }
+        }
+    } else if (cfg.qpc_mode == kQpcTimeoutLoop1Iter0) {
+        if (trace.qpc_calls <= 1000001u) {
+            out_low = 0x1000u;
+        } else {
+            qpc_counter_val += cfg.qpc_step;
+            out_low = qpc_counter_val;
+        }
+    } else if (cfg.qpc_mode == kQpcTimeoutLoop2Iter0) {
+        if (trace.qpc_calls == 1u) {
+            out_low = 0x1000u;
+        } else if (trace.qpc_calls == 2u) {
+            out_low = 0x1001u;
+        } else if (trace.qpc_calls <= 1000003u) {
+            out_low = 0x2000u;
+        } else {
+            qpc_counter_val += cfg.qpc_step;
+            out_low = qpc_counter_val;
+        }
+    }
+
+    *performance_count =
+        (static_cast<I64>(0x12345678u) << 32) | static_cast<I64>(out_low);
+    if (cfg.log_qpc != 0u) {
+        push_event(kEvQpc, out_low, 0u);
+    }
+    return static_cast<I>(out_low ^ 0x5a5a0001u);
+}
+
+namespace porsche {
+void __cdecl application_audio_wait_0053c380(std::int32_t interval) {
+    push_event(kEvWait, static_cast<U>(interval), 0u);
+}
+
+std::uint32_t __cdecl audio_probe_clock_0053c2e0() {
+    push_event(kEvClock, clock_worker_iterations_006b7c7c, 0u);
+    return 0x13572468u;
+}
+} // namespace porsche
+
+static void __cdecl stub_wait_orig(I interval) {
+    porsche::application_audio_wait_0053c380(interval);
+}
+
+static U __cdecl stub_clock_orig() {
+    return porsche::audio_probe_clock_0053c2e0();
+}
+
+static I invoke_cdecl0(void* fn, FpuSnapshot& fp_out, U& abi_fail, U& df_bad) {
+    I out = 0;
+    U fail = 0u;
+    U df = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        pushfd
+        pop eax
+        test eax, 00000400h
+        jz df_ok
+        mov df, 1
+df_ok:
+        cld
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    df_bad = df;
+    return out;
+}
+
+static I invoke_cdecl1(void* fn, U arg0, FpuSnapshot& fp_out, U& abi_fail, U& df_bad) {
+    I out = 0;
+    U fail = 0u;
+    U df = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 4
+        pushfd
+        pop eax
+        test eax, 00000400h
+        jz df_ok
+        mov df, 1
+df_ok:
+        cld
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    df_bad = df;
+    return out;
+}
+
+static void relocate_abs(B* p, U n, U old_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 4u <= n; ++i) {
+        if (rd(p, i) == old_va) {
+            wr(p, i, replacement);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected_count, "abs relocation count");
+}
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+static void init_fixture() {
+    static const B body_555a10[431] = {@BODY_00555A10@};
+    static const B body_555fa0[270] = {@BODY_00555FA0@};
+    static const B body_5560b0[278] = {@BODY_005560B0@};
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_555a10 = code + 0x000u;
+    slot_555fa0 = code + 0x200u;
+    slot_5560b0 = code + 0x380u;
+
+    std::memcpy(slot_555a10, body_555a10, sizeof body_555a10);
+    std::memcpy(slot_555fa0, body_555fa0, sizeof body_555fa0);
+    std::memcpy(slot_5560b0, body_5560b0, sizeof body_5560b0);
+
+    // 00555a10 relocations (18 total .rdata refs)
+    relocate_abs(slot_555a10, sizeof body_555a10, 0x005b3f30u, address(rdata_5b3f30), 1u);
+    relocate_abs(slot_555a10, sizeof body_555a10, 0x005b2468u, address(rdata_5b2468), 3u);
+    relocate_abs(slot_555a10, sizeof body_555a10, 0x005b2408u, address(rdata_5b2408), 1u);
+    relocate_abs(slot_555a10, sizeof body_555a10, 0x005bc374u, address(rdata_5bc374), 1u);
+    relocate_abs(slot_555a10, sizeof body_555a10, 0x005bc370u, address(rdata_5bc370), 1u);
+    relocate_abs(slot_555a10, sizeof body_555a10, 0x005b27a4u, address(rdata_5b27a4), 3u);
+    relocate_abs(slot_555a10, sizeof body_555a10, 0x005b24c0u, address(rdata_5b24c0), 3u);
+    relocate_abs(slot_555a10, sizeof body_555a10, 0x005bc368u, address(rdata_5bc368), 3u);
+    relocate_abs(slot_555a10, sizeof body_555a10, 0x005b24a8u, address(rdata_5b24a8), 2u);
+
+    // 00555fa0 relocations (IAT slots + 005deb24)
+    iat_qpf = reinterpret_cast<void*>(&stub_qpf);
+    iat_qpc = reinterpret_cast<void*>(&stub_qpc);
+    relocate_abs(slot_555fa0, sizeof body_555fa0, 0x005b214cu, address(&iat_qpf), 1u);
+    relocate_abs(slot_555fa0, sizeof body_555fa0, 0x005b2154u, address(&iat_qpc), 1u);
+    relocate_abs(
+        slot_555fa0, sizeof body_555fa0, 0x005deb24u, address(&porsche::cpu_has_rdtsc_005deb24), 2u);
+
+    // 005560b0 relocations (calls + globals + .rdata)
+    relocate_rel(slot_5560b0, sizeof body_5560b0, 0x005560b0u, 0x0053c380u,
+                 address(reinterpret_cast<void*>(&stub_wait_orig)), 1u);
+    relocate_rel(slot_5560b0, sizeof body_5560b0, 0x005560b0u, 0x0053c2e0u,
+                 address(reinterpret_cast<void*>(&stub_clock_orig)), 1u);
+    relocate_abs(
+        slot_5560b0, sizeof body_5560b0, 0x005deb48u, address(&porsche::timer_rate_005deb48), 1u);
+    relocate_abs(slot_5560b0, sizeof body_5560b0, 0x006b7c7cu,
+                 address(&porsche::clock_worker_iterations_006b7c7c), 2u);
+    relocate_abs(
+        slot_5560b0, sizeof body_5560b0, 0x005deb38u, address(&porsche::cpu_is_amd_005deb38), 1u);
+    relocate_abs(
+        slot_5560b0, sizeof body_5560b0, 0x005deb14u, address(&porsche::cpu_has_p6_005deb14), 1u);
+    relocate_abs(
+        slot_5560b0, sizeof body_5560b0, 0x005deb10u, address(&porsche::copy_flag_005deb10), 1u);
+    relocate_abs(
+        slot_5560b0, sizeof body_5560b0, 0x005deb34u, address(&porsche::cpu_is_cyrix_005deb34), 1u);
+    relocate_abs(slot_5560b0, sizeof body_5560b0, 0x005bc3d8u, address(rdata_5bc3d8), 1u);
+    relocate_abs(slot_5560b0, sizeof body_5560b0, 0x005bc3dcu, address(rdata_5bc3dc), 1u);
+    relocate_abs(slot_5560b0, sizeof body_5560b0, 0x005bc3e0u, address(rdata_5bc3e0), 1u);
+    relocate_abs(slot_5560b0, sizeof body_5560b0, 0x005bc3e4u, address(rdata_5bc3e4), 1u);
+    relocate_abs(slot_5560b0, sizeof body_5560b0, 0x005bc3e8u, address(rdata_5bc3e8), 1u);
+    relocate_abs(slot_5560b0, sizeof body_5560b0, 0x005bc3ecu, address(rdata_5bc3ec), 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+}
+
+static void capture_globals() {
+    trace.flag_p6 = porsche::cpu_has_p6_005deb14;
+    trace.flag_rdtsc = porsche::cpu_has_rdtsc_005deb24;
+    trace.flag_pentium = porsche::copy_flag_005deb10;
+    trace.flag_cyrix = porsche::cpu_is_cyrix_005deb34;
+    trace.flag_amd = porsche::cpu_is_amd_005deb38;
+    trace.timer_rate = porsche::timer_rate_005deb48;
+    trace.clock_iter = porsche::clock_worker_iterations_006b7c7c;
+}
+
+static void assert_traces_match(bool check_events) {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    require(expected.df_nonzero == 0u, "original df nonzero");
+    require(trace.df_nonzero == 0u, "cpp df nonzero");
+    require(trace.ret_i32 == expected.ret_i32, "return i32");
+    require(trace.qpf_calls == expected.qpf_calls, "qpf call count");
+    require(trace.qpc_calls == expected.qpc_calls, "qpc call count");
+    require(trace.qpc_null_seen == expected.qpc_null_seen, "qpc null");
+    if (check_events) {
+        require(trace.count == expected.count, "event count");
+        require(std::memcmp(trace.events, expected.events, trace.count * sizeof(Event)) == 0,
+                "event trace");
+    }
+    require(trace.flag_p6 == expected.flag_p6, "flag p6");
+    require(trace.flag_rdtsc == expected.flag_rdtsc, "flag rdtsc");
+    require(trace.flag_pentium == expected.flag_pentium, "flag pentium");
+    require(trace.flag_cyrix == expected.flag_cyrix, "flag cyrix");
+    require(trace.flag_amd == expected.flag_amd, "flag amd");
+    require(trace.timer_rate == expected.timer_rate, "timer rate");
+    require(trace.clock_iter == expected.clock_iter, "clock iter");
+    require(trace.fp.control == expected.fp.control, "fpu control");
+    require((expected.fp.status & 0x3800u) == 0u && (trace.fp.status & 0x3800u) == 0u,
+            "fpu TOP");
+    require(expected.fp.tag == 0xffffu && trace.fp.tag == 0xffffu, "fpu empty tag");
+    require((trace.fp.mxcsr & ~0x3fu) == (expected.fp.mxcsr & ~0x3fu), "fpu mxcsr control");
+    require(std::memcmp(trace.fp.values, expected.fp.values, sizeof trace.fp.values) == 0,
+            "fpu stack values");
+}
+
+static void run_quantize(I raw_hz) {
+    ++cases;
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::render_clock_quantize_hz_00555a10);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        std::memset(&trace, 0, sizeof trace);
+        void* const fn = (side == 0u) ? slot_555a10 : cpp_fn;
+        trace.ret_i32 = invoke_cdecl1(fn, static_cast<U>(raw_hz), trace.fp, trace.abi_fail, trace.df_nonzero);
+        capture_globals();
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match(false);
+}
+
+static void run_qpc_rdtsc(U rdtsc_flag, const StubCfg& c) {
+    ++cases;
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::render_clock_measure_qpc_rdtsc_00555fa0);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        cfg = c;
+        qpc_counter_val = 0x1000u;
+        qpc_base_val = 0u;
+        qpc_phase = 0u;
+        qpc_iter_polls = 0u;
+        porsche::cpu_has_rdtsc_005deb24 = rdtsc_flag;
+        std::memset(&trace, 0, sizeof trace);
+        void* const fn = (side == 0u) ? slot_555fa0 : cpp_fn;
+        trace.ret_i32 = invoke_cdecl0(fn, trace.fp, trace.abi_fail, trace.df_nonzero);
+        capture_globals();
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match(c.log_qpc != 0u);
+}
+
+static void run_div_loop(
+    U amd, U p6, U pentium, U cyrix, U timer_rate, U clock_iter) {
+    ++cases;
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::render_clock_measure_div_loop_005560b0);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        porsche::cpu_is_amd_005deb38 = amd;
+        porsche::cpu_has_p6_005deb14 = p6;
+        porsche::copy_flag_005deb10 = pentium;
+        porsche::cpu_is_cyrix_005deb34 = cyrix;
+        porsche::timer_rate_005deb48 = timer_rate;
+        porsche::clock_worker_iterations_006b7c7c = clock_iter;
+        std::memset(&trace, 0, sizeof trace);
+        void* const fn = (side == 0u) ? slot_5560b0 : cpp_fn;
+        trace.ret_i32 = invoke_cdecl0(fn, trace.fp, trace.abi_fail, trace.df_nonzero);
+        capture_globals();
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match(true);
+}
+
+int main(int argc, char**) {
+    if (argc < 1) {
+        return 2;
+    }
+    AddVectoredExceptionHandler(1u, fault_handler);
+
+    // Production initial state checks before fixture mutations.
+    require(porsche::cpu_has_p6_005deb14 == 0u, "initial 005deb14 == 0");
+    require(porsche::cpu_has_rdtsc_005deb24 == 1u, "initial 005deb24 == 1");
+    require(porsche::cpu_is_cyrix_005deb34 == 0u, "initial 005deb34 == 0");
+    require(porsche::cpu_is_amd_005deb38 == 0u, "initial 005deb38 == 0");
+    require(porsche::render_clock_query_performance_frequency != nullptr, "default qpf nonnull");
+    require(porsche::render_clock_query_performance_counter != nullptr, "default qpc nonnull");
+    {
+        I64 host_freq = 0;
+        I64 host_cnt = 0;
+        require(porsche::render_clock_query_performance_frequency(&host_freq) != 0 && host_freq > 0,
+                "default host qpf");
+        require(porsche::render_clock_query_performance_counter(&host_cnt) != 0, "default host qpc");
+    }
+
+    init_fixture();
+    porsche::render_clock_query_performance_frequency = stub_qpf;
+    porsche::render_clock_query_performance_counter = stub_qpc;
+
+    // 1. 00555a10: rounding boundaries, thresholds (52, 188, 292, 392), and MHz sweep.
+    static const I raw_boundaries[] = {
+        static_cast<I>(0x80000000u),
+        -2147000000,
+        -1924000000,
+        -1920000000,
+        -960000000,
+        -487000000,
+        -500001,
+        -500000,
+        -499999,
+        -1,
+        0,
+        499999,
+        500000,
+        500001,
+        0x7ff85edf,
+        0x7ff85ee0,
+        0x7fffffff,
+    };
+    for (I raw_hz : raw_boundaries) {
+        run_quantize(raw_hz);
+    }
+    for (I mhz = 0; mhz <= 600; ++mhz) {
+        run_quantize(mhz * 1000000);
+    }
+    for (I mhz = 633; mhz <= 2147; mhz += 33) {
+        run_quantize(mhz * 1000000);
+    }
+    run_quantize(2131000000);
+
+    // 2. 00555fa0: deterministic QPF/QPC with 005deb24 == 0 and 005deb24 != 0.
+    for (U rdtsc_flag : {0u, 1u, 0x80000000u}) {
+        run_qpc_rdtsc(rdtsc_flag, StubCfg{10000000, 1, kQpcStepEveryCall, 2000000u, 0u, 0u, 1u});
+        run_qpc_rdtsc(rdtsc_flag, StubCfg{5, 0, kQpcStepEveryCall, 1u, 0u, 0u, 1u});
+        run_qpc_rdtsc(rdtsc_flag, StubCfg{4, 1, kQpcStepEveryCall, 1u, 0u, 0u, 1u});
+        run_qpc_rdtsc(rdtsc_flag, StubCfg{0, 1, kQpcStepEveryCall, 1u, 0u, 0u, 1u});
+        run_qpc_rdtsc(rdtsc_flag, StubCfg{-10, 1, kQpcStepEveryCall, 1u, 0u, 0u, 1u});
+        run_qpc_rdtsc(rdtsc_flag,
+                      StubCfg{(static_cast<I64>(0x77777777u) << 32) | 25LL, 1,
+                              kQpcScriptedPerIter, 5u, 2u, 2u, 1u});
+    }
+    // Timeout countdown (0xf4240 = 1,000,000) in wait loop 1 and wait loop 2.
+    run_qpc_rdtsc(0u, StubCfg{5, 1, kQpcTimeoutLoop1Iter0, 1u, 0u, 0u, 0u});
+    run_qpc_rdtsc(0u, StubCfg{5, 1, kQpcTimeoutLoop2Iter0, 1u, 0u, 0u, 0u});
+
+    // 3. 005560b0: 5-iteration calibration with controlled 0053c380/0053c2e0 and timer_rate <= 3.
+    static const U flag_combos[7][4] = {
+        {1u, 1u, 1u, 1u},
+        {0u, 1u, 1u, 1u},
+        {0u, 0u, 1u, 1u},
+        {0u, 0u, 0u, 1u},
+        {0u, 0u, 0u, 0u},
+        {0x80000000u, 0u, 0u, 0u},
+        {0u, 0x00000002u, 0u, 0u},
+    };
+    static const U timer_rates[] = {
+        0u, 1u, 2u, 3u, 0xffffffffu, 0xfffffffcu, 0x80000000u,
+    };
+    for (const auto& fc : flag_combos) {
+        for (U rate : timer_rates) {
+            run_div_loop(fc[0], fc[1], fc[2], fc[3], rate, 0x12345678u);
+        }
+    }
+    run_div_loop(0u, 1u, 0u, 0u, 0u, 0xffffffffu);
+
+    std::printf("render_clock_calibration_leaves_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

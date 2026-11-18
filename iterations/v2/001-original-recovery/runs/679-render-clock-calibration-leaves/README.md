@@ -1,0 +1,23 @@
+# Run679 render clock calibration leaves (`00555a10`, `00555fa0`, `005560b0`)
+
+Bounded native x86-vs-C++ recovery proof for the three `render_clock_00555bc0` calibration leaves (`Porsche.exe` SHA-256 `ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39`, 979 code bytes total):
+- `porsche::render_clock_quantize_hz_00555a10` (`00555a10..00555bbe`, 431B, `__cdecl`, sha256 `04a8a1f971ea358675fe14290e9a8f3ccc27d9f60729afec703f61d3bac8f39d`): computes `mhz = (raw_hz + 500000) / 1000000`, picks step `75.0f` (`mhz <= 292`) or `50.0f`, snaps `mhz` to multiples of `30`, `33.333332f`, and `step` using `fistp`-matching round-to-nearest-even, scores weighted errors (penalizing underestimation by `-2.0`), selects `cand30` only when `err30 < err33 && 52 < mhz < 188` before comparing against `err_step`, and returns `best_cand * 1000000`.
+- `porsche::render_clock_measure_qpc_rdtsc_00555fa0` (`00555fa0..005560ad`, 270B, `__cdecl`, sha256 `a7578aa487ec6ae5d6e313a8bbad1f66f8a2bc6970c37fd3d2e2d1f0f731479f`): calls `QueryPerformanceFrequency` (`[0x005b214c]`) once and `QueryPerformanceCounter` (`[0x005b2154]`) across 5 iterations (two signed poll loops with `0xf4240` equal-read countdowns and `freq_low / 5` target delta, gated `rdtsc` when `cpu_has_rdtsc_005deb24 != 0`), returning `0x7f000000`. Uses IAT facades `render_clock_query_performance_frequency` and `render_clock_query_performance_counter` defaulting to Win32 APIs.
+- `porsche::render_clock_measure_div_loop_005560b0` (`005560b0..005561c5`, 278B, `__cdecl`, sha256 `77e8d7b5148f45ba3a0df92ff269964fac3cacc4a4a8ba4c0bad8ac86746d649`): runs 5 iterations calling `application_audio_wait_0053c380(1)` and `audio_probe_clock_0053c2e0()`, executes the `0x5555aaaa / 0x21` inner loop until `(int32_t)(clock_worker_iterations_006b7c7c - start) >= (int32_t)timer_rate_005deb48 >> 2`, scales `(min2 << 2)` by CPU-flag priority (`005deb38`, `005deb14`, `005deb10`, `005deb34`, fallback) times `1000000.0f`, and rounds to `int32_t`.
+
+Owned `.data` / `.rdata` and reused canonical symbols:
+- Owned `.data`: `cpu_has_p6_005deb14` (`005deb14`, 4B, init `0`), `cpu_has_rdtsc_005deb24` (`005deb24`, 4B, init `1`), `cpu_is_cyrix_005deb34` (`005deb34`, 4B, init `0`), `cpu_is_amd_005deb38` (`005deb38`, 4B, init `0`).
+- Owned `.rdata`: none (no duplicate globals for shared `005b2468`, `005b24a8`, `005b24c0`, `005b2408`, `005b27a4`, `005b3f30`, nor single-function `005bc368`/`005bc370`/`005bc374`/`005bc3d8..005bc3ec`; all inlined as exact IEEE-754 typed C++ float/double literals).
+- Reused canonical symbols: `application_audio_wait_0053c380` and `audio_probe_clock_0053c2e0` (`../464-audio-probe-startup/audio_probe_startup_464.hpp`), `copy_flag_005deb10` (`porsche/heap.hpp`), `timer_rate_005deb48` (`porsche/file_events.hpp`), and `clock_worker_iterations_006b7c7c` (`porsche/clock_worker.hpp`).
+
+## Verification
+
+- Attempt `001` failed `od-native` on `fpu mxcsr` (SSE2 C++ sets sticky `MXCSR` exception flags while x87 original leaves `MXCSR` untouched); preserved intact under `local/experiments/v2-render-clock-calibration-679/001/`.
+- Attempt `002` passed `/Od` and `/O2` (735 cases) and failed `wrong-555a10-step-threshold` (`292` vs `291` equivalent at 292 MHz); preserved intact under `local/experiments/v2-render-clock-calibration-679/002/`.
+- Attempt `003` passed `/Od` and `/O2` (735 cases) and failed `wrong-555fa0-countdown` (stub kept `0x1000` through call `1000002`, masking loop 1 vs loop 2 count); preserved intact under `local/experiments/v2-render-clock-calibration-679/003/`.
+- Attempt `004` (`local/experiments/v2-render-clock-calibration-679/004/receipt.json`, sha256 `af59fc699be49edb473f534e639d03caf1e316481f18d405450a35b342967b94`): PASS at `/Od` and `/O2` (`/W4`, 0 warnings on `render_clock_calibration_679.cpp`, 735 cases per optimization variant; 22/22 material `wrong-*` mutations detected).
+  - Command: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/679-render-clock-calibration-leaves/native-config.json --attempt 004`
+
+## Boundaries
+
+Bounded test domain (`PARTIAL`): covers deterministic `00555a10` quantization inputs under default round-to-nearest-even FPU/MXCSR control, controlled QPF/QPC facades (including `005deb24 == 0` / `!= 0` and `0xf4240` timeouts), and controlled `0053c380`/`0053c2e0` stubs with `timer_rate_005deb48 <= 3`. Non-default x87 CW modes on `00555a10`, local-only RDTSC `min2` tracking masked by `00555fa0`'s fixed `0x7f000000` return, multi-threaded `clock_worker_iterations_006b7c7c` increments for `timer_rate_005deb48 >= 4` in `005560b0`, parent `00555bc0` recovery, and production CMake/registry integration remain open.

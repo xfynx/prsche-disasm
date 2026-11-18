@@ -1,0 +1,261 @@
+{
+  "run": 680,
+  "experiment": "local/experiments/v2-input-ff-slot-render-680",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005337a0",
+      "bytes": 54,
+      "sha256": "13ffa3575fa1d624aec46646897b1603ecd0414b7ddadff186fecb88382fb8b8",
+      "token": "@BODY_005337A0@"
+    },
+    {
+      "va": "005337e0",
+      "bytes": 41,
+      "sha256": "729e54831f5b08e458efe17a371a89948d7e24810e5ffb33554be36dcd2ecfbc",
+      "token": "@BODY_005337E0@"
+    },
+    {
+      "va": "00533730",
+      "bytes": 40,
+      "sha256": "69fb99b3f22fb589c6536b7d5413982e8f6f51a7f354d7c2d198c09430fac004",
+      "token": "@BODY_00533730@"
+    },
+    {
+      "va": "00533760",
+      "bytes": 64,
+      "sha256": "f1246a45e78d67fe871c523e64374004887a7dc6f4f4a8c0770fac08952ceb67",
+      "token": "@BODY_00533760@"
+    },
+    {
+      "va": "00533120",
+      "bytes": 60,
+      "sha256": "e6ef39a088246bf5a9cf19083ab22b119035194f24aeccef74855a4d4b55ee04",
+      "token": "@BODY_00533120@"
+    },
+    {
+      "va": "00574080",
+      "bytes": 29,
+      "sha256": "ba6fc95f4e370e8f4706ebf4d0a5dca0b24336a29e6e1afc0e7d51769ddce706",
+      "token": "@BODY_00574080@"
+    }
+  ],
+  "pass_marker": "input_ff_slot_render_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-5337a0-drop-8007000c",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    if (result == 0x8007000cu || result == 0x8007001eu || result == 0x80040205u) {",
+      "new": "    if (result == 0x8007001eu || result == 0x80040205u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5337a0-drop-8007001e",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    if (result == 0x8007000cu || result == 0x8007001eu || result == 0x80040205u) {",
+      "new": "    if (result == 0x8007000cu || result == 0x80040205u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5337a0-drop-80040205",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    if (result == 0x8007000cu || result == 0x8007001eu || result == 0x80040205u) {",
+      "new": "    if (result == 0x8007000cu || result == 0x8007001eu) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5337a0-retry-failed-acquire",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "        if (result == 0u) {\n            result = call_download();\n        }",
+      "new": "        if (result == 0u || result == 1u) {\n            result = call_download();\n        }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5337a0-wrong-vtable-slot",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "        const auto fn = fx->vtable->download_28;",
+      "new": "        const auto fn = fx->vtable->unload_2c;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5337a0-cache-vtable",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    auto call_download = [fx]() -> std::uint32_t {\n        const auto fn = fx->vtable->download_28;\n        return fn(fx);\n    };",
+      "new": "    const auto cached_fn = fx->vtable->download_28;\n    auto call_download = [fx, cached_fn]() -> std::uint32_t {\n        return cached_fn(fx);\n    };",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5337e0-lower-bound",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "void __cdecl frame_control_slot_unload_005337e0(std::int32_t slot) {\n    if (slot < 0 || slot >= 32) {",
+      "new": "void __cdecl frame_control_slot_unload_005337e0(std::int32_t slot) {\n    if (slot <= 0 || slot >= 32) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5337e0-upper-bound",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "void __cdecl frame_control_slot_unload_005337e0(std::int32_t slot) {\n    if (slot < 0 || slot >= 32) {",
+      "new": "void __cdecl frame_control_slot_unload_005337e0(std::int32_t slot) {\n    if (slot < 0 || slot >= 31) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5337e0-skip-state-guard",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    if (entry.state == 0xffffffffu) {\n        return;\n    }\n    auto* const fx = reinterpret_cast<EffectObject*>",
+      "new": "    auto* const fx = reinterpret_cast<EffectObject*>",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5337e0-wrong-vtable-slot",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    (void)fx->vtable->unload_2c(fx);",
+      "new": "    (void)fx->vtable->download_28(fx);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533730-scan-only-31",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "std::int32_t __cdecl frame_control_slot_find_free_00533730() {\n    for (std::int32_t i = 0; i < 32; ++i) {",
+      "new": "std::int32_t __cdecl frame_control_slot_find_free_00533730() {\n    for (std::int32_t i = 0; i < 31; ++i) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533730-invert-state-check",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "        if (frame_control_slot_fields_494[i].state == 0xffffffffu) {",
+      "new": "        if (frame_control_slot_fields_494[i].state != 0xffffffffu) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533730-return-zero-on-full",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    return -1;\n}",
+      "new": "    return 0;\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533760-lower-bound",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "void __cdecl frame_control_slot_download_00533760(std::int32_t slot) {\n    if (slot < 0 || slot >= 32) {",
+      "new": "void __cdecl frame_control_slot_download_00533760(std::int32_t slot) {\n    if (slot <= 0 || slot >= 32) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533760-upper-bound",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "void __cdecl frame_control_slot_download_00533760(std::int32_t slot) {\n    if (slot < 0 || slot >= 32) {",
+      "new": "void __cdecl frame_control_slot_download_00533760(std::int32_t slot) {\n    if (slot < 0 || slot >= 31) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533760-skip-state-guard",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    if (entry.state == 0xffffffffu) {\n        return;\n    }\n    (void)input_effect_download_005337a0(",
+      "new": "    (void)input_effect_download_005337a0(",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533760-use-slot-instead-of-state",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "        input_slots_006be040[entry.state].device,",
+      "new": "        input_slots_006be040[slot].device,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533120-scan-only-31",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    const auto target_state = static_cast<std::uint32_t>(slot_index);\n    for (std::size_t i = 0u; i < 32u; ++i) {",
+      "new": "    const auto target_state = static_cast<std::uint32_t>(slot_index);\n    for (std::size_t i = 0u; i < 31u; ++i) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533120-ff-command",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "        input_slots_006be040[slot_index].device, 1u);",
+      "new": "        input_slots_006be040[slot_index].device, 2u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533120-clear-after-ff",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    for (std::size_t i = 0u; i < 32u; ++i) {\n        if (frame_control_slot_fields_494[i].state == target_state) {\n            frame_control_slot_fields_494[i].state = 0xffffffffu;\n        }\n    }\n    return input_device_ff_command_00533160(\n        input_slots_006be040[slot_index].device, 1u);",
+      "new": "    const std::uint32_t result = input_device_ff_command_00533160(\n        input_slots_006be040[slot_index].device, 1u);\n    for (std::size_t i = 0u; i < 32u; ++i) {\n        if (frame_control_slot_fields_494[i].state == target_state) {\n            frame_control_slot_fields_494[i].state = 0xffffffffu;\n        }\n    }\n    return result;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533120-drop-return",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    return input_device_ff_command_00533160(\n        input_slots_006be040[slot_index].device, 1u);",
+      "new": "    (void)input_device_ff_command_00533160(\n        input_slots_006be040[slot_index].device, 1u);\n    return 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-574080-unsigned-shift",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    const std::int32_t x_bytes =\n        static_cast<std::int32_t>(bpp * static_cast<std::uint32_t>(x)) >> 3;",
+      "new": "    const std::int32_t x_bytes = static_cast<std::int32_t>(\n        (bpp * static_cast<std::uint32_t>(x)) >> 3);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-574080-wrong-bpp-offset",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "        reinterpret_cast<const std::uint8_t*>(window_shutdown_config_005de620)[0x0eu];",
+      "new": "        reinterpret_cast<const std::uint8_t*>(window_shutdown_config_005de620)[0x0du];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-574080-wrong-pitch-index",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "    const std::uint32_t pitch = window_shutdown_config_005de620[9];",
+      "new": "    const std::uint32_t pitch = window_shutdown_config_005de620[10];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-574080-shift-by-4",
+      "source": "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp",
+      "old": "        static_cast<std::int32_t>(bpp * static_cast<std::uint32_t>(x)) >> 3;",
+      "new": "        static_cast<std::int32_t>(bpp * static_cast<std::uint32_t>(x)) >> 4;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
