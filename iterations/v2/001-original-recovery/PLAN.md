@@ -1,15 +1,16 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-18. Run654 shared audit (`001`) passes for frozen `652/003` (`652/001`..`002` preserved)+`653/008` (`653/001`..`007` preserved) on `651`.
-Build `001` compiles 373 TUs / 8 projects, 80 names / 85 refs, no EXE. Five
-real frontier names (`004dd4a0`, `0059e440`, `00566e10`, `0056b3b0`,
-`0056c420`) close while `0056c620` exposes `0056baf0`; 28B `.data`
-(`005d998c`, `005d999c`), 273B `.rdata`. Registry 1016 adds eight PARTIAL
-bodies (2534B total). README 654 owns commands and bounds: 122 native cases /
-24 controls at `/Od`/`/O2`, 924 pins.
+Current 2026-11-18. Run657 shared audit (`001`) passes for frozen `655/002` (`655/001` preserved)+`656/001` on `654`.
+Build `001` compiles 375 TUs / 8 projects, 78 names / 83 refs, no EXE. Three
+real frontier names (`application_main_function_0048cdf0`,
+`startup_sequence_call_0048cdf0`, `audio_stream_codec_refill_0056baf0`) close
+while `0056bd70` exposes `0056b860`; 77B `.data` (`005d0738..005d078d`), 143B
+`.rdata` (`005bdc70..005bdd01`). Registry 1023 adds seven PARTIAL bodies (2588B
+total). README 657 owns commands and bounds: 100 native cases / 27 controls at
+`/Od`/`/O2`, 929 pins.
 
-Active flash workers: `655` (`0055ff60`+`0048d350`+`0048cdf0`, 1409B, closes 2x`0048cdf0`) and `656` (audio/resource leaves).
-Next integrate `655`+`656` in shared batch `657`.
+Active flash workers: `658` (resource loadat/reset `00561e40`..`0059db50`/`00566880`/`004adf50`) and `659` (`0056b860`+`0056ba20`+`0056ba80`, closes `0056b860`).
+Next integrate `658`+`659` in shared batch `660`.
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

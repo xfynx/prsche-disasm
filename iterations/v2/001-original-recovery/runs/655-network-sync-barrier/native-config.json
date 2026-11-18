@@ -1,0 +1,177 @@
+{
+  "run": 655,
+  "experiment": "local/experiments/v2-network-sync-barrier-655",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/655-network-sync-barrier",
+    "iterations/v2/001-original-recovery/runs/549-render-diagnostic",
+    "iterations/v2/001-original-recovery/runs/345-diagnostic-devices",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0055ff60",
+      "bytes": 15,
+      "sha256": "2b72e8c048c139988bc25eacbd3d880e89a0d8ec84c99253b88c68c07b6e07ec",
+      "token": "@BODY_0055FF60@"
+    },
+    {
+      "va": "0048d350",
+      "bytes": 30,
+      "sha256": "6a9b14ab513d288903b7b8df3c4b3c7352829b4b98ef9cb5361531551da45acf",
+      "token": "@BODY_0048D350@"
+    },
+    {
+      "va": "0048cdf0",
+      "bytes": 1364,
+      "sha256": "fd96f64dc0628b4c3a516b5f43f62dae9461837645d6bb4e4dcf32b7d77afb64",
+      "token": "@BODY_0048CDF0@"
+    },
+    {
+      "va": "005d0738",
+      "bytes": 7,
+      "sha256": "af9efbb5932d2cddac21c460b2c5415a7056177cc3020e268f9fc247e996699d",
+      "token": "@BODY_005D0738@"
+    },
+    {
+      "va": "005d0740",
+      "bytes": 17,
+      "sha256": "3391b1f05aa1303be9a1200e33e0df90f8543d7a1a3c0fe4edcdb8e3b5b56b77",
+      "token": "@BODY_005D0740@"
+    },
+    {
+      "va": "005d0754",
+      "bytes": 17,
+      "sha256": "167b523aa872b2c046d4a31f61e805355997e2527cf4cfdfc91b94e96a96404e",
+      "token": "@BODY_005D0754@"
+    },
+    {
+      "va": "005d0768",
+      "bytes": 18,
+      "sha256": "4ba2cf767d7386f60564d7a50b2abd2f305dea4ca15bd7cc178c1a46a48c851e",
+      "token": "@BODY_005D0768@"
+    },
+    {
+      "va": "005d077c",
+      "bytes": 18,
+      "sha256": "759a8aa6847057d9deb35bb2669c9f989f0bfe668af2c68502e10831084c695d",
+      "token": "@BODY_005D077C@"
+    }
+  ],
+  "pass_marker": "network_sync_barrier_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-55ff60-null-callback-ret",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "    if (cb != nullptr) {\n        return cb();\n    }\n    return 0u;",
+      "new": "    if (cb != nullptr) {\n        return cb();\n    }\n    return 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48d350-third-arg",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "    application_network_message_0048c870(receiver, nullptr, message, first, second, 0u, fourth);",
+      "new": "    application_network_message_0048c870(receiver, nullptr, message, first, second, 1u, fourth);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-seq-high2-offset",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "    if (!wait_barrier_phase(self, 8u, network_sync_wait_high2_str_005d0768, 0xe7u, true, 0u)) {",
+      "new": "    if (!wait_barrier_phase(self, 0u, network_sync_wait_high2_str_005d0768, 0xe7u, true, 0u)) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-seq-low2-offset",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "    if (!wait_barrier_phase(self, 8u, network_sync_wait_low2_str_005d0740, 0xe7u, false, 2u)) {",
+      "new": "    if (!wait_barrier_phase(self, 0u, network_sync_wait_low2_str_005d0740, 0xe7u, false, 2u)) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-high-mask-any",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "        const bool phase_done = wait_high ? ((state & mask) == mask) : ((state & mask) == 0u);",
+      "new": "        const bool phase_done = wait_high ? ((state & mask) != 0u) : ((state & mask) == 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-low-mask-clear",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "        const bool phase_done = wait_high ? ((state & mask) == mask) : ((state & mask) == 0u);",
+      "new": "        const bool phase_done = wait_high ? ((state & mask) == mask) : ((state & mask) != mask);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-silent-c5-check",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "        if (read_u8(net, 0xbfu) == 0u && read_u8(net, 0xc5u) != 0u) {",
+      "new": "        if (false) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-esc-key-code",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "        if (startup_input_poll_key_0055ff60() == 0x1bu) {",
+      "new": "        if (startup_input_poll_key_0055ff60() == 0x1cu) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-sleep-arg",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "        file_sleep_0055f740(1u);",
+      "new": "        file_sleep_0055f740(0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-abort-channel",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "    render_texture_diagnostic_0055ec50(5u, network_sync_abort_str_005d0738);",
+      "new": "    render_texture_diagnostic_0055ec50(4u, network_sync_abort_str_005d0738);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-abort-flag-c5",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "    write_u8(net, 0xc5u, 1u);",
+      "new": "    write_u8(net, 0xc5u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-abort-flag-bd",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "    write_u8(startup_network_00628c70, 0xbdu, 1u);",
+      "new": "    write_u8(startup_network_00628c70, 0xbdu, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-48cdf0-abort-action-arg",
+      "source": "iterations/v2/001-original-recovery/runs/655-network-sync-barrier/network_sync_barrier_655.cpp",
+      "old": "        network_services_action_0048da60(0xfffffffeu, 0xffffffffu);",
+      "new": "        network_services_action_0048da60(0xffffffffu, 0xffffffffu);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

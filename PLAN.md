@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run654](iterations/v2/001-original-recovery/runs/654-movie-setup-codec-release-integration/README.md).
-Game setup movie (`00472860`..`004dd4a0`) and audio stream codec release (`00566e10`..`0056c620`) close five frontier dependencies.
-The shared build compiles 373 TUs with 80 unresolved names / 85 references.
+Latest recovery intake is [Run657](iterations/v2/001-original-recovery/runs/657-sync-barrier-stream-refill-integration/README.md).
+Network sync barrier (`0055ff60`..`0048cdf0`) and audio stream codec refill (`0056baf0`..`0056c000`) close three frontier dependencies.
+The shared build compiles 375 TUs with 78 unresolved names / 83 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are network sync barrier (`0055ff60`/`0048d350`/`0048cdf0`) and stream refill/probe frontier leaves. The real depth-conversion
+Next are stream advance (`0056b860`/`0056ba20`/`0056ba80`) and resource loadat/audio probe leaves. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;

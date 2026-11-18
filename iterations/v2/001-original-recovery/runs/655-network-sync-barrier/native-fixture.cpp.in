@@ -1,0 +1,1050 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "network_sync_barrier_655.hpp"
+#include "porsche/application_main.hpp"
+#include "porsche/file_wait.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/network_services.hpp"
+#include "porsche/startup_input.hpp"
+#include "porsche/startup_sequence.hpp"
+#include "porsche/startup_services.hpp"
+#include "porsche/window_runtime.hpp"
+#include "../549-render-diagnostic/render_diagnostic_549.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::network_sync_abort_str_005d0738) == 7u);
+static_assert(sizeof(porsche::network_sync_wait_low2_str_005d0740) == 17u);
+static_assert(sizeof(porsche::network_sync_wait_low1_str_005d0754) == 17u);
+static_assert(sizeof(porsche::network_sync_wait_high2_str_005d0768) == 18u);
+static_assert(sizeof(porsche::network_sync_wait_high1_str_005d077c) == 18u);
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U word(const void* p, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + off, 4u);
+    return v;
+}
+
+static void put_u32(void* p, U off, U v) {
+    std::memcpy(static_cast<B*>(p) + off, &v, 4u);
+}
+
+static void put_u8(void* p, U off, B v) {
+    static_cast<B*>(p)[off] = v;
+}
+
+static B get_u8(const void* p, U off) {
+    return static_cast<const B*>(p)[off];
+}
+
+static B* code = nullptr;
+static B* slot_55ff60 = nullptr;
+static B* slot_48d350 = nullptr;
+static B* slot_48cdf0 = nullptr;
+
+static B orig_str_5d0738[7] = {};
+static B orig_str_5d0740[17] = {};
+static B orig_str_5d0754[17] = {};
+static B orig_str_5d0768[18] = {};
+static B orig_str_5d077c[18] = {};
+
+static U cases = 0u;
+alignas(16) static B floating[512] = {};
+
+static B net_arena[0x100] = {};
+static B self_arena[0x100] = {};
+static B* active_self = net_arena;
+static B receiver_a[16] = {};
+static B receiver_b[16] = {};
+static U lock_cell_a[2] = {};
+static U lock_cell_b[2] = {};
+
+enum EventTag : U {
+    kEvKeyCb = 1u,
+    kEvNetMsg = 2u,
+    kEvAction = 3u,
+    kEvSplash = 4u,
+    kEvDiag = 5u,
+    kEvSleep = 6u,
+    kEvTimed = 7u,
+    kEvHeapEnter = 8u,
+    kEvHeapLeave = 9u,
+};
+
+struct Event {
+    U tag;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+    U a4;
+    char text[64];
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U count;
+    Event events[128];
+    B final_net[0x100];
+    B final_self[0x100];
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+struct ScriptStep {
+    U key_ret;
+    U set_e6_mask;
+    U clear_e6_mask;
+    U set_e7_mask;
+    U clear_e7_mask;
+    U new_seq_id;
+    bool change_seq_id;
+    B clear_be;
+    B set_bf;
+    B set_c5;
+    bool drop_net_ptr;
+    bool drop_net_active;
+};
+
+struct StubCfg {
+    U key_call_ret;
+    U splash_call_idx;
+    U timed_call_idx;
+    U diag_call_idx;
+    U script_count;
+    ScriptStep steps[24];
+    bool diag_abort_sets_c5;
+    bool diag_abort_sets_bf;
+    bool diag_abort_drops_net;
+    bool splash_abort_clears_c5;
+    bool splash_abort_sets_c5_loop;
+    U splash_trigger_at;
+    U action_sets_extra_flag;
+    U heap_enter_swaps_lock;
+    U net_msg_updates_field;
+};
+
+static StubCfg stub_cfg{};
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U normalize_ptr(U p) {
+    if (p == 0u) return 0u;
+    if (p == address(receiver_a)) return 0xb1000001u;
+    if (p == address(receiver_b)) return 0xb1000002u;
+    if (p == address(net_arena)) return 0xb2000001u;
+    if (p == address(self_arena)) return 0xb2000002u;
+    if (p == address(lock_cell_a)) return 0xb3000001u;
+    if (p == address(lock_cell_b)) return 0xb3000002u;
+    return p;
+}
+
+static Event& push_event(U tag, U a0 = 0u, U a1 = 0u, U a2 = 0u, U a3 = 0u, U a4 = 0u, const char* text = nullptr) {
+    require(trace.count < 128u, "event capacity");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof(e));
+    e.tag = tag;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+    e.a3 = a3;
+    e.a4 = a4;
+    if (text != nullptr) {
+        std::snprintf(e.text, sizeof(e.text), "%s", text);
+    }
+    return e;
+}
+
+static std::uint32_t __cdecl fixture_key_callback() {
+    const U idx = stub_cfg.timed_call_idx;
+    U ret = stub_cfg.key_call_ret;
+    if (idx < stub_cfg.script_count) {
+        ret = stub_cfg.steps[idx].key_ret;
+    }
+    push_event(kEvKeyCb, ret);
+    return ret;
+}
+
+namespace porsche {
+
+void* startup_network_00628c70 = nullptr;
+void* startup_input_key_callback_005df6a4 = nullptr;
+
+void __fastcall application_network_message_0048c870(void* receiver, void* unused_edx,
+    std::uint32_t message, std::uint32_t first, std::uint32_t second,
+    std::uint32_t third, std::uint32_t fourth) {
+    (void)unused_edx;
+    push_event(kEvNetMsg, normalize_ptr(address(receiver)), message, first, second,
+               (third & 0xffffu) ^ (fourth * 131u));
+    // Also check exact third and fourth via an extra event or packed check:
+    require(third == 0u || third == 0xdeadbeefu, "unexpected third arg");
+    if (stub_cfg.net_msg_updates_field != 0u && startup_network_00628c70 != nullptr) {
+        put_u8(startup_network_00628c70, 0xb8u, static_cast<B>(stub_cfg.net_msg_updates_field));
+    }
+}
+
+void __cdecl network_services_action_0048da60(std::uint32_t first, std::uint32_t second) {
+    push_event(kEvAction, first, second);
+    if (stub_cfg.action_sets_extra_flag != 0u && startup_network_00628c70 != nullptr) {
+        put_u8(startup_network_00628c70, 0xbdu, static_cast<B>(stub_cfg.action_sets_extra_flag));
+    }
+}
+
+void __cdecl splash_progress_004a4a70(std::int32_t phase) {
+    const U idx = stub_cfg.splash_call_idx++;
+    push_event(kEvSplash, static_cast<U>(phase), idx);
+    if (stub_cfg.splash_abort_clears_c5 && startup_network_00628c70 != nullptr) {
+        put_u8(startup_network_00628c70, 0xc5u, 0u);
+    }
+    if (stub_cfg.splash_abort_sets_c5_loop && idx == stub_cfg.splash_trigger_at &&
+        startup_network_00628c70 != nullptr) {
+        put_u8(startup_network_00628c70, 0xc5u, 1u);
+    }
+}
+
+void __cdecl render_texture_diagnostic_0055ec50(std::uint32_t channel, const char* format, ...) {
+    char buf[64] = {};
+    if (format != nullptr) {
+        va_list args;
+        va_start(args, format);
+        std::vsnprintf(buf, sizeof(buf), format, args);
+        va_end(args);
+    }
+    const U idx = stub_cfg.diag_call_idx++;
+    push_event(kEvDiag, channel, idx, 0u, 0u, 0u, buf);
+    if (format != nullptr && std::strcmp(format, "Abort\n") == 0) {
+        if (stub_cfg.diag_abort_sets_c5 && startup_network_00628c70 != nullptr) {
+            put_u8(startup_network_00628c70, 0xc5u, 1u);
+        }
+        if (stub_cfg.diag_abort_sets_bf && startup_network_00628c70 != nullptr) {
+            put_u8(startup_network_00628c70, 0xbfu, 1u);
+        }
+        if (stub_cfg.diag_abort_drops_net) {
+            startup_network_00628c70 = nullptr;
+        }
+    }
+}
+
+std::uint32_t __cdecl file_sleep_0055f740(std::uint32_t milliseconds) {
+    push_event(kEvSleep, milliseconds);
+    return 0u;
+}
+
+std::uint32_t __cdecl timed_callbacks_005366e0(std::uint32_t argument) {
+    const U idx = stub_cfg.timed_call_idx++;
+    push_event(kEvTimed, argument, idx);
+    if (idx < stub_cfg.script_count) {
+        const ScriptStep& st = stub_cfg.steps[idx];
+        B v6 = get_u8(active_self, 0xe6u);
+        v6 = static_cast<B>((v6 | st.set_e6_mask) & ~st.clear_e6_mask);
+        put_u8(active_self, 0xe6u, v6);
+
+        B v7 = get_u8(active_self, 0xe7u);
+        v7 = static_cast<B>((v7 | st.set_e7_mask) & ~st.clear_e7_mask);
+        put_u8(active_self, 0xe7u, v7);
+
+        if (st.change_seq_id) {
+            put_u32(net_arena, 0xdcu, st.new_seq_id);
+        }
+        if (st.clear_be != 0u) {
+            put_u8(net_arena, 0xbeu, 0u);
+        }
+        if (st.set_bf != 0u) {
+            put_u8(net_arena, 0xbfu, st.set_bf);
+        }
+        if (st.set_c5 != 0u) {
+            put_u8(net_arena, 0xc5u, st.set_c5);
+        }
+        if (st.drop_net_active) {
+            put_u32(net_arena, 0x08u, 0u);
+        }
+        if (st.drop_net_ptr) {
+            startup_network_00628c70 = nullptr;
+        }
+    }
+    return 0x12340000u | idx; // non-zero upper bits to verify AH/upper-EAX masking
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    push_event(kEvHeapEnter, address(lock));
+    if (stub_cfg.heap_enter_swaps_lock != 0u) {
+        lock_cell_a[0] = stub_cfg.heap_enter_swaps_lock;
+    }
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    push_event(kEvHeapLeave, address(lock));
+}
+
+} // namespace porsche
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static U invoke_cdecl0_u32(void* fn, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl0_void(void* fn) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_thiscall4(void* fn, void* ecx_ptr, U arg1, U arg2, U arg3, U arg4) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg4
+        push arg3
+        push arg2
+        push arg1
+        mov ecx, ecx_ptr
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_thiscall0_bool(void* fn, void* ecx_ptr, U& ret_al) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        mov ecx, ecx_ptr
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_al = eax_out & 0xffu;
+    require(ret_al == 0u || ret_al == 1u, "bool AL domain");
+    return fail;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put_u32(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U base_va, U off, U orig_target, const void* target) {
+    const U insn_va = base_va + off + 4u;
+    const U expected_rel = orig_target - insn_va;
+    require(word(slot, off) == expected_rel, "exact relative offset");
+    const U new_rel = address(target) - (address(slot) + off + 4u);
+    put_u32(slot, off, new_rel);
+}
+
+static void init() {
+    static const B data_5d0738[] = {@BODY_005D0738@};
+    static const B data_5d0740[] = {@BODY_005D0740@};
+    static const B data_5d0754[] = {@BODY_005D0754@};
+    static const B data_5d0768[] = {@BODY_005D0768@};
+    static const B data_5d077c[] = {@BODY_005D077C@};
+    require(sizeof data_5d0738 == 7u, "7-byte original .data 005d0738");
+    require(sizeof data_5d0740 == 17u, "17-byte original .data 005d0740");
+    require(sizeof data_5d0754 == 17u, "17-byte original .data 005d0754");
+    require(sizeof data_5d0768 == 18u, "18-byte original .data 005d0768");
+    require(sizeof data_5d077c == 18u, "18-byte original .data 005d077c");
+    std::memcpy(orig_str_5d0738, data_5d0738, sizeof data_5d0738);
+    std::memcpy(orig_str_5d0740, data_5d0740, sizeof data_5d0740);
+    std::memcpy(orig_str_5d0754, data_5d0754, sizeof data_5d0754);
+    std::memcpy(orig_str_5d0768, data_5d0768, sizeof data_5d0768);
+    std::memcpy(orig_str_5d077c, data_5d077c, sizeof data_5d077c);
+
+    // Assert production .data strings before any fixture resets.
+    require(std::memcmp(porsche::network_sync_abort_str_005d0738, data_5d0738, 7u) == 0, "initial .data 005d0738");
+    require(std::memcmp(porsche::network_sync_wait_low2_str_005d0740, data_5d0740, 17u) == 0, "initial .data 005d0740");
+    require(std::memcmp(porsche::network_sync_wait_low1_str_005d0754, data_5d0754, 17u) == 0, "initial .data 005d0754");
+    require(std::memcmp(porsche::network_sync_wait_high2_str_005d0768, data_5d0768, 18u) == 0, "initial .data 005d0768");
+    require(std::memcmp(porsche::network_sync_wait_high1_str_005d077c, data_5d077c, 18u) == 0, "initial .data 005d077c");
+
+    static const B body_55ff60[] = {@BODY_0055FF60@};
+    static const B body_48d350[] = {@BODY_0048D350@};
+    static const B body_48cdf0[] = {@BODY_0048CDF0@};
+    require(sizeof body_55ff60 == 15u, "15-byte original body 0055ff60");
+    require(sizeof body_48d350 == 30u, "30-byte original body 0048d350");
+    require(sizeof body_48cdf0 == 1364u, "1364-byte original body 0048cdf0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+
+    slot_55ff60 = code;
+    slot_48d350 = code + 0x40u;
+    slot_48cdf0 = code + 0x100u;
+    std::memcpy(slot_55ff60, body_55ff60, sizeof body_55ff60);
+    std::memcpy(slot_48d350, body_48d350, sizeof body_48d350);
+    std::memcpy(slot_48cdf0, body_48cdf0, sizeof body_48cdf0);
+
+    // Relocate 0055ff60.
+    relocate_abs32(slot_55ff60, 2u, 0x005df6a4u, address(&porsche::startup_input_key_callback_005df6a4));
+
+    // Relocate 0048d350.
+    relocate_rel32(slot_48d350, 0x0048d350u, 23u, 0x0048c870u,
+                   reinterpret_cast<const void*>(&porsche::application_network_message_0048c870));
+
+    // Relocate 0048cdf0.
+    static const U net_global_offs[] = {
+        1u, 61u, 194u, 274u, 291u, 316u, 373u, 503u, 560u, 576u, 601u, 655u, 782u,
+        863u, 876u, 887u, 933u, 960u, 989u, 1046u, 1175u, 1248u, 1260u, 1271u, 1305u, 1332u
+    };
+    for (U off : net_global_offs) {
+        relocate_abs32(slot_48cdf0, off, 0x00628c70u, address(&porsche::startup_network_00628c70));
+    }
+
+    relocate_abs32(slot_48cdf0, 39u, 0x005d077cu, address(orig_str_5d077c));
+    relocate_abs32(slot_48cdf0, 351u, 0x005d0768u, address(orig_str_5d0768));
+    relocate_abs32(slot_48cdf0, 633u, 0x005d0754u, address(orig_str_5d0754));
+    relocate_abs32(slot_48cdf0, 1024u, 0x005d0740u, address(orig_str_5d0740));
+    static const U abort_str_offs[] = {182u, 491u, 770u, 1163u};
+    for (U off : abort_str_offs) {
+        relocate_abs32(slot_48cdf0, off, 0x005d0738u, address(orig_str_5d0738));
+    }
+
+    static const U net_msg_offs[] = {34u, 346u, 628u, 1019u, 1327u};
+    for (U off : net_msg_offs) {
+        relocate_rel32(slot_48cdf0, 0x0048cdf0u, off, 0x0048c870u,
+                       reinterpret_cast<const void*>(&porsche::application_network_message_0048c870));
+    }
+    static const U diag_offs[] = {46u, 189u, 358u, 498u, 640u, 777u, 1031u, 1170u};
+    for (U off : diag_offs) {
+        relocate_rel32(slot_48cdf0, 0x0048cdf0u, off, 0x0055ec50u,
+                       reinterpret_cast<const void*>(&porsche::render_texture_diagnostic_0055ec50));
+    }
+    static const U splash_offs[] = {56u, 368u, 650u, 1041u};
+    for (U off : splash_offs) {
+        relocate_rel32(slot_48cdf0, 0x0048cdf0u, off, 0x004a4a70u,
+                       reinterpret_cast<const void*>(&porsche::splash_progress_004a4a70));
+    }
+    static const U key_poll_offs[] = {128u, 440u, 722u, 1113u};
+    for (U off : key_poll_offs) {
+        relocate_rel32(slot_48cdf0, 0x0048cdf0u, off, 0x0055ff60u, slot_55ff60);
+    }
+    static const U sleep_offs[] = {140u, 452u, 734u, 1125u};
+    for (U off : sleep_offs) {
+        relocate_rel32(slot_48cdf0, 0x0048cdf0u, off, 0x0055f740u,
+                       reinterpret_cast<const void*>(&porsche::file_sleep_0055f740));
+    }
+    static const U timed_offs[] = {146u, 458u, 740u, 1131u};
+    for (U off : timed_offs) {
+        relocate_rel32(slot_48cdf0, 0x0048cdf0u, off, 0x005366e0u,
+                       reinterpret_cast<const void*>(&porsche::timed_callbacks_005366e0));
+    }
+    static const U action_offs[] = {302u, 587u};
+    for (U off : action_offs) {
+        relocate_rel32(slot_48cdf0, 0x0048cdf0u, off, 0x0048da60u,
+                       reinterpret_cast<const void*>(&porsche::network_services_action_0048da60));
+    }
+    static const U enter_offs[] = {927u, 1299u};
+    for (U off : enter_offs) {
+        relocate_rel32(slot_48cdf0, 0x0048cdf0u, off, 0x005322b0u,
+                       reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    }
+    relocate_rel32(slot_48cdf0, 0x0048cdf0u, 954u, 0x0048d350u, slot_48d350);
+    static const U leave_offs[] = {975u, 1347u};
+    for (U off : leave_offs) {
+        relocate_rel32(slot_48cdf0, 0x0048cdf0u, off, 0x005322c0u,
+                       reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+    }
+}
+
+struct BarrierInit {
+    bool use_distinct_self;
+    U seq_id;
+    B mask;
+    B init_e6;
+    B init_e7;
+    U active;
+    B f_be;
+    B f_bf;
+    B f_c5;
+    bool use_key_cb;
+    StubCfg cfg;
+};
+
+static void setup_barrier_state(const BarrierInit& init_cfg) {
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(net_arena, 0, sizeof net_arena);
+    std::memset(self_arena, 0, sizeof self_arena);
+    std::memset(receiver_a, 0, sizeof receiver_a);
+    std::memset(receiver_b, 0, sizeof receiver_b);
+    lock_cell_a[0] = 0x55667788u;
+    lock_cell_a[1] = 0u;
+    lock_cell_b[0] = 0x99aabbccu;
+    lock_cell_b[1] = 0u;
+
+    stub_cfg = init_cfg.cfg;
+    stub_cfg.splash_call_idx = 0u;
+    stub_cfg.timed_call_idx = 0u;
+    stub_cfg.diag_call_idx = 0u;
+
+    put_u32(net_arena, 0x08u, init_cfg.active);
+    put_u32(net_arena, 0x0cu, address(receiver_a));
+    put_u32(net_arena, 0x10u, address(lock_cell_a));
+    put_u8(net_arena, 0xbeu, init_cfg.f_be);
+    put_u8(net_arena, 0xbfu, init_cfg.f_bf);
+    put_u8(net_arena, 0xc4u, 0x77u);
+    put_u8(net_arena, 0xc5u, init_cfg.f_c5);
+    put_u8(net_arena, 0xbcu, 0x22u);
+    put_u8(net_arena, 0xbdu, 0x33u);
+    put_u32(net_arena, 0xdcu, init_cfg.seq_id);
+    put_u8(net_arena, 0xe5u, init_cfg.mask);
+    put_u8(net_arena, 0xe6u, init_cfg.init_e6);
+    put_u8(net_arena, 0xe7u, init_cfg.init_e7);
+
+    if (init_cfg.use_distinct_self) {
+        active_self = self_arena;
+        put_u32(self_arena, 0x0cu, address(receiver_b));
+        put_u8(self_arena, 0xe5u, init_cfg.mask);
+        put_u8(self_arena, 0xe6u, init_cfg.init_e6);
+        put_u8(self_arena, 0xe7u, init_cfg.init_e7);
+    } else {
+        active_self = net_arena;
+        std::memcpy(self_arena, net_arena, sizeof net_arena);
+    }
+
+    porsche::startup_network_00628c70 = static_cast<void*>(net_arena);
+    porsche::startup_input_key_callback_005df6a4 =
+        init_cfg.use_key_cb ? reinterpret_cast<void*>(&fixture_key_callback) : nullptr;
+}
+
+static void snapshot_state() {
+    std::memcpy(trace.final_net, net_arena, sizeof net_arena);
+    std::memcpy(trace.final_self, self_arena, sizeof self_arena);
+}
+
+static void verify_trace() {
+    require(trace.abi_fail == 0u, "x86 ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.ret_eax == expected.ret_eax, "ret_eax");
+    require(trace.count == expected.count, "event count");
+    for (U i = 0u; i < trace.count; ++i) {
+        const Event& a = trace.events[i];
+        const Event& b = expected.events[i];
+        require(a.tag == b.tag, "event tag");
+        require(a.a0 == b.a0, "event a0");
+        require(a.a1 == b.a1, "event a1");
+        require(a.a2 == b.a2, "event a2");
+        require(a.a3 == b.a3, "event a3");
+        require(a.a4 == b.a4, "event a4");
+        require(std::strcmp(a.text, b.text) == 0, "event text");
+    }
+    require(std::memcmp(trace.final_net, expected.final_net, sizeof net_arena) == 0, "net_arena");
+    require(std::memcmp(trace.final_self, expected.final_self, sizeof self_arena) == 0, "self_arena");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0, "FPU");
+    ++cases;
+}
+
+static void compare_poll_key(void* cb, U key_ret) {
+    auto reset_poll = [&]() {
+        std::memset(&trace, 0, sizeof trace);
+        std::memset(net_arena, 0, sizeof net_arena);
+        std::memset(self_arena, 0, sizeof self_arena);
+        std::memset(&stub_cfg, 0, sizeof stub_cfg);
+        stub_cfg.key_call_ret = key_ret;
+        stub_cfg.timed_call_idx = 100u;
+        porsche::startup_input_key_callback_005df6a4 = cb;
+    };
+
+    reset_poll();
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl0_u32(
+        reinterpret_cast<void*>(&porsche::startup_input_poll_key_0055ff60), trace.ret_eax);
+    capture_fpu(trace.fpu);
+    snapshot_state();
+    expected = trace;
+
+    reset_poll();
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl0_u32(slot_55ff60, trace.ret_eax);
+    capture_fpu(trace.fpu);
+    snapshot_state();
+    verify_trace();
+}
+
+static void compare_short_message(void* receiver, U message, U first, U second, U fourth) {
+    auto reset_short = [&]() {
+        std::memset(&trace, 0, sizeof trace);
+        std::memset(net_arena, 0, sizeof net_arena);
+        std::memset(self_arena, 0, sizeof self_arena);
+        std::memset(&stub_cfg, 0, sizeof stub_cfg);
+    };
+
+    reset_short();
+    seed_fpu();
+    trace.abi_fail = invoke_thiscall4(
+        reinterpret_cast<void*>(&porsche::application_network_message_short_0048d350),
+        receiver, message, first, second, fourth);
+    capture_fpu(trace.fpu);
+    snapshot_state();
+    expected = trace;
+
+    reset_short();
+    seed_fpu();
+    trace.abi_fail = invoke_thiscall4(slot_48d350, receiver, message, first, second, fourth);
+    capture_fpu(trace.fpu);
+    snapshot_state();
+    verify_trace();
+}
+
+static void compare_barrier(const BarrierInit& init_cfg) {
+    auto target_self = [&]() -> void* {
+        return init_cfg.use_distinct_self ? static_cast<void*>(self_arena)
+                                          : static_cast<void*>(net_arena);
+    };
+
+    setup_barrier_state(init_cfg);
+    seed_fpu();
+    trace.abi_fail = invoke_thiscall0_bool(
+        reinterpret_cast<void*>(&porsche::network_sync_barrier_0048cdf0),
+        target_self(), trace.ret_eax);
+    capture_fpu(trace.fpu);
+    snapshot_state();
+    expected = trace;
+
+    setup_barrier_state(init_cfg);
+    seed_fpu();
+    trace.abi_fail = invoke_thiscall0_bool(slot_48cdf0, target_self(), trace.ret_eax);
+    capture_fpu(trace.fpu);
+    snapshot_state();
+    verify_trace();
+}
+
+static void compare_frontier_wrapper(void (*wrapper)(), const BarrierInit& init_cfg) {
+    setup_barrier_state(init_cfg);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl0_void(reinterpret_cast<void*>(wrapper));
+    capture_fpu(trace.fpu);
+    snapshot_state();
+    expected = trace;
+
+    setup_barrier_state(init_cfg);
+    seed_fpu();
+    U unused_al = 0u;
+    trace.abi_fail = invoke_thiscall0_bool(slot_48cdf0, porsche::startup_network_00628c70, unused_al);
+    capture_fpu(trace.fpu);
+    snapshot_state();
+    verify_trace();
+}
+
+static void run_cases() {
+    // 1. startup_input_poll_key_0055ff60
+    compare_poll_key(nullptr, 0x1bu);
+    compare_poll_key(reinterpret_cast<void*>(&fixture_key_callback), 0x1bu);
+    compare_poll_key(reinterpret_cast<void*>(&fixture_key_callback), 0x12345678u);
+
+    // 2. application_network_message_short_0048d350
+    compare_short_message(receiver_a, 0xb7u, 0xfffffffeu, 0xffffffffu, 0u);
+    compare_short_message(receiver_b, 0x42u, 0x11223344u, 0x55667788u, 0x99aabbcdu);
+
+    // 3. Full 4-phase success (single iteration per phase, extra unmasked bits)
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 10u;
+        cfg.mask = 0x05u;
+        cfg.init_e6 = 0x02u;
+        cfg.init_e7 = 0x08u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.use_key_cb = true;
+        cfg.cfg.script_count = 4u;
+        cfg.cfg.steps[0] = {0u, 0x05u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[1] = {0x20u, 0u, 0u, 0x05u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[2] = {0u, 0u, 0x05u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[3] = {0x41u, 0u, 0u, 0u, 0x05u, 0u, false, 0, 0, 0, false, false};
+        compare_barrier(cfg);
+    }
+
+    // 4. Multi-iteration / partial-bitmask progression across all 4 phases + seq_id update
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 100u;
+        cfg.mask = 0x05u;
+        cfg.init_e6 = 0x10u;
+        cfg.init_e7 = 0x20u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.use_key_cb = true;
+        cfg.cfg.script_count = 8u;
+        // Phase 1: bit 0 first (incomplete), then bit 2 (complete), and update seq_id for Phase 2
+        cfg.cfg.steps[0] = {0u, 0x01u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[1] = {0u, 0x04u, 0u, 0u, 0u, 200u, true, 0, 0, 0, false, false};
+        // Phase 2: bit 2 first (incomplete), then bit 0 (complete)
+        cfg.cfg.steps[2] = {0u, 0u, 0u, 0x04u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[3] = {0u, 0u, 0u, 0x01u, 0u, 0u, false, 0, 0, 0, false, false};
+        // Phase 3: clear bit 0 first (still bit 2 set -> incomplete), then clear bit 2
+        cfg.cfg.steps[4] = {0u, 0u, 0x01u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[5] = {0u, 0u, 0x04u, 0u, 0u, 300u, true, 0, 0, 0, false, false};
+        // Phase 4: clear bit 2 first (still bit 0 set -> incomplete), then clear bit 0
+        cfg.cfg.steps[6] = {0u, 0u, 0u, 0u, 0x04u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[7] = {0u, 0u, 0u, 0u, 0x01u, 0u, false, 0, 0, 0, false, false};
+        compare_barrier(cfg);
+    }
+
+    // 5. Zero mask (0xe5 == 0) fast completion
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 7u;
+        cfg.mask = 0u;
+        cfg.init_e6 = 0xffu;
+        cfg.init_e7 = 0xffu;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.use_key_cb = false;
+        compare_barrier(cfg);
+    }
+
+    // 6. Silent return false on entry when [net+0xbf]==0 && [net+0xc5]!=0 (no Abort diagnostic)
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 5u;
+        cfg.mask = 0x01u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.f_bf = 0u;
+        cfg.f_c5 = 1u;
+        compare_barrier(cfg);
+    }
+
+    // 7. Phase 1 abort via ESC key (calls network_services_action_0048da60)
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 12u;
+        cfg.mask = 0x01u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.use_key_cb = true;
+        cfg.cfg.script_count = 1u;
+        cfg.cfg.steps[0] = {0x1bu, 0u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        compare_barrier(cfg);
+    }
+
+    // 8. Phase 1 abort when [net+0xbf] != 0 (prints Abort\n, skips action 0048da60)
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 12u;
+        cfg.mask = 0x01u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.f_bf = 1u;
+        cfg.f_c5 = 1u; // ignored when bf != 0
+        compare_barrier(cfg);
+    }
+
+    // 9. Phase 1 abort when [net+0xbe] == 0 and when (int32_t)[net+0xdc] < 0
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 12u;
+        cfg.mask = 0x01u;
+        cfg.active = 1u;
+        cfg.f_be = 0u;
+        compare_barrier(cfg);
+
+        cfg.f_be = 1u;
+        cfg.seq_id = 0xffffffffu; // -1 signed
+        compare_barrier(cfg);
+    }
+
+    // 10. Phase 1 abort when net becomes inactive ([net+8]==0) or nullptr on iteration 2
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 33u;
+        cfg.mask = 0x03u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.cfg.script_count = 1u;
+        cfg.cfg.steps[0] = {0u, 0u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, true};
+        compare_barrier(cfg);
+
+        cfg.cfg.steps[0].drop_net_active = false;
+        cfg.cfg.steps[0].drop_net_ptr = true;
+        compare_barrier(cfg);
+    }
+
+    // 11. Phase 1 abort where Abort diagnostic mutates c5=1 before re-check
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 14u;
+        cfg.mask = 0x01u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.use_key_cb = true;
+        cfg.cfg.script_count = 1u;
+        cfg.cfg.steps[0] = {0x1bu, 0u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.diag_abort_sets_c5 = true;
+        compare_barrier(cfg);
+    }
+
+    // 12. Phase 2 abort via ESC key (calls network_services_action_0048da60)
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 40u;
+        cfg.mask = 0x02u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.use_key_cb = true;
+        cfg.cfg.script_count = 2u;
+        cfg.cfg.steps[0] = {0u, 0x02u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[1] = {0x1bu, 0u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        compare_barrier(cfg);
+    }
+
+    // 13. Phase 3 abort via ESC key (heap_enter -> 0048d350 -> 0048c870 -> set 0xbd=1 -> heap_leave)
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 50u;
+        cfg.mask = 0x04u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.use_key_cb = true;
+        cfg.cfg.script_count = 3u;
+        cfg.cfg.steps[0] = {0u, 0x04u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[1] = {0u, 0u, 0u, 0x04u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[2] = {0x1bu, 0u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.heap_enter_swaps_lock = 0x11223344u;
+        compare_barrier(cfg);
+
+        // Phase 3 abort with diag_abort_sets_bf=true (skips lock/0048d350)
+        cfg.cfg.diag_abort_sets_bf = true;
+        compare_barrier(cfg);
+    }
+
+    // 14. Phase 3 silent c5 return false inside loop
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 60u;
+        cfg.mask = 0x08u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.use_key_cb = true;
+        cfg.cfg.script_count = 3u;
+        cfg.cfg.steps[0] = {0u, 0x08u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[1] = {0u, 0u, 0u, 0x08u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[2] = {0u, 0u, 0u, 0u, 0u, 0u, false, 0, 0, 1, false, false};
+        compare_barrier(cfg);
+    }
+
+    // 15. Phase 4 abort via ESC key (heap_enter -> 0048c870 -> set 0xbd=1 -> heap_leave)
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = true;
+        cfg.seq_id = 70u;
+        cfg.mask = 0x10u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.use_key_cb = true;
+        cfg.cfg.script_count = 4u;
+        cfg.cfg.steps[0] = {0u, 0x10u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[1] = {0u, 0u, 0u, 0x10u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[2] = {0u, 0u, 0x10u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[3] = {0x1bu, 0u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.heap_enter_swaps_lock = 0x44332211u;
+        compare_barrier(cfg);
+    }
+
+    // 16. Canonical __cdecl frontier wrappers (application_main_function_0048cdf0 & startup_sequence_call_0048cdf0)
+    {
+        BarrierInit cfg{};
+        cfg.use_distinct_self = false;
+        cfg.seq_id = 88u;
+        cfg.mask = 0x03u;
+        cfg.active = 1u;
+        cfg.f_be = 1u;
+        cfg.use_key_cb = true;
+        cfg.cfg.script_count = 4u;
+        cfg.cfg.steps[0] = {0u, 0x03u, 0u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[1] = {0u, 0u, 0u, 0x03u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[2] = {0u, 0u, 0x03u, 0u, 0u, 0u, false, 0, 0, 0, false, false};
+        cfg.cfg.steps[3] = {0u, 0u, 0u, 0u, 0x03u, 0u, false, 0, 0, 0, false, false};
+        compare_frontier_wrapper(&porsche::application_main_function_0048cdf0, cfg);
+        compare_frontier_wrapper(&porsche::startup_sequence_call_0048cdf0, cfg);
+    }
+}
+
+int main() {
+    init();
+    run_cases();
+    std::printf("network_sync_barrier_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}
