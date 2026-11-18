@@ -1,0 +1,131 @@
+{
+  "run": 649,
+  "experiment": "local/experiments/v2-startup-sequence-resource-table-649",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table",
+    "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers",
+    "iterations/v2/001-original-recovery/runs/290-frame-service-cluster",
+    "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves",
+    "iterations/v2/001-original-recovery/runs/334-resource-open",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00561e00",
+      "bytes": 63,
+      "sha256": "f78f5bcefcb9c8d4d0aebf8a6941e95a2b939848cb11c5fe06bac54b82b1856b",
+      "token": "@BODY_00561E00@"
+    },
+    {
+      "va": "0059d9b0",
+      "bytes": 206,
+      "sha256": "67fefe2f5bf3db4a7a147cfbc16a6b1f740b2e80e7a7d2674873eccabc735dfd",
+      "token": "@BODY_0059D9B0@"
+    },
+    {
+      "va": "00452590",
+      "bytes": 198,
+      "sha256": "ffb8506fd5bffd55a85e4e51cccae68b67e402986ee2daf4d9cf3269a60b9c7f",
+      "token": "@BODY_00452590@"
+    },
+    {
+      "va": "004690d0",
+      "bytes": 17,
+      "sha256": "4f4307295da4d469e18b602ab3fc7fd4f8f9e33542012ec72bcedd4b97950eb0",
+      "token": "@BODY_004690D0@"
+    }
+  ],
+  "pass_marker": "startup_sequence_resource_table_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-561e00-diagnostic-flag",
+      "source": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp",
+      "old": "    context.callback_diagnostic_flag = 0u;",
+      "new": "    context.callback_diagnostic_flag = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-561e00-group-zero",
+      "source": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp",
+      "old": "    const std::uint32_t group = resource_leaf_group_005df770;",
+      "new": "    const std::uint32_t group = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-59d9b0-roots-inverted",
+      "source": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp",
+      "old": "    if (file_roots_enabled_006af370 == 0) {",
+      "new": "    if (file_roots_enabled_006af370 != 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-59d9b0-missing-code",
+      "source": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp",
+      "old": "        missing_file_006afbe4(name, -2);",
+      "new": "        missing_file_006afbe4(name, -1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-59d9b0-skip-fallback",
+      "source": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp",
+      "old": "    if (file_fallback_006af26c[0] != '\\0') {",
+      "new": "    if (file_fallback_006af26c[0] == '\\0') {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-452590-night-enabled-inverted",
+      "source": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp",
+      "old": "    if (startup_night_shape_enabled_00628a28 != 0u) {",
+      "new": "    if (startup_night_shape_enabled_00628a28 == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-452590-entry-offset",
+      "source": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp",
+      "old": "            reinterpret_cast<std::uintptr_t>(entry) + 0x10u);",
+      "new": "            reinterpret_cast<std::uintptr_t>(entry) + 0x08u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-452590-lookup-key1",
+      "source": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp",
+      "old": "        0x44414548u);",
+      "new": "        0x48454144u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-452590-skip-state-b-zero",
+      "source": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp",
+      "old": "    startup_head_state_b_0061e180 = 0u;",
+      "new": "    startup_head_state_b_0061e180 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4690d0-flag-value",
+      "source": "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.cpp",
+      "old": "    startup_sequence_flag_00619760 = 1u;",
+      "new": "    startup_sequence_flag_00619760 = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

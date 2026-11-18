@@ -1,16 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-18. Run648 shared audit (`001`) passes for frozen `646/002` (`646/001` preserved)+`647/002` (`647/001` preserved) on `645`.
-Build `001` compiles 369 TUs / 8 projects, 89 names / 92 refs, no EXE. Real
-frontier `startup_sequence_text_0044df10` closes (`-1`) while exposing
-`0044df70..0044dfa0` (`+4`); 505B `.data` (`005ce59c`, `005ce768`, `005ce8f4`,
-`00628bac`), 0B `.rdata`. Registry 997 adds five PARTIAL bodies (1249B total).
-README 648 owns commands and bounds: 192 native cases / 17 controls at
-`/Od`/`/O2`, 914 pins.
+Current 2026-11-18. Run651 shared audit (`001`) passes for frozen `649/002` (`649/001` preserved)+`650/001` on `648`.
+Build `001` compiles 371 TUs / 8 projects, 84 names / 88 refs, no EXE. Five
+real frontier names (`startup_sequence_call_004690d0` and
+`startup_text_fallback_0_0044df70`..`0044dfa0`) close with zero new names;
+295B `.data` (`005ce658..005ce763` + 31B loader-zero), 0B `.rdata`. Registry
+1008 adds eleven PARTIAL bodies (749B total). README 651 owns commands and
+bounds: 338 native cases / 22 controls at `/Od`/`/O2`, 919 pins.
 
-Verified pending packet: `649` (`00561e00`+`0059d9b0`+`00452590`+`004690d0`, 484B, closes `004690d0`).
-Active flash worker: `650` (`0044de50`..`0044dfe0`, 265B, closes `0044df70..0044dfa0`).
-Next integrate `649`+`650` in shared batch `651`.
+Active flash worker: `652` (`00472860`+`0059e440`+`004dd4a0`, 1188B, closes `004dd4a0`+`0059e440`).
+Next spawn `653` and integrate `652`+`653` in shared batch `654`.
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

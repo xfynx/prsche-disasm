@@ -4,24 +4,24 @@ Updated 2026-11-18. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run648](iterations/v2/001-original-recovery/runs/648-context-helpers-startup-text-integration/README.md)
-compiles 369 C++ translation units across 8 projects. The link has 89 unresolved names /
-92 references (closing `startup_sequence_text_0044df10`, while exposing its four local
-fallback targets `0044df70..0044dfa0`).
+[Run651](iterations/v2/001-original-recovery/runs/651-resource-table-text-fallbacks-integration/README.md)
+compiles 371 C++ translation units across 8 projects. The link has 84 unresolved names /
+88 references (closing `startup_sequence_call_004690d0` and `startup_text_fallback_0_0044df70`..`0044dfa0`
+with zero new unresolved names).
 **There is no recovered playable C++ game executable yet.**
 
-Run648 integrates five partial functions (1249 code bytes total: `0044b830`/`0044d320`/`0047f040`
-in `646/002` plus `0044df10`/`0044e010` in `647/002`), 505B `.data` (`005ce59c..005ce5fb` 96B,
-`005ce768..005ce8f3` 396B, `005ce8f4..005ce8fc` 9B, `00628bac..00628baf` 4B), and 0B new `.rdata`.
-Native comparisons pass 192 measured cases / 17 material controls at `/Od`/`/O2`. Canonical owners
-are reused. Shared audit verifies 914 source pins; registry 997 retains partial domains.
+Run651 integrates eleven partial functions (749 code bytes total: `00561e00`/`0059d9b0`/`00452590`/`004690d0`
+in `649/002` plus `0044de50`/`0044de60`/`0044df70`..`0044dfa0`/`0044dfe0` in `650/001`), 295B `.data`
+(264B fallback tables `005ce658..005ce763` + 31B loader-zero BSS), and 0B new `.rdata`. Native comparisons
+pass 338 measured cases / 22 material controls at `/Od`/`/O2`. Canonical owners are reused. Shared audit
+verifies 919 source pins; registry 1008 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run646 (`002`), Run647 (`002`), and Run648 (`001`) integration are accepted within their stated bounds.
-Run649 (`00561e00`..`004690d0`) and Run650 (`0044de50`..`0044dfe0`) are pending integration in Run651.
+Run649 (`002`), Run650 (`001`), and Run651 (`001`) integration are accepted within their stated bounds.
+Run652 (`00472860` + `0059e440` + `004dd4a0`) is active for integration in Run654.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.

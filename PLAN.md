@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run648](iterations/v2/001-original-recovery/runs/648-context-helpers-startup-text-integration/README.md).
-Startup context table helpers (`0044b830`..`0047f040`) and startup sequence text (`0044df10`/`0044e010`) close `startup_sequence_text_0044df10`.
-The shared build compiles 369 TUs with 89 unresolved names / 92 references.
+Latest recovery intake is [Run651](iterations/v2/001-original-recovery/runs/651-resource-table-text-fallbacks-integration/README.md).
+Startup sequence resource table (`00561e00`..`004690d0`) and startup text fallbacks (`0044de50`..`0044dfe0`) close five frontier dependencies.
+The shared build compiles 371 TUs with 84 unresolved names / 88 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are startup sequence resource table (`00561e00`/`0059d9b0`/`00452590`/`004690d0`) and startup text fallbacks (`0044de50`..`0044dfe0`). The real depth-conversion
+Next are game setup movie (`00472860`/`0059e440`/`004dd4a0`) and audio/render frontier leaves. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;
