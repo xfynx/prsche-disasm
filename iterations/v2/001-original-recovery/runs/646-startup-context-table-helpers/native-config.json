@@ -1,0 +1,98 @@
+{
+  "run": 646,
+  "experiment": "local/experiments/v2-startup-context-table-helpers-646",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers",
+    "iterations/v2/001-original-recovery/runs/290-frame-service-cluster",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0044b830",
+      "bytes": 136,
+      "sha256": "9df4778288dd4ce2bb76301d6f523560da38e0ebee0362a4bb771cc16ce352f8",
+      "token": "@BODY_0044B830@"
+    },
+    {
+      "va": "0044d320",
+      "bytes": 85,
+      "sha256": "ad4cd535d6ca2d98670350ecaae23c4eaf47b44b20a7063bdda821f6480cca13",
+      "token": "@BODY_0044D320@"
+    },
+    {
+      "va": "0047f040",
+      "bytes": 330,
+      "sha256": "c1f7ab319e41aa32821399bfe54e78223014ee3cf73eba993b7776e6837c415b",
+      "token": "@BODY_0047F040@"
+    }
+  ],
+  "pass_marker": "startup_context_table_helpers_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-44b830-upper-key-order",
+      "source": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp",
+      "old": "            if (node_key0 < key0 || (node_key0 == key0 && load32(cur, 0x14u) < key1)) {",
+      "new": "            if (node_key0 <= key0 || (node_key0 == key0 && load32(cur, 0x14u) < key1)) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44b830-post-check",
+      "source": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp",
+      "old": "    if (key0 < cand_key0 || (key0 == cand_key0 && key_pair[1] < load32(cand, 0x14u))) {",
+      "new": "    if (key0 < cand_key0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44d320-value-offset",
+      "source": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp",
+      "old": "    return load_ptr(node, 0x18u);",
+      "new": "    return load_ptr(node, 0x14u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-47f040-already-initialized-guard",
+      "source": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp",
+      "old": "    if (startup_context_table_00628bac != nullptr) {\n        return;\n    }",
+      "new": "    if (startup_context_table_00628bac == nullptr) {\n        return;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-47f040-table-alloc-bytes",
+      "source": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp",
+      "old": "    void* const table = startup_network_allocate_0059ef90(0xccu);",
+      "new": "    void* const table = startup_network_allocate_0059ef90(0xc8u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-47f040-cap-offset",
+      "source": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp",
+      "old": "    const std::uint32_t target_cap = load32(service_sub, 0x88u);",
+      "new": "    const std::uint32_t target_cap = load32(service_sub, 0x84u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-47f040-vec-storage-bytes",
+      "source": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp",
+      "old": "            new_buf = application_context_member_storage_004211d0(target_cap << 2, 0u);",
+      "new": "            new_buf = application_context_member_storage_004211d0(target_cap, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

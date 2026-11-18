@@ -18642,6 +18642,138 @@
           "0055569e"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0044b830",
+      "source": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "thiscall2 void** RET8 (startup_context_tree_find_0044b830; C++ __fastcall with unused EDX); searches red-black tree at ECX+4 by 64-bit unsigned key pair (key_pair[1] high, key_pair[0] low), stores matching or sentinel node at *out_node, returns out_node",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/648-context-helpers-startup-text-integration/validation.json",
+      "verification_boundary": "Shared648(001) PASS:112 native cases (56 per optimization in 646/002 at Od/O2; 646/001 preserved) and 7 material controls. SHAc2f564d7940bfc64e07796223f37a4b45f20e1f9d62570b31d1d6a0273a6e6ee. Zero new data. Build369TUs/89names92refs/noEXE.",
+      "partial_reason": "Bounded red-black tree arenas without cycles; additional callers 0044d380/0044a770 remain open.",
+      "body_bytes": 136,
+      "body_ranges": [
+        [
+          "0044b830",
+          "0044b8b7"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0044d320",
+      "source": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "thiscall2 void* RET8 (startup_context_table_lookup_0044d320; C++ __fastcall with unused EDX); returns nullptr when self+0x0c==0, else queries tree at self+0x04 via 0044b830 and returns node[6] (+0x18) when found",
+      "recovered_dependencies": [
+        "0044b830"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/648-context-helpers-startup-text-integration/validation.json",
+      "verification_boundary": "Shared648(001) PASS:112 native cases (56 per optimization in 646/002 at Od/O2; 646/001 preserved) and 7 material controls. SHAc2f564d7940bfc64e07796223f37a4b45f20e1f9d62570b31d1d6a0273a6e6ee. Zero new data. Build369TUs/89names92refs/noEXE.",
+      "partial_reason": "Bounded tree arenas; parent caller 00452590 and 18 other call sites remain open.",
+      "body_bytes": 85,
+      "body_ranges": [
+        [
+          "0044d320",
+          "0044d374"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0047f040",
+      "source": "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers/startup_context_table_helpers_646.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 void RET0 (startup_context_table_init_0047f040); allocates 0x1cB context table via 0059ef90, initializes 0x24B sentinel via 004211d0 (or small-block freelist at 005e4fe8+0x28 via 005322b0/005322c0 or 0059ecd0), copies frame_service_root_00628960+0x54 to +0x18, stores at startup_context_table_00628bac",
+      "recovered_dependencies": [
+        "004211d0",
+        "005322b0",
+        "005322c0",
+        "0059ecd0",
+        "0059ef90"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/648-context-helpers-startup-text-integration/validation.json",
+      "verification_boundary": "Shared648(001) PASS:112 native cases (56 per optimization in 646/002 at Od/O2; 646/001 preserved) and 7 material controls. SHAc2f564d7940bfc64e07796223f37a4b45f20e1f9d62570b31d1d6a0273a6e6ee. Owns 4B loader-zero .data (00628bac..00628baf). Build369TUs/89names92refs/noEXE.",
+      "partial_reason": "Controlled heap/sentinel arenas; external owner of frame_service_root_00628960 (00471b70/00471c40) and parent 004690d0 remain open.",
+      "body_bytes": 330,
+      "body_ranges": [
+        [
+          "0047f040",
+          "0047f189"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0044df10",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 void RET0 (startup_sequence_text_0044df10); calls render_texture_format_16bit_mode_00554930(1), invokes startup_text_load_0044e010(text_va), and dispatches quality fallback table [0044df70, 0044df80, 0044df90, 0044dfa0] indexed by render_quality_selected_00619770 on false",
+      "recovered_dependencies": [
+        "0044e010",
+        "00554930"
+      ],
+      "unrecovered_dependencies": [
+        "0044df70",
+        "0044df80",
+        "0044df90",
+        "0044dfa0"
+      ],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/648-context-helpers-startup-text-integration/validation.json",
+      "verification_boundary": "Shared648(001) PASS:80 native cases (40 per optimization in 647/002 at Od/O2; 647/001 preserved) and 10 material controls. SHAb76d5122b2d7da6a1b852187c09d96a5ecd82053de8996978d947421fc8bf8d6. Reuses 00619770; exposes 0044df70..0044dfa0. Build369TUs/89names92refs/noEXE.",
+      "partial_reason": "Quality index in 0..3; fallback targets 0044df70..0044dfa0 remain open for Run650.",
+      "body_bytes": 83,
+      "body_ranges": [
+        [
+          "0044df10",
+          "0044df62"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0044e010",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl1 bool RET0 (startup_text_load_0044e010); formats '%s%s.dtx' (005ce8f4) from 0065b2b8 and 00657444 via 005a0fbf, updates slot[9] counts from 005ce59c masks, checks 0059dc30, loads 11 byte counts via 0059d8e0, accumulates high/low totals, binds slots via 00555640, frees via 00531f90",
+      "recovered_dependencies": [
+        "00531f90",
+        "00555640",
+        "0059d8e0",
+        "0059dc30",
+        "005a0fbf"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/648-context-helpers-startup-text-integration/validation.json",
+      "verification_boundary": "Shared648(001) PASS:80 native cases (40 per optimization in 647/002 at Od/O2; 647/001 preserved) and 10 material controls. SHAb76d5122b2d7da6a1b852187c09d96a5ecd82053de8996978d947421fc8bf8d6. Owns 501B .data (005ce59c..005ce5fb 96B, 005ce768..005ce8f3 396B, 005ce8f4..005ce8fc 9B). Build369TUs/89names92refs/noEXE.",
+      "partial_reason": "Bounded <=99B formatted paths and non-null 11B resource buffer when rooted_file_exists_0059dc30 succeeds.",
+      "body_bytes": 615,
+      "body_ranges": [
+        [
+          "0044e010",
+          "0044e276"
+        ]
+      ]
     }
   ]
 }

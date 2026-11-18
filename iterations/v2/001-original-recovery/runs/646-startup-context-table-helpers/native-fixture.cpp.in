@@ -1,0 +1,622 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "startup_context_table_helpers_646.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::startup_context_table_00628bac) == 4u,
+              "4-byte context table pointer");
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+static B* code = nullptr;
+static B* slot_44b830 = nullptr;
+static B* slot_44d320 = nullptr;
+static B* slot_47f040 = nullptr;
+
+static U cases = 0u;
+alignas(16) static B floating[512] = {};
+
+// Fixture storage for 005e4fe8 and 00628960.
+static void* fixture_heap_state_005e4fe8 = nullptr;
+
+// Controlled arenas for 0047f040.
+static B table_arena[0xcc] = {};
+static B vec_arena[0x0c] = {};
+static B member_buf_arena[0x400] = {};
+static B root_arena[0x20] = {};
+static B service_sub_arena[0x90] = {};
+static B mgr_arena[0x100] = {};
+
+// Tree arenas for 0044b830 / 0044d320.
+struct TreeNode {
+    U color_or_pad;
+    TreeNode* parent;
+    TreeNode* left;
+    TreeNode* right;
+    U key0;
+    U key1;
+    void* value;
+    U extra;
+};
+static_assert(sizeof(TreeNode) == 0x20u);
+
+static TreeNode tree_nodes[16] = {};
+static void* tree_header_ptr = nullptr;
+static B holder_arena[0x10] = {};
+
+enum EventTag : U {
+    kEvAlloc59ef90 = 1u,
+    kEvMemberAlloc4211d0 = 2u,
+    kEvRelease59ecd0 = 3u,
+    kEvHeapEnter = 4u,
+    kEvHeapLeave = 5u,
+};
+
+struct Event {
+    U tag;
+    U a0;
+    U a1;
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U out_val;
+    U exception[3];
+    U count;
+    Event events[32];
+    B final_table[0xcc];
+    B final_vec[0x0c];
+    U final_global_628bac;
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+struct AllocScenario {
+    bool fail_table;
+    bool fail_vec;
+    bool fail_member_buf;
+    U target_cap;
+    U seed_global_value;
+};
+
+static AllocScenario alloc_cfg{};
+static U alloc_seq = 0u;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U normalize_ptr(U p) {
+    if (p == 0u) return 0u;
+    if (p == address(table_arena)) return 0xa0000001u;
+    if (p == address(vec_arena)) return 0xa0000002u;
+    if (p == address(member_buf_arena)) return 0xa0000003u;
+    return p;
+}
+
+static void record_event(U tag, U a0 = 0u, U a1 = 0u) {
+    require(trace.count < 32u, "event capacity");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.a0 = a0;
+    e.a1 = a1;
+}
+
+namespace porsche {
+
+std::uint32_t frame_service_root_00628960 = 0u;
+
+void* __cdecl startup_network_allocate_0059ef90(std::uint32_t bytes) {
+    record_event(kEvAlloc59ef90, bytes, 0u);
+    const U call_idx = alloc_seq++;
+    if (call_idx == 0u) {
+        return alloc_cfg.fail_table ? nullptr : static_cast<void*>(table_arena);
+    }
+    if (call_idx == 1u) {
+        return alloc_cfg.fail_vec ? nullptr : static_cast<void*>(vec_arena);
+    }
+    return nullptr;
+}
+
+void* __cdecl application_context_member_storage_004211d0(std::uint32_t bytes,
+                                                          std::uint32_t mode) {
+    record_event(kEvMemberAlloc4211d0, bytes, mode);
+    if (alloc_cfg.fail_member_buf) {
+        return nullptr;
+    }
+    return static_cast<void*>(member_buf_arena);
+}
+
+void __cdecl context_table_release_0059ecd0(void* block) {
+    record_event(kEvRelease59ecd0, normalize_ptr(address(block)), 0u);
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    record_event(kEvHeapEnter, address(lock), 0u);
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    record_event(kEvHeapLeave, address(lock), 0u);
+}
+
+void* __cdecl application_context_heap_state_005e4fe8() {
+    return fixture_heap_state_005e4fe8;
+}
+
+} // namespace porsche
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static U invoke_thiscall2(void* fn, void* ecx_ptr, U arg1, U arg2, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg2
+        push arg1
+        mov ecx, ecx_ptr
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl0(void* fn) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U base_va, U off, U orig_target, const void* target) {
+    const U insn_va = base_va + off + 4u;
+    const U expected_rel = orig_target - insn_va;
+    require(word(slot, off) == expected_rel, "exact relative call offset");
+    const U new_rel = address(target) - (address(slot) + off + 4u);
+    put(slot, off, new_rel);
+}
+
+static void init() {
+    // Assert production initial .data state before any fixture reset.
+    require(porsche::startup_context_table_00628bac == nullptr, "initial .data 00628bac");
+
+    static const B body_44b830[] = {@BODY_0044B830@};
+    static const B body_44d320[] = {@BODY_0044D320@};
+    static const B body_47f040[] = {@BODY_0047F040@};
+    require(sizeof body_44b830 == 136u, "136-byte original body 0044b830");
+    require(sizeof body_44d320 == 85u, "85-byte original body 0044d320");
+    require(sizeof body_47f040 == 330u, "330-byte original body 0047f040");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+
+    slot_44b830 = code;
+    slot_44d320 = code + 0x100u;
+    slot_47f040 = code + 0x200u;
+    std::memcpy(slot_44b830, body_44b830, sizeof body_44b830);
+    std::memcpy(slot_44d320, body_44d320, sizeof body_44d320);
+    std::memcpy(slot_47f040, body_47f040, sizeof body_47f040);
+
+    // Relocate 0044d320 call to 0044b830.
+    relocate_rel32(slot_44d320, 0x0044d320u, 0x036u, 0x0044b830u, slot_44b830);
+
+    // Relocate 0047f040 absolute data cells and relative calls.
+    relocate_abs32(slot_47f040, 0x001u, 0x00628bacu,
+                   address(&porsche::startup_context_table_00628bac));
+    relocate_abs32(slot_47f040, 0x04eu, 0x00628960u,
+                   address(&porsche::frame_service_root_00628960));
+    relocate_abs32(slot_47f040, 0x0cdu, 0x005e4fe8u,
+                   address(&fixture_heap_state_005e4fe8));
+    relocate_abs32(slot_47f040, 0x134u, 0x00628bacu,
+                   address(&porsche::startup_context_table_00628bac));
+    relocate_abs32(slot_47f040, 0x140u, 0x00628bacu,
+                   address(&porsche::startup_context_table_00628bac));
+
+    relocate_rel32(slot_47f040, 0x0047f040u, 0x01au, 0x0059ef90u,
+                   reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_rel32(slot_47f040, 0x0047f040u, 0x032u, 0x0059ef90u,
+                   reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_rel32(slot_47f040, 0x0047f040u, 0x092u, 0x004211d0u,
+                   reinterpret_cast<const void*>(
+                       &porsche::application_context_member_storage_004211d0));
+    relocate_rel32(slot_47f040, 0x0047f040u, 0x0e5u, 0x0059ecd0u,
+                   reinterpret_cast<const void*>(&porsche::context_table_release_0059ecd0));
+    relocate_rel32(slot_47f040, 0x0047f040u, 0x0f2u, 0x005322b0u,
+                   reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    relocate_rel32(slot_47f040, 0x0047f040u, 0x10bu, 0x005322c0u,
+                   reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void init_empty_tree() {
+    std::memset(tree_nodes, 0, sizeof tree_nodes);
+    tree_nodes[0].parent = nullptr;
+    tree_nodes[0].left = &tree_nodes[0];
+    tree_nodes[0].right = &tree_nodes[0];
+    tree_header_ptr = &tree_nodes[0];
+    put(holder_arena, 0x08u, address(&tree_header_ptr));
+}
+
+static void set_node(U idx, TreeNode* left, TreeNode* right, U k0, U k1, U val) {
+    tree_nodes[idx].left = left;
+    tree_nodes[idx].right = right;
+    tree_nodes[idx].key0 = k0;
+    tree_nodes[idx].key1 = k1;
+    tree_nodes[idx].value = reinterpret_cast<void*>(static_cast<std::uintptr_t>(val));
+}
+
+static void build_sample_tree() {
+    init_empty_tree();
+    // Root = node 4: (0, 0x80000000)
+    tree_nodes[0].parent = &tree_nodes[4];
+    set_node(4, &tree_nodes[2], &tree_nodes[6], 0u, 0x80000000u, 0x1004u);
+    // Left subtree of 4
+    set_node(2, &tree_nodes[1], &tree_nodes[3], 0u, 0x44414548u, 0x1002u);
+    set_node(1, nullptr, nullptr, 0u, 0u, 0x1001u);
+    set_node(3, nullptr, nullptr, 0u, 0x7fffffffu, 0x1003u);
+    // Right subtree of 4
+    set_node(6, &tree_nodes[5], &tree_nodes[7], 0x80000000u, 0u, 0x1006u);
+    set_node(5, nullptr, nullptr, 0u, 0xffffffffu, 0x1005u);
+    set_node(7, nullptr, &tree_nodes[8], 0x80000000u, 10u, 0x1007u);
+    set_node(8, nullptr, nullptr, 0xffffffffu, 0xffffffffu, 0x1008u);
+}
+
+static void run_find_pair(U k0, U k1) {
+    ++cases;
+    U key_pair[2] = {k0, k1};
+    void* out_orig = reinterpret_cast<void*>(0xdeadbeefu);
+    void* out_cpp = reinterpret_cast<void*>(0xdeadbeefu);
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_thiscall2(slot_44b830, &tree_header_ptr,
+                                          address(&out_orig), address(key_pair),
+                                          trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    trace.out_val = address(out_orig);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_thiscall2(
+            reinterpret_cast<void*>(&porsche::startup_context_tree_find_0044b830),
+            &tree_header_ptr, address(&out_cpp), address(key_pair), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    trace.out_val = address(out_cpp);
+    capture_fpu(trace.fpu);
+
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "44b830 ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "44b830 exception");
+    require(expected.ret_eax == address(&out_orig), "44b830 orig return ptr");
+    require(trace.ret_eax == address(&out_cpp), "44b830 cpp return ptr");
+    require(trace.out_val == expected.out_val, "44b830 matched node");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0, "44b830 FPU");
+}
+
+static void run_lookup_pair(U k0, U k1) {
+    ++cases;
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_thiscall2(slot_44d320, holder_arena, k0, k1, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_thiscall2(
+            reinterpret_cast<void*>(&porsche::startup_context_table_lookup_0044d320),
+            holder_arena, k0, k1, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_fpu(trace.fpu);
+
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "44d320 ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "44d320 exception");
+    require(trace.ret_eax == expected.ret_eax, "44d320 return value");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0, "44d320 FPU");
+}
+
+static void reset_init_arenas(const AllocScenario& sc) {
+    alloc_cfg = sc;
+    alloc_seq = 0u;
+    std::memset(table_arena, 0xa5, sizeof table_arena);
+    std::memset(vec_arena, 0x5a, sizeof vec_arena);
+    std::memset(member_buf_arena, 0x3c, sizeof member_buf_arena);
+    std::memset(root_arena, 0, sizeof root_arena);
+    std::memset(service_sub_arena, 0, sizeof service_sub_arena);
+    std::memset(mgr_arena, 0, sizeof mgr_arena);
+
+    put(service_sub_arena, 0x88u, sc.target_cap);
+    put(root_arena, 0x10u, address(service_sub_arena));
+    porsche::frame_service_root_00628960 = address(root_arena);
+    fixture_heap_state_005e4fe8 = mgr_arena;
+    porsche::startup_context_table_00628bac =
+        reinterpret_cast<void*>(static_cast<std::uintptr_t>(sc.seed_global_value));
+}
+
+static void capture_init_state(Trace& out) {
+    std::memcpy(out.final_table, table_arena, sizeof out.final_table);
+    std::memcpy(out.final_vec, vec_arena, sizeof out.final_vec);
+    // Normalize pointers stored inside table+0xa4 and vec+0x00/0x04/0x08.
+    put(out.final_table, 0xa4u, normalize_ptr(word(out.final_table, 0xa4u)));
+    const U v0 = word(out.final_vec, 0x00u);
+    const U v1 = word(out.final_vec, 0x04u);
+    const U v2 = word(out.final_vec, 0x08u);
+    put(out.final_vec, 0x00u, normalize_ptr(v0));
+    if (v0 == address(member_buf_arena)) {
+        put(out.final_vec, 0x04u, 0xb0000000u + (v1 - v0));
+        put(out.final_vec, 0x08u, 0xb0000000u + (v2 - v0));
+    }
+    out.final_global_628bac = normalize_ptr(address(porsche::startup_context_table_00628bac));
+}
+
+static void run_init_pair(const AllocScenario& sc) {
+    ++cases;
+
+    std::memset(&trace, 0, sizeof trace);
+    reset_init_arenas(sc);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl0(slot_47f040);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_init_state(trace);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    reset_init_arenas(sc);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl0(
+            reinterpret_cast<void*>(&porsche::startup_context_table_init_0047f040));
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_init_state(trace);
+    capture_fpu(trace.fpu);
+
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "47f040 ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "47f040 exception");
+    require(trace.count == expected.count, "47f040 event count");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag &&
+                trace.events[i].a0 == expected.events[i].a0 &&
+                trace.events[i].a1 == expected.events[i].a1,
+                "47f040 event mismatch");
+    }
+    require(std::memcmp(trace.final_table, expected.final_table, sizeof trace.final_table) == 0,
+            "47f040 table bytes");
+    require(std::memcmp(trace.final_vec, expected.final_vec, sizeof trace.final_vec) == 0,
+            "47f040 vec bytes");
+    require(trace.final_global_628bac == expected.final_global_628bac, "47f040 global 00628bac");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0, "47f040 FPU");
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    // 1. Empty tree tests for 0044b830 and 0044d320.
+    init_empty_tree();
+    run_find_pair(0u, 0u);
+    run_find_pair(0u, 0x44414548u);
+    run_lookup_pair(0u, 0x44414548u);
+
+    // 2. Single-node tree tests for 0044b830 and 0044d320.
+    init_empty_tree();
+    tree_nodes[0].parent = &tree_nodes[1];
+    set_node(1, nullptr, nullptr, 10u, 20u, 0x2222u);
+    run_find_pair(10u, 20u);
+    run_find_pair(9u, 20u);
+    run_find_pair(11u, 20u);
+    run_find_pair(10u, 19u);
+    run_find_pair(10u, 21u);
+    run_lookup_pair(10u, 20u);
+    run_lookup_pair(10u, 19u);
+
+    // 3. Multi-node tree with unsigned 32-bit boundary keys and 'HEAD' key.
+    build_sample_tree();
+    const struct { U k0; U k1; } queries[] = {
+        {0u, 0u},
+        {0u, 1u},
+        {0u, 0x44414547u},
+        {0u, 0x44414548u},
+        {0u, 0x44414549u},
+        {0u, 0x7fffffffu},
+        {0u, 0x80000000u},
+        {0u, 0x80000001u},
+        {0u, 0xfffffffeu},
+        {0u, 0xffffffffu},
+        {0x7fffffffu, 0xffffffffu},
+        {0x80000000u, 0u},
+        {0x80000000u, 5u},
+        {0x80000000u, 10u},
+        {0x80000000u, 11u},
+        {0xffffffffu, 0xfffffffeu},
+        {0xffffffffu, 0xffffffffu},
+    };
+    for (const auto& q : queries) {
+        run_find_pair(q.k0, q.k1);
+        run_lookup_pair(q.k0, q.k1);
+    }
+
+    // 4. Hit with nullptr payload in node+0x18 and duplicate-key lower_bound.
+    init_empty_tree();
+    tree_nodes[0].parent = &tree_nodes[1];
+    set_node(1, &tree_nodes[2], nullptr, 5u, 5u, 0u);
+    set_node(2, nullptr, nullptr, 5u, 5u, 0x9999u);
+    run_find_pair(5u, 5u);
+    run_lookup_pair(5u, 5u);
+
+    // 5. Unsorted candidate node where cand->key0 < key0 (exercises 0044b87f jne).
+    init_empty_tree();
+    tree_nodes[0].parent = &tree_nodes[1];
+    set_node(1, nullptr, nullptr, 100u, 0u, 0x5555u);
+    // Make node 1 key0 smaller than query while reached as candidate via left? No:
+    // if node 1 has key0=100, and left child node 2 has key0=50, query (60, 0) stops at cand=node1 (100>60).
+    // If root node 1 has key0=100 and right child isn't taken because left child node 2 has key0=50 and node 2->left is node 3 with key0=10?
+    // Wait: at node 1 (100 >= 60): cand=1, go left to node 2 (50 < 60): go right (null). cand stays node 1 (100).
+    // To get cand->key0 < key0, node 2 must be taken when node 2->key0 >= 100, then its left child has smaller? No, then cand updates.
+    // What if node 2 (left of root 100) has key0=60, key1=5, query=(60, 10)? node2 < query -> cand stays 100.
+    // To reach cand->key0 < key0 requires an unsorted left child: node 1 (key0=200) -> cand=1, left child node 2 (key0=50) -> if node 2 has key0=50 and we query (60,0), cand is 200;
+    // if node 1 has key0=50? Then node 1 < 60 so cand isn't updated.
+    // So in any tree where cand is updated only when node >= key, cand >= key always holds!
+    // What if node 1 has (200, 0), left child node 2 has (60, 10), and query is (60, 5)? Then cand=2 (60, 10), key0==cand_key0 && key1<cand_key1.
+    set_node(1, &tree_nodes[2], nullptr, 200u, 0u, 0x5555u);
+    set_node(2, nullptr, nullptr, 60u, 10u, 0x6666u);
+    run_find_pair(60u, 5u);
+    run_lookup_pair(60u, 5u);
+
+    // 6. 0047f040 tests.
+    run_init_pair({false, false, false, 0u, 0x12345678u}); // already initialized -> early return
+    run_init_pair({true,  false, false, 4u, 0u});          // 0xcc alloc returns nullptr
+    run_init_pair({false, false, false, 0u, 0u});          // target_cap == 0 -> skip 004211d0
+    run_init_pair({false, false, false, 1u, 0u});          // target_cap == 1
+    run_init_pair({false, false, false, 4u, 0u});          // target_cap == 4
+    run_init_pair({false, false, false, 64u, 0u});         // target_cap == 64 (0x100B)
+    run_init_pair({false, false, false, 65u, 0u});         // target_cap == 65 (0x104B)
+    run_init_pair({false, false, true,  8u, 0u});          // 004211d0 returns nullptr
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("startup_context_table_helpers_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

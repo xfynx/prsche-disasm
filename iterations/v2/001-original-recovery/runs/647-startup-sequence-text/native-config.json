@@ -1,0 +1,140 @@
+{
+  "run": 647,
+  "experiment": "local/experiments/v2-startup-sequence-text-647",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/install_paths_storage.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/647-startup-sequence-text",
+    "iterations/v2/001-original-recovery/runs/313-pr9-resource-open",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/runs/499-rooted-file-exists",
+    "iterations/v2/001-original-recovery/runs/596-startup-quality-tier",
+    "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0044df10",
+      "bytes": 83,
+      "sha256": "f5059db380db42931ac81fd47aad19a79e21ea0e7ced174212e3ecbcdd841456",
+      "token": "@BODY_0044DF10@"
+    },
+    {
+      "va": "0044e010",
+      "bytes": 615,
+      "sha256": "6908ff62044e244d73104e8cca4803513fb1b3203729570d73c0513c8d135e5a",
+      "token": "@BODY_0044E010@"
+    },
+    {
+      "va": "005ce59c",
+      "bytes": 96,
+      "sha256": "493ed4627abe3ebd9cdd3351d205ae4e0d36cfc856690296f57f716c0f19ed44",
+      "token": "@BODY_005CE59C@"
+    },
+    {
+      "va": "005ce768",
+      "bytes": 396,
+      "sha256": "eeda48d0e41e12044ece7788f5c71660ae53c4e1682510366e3d35c7556ac094",
+      "token": "@BODY_005CE768@"
+    },
+    {
+      "va": "005ce8f4",
+      "bytes": 9,
+      "sha256": "4aa5d1a1e18d61e122c6fd88a460113283655619714b8556ad07fc15fd76dffe",
+      "token": "@BODY_005CE8F4@"
+    }
+  ],
+  "pass_marker": "startup_sequence_text_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-44df10-16bit-mode-arg",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "old": "    render_texture_format_16bit_mode_00554930(1);",
+      "new": "    render_texture_format_16bit_mode_00554930(0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44df10-fallback-polarity",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "old": "    if (!startup_text_load_0044e010(text_va)) {",
+      "new": "    if (startup_text_load_0044e010(text_va)) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44df10-fallback-table-order",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "old": "        &startup_text_fallback_1_0044df80,\n        &startup_text_fallback_2_0044df90,",
+      "new": "        &startup_text_fallback_2_0044df90,\n        &startup_text_fallback_1_0044df80,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44e010-alt-slot-5ce8bc",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "old": "    const std::uint32_t mask_bc = startup_text_quality_masks_005ce59c[row_base + (alt_mode ? 5u : 2u)];",
+      "new": "    const std::uint32_t mask_bc = startup_text_quality_masks_005ce59c[row_base + (alt_mode ? 0u : 2u)];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44e010-5ce8c0-values",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "old": "    startup_text_slots_005ce768[9].counts[3] = ((mask_c0 & 0x0200u) != 0u) ? 2u : 3u;",
+      "new": "    startup_text_slots_005ce768[9].counts[3] = ((mask_c0 & 0x0200u) != 0u) ? 3u : 2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44e010-dtx-sign-extend",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "old": "        startup_text_slots_005ce768[i].counts[0] = static_cast<std::uint32_t>(dtx_bytes[i]);",
+      "new": "        startup_text_slots_005ce768[i].counts[0] = static_cast<std::uint32_t>(static_cast<std::int8_t>(dtx_bytes[i]));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44e010-skip-self-mask",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "old": "                    (size == 0x80u && (byte1 & 0x04u) != 0u) ||",
+      "new": "                    (size == 0x80u && (byte1 & 0x08u) != 0u) ||",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44e010-take-next-offset",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "old": "                    const std::uint32_t val = startup_text_slots_005ce768[i + 2u].counts[sub];",
+      "new": "                    const std::uint32_t val = startup_text_slots_005ce768[i + 1u].counts[sub];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44e010-format-b-for-2",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "old": "        const std::uint32_t format_b = (entry.format == 2) ? 4u : 0u;",
+      "new": "        const std::uint32_t format_b = (entry.format == 2) ? 2u : 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-44e010-second-bind-flags",
+      "source": "iterations/v2/001-original-recovery/runs/647-startup-sequence-text/startup_sequence_text_647.cpp",
+      "old": "            format_b,\n            0u);",
+      "new": "            format_b,\n            flags);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

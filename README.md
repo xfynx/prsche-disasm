@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run645](iterations/v2/001-original-recovery/runs/645-audio-transition-text-leaves-integration/README.md)
-  integrates the partial audio transition finish and render/startup text leaf providers.
-  The shared build has 86 unresolved names across 367 TUs.
+  [Run648](iterations/v2/001-original-recovery/runs/648-context-helpers-startup-text-integration/README.md)
+  integrates the partial startup context table helpers and startup sequence text providers.
+  The shared build has 89 unresolved names across 369 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

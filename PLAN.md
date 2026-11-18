@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run645](iterations/v2/001-original-recovery/runs/645-audio-transition-text-leaves-integration/README.md).
-Audio transition finish `004ae4d0`/`004ae8c0` and five render/startup text leaves (`0053c640`..`00555640`) close three frontier dependencies.
-The shared build compiles 367 TUs with 86 unresolved names / 89 references.
+Latest recovery intake is [Run648](iterations/v2/001-original-recovery/runs/648-context-helpers-startup-text-integration/README.md).
+Startup context table helpers (`0044b830`..`0047f040`) and startup sequence text (`0044df10`/`0044e010`) close `startup_sequence_text_0044df10`.
+The shared build compiles 369 TUs with 89 unresolved names / 92 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are startup context table helpers (`0044b830`/`0044d320`/`0047f040`) and startup sequence text (`0044e010`/`0044df10`). The real depth-conversion
+Next are startup sequence resource table (`00561e00`/`0059d9b0`/`00452590`/`004690d0`) and startup text fallbacks (`0044de50`..`0044dfe0`). The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;
