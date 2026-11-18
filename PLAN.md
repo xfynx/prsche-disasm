@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run639](iterations/v2/001-original-recovery/runs/639-audio-status-prng-integration/README.md).
-Audio stream/channel status `00567810`/`00567850`/`00591320` and render seed PRNG `00538040` integrate as unblocking dependencies for `004ae4d0`/`004ae8c0`.
-The shared build compiles 363 TUs with 88 unresolved names / 91 references.
+Latest recovery intake is [Run642](iterations/v2/001-original-recovery/runs/642-pattern-match-codec-leaves-integration/README.md).
+Wildcard pattern matcher `004a5f90` and five audio stream codec leaves (`0056bce0`..`0056c540`) integrate as unblocking dependencies.
+The shared build compiles 365 TUs with 88 unresolved names / 91 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are wildcard pattern matcher `004a5f90` (unblocking `004ae4d0`/`004ae8c0`) and audio stream codec leaves (`0056bce0`..`0056c540`). The real depth-conversion
+Next are audio transition finish `004ae4d0`/`004ae8c0` (closing three frontier names) and render/startup text leaves (`0053c640`..`00555640`). The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;

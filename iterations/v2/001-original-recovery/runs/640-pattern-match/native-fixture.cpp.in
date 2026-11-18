@@ -1,0 +1,423 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "audio_transition_pattern_match_640.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::audio_transition_pattern_ops_005d13bc) == 6u,
+              "6-byte operator string");
+
+static U address(const void* p) { return static_cast<U>(reinterpret_cast<std::uintptr_t>(p)); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+enum EventTag : U {
+    kEvFindLast = 1u,
+    kEvDigit = 2u,
+    kEvLower = 3u,
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    B pat[64];
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[512];
+    B final_pattern[64];
+    B final_ops[6];
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static bool cpp_side = false;
+
+static B text_buf[64] = {};
+static B pattern_buf[64] = {};
+alignas(16) static B floating[512];
+static B* code = nullptr;
+static B* slot_4a5f90 = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u cpp=%u\n", msg, cases, static_cast<U>(cpp_side));
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void record_event(U tag, U arg0, U arg1) {
+    require(trace.count < 512u, "event capacity");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    std::memcpy(e.pat, pattern_buf, sizeof(e.pat));
+}
+
+namespace porsche {
+
+const char* __cdecl formatter_text_find_last_005a2870(const char* text, int value) {
+    const std::uintptr_t base = reinterpret_cast<std::uintptr_t>(pattern_buf);
+    const std::uintptr_t ptr = reinterpret_cast<std::uintptr_t>(text);
+    const U offset = (ptr >= base && ptr < base + sizeof(pattern_buf))
+        ? static_cast<U>(ptr - base)
+        : 0xffffffffu;
+    record_event(kEvFindLast, offset, static_cast<U>(value));
+
+    const unsigned char target = static_cast<unsigned char>(value);
+    const char* last = nullptr;
+    for (const char* p = text;; ++p) {
+        if (static_cast<unsigned char>(*p) == target) {
+            last = p;
+        }
+        if (*p == '\0') {
+            break;
+        }
+    }
+    return last;
+}
+
+int __cdecl formatter_text_digit_005a2c52(int c) {
+    record_event(kEvDigit, static_cast<U>(c), 0u);
+    return (c >= '0' && c <= '9') ? 4 : 0;
+}
+
+int __cdecl formatter_float_lower_005a2248(int c) {
+    record_event(kEvLower, static_cast<U>(c), 0u);
+    return (c >= 'A' && c <= 'Z') ? (c + 32) : c;
+}
+
+} // namespace porsche
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+__declspec(noinline) static U invoke_cdecl2(void* fn, U a0, U a1, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push a1
+        push a0
+        call fn
+        add esp, 8
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_call(B* slot, U off, U orig_va, U orig_target, const void* target) {
+    const U actual = orig_va + 4u + word(slot, off);
+    require(actual == orig_target, "exact relative call target");
+    const U rel = address(target) - (address(slot) + off + 4u);
+    put(slot, off, rel);
+}
+
+static void init() {
+    // Assert production initial .data state against raw PE bytes before any fixture reset.
+    static const B orig_ops_5d13bc[] = {@BODY_005D13BC@};
+    require(sizeof orig_ops_5d13bc == 6u, "6-byte original .data 005d13bc..005d13c1");
+    require(std::memcmp(porsche::audio_transition_pattern_ops_005d13bc, orig_ops_5d13bc, 6u) == 0,
+            "initial .data 005d13bc..005d13c1");
+
+    static const B body_4a5f90[] = {@BODY_004A5F90@};
+    require(sizeof body_4a5f90 == 464u, "464-byte original body 004a5f90");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_4a5f90 = code;
+    std::memcpy(slot_4a5f90, body_4a5f90, sizeof body_4a5f90);
+
+    const U ops_ptr = address(porsche::audio_transition_pattern_ops_005d13bc);
+    relocate_abs32(slot_4a5f90, 0x001u, 0x005d13bcu, ops_ptr);
+    relocate_abs32(slot_4a5f90, 0x011u, 0x005d13bcu, ops_ptr);
+
+    // Verify all 11 internal recursive E8 calls resolve to 004a5f90 before relocation.
+    static const U kSelfCallOffsets[] = {
+        0x04eu, 0x05fu, 0x08du, 0x09eu, 0x0d6u, 0x0dfu,
+        0x0fcu, 0x10du, 0x18du, 0x1a2u, 0x1bau,
+    };
+    for (U off : kSelfCallOffsets) {
+        const U orig_next_va = 0x004a5f90u + off + 4u;
+        const U orig_target = orig_next_va + word(slot_4a5f90, off);
+        require(orig_target == 0x004a5f90u, "self-recursive call target");
+    }
+
+    relocate_call(slot_4a5f90, 0x021u, 0x004a5fb1u, 0x005a2870u,
+                  reinterpret_cast<const void*>(&porsche::formatter_text_find_last_005a2870));
+    relocate_call(slot_4a5f90, 0x150u, 0x004a60e0u, 0x005a2c52u,
+                  reinterpret_cast<const void*>(&porsche::formatter_text_digit_005a2c52));
+    relocate_call(slot_4a5f90, 0x166u, 0x004a60f6u, 0x005a2248u,
+                  reinterpret_cast<const void*>(&porsche::formatter_float_lower_005a2248));
+    relocate_call(slot_4a5f90, 0x171u, 0x004a6101u, 0x005a2248u,
+                  reinterpret_cast<const void*>(&porsche::formatter_float_lower_005a2248));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+static void setup_buffers(const char* text_in, const char* pattern_in, const char* ops_override) {
+    static const char kDefaultOps[6] = "&|!~^";
+    std::memcpy(porsche::audio_transition_pattern_ops_005d13bc,
+                ops_override != nullptr ? ops_override : kDefaultOps, 6u);
+    std::memset(text_buf, 0xaau, sizeof(text_buf));
+    std::memset(pattern_buf, 0xbbu, sizeof(pattern_buf));
+    const std::size_t text_len = std::strlen(text_in);
+    const std::size_t pat_len = std::strlen(pattern_in);
+    require(text_len < sizeof(text_buf) && pat_len < sizeof(pattern_buf), "buffer bounds");
+    std::memcpy(text_buf, text_in, text_len + 1u);
+    std::memcpy(pattern_buf, pattern_in, pat_len + 1u);
+}
+
+static void run_pair(const char* text_in, const char* pattern_in, const char* ops_override = nullptr) {
+    ++cases;
+
+    cpp_side = false;
+    std::memset(&trace, 0, sizeof trace);
+    setup_buffers(text_in, pattern_in, ops_override);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl2(slot_4a5f90, address(text_buf), address(pattern_buf),
+                                       trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    std::memcpy(trace.final_pattern, pattern_buf, sizeof(trace.final_pattern));
+    std::memcpy(trace.final_ops, porsche::audio_transition_pattern_ops_005d13bc,
+                sizeof(trace.final_ops));
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    cpp_side = true;
+    std::memset(&trace, 0, sizeof trace);
+    setup_buffers(text_in, pattern_in, ops_override);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl2(
+            reinterpret_cast<void*>(&porsche::audio_transition_pattern_match_004a5f90),
+            address(text_buf), address(pattern_buf), trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    std::memcpy(trace.final_pattern, pattern_buf, sizeof(trace.final_pattern));
+    std::memcpy(trace.final_ops, porsche::audio_transition_pattern_ops_005d13bc,
+                sizeof(trace.final_ops));
+    capture_fpu(trace.fpu);
+
+    require(expected.abi_fail == 0u, "original ABI");
+    require(trace.abi_fail == 0u, "cpp ABI");
+    require(expected.exception[0] == 0u && trace.exception[0] == 0u, "no exceptions");
+    require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    require(trace.count == expected.count, "event count mismatch");
+    require(std::memcmp(trace.events, expected.events, trace.count * sizeof(Event)) == 0,
+            "event trace mismatch");
+    require(std::memcmp(trace.final_pattern, expected.final_pattern, sizeof(trace.final_pattern)) == 0,
+            "final pattern buffer mismatch");
+    require(std::memcmp(trace.final_ops, expected.final_ops, sizeof(trace.final_ops)) == 0,
+            "final ops buffer mismatch");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0,
+            "x87/MXCSR state mismatch");
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    // 1. Empty / literal / case-insensitive matching.
+    run_pair("", "");
+    run_pair("", "a");
+    run_pair("a", "");
+    run_pair("abc", "abc");
+    run_pair("AbCdEf", "aBcDeF");
+    run_pair("abc", "abcd");
+    run_pair("abcd", "abc");
+    run_pair("race1", "RACE2");
+
+    // 2. '?' single-character wildcard.
+    run_pair("", "?");
+    run_pair("a", "?");
+    run_pair("ab", "?");
+    run_pair("ab", "??");
+    run_pair("abc", "a?c");
+    run_pair("ac", "a?c");
+
+    // 3. '#' digit wildcard & signed high-bit bytes.
+    run_pair("", "#");
+    run_pair("0", "#");
+    run_pair("9", "#");
+    run_pair("/", "#");
+    run_pair(":", "#");
+    run_pair("a", "#");
+    run_pair("track07", "TRACK##");
+    run_pair("track0a", "TRACK##");
+    run_pair("\x80", "#");
+    run_pair("\xff", "#");
+    run_pair("\x80", "\x80");
+    run_pair("\x80", "\x81");
+    run_pair("\xff", "\xff");
+
+    // 4. '*' multi-character wildcard (0-char match, greedy/backtrack, multiple '*').
+    run_pair("", "*");
+    run_pair("abc", "*");
+    run_pair("abc", "***");
+    run_pair("abc", "a*");
+    run_pair("abc", "*c");
+    run_pair("abc", "a*c");
+    run_pair("ac", "a*c");
+    run_pair("abbc", "a*b*c");
+    run_pair("abxbxbc", "a*b*c");
+    run_pair("abxbxbd", "a*b*c");
+    run_pair("a12b", "a*#*b");
+    run_pair("ab", "a*#*b");
+
+    // 5. '&' boolean AND + short-circuiting.
+    run_pair("abc", "a*&*c");
+    run_pair("abd", "a*&*c");
+    run_pair("xbc", "a*&*c");
+    run_pair("xbd", "a*&*c");
+    run_pair("abc", "a*&*b*&*c");
+
+    // 6. '|' boolean OR + short-circuiting.
+    run_pair("abc", "a*|*z");
+    run_pair("xyz", "a*|*z");
+    run_pair("xbc", "a*|*z");
+    run_pair("az", "a*|*z");
+
+    // 7. '!' and '~' split operators (both act as OR and overwrite *split with '!').
+    run_pair("abc", "a*!*z");
+    run_pair("xyz", "a*!*z");
+    run_pair("xbc", "a*!*z");
+    run_pair("abc", "a*~*z");
+    run_pair("xyz", "a*~*z");
+    run_pair("xbc", "a*~*z");
+    run_pair("abc", "~abc");
+    run_pair("", "~abc");
+
+    // 8. '^' boolean XOR (right-then-left evaluation order).
+    run_pair("abc", "a*^*z");
+    run_pair("xyz", "a*^*z");
+    run_pair("az", "a*^*z");
+    run_pair("xbc", "a*^*z");
+    run_pair("abc", "a*^*b~c");
+
+    // 9. Precedence via highest-address (last) operator scan in "&|!~^".
+    run_pair("a", "a&b|a");
+    run_pair("a", "a|b&a");
+    run_pair("c", "a^b&c");
+    run_pair("c", "c&a^c");
+    run_pair("ab", "a*&?#&*b");
+    run_pair("a1", "a*&?#^*b");
+    run_pair("a", "a|b~a");
+    run_pair("a", "a~b|a");
+
+    // 10. Custom .data operator table (exercises leaf '~' negation and signed ops byte).
+    static const char kOpsEmpty[6] = "";
+    static const char kOpsNoTilde[6] = "&|!";
+    static const char kOpsSigned[6] = "&|\x80";
+    run_pair("abc", "~abc", kOpsEmpty);
+    run_pair("xyz", "~abc", kOpsEmpty);
+    run_pair("abc", "~~abc", kOpsEmpty);
+    run_pair("a&b", "a&b", kOpsEmpty);
+    run_pair("abc", "a*c&~xyz", kOpsNoTilde);
+    run_pair("abc", "a*c&~abc", kOpsNoTilde);
+    run_pair("xyz", "a*c|~abc", kOpsNoTilde);
+    run_pair("a", "a\x80z", kOpsSigned);
+    run_pair("z", "a\x80z", kOpsSigned);
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("audio_transition_pattern_match_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}
