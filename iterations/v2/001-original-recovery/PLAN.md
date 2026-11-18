@@ -1,12 +1,13 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-19. Run681 shared audit (`001`) passes for frozen `679/004` (`679/001`..`003` preserved)+`680/001` on `678`.
-Build `001` compiles 390 TUs / 8 projects, 71 names / 76 refs, no EXE. Zero new
-unresolved names; `16B` `.data` (`005deb14`/`005deb24`/`005deb34`/`005deb38`),
-zero owned `.rdata`. Registry 1093 adds nine PARTIAL bodies (1267B total). README
-681 owns commands and bounds: 12856 native cases / 47 controls at `/Od`/`/O2`, 967 pins.
+Current 2026-11-19. Run684 shared audit (`001`) passes for frozen `682/002` (`682/001` preserved)+`683/001` on `681`.
+Build `001` compiles 392 TUs / 8 projects, 69 names / 73 refs, no EXE.
+`render_clock_00555bc0` and `render_mode_clock_00555bc0` close with zero new names;
+`60B` `.data`, `4B` `.bss` (`0069cb08..0069cb0b`), zero owned `.rdata`. Registry
+1103 adds ten PARTIAL bodies (1571B total). README 684 owns commands and bounds:
+2704 native cases / 54 controls at `/Od`/`/O2`, 972 pins.
 
-Next launch `682` and `683` (`00555bc0`/`005a1f4a`/`005a1ebf`, `005330a0`/`00533320`/`00533360`/`00572f30`..`00570490`).
+Next launch `685` and `686` (`00570260`..`00570540`, `005702a0`..`00571160`).
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

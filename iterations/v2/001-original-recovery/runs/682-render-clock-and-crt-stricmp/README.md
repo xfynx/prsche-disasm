@@ -1,0 +1,22 @@
+# Run682 render clock (`00555bc0`) and CRT `atol`/`atoi` (`005a1ebf`, `005a1f4a`)
+
+Bounded native x86-vs-C++ recovery proof (`Porsche.exe` SHA-256 `ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39`, 1129 code bytes total):
+- `porsche::crt_atol_005a1ebf` (`005a1ebf..005a1f49`, 139B, `__cdecl`, sha256 `453eed41cb78739a43b42f0fa94b58300e2687557d84971dd484067505dc12d2`): CRT `atol` (note: raw PE bytes are `atol`, not `stricmp`); skips `_SPACE` (`0x08`), reads optional `'-'`/`'+'`, accumulates `_DIGIT` (`0x04`) with unsigned 32-bit wraparound (`total * 10u + (ch - 0x30u)`), and negates on `'-'`. Uses `formatter_float_character_width_005e54dc`, `formatter_float_classify_005a2eae`, and `formatter_ctype_table_005e52d0`.
+- `porsche::crt_atoi_005a1f4a` (`005a1f4a..005a1f54`, 11B, `__cdecl`, sha256 `de8e53f3edb8d03fe276f4726fdf910ba2b7b005346cdbdad94cf3cb7728cff7`): CRT `atoi` forwarding directly to `005a1ebf`.
+- `porsche::render_clock_00555bc0` (`00555bc0..00555f92`, 979B, `__cdecl`, sha256 `c57c6532b83525c2c65cd11cbc580392cfade23749628e0c0132eaded0b89f28`) and forwarding `porsche::render_mode_clock_00555bc0`: resets CPU/clock globals (`005deb04..005deb3c` and `005deae8[0]`), probes CPUID or Cyrix div-flags fallback, identifies vendor (`GenuineIntel`, `AuthenticAMD`, `CyrixInstead`, `CentaurHauls`), extracts family/model/stepping and feature flags (including AMD `family >= 6` MOVNT and extended `0x80000001` 3DNow!), applies `ISMMX`/`ISK3D`/`ISKNI`/`ISMOVNT` environment overrides and Win95 (`dwPlatformId == 1 && dwMinorVersion == 0`) SSE disable, reads optional CPUID leaf 2/3 serials, measures clock via `00555fa0` (`cpu_has_rdtsc_005deb24 != 0`) or `005560b0` when QPF low DWORD != 0, quantizes via `00555a10`, stores into `render_clock_hz_005deae4`, and returns quantized Hz.
+
+Owned `.data` / `.rdata` and reused canonical symbols:
+- Owned `.data`: `render_clock_hz_005deae4` (`005deae4`, 4B), `cpu_vendor_005deae8` (`005deae8..005deaf7`, 16B), `cpu_serial_005deaf8` (`005deaf8..005deb03`, 12B), `cpu_family_005deb04` (4B), `cpu_model_005deb08` (4B), `cpu_stepping_005deb0c` (4B), `cpu_has_3dnow_005deb20` (4B), `cpu_has_cmov_005deb28` (4B), `cpu_has_movnt_005deb2c` (4B), `cpu_is_centaur_005deb3c` (4B) — all initial PE values `0`.
+- Owned `.rdata`: none (`005bc378..005bc3d7` vendor/env string literals are single-consumer in `00555bc0` and inlined directly).
+- Owned IAT facade: `render_clock_get_version_ex_a` (`[0x005b2150]` `GetVersionExA`).
+- Reused canonical symbols: `formatter_float_character_width_005e54dc`, `formatter_float_classify_005a2eae`, `formatter_ctype_table_005e52d0`, `cpu_check_cpuid_support_00574e50`, `cpu_query_cpuid_00574e6b`, `cpu_check_div_flags_00574e89`, `render_clock_quantize_hz_00555a10`, `render_clock_measure_qpc_rdtsc_00555fa0`, `render_clock_measure_div_loop_005560b0`, `render_clock_query_performance_frequency`, `cpu_has_p6_005deb14`, `cpu_has_rdtsc_005deb24`, `cpu_is_cyrix_005deb34`, `cpu_is_amd_005deb38`, `copy_flag_005deb10`, `copy_flag_005deb18`, `copy_flag_005deb30`, `shared_runtime_word_005deb1c`, `application_diagnostic_environment_005a3050`.
+
+## Verification
+
+- Attempt `001` failed before compilation on a 1-char SHA-256 typo for `005bc3c8` in `native-config.json`; preserved intact under `local/experiments/v2-render-clock-stricmp-682/001/`.
+- Attempt `002` (`local/experiments/v2-render-clock-stricmp-682/002/receipt.json`, sha256 `95f9dc44b9351e1bf8f4bc3b33997898e6ee8a091b3a930f9b147fb5c1e4f38d`): PASS at `/Od` and `/O2` (`/W4`, 0 warnings on `render_clock_stricmp_682.cpp`, 216 cases per optimization variant; 23/23 material `wrong-*` mutations detected).
+  - Command: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/native-config.json --attempt 002`
+
+## Boundaries
+
+Bounded test domain (`PARTIAL`): covers `005a1ebf`/`005a1f4a` (`atol`/`atoi`) across `width <= 1` and `width > 1` with deterministic ctype/classify tables, and `00555bc0` (`render_clock_00555bc0` and `render_mode_clock_00555bc0`) across controlled CPUID, div-flags, `ISMMX`/`ISK3D`/`ISKNI`/`ISMOVNT`, `GetVersionExA`, QPF, and `00555fa0`/`005560b0`/`00555a10` stubs. Null pointer dereferences in `005a1ebf`/`005a1f4a`, uninitialized stack `OSVERSIONINFOA` fields if `GetVersionExA` fails without writing them, live hardware CPUID/RDTSC variance, and production CMake/registry integration remain open.

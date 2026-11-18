@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run681](iterations/v2/001-original-recovery/runs/681-render-clock-calibration-and-ff-slot-integration/README.md)
-  integrates the partial render clock calibration leaves and input force-feedback slot/render offset unlockers.
-  The shared build has 71 unresolved names across 390 TUs.
+  [Run684](iterations/v2/001-original-recovery/runs/684-render-clock-and-input-ff-callers-integration/README.md)
+  integrates the partial render clock (`00555bc0`), CRT `atol`/`atoi`, and input FF-slot callers / render-palette leaf providers.
+  The shared build has 69 unresolved names across 392 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

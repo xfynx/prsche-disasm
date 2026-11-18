@@ -1,0 +1,276 @@
+{
+  "run": 682,
+  "experiment": "local/experiments/v2-render-clock-stricmp-682",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp",
+    "iterations/v2/001-original-recovery/runs/679-render-clock-calibration-leaves",
+    "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves",
+    "iterations/v2/001-original-recovery/runs/345-diagnostic-devices",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005a1ebf",
+      "bytes": 139,
+      "sha256": "453eed41cb78739a43b42f0fa94b58300e2687557d84971dd484067505dc12d2",
+      "token": "@BODY_005A1EBF@"
+    },
+    {
+      "va": "005a1f4a",
+      "bytes": 11,
+      "sha256": "de8e53f3edb8d03fe276f4726fdf910ba2b7b005346cdbdad94cf3cb7728cff7",
+      "token": "@BODY_005A1F4A@"
+    },
+    {
+      "va": "00555bc0",
+      "bytes": 979,
+      "sha256": "c57c6532b83525c2c65cd11cbc580392cfade23749628e0c0132eaded0b89f28",
+      "token": "@BODY_00555BC0@"
+    },
+    {
+      "va": "005bc378",
+      "bytes": 8,
+      "sha256": "2fde1b63c7ebc691b5579245178e328b46363a80ea5f49b97734b2cde718f476",
+      "token": "@RDATA_005BC378@"
+    },
+    {
+      "va": "005bc380",
+      "bytes": 6,
+      "sha256": "1f8e5822b823295c014d2996d5569ea16e8a0b57ff84b6f0039df6e1360cbc3a",
+      "token": "@RDATA_005BC380@"
+    },
+    {
+      "va": "005bc388",
+      "bytes": 6,
+      "sha256": "899355475093a39c8a37aede42c802a5856f1f2bcd0c2710fb357f7354b0edd2",
+      "token": "@RDATA_005BC388@"
+    },
+    {
+      "va": "005bc390",
+      "bytes": 6,
+      "sha256": "1f18a9025e538f70eca6397f57a66f6cfda415bc3b968264d9df597edf198a51",
+      "token": "@RDATA_005BC390@"
+    },
+    {
+      "va": "005bc398",
+      "bytes": 13,
+      "sha256": "b3b4949d9480257384508285fe8ba6337e216223dbc7dbc8d32bab6c1e430a82",
+      "token": "@RDATA_005BC398@"
+    },
+    {
+      "va": "005bc3a8",
+      "bytes": 13,
+      "sha256": "133b102d845261133574a15fb58de78c013407f5cbbd2cfce82e5d8311a93f87",
+      "token": "@RDATA_005BC3A8@"
+    },
+    {
+      "va": "005bc3b8",
+      "bytes": 13,
+      "sha256": "769063edb8e80a29330105d88592190aa870bdd17ddec81564decdc6f05adec6",
+      "token": "@RDATA_005BC3B8@"
+    },
+    {
+      "va": "005bc3c8",
+      "bytes": 13,
+      "sha256": "157ad35fa5c03c73f055214c8566e4e44f696daad5464cb461e3cf4ca38a1cf4",
+      "token": "@RDATA_005BC3C8@"
+    }
+  ],
+  "pass_marker": "render_clock_stricmp_682_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-5a1ebf-width-ge-1",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "        const std::int32_t is_space = (formatter_float_character_width_005e54dc > 1)",
+      "new": "        const std::int32_t is_space = (formatter_float_character_width_005e54dc >= 1)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5a1ebf-space-mask",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "            : (static_cast<std::int32_t>(formatter_ctype_table_005e52d0[ch * 2u]) & 8);",
+      "new": "            : (static_cast<std::int32_t>(formatter_ctype_table_005e52d0[ch * 2u]) & 4);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5a1ebf-digit-mask",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "            : (static_cast<std::int32_t>(formatter_ctype_table_005e52d0[ch * 2u]) & 4);",
+      "new": "            : (static_cast<std::int32_t>(formatter_ctype_table_005e52d0[ch * 2u]) & 8);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5a1ebf-drop-plus",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "    if (ch == static_cast<std::uint32_t>('-') || ch == static_cast<std::uint32_t>('+')) {",
+      "new": "    if (ch == static_cast<std::uint32_t>('-')) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5a1ebf-drop-negate",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "    if (sign == static_cast<std::uint32_t>('-')) {\n        total = 0u - total;\n    }",
+      "new": "    if (sign == static_cast<std::uint32_t>('+')) {\n        total = 0u - total;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5a1ebf-mul-base8",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "        total = total * 10u + (ch - 0x30u);",
+      "new": "        total = total * 8u + (ch - 0x30u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5a1f4a-return-zero",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "std::int32_t __cdecl crt_atoi_005a1f4a(const char* str) {\n    return crt_atol_005a1ebf(str);\n}",
+      "new": "std::int32_t __cdecl crt_atoi_005a1f4a(const char* str) {\n    (void)str;\n    return 0;\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-drop-vendor-nul-reset",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "    copy_flag_005deb30 = 0u;\n    cpu_vendor_005deae8[0] = '\\0';",
+      "new": "    copy_flag_005deb30 = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-invert-cpuid-support",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "    if (cpu_check_cpuid_support_00574e50() == 0u) {",
+      "new": "    if (cpu_check_cpuid_support_00574e50() != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-vendor-order",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "        std::memcpy(cpu_vendor_005deae8 + 4u, &regs[2], 4u);\n        std::memcpy(cpu_vendor_005deae8 + 8u, &regs[3], 4u);",
+      "new": "        std::memcpy(cpu_vendor_005deae8 + 4u, &regs[3], 4u);\n        std::memcpy(cpu_vendor_005deae8 + 8u, &regs[2], 4u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-max-leaf-ge0",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "        if (max_leaf > 0) {",
+      "new": "        if (max_leaf >= 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-drop-centaur",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "            } else if (std::strcmp(cpu_vendor_005deae8, \"CentaurHauls\") == 0) {\n                cpu_is_centaur_005deb3c = 1u;\n            }",
+      "new": "            }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-family-p5-gt5",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "            if (family >= 5) {\n                copy_flag_005deb10 = 1u;\n            }",
+      "new": "            if (family > 5) {\n                copy_flag_005deb10 = 1u;\n            }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-family-p6-gt6",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "            if (family >= 6) {\n                cpu_has_p6_005deb14 = 1u;\n            }",
+      "new": "            if (family > 6) {\n                cpu_has_p6_005deb14 = 1u;\n            }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-wrong-mmx-bit",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "            copy_flag_005deb18 = (features >> 23) & 1u;",
+      "new": "            copy_flag_005deb18 = (features >> 24) & 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-wrong-cmov-bit",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "            cpu_has_cmov_005deb28 = (features >> 15) & 1u;",
+      "new": "            cpu_has_cmov_005deb28 = (features >> 16) & 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-drop-amd-k7-movnt",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "            if (family >= 6 && cpu_is_amd_005deb38 != 0u) {\n                cpu_has_movnt_005deb2c = 1u;\n            }",
+      "new": "            if (family > 6 && cpu_is_amd_005deb38 != 0u) {\n                cpu_has_movnt_005deb2c = 1u;\n            }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-ext-leaf-ge",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "            if (regs[0] > 0x80000000u) {",
+      "new": "            if (regs[0] >= 0x80000000u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-win95-any-minor",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "            if (os_info.dwPlatformId == 1u && os_info.dwMinorVersion == 0u) {",
+      "new": "            if (os_info.dwPlatformId == 1u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-serial-order",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "                cpu_serial_005deaf8[0] = regs[3];\n                cpu_serial_005deaf8[1] = regs[2];\n                cpu_serial_005deaf8[2] = regs[1];",
+      "new": "                cpu_serial_005deaf8[0] = regs[1];\n                cpu_serial_005deaf8[1] = regs[2];\n                cpu_serial_005deaf8[2] = regs[3];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-qpf-64bit-check",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "    if (static_cast<std::uint32_t>(static_cast<std::uint64_t>(qpf_freq)) != 0u) {",
+      "new": "    if (qpf_freq != 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-drop-store-5deae4",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "    render_clock_hz_005deae4 = quantized_hz;\n    return quantized_hz;",
+      "new": "    return quantized_hz;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-555bc0-mode-forward-zero",
+      "source": "iterations/v2/001-original-recovery/runs/682-render-clock-and-crt-stricmp/render_clock_stricmp_682.cpp",
+      "old": "std::uint32_t __cdecl render_mode_clock_00555bc0() {\n    return render_clock_00555bc0();\n}",
+      "new": "std::uint32_t __cdecl render_mode_clock_00555bc0() {\n    return 0u;\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

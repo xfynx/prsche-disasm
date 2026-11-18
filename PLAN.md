@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run681](iterations/v2/001-original-recovery/runs/681-render-clock-calibration-and-ff-slot-integration/README.md).
-Render clock calibration leaves (`00555a10`/`00555fa0`/`005560b0`) and FF-slot/render helpers (`005337a0`..`00574080`) integrate as unlockers with zero new unresolved names.
-The shared build compiles 390 TUs with 71 unresolved names / 76 references.
+Latest recovery intake is [Run684](iterations/v2/001-original-recovery/runs/684-render-clock-and-input-ff-callers-integration/README.md).
+Render clock (`00555bc0` + `005a1ebf`/`005a1f4a` `atol`/`atoi`) and input FF-slot callers / render-palette leaves (`005330a0`..`00570490`) close `render_clock_00555bc0` and `render_mode_clock_00555bc0` with zero new unresolved names.
+The shared build compiles 392 TUs with 69 unresolved names / 73 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are `682`/`683` recovery waves on `render_clock_00555bc0` (`00555bc0`/`005a1f4a`/`005a1ebf`) and input/render leaves (`005330a0`, `00533320`, `00533360`, `00572f30`..`00570490`). The real depth-conversion
+Next are `685`/`686` recovery waves on render/palette leaves (`00570260`..`00570540` and `005702a0`..`00571160`). The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;

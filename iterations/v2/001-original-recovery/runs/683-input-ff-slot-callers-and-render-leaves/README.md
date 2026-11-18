@@ -1,0 +1,24 @@
+# Run683 input FF-slot callers and render/palette leaves (`005330a0`, `00533320`, `00533360`, `00572f30`, `00572f5b`, `00570420`, `00570490`)
+
+Bounded native x86-vs-C++ recovery proof for the 7-function input FF-slot callers and render/palette leaves packet (`Porsche.exe` SHA-256 `ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39`, 442 code bytes total):
+- `porsche::input_slot_enable_ff_005330a0` (`005330a0..00533115`, 118B, `__cdecl`, sha256 `d507817161cfad5ca04fc795359c2592e787bd7a396bec1f5a0e25927879e5e1`): returns `0u` unless `input_directinput_0069cb08 != nullptr`, `input_slot_has_device_00532b50(slot_index) != 0u`, `(caps[4] & 2u) != 0u` from `fe_input_getstate_00532e10(slot_index, 2u)`, `(input_slots_006be040[slot_index].flags_04 & 1u) == 0u`, and `input_slot_reset_ff_00533120(slot_index) == 0u`; on `0u` HRESULT re-reads `flags_04`, sets bit `1u`, and returns `1u`.
+- `porsche::input_slot_pause_ff_00533320` (`00533320..0053335a`, 59B, `__cdecl`, sha256 `6dec5e4b961eb2dde3824e73525856c6d7ee9bd41d91d32b91777e8dde823cf3`): checks `input_slot_has_device_00532b50(slot_index) != 0u` and `(input_slots_006be040[slot_index].flags_04 & 1u) != 0u`, then calls `input_device_ff_command_00533160(slot.device, 0x10u)`.
+- `porsche::input_slot_continue_ff_00533360` (`00533360..0053339a`, 59B, `__cdecl`, sha256 `5cc45d21f12abaec385a1541f996a8f1b0a7fdf55ff4788e67120c84940607a2`): checks `input_slot_has_device_00532b50(slot_index) != 0u` and `(input_slots_006be040[slot_index].flags_04 & 1u) != 0u`, then calls `input_device_ff_command_00533160(slot.device, 0x20u)`.
+- `porsche::render_color_888_to_565_00572f30` (`00572f30..00572f5a`, 43B, `__cdecl`, leaf, sha256 `16e12996bc7de619c387234b303b9dd9504cc4ea98164dd9af57ea988efe8681`): packs 24-bit RGB888 to 16-bit RGB565 in `EAX` (`((color & 0x00f80000u) >> 8) | ((color & 0x0000fc00u) >> 5) | ((color >> 3) & 0x1fu)`).
+- `porsche::render_color_888_to_1555_00572f5b` (`00572f5b..00572f8f`, 53B, `__cdecl`, leaf, sha256 `ecf57812fda58f56725f16569f1a7a162e185b87ccec4ecfe05981c9d3549253`): returns `0u` when `color == 0u`, else `0x8000u | ((color & 0x00f80000u) >> 9) | ((color & 0x0000f800u) >> 6) | ((color >> 3) & 0x1fu)`.
+- `porsche::render_palette_555_to_565_00570420` (`00570420..0057046b`, 76B, `__cdecl`, leaf, sha256 `1aca0e33eab342efeef476cc5f86647a5b24bec717f8d65313a327e47cb58af7`): converts `count` 16-bit RGB555 entries to RGB565 (`g6 = (g5 << 1) | (g5 >> 4)`, dropping bit 15).
+- `porsche::render_palette_copy_strided16_00570490` (`00570490..005704b1`, 34B, `__cdecl`, leaf, sha256 `17ef8b4290b1a22a4ea50f7d61ed93fa1a60458a2d943367ccc22c0d410d0523`): copies `count` 16-bit words from 4-byte-strided `src` (`src += 2` `uint16_t`s) to contiguous `dst`.
+
+Owned `.data` / `.rdata` / `.bss` and reused canonical symbols:
+- Owned `.data` / `.rdata`: none (4 render/palette leaves have zero `.data`/`.rdata` accesses; `.data` references at `005de33c..005de44c` are table entries pointing to `00570420`).
+- Owned `.bss`: `input_directinput_0069cb08` (`0069cb08..0069cb0b`, 4B, `.data` virtual tail / loader-zeroed `.bss`, initial value `nullptr`, zero prior owners in `source/` or accepted `runs/`).
+- Reused canonical symbols: `input_slot_has_device_00532b50` and `input_device_ff_command_00533160` (`../676-startup-input-slot-and-math-leaves/startup_input_slot_math_676.hpp`), `input_slot_reset_ff_00533120` (`../680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.hpp`), `fe_input_getstate_00532e10` (`porsche/fe_callbacks.hpp`), and `input_slots_006be040[32]` (`porsche/input_state.hpp`).
+
+## Verification
+
+- Attempt `001` (`local/experiments/v2-input-ff-render-leaves-683/001/receipt.json`, sha256 `8335d6cb6a457354c28b818d7706186f83dcacf480c053efe49a05268644b6cf`): PASS at `/Od` and `/O2` (`/W4`, 0 warnings on `input_ff_render_leaves_683.cpp`, 1136 cases per optimization / 2272 total; 31/31 material `wrong-*` mutations detected).
+  - Command: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/native-config.json --attempt 001`
+
+## Boundaries
+
+Bounded test domain (`PARTIAL`): covers `005330a0` DirectInput/device/caps/flag guards and post-`00533120` `flags_04` re-read with controlled `00532b50`/`00532e10`/`00533120` transport, `00533320`/`00533360` device+`flags_04` guards with controlled `00532b50`/`00533160` transport (`0x10u`/`0x20u`), `00572f30`/`00572f5b` full 32-bit bit-walk and alpha/zero conversions, and `00570420`/`00570490` positive/non-positive counts, bit-walks, stride isolation, guard canaries, and overlapping/in-place buffers. Null caps pointers from `00532e10` in `005330a0`, out-of-bounds indices if `00532b50` returned nonzero, null/unmapped `src`/`dst` pointers in `00570420`/`00570490`, live DirectInput hardware devices, real callee chaining in production link, concurrent mutation, and production CMake/registry integration remain open.

@@ -1,0 +1,876 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "render_clock_stricmp_682.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using I64 = std::int64_t;
+using U64 = std::uint64_t;
+using B = std::uint8_t;
+
+namespace porsche {
+std::int32_t formatter_float_character_width_005e54dc = 1;
+const std::uint8_t* formatter_ctype_table_005e52d0 = nullptr;
+std::uint32_t copy_flag_005deb10 = 1u;
+std::uint32_t copy_flag_005deb18 = 0u;
+std::uint32_t copy_flag_005deb30 = 0u;
+std::uint32_t shared_runtime_word_005deb1c = 0u;
+std::uint32_t& copy_flag_005deb1c = shared_runtime_word_005deb1c;
+std::uint32_t& render_display_clock_005deb1c = shared_runtime_word_005deb1c;
+std::uint32_t cpu_has_p6_005deb14 = 0u;
+std::uint32_t cpu_has_rdtsc_005deb24 = 1u;
+std::uint32_t cpu_is_cyrix_005deb34 = 0u;
+std::uint32_t cpu_is_amd_005deb38 = 0u;
+RenderClockQueryPerformanceFrequency render_clock_query_performance_frequency = nullptr;
+} // namespace porsche
+
+enum : U {
+    kMaxEvents = 64u,
+};
+
+enum EventKind : U {
+    kEvClassify = 1u,
+    kEvCpuidSupport = 2u,
+    kEvCpuidQuery = 3u,
+    kEvDivFlags = 4u,
+    kEvEnv = 5u,
+    kEvGetVersionEx = 6u,
+    kEvQpf = 7u,
+    kEvMeasureRdtsc = 8u,
+    kEvMeasureDiv = 9u,
+    kEvQuantize = 10u,
+};
+
+struct Event {
+    U kind;
+    U a0;
+    U a1;
+};
+
+struct Trace {
+    U abi_fail;
+    U df_nonzero;
+    I ret_i32;
+    U ret_u32;
+    U count;
+    Event events[kMaxEvents];
+    U clock_hz;
+    B vendor[16];
+    U serial[3];
+    U family;
+    U model;
+    U stepping;
+    U flag_p5;
+    U flag_p6;
+    U flag_mmx;
+    U flag_kni;
+    U flag_3dnow;
+    U flag_rdtsc;
+    U flag_cmov;
+    U flag_movnt;
+    U flag_intel;
+    U flag_cyrix;
+    U flag_amd;
+    U flag_centaur;
+};
+
+struct CpuStubCfg {
+    U cpuid_support;
+    U div_flags_ret;
+    I max_leaf;
+    char vendor[13];
+    U leaf1_eax;
+    U leaf1_edx;
+    U ext_max_leaf;
+    U ext1_edx;
+    U leaf3_ecx;
+    U leaf3_edx;
+    U leaf3_ebx;
+    const char* env_mmx;
+    const char* env_k3d;
+    const char* env_kni;
+    const char* env_movnt;
+    U os_major;
+    U os_minor;
+    U os_build;
+    U os_platform;
+    I os_ret;
+    I64 qpf_freq;
+    I qpf_ret;
+    I rdtsc_hz;
+    I div_hz;
+};
+
+static B* code = nullptr;
+static B* slot_5a1ebf = nullptr;
+static B* slot_5a1f4a = nullptr;
+static B* slot_555bc0 = nullptr;
+
+static void* iat_qpf = nullptr;
+static void* iat_get_version_ex_a = nullptr;
+
+static B rdata_5bc378[8] = {@RDATA_005BC378@};
+static B rdata_5bc380[6] = {@RDATA_005BC380@};
+static B rdata_5bc388[6] = {@RDATA_005BC388@};
+static B rdata_5bc390[6] = {@RDATA_005BC390@};
+static B rdata_5bc398[13] = {@RDATA_005BC398@};
+static B rdata_5bc3a8[13] = {@RDATA_005BC3A8@};
+static B rdata_5bc3b8[13] = {@RDATA_005BC3B8@};
+static B rdata_5bc3c8[13] = {@RDATA_005BC3C8@};
+
+static B ctype_table[512] = {};
+static U classify_table[256] = {};
+static CpuStubCfg cfg{};
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void push_event(U kind, U a0 = 0u, U a1 = 0u) {
+    if (trace.count < kMaxEvents) {
+        Event& ev = trace.events[trace.count++];
+        ev.kind = kind;
+        ev.a0 = a0;
+        ev.a1 = a1;
+    }
+}
+
+static I __stdcall stub_qpf(I64* frequency) {
+    require(frequency != nullptr, "qpf frequency nonnull");
+    *frequency = cfg.qpf_freq;
+    push_event(kEvQpf, static_cast<U>(cfg.qpf_freq), static_cast<U>(cfg.qpf_ret));
+    return cfg.qpf_ret;
+}
+
+static I __stdcall stub_get_version_ex_a(void* version_information) {
+    require(version_information != nullptr, "osvi nonnull");
+    const U size_field = rd(version_information, 0u);
+    require(size_field == 0x94u, "osvi size == 0x94");
+    wr(version_information, 0x04u, cfg.os_major);
+    wr(version_information, 0x08u, cfg.os_minor);
+    wr(version_information, 0x0cu, cfg.os_build);
+    wr(version_information, 0x10u, cfg.os_platform);
+    push_event(kEvGetVersionEx, cfg.os_platform, cfg.os_minor);
+    return cfg.os_ret;
+}
+
+namespace porsche {
+
+int __cdecl formatter_float_classify_005a2eae(int c, int mask) {
+    push_event(kEvClassify, static_cast<U>(c), static_cast<U>(mask));
+    const U entry = classify_table[static_cast<U>(c) & 0xffu];
+    return ((entry & static_cast<U>(mask)) != 0u) ? static_cast<int>(entry) : 0;
+}
+
+std::uint32_t __cdecl cpu_check_cpuid_support_00574e50() {
+    push_event(kEvCpuidSupport, cfg.cpuid_support, 0u);
+    return cfg.cpuid_support;
+}
+
+void __cdecl cpu_query_cpuid_00574e6b(std::uint32_t* out_regs, std::uint32_t leaf) {
+    require(out_regs != nullptr, "cpuid out_regs nonnull");
+    push_event(kEvCpuidQuery, leaf, 0u);
+    out_regs[0] = 0u;
+    out_regs[1] = 0u;
+    out_regs[2] = 0u;
+    out_regs[3] = 0u;
+    if (leaf == 0u) {
+        out_regs[0] = static_cast<U>(cfg.max_leaf);
+        std::memcpy(&out_regs[1], cfg.vendor + 0, 4u);
+        std::memcpy(&out_regs[2], cfg.vendor + 4, 4u);
+        std::memcpy(&out_regs[3], cfg.vendor + 8, 4u);
+    } else if (leaf == 1u) {
+        out_regs[0] = cfg.leaf1_eax;
+        out_regs[2] = cfg.leaf1_edx;
+    } else if (leaf == 2u) {
+        out_regs[0] = 0x01020304u;
+    } else if (leaf == 3u) {
+        out_regs[1] = cfg.leaf3_ebx;
+        out_regs[2] = cfg.leaf3_edx;
+        out_regs[3] = cfg.leaf3_ecx;
+    } else if (leaf == 0x80000000u) {
+        out_regs[0] = cfg.ext_max_leaf;
+    } else if (leaf == 0x80000001u) {
+        out_regs[2] = cfg.ext1_edx;
+    }
+}
+
+std::uint32_t __cdecl cpu_check_div_flags_00574e89() {
+    push_event(kEvDivFlags, cfg.div_flags_ret, 0u);
+    return cfg.div_flags_ret;
+}
+
+const char* __cdecl application_diagnostic_environment_005a3050(const char* name) {
+    require(name != nullptr, "env name nonnull");
+    if (std::strcmp(name, "ISMMX") == 0) {
+        push_event(kEvEnv, 1u, cfg.env_mmx != nullptr ? 1u : 0u);
+        return cfg.env_mmx;
+    }
+    if (std::strcmp(name, "ISK3D") == 0) {
+        push_event(kEvEnv, 2u, cfg.env_k3d != nullptr ? 1u : 0u);
+        return cfg.env_k3d;
+    }
+    if (std::strcmp(name, "ISKNI") == 0) {
+        push_event(kEvEnv, 3u, cfg.env_kni != nullptr ? 1u : 0u);
+        return cfg.env_kni;
+    }
+    if (std::strcmp(name, "ISMOVNT") == 0) {
+        push_event(kEvEnv, 4u, cfg.env_movnt != nullptr ? 1u : 0u);
+        return cfg.env_movnt;
+    }
+    push_event(kEvEnv, 99u, 0u);
+    return nullptr;
+}
+
+std::int32_t __cdecl render_clock_measure_qpc_rdtsc_00555fa0() {
+    push_event(kEvMeasureRdtsc, static_cast<U>(cfg.rdtsc_hz), 0u);
+    return cfg.rdtsc_hz;
+}
+
+std::int32_t __cdecl render_clock_measure_div_loop_005560b0() {
+    push_event(kEvMeasureDiv, static_cast<U>(cfg.div_hz), 0u);
+    return cfg.div_hz;
+}
+
+std::int32_t __cdecl render_clock_quantize_hz_00555a10(std::int32_t raw_hz) {
+    push_event(kEvQuantize, static_cast<U>(raw_hz), 0u);
+    return static_cast<I>(static_cast<U>(raw_hz) + 12345u);
+}
+
+} // namespace porsche
+
+static U invoke_cdecl0(void* fn, U& abi_fail, U& df_bad) {
+    U out = 0u;
+    U fail = 0u;
+    U df = 0u;
+    U before = 0u;
+    U frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        pushfd
+        pop eax
+        test eax, 00000400h
+        jz df_ok
+        mov df, 1
+df_ok:
+        cld
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    df_bad = df;
+    return out;
+}
+
+static I invoke_cdecl1(void* fn, U arg0, U& abi_fail, U& df_bad) {
+    I out = 0;
+    U fail = 0u;
+    U df = 0u;
+    U before = 0u;
+    U frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 4
+        pushfd
+        pop eax
+        test eax, 00000400h
+        jz df_ok
+        mov df, 1
+df_ok:
+        cld
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    df_bad = df;
+    return out;
+}
+
+static void relocate_abs(B* p, U n, U old_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 4u <= n; ++i) {
+        if (rd(p, i) == old_va) {
+            wr(p, i, replacement);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected_count, "abs relocation count");
+}
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+static void init_tables() {
+    std::memset(ctype_table, 0, sizeof ctype_table);
+    std::memset(classify_table, 0, sizeof classify_table);
+
+    for (U c = '0'; c <= '9'; ++c) {
+        ctype_table[c * 2u] = 0x04u;
+        classify_table[c] = 0x04u;
+    }
+    const char spaces[] = {' ', '\t', '\n', '\r', '\v', '\f'};
+    for (char sc : spaces) {
+        const U c = static_cast<unsigned char>(sc);
+        ctype_table[c * 2u] = 0x08u;
+        classify_table[c] = 0x08u;
+    }
+    // High-byte and non-space/non-digit bit checks.
+    ctype_table[0x41u * 2u] = 0x01u; // 'A': upper, not space/digit
+    ctype_table[0x85u * 2u] = 0x08u; // custom space byte > 127
+    ctype_table[0xa3u * 2u] = 0x04u; // custom digit byte > 127
+    ctype_table[0x86u * 2u] = 0x10u; // non-8, non-4 bit
+
+    classify_table[0x41u] = 0x01u;
+    classify_table[0x85u] = 0x108u; // bit 8 + _SPACE (0x08)
+    classify_table[0xa3u] = 0x204u; // bit 9 + _DIGIT (0x04)
+    classify_table[0x86u] = 0x10u;
+}
+
+static void init_fixture() {
+    static const B body_5a1ebf[139] = {@BODY_005A1EBF@};
+    static const B body_5a1f4a[11] = {@BODY_005A1F4A@};
+    static const B body_555bc0[979] = {@BODY_00555BC0@};
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_5a1ebf = code + 0x000u;
+    slot_5a1f4a = code + 0x100u;
+    slot_555bc0 = code + 0x200u;
+
+    std::memcpy(slot_5a1ebf, body_5a1ebf, sizeof body_5a1ebf);
+    std::memcpy(slot_5a1f4a, body_5a1f4a, sizeof body_5a1f4a);
+    std::memcpy(slot_555bc0, body_555bc0, sizeof body_555bc0);
+
+    // 005a1ebf relocations
+    relocate_rel(slot_5a1ebf, sizeof body_5a1ebf, 0x005a1ebfu, 0x005a2eaeu,
+                 address(reinterpret_cast<void*>(&porsche::formatter_float_classify_005a2eae)), 2u);
+    relocate_abs(slot_5a1ebf, sizeof body_5a1ebf, 0x005e54dcu,
+                 address(&porsche::formatter_float_character_width_005e54dc), 2u);
+    relocate_abs(slot_5a1ebf, sizeof body_5a1ebf, 0x005e52d0u,
+                 address(&porsche::formatter_ctype_table_005e52d0), 2u);
+
+    // 005a1f4a relocations
+    relocate_rel(slot_5a1f4a, sizeof body_5a1f4a, 0x005a1f4au, 0x005a1ebfu,
+                 address(slot_5a1ebf), 1u);
+
+    // 00555bc0 relocations: calls
+    relocate_rel(slot_555bc0, sizeof body_555bc0, 0x00555bc0u, 0x00574e50u,
+                 address(reinterpret_cast<void*>(&porsche::cpu_check_cpuid_support_00574e50)), 1u);
+    relocate_rel(slot_555bc0, sizeof body_555bc0, 0x00555bc0u, 0x00574e6bu,
+                 address(reinterpret_cast<void*>(&porsche::cpu_query_cpuid_00574e6b)), 6u);
+    relocate_rel(slot_555bc0, sizeof body_555bc0, 0x00555bc0u, 0x00574e89u,
+                 address(reinterpret_cast<void*>(&porsche::cpu_check_div_flags_00574e89)), 1u);
+    relocate_rel(slot_555bc0, sizeof body_555bc0, 0x00555bc0u, 0x005a3050u,
+                 address(reinterpret_cast<void*>(&porsche::application_diagnostic_environment_005a3050)), 4u);
+    relocate_rel(slot_555bc0, sizeof body_555bc0, 0x00555bc0u, 0x005a1f4au,
+                 address(slot_5a1f4a), 4u);
+    relocate_rel(slot_555bc0, sizeof body_555bc0, 0x00555bc0u, 0x00555fa0u,
+                 address(reinterpret_cast<void*>(&porsche::render_clock_measure_qpc_rdtsc_00555fa0)), 1u);
+    relocate_rel(slot_555bc0, sizeof body_555bc0, 0x00555bc0u, 0x005560b0u,
+                 address(reinterpret_cast<void*>(&porsche::render_clock_measure_div_loop_005560b0)), 1u);
+    relocate_rel(slot_555bc0, sizeof body_555bc0, 0x00555bc0u, 0x00555a10u,
+                 address(reinterpret_cast<void*>(&porsche::render_clock_quantize_hz_00555a10)), 1u);
+
+    // 00555bc0 relocations: IAT slots
+    iat_qpf = reinterpret_cast<void*>(&stub_qpf);
+    iat_get_version_ex_a = reinterpret_cast<void*>(&stub_get_version_ex_a);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005b214cu, address(&iat_qpf), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005b2150u, address(&iat_get_version_ex_a), 1u);
+
+    // 00555bc0 relocations: .rdata string literals
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005bc378u, address(rdata_5bc378), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005bc380u, address(rdata_5bc380), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005bc388u, address(rdata_5bc388), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005bc390u, address(rdata_5bc390), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005bc398u, address(rdata_5bc398), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005bc3a8u, address(rdata_5bc3a8), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005bc3b8u, address(rdata_5bc3b8), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005bc3c8u, address(rdata_5bc3c8), 1u);
+
+    // 00555bc0 relocations: .data globals
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deae4u,
+                 address(&porsche::render_clock_hz_005deae4), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deae8u,
+                 address(porsche::cpu_vendor_005deae8 + 0u), 6u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deaecu,
+                 address(porsche::cpu_vendor_005deae8 + 4u), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deaf0u,
+                 address(porsche::cpu_vendor_005deae8 + 8u), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deaf4u,
+                 address(porsche::cpu_vendor_005deae8 + 12u), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deaf8u,
+                 address(&porsche::cpu_serial_005deaf8[0]), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deafcu,
+                 address(&porsche::cpu_serial_005deaf8[1]), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb00u,
+                 address(&porsche::cpu_serial_005deaf8[2]), 1u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb04u,
+                 address(&porsche::cpu_family_005deb04), 2u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb08u,
+                 address(&porsche::cpu_model_005deb08), 2u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb0cu,
+                 address(&porsche::cpu_stepping_005deb0c), 2u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb10u,
+                 address(&porsche::copy_flag_005deb10), 2u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb14u,
+                 address(&porsche::cpu_has_p6_005deb14), 2u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb18u,
+                 address(&porsche::copy_flag_005deb18), 3u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb1cu,
+                 address(&porsche::shared_runtime_word_005deb1c), 4u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb20u,
+                 address(&porsche::cpu_has_3dnow_005deb20), 3u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb24u,
+                 address(&porsche::cpu_has_rdtsc_005deb24), 3u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb28u,
+                 address(&porsche::cpu_has_cmov_005deb28), 2u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb2cu,
+                 address(&porsche::cpu_has_movnt_005deb2c), 4u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb30u,
+                 address(&porsche::copy_flag_005deb30), 2u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb34u,
+                 address(&porsche::cpu_is_cyrix_005deb34), 3u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb38u,
+                 address(&porsche::cpu_is_amd_005deb38), 3u);
+    relocate_abs(slot_555bc0, sizeof body_555bc0, 0x005deb3cu,
+                 address(&porsche::cpu_is_centaur_005deb3c), 2u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+}
+
+static void poison_globals() {
+    porsche::render_clock_hz_005deae4 = 0xdead0001u;
+    std::memset(porsche::cpu_vendor_005deae8, 0x5au, sizeof porsche::cpu_vendor_005deae8);
+    porsche::cpu_serial_005deaf8[0] = 0x11111111u;
+    porsche::cpu_serial_005deaf8[1] = 0x22222222u;
+    porsche::cpu_serial_005deaf8[2] = 0x33333333u;
+    porsche::cpu_family_005deb04 = 0xaaaaaaaau;
+    porsche::cpu_model_005deb08 = 0xbbbbbbbbu;
+    porsche::cpu_stepping_005deb0c = 0xccccccccu;
+    porsche::copy_flag_005deb10 = 0xddddddddu;
+    porsche::cpu_has_p6_005deb14 = 0xeeeeeeeeu;
+    porsche::copy_flag_005deb18 = 0x12121212u;
+    porsche::shared_runtime_word_005deb1c = 0x34343434u;
+    porsche::cpu_has_3dnow_005deb20 = 0x56565656u;
+    porsche::cpu_has_rdtsc_005deb24 = 0x78787878u;
+    porsche::cpu_has_cmov_005deb28 = 0x9a9a9a9au;
+    porsche::cpu_has_movnt_005deb2c = 0xbcbcbcbcu;
+    porsche::copy_flag_005deb30 = 0xdedededeu;
+    porsche::cpu_is_cyrix_005deb34 = 0xf0f0f0f0u;
+    porsche::cpu_is_amd_005deb38 = 0x01020304u;
+    porsche::cpu_is_centaur_005deb3c = 0x05060708u;
+}
+
+static void capture_globals() {
+    trace.clock_hz = porsche::render_clock_hz_005deae4;
+    std::memcpy(trace.vendor, porsche::cpu_vendor_005deae8, sizeof trace.vendor);
+    std::memcpy(trace.serial, porsche::cpu_serial_005deaf8, sizeof trace.serial);
+    trace.family = porsche::cpu_family_005deb04;
+    trace.model = porsche::cpu_model_005deb08;
+    trace.stepping = porsche::cpu_stepping_005deb0c;
+    trace.flag_p5 = porsche::copy_flag_005deb10;
+    trace.flag_p6 = porsche::cpu_has_p6_005deb14;
+    trace.flag_mmx = porsche::copy_flag_005deb18;
+    trace.flag_kni = porsche::shared_runtime_word_005deb1c;
+    trace.flag_3dnow = porsche::cpu_has_3dnow_005deb20;
+    trace.flag_rdtsc = porsche::cpu_has_rdtsc_005deb24;
+    trace.flag_cmov = porsche::cpu_has_cmov_005deb28;
+    trace.flag_movnt = porsche::cpu_has_movnt_005deb2c;
+    trace.flag_intel = porsche::copy_flag_005deb30;
+    trace.flag_cyrix = porsche::cpu_is_cyrix_005deb34;
+    trace.flag_amd = porsche::cpu_is_amd_005deb38;
+    trace.flag_centaur = porsche::cpu_is_centaur_005deb3c;
+}
+
+static void assert_traces_match() {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    require(expected.df_nonzero == 0u, "original df nonzero");
+    require(trace.df_nonzero == 0u, "cpp df nonzero");
+    require(trace.ret_i32 == expected.ret_i32, "return i32");
+    require(trace.ret_u32 == expected.ret_u32, "return u32");
+    require(trace.count == expected.count, "event count");
+    require(std::memcmp(trace.events, expected.events, trace.count * sizeof(Event)) == 0,
+            "event trace");
+    require(trace.clock_hz == expected.clock_hz, "clock_hz");
+    require(std::memcmp(trace.vendor, expected.vendor, sizeof trace.vendor) == 0, "vendor");
+    require(std::memcmp(trace.serial, expected.serial, sizeof trace.serial) == 0, "serial");
+    require(trace.family == expected.family, "family");
+    require(trace.model == expected.model, "model");
+    require(trace.stepping == expected.stepping, "stepping");
+    require(trace.flag_p5 == expected.flag_p5, "flag p5");
+    require(trace.flag_p6 == expected.flag_p6, "flag p6");
+    require(trace.flag_mmx == expected.flag_mmx, "flag mmx");
+    require(trace.flag_kni == expected.flag_kni, "flag kni");
+    require(trace.flag_3dnow == expected.flag_3dnow, "flag 3dnow");
+    require(trace.flag_rdtsc == expected.flag_rdtsc, "flag rdtsc");
+    require(trace.flag_cmov == expected.flag_cmov, "flag cmov");
+    require(trace.flag_movnt == expected.flag_movnt, "flag movnt");
+    require(trace.flag_intel == expected.flag_intel, "flag intel");
+    require(trace.flag_cyrix == expected.flag_cyrix, "flag cyrix");
+    require(trace.flag_amd == expected.flag_amd, "flag amd");
+    require(trace.flag_centaur == expected.flag_centaur, "flag centaur");
+}
+
+static void run_str_parse(bool use_atoi, I char_width, const char* input) {
+    ++cases;
+    void* const orig_fn = use_atoi ? slot_5a1f4a : slot_5a1ebf;
+    void* const cpp_fn = use_atoi
+        ? reinterpret_cast<void*>(&porsche::crt_atoi_005a1f4a)
+        : reinterpret_cast<void*>(&porsche::crt_atol_005a1ebf);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        poison_globals();
+        porsche::formatter_float_character_width_005e54dc = char_width;
+        porsche::formatter_ctype_table_005e52d0 = ctype_table;
+        std::memset(&trace, 0, sizeof trace);
+        void* const fn = (side == 0u) ? orig_fn : cpp_fn;
+        trace.ret_i32 = invoke_cdecl1(fn, address(input), trace.abi_fail, trace.df_nonzero);
+        trace.ret_u32 = static_cast<U>(trace.ret_i32);
+        capture_globals();
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match();
+}
+
+static void run_render_clock(const CpuStubCfg& c, bool via_mode_forward) {
+    ++cases;
+    void* const cpp_fn = via_mode_forward
+        ? reinterpret_cast<void*>(&porsche::render_mode_clock_00555bc0)
+        : reinterpret_cast<void*>(&porsche::render_clock_00555bc0);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        cfg = c;
+        poison_globals();
+        porsche::formatter_float_character_width_005e54dc = 1;
+        porsche::formatter_ctype_table_005e52d0 = ctype_table;
+        std::memset(&trace, 0, sizeof trace);
+        void* const fn = (side == 0u) ? slot_555bc0 : cpp_fn;
+        trace.ret_u32 = invoke_cdecl0(fn, trace.abi_fail, trace.df_nonzero);
+        trace.ret_i32 = static_cast<I>(trace.ret_u32);
+        capture_globals();
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match();
+}
+
+static U make_leaf1_eax(U family, U model, U stepping) {
+    return ((family & 0xfu) << 8) | ((model & 0xfu) << 4) | (stepping & 0xfu);
+}
+
+static U make_leaf1_edx(bool rdtsc, bool cmov, bool mmx, bool sse) {
+    return (rdtsc ? (1u << 4) : 0u)
+         | (cmov ? (1u << 15) : 0u)
+         | (mmx ? (1u << 23) : 0u)
+         | (sse ? (1u << 25) : 0u);
+}
+
+int main(int argc, char**) {
+    if (argc < 1) {
+        return 2;
+    }
+    AddVectoredExceptionHandler(1u, fault_handler);
+
+    // Production initial state checks before fixture mutations.
+    require(porsche::render_clock_hz_005deae4 == 0u, "initial 005deae4 == 0");
+    for (U i = 0u; i < 16u; ++i) {
+        require(porsche::cpu_vendor_005deae8[i] == 0, "initial 005deae8 == 0");
+    }
+    for (U i = 0u; i < 3u; ++i) {
+        require(porsche::cpu_serial_005deaf8[i] == 0u, "initial 005deaf8 == 0");
+    }
+    require(porsche::cpu_family_005deb04 == 0u, "initial 005deb04 == 0");
+    require(porsche::cpu_model_005deb08 == 0u, "initial 005deb08 == 0");
+    require(porsche::cpu_stepping_005deb0c == 0u, "initial 005deb0c == 0");
+    require(porsche::cpu_has_3dnow_005deb20 == 0u, "initial 005deb20 == 0");
+    require(porsche::cpu_has_cmov_005deb28 == 0u, "initial 005deb28 == 0");
+    require(porsche::cpu_has_movnt_005deb2c == 0u, "initial 005deb2c == 0");
+    require(porsche::cpu_is_centaur_005deb3c == 0u, "initial 005deb3c == 0");
+    require(porsche::render_clock_get_version_ex_a != nullptr, "default GetVersionExA nonnull");
+    {
+        B osvi[0x94] = {};
+        wr(osvi, 0u, 0x94u);
+        require(porsche::render_clock_get_version_ex_a(osvi) != 0, "default host GetVersionExA");
+    }
+
+    init_tables();
+    init_fixture();
+    porsche::render_clock_query_performance_frequency = stub_qpf;
+    porsche::render_clock_get_version_ex_a = stub_get_version_ex_a;
+
+    // 1. 005a1ebf (atol) and 005a1f4a (atoi) across width <= 1 and width > 1.
+    static const char* const str_inputs[] = {
+        "",
+        "   \t\n\r\v\f",
+        "0",
+        "-0",
+        "+0",
+        "42",
+        "  \t+42xyz",
+        "  \r-42xyz",
+        "--42",
+        "-+42",
+        "+-42",
+        "- 42",
+        "+ 42",
+        "0000123",
+        "2147483647",
+        "-2147483648",
+        "2147483648",
+        "-2147483649",
+        "999999999999",
+        "-999999999999",
+        "A123",
+        "\x85\x85+12\xa3",
+        "\x85-\xa3\x34",
+        "\x86\x39",
+    };
+    static const I widths[] = {-1, 0, 1, 2};
+    for (I w : widths) {
+        for (const char* s : str_inputs) {
+            run_str_parse(false, w, s);
+            run_str_parse(true, w, s);
+        }
+    }
+
+    // 2. 00555bc0: no CPUID support + div_flags 0 / 1 + QPF 0 / nonzero.
+    {
+        CpuStubCfg base{};
+        std::memcpy(base.vendor, "GenuineIntel", 13);
+        base.cpuid_support = 0u;
+        base.div_flags_ret = 0u;
+        base.qpf_freq = 0;
+        base.qpf_ret = 1;
+        base.rdtsc_hz = 450000000;
+        base.div_hz = 233000000;
+        run_render_clock(base, false);
+
+        base.div_flags_ret = 1u;
+        base.qpf_freq = 10000000;
+        run_render_clock(base, false);
+
+        // High 32 bits non-zero, low 32 bits zero: must skip measurement and call quantize(0).
+        base.qpf_freq = static_cast<I64>(0x0000000100000000ULL);
+        run_render_clock(base, false);
+    }
+
+    // 3. 00555bc0: CPUID supported with max_leaf <= 0 (0 and -1).
+    for (I max_leaf : {-1, 0}) {
+        CpuStubCfg c{};
+        std::memcpy(c.vendor, "GenuineIntel", 13);
+        c.cpuid_support = 1u;
+        c.max_leaf = max_leaf;
+        c.qpf_freq = 3579545;
+        c.qpf_ret = 1;
+        c.rdtsc_hz = 500000000;
+        c.div_hz = 166000000;
+        run_render_clock(c, false);
+    }
+
+    // 4. 00555bc0: All vendors, family thresholds (4, 5, 6), feature bits, extended CPUID,
+    // OS version checks (Win95 vs Win98 vs WinNT), env overrides, leaf 2, leaf 3, and forwarding.
+    static const char* const vendors[] = {
+        "GenuineIntel",
+        "AuthenticAMD",
+        "CyrixInstead",
+        "CentaurHauls",
+        "UnknownCpuId",
+    };
+    for (const char* v : vendors) {
+        for (U fam : {4u, 5u, 6u}) {
+            CpuStubCfg c{};
+            std::memcpy(c.vendor, v, 13);
+            c.cpuid_support = 1u;
+            c.max_leaf = (fam == 6u) ? 3 : 1;
+            c.leaf1_eax = make_leaf1_eax(fam, 3u, 7u);
+            c.leaf1_edx = make_leaf1_edx(fam >= 5u, fam >= 6u, fam >= 5u, fam >= 6u && v[0] == 'G');
+            c.ext_max_leaf = (v[0] == 'A') ? 0x80000001u : 0x80000000u;
+            c.ext1_edx = (v[0] == 'A') ? 0x80000000u : 0u;
+            c.leaf3_ecx = 0x11223344u;
+            c.leaf3_edx = 0x55667788u;
+            c.leaf3_ebx = 0x99aabbcdu;
+            c.os_major = 4u;
+            c.os_minor = 10u;
+            c.os_platform = 1u;
+            c.os_ret = 1;
+            c.qpf_freq = 10000000;
+            c.qpf_ret = 1;
+            c.rdtsc_hz = 733000000;
+            c.div_hz = 133000000;
+            run_render_clock(c, false);
+        }
+    }
+
+    // Leaf 2 only (max_leaf == 2) + extended 0x7fffffff + Win95 clears SSE + WinNT keeps SSE.
+    {
+        CpuStubCfg c{};
+        std::memcpy(c.vendor, "GenuineIntel", 13);
+        c.cpuid_support = 1u;
+        c.max_leaf = 2;
+        c.leaf1_eax = make_leaf1_eax(6u, 8u, 1u);
+        c.leaf1_edx = make_leaf1_edx(true, true, true, true);
+        c.ext_max_leaf = 0x7fffffffu;
+        c.ext1_edx = 0x80000000u;
+        c.os_major = 4u;
+        c.os_minor = 0u;
+        c.os_platform = 1u; // Win95: clears 005deb1c
+        c.os_ret = 1;
+        c.qpf_freq = 10000000;
+        c.qpf_ret = 1;
+        c.rdtsc_hz = 800000000;
+        c.div_hz = 200000000;
+        run_render_clock(c, false);
+
+        // Win95 + ISKNI env override restores 005deb1c, plus all 4 env overrides with whitespace/signs.
+        c.env_mmx = "  +0 ";
+        c.env_k3d = "\t1";
+        c.env_kni = " 1 ";
+        c.env_movnt = " -1 ";
+        c.max_leaf = 3;
+        c.leaf3_ecx = 0x0a0b0c0du;
+        c.leaf3_edx = 0x0e0f1011u;
+        c.leaf3_ebx = 0x12131415u;
+        run_render_clock(c, false);
+
+        // WinNT + no RDTSC uses measure_div_loop, plus render_mode_clock_00555bc0 forwarding.
+        c.leaf1_edx = make_leaf1_edx(false, true, true, true);
+        c.env_mmx = nullptr;
+        c.env_k3d = nullptr;
+        c.env_kni = nullptr;
+        c.env_movnt = nullptr;
+        c.os_major = 5u;
+        c.os_minor = 0u;
+        c.os_platform = 2u;
+        run_render_clock(c, true);
+    }
+
+    // Extended max_leaf == 0x80000000 (unsigned boundary: must NOT query 0x80000001).
+    {
+        CpuStubCfg c{};
+        std::memcpy(c.vendor, "AuthenticAMD", 13);
+        c.cpuid_support = 1u;
+        c.max_leaf = 1;
+        c.leaf1_eax = make_leaf1_eax(6u, 1u, 2u);
+        c.leaf1_edx = make_leaf1_edx(true, true, true, false);
+        c.ext_max_leaf = 0x80000000u;
+        c.ext1_edx = 0x80000000u;
+        c.os_major = 5u;
+        c.os_minor = 1u;
+        c.os_platform = 2u;
+        c.os_ret = 1;
+        c.qpf_freq = 10000000;
+        c.qpf_ret = 1;
+        c.rdtsc_hz = 900000000;
+        c.div_hz = 250000000;
+        run_render_clock(c, false);
+    }
+
+    std::printf("render_clock_stricmp_682_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

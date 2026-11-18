@@ -1,0 +1,316 @@
+{
+  "run": 683,
+  "experiment": "local/experiments/v2-input-ff-render-leaves-683",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005330a0",
+      "bytes": 118,
+      "sha256": "d507817161cfad5ca04fc795359c2592e787bd7a396bec1f5a0e25927879e5e1",
+      "token": "@BODY_005330A0@"
+    },
+    {
+      "va": "00533320",
+      "bytes": 59,
+      "sha256": "6dec5e4b961eb2dde3824e73525856c6d7ee9bd41d91d32b91777e8dde823cf3",
+      "token": "@BODY_00533320@"
+    },
+    {
+      "va": "00533360",
+      "bytes": 59,
+      "sha256": "5cc45d21f12abaec385a1541f996a8f1b0a7fdf55ff4788e67120c84940607a2",
+      "token": "@BODY_00533360@"
+    },
+    {
+      "va": "00572f30",
+      "bytes": 43,
+      "sha256": "16e12996bc7de619c387234b303b9dd9504cc4ea98164dd9af57ea988efe8681",
+      "token": "@BODY_00572F30@"
+    },
+    {
+      "va": "00572f5b",
+      "bytes": 53,
+      "sha256": "ecf57812fda58f56725f16569f1a7a162e185b87ccec4ecfe05981c9d3549253",
+      "token": "@BODY_00572F5B@"
+    },
+    {
+      "va": "00570420",
+      "bytes": 76,
+      "sha256": "1aca0e33eab342efeef476cc5f86647a5b24bec717f8d65313a327e47cb58af7",
+      "token": "@BODY_00570420@"
+    },
+    {
+      "va": "00570490",
+      "bytes": 34,
+      "sha256": "17ef8b4290b1a22a4ea50f7d61ed93fa1a60458a2d943367ccc22c0d410d0523",
+      "token": "@BODY_00570490@"
+    }
+  ],
+  "pass_marker": "input_ff_render_leaves_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-5330a0-skip-directinput-check",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if (input_directinput_0069cb08 == nullptr) {\n        return 0u;\n    }",
+      "new": "    if (input_directinput_0069cb08 != nullptr && false) {\n        return 0u;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5330a0-skip-has-device",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if (input_slot_has_device_00532b50(slot_index) == 0u) {\n        return 0u;\n    }",
+      "new": "    if (input_slot_has_device_00532b50(slot_index) != 0u && false) {\n        return 0u;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5330a0-caps-wrong-bit",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if ((caps[4] & 2u) == 0u) {",
+      "new": "    if ((caps[4] & 1u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5330a0-caps-wrong-offset",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if ((caps[4] & 2u) == 0u) {",
+      "new": "    if ((caps[3] & 2u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5330a0-skip-flags-guard",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if ((slot.flags_04 & 1u) != 0u) {\n        return 0u;\n    }",
+      "new": "    if ((slot.flags_04 & 1u) != 0u && false) {\n        return 0u;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5330a0-invert-reset-check",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if (input_slot_reset_ff_00533120(slot_index) != 0u) {",
+      "new": "    if (input_slot_reset_ff_00533120(slot_index) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5330a0-drop-set-flag",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    slot.flags_04 |= 1u;\n    return 1u;",
+      "new": "    return 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5330a0-stale-flags-cache",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if ((slot.flags_04 & 1u) != 0u) {\n        return 0u;\n    }\n    if (input_slot_reset_ff_00533120(slot_index) != 0u) {\n        return 0u;\n    }\n    slot.flags_04 |= 1u;",
+      "new": "    const std::uint32_t old_flags = slot.flags_04;\n    if ((old_flags & 1u) != 0u) {\n        return 0u;\n    }\n    if (input_slot_reset_ff_00533120(slot_index) != 0u) {\n        return 0u;\n    }\n    slot.flags_04 = old_flags | 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5330a0-return-zero-on-success",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    slot.flags_04 |= 1u;\n    return 1u;",
+      "new": "    slot.flags_04 |= 1u;\n    return 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533320-wrong-command",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    input_slot_send_ff_command(slot_index, 0x10u);",
+      "new": "    input_slot_send_ff_command(slot_index, 0x20u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533360-wrong-command",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    input_slot_send_ff_command(slot_index, 0x20u);",
+      "new": "    input_slot_send_ff_command(slot_index, 0x10u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533320-360-skip-has-device",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if (input_slot_has_device_00532b50(slot_index) == 0u) {\n        return;\n    }",
+      "new": "    if (input_slot_has_device_00532b50(slot_index) != 0u && false) {\n        return;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533320-360-wrong-flag-bit",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if ((slot.flags_04 & 1u) == 0u) {\n        return;\n    }",
+      "new": "    if ((slot.flags_04 & 2u) == 0u) {\n        return;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-533320-360-invert-flag-check",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if ((slot.flags_04 & 1u) == 0u) {\n        return;\n    }",
+      "new": "    if ((slot.flags_04 & 1u) != 0u) {\n        return;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-572f30-red-shift-9",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    return ((color & 0x00f80000u) >> 8) |",
+      "new": "    return ((color & 0x00f80000u) >> 9) |",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-572f30-green-mask-f800",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "           ((color & 0x0000fc00u) >> 5) |",
+      "new": "           ((color & 0x0000f800u) >> 5) |",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-572f30-green-shift-6",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "           ((color & 0x0000fc00u) >> 5) |",
+      "new": "           ((color & 0x0000fc00u) >> 6) |",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-572f30-blue-shift-2",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "std::uint32_t __cdecl render_color_888_to_565_00572f30(std::uint32_t color) {\n    return ((color & 0x00f80000u) >> 8) |\n           ((color & 0x0000fc00u) >> 5) |\n           ((color >> 3) & 0x1fu);\n}",
+      "new": "std::uint32_t __cdecl render_color_888_to_565_00572f30(std::uint32_t color) {\n    return ((color & 0x00f80000u) >> 8) |\n           ((color & 0x0000fc00u) >> 5) |\n           ((color >> 2) & 0x1fu);\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-572f5b-drop-zero-check",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    if (color == 0u) {\n        return 0u;\n    }",
+      "new": "    if (color == 0u && false) {\n        return 0u;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-572f5b-drop-alpha-bit",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    return 0x8000u |",
+      "new": "    return",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-572f5b-red-shift-8",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "           ((color & 0x00f80000u) >> 9) |",
+      "new": "           ((color & 0x00f80000u) >> 8) |",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-572f5b-green-mask-fc00",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "           ((color & 0x0000f800u) >> 6) |",
+      "new": "           ((color & 0x0000fc00u) >> 6) |",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-572f5b-blue-shift-4",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "    return 0x8000u |\n           ((color & 0x00f80000u) >> 9) |\n           ((color & 0x0000f800u) >> 6) |\n           ((color >> 3) & 0x1fu);",
+      "new": "    return 0x8000u |\n           ((color & 0x00f80000u) >> 9) |\n           ((color & 0x0000f800u) >> 6) |\n           ((color >> 4) & 0x1fu);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-570420-drop-g5-lsb-fill",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "        const std::uint32_t g6 = (g5 << 1) | (g5 >> 4);",
+      "new": "        const std::uint32_t g6 = (g5 << 1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-570420-green-shift-6",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "        dst[i] = static_cast<std::uint16_t>(r5 | (g6 << 5) | b5);",
+      "new": "        dst[i] = static_cast<std::uint16_t>(r5 | (g6 << 6) | b5);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-570420-red-mask-7800",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "        const std::uint32_t r5 = (v & 0x7c00u) << 1;",
+      "new": "        const std::uint32_t r5 = (v & 0x7800u) << 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-570420-blue-mask-0f",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "        const std::uint32_t b5 = v & 0x1fu;",
+      "new": "        const std::uint32_t b5 = v & 0x0fu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-570420-no-red-shift",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "        const std::uint32_t r5 = (v & 0x7c00u) << 1;",
+      "new": "        const std::uint32_t r5 = (v & 0x7c00u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-570490-stride-1",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "        src += 2;",
+      "new": "        src += 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-570490-stride-4",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "        src += 2;",
+      "new": "        src += 4;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-570490-drop-last-element",
+      "source": "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp",
+      "old": "void __cdecl render_palette_copy_strided16_00570490(\n    std::uint16_t* dst, const std::uint16_t* src, std::int32_t count) {\n    for (std::int32_t i = 0; i < count; ++i) {",
+      "new": "void __cdecl render_palette_copy_strided16_00570490(\n    std::uint16_t* dst, const std::uint16_t* src, std::int32_t count) {\n    for (std::int32_t i = 0; i + 1 < count; ++i) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
