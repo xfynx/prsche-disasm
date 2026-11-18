@@ -1,12 +1,13 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-19. Run672 shared audit (`001`) passes for frozen `670/001`+`671/002` (`671/001` preserved) on `669`.
-Build `001` compiles 384 TUs / 8 projects, 72 names / 77 refs, no EXE. Zero new
-unresolved names; `35B` `.rdata` (`005bbb44..005bbb66`) and zero `.data`/`.bss`.
-Registry 1063 adds seven PARTIAL bodies (649B total). README 672 owns commands and
-bounds: 186 native cases / 32 controls at `/Od`/`/O2`, 952 pins.
+Current 2026-11-19. Run675 shared audit (`001`) passes for frozen `673/001`+`674/003` (`674/001`..`002` preserved) on `672`.
+Build `001` compiles 386 TUs / 8 projects, 71 names / 76 refs, no EXE. One real
+frontier name (`render_loader_directx_00574eb0`) closes with zero new names; `84B`
+`.data` (`005de574..005de5c7`) and zero `.rdata`. Registry 1072 adds nine PARTIAL
+bodies (607B total). README 675 owns commands and bounds: 1764 native cases / 42
+controls at `/Od`/`/O2`, 957 pins.
 
-Next launch `673` and `674` (`00574eb0`/`00414bd0`/`00414c30`, `004a8b80`, render/startup leaves).
+Next launch `676` and `677` (`00532b50`..`00411710`, `00565b30`/`00565ad0`/`00590140`).
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

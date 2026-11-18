@@ -1,0 +1,659 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <utility>
+
+#include "render_loader_directx_673.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+enum : U {
+    kMaxEvents = 32u,
+    kMallocArenaBytes = 256u,
+    kTableArenaBytes = 512u,
+};
+
+enum EventKind : U {
+    kEvGetVersionEx = 1u,
+    kEvGetVerSize = 2u,
+    kEvMalloc = 3u,
+    kEvGetVerInfo = 4u,
+    kEvVerQuery = 5u,
+    kEvFree = 6u,
+    kEvAllocate = 7u,
+    kEvHeapCopy = 8u,
+};
+
+struct Event {
+    U kind;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_ptr_ok;
+    U dx_result[2];
+    U count;
+    Event events[kMaxEvents];
+    B table_arena[kTableArenaBytes];
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512] = {};
+static B fp_env[28] = {};
+
+static B* code = nullptr;
+static B* slot_574eb0 = nullptr;
+static B* slot_414bd0 = nullptr;
+static B* slot_414c30 = nullptr;
+static void* iat_get_version_ex = nullptr;
+
+static const char orig_str_5d11e8[2] = {@STR_005D11E8@};
+
+alignas(16) static B malloc_arena[kMallocArenaBytes] = {};
+alignas(16) static B fixed_info_arena[64] = {};
+alignas(16) static B table_arena[kTableArenaBytes] = {};
+
+struct StubCfg {
+    const char* dll;
+    U get_version_ret;
+    U osvi_write_platform;
+    U platform_id;
+    U ver_size;
+    U ver_handle;
+    U malloc_null;
+    U ver_info_ret;
+    U ver_query_ret;
+    U ver_ms;
+    U ver_ls;
+    const char* tbl_name;
+};
+
+static StubCfg cfg{};
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu() {
+    const unsigned short cw = 0x037fu;
+    __asm {
+        fninit
+        fldcw cw
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    __asm {
+        fxsave fp_area
+        fnstenv fp_env
+        fldenv fp_env
+    }
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void check_fpu_clean(const FpuSnapshot& orig_fp, const FpuSnapshot& cpp_fp) {
+    require(orig_fp.control == cpp_fp.control, "FPU control");
+    require((orig_fp.status & 0x3800u) == 0u && (cpp_fp.status & 0x3800u) == 0u, "FPU TOP");
+    require(orig_fp.tag == 0xffffu && cpp_fp.tag == 0xffffu, "FPU empty tag");
+}
+
+static Event& push_event(U kind, U a0 = 0u, U a1 = 0u, U a2 = 0u, U a3 = 0u) {
+    require(trace.count < kMaxEvents, "event capacity");
+    Event& ev = trace.events[trace.count++];
+    ev.kind = kind;
+    ev.a0 = a0;
+    ev.a1 = a1;
+    ev.a2 = a2;
+    ev.a3 = a3;
+    return ev;
+}
+
+static I __stdcall stub_get_version_ex_a(void* osvi) {
+    require(osvi != nullptr, "osvi nonnull");
+    const auto* const bytes = static_cast<const B*>(osvi);
+    const U sz = rd(bytes, 0u);
+    U rest_zero = 1u;
+    for (U i = 4u; i < 0x94u; ++i) {
+        if (bytes[i] != 0u) {
+            rest_zero = 0u;
+            break;
+        }
+    }
+    push_event(kEvGetVersionEx, sz, rest_zero, cfg.platform_id, cfg.get_version_ret);
+    if (cfg.osvi_write_platform != 0u) {
+        wr(osvi, 0x10u, cfg.platform_id);
+        wr(osvi, 0x04u, 4u);
+        wr(osvi, 0x08u, 10u);
+    }
+    return static_cast<I>(cfg.get_version_ret);
+}
+
+static U __stdcall stub_get_file_version_info_size_a(const char* filename, U* handle) {
+    const U name_match =
+        (filename != nullptr && cfg.dll != nullptr && std::strcmp(filename, cfg.dll) == 0) ? 1u : 0u;
+    const U handle_nonnull = (handle != nullptr) ? 1u : 0u;
+    push_event(kEvGetVerSize, name_match, handle_nonnull, cfg.ver_size, cfg.ver_handle);
+    if (handle != nullptr) {
+        *handle = cfg.ver_handle;
+    }
+    return cfg.ver_size;
+}
+
+static I __stdcall stub_get_file_version_info_a(
+    const char* filename, U handle, U len, void* data) {
+    const U name_match =
+        (filename != nullptr && cfg.dll != nullptr && std::strcmp(filename, cfg.dll) == 0) ? 1u : 0u;
+    const U data_match = (data == malloc_arena) ? 1u : 0u;
+    push_event(kEvGetVerInfo, name_match, handle, len, data_match);
+    if (cfg.ver_info_ret != 0u && data != nullptr && len <= kMallocArenaBytes) {
+        for (U i = 0u; i < len; ++i) {
+            static_cast<B*>(data)[i] = static_cast<B>((i * 17u + 3u) & 0xffu);
+        }
+    }
+    return static_cast<I>(cfg.ver_info_ret);
+}
+
+static I __stdcall stub_ver_query_value_a(
+    const void* block, const char* sub_block, void** buffer, U* len) {
+    const U block_match = (block == malloc_arena) ? 1u : 0u;
+    const U sub_match =
+        (sub_block != nullptr && std::strcmp(sub_block, orig_str_5d11e8) == 0) ? 1u : 0u;
+    const U len_is_null = (len == nullptr) ? 1u : 0u;
+    push_event(kEvVerQuery, block_match, sub_match, len_is_null, buffer != nullptr ? 1u : 0u);
+    if (cfg.ver_query_ret != 0u && buffer != nullptr) {
+        std::memset(fixed_info_arena, 0x33, sizeof fixed_info_arena);
+        wr(fixed_info_arena, 0x00u, 0xfeef04bdu);
+        wr(fixed_info_arena, 0x04u, 0x00010000u);
+        wr(fixed_info_arena, 0x08u, cfg.ver_ms);
+        wr(fixed_info_arena, 0x0cu, cfg.ver_ls);
+        *buffer = fixed_info_arena;
+    }
+    return static_cast<I>(cfg.ver_query_ret);
+}
+
+namespace porsche {
+
+void* __cdecl exit_registry_malloc_005a3be5(std::uint32_t bytes) {
+    push_event(kEvMalloc, bytes, cfg.malloc_null);
+    if (cfg.malloc_null != 0u) {
+        return nullptr;
+    }
+    require(bytes <= kMallocArenaBytes, "malloc arena size");
+    std::memset(malloc_arena, 0xaa, sizeof malloc_arena);
+    return malloc_arena;
+}
+
+void __cdecl formatter_crt_free_005a3b9d(void* ptr) {
+    push_event(kEvFree, (ptr == malloc_arena) ? 1u : 0u, address(ptr) != 0u ? 1u : 0u);
+}
+
+void* __cdecl allocate_00531ca0(const char* name, std::int32_t bytes, std::uint32_t heap) {
+    const U name_match =
+        (name != nullptr && cfg.tbl_name != nullptr && std::strcmp(name, cfg.tbl_name) == 0) ? 1u : 0u;
+    push_event(kEvAllocate, name_match, static_cast<U>(bytes), heap);
+    require(bytes >= 0 && static_cast<U>(bytes) <= kTableArenaBytes, "table arena size");
+    std::memset(table_arena, 0x5a, sizeof table_arena);
+    return table_arena;
+}
+
+void __cdecl heap_copy_dispatch_005323e0(void* dst, const void* src, std::uint32_t bytes) {
+    const U base = address(table_arena);
+    const U dst_off = address(dst) - base;
+    const U src_off = address(src) - base;
+    require(dst_off + bytes <= kTableArenaBytes && src_off + bytes <= kTableArenaBytes,
+            "heap copy bounds");
+    push_event(kEvHeapCopy, dst_off, src_off, bytes);
+    std::memmove(dst, src, bytes);
+}
+
+} // namespace porsche
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(rd(slot, off) == orig, "exact abs32 offset");
+    wr(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U base_va, U off, U orig_target, const void* target) {
+    const U insn_va = base_va + off + 4u;
+    const U expected_rel = orig_target - insn_va;
+    require(rd(slot, off) == expected_rel, "exact rel32 offset");
+    wr(slot, off, address(target) - (address(slot) + off + 4u));
+}
+
+static void init() {
+    SetUnhandledExceptionFilter(fault_handler);
+
+    // Assert production Win32 IAT facade initial pointers before fixture hooks.
+    require(porsche::render_directx_get_version_ex_a != nullptr, "initial GetVersionExA");
+    require(porsche::render_directx_get_file_version_info_size_a != nullptr,
+            "initial GetFileVersionInfoSizeA");
+    require(porsche::render_directx_get_file_version_info_a != nullptr,
+            "initial GetFileVersionInfoA");
+    require(porsche::render_directx_ver_query_value_a != nullptr, "initial VerQueryValueA");
+
+    require(orig_str_5d11e8[0] == '\\' && orig_str_5d11e8[1] == '\0', "orig 005d11e8");
+
+    porsche::render_directx_get_version_ex_a = &stub_get_version_ex_a;
+    porsche::render_directx_get_file_version_info_size_a = &stub_get_file_version_info_size_a;
+    porsche::render_directx_get_file_version_info_a = &stub_get_file_version_info_a;
+    porsche::render_directx_ver_query_value_a = &stub_ver_query_value_a;
+    iat_get_version_ex = reinterpret_cast<void*>(&stub_get_version_ex_a);
+
+    static const B body_574eb0[] = {@BODY_00574EB0@};
+    static const B body_414bd0[] = {@BODY_00414BD0@};
+    static const B body_414c30[] = {@BODY_00414C30@};
+    static_assert(sizeof body_574eb0 == 202u, "00574eb0 size");
+    static_assert(sizeof body_414bd0 == 75u, "00414bd0 size");
+    static_assert(sizeof body_414c30 == 124u, "00414c30 size");
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    std::memset(code, 0xcc, 4096u);
+
+    slot_574eb0 = code + 0x000u;
+    slot_414bd0 = code + 0x100u;
+    slot_414c30 = code + 0x200u;
+
+    std::memcpy(slot_574eb0, body_574eb0, sizeof body_574eb0);
+    std::memcpy(slot_414bd0, body_414bd0, sizeof body_414bd0);
+    std::memcpy(slot_414c30, body_414c30, sizeof body_414c30);
+
+    // Relocate 00574eb0.
+    relocate_abs32(slot_574eb0, 0x34u, 0x005b2150u, address(&iat_get_version_ex));
+    relocate_rel32(slot_574eb0, 0x00574eb0u, 0x5au, 0x00594cbcu,
+                   reinterpret_cast<const void*>(&stub_get_file_version_info_size_a));
+    relocate_rel32(slot_574eb0, 0x00574eb0u, 0x66u, 0x005a3be5u,
+                   reinterpret_cast<const void*>(&porsche::exit_registry_malloc_005a3be5));
+    relocate_rel32(slot_574eb0, 0x00574eb0u, 0x7cu, 0x00594cb6u,
+                   reinterpret_cast<const void*>(&stub_get_file_version_info_a));
+    relocate_abs32(slot_574eb0, 0x8bu, 0x005d11e8u, address(orig_str_5d11e8));
+    relocate_rel32(slot_574eb0, 0x00574eb0u, 0x91u, 0x00594cb0u,
+                   reinterpret_cast<const void*>(&stub_ver_query_value_a));
+    relocate_rel32(slot_574eb0, 0x00574eb0u, 0xb6u, 0x005a3b9du,
+                   reinterpret_cast<const void*>(&porsche::formatter_crt_free_005a3b9d));
+
+    // Relocate 00414bd0.
+    relocate_rel32(slot_414bd0, 0x00414bd0u, 0x16u, 0x00531ca0u,
+                   reinterpret_cast<const void*>(&porsche::allocate_00531ca0));
+
+    // Relocate 00414c30.
+    relocate_rel32(slot_414c30, 0x00414c30u, 0x4au, 0x005323e0u,
+                   reinterpret_cast<const void*>(&porsche::heap_copy_dispatch_005323e0));
+}
+
+static U invoke_cdecl2_ret(void* fn, U a0, U a1, U& out_eax) {
+    U before = 0u;
+    U frame = 0u;
+    U fail = 0u;
+    U eax_val = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push a1
+        push a0
+        call fn
+        mov eax_val, eax
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    out_eax = eax_val;
+    return fail;
+}
+
+static U invoke_cdecl4_void(void* fn, U a0, U a1, U a2, U a3) {
+    U before = 0u;
+    U frame = 0u;
+    U fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push a3
+        push a2
+        push a1
+        push a0
+        call fn
+        add esp, 16
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static void compare_traces(bool check_table, bool check_ret) {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "recovered ABI");
+    if (check_ret) {
+        require(trace.ret_ptr_ok == expected.ret_ptr_ok, "return ptr");
+    }
+    require(trace.dx_result[0] == expected.dx_result[0] &&
+                trace.dx_result[1] == expected.dx_result[1],
+            "dx_result");
+    require(trace.count == expected.count, "event count");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0,
+                "event mismatch");
+    }
+    if (check_table) {
+        require(std::memcmp(trace.table_arena, expected.table_arena, sizeof trace.table_arena) == 0,
+                "table arena");
+    }
+    check_fpu_clean(trace.fp, expected.fp);
+    ++cases;
+}
+
+static void check_directx(
+    const char* dll,
+    U get_version_ret,
+    U osvi_write_platform,
+    U platform_id,
+    U ver_size,
+    U ver_handle,
+    U malloc_null,
+    U ver_info_ret,
+    U ver_query_ret,
+    U ver_ms,
+    U ver_ls) {
+    cfg.dll = dll;
+    cfg.get_version_ret = get_version_ret;
+    cfg.osvi_write_platform = osvi_write_platform;
+    cfg.platform_id = platform_id;
+    cfg.ver_size = ver_size;
+    cfg.ver_handle = ver_handle;
+    cfg.malloc_null = malloc_null;
+    cfg.ver_info_ret = ver_info_ret;
+    cfg.ver_query_ret = ver_query_ret;
+    cfg.ver_ms = ver_ms;
+    cfg.ver_ls = ver_ls;
+
+    U unused = 0u;
+
+    which = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    U res_orig[2] = {0xdeadbeefu, 0xcafebabeu};
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl2_ret(
+        slot_574eb0, address(res_orig), address(dll), unused);
+    capture_fpu(trace.fp);
+    trace.dx_result[0] = res_orig[0];
+    trace.dx_result[1] = res_orig[1];
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof trace);
+    U res_cpp[2] = {0xdeadbeefu, 0xcafebabeu};
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl2_ret(
+        reinterpret_cast<void*>(&porsche::render_loader_directx_00574eb0),
+        address(res_cpp),
+        address(dll),
+        unused);
+    capture_fpu(trace.fp);
+    trace.dx_result[0] = res_cpp[0];
+    trace.dx_result[1] = res_cpp[1];
+    std::swap(trace, expected);
+
+    compare_traces(false, false);
+}
+
+static void check_table_create(const char* name, I capacity) {
+    cfg.tbl_name = name;
+
+    U ret_orig = 0u;
+    which = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(table_arena, 0x5a, sizeof table_arena);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl2_ret(
+        slot_414bd0, address(name), static_cast<U>(capacity), ret_orig);
+    capture_fpu(trace.fp);
+    trace.ret_ptr_ok = (ret_orig == address(table_arena)) ? 1u : 0u;
+    std::memcpy(trace.table_arena, table_arena, sizeof trace.table_arena);
+    expected = trace;
+
+    U ret_cpp = 0u;
+    which = 1u;
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(table_arena, 0x5a, sizeof table_arena);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl2_ret(
+        reinterpret_cast<void*>(&porsche::startup_sorted_table_create_00414bd0),
+        address(name),
+        static_cast<U>(capacity),
+        ret_cpp);
+    capture_fpu(trace.fp);
+    trace.ret_ptr_ok = (ret_cpp == address(table_arena)) ? 1u : 0u;
+    std::memcpy(trace.table_arena, table_arena, sizeof trace.table_arena);
+    std::swap(trace, expected);
+
+    compare_traces(true, true);
+}
+
+struct InsertOp {
+    U value0;
+    U value1;
+    I key;
+};
+
+static void check_table_sequence(
+    I capacity, const InsertOp* ops, U op_count, I initial_count_override = 0) {
+    cfg.tbl_name = "seq_tbl";
+    B init_snapshot[kTableArenaBytes] = {};
+
+    // Prepare identical initial table state via original create (and optional count override).
+    std::memset(&trace, 0, sizeof trace);
+    U ret_init = 0u;
+    require(invoke_cdecl2_ret(slot_414bd0, address("seq_tbl"), static_cast<U>(capacity), ret_init) == 0u,
+            "seq init");
+    if (initial_count_override != 0) {
+        wr(table_arena, 4u, static_cast<U>(initial_count_override));
+    }
+    std::memcpy(init_snapshot, table_arena, sizeof init_snapshot);
+
+    // Run sequence on original.
+    which = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    std::memcpy(table_arena, init_snapshot, sizeof table_arena);
+    seed_fpu();
+    for (U i = 0u; i < op_count; ++i) {
+        const U fail = invoke_cdecl4_void(
+            slot_414c30,
+            address(table_arena),
+            ops[i].value0,
+            ops[i].value1,
+            static_cast<U>(ops[i].key));
+        trace.abi_fail |= fail;
+    }
+    capture_fpu(trace.fp);
+    std::memcpy(trace.table_arena, table_arena, sizeof trace.table_arena);
+    expected = trace;
+
+    // Run sequence on recovered C++.
+    which = 1u;
+    std::memset(&trace, 0, sizeof trace);
+    std::memcpy(table_arena, init_snapshot, sizeof table_arena);
+    seed_fpu();
+    for (U i = 0u; i < op_count; ++i) {
+        const U fail = invoke_cdecl4_void(
+            reinterpret_cast<void*>(&porsche::startup_sorted_table_insert_00414c30),
+            address(table_arena),
+            ops[i].value0,
+            ops[i].value1,
+            static_cast<U>(ops[i].key));
+        trace.abi_fail |= fail;
+    }
+    capture_fpu(trace.fp);
+    std::memcpy(trace.table_arena, table_arena, sizeof table_arena);
+    std::swap(trace, expected);
+
+    compare_traces(true, false);
+}
+
+int main() {
+    init();
+
+    // 1. 00574eb0 (render_loader_directx_00574eb0).
+    // Early exit when dwPlatformId == 2 (WinNT).
+    check_directx("ddraw.dll", 1u, 1u, 2u, 64u, 0u, 0u, 1u, 1u, 0x00040007u, 0x000002bcu);
+    // Win9x (platform=1): proceeds, and zero ver_size exits cleanly.
+    check_directx("ddraw.dll", 1u, 1u, 1u, 0u, 0u, 0u, 1u, 1u, 0x00040007u, 0x000002bcu);
+    // GetVersionExA returning 0 with dwPlatformId still 0 (!= 2) proceeds.
+    check_directx("ddraw.dll", 0u, 0u, 0u, 64u, 0x13572468u, 0u, 1u, 1u, 0x00040007u, 0x000002bcu);
+    // malloc returning nullptr exits cleanly without calling free.
+    check_directx("ddraw.dll", 1u, 1u, 1u, 64u, 0x11112222u, 1u, 1u, 1u, 0x00040007u, 0x000002bcu);
+    // GetFileVersionInfoA fails -> calls free and leaves result {0, 0}.
+    check_directx("ddraw.dll", 1u, 1u, 1u, 96u, 0x12345678u, 0u, 0u, 1u, 0x00040007u, 0x000002bcu);
+    // VerQueryValueA fails -> calls free and leaves result {0, 0}.
+    check_directx("ddraw.dll", 1u, 1u, 1u, 96u, 0xabcdef01u, 0u, 1u, 0u, 0x00040007u, 0x000002bcu);
+    // Full success path with distinct MS/LS values, platform=0, platform=1, and various DLL names.
+    check_directx("ddraw.dll", 1u, 1u, 0u, 128u, 0x0000feedu, 0u, 1u, 1u, 0x00040007u, 0x000002bcu);
+    check_directx("d3dim700.dll", 1u, 1u, 1u, 256u, 0x00000000u, 0u, 1u, 1u, 0x11223344u, 0x55667788u);
+
+    // 2. 00414bd0 (startup_sorted_table_create_00414bd0).
+    check_table_create("empty", 0);
+    check_table_create("neg1", -1);
+    check_table_create("one", 1);
+    check_table_create("five", 5);
+    check_table_create("ten", 10);
+    check_table_create("twenty", 20);
+
+    // 3. 00414c30 (startup_sorted_table_insert_00414c30).
+    const InsertOp asc[] = {{0x463c30u, 1u, 10}, {0x463c40u, 2u, 20}, {0x463c50u, 3u, 30}};
+    check_table_sequence(5, asc, 3);
+
+    const InsertOp desc[] = {{0x11111111u, 0xau, 300}, {0x22222222u, 0xbu, 200}, {0x33333333u, 0xcu, 100}};
+    check_table_sequence(5, desc, 3);
+
+    const InsertOp mixed_signed[] = {
+        {0x0101u, 1u, 100},
+        {0x0202u, 2u, -5},
+        {0x0303u, 3u, 50},
+        {0x0404u, 4u, 50},
+        {0x0505u, 5u, 0x7ffe},
+        {0x0606u, 6u, 0x8000},
+        {0x0707u, 7u, -0x7fffffff - 1},
+    };
+    check_table_sequence(10, mixed_signed, 7);
+
+    // Negative new_count branch (old_count <= -1).
+    const InsertOp neg_count_op[] = {{0xaaaa1111u, 0xbbbb2222u, 42}};
+    check_table_sequence(4, neg_count_op, 1, -1);
+    check_table_sequence(4, neg_count_op, 1, -5);
+
+    std::printf("render_loader_directx_and_startup_alloc_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

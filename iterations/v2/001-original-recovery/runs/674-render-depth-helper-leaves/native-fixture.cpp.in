@@ -1,0 +1,609 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "render_depth_helpers_674.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::render_depth_format_table_005de574) == 56u);
+static_assert(sizeof(porsche::render_depth_level_table_005de5ac) == 28u);
+
+enum : U {
+    kMaxReadBeEvents = 4u,
+    kHeaderBytes = 16u,
+};
+
+struct ReadBeEvent {
+    U source_offset;
+    U count;
+    U ret_val;
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_u32;
+    U read_be_count;
+    ReadBeEvent read_be[kMaxReadBeEvents];
+    B header_after[kHeaderBytes];
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512] = {};
+
+static B* code = nullptr;
+static B* slot_5345e0 = nullptr;
+static B* slot_53462c = nullptr;
+static B* slot_534650 = nullptr;
+static B* slot_535340 = nullptr;
+static B* slot_535360 = nullptr;
+static B* slot_571490 = nullptr;
+static B* slot_5714d8 = nullptr;
+static B* slot_5714e0 = nullptr;
+static B* slot_571520 = nullptr;
+static B* slot_573070 = nullptr;
+static B* slot_56e290 = nullptr;
+
+static I orig_data_5de574[14] = {};
+static U orig_data_5de5ac[7] = {};
+
+alignas(16) static B header_buf[kHeaderBytes] = {};
+static bool use_sentinel_read_be = false;
+static U sentinel_read_be_val = 0u;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu(U mode) {
+    unsigned short cw = 0x037fu;
+    switch (mode) {
+    case 0u:
+        __asm {
+            fninit
+            fldcw cw
+        }
+        break;
+    case 1u:
+        __asm {
+            fninit
+            fldcw cw
+            fld1
+        }
+        break;
+    case 2u:
+        __asm {
+            fninit
+            fldcw cw
+            fld1
+            fldpi
+            fldz
+        }
+        break;
+    case 3u:
+        __asm {
+            fninit
+            fldcw cw
+            fld1
+            fld1
+            fld1
+            fld1
+            fld1
+            fld1
+            fld1
+            fld1
+        }
+        break;
+    case 4u:
+        cw = 0x027fu;
+        __asm {
+            fninit
+            fldcw cw
+            mov eax, 12345678h
+            movd mm0, eax
+        }
+        break;
+    default:
+        cw = 0x0e7fu;
+        __asm {
+            fninit
+            fldcw cw
+            mov eax, 0deadbeefh
+            movd mm0, eax
+            movq mm7, mm0
+        }
+        break;
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    std::memset(fp_area, 0, sizeof fp_area);
+    __asm {
+        fxsave fp_area
+    }
+    std::memcpy(&fp.control, fp_area + 0, 2u);
+    std::memcpy(&fp.status, fp_area + 2, 2u);
+    fp.tag = static_cast<unsigned short>(fp_area[4]);
+    std::memcpy(&fp.mxcsr, fp_area + 24, 4u);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((static_cast<U>(fp.status) >> 11u) + i) & 7u;
+        if ((fp_area[4] & (1u << physical)) != 0u) {
+            std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        }
+    }
+}
+
+static U invoke_cdecl0(void* fn, U seed_mode, FpuSnapshot& fp_out, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu(seed_mode);
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    return out;
+}
+
+static U invoke_cdecl1(void* fn, U arg0, FpuSnapshot& fp_out, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu(0u);
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    return out;
+}
+
+static U invoke_cdecl2_plain(void* fn, U arg0, U arg1) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg1
+        push arg0
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    require(fail == 0u, "0056e290 abi");
+    return out;
+}
+
+namespace porsche {
+
+std::uint32_t __cdecl render_descriptor_read_be_0056e290(const void* source, std::uint32_t count) {
+    require(trace.read_be_count < kMaxReadBeEvents, "read_be event overflow");
+    const U src_addr = address(source);
+    const U hdr_addr = address(header_buf);
+    const U offset = (src_addr >= hdr_addr && src_addr < hdr_addr + kHeaderBytes)
+                         ? (src_addr - hdr_addr)
+                         : 0xffffffffu;
+    const U val = use_sentinel_read_be
+                      ? sentinel_read_be_val
+                      : invoke_cdecl2_plain(slot_56e290, src_addr, count);
+    auto& ev = trace.read_be[trace.read_be_count++];
+    ev.source_offset = offset;
+    ev.count = count;
+    ev.ret_val = val;
+    return val;
+}
+
+} // namespace porsche
+
+static void relocate_abs(B* p, U n, U old_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 4u <= n; ++i) {
+        if (rd(p, i) == old_va) {
+            wr(p, i, replacement);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected_count, "abs relocation count");
+}
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+static void init_fixture() {
+    static const B body_5345e0[74] = {@BODY_005345E0@};
+    static const B jtbl_53462c[36] = {@JTBL_0053462C@};
+    static const B lut_534650[127] = {@LUT_00534650@};
+    static const B body_535340[21] = {@BODY_00535340@};
+    static const B data_5de574[56] = {@DATA_005DE574@};
+    static const B body_535360[24] = {@BODY_00535360@};
+    static const B data_5de5ac[28] = {@DATA_005DE5AC@};
+    static const B body_571490[70] = {@BODY_00571490@};
+    static const B jtbl_5714d8[8] = {@JTBL_005714D8@};
+    static const B lut_5714e0[55] = {@LUT_005714E0@};
+    static const B body_571520[14] = {@BODY_00571520@};
+    static const B body_573070[3] = {@BODY_00573070@};
+    static const B body_56e290[24] = {@BODY_0056E290@};
+
+    // Verify production .data tables match Porsche.exe initial bytes and are writable.
+    MEMORY_BASIC_INFORMATION mbi{};
+    require(VirtualQuery(porsche::render_depth_format_table_005de574, &mbi, sizeof mbi) != 0 &&
+                mbi.Protect == PAGE_READWRITE,
+            "5de574 writable data");
+    require(VirtualQuery(porsche::render_depth_level_table_005de5ac, &mbi, sizeof mbi) != 0 &&
+                mbi.Protect == PAGE_READWRITE,
+            "5de5ac writable data");
+    require(std::memcmp(porsche::render_depth_format_table_005de574, data_5de574, 56u) == 0,
+            "initial 5de574 bytes");
+    require(std::memcmp(porsche::render_depth_level_table_005de5ac, data_5de5ac, 28u) == 0,
+            "initial 5de5ac bytes");
+
+    std::memcpy(orig_data_5de574, data_5de574, 56u);
+    std::memcpy(orig_data_5de5ac, data_5de5ac, 28u);
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_5345e0 = code + 0x000u;
+    slot_53462c = code + 0x060u;
+    slot_534650 = code + 0x090u;
+    slot_535340 = code + 0x120u;
+    slot_535360 = code + 0x140u;
+    slot_571490 = code + 0x160u;
+    slot_5714d8 = code + 0x1b0u;
+    slot_5714e0 = code + 0x1c0u;
+    slot_571520 = code + 0x200u;
+    slot_573070 = code + 0x220u;
+    slot_56e290 = code + 0x230u;
+
+    std::memcpy(slot_5345e0, body_5345e0, 74u);
+    std::memcpy(slot_53462c, jtbl_53462c, 36u);
+    std::memcpy(slot_534650, lut_534650, 127u);
+    std::memcpy(slot_535340, body_535340, 21u);
+    std::memcpy(slot_535360, body_535360, 24u);
+    std::memcpy(slot_571490, body_571490, 70u);
+    std::memcpy(slot_5714d8, jtbl_5714d8, 8u);
+    std::memcpy(slot_5714e0, lut_5714e0, 55u);
+    std::memcpy(slot_571520, body_571520, 14u);
+    std::memcpy(slot_573070, body_573070, 3u);
+    std::memcpy(slot_56e290, body_56e290, 24u);
+
+    relocate_abs(slot_5345e0, 74u, 0x00534650u, address(slot_534650), 1u);
+    relocate_abs(slot_5345e0, 74u, 0x0053462cu, address(slot_53462c), 1u);
+    for (U i = 0u; i < 9u; ++i) {
+        const U target = rd(slot_53462c, i * 4u);
+        require(target >= 0x005345e0u && target <= 0x00534629u, "53462c target range");
+        wr(slot_53462c, i * 4u, address(slot_5345e0) + (target - 0x005345e0u));
+    }
+
+    relocate_abs(slot_535340, 21u, 0x005de574u, address(orig_data_5de574), 1u);
+    relocate_abs(slot_535360, 24u, 0x005de5acu, address(orig_data_5de5ac), 1u);
+
+    relocate_abs(slot_571490, 70u, 0x005714e0u, address(slot_5714e0), 1u);
+    relocate_abs(slot_571490, 70u, 0x005714d8u, address(slot_5714d8), 1u);
+    for (U i = 0u; i < 2u; ++i) {
+        const U target = rd(slot_5714d8, i * 4u);
+        require(target >= 0x00571490u && target <= 0x005714d5u, "5714d8 target range");
+        wr(slot_5714d8, i * 4u, address(slot_571490) + (target - 0x00571490u));
+    }
+    relocate_rel(
+        slot_571490,
+        70u,
+        0x00571490u,
+        0x0056e290u,
+        address(reinterpret_cast<const void*>(&porsche::render_descriptor_read_be_0056e290)),
+        1u);
+
+    relocate_rel(slot_571520, 14u, 0x00571520u, 0x00571490u, address(slot_571490), 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+}
+
+static void assert_traces_match(bool check_ret) {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    if (check_ret) {
+        require(trace.ret_u32 == expected.ret_u32, "return u32");
+    }
+    require(trace.read_be_count == expected.read_be_count, "read_be count");
+    for (U i = 0u; i < trace.read_be_count; ++i) {
+        require(trace.read_be[i].source_offset == expected.read_be[i].source_offset,
+                "read_be source offset");
+        require(trace.read_be[i].count == expected.read_be[i].count, "read_be byte count");
+        require(trace.read_be[i].ret_val == expected.read_be[i].ret_val, "read_be ret_val");
+    }
+    require(std::memcmp(trace.header_after, expected.header_after, kHeaderBytes) == 0,
+            "header unchanged");
+    require(trace.fp.control == expected.fp.control, "fpu control");
+    require(trace.fp.status == expected.fp.status, "fpu status");
+    require(trace.fp.tag == expected.fp.tag, "fpu tag");
+    require(trace.fp.mxcsr == expected.fp.mxcsr, "fpu mxcsr");
+    require(std::memcmp(trace.fp.values, expected.fp.values, sizeof trace.fp.values) == 0,
+            "fpu stack values");
+}
+
+static void run_cdecl1_pair(void* orig_fn, void* cpp_fn, U arg0, const B* hdr, bool sentinel, U sent_val) {
+    ++cases;
+    use_sentinel_read_be = sentinel;
+    sentinel_read_be_val = sent_val;
+
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        std::memset(&trace, 0, sizeof trace);
+        std::memset(header_buf, 0, sizeof header_buf);
+        if (hdr != nullptr) {
+            std::memcpy(header_buf, hdr, kHeaderBytes);
+        }
+        void* const fn = (side == 0u) ? orig_fn : cpp_fn;
+        trace.ret_u32 = invoke_cdecl1(fn, arg0, trace.fp, trace.abi_fail);
+        std::memcpy(trace.header_after, header_buf, kHeaderBytes);
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match(true);
+}
+
+static void run_cdecl0_pair(void* orig_fn, void* cpp_fn, U seed_mode) {
+    ++cases;
+    use_sentinel_read_be = false;
+    sentinel_read_be_val = 0u;
+    std::memset(header_buf, 0, sizeof header_buf);
+
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        std::memset(&trace, 0, sizeof trace);
+        void* const fn = (side == 0u) ? orig_fn : cpp_fn;
+        (void)invoke_cdecl0(fn, seed_mode, trace.fp, trace.abi_fail);
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match(false);
+}
+
+int main(int argc, char**) {
+    if (argc < 1) {
+        return 2;
+    }
+    AddVectoredExceptionHandler(1u, fault_handler);
+    init_fixture();
+
+    // 1. 005345e0: all byte inputs 0x00..0xff plus 32-bit boundary values.
+    void* const cpp_5345e0 =
+        reinterpret_cast<void*>(&porsche::render_shape_type_to_depth_index_005345e0);
+    for (U v = 0u; v <= 0xffu; ++v) {
+        run_cdecl1_pair(slot_5345e0, cpp_5345e0, v, nullptr, false, 0u);
+    }
+    static const U extra_5345e0[] = {
+        0x00000100u, 0x00000101u, 0x00000140u, 0x0000017fu,
+        0x7fffffffu, 0x80000000u, 0x80000001u, 0xffffffffu,
+    };
+    for (U v : extra_5345e0) {
+        run_cdecl1_pair(slot_5345e0, cpp_5345e0, v, nullptr, false, 0u);
+    }
+
+    // 2. 00535340: all indices 0..16 plus signed/unsigned boundary values.
+    void* const cpp_535340 =
+        reinterpret_cast<void*>(&porsche::render_depth_format_index_00535340);
+    for (U v = 0u; v <= 16u; ++v) {
+        run_cdecl1_pair(slot_535340, cpp_535340, v, nullptr, false, 0u);
+    }
+    static const U extra_535340[] = {
+        0x00000100u, 0x7fffffffu, 0x80000000u, 0xfffffffeu, 0xffffffffu,
+    };
+    for (U v : extra_535340) {
+        run_cdecl1_pair(slot_535340, cpp_535340, v, nullptr, false, 0u);
+    }
+
+    // 3. 00535360: signed boundary indices around [0, 7).
+    void* const cpp_535360 =
+        reinterpret_cast<void*>(&porsche::render_depth_level_00535360);
+    static const I vals_535360[] = {
+        -2147483647 - 1, -100, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 100, 2147483647,
+    };
+    for (I v : vals_535360) {
+        run_cdecl1_pair(slot_535360, cpp_535360, static_cast<U>(v), nullptr, false, 0u);
+    }
+
+    // 4. 00571490: exhaustive b0 (0x00..0xff) for both valid markers 0xfb and 0x32,
+    //    plus invalid markers, plus 32-bit sentinel forwarding.
+    void* const cpp_571490 =
+        reinterpret_cast<void*>(&porsche::render_chunk_size_00571490);
+    const U hdr_arg = address(header_buf);
+    static const B valid_markers[] = {0xfbu, 0x32u};
+    for (B marker : valid_markers) {
+        for (U b0 = 0u; b0 <= 0xffu; ++b0) {
+            B hdr[kHeaderBytes] = {
+                static_cast<B>(b0), marker, 0x12u, 0x34u, 0x56u, 0x78u,
+                0x9au, 0xbcu, 0xdeu, 0xf0u, 0x11u, 0x22u, 0x33u, 0x44u, 0x55u, 0x66u,
+            };
+            run_cdecl1_pair(slot_571490, cpp_571490, hdr_arg, hdr, false, 0u);
+        }
+    }
+    static const B invalid_markers[] = {0x00u, 0x31u, 0x33u, 0xfau, 0xfcu, 0xffu};
+    static const B sample_b0s[] = {0x10u, 0x32u, 0x46u, 0x47u};
+    for (B marker : invalid_markers) {
+        for (B b0 : sample_b0s) {
+            B hdr[kHeaderBytes] = {
+                b0, marker, 0xffu, 0x00u, 0xabu, 0xcdu,
+                0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+            };
+            run_cdecl1_pair(slot_571490, cpp_571490, hdr_arg, hdr, false, 0u);
+        }
+    }
+    {
+        B hdr[kHeaderBytes] = {0x35u, 0xfbu, 0xaau, 0xbbu, 0xccu, 0xddu};
+        run_cdecl1_pair(slot_571490, cpp_571490, hdr_arg, hdr, true, 0x89abcdefu);
+    }
+
+    // 5. 00571520: wrapper forwarding to 00571490 and returning EAX.
+    void* const cpp_571520 =
+        reinterpret_cast<void*>(&porsche::render_chunk_size_wrapper_00571520);
+    static const B wrap_b0s[] = {0x10u, 0x11u, 0x12u, 0x46u, 0x47u, 0x48u};
+    static const B wrap_markers[] = {0xfbu, 0x32u, 0x31u};
+    for (B b0 : wrap_b0s) {
+        for (B marker : wrap_markers) {
+            B hdr[kHeaderBytes] = {b0, marker, 0xfeu, 0xdcu, 0xbau, 0x98u};
+            run_cdecl1_pair(slot_571520, cpp_571520, hdr_arg, hdr, false, 0u);
+        }
+    }
+    {
+        B hdr[kHeaderBytes] = {0x18u, 0x32u, 0x01u, 0x02u, 0x03u, 0x04u};
+        run_cdecl1_pair(slot_571520, cpp_571520, hdr_arg, hdr, true, 0xdeadbeefu);
+    }
+
+    // 6. 00573070: EMMS across empty, partial, full x87 stacks and dirtied MMX regs.
+    void* const cpp_573070 =
+        reinterpret_cast<void*>(&porsche::render_mmx_empty_00573070);
+    for (U seed_mode = 0u; seed_mode <= 5u; ++seed_mode) {
+        run_cdecl0_pair(slot_573070, cpp_573070, seed_mode);
+    }
+
+    std::printf("render_depth_helper_leaves_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

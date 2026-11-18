@@ -1,0 +1,218 @@
+{
+  "run": 673,
+  "experiment": "local/experiments/v2-render-loader-directx-673",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "extra_libraries": [
+    "version.lib"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00574eb0",
+      "bytes": 202,
+      "sha256": "3be4e6ab97ade9607a60b8c8b738841824387feb16fd25452da8508996b90691",
+      "token": "@BODY_00574EB0@"
+    },
+    {
+      "va": "00414bd0",
+      "bytes": 75,
+      "sha256": "e10e86cfaa1b74e636cac7490b97632c38d219bbd5d967c7e12142782c3ee211",
+      "token": "@BODY_00414BD0@"
+    },
+    {
+      "va": "00414c30",
+      "bytes": 124,
+      "sha256": "e51c8af98c065d1ff4f8a0c11d757eacd105c8d5a954ec8df58cdd2f3f2bf7b3",
+      "token": "@BODY_00414C30@"
+    },
+    {
+      "va": "005d11e8",
+      "bytes": 2,
+      "sha256": "1472d0645f552820b5472b91341c2d9a118c8a96f4a72758d6aeeb14c10a1107",
+      "token": "@STR_005D11E8@"
+    }
+  ],
+  "pass_marker": "render_loader_directx_and_startup_alloc_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-dx-skip-result-zero",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    result[1] = 0u;\n    result[0] = 0u;",
+      "new": "    (void)result;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx-osvi-size",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    osvi.dwOSVersionInfoSize = sizeof(osvi);",
+      "new": "    osvi.dwOSVersionInfoSize = sizeof(osvi) - 4u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx-osvi-no-zero",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    std::memset(&osvi, 0, sizeof(osvi));",
+      "new": "    std::memset(&osvi, 0x55, sizeof(osvi));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx-platform-id",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    if (osvi.dwPlatformId == 2u) {",
+      "new": "    if (osvi.dwPlatformId == 1u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx-check-version-ret",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    (void)render_directx_get_version_ex_a(&osvi);\n    if (osvi.dwPlatformId == 2u) {",
+      "new": "    if (render_directx_get_version_ex_a(&osvi) == 0 || osvi.dwPlatformId == 2u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx-free-on-null-malloc",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    void* const buffer = exit_registry_malloc_005a3be5(size);\n    if (buffer == nullptr) {\n        return;\n    }",
+      "new": "    void* const buffer = exit_registry_malloc_005a3be5(size);\n    if (buffer == nullptr) {\n        formatter_crt_free_005a3b9d(buffer);\n        return;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx-handle-zero",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    if (render_directx_get_file_version_info_a(dll, handle, size, buffer) != 0) {",
+      "new": "    if (render_directx_get_file_version_info_a(dll, 0u, size, buffer) != 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx-subblock",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "        if (render_directx_ver_query_value_a(buffer, \"\\\\\", &info, nullptr) != 0) {",
+      "new": "        if (render_directx_ver_query_value_a(buffer, \"/\", &info, nullptr) != 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx-pulen-nonnull",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "        if (render_directx_ver_query_value_a(buffer, \"\\\\\", &info, nullptr) != 0) {",
+      "new": "        std::uint32_t unused_len = 0u;\n        if (render_directx_ver_query_value_a(buffer, \"\\\\\", &info, &unused_len) != 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx-result-swap",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "            result[0] = low;\n            result[1] = high;",
+      "new": "            result[0] = high;\n            result[1] = low;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dx-skip-free",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    formatter_crt_free_005a3b9d(buffer);",
+      "new": "    (void)buffer;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tbl-alloc-bytes",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "        (static_cast<std::uint32_t>(capacity) << 4) + 0x18u);",
+      "new": "        (static_cast<std::uint32_t>(capacity) << 4) + 0x10u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tbl-alloc-heap",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    void* const table = allocate_00531ca0(name, bytes, 0u);",
+      "new": "    void* const table = allocate_00531ca0(name, bytes, 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tbl-init-sentinel",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "            write_i32(table, offset + 8u, 0x7ffe);",
+      "new": "            write_i32(table, offset + 8u, 0x7fff);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tbl-init-count-nonzero",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    write_i32(table, 4u, 0);",
+      "new": "    write_i32(table, 4u, 1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tbl-init-skip-val0",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "            write_u32(table, offset + 12u, 0u);",
+      "new": "            write_u32(table, offset + 12u, 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-ins-unsigned-key",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "            if (key < entry_key) {",
+      "new": "            if (static_cast<std::uint32_t>(key) < static_cast<std::uint32_t>(entry_key)) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-ins-skip-shift",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "                if (old_count > index) {",
+      "new": "                if (false) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-ins-val0-offset",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    write_u32(table, offset + 12u, value0);",
+      "new": "    write_u32(table, offset + 16u, value0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-ins-val1-offset",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "    write_u32(table, (static_cast<std::uint32_t>(insert_index) + 1u) * 16u, value1);",
+      "new": "    write_u32(table, (static_cast<std::uint32_t>(insert_index) + 1u) * 16u + 4u, value1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-ins-copy-bytes",
+      "source": "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc/render_loader_directx_673.cpp",
+      "old": "                        heap_copy_dispatch_005323e0(dst, src, 16u);",
+      "new": "                        heap_copy_dispatch_005323e0(dst, src, 12u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

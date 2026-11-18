@@ -4,23 +4,23 @@ Updated 2026-11-18. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run672](iterations/v2/001-original-recovery/runs/672-bigheader-loud-and-font-state-integration/README.md)
-compiles 384 C++ translation units across 8 projects. The link has 72 unresolved names /
-77 references (adding unlocker providers with zero new unresolved names). **There is no
-recovered playable C++ game executable yet.**
+[Run675](iterations/v2/001-original-recovery/runs/675-render-loader-directx-and-depth-helpers-integration/README.md)
+compiles 386 C++ translation units across 8 projects. The link has 71 unresolved names /
+76 references (closing `render_loader_directx_00574eb0` with zero new unresolved names).
+**There is no recovered playable C++ game executable yet.**
 
-Run672 integrates seven partial functions (649 code bytes total: `005620c0`,
-`0059dea0`, `0059fd90` in `670/001` plus `0053eea0`, `0053e890`, `00532b20`,
-`005323a0` in `671/002`), `35B` `.rdata` (`005bbb44..005bbb66`), and zero new
-`.data`/`.bss`. Native comparisons pass 186 measured cases / 32 material controls at
-`/Od`/`/O2`. Canonical owners are reused. Shared audit verifies 952 source pins;
-registry 1063 retains partial domains.
+Run675 integrates nine partial functions (607 code bytes total: `00574eb0`, `00414bd0`,
+`00414c30` in `673/001` plus `005345e0`, `00535340`, `00535360`, `00571490`,
+`00571520`, `00573070` in `674/003`), `84B` `.data` (`005de574..005de5ab`,
+`005de5ac..005de5c7`), and zero owned `.rdata`. Native comparisons pass 1764 measured
+cases / 42 material controls at `/Od`/`/O2`. Canonical owners are reused. Shared audit
+verifies 957 source pins; registry 1072 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run670 (`001`), Run671 (`002`), and Run672 (`001`) integration are accepted within their stated bounds.
+Run673 (`001`), Run674 (`003`), and Run675 (`001`) integration are accepted within their stated bounds.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
