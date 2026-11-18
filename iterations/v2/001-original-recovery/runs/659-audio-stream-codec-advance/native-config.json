@@ -1,0 +1,206 @@
+{
+  "run": 659,
+  "experiment": "local/experiments/v2-audio-stream-codec-advance-659",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+    "iterations/v2/001-original-recovery/runs/629-audio-stream-codec-create/audio_stream_codec_create_629.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/shared_runtime_globals.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance",
+    "iterations/v2/001-original-recovery/runs/656-audio-stream-codec-refill",
+    "iterations/v2/001-original-recovery/runs/641-audio-stream-codec-leaves",
+    "iterations/v2/001-original-recovery/runs/629-audio-stream-codec-create",
+    "iterations/v2/001-original-recovery/runs/565-audio-stream-codec-lifecycle",
+    "iterations/v2/001-original-recovery/runs/568-audio-greedy-transition",
+    "iterations/v2/001-original-recovery/runs/561-audio-stream-creation",
+    "iterations/v2/001-original-recovery/runs/559-audio-stream-service",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0056b860",
+      "bytes": 433,
+      "sha256": "7934318957f3fd74c440f7f8f20b10299a959d2361223fd6d1e167561b2f27a5",
+      "token": "@BODY_0056B860@"
+    },
+    {
+      "va": "0056ba20",
+      "bytes": 85,
+      "sha256": "0c7048ca80924f5deb797afa63eee427b9363c92c115e0099a1f48dfe63b8b99",
+      "token": "@BODY_0056BA20@"
+    },
+    {
+      "va": "0056ba80",
+      "bytes": 97,
+      "sha256": "09c69111b2176f2560a92a51ae1f75ff6a6d32875a6357dd8580559ee99bc3d6",
+      "token": "@BODY_0056BA80@"
+    },
+    {
+      "va": "005bdbfc",
+      "bytes": 40,
+      "sha256": "f9febd79be8378d7d942cf0154a04d722f02572a70097b4da9daca38a9327745",
+      "token": "@STR_005BDBFC@"
+    },
+    {
+      "va": "005bdc24",
+      "bytes": 39,
+      "sha256": "da27c69ec5efca7426511392488414b2aaef64eb70bc4c454c192a89311188d3",
+      "token": "@STR_005BDC24@"
+    },
+    {
+      "va": "005bdc4c",
+      "bytes": 35,
+      "sha256": "0c6ec80e892e46599a47b433580bb4e63cc912c96ee14b3fb96c04cce50d7bd3",
+      "token": "@STR_005BDC4C@"
+    },
+    {
+      "va": "005bd978",
+      "bytes": 19,
+      "sha256": "4a87a432224df5a492d35a98ba89e025b801e4b1689c7d6555884b6d00829034",
+      "token": "@STR_005BD978@"
+    }
+  ],
+  "pass_marker": "audio_stream_codec_advance_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-advance-req-next-link",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "            req = read_u32(req + 0x0cu);",
+      "new": "            req = read_u32(req + 0x08u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-advance-status1-guard",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "        if (read_u32(req + 0x04u) != 1u) {",
+      "new": "        if (read_u32(req + 0x04u) != 2u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-advance-missing-state28",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "        write_u32(codec_va + 0x28u, 0u);",
+      "new": "        write_u32(codec_va + 0x28u, 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-advance-mem-branch",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "    if (read_u32(req + 0x10u) == 1u) {",
+      "new": "    if (read_u32(req + 0x10u) == 2u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-advance-write48-reset",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "    write_u32(codec_va + 0x48u, write44);",
+      "new": "    write_u32(codec_va + 0x48u, write44 + 4u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-advance-path-cmp",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "    if (std::strcmp(req_path, codec_path) == 0) {",
+      "new": "    if (std::strcmp(req_path, codec_path) != 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-advance-skip-strcpy",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "    std::memcpy(codec_path, req_path, std::strlen(req_path) + 1u);",
+      "new": "    (void)codec_path;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-advance-handle-zero-check",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "    if (file_handle == 0u) {",
+      "new": "    if (file_handle != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-advance-open-diag-line",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "            report_stream_error(0x291u, stream_err_unable_to_open_005bdc24);",
+      "new": "            report_stream_error(0x290u, stream_err_unable_to_open_005bdc24);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-advance-close-diag-line",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "        report_stream_error(0x29cu, stream_err_unable_to_close_005bdbfc);",
+      "new": "        report_stream_error(0x29bu, stream_err_unable_to_close_005bdbfc);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-open-done-diag-line",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "        report_stream_open_file_error(\n            0x1e7u,",
+      "new": "        report_stream_open_file_error(\n            0x1e6u,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-open-done-diag-arg",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "            reinterpret_cast<const char*>(ptr_from_va(codec_va + 0x5cu)));",
+      "new": "            reinterpret_cast<const char*>(ptr_from_va(codec_va + 0x60u)));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-open-done-refill-off",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "    audio_stream_codec_refill_0056baf0(codec, read_u32(codec_va + 0x30u));",
+      "new": "    audio_stream_codec_refill_0056baf0(codec, read_u32(codec_va + 0x34u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-close-done-op-complete",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "    (void)operation_complete_00567df0(read_u32(codec_va + 0x168u));",
+      "new": "    (void)operation_complete_00567df0(read_u32(codec_va + 0x160u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-close-done-req-open-flags",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "        1u,\n        read_u32(codec_va + 0x30u),\n        codec);",
+      "new": "        2u,\n        read_u32(codec_va + 0x30u),\n        codec);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-close-done-diag-line",
+      "source": "iterations/v2/001-original-recovery/runs/659-audio-stream-codec-advance/audio_stream_codec_advance_659.cpp",
+      "old": "        report_stream_error(0x206u, stream_err_unable_to_open_005bdc24);",
+      "new": "        report_stream_error(0x205u, stream_err_unable_to_open_005bdc24);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

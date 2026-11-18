@@ -1,16 +1,13 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-18. Run657 shared audit (`001`) passes for frozen `655/002` (`655/001` preserved)+`656/001` on `654`.
-Build `001` compiles 375 TUs / 8 projects, 78 names / 83 refs, no EXE. Three
-real frontier names (`application_main_function_0048cdf0`,
-`startup_sequence_call_0048cdf0`, `audio_stream_codec_refill_0056baf0`) close
-while `0056bd70` exposes `0056b860`; 77B `.data` (`005d0738..005d078d`), 143B
-`.rdata` (`005bdc70..005bdd01`). Registry 1023 adds seven PARTIAL bodies (2588B
-total). README 657 owns commands and bounds: 100 native cases / 27 controls at
-`/Od`/`/O2`, 929 pins.
+Current 2026-11-18. Run660 shared audit (`001`) passes for frozen `658/003` (`658/001`..`002` preserved)+`659/002` (`659/001` preserved) on `657`.
+Build `001` compiles 377 TUs / 8 projects, 77 names / 82 refs, no EXE. One real
+frontier name (`audio_stream_codec_advance_0056b860`) closes with zero new names;
+0B `.data`, 152B `.rdata` (`005bcd90`, `005bdbfc..005bdc6e`). Registry 1032 adds
+nine PARTIAL bodies (1363B total). README 660 owns commands and bounds: 220
+native cases / 33 controls at `/Od`/`/O2`, 934 pins.
 
-Active flash workers: `658` (resource loadat/reset `00561e40`..`0059db50`/`00566880`/`004adf50`) and `659` (`0056b860`+`0056ba20`+`0056ba80`, closes `0056b860`).
-Next integrate `658`+`659` in shared batch `660`.
+Next launch `661` (bigfile header load + `004ae100`) and `662` (frontier unlockers).
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

@@ -1,0 +1,218 @@
+{
+  "run": 658,
+  "experiment": "local/experiments/v2-resource-loadat-reset-658",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset",
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls",
+    "iterations/v2/001-original-recovery/runs/537-render-resource-descriptor-cleanup",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/original-index-supplement.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00561e90",
+      "bytes": 138,
+      "sha256": "7ca7f775c932f6c153640bd2cd52b234958c6dd86ec4b0890f8c8b217dbdd1f4",
+      "token": "@BODY_00561E90@"
+    },
+    {
+      "va": "00561e40",
+      "bytes": 71,
+      "sha256": "aabda080980c22a82b4a309a185fef6d894ff093bdce36165f8b483309195efa",
+      "token": "@BODY_00561E40@"
+    },
+    {
+      "va": "00561f20",
+      "bytes": 71,
+      "sha256": "fa8708eb9e90634df511894fc5ace3819c98bd2c7f0b7e40a8960e5edbafeef3",
+      "token": "@BODY_00561F20@"
+    },
+    {
+      "va": "0059db50",
+      "bytes": 218,
+      "sha256": "bde9e10a7399e913993f2e26c5c2b3ccb24e607e3665f3af35ff52a9104ad045",
+      "token": "@BODY_0059DB50@"
+    },
+    {
+      "va": "00566880",
+      "bytes": 62,
+      "sha256": "137d8c1f4e90ba77f75aa5d4e39d1c970088cf385cb9622c2752019e0ae241da",
+      "token": "@BODY_00566880@"
+    },
+    {
+      "va": "004adf50",
+      "bytes": 188,
+      "sha256": "212628c50f9779d1b031a184e95b6837508be890b68093a0aab8dee324637b41",
+      "token": "@BODY_004ADF50@"
+    },
+    {
+      "va": "005bcd90",
+      "bytes": 38,
+      "sha256": "2ce0ea9178fb463baa82459cfe7e359c45548d79c347400f3b52bf36ced45d62",
+      "token": "@STR_005BCD90@"
+    },
+    {
+      "va": "005bcd00",
+      "bytes": 20,
+      "sha256": "b90dce18b9d059076f1b7b9eaf0963f0eb3362486bafd299741d337fcda3c970",
+      "token": "@STR_005BCD00@"
+    },
+    {
+      "va": "005cc588",
+      "bytes": 5,
+      "sha256": "0c12582270939f383c07b5f8439aa0cbe33fb62008e8bc2f39fd5953e3e7b584",
+      "token": "@STR_005CC588@"
+    }
+  ],
+  "pass_marker": "resource_loadat_and_reset_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-loadat-max-bytes-clamp",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    if (max_bytes <= 0) {",
+      "new": "    if (max_bytes < 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-loadat-clamp-value",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "        max_bytes = 0x7fffffff;",
+      "new": "        max_bytes = 0x7ffffffe;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-loadat-nested-group",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    const std::uint32_t nested_group = group - 1u;",
+      "new": "    const std::uint32_t nested_group = group;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-loadat-open-mode",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    if (!file_open_00533b90(saved_path, 1u, group, &handle)) {",
+      "new": "    if (!file_open_00533b90(saved_path, 0u, group, &handle)) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-loadat-open-err-line",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    diagnostic_line_005deb78 = 0x12fu;",
+      "new": "    diagnostic_line_005deb78 = 0x12eu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-loadat-diag-flag-check",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "        if (context->callback_diagnostic_flag != 0u) {",
+      "new": "        if (context->callback_diagnostic_flag == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-loadat-loud-flag",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    return file_loadat_with_flag(path, buffer, max_bytes, 1u);",
+      "new": "    return file_loadat_with_flag(path, buffer, max_bytes, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-loadat-quiet-flag",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    return file_loadat_with_flag(path, buffer, max_bytes, 0u);",
+      "new": "    return file_loadat_with_flag(path, buffer, max_bytes, 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-loadat-group-order",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    const std::uint32_t group = resource_leaf_group_005df770;\n    context.callback_diagnostic_flag = diagnostic_flag;\n    const std::uint32_t device = file_device_name_00568e90(path);",
+      "new": "    context.callback_diagnostic_flag = diagnostic_flag;\n    const std::uint32_t device = file_device_name_00568e90(path);\n    const std::uint32_t group = resource_leaf_group_005df770;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-resource-loadat-roots-flag",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    if (file_roots_enabled_006af370 == 0) {",
+      "new": "    if (file_roots_enabled_006af370 != 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-resource-loadat-fallback-check",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    if (file_fallback_006af26c[0] != '\\0') {",
+      "new": "    if (file_fallback_006af26c[0] == '\\0') {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-resource-loadat-missing-code",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "        missing_file_006afbe4(name, -2);",
+      "new": "        missing_file_006afbe4(name, -1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-audio-offset-kind1",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "            reinterpret_cast<const void*>(static_cast<std::uintptr_t>(source + 4u)), 2u);",
+      "new": "            reinterpret_cast<const void*>(static_cast<std::uintptr_t>(source + 4u)), 4u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-audio-offset-kind2",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "            reinterpret_cast<const void*>(static_cast<std::uintptr_t>(source + 8u)), 4u);",
+      "new": "            reinterpret_cast<const void*>(static_cast<std::uintptr_t>(source + 4u)), 4u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-query-root-reset-neg1",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    write_at(0x70u, 0xffffffffu);",
+      "new": "    write_at(0x70u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-query-root-reset-0c",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "    write_at(0x0cu, 0xffffffffu);",
+      "new": "    write_at(0x0cu, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-query-root-reset-tail",
+      "source": "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset/resource_loadat_658.cpp",
+      "old": "        0x08u, 0x24u, 0x0cu, 0x10u, 0x14u, 0x18u, 0x20u};",
+      "new": "        0x08u, 0x24u, 0x0cu, 0x10u, 0x14u, 0x18u, 0x1cu};",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

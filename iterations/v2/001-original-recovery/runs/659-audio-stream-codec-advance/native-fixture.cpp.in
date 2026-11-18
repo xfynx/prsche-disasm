@@ -1,0 +1,736 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+#include "audio_stream_codec_advance_659.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+enum : U {
+    kArenaBytes = 8192u,
+    kMaxEvents = 64u,
+    kMsgCap = 128u,
+};
+
+enum EventTag : U {
+    kEvHeapEnter = 1u,
+    kEvHeapLeave = 2u,
+    kEvOpComplete = 3u,
+    kEvOpCallback = 4u,
+    kEvRequestOpen = 5u,
+    kEvRequestClose = 6u,
+    kEvRefill = 7u,
+    kEvDiagnostic = 8u,
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    U arg3;
+    U arg4;
+    U file_word;
+    U line_word;
+    U extra0;
+    U extra1;
+    char msg[kMsgCap];
+};
+
+struct Trace {
+    U ret;
+    U abi_fail;
+    U count;
+    Event events[kMaxEvents];
+    U final_file_word;
+    U final_line_word;
+    FpuSnapshot fp;
+    B memory[kArenaBytes];
+};
+
+alignas(256) static B arena[kArenaBytes];
+alignas(16) static B fp_area[512];
+static B fp_env[28];
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events_total = 0u;
+static U which = 0u;
+static U captured_return = 0u;
+
+static U active_stream_va = 0u;
+static U enter_mutates_lock = 0u;
+static U new_lock_value = 0u;
+static U enter_mutates_write44 = 0u;
+static U new_enter_write44 = 0u;
+static U leave_mutates_write44 = 0u;
+static U new_leave_write44 = 0u;
+
+static U mock_op_complete_ret = 0u;
+static U mock_request_open_ret = 0u;
+static U mock_request_close_ret = 0u;
+static U mock_chain_callbacks = 0u;
+static I mock_cb_status = 0;
+
+static B* code = nullptr;
+static B* orig_56b860 = nullptr;
+static B* orig_56ba20 = nullptr;
+static B* orig_56ba80 = nullptr;
+
+static const B raw_str_005bdbfc[] = {@STR_005BDBFC@};
+static const B raw_str_005bdc24[] = {@STR_005BDC24@};
+static const B raw_str_005bdc4c[] = {@STR_005BDC4C@};
+static const B raw_str_005bd978[] = {@STR_005BD978@};
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static U rd_va(U va) {
+    U v = 0u;
+    std::memcpy(&v, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(va)), 4u);
+    return v;
+}
+static void wr_va(U va, U v) {
+    std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(va)), &v, 4u);
+}
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+static void copy_cstr(char* dst, std::size_t cap, const char* src) {
+    if (src == nullptr || cap == 0u) {
+        return;
+    }
+    std::size_t n = 0u;
+    while (n + 1u < cap && src[n] != '\0') {
+        dst[n] = src[n];
+        ++n;
+    }
+    dst[n] = '\0';
+}
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", why, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip, cases, which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void capture_fp(FpuSnapshot& fp) {
+    __asm fxsave fp_area
+    __asm fnstenv fp_env
+    __asm fldenv fp_env
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void __cdecl mock_diagnostic_fn(const char* fmt, ...) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvDiagnostic;
+    e.arg0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(fmt));
+    e.file_word = porsche::shared_runtime_word_005deb74;
+    e.line_word = porsche::shared_runtime_word_005deb78;
+    if (fmt != nullptr) {
+        std::va_list ap;
+        va_start(ap, fmt);
+        std::vsnprintf(e.msg, sizeof e.msg, fmt, ap);
+        va_end(ap);
+    }
+}
+
+namespace porsche {
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvHeapEnter;
+    e.arg0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(lock));
+    if (active_stream_va != 0u) {
+        if (enter_mutates_lock != 0u) {
+            wr_va(active_stream_va + 0x04u, new_lock_value);
+        }
+        if (enter_mutates_write44 != 0u) {
+            wr_va(active_stream_va + 0x44u, new_enter_write44);
+        }
+    }
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvHeapLeave;
+    e.arg0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(lock));
+    if (active_stream_va != 0u) {
+        const U req = rd_va(active_stream_va + 0x50u);
+        if (req != 0u) {
+            e.extra0 = rd_va(req + 0x04u);
+            e.extra1 = rd_va(req + 0x124u);
+        }
+        if (leave_mutates_write44 != 0u) {
+            wr_va(active_stream_va + 0x44u, new_leave_write44);
+        }
+    }
+}
+
+std::uint32_t __cdecl operation_complete_00567df0(std::uint32_t op_id) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvOpComplete;
+    e.arg0 = op_id;
+    return mock_op_complete_ret;
+}
+
+void __cdecl operation_callback_005680c0(std::uint32_t op_id, FileCompletion cb) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvOpCallback;
+    e.arg0 = op_id;
+    if (cb == reinterpret_cast<FileCompletion>(orig_56ba20) ||
+        cb == &audio_stream_codec_open_done_0056ba20) {
+        e.arg1 = 0x0056ba20u;
+    } else if (cb == reinterpret_cast<FileCompletion>(orig_56ba80) ||
+               cb == &audio_stream_codec_close_done_0056ba80) {
+        e.arg1 = 0x0056ba80u;
+    } else {
+        e.arg1 = static_cast<U>(reinterpret_cast<std::uintptr_t>(cb));
+    }
+
+    if (mock_chain_callbacks > 0u && cb != nullptr) {
+        --mock_chain_callbacks;
+        cb(op_id, mock_cb_status, reinterpret_cast<void*>(static_cast<std::uintptr_t>(active_stream_va)));
+    }
+}
+
+std::uint32_t __cdecl request_open_00568aa0(
+    const char* path,
+    std::uint32_t flags,
+    std::uint32_t group,
+    void* context) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvRequestOpen;
+    e.arg0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(path));
+    e.arg1 = flags;
+    e.arg2 = group;
+    e.arg3 = static_cast<U>(reinterpret_cast<std::uintptr_t>(context));
+    copy_cstr(e.msg, sizeof e.msg, path);
+    return mock_request_open_ret;
+}
+
+std::uint32_t __cdecl request_close_00568ae0(
+    void* handle,
+    std::uint32_t group,
+    void* context) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvRequestClose;
+    e.arg0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(handle));
+    e.arg1 = group;
+    e.arg2 = static_cast<U>(reinterpret_cast<std::uintptr_t>(context));
+    return mock_request_close_ret;
+}
+
+void __cdecl audio_stream_codec_refill_0056baf0(void* codec, std::uint32_t offset) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvRefill;
+    const U codec_va = static_cast<U>(reinterpret_cast<std::uintptr_t>(codec));
+    e.arg0 = codec_va;
+    e.arg1 = offset;
+    e.extra0 = rd_va(codec_va + 0x48u);
+    e.extra1 = rd_va(codec_va + 0x164u);
+    const U req = rd_va(codec_va + 0x50u);
+    e.arg2 = req;
+    if (req != 0u) {
+        e.arg3 = rd_va(req + 0x04u);
+        e.arg4 = rd_va(req + 0x124u);
+    }
+    copy_cstr(e.msg, sizeof e.msg, reinterpret_cast<const char*>(static_cast<std::uintptr_t>(codec_va + 0x5cu)));
+}
+
+void (__cdecl* diagnostic_handler_005debf0)(const char*) =
+    reinterpret_cast<void(__cdecl*)(const char*)>(mock_diagnostic_fn);
+
+// Unused symbols referenced by audio_stream_codec_create_629.cpp; fail closed.
+std::uint32_t __cdecl audio_stream_codec_bytes_0056afc0(std::uint32_t, std::uint32_t, std::uint32_t) {
+    ExitProcess(90);
+    return 0u;
+}
+void* __cdecl heap_lock_create_005321f0() {
+    ExitProcess(90);
+    return nullptr;
+}
+
+} // namespace porsche
+
+static U invoke_2(void* fn, U a0, U a1) {
+    U saved_sp = 0u;
+    U saved_bp = 0u;
+    U fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp, esp
+        mov saved_bp, ebp
+        push a1
+        push a0
+        mov ebx, 0x13579bdf
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        call fn
+        mov captured_return, eax
+        add esp, 8
+        cmp esp, saved_sp
+        jne bad_abi
+        cmp ebp, saved_bp
+        jne bad_abi
+        cmp ebx, 0x13579bdf
+        jne bad_abi
+        cmp esi, 0x2468ace0
+        jne bad_abi
+        cmp edi, 0x10203040
+        je ok_abi
+    bad_abi:
+        mov fail, 1
+    ok_abi:
+        mov esp, saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_3(void* fn, U a0, U a1, U a2) {
+    U saved_sp = 0u;
+    U saved_bp = 0u;
+    U fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp, esp
+        mov saved_bp, ebp
+        push a2
+        push a1
+        push a0
+        mov ebx, 0x13579bdf
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        call fn
+        mov captured_return, eax
+        add esp, 12
+        cmp esp, saved_sp
+        jne bad_abi
+        cmp ebp, saved_bp
+        jne bad_abi
+        cmp ebx, 0x13579bdf
+        jne bad_abi
+        cmp esi, 0x2468ace0
+        jne bad_abi
+        cmp edi, 0x10203040
+        je ok_abi
+    bad_abi:
+        mov fail, 1
+    ok_abi:
+        mov esp, saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static void init_original_code() {
+    const B body_0056b860[] = {@BODY_0056B860@};
+    const B body_0056ba20[] = {@BODY_0056BA20@};
+    const B body_0056ba80[] = {@BODY_0056BA80@};
+    static_assert(sizeof body_0056b860 == 433u, "0056b860 size");
+    static_assert(sizeof body_0056ba20 == 85u, "0056ba20 size");
+    static_assert(sizeof body_0056ba80 == 97u, "0056ba80 size");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    std::memset(code, 0xcc, 4096u);
+
+    orig_56b860 = code + 0x000u;
+    orig_56ba20 = code + 0x200u;
+    orig_56ba80 = code + 0x300u;
+
+    std::memcpy(orig_56b860, body_0056b860, sizeof body_0056b860);
+    std::memcpy(orig_56ba20, body_0056ba20, sizeof body_0056ba20);
+    std::memcpy(orig_56ba80, body_0056ba80, sizeof body_0056ba80);
+
+    auto reloc_rel = [&](B* fn, U off, U expected_disp, const void* target) {
+        require(rd(fn, off) == expected_disp, "rel disp");
+        wr(fn, off, address(target) - (address(fn) + off + 4u));
+    };
+    auto reloc_abs = [&](B* fn, U off, U expected_va, const void* target) {
+        require(rd(fn, off) == expected_va, "abs va");
+        wr(fn, off, address(target));
+    };
+
+    // 0056b860 relocations
+    reloc_rel(orig_56b860, 0x00du, 0xfffc6a3fu, reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    reloc_rel(orig_56b860, 0x046u, 0xfffc6a16u, reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+    reloc_rel(orig_56b860, 0x070u, 0x0000021cu, reinterpret_cast<const void*>(&porsche::audio_stream_codec_refill_0056baf0));
+    reloc_rel(orig_56b860, 0x101u, 0xffffd13bu, reinterpret_cast<const void*>(&porsche::request_open_00568aa0));
+    reloc_abs(orig_56b860, 0x113u, 0x005bdc24u, porsche::stream_err_unable_to_open_005bdc24);
+    reloc_abs(orig_56b860, 0x119u, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    reloc_abs(orig_56b860, 0x11du, 0x005bd978u, porsche::stream_source_file_005bd978);
+    reloc_abs(orig_56b860, 0x123u, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    reloc_abs(orig_56b860, 0x12du, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    reloc_abs(orig_56b860, 0x13au, 0x0056ba20u, orig_56ba20);
+    reloc_rel(orig_56b860, 0x140u, 0xffffc71cu, reinterpret_cast<const void*>(&porsche::operation_callback_005680c0));
+    reloc_rel(orig_56b860, 0x153u, 0xffffd129u, reinterpret_cast<const void*>(&porsche::request_close_00568ae0));
+    reloc_abs(orig_56b860, 0x165u, 0x005bdbfcu, porsche::stream_err_unable_to_close_005bdbfc);
+    reloc_abs(orig_56b860, 0x16bu, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    reloc_abs(orig_56b860, 0x16fu, 0x005bd978u, porsche::stream_source_file_005bd978);
+    reloc_abs(orig_56b860, 0x175u, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    reloc_abs(orig_56b860, 0x17fu, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    reloc_abs(orig_56b860, 0x18cu, 0x0056ba80u, orig_56ba80);
+    reloc_rel(orig_56b860, 0x192u, 0xffffc6cau, reinterpret_cast<const void*>(&porsche::operation_callback_005680c0));
+    reloc_rel(orig_56b860, 0x1a5u, 0x000000e7u, reinterpret_cast<const void*>(&porsche::audio_stream_codec_refill_0056baf0));
+
+    // 0056ba20 relocations
+    reloc_rel(orig_56ba20, 0x00du, 0xffffc3bfu, reinterpret_cast<const void*>(&porsche::operation_complete_00567df0));
+    reloc_abs(orig_56ba20, 0x023u, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    reloc_abs(orig_56ba20, 0x027u, 0x005bd978u, porsche::stream_source_file_005bd978);
+    reloc_abs(orig_56ba20, 0x02du, 0x005bdc4cu, porsche::stream_err_unable_to_open_file_005bdc4c);
+    reloc_abs(orig_56ba20, 0x033u, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    reloc_abs(orig_56ba20, 0x03du, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    reloc_rel(orig_56ba20, 0x04cu, 0x00000080u, reinterpret_cast<const void*>(&porsche::audio_stream_codec_refill_0056baf0));
+
+    // 0056ba80 relocations
+    reloc_rel(orig_56ba80, 0x00du, 0xffffc35fu, reinterpret_cast<const void*>(&porsche::operation_complete_00567df0));
+    reloc_rel(orig_56ba80, 0x01du, 0xffffcfffu, reinterpret_cast<const void*>(&porsche::request_open_00568aa0));
+    reloc_abs(orig_56ba80, 0x030u, 0x005bdc24u, porsche::stream_err_unable_to_open_005bdc24);
+    reloc_abs(orig_56ba80, 0x036u, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    reloc_abs(orig_56ba80, 0x03au, 0x005bd978u, porsche::stream_source_file_005bd978);
+    reloc_abs(orig_56ba80, 0x040u, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    reloc_abs(orig_56ba80, 0x04au, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    reloc_abs(orig_56ba80, 0x053u, 0x0056ba20u, orig_56ba20);
+    reloc_rel(orig_56ba80, 0x059u, 0xffffc5e3u, reinterpret_cast<const void*>(&porsche::operation_callback_005680c0));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+}
+
+static void prepare_arena() {
+    for (U i = 0u; i < kArenaBytes; ++i) {
+        arena[i] = static_cast<B>((i * 41u + 0x5au) & 0xffu);
+    }
+    porsche::shared_runtime_word_005deb74 = 0x11223344u;
+    porsche::shared_runtime_word_005deb78 = 0x55667788u;
+    porsche::diagnostic_handler_005debf0 =
+        reinterpret_cast<void(__cdecl*)(const char*)>(mock_diagnostic_fn);
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "abi");
+    require(trace.count == expected.count, "event_count");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "ev_tag");
+        require(trace.events[i].arg0 == expected.events[i].arg0, "ev_arg0");
+        require(trace.events[i].arg1 == expected.events[i].arg1, "ev_arg1");
+        require(trace.events[i].arg2 == expected.events[i].arg2, "ev_arg2");
+        require(trace.events[i].arg3 == expected.events[i].arg3, "ev_arg3");
+        require(trace.events[i].arg4 == expected.events[i].arg4, "ev_arg4");
+        require(trace.events[i].file_word == expected.events[i].file_word, "ev_file_word");
+        require(trace.events[i].line_word == expected.events[i].line_word, "ev_line_word");
+        require(trace.events[i].extra0 == expected.events[i].extra0, "ev_extra0");
+        require(trace.events[i].extra1 == expected.events[i].extra1, "ev_extra1");
+        require(std::memcmp(trace.events[i].msg, expected.events[i].msg, kMsgCap) == 0, "ev_msg");
+    }
+    require(trace.final_file_word == expected.final_file_word, "final_file_word");
+    require(trace.final_line_word == expected.final_line_word, "final_line_word");
+    require(std::memcmp(&trace.fp, &expected.fp, sizeof trace.fp) == 0, "fp");
+    require(std::memcmp(trace.memory, expected.memory, kArenaBytes) == 0, "arena_memory");
+
+    ++cases;
+    events_total += trace.count;
+}
+
+static void run_open_done(
+    U op_handle,
+    I status,
+    U op168,
+    U op_complete_ret,
+    U offset30,
+    U field34,
+    const char* path) {
+    const U codec_va = address(arena);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        prepare_arena();
+        active_stream_va = codec_va;
+        enter_mutates_lock = 0u;
+        enter_mutates_write44 = 0u;
+        leave_mutates_write44 = 0u;
+        mock_op_complete_ret = op_complete_ret;
+        mock_request_open_ret = 0u;
+        mock_request_close_ret = 0u;
+        mock_chain_callbacks = 0u;
+
+        wr_va(codec_va + 0x30u, offset30);
+        wr_va(codec_va + 0x34u, field34);
+        wr_va(codec_va + 0x48u, 0xabcdef01u);
+        wr_va(codec_va + 0x50u, 0u);
+        wr_va(codec_va + 0x160u, 0x88887777u);
+        wr_va(codec_va + 0x164u, 0x11112222u);
+        wr_va(codec_va + 0x168u, op168);
+        std::memset(arena + 0x5cu, 0x55, 64u);
+        copy_cstr(reinterpret_cast<char*>(arena + 0x5cu), 256u, path);
+
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_open_done_0056ba20)
+                        : reinterpret_cast<void*>(orig_56ba20);
+        trace.abi_fail = invoke_3(fn, op_handle, static_cast<U>(status), codec_va);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0u) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+static void run_close_done(
+    U op_handle,
+    I status,
+    U op168,
+    U handle160,
+    U offset30,
+    const char* path,
+    U req_open_ret,
+    U chain_callbacks,
+    U op_complete_ret) {
+    const U codec_va = address(arena);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        prepare_arena();
+        active_stream_va = codec_va;
+        enter_mutates_lock = 0u;
+        enter_mutates_write44 = 0u;
+        leave_mutates_write44 = 0u;
+        mock_op_complete_ret = op_complete_ret;
+        mock_request_open_ret = req_open_ret;
+        mock_request_close_ret = 0u;
+        mock_chain_callbacks = chain_callbacks;
+        mock_cb_status = 0;
+
+        wr_va(codec_va + 0x30u, offset30);
+        wr_va(codec_va + 0x50u, 0u);
+        wr_va(codec_va + 0x160u, handle160);
+        wr_va(codec_va + 0x164u, 0x33334444u);
+        wr_va(codec_va + 0x168u, op168);
+        std::memset(arena + 0x5cu, 0x44, 64u);
+        copy_cstr(reinterpret_cast<char*>(arena + 0x5cu), 256u, path);
+
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_close_done_0056ba80)
+                        : reinterpret_cast<void*>(orig_56ba80);
+        trace.abi_fail = invoke_3(fn, op_handle, static_cast<U>(status), codec_va);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0u) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+struct AdvanceCase {
+    bool has_req0;
+    U req0_status;
+    bool has_req1;
+    U req1_status;
+    U req_mem_backed;
+    U req_init_off11c;
+    const char* req_path;
+    const char* codec_path;
+    U codec_handle160;
+    U codec_write44;
+    U codec_state28;
+    U arg_offset;
+    U req_open_ret;
+    U req_close_ret;
+    U op_complete_ret;
+    U chain_callbacks;
+    U mutate_lock;
+    U mutate_write44;
+};
+
+static void run_advance(const AdvanceCase& c) {
+    const U codec_va = address(arena);
+    const U req0_va = address(arena) + 0x200u;
+    const U req1_va = address(arena) + 0x400u;
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        prepare_arena();
+        active_stream_va = codec_va;
+        enter_mutates_lock = c.mutate_lock;
+        new_lock_value = 0xdeadbeefu;
+        enter_mutates_write44 = c.mutate_write44;
+        new_enter_write44 = c.codec_write44 + 0x100u;
+        leave_mutates_write44 = c.mutate_write44;
+        new_leave_write44 = c.codec_write44 + 0x200u;
+        mock_op_complete_ret = c.op_complete_ret;
+        mock_request_open_ret = c.req_open_ret;
+        mock_request_close_ret = c.req_close_ret;
+        mock_chain_callbacks = c.chain_callbacks;
+        mock_cb_status = 0;
+
+        wr_va(codec_va + 0x04u, 0x11220001u);
+        wr_va(codec_va + 0x28u, c.codec_state28);
+        wr_va(codec_va + 0x30u, c.arg_offset);
+        wr_va(codec_va + 0x44u, c.codec_write44);
+        wr_va(codec_va + 0x48u, 0x99887766u);
+        wr_va(codec_va + 0x50u, c.has_req0 ? req0_va : 0u);
+        wr_va(codec_va + 0x160u, c.codec_handle160);
+        wr_va(codec_va + 0x164u, 0x55443322u);
+        wr_va(codec_va + 0x168u, 0x00abcdefu);
+        std::memset(arena + 0x5cu, 0x33, 64u);
+        copy_cstr(reinterpret_cast<char*>(arena + 0x5cu), 256u, c.codec_path);
+
+        if (c.has_req0) {
+            wr_va(req0_va + 0x04u, c.req0_status);
+            wr_va(req0_va + 0x08u, c.has_req1 ? req1_va : 0u);
+            wr_va(req0_va + 0x0cu, c.has_req1 ? req1_va : 0u);
+            wr_va(req0_va + 0x10u, c.req_mem_backed);
+            wr_va(req0_va + 0x11cu, c.req_init_off11c);
+            wr_va(req0_va + 0x124u, 0x77777777u);
+            copy_cstr(reinterpret_cast<char*>(arena + 0x200u + 0x14u), 256u, c.req_path);
+        }
+        if (c.has_req1) {
+            // Put distinct +0x08 vs +0x0c in req0 when testing req0->0x0c vs req0->0x08
+            wr_va(req0_va + 0x08u, 0u);
+            wr_va(req1_va + 0x04u, c.req1_status);
+            wr_va(req1_va + 0x0cu, 0u);
+            wr_va(req1_va + 0x10u, c.req_mem_backed);
+            wr_va(req1_va + 0x11cu, c.req_init_off11c);
+            wr_va(req1_va + 0x124u, 0x66666666u);
+            copy_cstr(reinterpret_cast<char*>(arena + 0x400u + 0x14u), 256u, c.req_path);
+        }
+
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_advance_0056b860)
+                        : reinterpret_cast<void*>(orig_56b860);
+        trace.abi_fail = invoke_2(fn, codec_va, c.arg_offset);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0u) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+int main() {
+    SetUnhandledExceptionFilter(fault_handler);
+
+    // Check initial production state before any fixture writes.
+    require(porsche::shared_runtime_word_005deb74 == 0u, "initial_005deb74");
+    require(porsche::shared_runtime_word_005deb78 == 0u, "initial_005deb78");
+
+    // Check exact .rdata bytes against raw PE before relocation.
+    require(sizeof porsche::stream_err_unable_to_close_005bdbfc == sizeof raw_str_005bdbfc &&
+            std::memcmp(porsche::stream_err_unable_to_close_005bdbfc, raw_str_005bdbfc, sizeof raw_str_005bdbfc) == 0,
+            "rdata_005bdbfc");
+    require(sizeof porsche::stream_err_unable_to_open_005bdc24 == sizeof raw_str_005bdc24 &&
+            std::memcmp(porsche::stream_err_unable_to_open_005bdc24, raw_str_005bdc24, sizeof raw_str_005bdc24) == 0,
+            "rdata_005bdc24");
+    require(sizeof porsche::stream_err_unable_to_open_file_005bdc4c == sizeof raw_str_005bdc4c &&
+            std::memcmp(porsche::stream_err_unable_to_open_file_005bdc4c, raw_str_005bdc4c, sizeof raw_str_005bdc4c) == 0,
+            "rdata_005bdc4c");
+    require(sizeof porsche::stream_source_file_005bd978 == sizeof raw_str_005bd978 &&
+            std::memcmp(porsche::stream_source_file_005bd978, raw_str_005bd978, sizeof raw_str_005bd978) == 0,
+            "rdata_005bd978");
+
+    init_original_code();
+
+    // 1. 0056ba20: open_done
+    // Failure path: operation_complete returns 0 -> 2-arg diagnostic with codec+0x5c
+    run_open_done(0x1111u, -1, 0x2222u, 0u, 0x77u, 0x88u, "audio/track01.asf");
+    // Success path: operation_complete returns handle -> stores codec+0x160 and calls refill(codec, codec+0x30)
+    run_open_done(0x3333u, 0, 0x4444u, 0x55667788u, 0x99u, 0x11u, "audio/track02.asf");
+
+    // 2. 0056ba80: close_done
+    // Failure path: request_open returns 0 -> 0x206 diagnostic
+    run_close_done(0x1010u, 0, 0x2020u, 0x3030u, 0x44u, "audio/next.asf", 0u, 0u, 0u);
+    // Success path: request_open returns non-zero -> registers open_done callback (and chains to open_done -> refill)
+    run_close_done(0x1011u, -5, 0x2021u, 0x3031u, 0x55u, "audio/chain.asf", 0x9001u, 1u, 0xaa11bb22u);
+
+    // 3. 0056b860: advance
+    // No active request (codec+0x50 == 0) -> sets codec+0x28 = 0, preserves saved lock across heap_enter/leave
+    run_advance({false, 0u, false, 0u, 0u, 0u, "", "old.asf", 0u, 0x1000u, 2u, 0x12u, 0u, 0u, 0u, 0u, 1u, 0u});
+    // Current request status != 1 and next == 0 -> sets codec+0x28 = 0, does NOT clear codec+0x50
+    run_advance({true, 3u, false, 0u, 0u, 0u, "a.asf", "old.asf", 0u, 0x1000u, 2u, 0x13u, 0u, 0u, 0u, 0u, 0u, 0u});
+    // Current request status == 1, memory-backed (req+0x10 == 1) -> lock + write44 mutation checks + refill
+    run_advance({true, 1u, false, 0u, 1u, 0x400u, "ignored", "keep.asf", 0x7777u, 0x1200u, 1u, 0x22u, 0u, 0u, 0u, 0u, 1u, 1u});
+    // Current request status != 1, chains to req->next (even if req->next->status == 99), same path -> direct refill with req+0x11c
+    run_advance({true, 3u, true, 99u, 0u, 0x380u, "music/same.asf", "music/same.asf", 0x7777u, 0x1400u, 1u, 0x33u, 0u, 0u, 0u, 0u, 0u, 0u});
+    // Path mismatch, handle == 0, request_open fails -> strcpy + 0x291 diagnostic
+    run_advance({true, 1u, false, 0u, 0u, 0x200u, "music/new_open_fail.asf", "music/old.asf", 0u, 0x1500u, 1u, 0x44u, 0u, 0u, 0u, 0u, 0u, 0u});
+    // Path mismatch, handle == 0, request_open succeeds -> registers open_done and chains to refill
+    run_advance({true, 1u, false, 0u, 0u, 0x240u, "music/new_open_ok.asf", "music/old.asf", 0u, 0x1600u, 1u, 0x55u, 0x8001u, 0u, 0x9988u, 1u, 0u, 0u});
+    // Path mismatch, handle != 0, request_close fails -> strcpy + 0x29c diagnostic
+    run_advance({true, 1u, false, 0u, 0u, 0x280u, "music/close_fail.asf", "music/old.asf", 0x44556677u, 0x1700u, 1u, 0x66u, 0u, 0u, 0u, 0u, 0u, 0u});
+    // Path mismatch, handle != 0, request_close succeeds -> full 2-step chain close_done -> open_done -> refill
+    run_advance({true, 1u, false, 0u, 0u, 0x2c0u, "music/full_chain.asf", "music/old.asf", 0x44556677u, 0x1800u, 1u, 0x77u, 0x8003u, 0x8002u, 0xccddeeffu, 2u, 0u, 0u});
+
+    std::printf("audio_stream_codec_advance_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events_total);
+    return 0;
+}
