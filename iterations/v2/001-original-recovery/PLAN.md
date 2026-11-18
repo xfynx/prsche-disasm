@@ -1,15 +1,12 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-19. Run669 shared audit (`001`) passes for frozen `667/005` (`667/001`..`004` preserved)+`668/001` on `666`.
-Build `001` compiles 382 TUs / 8 projects, 72 names / 77 refs, no EXE. Two real
-frontier names (`application_audio_service_callback_004ad9c0` and
-`startup_sequence_call_00413cf0`) close with zero new names; 16065B `.data`/`.bss`
-(`005d1bd4..005d1be0`, `005e99fc`, `005e9a20..005ed843`, `005ed844`, `00606858`,
-`00606a80`, `00699f34..00699fb3`), 97B `.data` ro (`005cc698..005cc6fa`). Registry
-1056 adds ten PARTIAL bodies (2606B total). README 669 owns commands and bounds:
-144 native cases / 36 controls at `/Od`/`/O2`, 947 pins.
+Current 2026-11-19. Run672 shared audit (`001`) passes for frozen `670/001`+`671/002` (`671/001` preserved) on `669`.
+Build `001` compiles 384 TUs / 8 projects, 72 names / 77 refs, no EXE. Zero new
+unresolved names; `35B` `.rdata` (`005bbb44..005bbb66`) and zero `.data`/`.bss`.
+Registry 1063 adds seven PARTIAL bodies (649B total). README 672 owns commands and
+bounds: 186 native cases / 32 controls at `/Od`/`/O2`, 952 pins.
 
-Next launch `670` and `671` (frontier unlockers `005620c0`/`0059dea0`, `004a8b80`, render/startup leaves).
+Next launch `673` and `674` (`00574eb0`/`00414bd0`/`00414c30`, `004a8b80`, render/startup leaves).
 
 User requested continued recovery until available limits with simple worker models
 and strong root orchestration/acceptance. Passed inputs remain immutable.

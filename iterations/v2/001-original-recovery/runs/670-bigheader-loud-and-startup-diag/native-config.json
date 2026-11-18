@@ -1,0 +1,153 @@
+{
+  "run": 670,
+  "experiment": "local/experiments/v2-bigheader-loud-startup-diag-670",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag",
+    "iterations/v2/001-original-recovery/runs/661-bigheader-and-audio-probe-configure",
+    "iterations/v2/001-original-recovery/runs/658-resource-loadat-and-reset",
+    "iterations/v2/001-original-recovery/runs/590-game-setup-object-init",
+    "iterations/v2/001-original-recovery/runs/556-application-audio-lifecycle",
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls",
+    "iterations/v2/001-original-recovery/runs/537-render-resource-descriptor-cleanup",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/runs/353-diagnostic-mono",
+    "iterations/v2/001-original-recovery/runs/390-diagnostic-terminal",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005620c0",
+      "bytes": 63,
+      "sha256": "8f8e118a09d1f2fffd633b330884fe60ff834d28487eafe2816a19eacd7c890a",
+      "token": "@BODY_005620C0@"
+    },
+    {
+      "va": "0059dea0",
+      "bytes": 206,
+      "sha256": "fdf31c1b28a61512ef3c56a0127a4db29b5f0bd7d20d9ae6844041f839e95592",
+      "token": "@BODY_0059DEA0@"
+    },
+    {
+      "va": "0059fd90",
+      "bytes": 46,
+      "sha256": "a077315c01ba62bba2ac4d329b691c06a83c6aff261d4e5041144febacfa99b0",
+      "token": "@BODY_0059FD90@"
+    },
+    {
+      "va": "005cc588",
+      "bytes": 5,
+      "sha256": "0c12582270939f383c07b5f8439aa0cbe33fb62008e8bc2f39fd5953e3e7b584",
+      "token": "@STR_005CC588@"
+    }
+  ],
+  "pass_marker": "bigheader_loud_startup_diag_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-bigheader-diag-flag",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    context.callback_diagnostic_flag = 1u;",
+      "new": "    context.callback_diagnostic_flag = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-bigheader-group-order",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    const std::uint32_t group = resource_leaf_group_005df770;\n    context.callback_diagnostic_flag = 1u;\n    const std::uint32_t device = file_device_name_00568e90(path);",
+      "new": "    context.callback_diagnostic_flag = 1u;\n    const std::uint32_t device = file_device_name_00568e90(path);\n    const std::uint32_t group = resource_leaf_group_005df770;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-bigheader-callback-arg",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    const std::int32_t result = resource_leaf_atomic_dispatch_00568d50(\n        file_load_bigheader_callback_00562100, device, group, &context);",
+      "new": "    const std::int32_t result = resource_leaf_atomic_dispatch_00568d50(\n        nullptr, device, group, &context);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-bigheader-flags-field",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    context.opaque_08 = flags;",
+      "new": "    context.opaque_08 = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-res-bigheader-roots-cond",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    if (file_roots_enabled_006af370 == 0) {",
+      "new": "    if (file_roots_enabled_006af370 != 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-res-bigheader-skip-fallback",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    if (file_fallback_006af26c[0] != '\\0') {",
+      "new": "    if (false) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-res-bigheader-missing-code",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "        missing_file_006afbe4(name, -2);",
+      "new": "        missing_file_006afbe4(name, -1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-res-bigheader-primary-null",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    formatter_entry_005a0fbf(path, \"%s%s\", file_root_006af168, name);\n    if (file_exists_00561b80(path) != 0) {\n        return file_load_bigheader_005620c0(path, flags);\n    }",
+      "new": "    formatter_entry_005a0fbf(path, \"%s%s\", file_root_006af168, name);\n    if (file_exists_00561b80(path) != 0) {\n        return nullptr;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-diag-fmt-skip-sink",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    startup_diagnostic_sink_0059fc20(buffer);",
+      "new": "    (void)buffer;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-diag-fmt-null-varargs",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    (void)application_diagnostic_mono_vsprintf_005a299e(\n        buffer, format, reinterpret_cast<const std::uint32_t*>(arguments));",
+      "new": "    (void)application_diagnostic_mono_vsprintf_005a299e(\n        buffer, format, nullptr);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-diag-fmt-sink-arg",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    va_end(arguments);\n    startup_diagnostic_sink_0059fc20(buffer);",
+      "new": "    va_end(arguments);\n    startup_diagnostic_sink_0059fc20(format);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-diag-fmt-skip-vsprintf",
+      "source": "iterations/v2/001-original-recovery/runs/670-bigheader-loud-and-startup-diag/bigheader_loud_startup_diag_670.cpp",
+      "old": "    (void)application_diagnostic_mono_vsprintf_005a299e(\n        buffer, format, reinterpret_cast<const std::uint32_t*>(arguments));",
+      "new": "    buffer[0] = '\\0';",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

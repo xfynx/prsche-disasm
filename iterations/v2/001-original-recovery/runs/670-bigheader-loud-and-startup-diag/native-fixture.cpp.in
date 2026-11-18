@@ -1,0 +1,669 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <utility>
+
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "bigheader_loud_startup_diag_670.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(void*) == 4u, "original x86 layout requires 32-bit pointers");
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static B* code = nullptr;
+static B* slot_5620c0 = nullptr;
+static B* slot_59dea0 = nullptr;
+static B* slot_59fd90 = nullptr;
+
+static const char orig_str_5cc588[5] = {@STR_005CC588@};
+
+static U cases = 0u;
+alignas(16) static B floating[512] = {};
+
+enum EventTag : U {
+    kEvDevice = 1u,
+    kEvAtomic = 2u,
+    kEvCallback = 3u,
+    kEvFormat = 4u,
+    kEvExists = 5u,
+    kEvMissing = 6u,
+    kEvVsprintf = 7u,
+    kEvSink = 8u,
+};
+
+struct Event {
+    U tag;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+    U a4;
+    U args[8];
+    char text[96];
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U count;
+    Event events[16];
+    U final_group;
+    U final_missing_cb;
+    char sink_text[1024];
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+struct StubCfg {
+    bool mutate_group_in_device;
+    bool invoke_atomic_cb;
+    U atomic_ret;
+    U callback_ret;
+    U exists_mask;
+    bool mutate_missing_on_exists;
+    U vsprintf_len;
+    std::int32_t vsprintf_ret;
+    U vararg_count;
+};
+
+static StubCfg stub_cfg{};
+static char* vsprintf_buffer_origin = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void copy_text(char* dst, std::size_t cap, const char* src) {
+    if (src == nullptr) {
+        std::snprintf(dst, cap, "<null>");
+        return;
+    }
+    std::snprintf(dst, cap, "%s", src);
+}
+
+static void push_event(
+    U tag,
+    U a0 = 0u,
+    U a1 = 0u,
+    U a2 = 0u,
+    U a3 = 0u,
+    U a4 = 0u,
+    const char* text = nullptr,
+    const U* args_in = nullptr,
+    U arg_count = 0u) {
+    require(trace.count < 16u, "event capacity");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof(e));
+    e.tag = tag;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+    e.a3 = a3;
+    e.a4 = a4;
+    for (U i = 0u; i < arg_count && i < 8u; ++i) {
+        e.args[i] = args_in[i];
+    }
+    if (text != nullptr) {
+        copy_text(e.text, sizeof(e.text), text);
+    }
+}
+
+static void __cdecl fixture_missing_a(const char* name, std::int32_t code_arg) {
+    push_event(kEvMissing, 1u, static_cast<U>(code_arg), 0u, 0u, 0u, name);
+}
+
+static void __cdecl fixture_missing_b(const char* name, std::int32_t code_arg) {
+    push_event(kEvMissing, 2u, static_cast<U>(code_arg), 0u, 0u, 0u, name);
+}
+
+static U normalize_missing_cb(void(__cdecl* cb)(const char*, std::int32_t)) {
+    if (cb == nullptr) return 0u;
+    if (cb == &fixture_missing_a) return 1u;
+    if (cb == &fixture_missing_b) return 2u;
+    return 0xffu;
+}
+
+namespace porsche {
+
+std::uint32_t resource_leaf_group_005df770 = 0x64u;
+char file_root_006af168[260] = {};
+char file_fallback_006af26c[260] = {};
+char file_roots_enabled_006af370 = 0;
+void(__cdecl* missing_file_006afbe4)(const char*, std::int32_t) = nullptr;
+
+std::int32_t __cdecl file_load_bigheader_callback_00562100(
+    std::uint32_t group, void* opaque_context) {
+    const auto* const ctx = static_cast<const ResourceAtomicContext*>(opaque_context);
+    push_event(
+        kEvCallback,
+        group,
+        ctx != nullptr ? ctx->opaque_08 : 0u,
+        ctx != nullptr ? ctx->callback_diagnostic_flag : 0u,
+        0u,
+        0u,
+        ctx != nullptr ? ctx->path : nullptr);
+    return static_cast<std::int32_t>(stub_cfg.callback_ret);
+}
+
+std::uint32_t __cdecl file_device_name_00568e90(const char* path) {
+    U dev = 0x10u;
+    if (path != nullptr) {
+        for (const char* p = path; *p != '\0'; ++p) {
+            dev = dev * 33u + static_cast<B>(*p);
+        }
+    }
+    if (stub_cfg.mutate_group_in_device) {
+        resource_leaf_group_005df770 ^= 0x10101u;
+    }
+    push_event(kEvDevice, dev, path != nullptr ? 1u : 0u, 0u, 0u, 0u, path);
+    return dev;
+}
+
+std::int32_t __cdecl resource_leaf_atomic_dispatch_00568d50(
+    ResourceLeafAtomicCallback callback,
+    std::uint32_t device,
+    std::uint32_t group,
+    void* opaque_context) {
+    const auto* const ctx = static_cast<const ResourceAtomicContext*>(opaque_context);
+    const U cb_ok = (callback == &file_load_bigheader_callback_00562100) ? 1u : 0u;
+    push_event(
+        kEvAtomic,
+        cb_ok,
+        device,
+        group,
+        ctx != nullptr ? ctx->opaque_08 : 0u,
+        ctx != nullptr ? ctx->callback_diagnostic_flag : 0u,
+        ctx != nullptr ? ctx->path : nullptr);
+    if (stub_cfg.invoke_atomic_cb && callback != nullptr) {
+        return callback(group, opaque_context);
+    }
+    return static_cast<std::int32_t>(stub_cfg.atomic_ret);
+}
+
+std::int32_t __cdecl formatter_entry_005a0fbf(char* output, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    const int n = std::vsnprintf(output, 260u, format, args);
+    va_end(args);
+    push_event(kEvFormat, 0u, 0u, 0u, 0u, 0u, output);
+    return static_cast<std::int32_t>(n);
+}
+
+std::int32_t __cdecl file_exists_00561b80(const char* path) {
+    std::int32_t hit = 0;
+    if (path != nullptr) {
+        if (std::strncmp(path, file_root_006af168, std::strlen(file_root_006af168)) == 0 &&
+            (stub_cfg.exists_mask & 1u) != 0u) {
+            hit = 1;
+        } else if (file_fallback_006af26c[0] != '\0' &&
+                   std::strncmp(path, file_fallback_006af26c, std::strlen(file_fallback_006af26c)) == 0 &&
+                   (stub_cfg.exists_mask & 2u) != 0u) {
+            hit = 1;
+        }
+    }
+    if (stub_cfg.mutate_missing_on_exists) {
+        missing_file_006afbe4 = &fixture_missing_b;
+    }
+    push_event(kEvExists, static_cast<U>(hit), 0u, 0u, 0u, 0u, path);
+    return hit;
+}
+
+int __cdecl application_diagnostic_mono_vsprintf_005a299e(
+    char* output, const char* format, const std::uint32_t* arguments) {
+    require(output != nullptr, "vsprintf null output");
+    require(arguments != nullptr, "vsprintf null arguments");
+    require(stub_cfg.vsprintf_len < 1024u, "vsprintf len");
+    vsprintf_buffer_origin = output;
+    for (U i = 0u; i < stub_cfg.vsprintf_len; ++i) {
+        output[i] = static_cast<char>('A' + (i % 26u));
+    }
+    output[stub_cfg.vsprintf_len] = '\0';
+    push_event(
+        kEvVsprintf,
+        stub_cfg.vsprintf_len,
+        static_cast<U>(stub_cfg.vsprintf_ret),
+        stub_cfg.vararg_count,
+        0u,
+        0u,
+        format,
+        arguments,
+        stub_cfg.vararg_count);
+    return static_cast<int>(stub_cfg.vsprintf_ret);
+}
+
+void __cdecl startup_diagnostic_sink_0059fc20(const char* text) {
+    require(text != nullptr, "sink null text");
+    require(vsprintf_buffer_origin != nullptr, "sink before vsprintf");
+    const U offset = address(text) - address(vsprintf_buffer_origin);
+    const U len = static_cast<U>(std::strlen(text));
+    require(len < sizeof(trace.sink_text), "sink len");
+    std::memcpy(trace.sink_text, text, len + 1u);
+    push_event(kEvSink, offset, len, 0u, 0u, 0u, text);
+}
+
+} // namespace porsche
+
+static void relocate_rel32(B* slot, U base_va, U patch_offset, U target_va, const void* dst) {
+    const std::int32_t expected_rel = static_cast<std::int32_t>(target_va - (base_va + patch_offset + 4u));
+    std::int32_t actual_rel = 0;
+    std::memcpy(&actual_rel, slot + patch_offset, 4u);
+    require(actual_rel == expected_rel, "rel32 check");
+    const std::int32_t rel = static_cast<std::int32_t>(
+        address(dst) - (address(slot) + patch_offset + 4u));
+    std::memcpy(slot + patch_offset, &rel, 4u);
+}
+
+static void relocate_abs32(B* slot, U patch_offset, U expected_va, U new_val) {
+    U actual = 0u;
+    std::memcpy(&actual, slot + patch_offset, 4u);
+    require(actual == expected_va, "abs32 check");
+    std::memcpy(slot + patch_offset, &new_val, 4u);
+}
+
+static void load_originals() {
+    static const B body_5620c0[] = {@BODY_005620C0@};
+    static const B body_59dea0[] = {@BODY_0059DEA0@};
+    static const B body_59fd90[] = {@BODY_0059FD90@};
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+
+    slot_5620c0 = code + 0x000u;
+    slot_59dea0 = code + 0x080u;
+    slot_59fd90 = code + 0x180u;
+
+    std::memcpy(slot_5620c0, body_5620c0, sizeof body_5620c0);
+    std::memcpy(slot_59dea0, body_59dea0, sizeof body_59dea0);
+    std::memcpy(slot_59fd90, body_59fd90, sizeof body_59fd90);
+
+    // 005620c0
+    relocate_abs32(slot_5620c0, 0x011u, 0x005df770u, address(&porsche::resource_leaf_group_005df770));
+    relocate_rel32(slot_5620c0, 0x005620c0u, 0x029u, 0x00568e90u,
+                   reinterpret_cast<const void*>(&porsche::file_device_name_00568e90));
+    relocate_abs32(slot_5620c0, 0x032u, 0x00562100u,
+                   address(reinterpret_cast<const void*>(&porsche::file_load_bigheader_callback_00562100)));
+    relocate_rel32(slot_5620c0, 0x005620c0u, 0x037u, 0x00568d50u,
+                   reinterpret_cast<const void*>(&porsche::resource_leaf_atomic_dispatch_00568d50));
+
+    // 0059dea0
+    relocate_abs32(slot_59dea0, 0x001u, 0x006af370u, address(&porsche::file_roots_enabled_006af370));
+    relocate_rel32(slot_59dea0, 0x0059dea0u, 0x048u, 0x005620c0u, slot_5620c0);
+    relocate_abs32(slot_59dea0, 0x064u, 0x006af168u, address(porsche::file_root_006af168));
+    relocate_abs32(slot_59dea0, 0x069u, 0x005cc588u, address(orig_str_5cc588));
+    relocate_rel32(slot_59dea0, 0x0059dea0u, 0x06fu, 0x005a0fbfu,
+                   reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_rel32(slot_59dea0, 0x0059dea0u, 0x079u, 0x00561b80u,
+                   reinterpret_cast<const void*>(&porsche::file_exists_00561b80));
+    relocate_abs32(slot_59dea0, 0x085u, 0x006af26cu, address(porsche::file_fallback_006af26c));
+    relocate_abs32(slot_59dea0, 0x08fu, 0x006af26cu, address(porsche::file_fallback_006af26c));
+    relocate_abs32(slot_59dea0, 0x098u, 0x005cc588u, address(orig_str_5cc588));
+    relocate_rel32(slot_59dea0, 0x0059dea0u, 0x09eu, 0x005a0fbfu,
+                   reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_rel32(slot_59dea0, 0x0059dea0u, 0x0a8u, 0x00561b80u,
+                   reinterpret_cast<const void*>(&porsche::file_exists_00561b80));
+    relocate_abs32(slot_59dea0, 0x0b4u, 0x006afbe4u, address(&porsche::missing_file_006afbe4));
+
+    // 0059fd90
+    relocate_rel32(slot_59fd90, 0x0059fd90u, 0x019u, 0x005a299eu,
+                   reinterpret_cast<const void*>(&porsche::application_diagnostic_mono_vsprintf_005a299e));
+    relocate_rel32(slot_59fd90, 0x0059fd90u, 0x023u, 0x0059fc20u,
+                   reinterpret_cast<const void*>(&porsche::startup_diagnostic_sink_0059fc20));
+
+    DWORD old = 0u;
+    require(VirtualProtect(code, 4096, PAGE_EXECUTE_READ, &old) != FALSE, "VirtualProtect");
+    FlushInstructionCache(GetCurrentProcess(), code, 4096);
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        fldln2
+        faddp st(1), st(0)
+        fsave floating
+        frstor floating
+    }
+}
+
+static void capture_fpu(Fpu& fpu) {
+    B raw[108]{};
+    U mxcsr = 0u;
+    __asm {
+        fsave raw
+        stmxcsr mxcsr
+        frstor raw
+    }
+    fpu.control = static_cast<unsigned short>(raw[0] | (raw[1] << 8));
+    fpu.status = static_cast<unsigned short>(raw[4] | (raw[5] << 8));
+    fpu.full_tag = static_cast<unsigned short>(raw[8] | (raw[9] << 8));
+    fpu.tag = 0;
+    for (int i = 0; i < 8; ++i) {
+        if (((fpu.full_tag >> (i * 2)) & 3) != 3) {
+            fpu.tag |= static_cast<B>(1u << i);
+        }
+    }
+    std::memcpy(fpu.values, raw + 28, 80);
+    fpu.mxcsr = mxcsr & 0xffffffc0u;
+}
+
+static U invoke_cdecl2(void* fn, U a0, U a1, U& out_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        push a1
+        push a0
+        call fn
+        add esp, 8
+        mov eax_out, eax
+        pushfd
+        pop eax
+        and eax, 0x400
+        jne abi_bad
+        cmp esp, before
+        jne abi_bad
+        cmp ebp, frame
+        jne abi_bad
+        cmp ebx, 0x13572468
+        jne abi_bad
+        cmp esi, 0x2468ace0
+        jne abi_bad
+        cmp edi, 0x10203040
+        je abi_ok
+    abi_bad:
+        mov fail, 1
+    abi_ok:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    out_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl_varargs(void* fn, const U* args9) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        mov ecx, 9
+        mov edx, args9
+    push_loop:
+        dec ecx
+        push dword ptr [edx + ecx * 4]
+        test ecx, ecx
+        jnz push_loop
+        call fn
+        add esp, 36
+        pushfd
+        pop eax
+        and eax, 0x400
+        jne abi_bad
+        cmp esp, before
+        jne abi_bad
+        cmp ebp, frame
+        jne abi_bad
+        cmp ebx, 0x13572468
+        jne abi_bad
+        cmp esi, 0x2468ace0
+        jne abi_bad
+        cmp edi, 0x10203040
+        je abi_ok
+    abi_bad:
+        mov fail, 1
+    abi_ok:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+struct CaseEnv {
+    StubCfg stub;
+    const char* root;
+    const char* fallback;
+    char roots_enabled;
+    void(__cdecl* missing_cb)(const char*, std::int32_t);
+    U group;
+};
+
+static void setup_env(const CaseEnv& c) {
+    stub_cfg = c.stub;
+    vsprintf_buffer_origin = nullptr;
+    std::memset(&trace, 0, sizeof(trace));
+    porsche::resource_leaf_group_005df770 = c.group;
+    std::memset(porsche::file_root_006af168, 0, sizeof(porsche::file_root_006af168));
+    std::memset(porsche::file_fallback_006af26c, 0, sizeof(porsche::file_fallback_006af26c));
+    if (c.root != nullptr) {
+        std::snprintf(porsche::file_root_006af168, sizeof(porsche::file_root_006af168), "%s", c.root);
+    }
+    if (c.fallback != nullptr) {
+        std::snprintf(porsche::file_fallback_006af26c, sizeof(porsche::file_fallback_006af26c), "%s", c.fallback);
+    }
+    porsche::file_roots_enabled_006af370 = c.roots_enabled;
+    porsche::missing_file_006afbe4 = c.missing_cb;
+}
+
+static void capture_state() {
+    trace.final_group = porsche::resource_leaf_group_005df770;
+    trace.final_missing_cb = normalize_missing_cb(porsche::missing_file_006afbe4);
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "ABI");
+    require(trace.ret_eax == expected.ret_eax, "EAX");
+    require(trace.count == expected.count, "event count");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0, "event");
+    }
+    require(trace.final_group == expected.final_group, "005df770");
+    require(trace.final_missing_cb == expected.final_missing_cb, "006afbe4");
+    require(std::memcmp(trace.sink_text, expected.sink_text, sizeof(trace.sink_text)) == 0, "sink_text");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(trace.fpu)) == 0, "FPU");
+    ++cases;
+}
+
+static void check_5620c0(const CaseEnv& c, const char* path, U flags) {
+    setup_env(c);
+    seed_fpu();
+    U eax_orig = 0u;
+    trace.abi_fail = invoke_cdecl2(slot_5620c0, address(path), flags, eax_orig);
+    trace.ret_eax = eax_orig;
+    capture_state();
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(c);
+    seed_fpu();
+    U eax_cpp = 0u;
+    trace.abi_fail = invoke_cdecl2(
+        reinterpret_cast<void*>(&porsche::file_load_bigheader_005620c0),
+        address(path), flags, eax_cpp);
+    trace.ret_eax = eax_cpp;
+    capture_state();
+    capture_fpu(trace.fpu);
+    std::swap(trace, expected);
+    compare_traces();
+}
+
+static void check_59dea0(const CaseEnv& c, const char* name, U flags) {
+    setup_env(c);
+    seed_fpu();
+    U eax_orig = 0u;
+    trace.abi_fail = invoke_cdecl2(slot_59dea0, address(name), flags, eax_orig);
+    trace.ret_eax = eax_orig;
+    capture_state();
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(c);
+    seed_fpu();
+    U eax_cpp = 0u;
+    trace.abi_fail = invoke_cdecl2(
+        reinterpret_cast<void*>(&porsche::resource_load_bigheader_0059dea0),
+        address(name), flags, eax_cpp);
+    trace.ret_eax = eax_cpp;
+    capture_state();
+    capture_fpu(trace.fpu);
+    std::swap(trace, expected);
+    compare_traces();
+}
+
+static void check_59fd90(const CaseEnv& c, const char* fmt, const U* varargs8) {
+    U args9[9] = {address(fmt), 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u};
+    for (U i = 0u; i < 8u; ++i) {
+        args9[i + 1u] = varargs8[i];
+    }
+
+    setup_env(c);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl_varargs(slot_59fd90, args9);
+    trace.ret_eax = 0u;
+    capture_state();
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(c);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl_varargs(
+        reinterpret_cast<void*>(&porsche::startup_diagnostic_format_0059fd90), args9);
+    trace.ret_eax = 0u;
+    capture_state();
+    capture_fpu(trace.fpu);
+    std::swap(trace, expected);
+    compare_traces();
+}
+
+int main() {
+    // Verify production initial state BEFORE fixture resets.
+    require(porsche::resource_leaf_group_005df770 == 0x64u, "initial 005df770");
+    require(porsche::file_roots_enabled_006af370 == 0, "initial 006af370");
+    require(porsche::missing_file_006afbe4 == nullptr, "initial 006afbe4");
+
+    load_originals();
+
+    const CaseEnv base_env{
+        {false, false, 0x12345678u, 0x87654321u, 1u, false, 16u, 16, 4u},
+        "R:\\", "F:\\", 0, nullptr, 0x64u
+    };
+
+    // 1. file_load_bigheader_005620c0 (63B)
+    check_5620c0(base_env, "header_a.viv", 0u);
+    check_5620c0(base_env, nullptr, 0xdeadbeefu);
+    {
+        CaseEnv env = base_env;
+        env.stub.mutate_group_in_device = true;
+        check_5620c0(env, "header_b.viv", 7u);
+    }
+    {
+        CaseEnv env = base_env;
+        env.stub.invoke_atomic_cb = true;
+        check_5620c0(env, "header_cb_hi.viv", 9u);
+        env.stub.callback_ret = 0u;
+        check_5620c0(env, "header_cb_zero.viv", 0x11u);
+    }
+
+    // 2. resource_load_bigheader_0059dea0 (206B)
+    check_59dea0(base_env, "unrooted.viv", 0u);
+    check_59dea0(base_env, "unrooted_flags.viv", 0x80000001u);
+    {
+        CaseEnv env = base_env;
+        env.roots_enabled = 1;
+        env.stub.exists_mask = 1u;
+        check_59dea0(env, "primary.viv", 2u);
+
+        env.roots_enabled = -1;
+        env.stub.exists_mask = 2u;
+        check_59dea0(env, "fallback.viv", 3u);
+
+        env.roots_enabled = 1;
+        env.stub.exists_mask = 0u;
+        env.missing_cb = &fixture_missing_a;
+        check_59dea0(env, "missing_a.viv", 4u);
+
+        env.stub.mutate_missing_on_exists = true;
+        env.missing_cb = nullptr;
+        check_59dea0(env, "missing_mut.viv", 5u);
+
+        env.fallback = "";
+        env.stub.mutate_missing_on_exists = false;
+        env.missing_cb = &fixture_missing_a;
+        check_59dea0(env, "no_fallback.viv", 6u);
+
+        env.missing_cb = nullptr;
+        check_59dea0(env, "no_fallback_nocb.viv", 7u);
+
+        env.fallback = "F:\\";
+        env.stub.exists_mask = 1u;
+        env.stub.invoke_atomic_cb = true;
+        check_59dea0(env, "end2end_loud.viv", 11u);
+    }
+
+    // 3. startup_diagnostic_format_0059fd90 (46B)
+    {
+        static const char payload_str[] = "diag-payload";
+        const U va_zero[8] = {};
+        const U va_mix[8] = {
+            0x80000000u, 0x12345678u, address(payload_str), 0xffffffffu,
+            0x11223344u, 0x55667788u, 0x99aabbccu, 0xddeeff00u
+        };
+
+        for (U len : {0u, 1u, 31u, 252u, 512u, 1023u}) {
+            CaseEnv env = base_env;
+            env.stub.vsprintf_len = len;
+            env.stub.vsprintf_ret = static_cast<std::int32_t>(len);
+            env.stub.vararg_count = 0u;
+            check_59fd90(env, "plain_fmt", va_zero);
+
+            env.stub.vararg_count = 8u;
+            check_59fd90(env, "msg=%d/%x/%s/%u", va_mix);
+        }
+
+        // Verify ignored vsprintf return (-1 and 0) still calls sink with buffer.
+        CaseEnv env = base_env;
+        env.stub.vsprintf_len = 17u;
+        env.stub.vsprintf_ret = -1;
+        env.stub.vararg_count = 3u;
+        check_59fd90(env, "neg_ret=%d:%x:%s", va_mix);
+    }
+
+    std::printf("bigheader_loud_startup_diag_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

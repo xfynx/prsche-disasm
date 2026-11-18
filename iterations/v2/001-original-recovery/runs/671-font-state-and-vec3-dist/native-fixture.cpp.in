@@ -1,0 +1,566 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <utility>
+
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "font_state_vec3_671.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::font_setstatef_invalid_state_005bbb44) == 35u);
+
+enum : U {
+    kFontArenaBytes = 0x100u,
+    kMaxDiagEvents = 4u,
+};
+
+struct DiagEvent {
+    U fmt_match;
+    U file_match;
+    U line;
+    I state;
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_f32_bits;
+    U diag_count;
+    DiagEvent diag[kMaxDiagEvents];
+    B font_arena[kFontArenaBytes];
+    U final_diag_file_ok;
+    U final_diag_line;
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512] = {};
+static B fp_env[28] = {};
+
+static B* code = nullptr;
+static B* slot_53eea0 = nullptr;
+static B* slot_53e890 = nullptr;
+static B* slot_53e974 = nullptr;
+static B* slot_53e9a0 = nullptr;
+static B* slot_532b20 = nullptr;
+static B* slot_5323a0 = nullptr;
+
+static const char orig_str_5bbb08[21] = {@STR_005BBB08@};
+static const char orig_str_5bbb44[35] = {@STR_005BBB44@};
+
+alignas(16) static B font_arena[kFontArenaBytes] = {};
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static U f32_bits(float v) {
+    U bits = 0u;
+    std::memcpy(&bits, &v, 4u);
+    return bits;
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu(unsigned short cw = 0x037fu) {
+    __asm {
+        fninit
+        fldcw cw
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    __asm {
+        fxsave fp_area
+        fnstenv fp_env
+        fldenv fp_env
+    }
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void check_fpu_clean(const FpuSnapshot& orig_fp, const FpuSnapshot& cpp_fp) {
+    require(orig_fp.control == cpp_fp.control, "FPU control");
+    require((orig_fp.status & 0x3800u) == 0u && (cpp_fp.status & 0x3800u) == 0u, "FPU TOP");
+    require(orig_fp.tag == 0xffffu && cpp_fp.tag == 0xffffu, "FPU empty tag");
+}
+
+extern "C" void __cdecl diagnostic_raw_671(const char* format, I state) {
+    require(trace.diag_count < kMaxDiagEvents, "diag capacity");
+    DiagEvent& ev = trace.diag[trace.diag_count++];
+    ev.fmt_match = (format != nullptr && std::strcmp(format, orig_str_5bbb44) == 0) ? 1u : 0u;
+    const char* const file = porsche::diagnostic_file_005deb74();
+    ev.file_match = (file != nullptr && std::strcmp(file, orig_str_5bbb08) == 0) ? 1u : 0u;
+    ev.line = porsche::diagnostic_line_005deb78;
+    ev.state = state;
+}
+
+namespace porsche {
+
+void(__cdecl* diagnostic_handler_005debf0)(const char*) = nullptr;
+
+__declspec(naked) void __cdecl diagnostic_entry_671(const char*) {
+    __asm { jmp diagnostic_raw_671 }
+}
+
+} // namespace porsche
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(rd(slot, off) == orig, "exact absolute relocation offset");
+    wr(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U base_va, U off, U orig_target, const void* target) {
+    const U insn_va = base_va + off + 4u;
+    const U expected_rel = orig_target - insn_va;
+    require(rd(slot, off) == expected_rel, "exact relative offset");
+    wr(slot, off, address(target) - (address(slot) + off + 4u));
+}
+
+static void init() {
+    SetUnhandledExceptionFilter(fault_handler);
+
+    // Assert production initial diagnostic state before any fixture reset.
+    require(porsche::shared_runtime_word_005deb74 == 0u, "initial 005deb74");
+    require(porsche::shared_runtime_word_005deb78 == 0u, "initial 005deb78");
+    require(porsche::diagnostic_handler_005debf0 == nullptr, "initial 005debf0");
+    require(std::strcmp(orig_str_5bbb08, "\\real\\cmn\\fontattr.c") == 0, "orig 005bbb08");
+    require(std::strcmp(orig_str_5bbb44, porsche::font_setstatef_invalid_state_005bbb44) == 0,
+            "orig 005bbb44");
+
+    static const B body_53eea0[] = {@BODY_0053EEA0@};
+    static const B body_53e890[] = {@BODY_0053E890@};
+    static const B jtbl_53e974[] = {@JTBL_0053E974@};
+    static const B lut_53e9a0[] = {@LUT_0053E9A0@};
+    static const B body_532b20[] = {@BODY_00532B20@};
+    static const B body_5323a0[] = {@BODY_005323A0@};
+    static_assert(sizeof body_53eea0 == 19u, "0053eea0 size");
+    static_assert(sizeof body_53e890 == 225u, "0053e890 size");
+    static_assert(sizeof jtbl_53e974 == 44u, "0053e974 size");
+    static_assert(sizeof lut_53e9a0 == 23u, "0053e9a0 size");
+    static_assert(sizeof body_532b20 == 37u, "00532b20 size");
+    static_assert(sizeof body_5323a0 == 53u, "005323a0 size");
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    std::memset(code, 0xcc, 4096u);
+
+    slot_53eea0 = code + 0x000u;
+    slot_53e890 = code + 0x100u;
+    slot_53e974 = code + 0x200u;
+    slot_53e9a0 = code + 0x240u;
+    slot_532b20 = code + 0x300u;
+    slot_5323a0 = code + 0x400u;
+
+    std::memcpy(slot_53eea0, body_53eea0, sizeof body_53eea0);
+    std::memcpy(slot_53e890, body_53e890, sizeof body_53e890);
+    std::memcpy(slot_53e974, jtbl_53e974, sizeof jtbl_53e974);
+    std::memcpy(slot_53e9a0, lut_53e9a0, sizeof lut_53e9a0);
+    std::memcpy(slot_532b20, body_532b20, sizeof body_532b20);
+    std::memcpy(slot_5323a0, body_5323a0, sizeof body_5323a0);
+
+    // Relocate 0053e890 switch lookup/jump table and diagnostic references.
+    relocate_abs32(slot_53e890, 0x16u, 0x0053e9a0u, address(slot_53e9a0));
+    relocate_abs32(slot_53e890, 0x1du, 0x0053e974u, address(slot_53e974));
+    relocate_abs32(slot_53e890, 0xbeu, 0x005bbb44u, address(orig_str_5bbb44));
+    relocate_abs32(slot_53e890, 0xc4u, 0x005deb74u, address(&porsche::shared_runtime_word_005deb74));
+    relocate_abs32(slot_53e890, 0xc8u, 0x005bbb08u, address(orig_str_5bbb08));
+    relocate_abs32(slot_53e890, 0xceu, 0x005deb78u, address(&porsche::shared_runtime_word_005deb78));
+    relocate_abs32(slot_53e890, 0xd8u, 0x005debf0u, address(&porsche::diagnostic_handler_005debf0));
+
+    for (U i = 0u; i < 11u; ++i) {
+        const U orig_target = rd(slot_53e974, i * 4u);
+        require(orig_target >= 0x0053e890u && orig_target <= 0x0053e970u, "jtbl range");
+        wr(slot_53e974, i * 4u, address(slot_53e890) + (orig_target - 0x0053e890u));
+    }
+
+    // Relocate 005323a0 call to 00532b20.
+    relocate_rel32(slot_5323a0, 0x005323a0u, 0x2du, 0x00532b20u, slot_532b20);
+}
+
+static U invoke_cdecl3_void(void* fn, U a0, U a1, U a2) {
+    U before = 0u;
+    U frame = 0u;
+    U fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push a2
+        push a1
+        push a0
+        call fn
+        add esp, 12
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_f32_1ptr(void* fn, const float* p, U& out_bits) {
+    U before = 0u;
+    U frame = 0u;
+    U fail = 0u;
+    U result_bits = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push p
+        call fn
+        fstp dword ptr [result_bits]
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    out_bits = result_bits;
+    return fail;
+}
+
+static U invoke_f32_2ptr(void* fn, const float* a, const float* b, U& out_bits) {
+    U before = 0u;
+    U frame = 0u;
+    U fail = 0u;
+    U result_bits = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push b
+        push a
+        call fn
+        fstp dword ptr [result_bits]
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    out_bits = result_bits;
+    return fail;
+}
+
+static void reset_font_state(B fill_byte, U init_b8_bits) {
+    std::memset(font_arena, fill_byte, sizeof font_arena);
+    wr(font_arena, 0xb8u, init_b8_bits);
+    porsche::diagnostic_file_005deb74_set(nullptr);
+    porsche::diagnostic_line_005deb78 = 0u;
+    porsche::diagnostic_handler_005debf0 = &porsche::diagnostic_entry_671;
+}
+
+static void capture_font_post(Trace& t) {
+    std::memcpy(t.font_arena, font_arena, sizeof t.font_arena);
+    const char* const file = porsche::diagnostic_file_005deb74();
+    t.final_diag_file_ok =
+        (file != nullptr && std::strcmp(file, orig_str_5bbb08) == 0) ? 1u : 0u;
+    t.final_diag_line = porsche::diagnostic_line_005deb78;
+}
+
+static void compare_font_traces() {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "recovered ABI");
+    require(trace.diag_count == expected.diag_count, "diag count");
+    for (U i = 0u; i < trace.diag_count; ++i) {
+        require(std::memcmp(&trace.diag[i], &expected.diag[i], sizeof(DiagEvent)) == 0,
+                "diag event");
+    }
+    require(std::memcmp(trace.font_arena, expected.font_arena, sizeof trace.font_arena) == 0,
+            "font arena");
+    require(trace.final_diag_file_ok == expected.final_diag_file_ok, "final diag file");
+    require(trace.final_diag_line == expected.final_diag_line, "final diag line");
+    check_fpu_clean(trace.fp, expected.fp);
+    ++cases;
+}
+
+static void check_pair(U first, U second) {
+    which = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    reset_font_state(0xa5, 0x3f800000u);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl3_void(slot_53eea0, address(font_arena), first, second);
+    capture_fpu(trace.fp);
+    capture_font_post(trace);
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof trace);
+    reset_font_state(0xa5, 0x3f800000u);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl3_void(
+        reinterpret_cast<void*>(&porsche::font_state_set_pair_0053eea0),
+        address(font_arena),
+        first,
+        second);
+    capture_fpu(trace.fp);
+    capture_font_post(trace);
+    std::swap(trace, expected);
+
+    compare_font_traces();
+}
+
+static void check_setstatef(
+    I state, U value_bits, U init_b8_bits, unsigned short cw = 0x037fu) {
+    which = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    reset_font_state(0x5a, init_b8_bits);
+    seed_fpu(cw);
+    trace.abi_fail = invoke_cdecl3_void(
+        slot_53e890, address(font_arena), static_cast<U>(state), value_bits);
+    capture_fpu(trace.fp);
+    capture_font_post(trace);
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof trace);
+    reset_font_state(0x5a, init_b8_bits);
+    seed_fpu(cw);
+    trace.abi_fail = invoke_cdecl3_void(
+        reinterpret_cast<void*>(&porsche::font_setstatef_0053e890),
+        address(font_arena),
+        static_cast<U>(state),
+        value_bits);
+    capture_fpu(trace.fp);
+    capture_font_post(trace);
+    std::swap(trace, expected);
+
+    compare_font_traces();
+}
+
+static void check_vec3_length(float x, float y, float z, unsigned short cw = 0x037fu) {
+    const float v[3] = {x, y, z};
+
+    which = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    seed_fpu(cw);
+    trace.abi_fail = invoke_f32_1ptr(slot_532b20, v, trace.ret_f32_bits);
+    capture_fpu(trace.fp);
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof trace);
+    seed_fpu(cw);
+    trace.abi_fail = invoke_f32_1ptr(
+        reinterpret_cast<void*>(&porsche::vec3_length_00532b20), v, trace.ret_f32_bits);
+    capture_fpu(trace.fp);
+    std::swap(trace, expected);
+
+    require(trace.abi_fail == 0u, "original 00532b20 ABI");
+    require(expected.abi_fail == 0u, "recovered 00532b20 ABI");
+    require(trace.ret_f32_bits == expected.ret_f32_bits, "00532b20 float bits");
+    check_fpu_clean(trace.fp, expected.fp);
+    ++cases;
+}
+
+static void check_vec3_distance(
+    float ax, float ay, float az, float bx, float by, float bz) {
+    const float a[3] = {ax, ay, az};
+    const float b[3] = {bx, by, bz};
+
+    which = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    seed_fpu();
+    trace.abi_fail = invoke_f32_2ptr(slot_5323a0, a, b, trace.ret_f32_bits);
+    capture_fpu(trace.fp);
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof trace);
+    seed_fpu();
+    trace.abi_fail = invoke_f32_2ptr(
+        reinterpret_cast<void*>(&porsche::vec3_distance_005323a0), a, b, trace.ret_f32_bits);
+    capture_fpu(trace.fp);
+    std::swap(trace, expected);
+
+    require(trace.abi_fail == 0u, "original 005323a0 ABI");
+    require(expected.abi_fail == 0u, "recovered 005323a0 ABI");
+    require(trace.ret_f32_bits == expected.ret_f32_bits, "005323a0 float bits");
+    check_fpu_clean(trace.fp, expected.fp);
+    ++cases;
+}
+
+int main() {
+    init();
+
+    // 1. 0053eea0 (font_state_set_pair_0053eea0).
+    check_pair(0u, 0u);
+    check_pair(0x12345678u, 0x9abcdef0u);
+    check_pair(0xffffffffu, 0x00000001u);
+
+    // 2. 0053e890 (font_setstatef_0053e890): all valid & invalid states -2..25 + extreme edges.
+    for (I st = -2; st <= 25; ++st) {
+        check_setstatef(st, f32_bits(12.25f), f32_bits(2.5f));
+    }
+    check_setstatef(0x7fffffff, f32_bits(1.0f), f32_bits(1.0f));
+    check_setstatef(-0x7fffffff - 1, f32_bits(1.0f), f32_bits(1.0f));
+
+    // Special float bit patterns on setter cases (1..3, 18..23).
+    check_setstatef(1, 0x80000000u, f32_bits(1.0f)); // -0.0f
+    check_setstatef(2, 0x7f800000u, f32_bits(1.0f)); // +Inf
+    check_setstatef(3, 0xff800000u, f32_bits(1.0f)); // -Inf
+    check_setstatef(18, 0x7fc00001u, f32_bits(1.0f)); // qNaN
+    check_setstatef(23, 0x00000001u, f32_bits(1.0f)); // subnormal
+
+    // Case 4 exact x87 fdivr + fistp semantics:
+    // Halfway ties (1.5 -> 2, 2.5 -> 2, 3.5 -> 4, -1.5 -> -2), asymmetric operands (3/2 vs 2/3),
+    // division by zero (+Inf -> 0x80000000), overflow, and explicit CW rounding modes.
+    check_setstatef(4, f32_bits(3.0f), f32_bits(2.0f));          // 1.5 -> 2
+    check_setstatef(4, f32_bits(5.0f), f32_bits(2.0f));          // 2.5 -> 2
+    check_setstatef(4, f32_bits(7.0f), f32_bits(2.0f));          // 3.5 -> 4
+    check_setstatef(4, f32_bits(-3.0f), f32_bits(2.0f));         // -1.5 -> -2
+    check_setstatef(4, f32_bits(10.0f), f32_bits(3.0f));         // 3.333 -> 3
+    check_setstatef(4, f32_bits(2.0f), f32_bits(3.0f));          // 0.666 -> 1
+    check_setstatef(4, f32_bits(1.0f), f32_bits(0.0f));          // +Inf -> INT32_MIN
+    check_setstatef(4, f32_bits(1.0e30f), f32_bits(1.0f));       // overflow -> INT32_MIN
+    check_setstatef(4, f32_bits(3.0f), f32_bits(2.0f), 0x0f7fu); // RC=truncate: 1.5 -> 1
+    check_setstatef(4, f32_bits(3.0f), f32_bits(2.0f), 0x077fu); // RC=floor: 1.5 -> 1
+    check_setstatef(4, f32_bits(-3.0f), f32_bits(2.0f), 0x077fu);// RC=floor: -1.5 -> -2
+
+    // 3. 00532b20 (vec3_length_00532b20).
+    check_vec3_length(0.0f, 0.0f, 0.0f);
+    check_vec3_length(-0.0f, -0.0f, -0.0f);
+    check_vec3_length(3.0f, 4.0f, 0.0f);
+    check_vec3_length(3.0f, 4.0f, 12.0f);
+    check_vec3_length(-1.0f, -2.0f, 2.0f);
+    check_vec3_length(1.25f, -3.5f, 7.75f);
+    check_vec3_length(1.0e20f, 0.0f, 0.0f);   // overflows float32 square, valid in x87
+    check_vec3_length(3.0e20f, 4.0e20f, 12.0e20f);
+    check_vec3_length(1.0e-25f, 2.0e-25f, 2.0e-25f); // underflows float32 square, valid in x87
+    check_vec3_length(1.25f, -3.5f, 7.75f, 0x027fu); // PC=53-bit
+
+    // 4. 005323a0 (vec3_distance_005323a0).
+    check_vec3_distance(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    check_vec3_distance(1.0f, 2.0f, 3.0f, 1.0f, 2.0f, 3.0f);
+    check_vec3_distance(1.0f, 2.0f, 3.0f, 4.0f, 6.0f, 3.0f);
+    check_vec3_distance(-5.0f, 2.0f, -1.0f, -2.0f, 6.0f, 11.0f);
+    check_vec3_distance(10.5f, -3.25f, 4.75f, -1.5f, 8.75f, -7.25f);
+    check_vec3_distance(1.0e20f, 2.0e20f, -3.0e20f, 4.0e20f, 6.0e20f, 9.0e20f);
+    check_vec3_distance(0.1234567f, -0.9876543f, 3.1415927f, -2.7182817f, 1.4142135f, -0.5772157f);
+
+    std::printf("font_state_and_vec3_dist_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}
