@@ -19,15 +19,15 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run663](iterations/v2/001-original-recovery/runs/663-bigheader-configure-and-stream-start-integration/README.md).
-Bigheader/audio probe configure (`00568b50`..`004ae100`) and audio service stream start (`0056b790`..`00567550`) close `application_audio_probe_configure_004ae100` and `audio_service_stream_start_00567550`.
-The shared build compiles 379 TUs with 75 unresolved names / 80 references.
+Latest recovery intake is [Run666](iterations/v2/001-original-recovery/runs/666-ribbon-sampler-and-file-exists-integration/README.md).
+Road ribbon sampler (`00532860`..`00434a90`) closes `startup_sequence_call_00434a90` (standalone `665/005` verified without duplicating `326`..`331`).
+The shared build compiles 380 TUs with 74 unresolved names / 79 references.
 Activation4ae010,
 two texture constructors and earlier metric597360 retain explicit partial domains.
 [PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
 adds reusable recorders and prototype ports, with unproved compositions gated off.
 Run566 retains six partial callback/resource providers as archive-only intake.
-Next are `664`/`665` -> `666` integration plus audio probe start (`004a8b80`) and startup frontier leaves (`00413cf0`/`004ad9c0`). The real depth-conversion
+Next are `667`/`668` integration (`004ad9c0`, `00413cf0`) plus audio probe start (`004a8b80`) and remaining audio/render leaves. The real depth-conversion
 dependency005350e0 remains open. Broader
 archive-only continuation and validation domains are deferred under the
 first-executable priority in AGENTS.md;

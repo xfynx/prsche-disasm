@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run663](iterations/v2/001-original-recovery/runs/663-bigheader-configure-and-stream-start-integration/README.md)
-  integrates the partial bigheader/audio probe configure and audio service stream start providers.
-  The shared build has 75 unresolved names across 379 TUs.
+  [Run666](iterations/v2/001-original-recovery/runs/666-ribbon-sampler-and-file-exists-integration/README.md)
+  integrates the partial road ribbon sampler provider (plus standalone `Run665` file-exists native verification).
+  The shared build has 74 unresolved names across 380 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

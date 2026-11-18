@@ -1,0 +1,737 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "file_exists_path_device_665.hpp"
+
+namespace porsche {
+std::uint32_t formatter_text_locale_006afd80 = 0u;
+std::uint32_t formatter_text_locale_writer_006c02e4 = 0u;
+std::int32_t formatter_text_locale_readers_006c02e8 = 0;
+void __cdecl exit_registry_lock_api_005a4ba4(std::uint32_t) {}
+void __cdecl exit_registry_unlock_api_005a4c05(std::uint32_t) {}
+int __cdecl formatter_text_lower_inner_005a22b7(int c) { return c; }
+} // namespace porsche
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static B* code = nullptr;
+static B* slot_5a2770 = nullptr;
+static B* slot_5a2780 = nullptr;
+static B* slot_5916a0 = nullptr;
+static B* slot_591760 = nullptr;
+static B* slot_568e90 = nullptr;
+static B* slot_568260 = nullptr;
+static B* slot_533f00 = nullptr;
+static B* slot_561b80 = nullptr;
+
+static const char orig_str_5cd1f4[2] = {@STR_005CD1F4@};
+
+static U cases = 0u;
+alignas(16) static B floating[512] = {};
+alignas(16) static char str_arena[300] = {};
+static B ctx_arena[64] = {};
+
+enum EventTag : U {
+    kEvFullPath = 1u,
+    kEvCharUpper = 2u,
+    kEvAlloc = 3u,
+    kEvOpName = 4u,
+    kEvQueue = 5u,
+    kEvWait = 6u,
+    kEvComplete = 7u,
+};
+
+struct Event {
+    U tag;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+    char text[128];
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U count;
+    Event events[16];
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+struct StubCfg {
+    char full_path[261];
+    U full_path_ret;
+    bool alloc_null;
+    U queue_ret;
+    U complete_ret;
+};
+
+static StubCfg stub_cfg{};
+static porsche::FileOperation dummy_op{};
+static const char* expected_str_base = nullptr;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U normalize_ptr(U p) {
+    if (p == 0u) return 0u;
+    if (p == address(&dummy_op)) return 0xa1000000u;
+    if (p >= address(ctx_arena) && p < address(ctx_arena) + sizeof(ctx_arena)) {
+        return 0xa2000000u + (p - address(ctx_arena));
+    }
+    if (expected_str_base != nullptr &&
+        p >= address(expected_str_base) &&
+        p <= address(expected_str_base) + 280u) {
+        return 0xa3000000u + (p - address(expected_str_base));
+    }
+    return p;
+}
+
+static void copy_text(char* dst, std::size_t cap, const char* src) {
+    if (src == nullptr) {
+        std::snprintf(dst, cap, "<null>");
+        return;
+    }
+    std::snprintf(dst, cap, "%s", src);
+}
+
+static Event& push_event(
+    U tag, U a0 = 0u, U a1 = 0u, U a2 = 0u, U a3 = 0u, const char* text = nullptr) {
+    require(trace.count < 16u, "event capacity");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof(e));
+    e.tag = tag;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+    e.a3 = a3;
+    if (text != nullptr) {
+        copy_text(e.text, sizeof(e.text), text);
+    }
+    return e;
+}
+
+static U __stdcall stub_get_full_path_name_a(
+    const char* file_name, U buffer_length, char* buffer, char** file_part) {
+    const U has_buf = (buffer != nullptr) ? 1u : 0u;
+    const U has_part = (file_part != nullptr) ? 1u : 0u;
+    push_event(kEvFullPath, buffer_length, has_buf, has_part, 0u, file_name);
+    if (buffer != nullptr && buffer_length > 0u) {
+        std::snprintf(buffer, buffer_length, "%s", stub_cfg.full_path);
+        if (file_part != nullptr) {
+            *file_part = buffer;
+        }
+    }
+    return stub_cfg.full_path_ret;
+}
+
+static char* __stdcall stub_char_upper_a(char* text) {
+    if (text != nullptr) {
+        for (char* p = text; *p != '\0'; ++p) {
+            if (*p >= 'a' && *p <= 'z') {
+                *p = static_cast<char>(*p - ('a' - 'A'));
+            }
+        }
+    }
+    push_event(kEvCharUpper, text != nullptr ? 1u : 0u, 0u, 0u, 0u, text);
+    return text;
+}
+
+namespace porsche {
+
+std::uint32_t resource_leaf_group_005df770 = 0u;
+
+FileOperation* __cdecl operation_allocate_005682a0(
+    std::uint32_t type, std::uint8_t group, void* context, std::uint32_t device) {
+    push_event(kEvAlloc, type, static_cast<U>(group), normalize_ptr(address(context)), device);
+    return stub_cfg.alloc_null ? nullptr : &dummy_op;
+}
+
+void __cdecl operation_name_005684e0(FileOperation* op, const char* name) {
+    push_event(kEvOpName, normalize_ptr(address(op)), 0u, 0u, 0u, name);
+}
+
+std::uint32_t __cdecl operation_queue_00568200(FileOperation* op) {
+    push_event(kEvQueue, normalize_ptr(address(op)));
+    return stub_cfg.queue_ret;
+}
+
+std::int32_t __cdecl file_wait_00567f70(std::uint32_t id) {
+    push_event(kEvWait, id);
+    return 0;
+}
+
+std::uint32_t __cdecl operation_complete_00567df0(std::uint32_t id) {
+    push_event(kEvComplete, id);
+    return stub_cfg.complete_ret;
+}
+
+} // namespace porsche
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static U invoke_cdecl1(void* fn, U arg0, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg0
+        call fn
+        add esp, 4
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl2(void* fn, U arg0, U arg1, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg1
+        push arg0
+        call fn
+        add esp, 8
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl3(void* fn, U arg0, U arg1, U arg2, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg2
+        push arg1
+        push arg0
+        call fn
+        add esp, 12
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U base_va, U off, U orig_target, const void* target) {
+    const U insn_va = base_va + off + 4u;
+    const U expected_rel = orig_target - insn_va;
+    require(word(slot, off) == expected_rel, "exact relative offset");
+    const U new_rel = address(target) - (address(slot) + off + 4u);
+    put(slot, off, new_rel);
+}
+
+static void init() {
+    require(porsche::platform_disk_get_full_path_name != nullptr, "initial fullpath");
+    require(porsche::platform_disk_char_upper != nullptr, "initial charupper");
+    require(sizeof(orig_str_5cd1f4) == 2u && std::strcmp(orig_str_5cd1f4, ".") == 0, "shared dot literal");
+
+    porsche::platform_disk_get_full_path_name = stub_get_full_path_name_a;
+    porsche::platform_disk_char_upper = stub_char_upper_a;
+
+    static const B tail_5a2770[] = {@TAIL_005A2770@};
+    static const B body_5a2780[] = {@BODY_005A2780@};
+    static const B body_5916a0[] = {@BODY_005916A0@};
+    static const B body_591760[] = {@BODY_00591760@};
+    static const B body_568e90[] = {@BODY_00568E90@};
+    static const B body_568260[] = {@BODY_00568260@};
+    static const B body_533f00[] = {@BODY_00533F00@};
+    static const B body_561b80[] = {@BODY_00561B80@};
+    require(sizeof tail_5a2770 == 5u, "5-byte shared CRT tail 005a2770");
+    require(sizeof body_5a2780 == 188u, "188-byte original body 005a2780");
+    require(sizeof body_5916a0 == 111u, "111-byte original body 005916a0");
+    require(sizeof body_591760 == 27u, "27-byte original body 00591760");
+    require(sizeof body_568e90 == 35u, "35-byte original body 00568e90");
+    require(sizeof body_568260 == 51u, "51-byte original body 00568260");
+    require(sizeof body_533f00 == 52u, "52-byte original body 00533f00");
+    require(sizeof body_561b80 == 20u, "20-byte original body 00561b80");
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+
+    slot_5a2770 = code;
+    slot_5a2780 = code + 0x010u;
+    slot_5916a0 = code + 0x100u;
+    slot_591760 = code + 0x200u;
+    slot_568e90 = code + 0x300u;
+    slot_568260 = code + 0x400u;
+    slot_533f00 = code + 0x500u;
+    slot_561b80 = code + 0x600u;
+
+    std::memcpy(slot_5a2770, tail_5a2770, sizeof tail_5a2770);
+    std::memcpy(slot_5a2780, body_5a2780, sizeof body_5a2780);
+    std::memcpy(slot_5916a0, body_5916a0, sizeof body_5916a0);
+    std::memcpy(slot_591760, body_591760, sizeof body_591760);
+    std::memcpy(slot_568e90, body_568e90, sizeof body_568e90);
+    std::memcpy(slot_568260, body_568260, sizeof body_568260);
+    std::memcpy(slot_533f00, body_533f00, sizeof body_533f00);
+    std::memcpy(slot_561b80, body_561b80, sizeof body_561b80);
+
+    // Relocate 005916a0.
+    relocate_rel32(slot_5916a0, 0x005916a0u, 0x012u, 0x005a2780u, slot_5a2780);
+    relocate_abs32(slot_5916a0, 0x026u, 0x005cd1f4u, address(orig_str_5cd1f4));
+    relocate_abs32(
+        slot_5916a0, 0x03cu, 0x005b221cu, address(&porsche::platform_disk_get_full_path_name));
+    relocate_abs32(
+        slot_5916a0, 0x049u, 0x005b2290u, address(&porsche::platform_disk_char_upper));
+
+    // Relocate 00591760.
+    relocate_rel32(slot_591760, 0x00591760u, 0x006u, 0x005916a0u, slot_5916a0);
+
+    // Relocate 00568e90.
+    relocate_rel32(slot_568e90, 0x00568e90u, 0x009u, 0x005a2780u, slot_5a2780);
+    relocate_rel32(slot_568e90, 0x00568e90u, 0x016u, 0x00591760u, slot_591760);
+
+    // Relocate 00568260.
+    relocate_rel32(slot_568260, 0x00568260u, 0x008u, 0x00568e90u, slot_568e90);
+    relocate_rel32(
+        slot_568260, 0x00568260u, 0x01au, 0x005682a0u,
+        reinterpret_cast<const void*>(&porsche::operation_allocate_005682a0));
+    relocate_rel32(
+        slot_568260, 0x00568260u, 0x023u, 0x005684e0u,
+        reinterpret_cast<const void*>(&porsche::operation_name_005684e0));
+    relocate_rel32(
+        slot_568260, 0x00568260u, 0x029u, 0x00568200u,
+        reinterpret_cast<const void*>(&porsche::operation_queue_00568200));
+
+    // Relocate 00533f00.
+    relocate_rel32(slot_533f00, 0x00533f00u, 0x010u, 0x00568260u, slot_568260);
+    relocate_rel32(
+        slot_533f00, 0x00533f00u, 0x01fu, 0x00567f70u,
+        reinterpret_cast<const void*>(&porsche::file_wait_00567f70));
+    relocate_rel32(
+        slot_533f00, 0x00533f00u, 0x025u, 0x00567df0u,
+        reinterpret_cast<const void*>(&porsche::operation_complete_00567df0));
+
+    // Relocate 00561b80.
+    relocate_abs32(
+        slot_561b80, 0x001u, 0x005df770u, address(&porsche::resource_leaf_group_005df770));
+    relocate_rel32(slot_561b80, 0x00561b80u, 0x00cu, 0x00533f00u, slot_533f00);
+}
+
+struct CaseEnv {
+    const char* full_path;
+    U full_path_ret;
+    U leaf_group;
+    bool alloc_null;
+    U queue_ret;
+    U complete_ret;
+};
+
+static void setup_env(const CaseEnv& c) {
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(&dummy_op, 0x5au, sizeof dummy_op);
+    std::memset(ctx_arena, 0x33, sizeof ctx_arena);
+    porsche::resource_leaf_group_005df770 = c.leaf_group;
+    stub_cfg = {};
+    if (c.full_path != nullptr) {
+        std::snprintf(stub_cfg.full_path, sizeof stub_cfg.full_path, "%s", c.full_path);
+    }
+    stub_cfg.full_path_ret = c.full_path_ret;
+    stub_cfg.alloc_null = c.alloc_null;
+    stub_cfg.queue_ret = c.queue_ret;
+    stub_cfg.complete_ret = c.complete_ret;
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "recovered ABI");
+    require(trace.ret_eax == expected.ret_eax, "return value");
+    require(trace.count == expected.count, "event count");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag");
+        require(trace.events[i].a0 == expected.events[i].a0, "event a0");
+        require(trace.events[i].a1 == expected.events[i].a1, "event a1");
+        require(trace.events[i].a2 == expected.events[i].a2, "event a2");
+        require(trace.events[i].a3 == expected.events[i].a3, "event a3");
+        require(std::strcmp(trace.events[i].text, expected.events[i].text) == 0, "event text");
+    }
+    require(trace.fpu.control == expected.fpu.control, "x87 control");
+    require(trace.fpu.status == expected.fpu.status, "x87 status");
+    require(trace.fpu.tag == expected.fpu.tag, "x87 tag");
+    require(trace.fpu.full_tag == expected.fpu.full_tag, "x87 full tag");
+    require(trace.fpu.mxcsr == expected.fpu.mxcsr, "mxcsr");
+    require(std::memcmp(trace.fpu.values, expected.fpu.values, 80u) == 0, "x87 stack");
+}
+
+static void verify_strchr_case(const char* bytes, std::size_t len, U align_off, int ch) {
+    ++cases;
+    std::memset(str_arena, 0x77, sizeof str_arena);
+    char* const s = str_arena + align_off;
+    std::memcpy(s, bytes, len);
+    expected_str_base = s;
+
+    CaseEnv env{"", 0u, 0u, false, 0u, 0u};
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl2(slot_5a2780, address(s), static_cast<U>(ch), trace.ret_eax);
+    trace.ret_eax = normalize_ptr(trace.ret_eax);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl2(
+        reinterpret_cast<void*>(&porsche::formatter_search_character_005a2780),
+        address(s),
+        static_cast<U>(ch),
+        trace.ret_eax);
+    trace.ret_eax = normalize_ptr(trace.ret_eax);
+    capture_fpu(trace.fpu);
+    compare_traces();
+    expected_str_base = nullptr;
+}
+
+static void verify_drive_letter_case(const char* path, const CaseEnv& env) {
+    ++cases;
+    expected_str_base = path;
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl1(slot_5916a0, address(path), trace.ret_eax);
+    trace.ret_eax &= 0xffu;
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl1(
+        reinterpret_cast<void*>(&porsche::disk_path_drive_letter_005916a0),
+        address(path),
+        trace.ret_eax);
+    trace.ret_eax &= 0xffu;
+    capture_fpu(trace.fpu);
+    compare_traces();
+    expected_str_base = nullptr;
+}
+
+static void verify_path_device_case(const char* path, const CaseEnv& env) {
+    ++cases;
+    expected_str_base = path;
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl1(slot_591760, address(path), trace.ret_eax);
+    trace.ret_eax &= 0xffu;
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl1(
+        reinterpret_cast<void*>(&porsche::disk_path_device_00591760),
+        address(path),
+        trace.ret_eax);
+    trace.ret_eax &= 0xffu;
+    capture_fpu(trace.fpu);
+    compare_traces();
+    expected_str_base = nullptr;
+}
+
+static void verify_file_device_case(const char* path, const CaseEnv& env) {
+    ++cases;
+    expected_str_base = path;
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl1(slot_568e90, address(path), trace.ret_eax);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl1(
+        reinterpret_cast<void*>(&porsche::file_device_name_00568e90),
+        address(path),
+        trace.ret_eax);
+    capture_fpu(trace.fpu);
+    compare_traces();
+    expected_str_base = nullptr;
+}
+
+static void verify_request_exists_case(
+    const char* path, U group, void* context, const CaseEnv& env) {
+    ++cases;
+    expected_str_base = path;
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl3(
+        slot_568260, address(path), group, address(context), trace.ret_eax);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl3(
+        reinterpret_cast<void*>(&porsche::request_exists_00568260),
+        address(path),
+        group,
+        address(context),
+        trace.ret_eax);
+    capture_fpu(trace.fpu);
+    compare_traces();
+    expected_str_base = nullptr;
+}
+
+static void verify_exists_sync_case(const char* path, U group, const CaseEnv& env) {
+    ++cases;
+    expected_str_base = path;
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl2(slot_533f00, address(path), group, trace.ret_eax);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl2(
+        reinterpret_cast<void*>(&porsche::file_exists_sync_00533f00),
+        address(path),
+        group,
+        trace.ret_eax);
+    capture_fpu(trace.fpu);
+    compare_traces();
+    expected_str_base = nullptr;
+}
+
+static void verify_exists_case(const char* path, const CaseEnv& env) {
+    ++cases;
+    expected_str_base = path;
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl1(slot_561b80, address(path), trace.ret_eax);
+    capture_fpu(trace.fpu);
+    expected = trace;
+
+    setup_env(env);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl1(
+        reinterpret_cast<void*>(&porsche::file_exists_00561b80),
+        address(path),
+        trace.ret_eax);
+    capture_fpu(trace.fpu);
+    compare_traces();
+    expected_str_base = nullptr;
+}
+
+int main() {
+    init();
+
+    // 1. formatter_search_character_005a2780 across alignments 0..3, NUL hits, high-bit carries, and truncation.
+    const char s_empty[] = "";
+    const char s_short[] = "a|b";
+    const char s_long[] = "0123456789abcdef|tail";
+    const char s_hibyte[] = "\x80\x81\xfe\xff\x01\x7f|z";
+    const int chars[] = {0, 0x100, 'a', '|', 0x17c, 'z', '9', 0x80, 0x180, 0xfe, 0xff, -1, 'Q'};
+    for (U align = 0u; align < 4u; ++align) {
+        for (int ch : chars) {
+            verify_strchr_case(s_empty, sizeof s_empty, align, ch);
+            verify_strchr_case(s_short, sizeof s_short, align, ch);
+            verify_strchr_case(s_long, sizeof s_long, align, ch);
+            verify_strchr_case(s_hibyte, sizeof s_hibyte, align, ch);
+        }
+    }
+
+    // 2. disk_path_drive_letter_005916a0, disk_path_device_00591760, file_device_name_00568e90.
+    struct PathCase {
+        const char* path;
+        CaseEnv env;
+    };
+    const PathCase path_cases[] = {
+        {".", {"c:\\work\\porsche", 15u, 0u, false, 0u, 0u}},
+        {"a:\\track.bin", {"a:\\track.bin", 12u, 0u, false, 0u, 0u}},
+        {"z:rel", {"z:\\rel", 6u, 0u, false, 0u, 0u}},
+        {"e:", {"e:", 2u, 0u, false, 0u, 0u}},
+        {"c:\\bad|pipe", {"c:\\bad|pipe", 11u, 0u, false, 0u, 0u}},
+        {"|", {"|", 1u, 0u, false, 0u, 0u}},
+        {"\\\\server\\share\\file", {"\\\\server\\share\\file", 19u, 0u, false, 0u, 0u}},
+        {"c;\\colonmiss", {"c;\\colonmiss", 12u, 0u, false, 0u, 0u}},
+        {"short0", {"", 0u, 0u, false, 0u, 0u}},
+        {"short1", {"d", 1u, 0u, false, 0u, 0u}},
+        {"short1_colon", {"d:", 1u, 0u, false, 0u, 0u}},
+        {"neg_len", {"f:\\neg", 0x80000002u, 0u, false, 0u, 0u}},
+        {"hibyte_drv", {"\x81:\\hi", 5u, 0u, false, 0u, 0u}},
+    };
+    for (const PathCase& pc : path_cases) {
+        verify_drive_letter_case(pc.path, pc.env);
+        verify_path_device_case(pc.path, pc.env);
+        verify_file_device_case(pc.path, pc.env);
+    }
+
+    // 3. request_exists_00568260.
+    verify_request_exists_case(
+        "d:\\cars\\911.viv", 0x123456abu, ctx_arena + 8, {"d:\\cars\\911.viv", 15u, 0u, false, 0x201u, 0u});
+    verify_request_exists_case(
+        "bad|name", 0x05u, nullptr, {"bad|name", 8u, 0u, false, 0x202u, 0u});
+    verify_request_exists_case(
+        "c:\\nullop.dat", 0x7fu, ctx_arena, {"c:\\nullop.dat", 12u, 0u, true, 0u, 0u});
+
+    // 4. file_exists_sync_00533f00.
+    verify_exists_sync_case(
+        "c:\\ok.dat", 0x31u, {"c:\\ok.dat", 9u, 0u, false, 0x301u, 1u});
+    verify_exists_sync_case(
+        "c:\\miss.dat", 0x32u, {"c:\\miss.dat", 11u, 0u, false, 0x302u, 0u});
+    verify_exists_sync_case(
+        "c:\\failq.dat", 0x33u, {"c:\\failq.dat", 12u, 0u, false, 0u, 1u});
+    verify_exists_sync_case(
+        "c:\\negcomp.dat", 0x34u, {"c:\\negcomp.dat", 14u, 0u, false, 0x303u, 0xffffffffu});
+
+    // 5. file_exists_00561b80.
+    verify_exists_case(
+        "c:\\gamedata\\audio.bnk", {"c:\\gamedata\\audio.bnk", 23u, 0x64u, false, 0x401u, 1u});
+    verify_exists_case(
+        "d:\\gamedata\\missing.bnk", {"d:\\gamedata\\missing.bnk", 25u, 0x12u, false, 0x402u, 0u});
+    verify_exists_case(
+        "e:\\pipe|blocked", {"e:\\pipe|blocked", 15u, 0x77u, false, 0u, 1u});
+    verify_exists_case(
+        ".", {"g:\\root\\.", 9u, 0xffu, false, 0x403u, 1u});
+
+    std::printf("file_exists_and_path_device_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

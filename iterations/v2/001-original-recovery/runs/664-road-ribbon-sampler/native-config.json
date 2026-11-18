@@ -1,0 +1,145 @@
+{
+  "run": 664,
+  "experiment": "local/experiments/v2-road-ribbon-sampler-664",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00532860",
+      "bytes": 17,
+      "sha256": "4e0586f70f4a2247b95a31480910ec7d32a86f17dafa234c11c874ed017ddb2b",
+      "token": "@BODY_00532860@"
+    },
+    {
+      "va": "00434aa0",
+      "bytes": 750,
+      "sha256": "b8ba12d0818aa3394ddbefd51c88ee1085783070df58c3b4433754b57c8d4812",
+      "token": "@BODY_00434AA0@"
+    },
+    {
+      "va": "00434a90",
+      "bytes": 5,
+      "sha256": "ec7d2aa54ab353ae3e298f2752ca2bce4eae1ebdb8c1ddeefde03cd044576859",
+      "token": "@BODY_00434A90@"
+    }
+  ],
+  "pass_marker": "road_ribbon_sampler_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-turns-scale",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "    alignas(8) static const std::uint64_t kTurnsScaleBits = 0x3fc45f3080000000ULL;",
+      "new": "    alignas(8) static const std::uint64_t kTurnsScaleBits = 0x3fc45f30c0000000ULL;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-atan2-arg-order",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "        fld dword ptr [y]\n        fld dword ptr [x]",
+      "new": "        fld dword ptr [x]\n        fld dword ptr [y]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-wrap-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "    if (delta > 0.5) {",
+      "new": "    if (delta > 0.25) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-wrap-sub",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "        delta = std::fabs(1.0 - delta);",
+      "new": "        delta = std::fabs(2.0 - delta);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-step-005f",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "    const float step = total_accum * 0.005f;",
+      "new": "    const float step = total_accum * 0.01f;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-out-slot-limit",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "constexpr std::int32_t kRoadRibbonMaxPoints = 200;",
+      "new": "constexpr std::int32_t kRoadRibbonMaxPoints = 199;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tail-fill-stride",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "        const std::size_t last_off = static_cast<std::size_t>(slice_count - 1) * kRoadSliceStride;",
+      "new": "        const std::size_t last_off = static_cast<std::size_t>(slice_count - 2) * kRoadSliceStride;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-n-le-1-guard",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "    if (slice_count > 1) {\n        std::size_t slice_off = kRoadSliceStride;\n        for (std::int32_t i = 1; i < slice_count; ++i) {\n            if (out_idx >= kRoadRibbonMaxPoints) {",
+      "new": "    if (slice_count > 2) {\n        std::size_t slice_off = kRoadSliceStride;\n        for (std::int32_t i = 1; i < slice_count; ++i) {\n            if (out_idx >= kRoadRibbonMaxPoints) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-w-one-float",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "    road_ribbon_points_0060fde0[0] = {p0_x, p0_y, p0_z, 1.0f};",
+      "new": "    road_ribbon_points_0060fde0[0] = {p0_x, p0_y, p0_z, 0.0f};",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-first-pass-accum",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "            total_accum = static_cast<float>(\n                static_cast<double>(total_accum) + wrapped_turn_delta(angle, prev_angle));",
+      "new": "            total_accum = static_cast<float>(wrapped_turn_delta(angle, prev_angle));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-emit-prev-vs-cur",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "                road_ribbon_points_0060fde0[out_idx] = {emit_x, emit_y, emit_z, 1.0f};",
+      "new": "                road_ribbon_points_0060fde0[out_idx] = {cur_x, cur_y, cur_z, 1.0f};",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-pass2-step-sub",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "                accum -= step;",
+      "new": "                accum = 0.0f;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-thunk-noop",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "old": "void __cdecl startup_sequence_call_00434a90() {\n    road_ribbon_sample_00434aa0();\n}",
+      "new": "void __cdecl startup_sequence_call_00434a90() {\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

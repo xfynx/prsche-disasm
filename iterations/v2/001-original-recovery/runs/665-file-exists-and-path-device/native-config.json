@@ -1,0 +1,193 @@
+{
+  "run": 665,
+  "experiment": "local/experiments/v2-file-exists-path-device-665",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/formatter_search.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "extra_libraries": [
+    "user32.lib"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005a2770",
+      "bytes": 5,
+      "sha256": "129f1135daa1b60c707996d1ed0561b8f4731388ee1f4732c0a27db4c5e3a907",
+      "token": "@TAIL_005A2770@"
+    },
+    {
+      "va": "005a2780",
+      "bytes": 188,
+      "sha256": "6979c6178f67a389b905ed0e7c5328630a49bc83d5660fb2758fd6de07864049",
+      "token": "@BODY_005A2780@"
+    },
+    {
+      "va": "005916a0",
+      "bytes": 111,
+      "sha256": "1664d1ed6fbdfabe2bf76b9dbc96d52f5b44ac985acc2d9fb284a6074782c6c7",
+      "token": "@BODY_005916A0@"
+    },
+    {
+      "va": "00591760",
+      "bytes": 27,
+      "sha256": "acc20270b66ebca0881f491c3365e644e9f3a7f429fc621c9fa698bab4cc6dc9",
+      "token": "@BODY_00591760@"
+    },
+    {
+      "va": "00568e90",
+      "bytes": 35,
+      "sha256": "39a3707f51099fd1ae5546253fe56fe0e6093bca1924cbd53d624f09bdfe6c0b",
+      "token": "@BODY_00568E90@"
+    },
+    {
+      "va": "00568260",
+      "bytes": 51,
+      "sha256": "2d76d7cc139123d46257f30dd104c963b506628f1d4f182ee34b0d28b20f2510",
+      "token": "@BODY_00568260@"
+    },
+    {
+      "va": "00533f00",
+      "bytes": 52,
+      "sha256": "aef1dd8cf8d1da9b8dc07ad127c846b1a4b6ea91bf42a4c002d6ae12a4366dc0",
+      "token": "@BODY_00533F00@"
+    },
+    {
+      "va": "00561b80",
+      "bytes": 20,
+      "sha256": "6c38d1ce8539e936a15a3d0b914a4bcb912fa03129e780dbc5991568018c2812",
+      "token": "@BODY_00561B80@"
+    },
+    {
+      "va": "005cd1f4",
+      "bytes": 2,
+      "sha256": "075d3ddf5a3a826e13a92288e853bc4b2cb17fb05367ae865f401a4bb11f05ce",
+      "token": "@STR_005CD1F4@"
+    }
+  ],
+  "pass_marker": "file_exists_and_path_device_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-drive-pipe-bypass",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    if (formatter_search_character_005a2780(path, 0x7c) != nullptr) {\n        return 0;\n    }",
+      "new": "    if (formatter_search_character_005a2780(path, 0x7c) != nullptr) {\n        return 'A';\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-drive-buf-size",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    const std::uint32_t len = platform_disk_get_full_path_name(\n        path, 0x105u, buffer, &file_part);",
+      "new": "    const std::uint32_t len = platform_disk_get_full_path_name(\n        path, 0x104u, buffer, &file_part);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-drive-upper-order",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    (void)platform_disk_char_upper(buffer);\n    if (static_cast<std::int32_t>(len) <= 1) {\n        return 0;\n    }",
+      "new": "    if (static_cast<std::int32_t>(len) <= 1) {\n        return 0;\n    }\n    (void)platform_disk_char_upper(buffer);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-drive-len-signed",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    if (static_cast<std::int32_t>(len) <= 1) {",
+      "new": "    if (len <= 1u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-drive-len-gt1",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    if (static_cast<std::int32_t>(len) <= 1) {\n        return 0;\n    }",
+      "new": "    if (static_cast<std::int32_t>(len) <= 0) {\n        return 0;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-drive-colon-check",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    if (buffer[1] != ':') {",
+      "new": "    if (buffer[1] == ':') {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-drive-offset-0x40",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    return static_cast<std::uint8_t>(letter - 0x40u);",
+      "new": "    return static_cast<std::uint8_t>(letter - 0x41u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-device-pipe-guard",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    if (formatter_search_character_005a2780(path, 0x7c) != nullptr) {\n        return 0u;\n    }",
+      "new": "    if (formatter_search_character_005a2780(path, 0x7c) == nullptr) {\n        return 0u;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-req-type-6",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    FileOperation* const op = operation_allocate_005682a0(\n        6u, static_cast<std::uint8_t>(group), context, device);",
+      "new": "    FileOperation* const op = operation_allocate_005682a0(\n        0u, static_cast<std::uint8_t>(group), context, device);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-req-group-trunc",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "        6u, static_cast<std::uint8_t>(group), context, device);",
+      "new": "        6u, static_cast<std::uint8_t>(group ^ 1u), context, device);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-req-op-null-guard",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    operation_name_005684e0(op, path);\n    return operation_queue_00568200(op);",
+      "new": "    if (op == nullptr) {\n        return 0u;\n    }\n    operation_name_005684e0(op, path);\n    return operation_queue_00568200(op);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-exists-wait-skip",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    (void)file_wait_00567f70(id);\n    return static_cast<std::int32_t>(operation_complete_00567df0(id));",
+      "new": "    return static_cast<std::int32_t>(operation_complete_00567df0(id));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-exists-id-zero",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    if (id == 0u) {\n        return 0;\n    }",
+      "new": "    if (id == 0u) {\n        return 1;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-exists-group-global",
+      "source": "iterations/v2/001-original-recovery/runs/665-file-exists-and-path-device/file_exists_path_device_665.cpp",
+      "old": "    return file_exists_sync_00533f00(path, resource_leaf_group_005df770);",
+      "new": "    return file_exists_sync_00533f00(path, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

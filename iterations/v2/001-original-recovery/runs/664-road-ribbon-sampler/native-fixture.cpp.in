@@ -1,0 +1,523 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <utility>
+#include "road_ribbon_sampler_664.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::track_road_data_00628bc0) == 4u, "00628bc0 size");
+static_assert(sizeof(porsche::road_ribbon_points_0060fde0) == 3200u, "0060fde0 size");
+
+enum : U {
+    kSliceStride = 0x50u,
+    kMaxSlices = 300u,
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_f32_bits;
+    FpuSnapshot fp;
+    B ribbon_bytes[sizeof(porsche::road_ribbon_points_0060fde0)];
+};
+
+alignas(16) static B fp_area[512] = {};
+static B fp_env[28] = {};
+
+alignas(16) static B road_root_arena[0x20] = {};
+alignas(16) static B road_slices_arena[kMaxSlices * kSliceStride] = {};
+
+static B* code = nullptr;
+static B* slot_532860 = nullptr;
+static B* slot_434aa0 = nullptr;
+static B* slot_434a90 = nullptr;
+
+// Exact .rdata bytes from Porsche.exe:
+// 005bb2c8: 00 00 00 80 30 5f c4 3f (0.1591549515724182)
+// 005b23f0: 00 00 00 3f (0.5f)
+// 005b24a8: 00 00 80 3f (1.0f)
+// 005b3284: 0a d7 a3 3b (0.004999999888241291f)
+alignas(8) static const std::uint64_t orig_rdata_005bb2c8 = 0x3fc45f3080000000ULL;
+alignas(4) static const U orig_rdata_005b23f0 = 0x3f000000u;
+alignas(4) static const U orig_rdata_005b24a8 = 0x3f800000u;
+alignas(4) static const U orig_rdata_005b3284 = 0x3ba3d70au;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static U f32_bits(float v) {
+    U bits = 0u;
+    std::memcpy(&bits, &v, 4u);
+    return bits;
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip, cases, which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    __asm {
+        fxsave fp_area
+        fnstenv fp_env
+        fldenv fp_env
+    }
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static U invoke_cdecl0(void* fn) {
+    U before = 0u;
+    U frame = 0u;
+    U fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_f32_2(void* fn, U y_bits, U x_bits, U& out_bits) {
+    U before = 0u;
+    U frame = 0u;
+    U fail = 0u;
+    U result_bits = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push x_bits
+        push y_bits
+        call fn
+        fstp dword ptr [result_bits]
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    out_bits = result_bits;
+    return fail;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(rd(slot, off) == orig, "exact absolute relocation offset");
+    wr(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U base_va, U off, U orig_target, const void* target) {
+    const U insn_va = base_va + off + 4u;
+    const U expected_rel = orig_target - insn_va;
+    require(rd(slot, off) == expected_rel, "exact relative offset");
+    wr(slot, off, address(target) - (address(slot) + off + 4u));
+}
+
+static void init() {
+    SetUnhandledExceptionFilter(fault_handler);
+
+    // Assert production initial .data BSS state before any fixture reset.
+    require(porsche::track_road_data_00628bc0 == nullptr, "initial .data 00628bc0");
+    for (U i = 0u; i < 200u; ++i) {
+        const auto& pt = porsche::road_ribbon_points_0060fde0[i];
+        require(f32_bits(pt.x) == 0u && f32_bits(pt.y) == 0u &&
+                    f32_bits(pt.z) == 0u && f32_bits(pt.w) == 0u,
+                "initial .data 0060fde0");
+    }
+
+    static const B body_532860[] = {@BODY_00532860@};
+    static const B body_434aa0[] = {@BODY_00434AA0@};
+    static const B body_434a90[] = {@BODY_00434A90@};
+    static_assert(sizeof body_532860 == 17u, "00532860 size");
+    static_assert(sizeof body_434aa0 == 750u, "00434aa0 size");
+    static_assert(sizeof body_434a90 == 5u, "00434a90 size");
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    std::memset(code, 0xcc, 4096u);
+
+    slot_532860 = code + 0x000u;
+    slot_434aa0 = code + 0x100u;
+    slot_434a90 = code + 0x500u;
+
+    std::memcpy(slot_532860, body_532860, sizeof body_532860);
+    std::memcpy(slot_434aa0, body_434aa0, sizeof body_434aa0);
+    std::memcpy(slot_434a90, body_434a90, sizeof body_434a90);
+
+    // Relocate 00532860.
+    relocate_abs32(slot_532860, 0x00cu, 0x005bb2c8u, address(&orig_rdata_005bb2c8));
+
+    // Relocate 00434aa0.
+    const U ribbon_base = address(porsche::road_ribbon_points_0060fde0);
+    relocate_abs32(slot_434aa0, 0x009u, 0x00628bc0u, address(&porsche::track_road_data_00628bc0));
+    relocate_rel32(slot_434aa0, 0x00434aa0u, 0x061u, 0x00532860u, slot_532860);
+    relocate_rel32(slot_434aa0, 0x00434aa0u, 0x0b9u, 0x00532860u, slot_532860);
+    relocate_abs32(slot_434aa0, 0x0cau, 0x005b23f0u, address(&orig_rdata_005b23f0));
+    relocate_abs32(slot_434aa0, 0x0d7u, 0x005b24a8u, address(&orig_rdata_005b24a8));
+    relocate_rel32(slot_434aa0, 0x00434aa0u, 0x14du, 0x00532860u, slot_532860);
+    relocate_abs32(slot_434aa0, 0x164u, 0x005b3284u, address(&orig_rdata_005b3284));
+    relocate_abs32(slot_434aa0, 0x171u, 0x0060fde0u, ribbon_base + 0x000u);
+    relocate_abs32(slot_434aa0, 0x177u, 0x0060fde4u, ribbon_base + 0x004u);
+    relocate_abs32(slot_434aa0, 0x17du, 0x0060fde8u, ribbon_base + 0x008u);
+    relocate_abs32(slot_434aa0, 0x187u, 0x0060fdecu, ribbon_base + 0x00cu);
+    relocate_abs32(slot_434aa0, 0x1adu, 0x0060fdfcu, ribbon_base + 0x01cu);
+    relocate_abs32(slot_434aa0, 0x1b5u, 0x00610a6cu, ribbon_base + 0xc8cu);
+    relocate_rel32(slot_434aa0, 0x00434aa0u, 0x1fdu, 0x00532860u, slot_532860);
+    relocate_abs32(slot_434aa0, 0x20eu, 0x005b23f0u, address(&orig_rdata_005b23f0));
+    relocate_abs32(slot_434aa0, 0x21bu, 0x005b24a8u, address(&orig_rdata_005b24a8));
+    relocate_abs32(slot_434aa0, 0x2b3u, 0x0060fdecu, ribbon_base + 0x00cu);
+    relocate_abs32(slot_434aa0, 0x2c5u, 0x00610a6cu, ribbon_base + 0xc8cu);
+
+    // Relocate 00434a90.
+    relocate_rel32(slot_434a90, 0x00434a90u, 0x001u, 0x00434aa0u, slot_434aa0);
+}
+
+static void check_fpu_clean(const FpuSnapshot& orig_fp, const FpuSnapshot& cpp_fp) {
+    require(orig_fp.control == cpp_fp.control, "FPU control");
+    require((orig_fp.status & 0x3800u) == 0u && (cpp_fp.status & 0x3800u) == 0u, "FPU TOP");
+    require(orig_fp.tag == 0xffffu && cpp_fp.tag == 0xffffu, "FPU empty tag");
+}
+
+static void check_532860(float y, float x) {
+    const U y_bits = f32_bits(y);
+    const U x_bits = f32_bits(x);
+
+    which = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    seed_fpu();
+    trace.abi_fail = invoke_f32_2(slot_532860, y_bits, x_bits, trace.ret_f32_bits);
+    capture_fpu(trace.fp);
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof trace);
+    seed_fpu();
+    trace.abi_fail = invoke_f32_2(
+        reinterpret_cast<void*>(&porsche::math_angle_turns_00532860),
+        y_bits,
+        x_bits,
+        trace.ret_f32_bits);
+    capture_fpu(trace.fp);
+    std::swap(trace, expected);
+
+    require(trace.abi_fail == 0u, "original 00532860 ABI");
+    require(expected.abi_fail == 0u, "recovered 00532860 ABI");
+    require(trace.ret_f32_bits == expected.ret_f32_bits, "00532860 float bits");
+    check_fpu_clean(trace.fp, expected.fp);
+    ++cases;
+}
+
+static void reset_road_arenas(I slice_count) {
+    std::memset(road_root_arena, 0x55, sizeof road_root_arena);
+    std::memset(road_slices_arena, 0xa5, sizeof road_slices_arena);
+    wr(road_root_arena, 0x00u, static_cast<U>(slice_count));
+    wr(road_root_arena, 0x0cu, address(road_slices_arena));
+    porsche::track_road_data_00628bc0 = road_root_arena;
+}
+
+static void set_slice(U idx, float x, float y, float z) {
+    require(idx < kMaxSlices, "slice index");
+    B* const s = road_slices_arena + idx * kSliceStride;
+    wr(s, 0x04u, f32_bits(x));
+    wr(s, 0x08u, f32_bits(y));
+    wr(s, 0x0cu, f32_bits(z));
+}
+
+static void run_sampler_case(bool via_thunk) {
+    void* const orig_fn = via_thunk ? static_cast<void*>(slot_434a90)
+                                    : static_cast<void*>(slot_434aa0);
+    void* const cpp_fn = via_thunk
+                             ? reinterpret_cast<void*>(&porsche::startup_sequence_call_00434a90)
+                             : reinterpret_cast<void*>(&porsche::road_ribbon_sample_00434aa0);
+
+    which = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(porsche::road_ribbon_points_0060fde0, 0xa5,
+                sizeof porsche::road_ribbon_points_0060fde0);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl0(orig_fn);
+    capture_fpu(trace.fp);
+    std::memcpy(trace.ribbon_bytes, porsche::road_ribbon_points_0060fde0,
+                sizeof trace.ribbon_bytes);
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(porsche::road_ribbon_points_0060fde0, 0xa5,
+                sizeof porsche::road_ribbon_points_0060fde0);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl0(cpp_fn);
+    capture_fpu(trace.fp);
+    std::memcpy(trace.ribbon_bytes, porsche::road_ribbon_points_0060fde0,
+                sizeof trace.ribbon_bytes);
+    std::swap(trace, expected);
+
+    require(trace.abi_fail == 0u, "original sampler ABI");
+    require(expected.abi_fail == 0u, "recovered sampler ABI");
+    require(std::memcmp(trace.ribbon_bytes, expected.ribbon_bytes, sizeof trace.ribbon_bytes) == 0,
+            "road_ribbon_points_0060fde0 bytes");
+    check_fpu_clean(trace.fp, expected.fp);
+    ++cases;
+}
+
+int main() {
+    init();
+
+    // 1. Direct 00532860 (math_angle_turns_00532860) exact 32-bit float bit checks.
+    const float coords[][2] = {
+        {0.0f, 1.0f},
+        {1.0f, 0.0f},
+        {0.0f, -1.0f},
+        {-1.0f, 0.0f},
+        {1.0f, 1.0f},
+        {1.0f, -1.0f},
+        {-1.0f, -1.0f},
+        {-1.0f, 1.0f},
+        {0.0f, 0.0f},
+        {-0.0f, 1.0f},
+        {-0.0f, -1.0f},
+        {0.0f, -0.0f},
+        {3.5f, 7.25f},
+        {-3.5f, 7.25f},
+        {12.345f, -0.001f},
+        {-0.001f, -12.345f},
+        {1000.0f, 0.25f},
+        {0.25f, 1000.0f},
+        {1.7320508f, 1.0f},
+        {-1.7320508f, -1.0f},
+        {0.1234567f, -0.9876543f},
+        {-0.1234567f, 0.9876543f},
+    };
+    for (const auto& pair : coords) {
+        check_532860(pair[0], pair[1]);
+    }
+
+    // 2. n = 1 (reads slice[0] and slice[1] initially, skips loops, tail-fills 1..199 with slice[0]).
+    {
+        reset_road_arenas(1);
+        set_slice(0u, 10.0f, 20.0f, 30.0f);
+        set_slice(1u, 15.0f, 22.0f, 35.0f);
+        run_sampler_case(false);
+        run_sampler_case(true);
+    }
+
+    // 3. n = 2 (exercises n > 1 guard in pass 2, emits out[1]=slice[0], tail-fills 2..199 with slice[1]).
+    {
+        reset_road_arenas(2);
+        set_slice(0u, -4.0f, 1.5f, 2.0f);
+        set_slice(1u, 8.0f, -3.5f, 14.0f);
+        run_sampler_case(false);
+        run_sampler_case(true);
+    }
+
+    // 4. n = 8 straight line (total_accum == 0, step == 0, emits every slice 0..6 then tail-fills 7..199).
+    {
+        reset_road_arenas(8);
+        for (U i = 0u; i < 8u; ++i) {
+            set_slice(i, static_cast<float>(i) * 10.0f, static_cast<float>(i) * 0.5f,
+                      static_cast<float>(i) * 5.0f);
+        }
+        run_sampler_case(false);
+    }
+
+    // 5. n = 5 sharp turn & wrap-around across +/-pi (+/-0.5 turns) and 135-degree bend (0.25 < delta < 0.5).
+    {
+        reset_road_arenas(5);
+        set_slice(0u, 0.0f, 0.0f, 0.0f);
+        set_slice(1u, -10.0f, 1.0f, 1.0f);   // angle ~ +0.484 turns
+        set_slice(2u, -20.0f, 2.0f, 0.0f);   // angle ~ -0.484 turns -> delta ~ 0.968 > 0.5 -> wraps to ~0.032
+        set_slice(3u, -20.0f, 3.0f, -15.0f); // angle = -0.25 turns
+        set_slice(4u, 0.0f, 4.0f, -15.0f);   // angle = 0.0 turns
+        run_sampler_case(false);
+        run_sampler_case(true);
+    }
+
+    // 5b. n = 16: gentle ~0.0025-turn steps first, followed by one 135-degree turn (delta = 0.375,
+    //     0.25 < delta <= 0.5) at the end so step crosses 0.0025 if 0.5 threshold becomes 0.25.
+    {
+        reset_road_arenas(16);
+        float px = 0.0f;
+        float pz = 0.0f;
+        float theta = 0.0f;
+        set_slice(0u, px, 0.0f, pz);
+        px += 10.0f;
+        set_slice(1u, px, 1.0f, pz); // angle = 0.0 turns
+        for (U i = 2u; i < 15u; ++i) {
+            theta += 0.0025f * 6.2831853f;
+            px += std::cos(theta) * 10.0f;
+            pz += std::sin(theta) * 10.0f;
+            set_slice(i, px, static_cast<float>(i), pz);
+        }
+        theta += 0.375f * 6.2831853f;
+        px += std::cos(theta) * 10.0f;
+        pz += std::sin(theta) * 10.0f;
+        set_slice(15u, px, 15.0f, pz);
+        run_sampler_case(false);
+        run_sampler_case(true);
+    }
+
+    // 6. n = 36 curved spiral (exercises fractional step accumulation and carry-over).
+    {
+        reset_road_arenas(36);
+        float px = 0.0f;
+        float pz = 0.0f;
+        for (U i = 0u; i < 36u; ++i) {
+            const float theta = static_cast<float>(i) * 0.22f;
+            set_slice(i, px, static_cast<float>(i) * 0.25f, pz);
+            px += std::cos(theta) * 12.0f;
+            pz += std::sin(theta) * 12.0f;
+        }
+        run_sampler_case(false);
+    }
+
+    // 7. n = 80 multi-turn S-curve with non-uniform radii and elevation.
+    {
+        reset_road_arenas(80);
+        float px = 100.0f;
+        float pz = -50.0f;
+        for (U i = 0u; i < 80u; ++i) {
+            const float theta = 1.8f * std::sin(static_cast<float>(i) * 0.14f);
+            set_slice(i, px, 2.0f * std::cos(static_cast<float>(i) * 0.1f), pz);
+            px += std::cos(theta) * (5.0f + static_cast<float>(i % 5u));
+            pz += std::sin(theta) * (5.0f + static_cast<float>(i % 5u));
+        }
+        run_sampler_case(false);
+        run_sampler_case(true);
+    }
+
+    // 8. n = 250 straight road (hits out_idx == 200 cap cleanly without overflow).
+    {
+        reset_road_arenas(250);
+        for (U i = 0u; i < 250u; ++i) {
+            set_slice(i, static_cast<float>(i) * 3.0f, -1.25f, static_cast<float>(i) * 4.0f);
+        }
+        run_sampler_case(false);
+    }
+
+    // 9. n = 220 dense gentle curve (hits out_idx == 200 cap on curved input).
+    {
+        reset_road_arenas(220);
+        float px = 0.0f;
+        float pz = 0.0f;
+        for (U i = 0u; i < 220u; ++i) {
+            const float theta = static_cast<float>(i) * 0.025f;
+            set_slice(i, px, static_cast<float>(i) * 0.1f, pz);
+            px += std::cos(theta) * 8.0f;
+            pz += std::sin(theta) * 8.0f;
+        }
+        run_sampler_case(false);
+        run_sampler_case(true);
+    }
+
+    std::printf("road_ribbon_sampler_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

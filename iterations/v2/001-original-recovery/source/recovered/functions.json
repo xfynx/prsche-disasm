@@ -20021,6 +20021,76 @@
           "0056765a"
         ]
       ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00532860",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl2 float32 ST(0)/RET0 (math_angle_turns_00532860); atan2(y,x)*0.1591549515724182 via x87 fpatan and 005bb2c8",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/666-ribbon-sampler-and-file-exists-integration/validation.json",
+      "verification_boundary": "Shared666(003) PASS:74 native cases (37 per optimization in 664/005 at Od/O2; 001..004 preserved) and 13 material controls. SHAcd2b71a8c7bd367dcb7126b63a16e82beef424df518f3071159b830255e986b5. Owns 8B .rdata (005bb2c8..005bb2cf). Build380TUs/74names79refs/noEXE.",
+      "partial_reason": "Direct float vectors with clean x87 FPU state and host/x86 FP rounding.",
+      "body_bytes": 17,
+      "body_ranges": [
+        [
+          "00532860",
+          "00532870"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00434aa0",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 void RET0 (road_ribbon_sample_00434aa0); accumulates wrapped curvature turns from 00628bc0 slices into up to 200 RoadRibbonPoint entries at 0060fde0..00610a5f",
+      "recovered_dependencies": [
+        "00532860"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/666-ribbon-sampler-and-file-exists-integration/validation.json",
+      "verification_boundary": "Shared666(003) PASS:74 native cases (37 per optimization in 664/005 at Od/O2) and 13 material controls. SHAcd2b71a8c7bd367dcb7126b63a16e82beef424df518f3071159b830255e986b5. Owns 3204B .bss (00628bc0, 0060fde0..00610a5f). Build380TUs/74names79refs/noEXE.",
+      "partial_reason": "Controlled non-null track_road_data_00628bc0 arenas (n=1..250).",
+      "body_bytes": 750,
+      "body_ranges": [
+        [
+          "00434aa0",
+          "00434d8d"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00434a90",
+      "source": "iterations/v2/001-original-recovery/runs/664-road-ribbon-sampler/road_ribbon_sampler_664.cpp",
+      "status": "partial-native-differential-verified",
+      "calling_convention": "cdecl0 void RET0 (startup_sequence_call_00434a90); 5B jmp thunk to 00434aa0",
+      "recovered_dependencies": [
+        "00434aa0"
+      ],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/audit-v2-native-game-batch.py",
+      "verification_report": "iterations/v2/001-original-recovery/runs/666-ribbon-sampler-and-file-exists-integration/validation.json",
+      "verification_boundary": "Shared666(003) PASS:74 native cases (37 per optimization in 664/005 at Od/O2) and 13 material controls. SHAcd2b71a8c7bd367dcb7126b63a16e82beef424df518f3071159b830255e986b5. Closes startup_sequence_call_00434a90. Build380TUs/74names79refs/noEXE.",
+      "partial_reason": "Controlled track_road_data_00628bc0 arena inherited from 00434aa0.",
+      "body_bytes": 5,
+      "body_ranges": [
+        [
+          "00434a90",
+          "00434a94"
+        ]
+      ]
     }
   ]
 }
