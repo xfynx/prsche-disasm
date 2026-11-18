@@ -1,0 +1,907 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "startup_input_slot_math_676.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::InputSlot) == 0x10cu);
+static_assert(sizeof(porsche::input_slots_006be040) == 32u * 0x10cu);
+static_assert(sizeof(porsche::fe_input_devices_005e8e60) == 32u);
+static_assert(sizeof(porsche::frame_control_slot_fields_494) == 32u * 12u);
+
+enum : U {
+    kMaxEvents = 64u,
+    kFillBufSize = 0x280u,
+    kCanarySize = 16u,
+    kFcRecordBytes = 0x90u,
+};
+
+enum EventKind : U {
+    kEvFfCmd = 1u,
+    kEvAcquire = 2u,
+    kEvHeapFill = 3u,
+    kEvGetState = 4u,
+};
+
+struct Event {
+    U kind;
+    U a0;
+    U a1;
+    U a2;
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_u32;
+    U event_count;
+    Event events[kMaxEvents];
+    porsche::FrameControlSlotFields_494 fc_fields[32];
+    B fill_area[kCanarySize + kFillBufSize + kCanarySize];
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512] = {};
+static B fp_env[28] = {};
+
+static B* code = nullptr;
+static B* slot_532b50 = nullptr;
+static B* slot_533160 = nullptr;
+static B* slot_533480 = nullptr;
+static B* slot_532ff0 = nullptr;
+static B* slot_4116d0 = nullptr;
+static B* slot_411710 = nullptr;
+
+// Flat original 32 x 0x90-byte records for 0069cb90..0069dd8f.
+alignas(16) static B orig_fc_slots[32u * kFcRecordBytes] = {};
+alignas(16) static B fill_arena[kCanarySize + kFillBufSize + kCanarySize] = {};
+alignas(16) static B caps_buf[64] = {};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+// Mock COM state for 00533160 / 00533480.
+struct MockFfState {
+    U ff_calls;
+    U ff_hr0;
+    U ff_hr1;
+    U acq_hr;
+    porsche::InputVtable* swap_after_ff0;
+    porsche::InputVtable* swap_after_acq;
+    bool mutate_fc_active;
+    U mutate_fc_val;
+};
+
+static MockFfState mock_ff{};
+static porsche::InputVtable mock_vt_main{};
+static porsche::InputVtable mock_vt_alt0{};
+static porsche::InputVtable mock_vt_alt1{};
+static porsche::InputDevice mock_dev_main{};
+static porsche::InputDevice mock_dev_other{};
+
+// Mock getstate state for 004116d0 / 00411710.
+struct MockGetStateCfg {
+    U call_idx;
+    B caps_byte4[64];
+    I mutate_count_on_call;
+    I new_count;
+    I mutate_dev_on_call;
+    U mutate_dev_slot;
+    std::int8_t mutate_dev_val;
+};
+
+static MockGetStateCfg mock_gs{};
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu() {
+    const unsigned short cw = 0x037fu;
+    __asm {
+        fninit
+        fldcw cw
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    __asm {
+        fxsave fp_area
+        fnstenv fp_env
+        fldenv fp_env
+    }
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void check_fpu_clean(const FpuSnapshot& orig_fp, const FpuSnapshot& cpp_fp) {
+    require(orig_fp.control == cpp_fp.control, "FPU control");
+    require(orig_fp.status == cpp_fp.status, "FPU status");
+    require(orig_fp.tag == cpp_fp.tag, "FPU tag");
+    require(orig_fp.mxcsr == cpp_fp.mxcsr, "FPU mxcsr");
+    require(std::memcmp(orig_fp.values, cpp_fp.values, sizeof orig_fp.values) == 0, "FPU stack");
+}
+
+static U invoke_cdecl0(void* fn, FpuSnapshot& fp_out, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    return out;
+}
+
+static U invoke_cdecl1(void* fn, U arg0, FpuSnapshot& fp_out, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    return out;
+}
+
+static U invoke_cdecl2(void* fn, U arg0, U arg1, FpuSnapshot& fp_out, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg1
+        push arg0
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    return out;
+}
+
+static void push_event(U kind, U a0, U a1, U a2) {
+    require(trace.event_count < kMaxEvents, "event overflow");
+    Event& ev = trace.events[trace.event_count++];
+    ev.kind = kind;
+    ev.a0 = a0;
+    ev.a1 = a1;
+    ev.a2 = a2;
+}
+
+static U __stdcall mock_ff_cmd(void* device, U command) {
+    const U idx = mock_ff.ff_calls++;
+    const U hr = (idx == 0u) ? mock_ff.ff_hr0 : mock_ff.ff_hr1;
+    push_event(kEvFfCmd, address(device), command, hr);
+    auto* const dev = static_cast<porsche::InputDevice*>(device);
+    if (idx == 0u && mock_ff.swap_after_ff0 != nullptr) {
+        dev->vtable = mock_ff.swap_after_ff0;
+    }
+    if (mock_ff.mutate_fc_active) {
+        for (U i = 0u; i < 32u; ++i) {
+            if (which == 0u) {
+                wr(orig_fc_slots, i * kFcRecordBytes, mock_ff.mutate_fc_val);
+            } else {
+                porsche::frame_control_slot_fields_494[i].active = mock_ff.mutate_fc_val;
+            }
+        }
+    }
+    return hr;
+}
+
+static U __stdcall mock_acquire(void* device) {
+    const U hr = mock_ff.acq_hr;
+    push_event(kEvAcquire, address(device), hr, 0u);
+    auto* const dev = static_cast<porsche::InputDevice*>(device);
+    if (mock_ff.swap_after_acq != nullptr) {
+        dev->vtable = mock_ff.swap_after_acq;
+    }
+    return hr;
+}
+
+namespace porsche {
+
+std::int32_t input_count_0069cb0c = 0;
+InputSlot input_slots_006be040[32] = {};
+std::int8_t fe_input_devices_005e8e60[32] = {};
+FrameControlSlotFields_494 frame_control_slot_fields_494[32] = {};
+
+void __cdecl heap_fill_0053c290(void* destination, std::uint32_t pattern, std::uint32_t bytes) {
+    const U dst_addr = address(destination);
+    const U base_addr = address(fill_arena);
+    const U offset = (dst_addr >= base_addr && dst_addr < base_addr + sizeof(fill_arena))
+                         ? (dst_addr - base_addr)
+                         : 0xffffffffu;
+    push_event(kEvHeapFill, offset, pattern, bytes);
+    if (destination != nullptr && bytes > 0u) {
+        std::memset(destination, static_cast<int>(pattern & 0xffu), bytes);
+    }
+}
+
+void* __cdecl fe_input_getstate_00532e10(std::uint32_t index, std::uint32_t mode) {
+    const U cidx = mock_gs.call_idx++;
+    push_event(kEvGetState, index, mode, cidx);
+    std::memset(caps_buf, 0xa5, sizeof caps_buf);
+    caps_buf[4] = mock_gs.caps_byte4[cidx & 63u];
+    if (mock_gs.mutate_count_on_call >= 0 &&
+        cidx == static_cast<U>(mock_gs.mutate_count_on_call)) {
+        fe_input_device_count_005e8e5c = mock_gs.new_count;
+    }
+    if (mock_gs.mutate_dev_on_call >= 0 &&
+        cidx == static_cast<U>(mock_gs.mutate_dev_on_call) &&
+        mock_gs.mutate_dev_slot < 32u) {
+        fe_input_devices_005e8e60[mock_gs.mutate_dev_slot] = mock_gs.mutate_dev_val;
+    }
+    return caps_buf;
+}
+
+} // namespace porsche
+
+static void relocate_abs(B* p, U n, U old_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 4u <= n; ++i) {
+        if (rd(p, i) == old_va) {
+            wr(p, i, replacement);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected_count, "abs relocation count");
+}
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+static void init_fixture() {
+    // Assert initial production .bss state before any fixture reset.
+    MEMORY_BASIC_INFORMATION mbi{};
+    require(VirtualQuery(&porsche::fe_input_device_count_005e8e5c, &mbi, sizeof mbi) != 0 &&
+                mbi.Protect == PAGE_READWRITE,
+            "005e8e5c writable bss");
+    require(porsche::fe_input_device_count_005e8e5c == 0, "initial 005e8e5c zero");
+
+    static const B body_532b50[46] = {@BODY_00532B50@};
+    static const B body_533160[58] = {@BODY_00533160@};
+    static const B body_533480[82] = {@BODY_00533480@};
+    static const B body_532ff0[21] = {@BODY_00532FF0@};
+    static const B body_4116d0[62] = {@BODY_004116D0@};
+    static const B body_411710[67] = {@BODY_00411710@};
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_532b50 = code + 0x000u;
+    slot_533160 = code + 0x040u;
+    slot_533480 = code + 0x090u;
+    slot_532ff0 = code + 0x100u;
+    slot_4116d0 = code + 0x130u;
+    slot_411710 = code + 0x180u;
+
+    std::memcpy(slot_532b50, body_532b50, 46u);
+    std::memcpy(slot_533160, body_533160, 58u);
+    std::memcpy(slot_533480, body_533480, 82u);
+    std::memcpy(slot_532ff0, body_532ff0, 21u);
+    std::memcpy(slot_4116d0, body_4116d0, 62u);
+    std::memcpy(slot_411710, body_411710, 67u);
+
+    // 00532b50 relocations
+    relocate_abs(slot_532b50, 46u, 0x0069cb0cu, address(&porsche::input_count_0069cb0c), 1u);
+    relocate_abs(slot_532b50, 46u, 0x006be040u, address(porsche::input_slots_006be040), 1u);
+
+    // 00533480 relocations
+    relocate_rel(slot_533480, 82u, 0x00533480u, 0x00532b50u, address(slot_532b50), 1u);
+    relocate_abs(slot_533480, 82u, 0x006be044u,
+                 address(&porsche::input_slots_006be040[0].flags_04), 1u);
+    relocate_abs(slot_533480, 82u, 0x006be040u, address(porsche::input_slots_006be040), 1u);
+    relocate_rel(slot_533480, 82u, 0x00533480u, 0x00533160u, address(slot_533160), 1u);
+    relocate_abs(slot_533480, 82u, 0x0069cb90u, address(orig_fc_slots), 1u);
+    relocate_abs(slot_533480, 82u, 0x0069dd90u, address(orig_fc_slots + 32u * kFcRecordBytes), 1u);
+
+    // 00532ff0 relocations
+    relocate_rel(
+        slot_532ff0,
+        21u,
+        0x00532ff0u,
+        0x0053c290u,
+        address(reinterpret_cast<const void*>(&porsche::heap_fill_0053c290)),
+        1u);
+
+    // 004116d0 relocations
+    relocate_abs(slot_4116d0, 62u, 0x005e8e5cu, address(&porsche::fe_input_device_count_005e8e5c), 2u);
+    relocate_abs(slot_4116d0, 62u, 0x005e8e60u, address(porsche::fe_input_devices_005e8e60), 1u);
+    relocate_rel(
+        slot_4116d0,
+        62u,
+        0x004116d0u,
+        0x00532e10u,
+        address(reinterpret_cast<const void*>(&porsche::fe_input_getstate_00532e10)),
+        1u);
+
+    // 00411710 relocations
+    relocate_abs(slot_411710, 67u, 0x005e8e5cu, address(&porsche::fe_input_device_count_005e8e5c), 2u);
+    relocate_abs(slot_411710, 67u, 0x005e8e60u, address(porsche::fe_input_devices_005e8e60), 1u);
+    relocate_rel(
+        slot_411710,
+        67u,
+        0x00411710u,
+        0x00532e10u,
+        address(reinterpret_cast<const void*>(&porsche::fe_input_getstate_00532e10)),
+        1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+
+    std::memset(&mock_vt_main, 0, sizeof mock_vt_main);
+    std::memset(&mock_vt_alt0, 0, sizeof mock_vt_alt0);
+    std::memset(&mock_vt_alt1, 0, sizeof mock_vt_alt1);
+    mock_vt_main.acquire_1c = mock_acquire;
+    mock_vt_main.other_28[12] = reinterpret_cast<void*>(&mock_ff_cmd);
+    mock_vt_alt0.acquire_1c = mock_acquire;
+    mock_vt_alt0.other_28[12] = reinterpret_cast<void*>(&mock_ff_cmd);
+    mock_vt_alt1.acquire_1c = mock_acquire;
+    mock_vt_alt1.other_28[12] = reinterpret_cast<void*>(&mock_ff_cmd);
+}
+
+static void assert_traces_match(U ret_mask) {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    if (ret_mask != 0u) {
+        require((trace.ret_u32 & ret_mask) == (expected.ret_u32 & ret_mask), "return value");
+    }
+    require(trace.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < trace.event_count; ++i) {
+        require(trace.events[i].kind == expected.events[i].kind, "event kind");
+        require(trace.events[i].a0 == expected.events[i].a0, "event a0");
+        require(trace.events[i].a1 == expected.events[i].a1, "event a1");
+        require(trace.events[i].a2 == expected.events[i].a2, "event a2");
+    }
+    require(std::memcmp(trace.fc_fields, expected.fc_fields, sizeof trace.fc_fields) == 0,
+            "frame control fields");
+    require(std::memcmp(trace.fill_area, expected.fill_area, sizeof trace.fill_area) == 0,
+            "fill area");
+    check_fpu_clean(expected.fp, trace.fp);
+}
+
+static void seed_fc_records(U base_seed) {
+    std::memset(orig_fc_slots, 0xaa, sizeof orig_fc_slots);
+    for (U i = 0u; i < 32u; ++i) {
+        const U active = base_seed + i * 3u + 1u;
+        const U dev = 0x10000000u + i * 0x10u;
+        const U state = (i == 5u) ? 0xffffffffu : (i + 100u);
+        porsche::frame_control_slot_fields_494[i].active = active;
+        porsche::frame_control_slot_fields_494[i].device = dev;
+        porsche::frame_control_slot_fields_494[i].state = state;
+        wr(orig_fc_slots, i * kFcRecordBytes + 0u, active);
+        wr(orig_fc_slots, i * kFcRecordBytes + 8u, dev);
+        wr(orig_fc_slots, i * kFcRecordBytes + 12u, state);
+    }
+}
+
+static void capture_fc_from_orig(porsche::FrameControlSlotFields_494 out[32]) {
+    for (U i = 0u; i < 32u; ++i) {
+        out[i].active = rd(orig_fc_slots, i * kFcRecordBytes + 0u);
+        out[i].device = rd(orig_fc_slots, i * kFcRecordBytes + 8u);
+        out[i].state = rd(orig_fc_slots, i * kFcRecordBytes + 12u);
+        // Verify unowned bytes in the 0x90-byte record were not touched.
+        for (U b = 0u; b < kFcRecordBytes; ++b) {
+            if ((b >= 4u && b < 8u) || b >= 16u) {
+                require(orig_fc_slots[i * kFcRecordBytes + b] == 0xaa, "fc padding intact");
+            }
+        }
+    }
+}
+
+static void test_532b50() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::input_slot_has_device_00532b50);
+    static const I counts[] = {-2147483647 - 1, -1, 0, 1, 16, 32};
+    static const I indices[] = {-2147483647 - 1, -2, -1, 0, 1, 15, 31, 32, 33, 2147483647};
+
+    for (I cnt : counts) {
+        for (I idx : indices) {
+            for (U has_dev = 0u; has_dev < 2u; ++has_dev) {
+                ++cases;
+                for (U side = 0u; side < 2u; ++side) {
+                    which = side;
+                    std::memset(&trace, 0, sizeof trace);
+                    porsche::input_count_0069cb0c = cnt;
+                    std::memset(porsche::input_slots_006be040, 0, sizeof porsche::input_slots_006be040);
+                    for (U s = 0u; s < 32u; ++s) {
+                        porsche::input_slots_006be040[s].flags_04 = (s & 1u) ? 0u : 1u;
+                        porsche::input_slots_006be040[s].device =
+                            ((s & 1u) == 0u) ? &mock_dev_other : nullptr;
+                    }
+                    if (idx >= 0 && idx < 32) {
+                        porsche::input_slots_006be040[idx].device =
+                            (has_dev != 0u) ? &mock_dev_main : nullptr;
+                        porsche::input_slots_006be040[idx].flags_04 = (has_dev != 0u) ? 0u : 1u;
+                    }
+                    void* const fn = (side == 0u) ? slot_532b50 : cpp_fn;
+                    trace.ret_u32 = invoke_cdecl1(fn, static_cast<U>(idx), trace.fp, trace.abi_fail);
+                    if (side == 0u) {
+                        expected = trace;
+                    }
+                }
+                assert_traces_match(0xffffffffu);
+            }
+        }
+    }
+}
+
+static void test_533160() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::input_device_ff_command_00533160);
+    struct Case533160 {
+        U cmd;
+        U hr0;
+        U acq_hr;
+        U hr1;
+        bool swap0;
+        bool swap_acq;
+    };
+    static const Case533160 table[] = {
+        {2u, 0x00000000u, 0u, 0u, false, false},
+        {1u, 0x80004005u, 0u, 0u, false, false},
+        {0x10u, 0x8007000bu, 0u, 0u, false, false},
+        {0x20u, 0x8007001fu, 0u, 0u, false, false},
+        {2u, 0x80040204u, 0u, 0u, false, false},
+        {2u, 0x80040206u, 0u, 0u, false, false},
+        {2u, 0x8007000cu, 0x00000000u, 0x00000000u, false, false},
+        {1u, 0x8007001eu, 0x00000000u, 0x00000001u, false, false},
+        {0x10u, 0x80040205u, 0x00000000u, 0x8007001eu, false, false},
+        {0x20u, 0x8007000cu, 0x00000000u, 0x80004005u, true, true},
+        {2u, 0x8007000cu, 0x00000001u, 0x00000000u, false, false},
+        {2u, 0x8007001eu, 0x80070005u, 0x00000000u, false, false},
+        {0xffffffffu, 0x80040205u, 0x8007000cu, 0x00000000u, true, false},
+    };
+
+    for (const auto& c : table) {
+        ++cases;
+        for (U side = 0u; side < 2u; ++side) {
+            which = side;
+            std::memset(&trace, 0, sizeof trace);
+            std::memset(&mock_ff, 0, sizeof mock_ff);
+            mock_ff.ff_hr0 = c.hr0;
+            mock_ff.acq_hr = c.acq_hr;
+            mock_ff.ff_hr1 = c.hr1;
+            mock_ff.swap_after_ff0 = c.swap0 ? &mock_vt_alt0 : nullptr;
+            mock_ff.swap_after_acq = c.swap_acq ? &mock_vt_alt1 : nullptr;
+            mock_dev_main.vtable = &mock_vt_main;
+
+            void* const fn = (side == 0u) ? slot_533160 : cpp_fn;
+            trace.ret_u32 =
+                invoke_cdecl2(fn, address(&mock_dev_main), c.cmd, trace.fp, trace.abi_fail);
+            const porsche::InputVtable* expected_vt = &mock_vt_main;
+            if (c.swap0) {
+                expected_vt = &mock_vt_alt0;
+            }
+            if (c.swap_acq && (c.hr0 == 0x8007000cu || c.hr0 == 0x8007001eu || c.hr0 == 0x80040205u)) {
+                expected_vt = &mock_vt_alt1;
+            }
+            require(mock_dev_main.vtable == expected_vt, "mock_dev_main vtable");
+            if (side == 0u) {
+                expected = trace;
+            }
+        }
+        assert_traces_match(0xffffffffu);
+    }
+}
+
+static void test_533480() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::input_slot_stop_ff_00533480);
+    struct Case533480 {
+        I count;
+        I index;
+        bool has_device;
+        U flags;
+        U hr0;
+        U acq_hr;
+        U hr1;
+        bool mutate_fc;
+    };
+    static const Case533480 table[] = {
+        {0, 0, true, 1u, 0u, 0u, 0u, false},
+        {4, -1, true, 1u, 0u, 0u, 0u, false},
+        {4, -2147483647 - 1, true, 1u, 0u, 0u, 0u, false},
+        {4, 4, true, 1u, 0u, 0u, 0u, false},
+        {32, 32, true, 1u, 0u, 0u, 0u, false},
+        {32, 2147483647, true, 1u, 0u, 0u, 0u, false},
+        {4, 1, false, 1u, 0u, 0u, 0u, false},
+        {4, 1, true, 0u, 0u, 0u, 0u, false},
+        {4, 1, true, 2u, 0u, 0u, 0u, false},
+        {4, 1, true, 0xfffffffeu, 0u, 0u, 0u, false},
+        {4, 0, true, 1u, 0u, 0u, 0u, false},
+        {4, 1, true, 3u, 0x8007001eu, 0u, 0u, true},
+        {16, 15, true, 0xffffffffu, 0x8007000cu, 0x80070005u, 0u, true},
+        {32, 31, true, 1u, 0x80040205u, 0u, 0x80004005u, true},
+    };
+
+    for (const auto& c : table) {
+        ++cases;
+        for (U side = 0u; side < 2u; ++side) {
+            which = side;
+            std::memset(&trace, 0, sizeof trace);
+            std::memset(&mock_ff, 0, sizeof mock_ff);
+            mock_ff.ff_hr0 = c.hr0;
+            mock_ff.acq_hr = c.acq_hr;
+            mock_ff.ff_hr1 = c.hr1;
+            mock_ff.mutate_fc_active = c.mutate_fc;
+            mock_ff.mutate_fc_val = 0x77777777u;
+            mock_dev_main.vtable = &mock_vt_main;
+
+            porsche::input_count_0069cb0c = c.count;
+            std::memset(porsche::input_slots_006be040, 0, sizeof porsche::input_slots_006be040);
+            if (c.index >= 0 && c.index < 32) {
+                porsche::input_slots_006be040[c.index].device = c.has_device ? &mock_dev_main : nullptr;
+                porsche::input_slots_006be040[c.index].flags_04 = c.flags;
+            }
+            seed_fc_records(0x10u);
+
+            void* const fn = (side == 0u) ? slot_533480 : cpp_fn;
+            (void)invoke_cdecl1(fn, static_cast<U>(c.index), trace.fp, trace.abi_fail);
+            if (side == 0u) {
+                capture_fc_from_orig(trace.fc_fields);
+                expected = trace;
+            } else {
+                std::memcpy(trace.fc_fields, porsche::frame_control_slot_fields_494,
+                            sizeof trace.fc_fields);
+            }
+        }
+        // void return: do not compare EAX.
+        assert_traces_match(0u);
+    }
+}
+
+static void test_532ff0() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::input_zero_memory_00532ff0);
+    static const U sizes[] = {0u, 1u, 4u, 15u, 64u, 256u, kFillBufSize};
+    static const U offsets[] = {0u, 3u, 17u};
+
+    for (U sz : sizes) {
+        for (U off : offsets) {
+            if (off + sz > kFillBufSize) {
+                continue;
+            }
+            ++cases;
+            for (U side = 0u; side < 2u; ++side) {
+                which = side;
+                std::memset(&trace, 0, sizeof trace);
+                for (U i = 0u; i < sizeof fill_arena; ++i) {
+                    fill_arena[i] = static_cast<B>((i * 37u + 11u) & 0xffu);
+                }
+                void* const dst = fill_arena + kCanarySize + off;
+                void* const fn = (side == 0u) ? slot_532ff0 : cpp_fn;
+                (void)invoke_cdecl2(fn, address(dst), sz, trace.fp, trace.abi_fail);
+                std::memcpy(trace.fill_area, fill_arena, sizeof fill_arena);
+                if (side == 0u) {
+                    expected = trace;
+                }
+            }
+            assert_traces_match(0u);
+        }
+    }
+}
+
+static void test_4116d0() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::fe_input_any_attached_004116d0);
+    struct Case4116d0 {
+        I count;
+        std::int8_t devs[32];
+        B caps[8];
+        I mutate_count_call;
+        I new_count;
+        I mutate_dev_call;
+        U mutate_dev_slot;
+        std::int8_t mutate_dev_val;
+    };
+    static const Case4116d0 table[] = {
+        {-2147483647 - 1, {0}, {2}, -1, 0, -1, 0, 0},
+        {-1, {0}, {2}, -1, 0, -1, 0, 0},
+        {0, {0}, {2}, -1, 0, -1, 0, 0},
+        {1, {-1}, {2}, -1, 0, -1, 0, 0},
+        {3, {-128, -2, -1}, {2, 2, 2}, -1, 0, -1, 0, 0},
+        {4, {-1, 0, 1, 2}, {0x00, 0x01, 0xfd, 0x00}, -1, 0, -1, 0, 0},
+        {4, {-1, 5, 6, 7}, {0x00, 0x02, 0x00, 0x00}, -1, 0, -1, 0, 0},
+        {4, {127, -1, 3, 4}, {0xff, 0x00, 0x00, 0x00}, -1, 0, -1, 0, 0},
+        // Callback shrinks count after call 0 -> loop terminates early without visiting slot 1.
+        {4, {0, 1, 2, 3}, {0x00, 0x02, 0x02, 0x02}, 0, 1, -1, 0, 0},
+        // Callback grows count after call 0 -> visits newly exposed slot 1!
+        {1, {0, 4, -1, -1}, {0x00, 0x02, 0x00, 0x00}, 0, 2, -1, 0, 0},
+        // Callback mutates next device byte mid-loop.
+        {3, {0, 1, 2}, {0x00, 0x03, 0x00}, -1, 0, 0, 1u, 9},
+        // Full 32-slot scan hitting on slot 31.
+        {32,
+         {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+          -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 31},
+         {0x02},
+         -1,
+         0,
+         -1,
+         0,
+         0},
+        // Full 32-slot scan with all non-negative devices unattached.
+        {32,
+         {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+          16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31},
+         {0x01, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0xfd},
+         -1,
+         0,
+         -1,
+         0,
+         0},
+    };
+
+    for (const auto& c : table) {
+        ++cases;
+        for (U side = 0u; side < 2u; ++side) {
+            which = side;
+            std::memset(&trace, 0, sizeof trace);
+            std::memset(&mock_gs, 0, sizeof mock_gs);
+            for (U i = 0u; i < 64u; ++i) {
+                mock_gs.caps_byte4[i] = c.caps[i & 7u];
+            }
+            mock_gs.mutate_count_on_call = c.mutate_count_call;
+            mock_gs.new_count = c.new_count;
+            mock_gs.mutate_dev_on_call = c.mutate_dev_call;
+            mock_gs.mutate_dev_slot = c.mutate_dev_slot;
+            mock_gs.mutate_dev_val = c.mutate_dev_val;
+
+            porsche::fe_input_device_count_005e8e5c = c.count;
+            std::memcpy(porsche::fe_input_devices_005e8e60, c.devs, 32u);
+
+            void* const fn = (side == 0u) ? slot_4116d0 : cpp_fn;
+            trace.ret_u32 = invoke_cdecl0(fn, trace.fp, trace.abi_fail);
+            if (side == 0u) {
+                expected = trace;
+            }
+        }
+        // 004116d0 sets AL only (0 or 1).
+        assert_traces_match(0x000000ffu);
+    }
+}
+
+static void test_411710() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::fe_input_device_attached_00411710);
+    struct Case411710 {
+        I count;
+        I target;
+        std::int8_t devs[32];
+        B caps[8];
+        I mutate_count_call;
+        I new_count;
+    };
+    static const Case411710 table[] = {
+        {-2147483647 - 1, 0, {0}, {2}, -1, 0},
+        {-1, 0, {0}, {2}, -1, 0},
+        {0, 0, {0}, {2}, -1, 0},
+        {4, 2, {0, 1, 3, 4}, {2, 2, 2, 2}, -1, 0},
+        {4, 2, {0, 1, 2, 3}, {0x00, 0x00, 0x00, 0x00}, -1, 0},
+        {4, 2, {0, 1, 2, 3}, {0x02, 0x00, 0x00, 0x00}, -1, 0},
+        // Duplicate matching entries: first unattached, second attached!
+        {4, 2, {2, 5, 2, 6}, {0x00, 0x02, 0x00, 0x00}, -1, 0},
+        // Sign extension: -1 matches -1 (not 255!), -128 matches -128.
+        {4, -1, {0, -1, 1, 2}, {0x02, 0x00, 0x00, 0x00}, -1, 0},
+        {4, 255, {0, -1, 1, 2}, {0x02, 0x02, 0x02, 0x02}, -1, 0},
+        {4, -128, {0, -128, 1, 2}, {0x03, 0x00, 0x00, 0x00}, -1, 0},
+        {4, 256, {0, 1, 2, 3}, {0x02, 0x02, 0x02, 0x02}, -1, 0},
+        {4, 127, {0, 127, 2, 3}, {0xfe, 0x00, 0x00, 0x00}, -1, 0},
+        // Mid-loop count shrink and grow.
+        {4, 5, {5, 5, 5, 5}, {0x00, 0x02, 0x02, 0x02}, 0, 1},
+        {1, 5, {5, 5, -1, -1}, {0x00, 0x02, 0x00, 0x00}, 0, 2},
+        // Full 32-slot scan matching slot 31.
+        {32,
+         31,
+         {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+          16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31},
+         {0x02},
+         -1,
+         0},
+    };
+
+    for (const auto& c : table) {
+        ++cases;
+        for (U side = 0u; side < 2u; ++side) {
+            which = side;
+            std::memset(&trace, 0, sizeof trace);
+            std::memset(&mock_gs, 0, sizeof mock_gs);
+            for (U i = 0u; i < 64u; ++i) {
+                mock_gs.caps_byte4[i] = c.caps[i & 7u];
+            }
+            mock_gs.mutate_count_on_call = c.mutate_count_call;
+            mock_gs.new_count = c.new_count;
+            mock_gs.mutate_dev_on_call = -1;
+
+            porsche::fe_input_device_count_005e8e5c = c.count;
+            std::memcpy(porsche::fe_input_devices_005e8e60, c.devs, 32u);
+
+            void* const fn = (side == 0u) ? slot_411710 : cpp_fn;
+            trace.ret_u32 =
+                invoke_cdecl1(fn, static_cast<U>(c.target), trace.fp, trace.abi_fail);
+            if (side == 0u) {
+                expected = trace;
+            }
+        }
+        // 00411710 sets AL only (0 or 1).
+        assert_traces_match(0x000000ffu);
+    }
+}
+
+int main(int argc, char**) {
+    if (argc < 1) {
+        return 2;
+    }
+    AddVectoredExceptionHandler(1u, fault_handler);
+    init_fixture();
+
+    test_532b50();
+    test_533160();
+    test_533480();
+    test_532ff0();
+    test_4116d0();
+    test_411710();
+
+    std::printf("startup_input_slot_math_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

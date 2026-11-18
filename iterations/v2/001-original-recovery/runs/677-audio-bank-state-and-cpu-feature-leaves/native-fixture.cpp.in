@@ -1,0 +1,604 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "audio_bank_cpu_leaves_677.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+enum : U {
+    kSlotCount = 16u,
+    kSlotBytes = kSlotCount * 12u,
+    kCopyBufBytes = 256u,
+    kBankRecordBytes = 32u,
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_u32;
+    U df_nonzero;
+    B state_after[porsche::kApplicationAudioDeviceStateBytes];
+    U table_words[kSlotCount * 3u];
+    B dst_after[kCopyBufBytes];
+    U cpuid_regs[4];
+    FpuSnapshot fp;
+};
+
+namespace porsche {
+ApplicationAudioDeviceStateStorage application_audio_device_state_006b48c0{};
+} // namespace porsche
+
+alignas(16) static B fp_area[512] = {};
+alignas(16) static B table_arena[kSlotBytes] = {};
+alignas(16) static B bank_records[kSlotCount][kBankRecordBytes] = {};
+alignas(16) static B src_arenas[kSlotCount][kCopyBufBytes] = {};
+alignas(16) static B dst_arena[kCopyBufBytes] = {};
+static U cpuid_out[4] = {};
+
+static B* code = nullptr;
+static B* slot_565b30 = nullptr;
+static B* slot_565ad0 = nullptr;
+static B* slot_590140 = nullptr;
+static B* slot_574e50 = nullptr;
+static B* slot_574e6b = nullptr;
+static B* slot_574e89 = nullptr;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    std::memset(fp_area, 0, sizeof fp_area);
+    __asm {
+        fxsave fp_area
+    }
+    std::memcpy(&fp.control, fp_area + 0, 2u);
+    std::memcpy(&fp.status, fp_area + 2, 2u);
+    fp.tag = static_cast<unsigned short>(fp_area[4]);
+    std::memcpy(&fp.mxcsr, fp_area + 24, 4u);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((static_cast<U>(fp.status) >> 11u) + i) & 7u;
+        if ((fp_area[4] & (1u << physical)) != 0u) {
+            std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    unsigned short cw = 0x037fu;
+    __asm {
+        fninit
+        fldcw cw
+    }
+}
+
+static U invoke_cdecl0(void* fn, U flags_seed, FpuSnapshot& fp_out, U& abi_fail, U& df_bad) {
+    U out = 0u;
+    U fail = 0u;
+    U df = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        pushfd
+        pop eax
+        and eax, not 00000cd5h
+        mov ecx, flags_seed
+        and ecx, 000008d5h
+        or eax, ecx
+        push eax
+        popfd
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        pushfd
+        pop eax
+        test eax, 00000400h
+        jz df_ok
+        mov df, 1
+df_ok:
+        cld
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    df_bad = df;
+    return out;
+}
+
+static U invoke_cdecl1(void* fn, U arg0, FpuSnapshot& fp_out, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    return out;
+}
+
+static U invoke_cdecl2(void* fn, U arg0, U arg1, FpuSnapshot& fp_out, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg1
+        push arg0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    return out;
+}
+
+static void relocate_abs(B* p, U n, U old_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 4u <= n; ++i) {
+        if (rd(p, i) == old_va) {
+            wr(p, i, replacement);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected_count, "abs relocation count");
+}
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+static void init_fixture() {
+    static const B body_565b30[35] = {@BODY_00565B30@};
+    static const B body_565ad0[81] = {@BODY_00565AD0@};
+    static const B body_590140[41] = {@BODY_00590140@};
+    static const B body_574e50[27] = {@BODY_00574E50@};
+    static const B body_574e6b[30] = {@BODY_00574E6B@};
+    static const B body_574e89[34] = {@BODY_00574E89@};
+
+    // Pin thread to one logical CPU so CPUID leaf 1 APIC ID cannot drift between calls.
+    (void)SetThreadAffinityMask(GetCurrentThread(), 1u);
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_565b30 = code + 0x000u;
+    slot_565ad0 = code + 0x040u;
+    slot_590140 = code + 0x0b0u;
+    slot_574e50 = code + 0x0f0u;
+    slot_574e6b = code + 0x120u;
+    slot_574e89 = code + 0x150u;
+
+    std::memcpy(slot_565b30, body_565b30, sizeof body_565b30);
+    std::memcpy(slot_565ad0, body_565ad0, sizeof body_565ad0);
+    std::memcpy(slot_590140, body_590140, sizeof body_590140);
+    std::memcpy(slot_574e50, body_574e50, sizeof body_574e50);
+    std::memcpy(slot_574e6b, body_574e6b, sizeof body_574e6b);
+    std::memcpy(slot_574e89, body_574e89, sizeof body_574e89);
+
+    const U va_active = address(&porsche::application_audio_device_state_006b48c0[0xdcu]);
+    const U va_count = address(porsche::application_audio_device_state_006b48c0.data() + 0x18u);
+    const U va_table = address(porsche::application_audio_device_state_006b48c0.data() + 0x144u);
+
+    // 00565b30 relocations
+    relocate_abs(slot_565b30, sizeof body_565b30, 0x006b499cu, va_active, 1u);
+    relocate_abs(slot_565b30, sizeof body_565b30, 0x006b4a04u, va_table, 1u);
+
+    // 00565ad0 relocations
+    relocate_abs(slot_565ad0, sizeof body_565ad0, 0x006b499cu, va_active, 1u);
+    relocate_rel(slot_565ad0, sizeof body_565ad0, 0x00565ad0u, 0x00565b30u, address(slot_565b30), 1u);
+    relocate_abs(slot_565ad0, sizeof body_565ad0, 0x006b4a04u, va_table, 1u);
+
+    // 00590140 relocations
+    relocate_abs(slot_590140, sizeof body_590140, 0x006b48d8u, va_count, 1u);
+    relocate_abs(slot_590140, sizeof body_590140, 0x006b4a04u, va_table, 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+}
+
+static U normalize_ptr(U v) {
+    if (v == address(dst_arena + 16u)) {
+        return 0xb0000001u;
+    }
+    if (v == address(dst_arena)) {
+        return 0xb0000002u;
+    }
+    for (U i = 0u; i < kSlotCount; ++i) {
+        if (v == address(bank_records[i])) {
+            return 0xc0000000u + i;
+        }
+        if (v == address(src_arenas[i])) {
+            return 0xd0000000u + i;
+        }
+    }
+    return v;
+}
+
+static void setup_audio_state(B active_flag, U slot_count_dword, const I* slot_sizes, const U* slot_ptrs) {
+    std::memset(porsche::application_audio_device_state_006b48c0.backing.data(), 0xcc,
+                porsche::application_audio_device_state_006b48c0.backing.size());
+    std::memset(porsche::application_audio_device_state_006b48c0.data(), 0x55,
+                porsche::kApplicationAudioDeviceStateBytes);
+    porsche::application_audio_device_state_006b48c0[0xdcu] = active_flag;
+    wr(porsche::application_audio_device_state_006b48c0.data(), 0x18u, slot_count_dword);
+    wr(porsche::application_audio_device_state_006b48c0.data(), 0x144u, address(table_arena));
+
+    std::memset(table_arena, 0, sizeof table_arena);
+    std::memset(bank_records, 0x77, sizeof bank_records);
+    std::memset(dst_arena, 0xa5, sizeof dst_arena);
+    for (U i = 0u; i < kSlotCount; ++i) {
+        for (U j = 0u; j < kCopyBufBytes; ++j) {
+            src_arenas[i][j] = static_cast<B>((i * 37u + j * 13u + 5u) & 0xffu);
+        }
+        const U ptr_val = (slot_ptrs != nullptr) ? slot_ptrs[i] : address(bank_records[i]);
+        wr(table_arena, i * 12u + 0u, ptr_val);
+        wr(table_arena, i * 12u + 4u, 0x11110000u + i);
+        wr(table_arena, i * 12u + 8u, 0x22220000u + i);
+        if (slot_sizes != nullptr) {
+            wr(bank_records[i], 0u, 0x33330000u + i);
+            wr(bank_records[i], 4u, 0x44440000u + i);
+            wr(bank_records[i], 8u, static_cast<U>(slot_sizes[i]));
+        }
+    }
+}
+
+static void capture_audio_trace(bool check_table, bool check_dst) {
+    std::memcpy(trace.state_after, porsche::application_audio_device_state_006b48c0.data(),
+                porsche::kApplicationAudioDeviceStateBytes);
+    if (check_table) {
+        for (U i = 0u; i < kSlotCount * 3u; ++i) {
+            trace.table_words[i] = normalize_ptr(rd(table_arena, i * 4u));
+        }
+    }
+    if (check_dst) {
+        std::memcpy(trace.dst_after, dst_arena, kCopyBufBytes);
+    }
+}
+
+static void assert_traces_match(bool check_ret, bool check_cpuid, bool check_audio) {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    require(expected.df_nonzero == 0u, "original df nonzero");
+    require(trace.df_nonzero == 0u, "cpp df nonzero");
+    if (check_ret) {
+        require(trace.ret_u32 == expected.ret_u32, "return u32");
+    }
+    if (check_cpuid) {
+        for (U i = 0u; i < 4u; ++i) {
+            require(trace.cpuid_regs[i] == expected.cpuid_regs[i], "cpuid regs");
+        }
+    }
+    if (check_audio) {
+        require(std::memcmp(trace.state_after, expected.state_after,
+                            porsche::kApplicationAudioDeviceStateBytes) == 0,
+                "device state mismatch");
+        require(std::memcmp(trace.table_words, expected.table_words, sizeof trace.table_words) == 0,
+                "bank table mismatch");
+        require(std::memcmp(trace.dst_after, expected.dst_after, kCopyBufBytes) == 0,
+                "dst buffer mismatch");
+    }
+    require(trace.fp.control == expected.fp.control, "fpu control");
+    require(trace.fp.status == expected.fp.status, "fpu status");
+    require(trace.fp.tag == expected.fp.tag, "fpu tag");
+    require(trace.fp.mxcsr == expected.fp.mxcsr, "fpu mxcsr");
+    require(std::memcmp(trace.fp.values, expected.fp.values, sizeof trace.fp.values) == 0,
+            "fpu stack values");
+}
+
+static void run_get_size(B active_flag, I bank_index, const I* slot_sizes) {
+    ++cases;
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::audio_bank_get_size_00565b30);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        std::memset(&trace, 0, sizeof trace);
+        setup_audio_state(active_flag, 16u, slot_sizes, nullptr);
+        void* const fn = (side == 0u) ? slot_565b30 : cpp_fn;
+        trace.ret_u32 = invoke_cdecl1(fn, static_cast<U>(bank_index), trace.fp, trace.abi_fail);
+        capture_audio_trace(true, false);
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match(true, false, true);
+}
+
+static void run_copy(B active_flag, I bank_index, U dst_offset, const I* slot_sizes) {
+    ++cases;
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::audio_bank_copy_00565ad0);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        std::memset(&trace, 0, sizeof trace);
+        setup_audio_state(active_flag, 16u, slot_sizes, nullptr);
+        // Put source buffer VA in slot[0] and size in record[8]; slot_565ad0 reads size via 00565b30
+        // which reads [table + idx*12] -> record -> [record + 8], AND 00565ad0 reads [table + idx*12] as src!
+        // Note: in the original, bank_records[i] IS the source buffer whose dword at +8 is its size!
+        for (U i = 0u; i < kSlotCount; ++i) {
+            std::memcpy(src_arenas[i], bank_records[i], kBankRecordBytes);
+            wr(src_arenas[i], 8u, static_cast<U>(slot_sizes[i]));
+            wr(table_arena, i * 12u + 0u, address(src_arenas[i]));
+        }
+        void* const fn = (side == 0u) ? slot_565ad0 : cpp_fn;
+        trace.ret_u32 = invoke_cdecl2(
+            fn, address(dst_arena + dst_offset), static_cast<U>(bank_index), trace.fp, trace.abi_fail);
+        capture_audio_trace(true, true);
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match(true, false, true);
+}
+
+static void run_find_free(U slot_count_dword, const U* slot_ptrs) {
+    ++cases;
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::audio_bank_find_free_slot_00590140);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        std::memset(&trace, 0, sizeof trace);
+        setup_audio_state(1u, slot_count_dword, nullptr, slot_ptrs);
+        void* const fn = (side == 0u) ? slot_590140 : cpp_fn;
+        trace.ret_u32 = invoke_cdecl0(fn, 0u, trace.fp, trace.abi_fail, trace.df_nonzero);
+        capture_audio_trace(true, false);
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match(true, false, true);
+}
+
+static void run_cpu_cdecl0(void* orig_fn, void* cpp_fn, U flags_seed) {
+    ++cases;
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        std::memset(&trace, 0, sizeof trace);
+        void* const fn = (side == 0u) ? orig_fn : cpp_fn;
+        trace.ret_u32 = invoke_cdecl0(fn, flags_seed, trace.fp, trace.abi_fail, trace.df_nonzero);
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match(true, false, false);
+}
+
+static void run_cpuid(U leaf) {
+    ++cases;
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::cpu_query_cpuid_00574e6b);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        std::memset(&trace, 0, sizeof trace);
+        for (U i = 0u; i < 4u; ++i) {
+            cpuid_out[i] = 0xdeadbeefu ^ (i * 0x11111111u);
+        }
+        void* const fn = (side == 0u) ? slot_574e6b : cpp_fn;
+        (void)invoke_cdecl2(fn, address(cpuid_out), leaf, trace.fp, trace.abi_fail);
+        std::memcpy(trace.cpuid_regs, cpuid_out, sizeof cpuid_out);
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match(false, true, false);
+}
+
+int main(int argc, char**) {
+    if (argc < 1) {
+        return 2;
+    }
+    AddVectoredExceptionHandler(1u, fault_handler);
+    init_fixture();
+
+    // 1. 00565b30: inactive state (-10) and active reads across indices/signed sizes.
+    static const I sizes_a[kSlotCount] = {
+        0, 1, 3, 4, 7, 15, 64, 127, -1, -10, 0x7fffffff, static_cast<I>(0x80000000u), 12, 20, 33, 99,
+    };
+    run_get_size(0u, 0, sizes_a);
+    run_get_size(0u, 3, sizes_a);
+    for (I idx = 0; idx < static_cast<I>(kSlotCount); ++idx) {
+        run_get_size(1u, idx, sizes_a);
+    }
+    run_get_size(0x80u, 2, sizes_a);
+    run_get_size(0xffu, 11, sizes_a);
+
+    // 2. 00565ad0: inactive, negative size pass-through, size==0 pointer store, and byte/dword copy lengths.
+    run_copy(0u, 0, 16u, sizes_a);
+    run_copy(1u, 8, 16u, sizes_a);   // size == -1
+    run_copy(1u, 9, 16u, sizes_a);   // size == -10
+    run_copy(1u, 11, 16u, sizes_a);  // size == 0x80000000 (< 0)
+    run_copy(1u, 0, 16u, sizes_a);   // size == 0: stores dst_buffer, returns 0
+    for (I idx = 1; idx <= 7; ++idx) {
+        run_copy(1u, idx, 16u, sizes_a);
+    }
+    run_copy(0xffu, 14, 0u, sizes_a);  // size == 33, aligned offset 0
+    run_copy(0x40u, 15, 3u, sizes_a);  // size == 99, unaligned dst offset 3
+
+    // 3. 00590140: slot_count == 0, high-word garbage at +0x18, free slot positions, all busy (-9).
+    {
+        U ptrs_all_free[kSlotCount] = {};
+        run_find_free(0u, ptrs_all_free);
+        run_find_free(0x00020000u, ptrs_all_free);  // low 16 bits == 0 -> -9
+        run_find_free(0xffff0000u, ptrs_all_free);  // low 16 bits == 0 -> -9
+        run_find_free(1u, ptrs_all_free);
+        run_find_free(5u, ptrs_all_free);
+    }
+    for (U free_idx = 0u; free_idx <= 6u; ++free_idx) {
+        U ptrs[kSlotCount] = {};
+        for (U i = 0u; i < kSlotCount; ++i) {
+            ptrs[i] = (i == free_idx) ? 0u : (0x50000000u + i * 0x100u);
+        }
+        run_find_free(5u, ptrs);           // finds 0..4, returns -9 when free_idx >= 5
+        run_find_free(0xffff0005u, ptrs);  // high bits set (signed negative u32, positive u16 == 5)
+        run_find_free(0x80000006u, ptrs);  // u16 == 6
+    }
+
+    // 4. 00574e50: CPUID EFLAGS ID-bit (0x00200000) probe under clean/dirty EFLAGS seeds.
+    void* const cpp_574e50 = reinterpret_cast<void*>(&porsche::cpu_check_cpuid_support_00574e50);
+    static const U flag_seeds[] = {0x00000000u, 0x000008d5u, 0x00000001u, 0x00000040u, 0x00000881u};
+    for (U seed : flag_seeds) {
+        run_cpu_cdecl0(slot_574e50, cpp_574e50, seed);
+    }
+
+    // 5. 00574e6b: CPUID leaf queries storing [EAX, EBX, EDX, ECX] on leaves used by 00555bc0.
+    static const U cpuid_leaves[] = {
+        0x00000000u,
+        0x00000001u,
+        0x00000002u,
+        0x00000003u,
+        0x80000000u,
+        0x80000001u,
+    };
+    for (U leaf : cpuid_leaves) {
+        run_cpuid(leaf);
+    }
+
+    // 6. 00574e89: sahf / div bl / lahf probe under clean/dirty EFLAGS seeds.
+    void* const cpp_574e89 = reinterpret_cast<void*>(&porsche::cpu_check_div_flags_00574e89);
+    for (U seed : flag_seeds) {
+        run_cpu_cdecl0(slot_574e89, cpp_574e89, seed);
+    }
+
+    std::printf("audio_bank_cpu_leaves_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

@@ -1,0 +1,195 @@
+{
+  "run": 677,
+  "experiment": "local/experiments/v2-audio-bank-cpu-leaves-677",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00565b30",
+      "bytes": 35,
+      "sha256": "297d8c891b6e9fd4ebef2db3520f38c0fe843da5dc68a71f469087e7dadc2ac6",
+      "token": "@BODY_00565B30@"
+    },
+    {
+      "va": "00565ad0",
+      "bytes": 81,
+      "sha256": "c2e8154b16d4023e71d92a8b9a4021c9d867d7a62a24f2271abde91f21a74cbb",
+      "token": "@BODY_00565AD0@"
+    },
+    {
+      "va": "00590140",
+      "bytes": 41,
+      "sha256": "222ec12d808a6793fc0860627e39148a68ed6ffd13739b3d9d5e85cedec334d3",
+      "token": "@BODY_00590140@"
+    },
+    {
+      "va": "00574e50",
+      "bytes": 27,
+      "sha256": "18e33bf91423f5dfb61fd2a98e186b00d3238bac0b972ae91502cd938f3d4e11",
+      "token": "@BODY_00574E50@"
+    },
+    {
+      "va": "00574e6b",
+      "bytes": 30,
+      "sha256": "94884ce50dbc7092c39645556b3790b037a2928ce21c7d92a5eb782b89ab9cf1",
+      "token": "@BODY_00574E6B@"
+    },
+    {
+      "va": "00574e89",
+      "bytes": 34,
+      "sha256": "0d48bd62ae5b5922c48e5b19bf9752f1a4ac480194bb37e1d4db0b1712194b0e",
+      "token": "@BODY_00574E89@"
+    }
+  ],
+  "pass_marker": "audio_bank_cpu_leaves_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-565b30-inactive-ret",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "std::int32_t __cdecl audio_bank_get_size_00565b30(std::int32_t bank_index) {\n    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -10;\n    }",
+      "new": "std::int32_t __cdecl audio_bank_get_size_00565b30(std::int32_t bank_index) {\n    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -9;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-565b30-stride",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "std::int32_t __cdecl audio_bank_get_size_00565b30(std::int32_t bank_index) {\n    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -10;\n    }\n    const std::uint32_t table_va =\n        read_u32_ptr(application_audio_device_state_006b48c0.data() + 0x144u);\n    const std::uint32_t entry_va = table_va + static_cast<std::uint32_t>(bank_index) * 12u;",
+      "new": "std::int32_t __cdecl audio_bank_get_size_00565b30(std::int32_t bank_index) {\n    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -10;\n    }\n    const std::uint32_t table_va =\n        read_u32_ptr(application_audio_device_state_006b48c0.data() + 0x144u);\n    const std::uint32_t entry_va = table_va + static_cast<std::uint32_t>(bank_index) * 24u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-565b30-field-offset",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    return static_cast<std::int32_t>(read_va_u32(bank_ptr_va + 8u));",
+      "new": "    return static_cast<std::int32_t>(read_va_u32(bank_ptr_va + 4u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-565ad0-inactive-ret",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "std::int32_t __cdecl audio_bank_copy_00565ad0(void* dst_buffer, std::int32_t bank_index) {\n    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -10;\n    }",
+      "new": "std::int32_t __cdecl audio_bank_copy_00565ad0(void* dst_buffer, std::int32_t bank_index) {\n    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -1;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-565ad0-zero-size-guard",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    if (byte_size < 0) {\n        return byte_size;\n    }",
+      "new": "    if (byte_size <= 0) {\n        return byte_size;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-565ad0-omit-store-ptr",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    write_va_u32(entry_va, va_from_ptr(dst_buffer));\n    return 0;",
+      "new": "    (void)entry_va;\n    return 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-565ad0-stride",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    const std::uint32_t src_va = read_va_u32(entry_va);",
+      "new": "    const std::uint32_t src_va = read_va_u32(table_va + static_cast<std::uint32_t>(bank_index) * 24u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-590140-empty-ret",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    if (slot_count == 0u) {\n        return -9;\n    }",
+      "new": "    if (slot_count == 0u) {\n        return -1;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-590140-u32-count",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    const std::uint16_t slot_count =\n        read_u16_ptr(application_audio_device_state_006b48c0.data() + 0x18u);\n    if (slot_count == 0u) {\n        return -9;\n    }\n    const std::uint32_t table_va =\n        read_u32_ptr(application_audio_device_state_006b48c0.data() + 0x144u);\n    for (std::uint32_t i = 0u; i < static_cast<std::uint32_t>(slot_count); ++i) {",
+      "new": "    const std::int32_t slot_count = static_cast<std::int32_t>(\n        read_u32_ptr(application_audio_device_state_006b48c0.data() + 0x18u));\n    if (slot_count <= 0) {\n        return -9;\n    }\n    const std::uint32_t table_va =\n        read_u32_ptr(application_audio_device_state_006b48c0.data() + 0x144u);\n    for (std::uint32_t i = 0u; i < static_cast<std::uint32_t>(slot_count); ++i) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-590140-stride",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "        if (read_va_u32(table_va + i * 12u) == 0u) {",
+      "new": "        if (read_va_u32(table_va + i * 4u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-590140-off-by-one",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    for (std::uint32_t i = 0u; i < static_cast<std::uint32_t>(slot_count); ++i) {",
+      "new": "    for (std::uint32_t i = 0u; i <= static_cast<std::uint32_t>(slot_count); ++i) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-574e50-bit-mask",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    __writeeflags(original_flags ^ 0x00200000u);",
+      "new": "    __writeeflags(original_flags ^ 0x00040000u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-574e50-normalize-bool",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    return diff;",
+      "new": "    return diff != 0u ? 1u : 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-574e6b-swap-edx-ecx",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    out_regs[2] = static_cast<std::uint32_t>(regs[3]);\n    out_regs[3] = static_cast<std::uint32_t>(regs[2]);",
+      "new": "    out_regs[2] = static_cast<std::uint32_t>(regs[2]);\n    out_regs[3] = static_cast<std::uint32_t>(regs[3]);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-574e6b-wrong-leaf",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "    __cpuid(regs, static_cast<int>(leaf));",
+      "new": "    (void)leaf;\n    __cpuid(regs, 0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-574e89-cmp-value",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "        cmp ah, 2",
+      "new": "        cmp ah, 12h",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-574e89-invert-ret",
+      "source": "iterations/v2/001-original-recovery/runs/677-audio-bank-state-and-cpu-feature-leaves/audio_bank_cpu_leaves_677.cpp",
+      "old": "        mov eax, 0\n        jne done\n        mov eax, 1",
+      "new": "        mov eax, 1\n        jne done\n        mov eax, 0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

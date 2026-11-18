@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run675](iterations/v2/001-original-recovery/runs/675-render-loader-directx-and-depth-helpers-integration/README.md)
-  integrates the partial render loader DirectX version probe, startup sorted table, and render depth/MMX helper providers.
-  The shared build has 71 unresolved names across 386 TUs.
+  [Run678](iterations/v2/001-original-recovery/runs/678-input-slot-math-and-audio-cpu-leaves-integration/README.md)
+  integrates the partial input-slot/FE-attachment and audio-bank/CPU-probe leaf unlockers.
+  The shared build has 71 unresolved names across 388 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.
