@@ -1,0 +1,478 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "render_palette_expand_685.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using H = std::uint16_t;
+using B = std::uint8_t;
+
+enum : U {
+    kMaxEvents = 300u,
+    kBufWords = 640u,
+};
+
+enum EventKind : U {
+    kEv888To565 = 1u,
+    kEv888To1555 = 2u,
+};
+
+enum MockMode : U {
+    kMockReal = 0u,
+    kMockUpper16ZeroLow = 1u,
+    kMockUpper16NonZeroLow = 2u,
+    kMockZero = 3u,
+};
+
+struct Event {
+    U kind;
+    U color;
+    U ret;
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U event_count;
+    Event events[kMaxEvents];
+    H out_words[kBufWords];
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512] = {};
+static B fp_env[28] = {};
+
+static B* code = nullptr;
+static B* slot_570260 = nullptr;
+static B* slot_570330 = nullptr;
+static B* slot_570370 = nullptr;
+static B* slot_5704c0 = nullptr;
+static B* slot_570510 = nullptr;
+static B* slot_570540 = nullptr;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+static U mock_mode = kMockReal;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu() {
+    const unsigned short cw = 0x037fu;
+    __asm {
+        fninit
+        fldcw cw
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    __asm {
+        fxsave fp_area
+        fnstenv fp_env
+        fldenv fp_env
+    }
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void check_fpu_clean(const FpuSnapshot& orig_fp, const FpuSnapshot& cpp_fp) {
+    require(orig_fp.control == cpp_fp.control, "FPU control");
+    require(orig_fp.status == cpp_fp.status, "FPU status");
+    require(orig_fp.tag == cpp_fp.tag, "FPU tag");
+    require(orig_fp.mxcsr == cpp_fp.mxcsr, "FPU mxcsr");
+    require(std::memcmp(orig_fp.values, cpp_fp.values, sizeof orig_fp.values) == 0, "FPU stack");
+}
+
+static U invoke_cdecl3(void* fn, U arg0, U arg1, U arg2, FpuSnapshot& fp_out, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg2
+        push arg1
+        push arg0
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 12
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    return out;
+}
+
+static void push_event(U kind, U color, U ret) {
+    require(trace.event_count < kMaxEvents, "event overflow");
+    Event& ev = trace.events[trace.event_count++];
+    ev.kind = kind;
+    ev.color = color;
+    ev.ret = ret;
+}
+
+namespace porsche {
+
+std::uint32_t __cdecl render_color_888_to_565_00572f30(std::uint32_t color) {
+    U ret = 0u;
+    if (mock_mode == kMockReal) {
+        ret = ((color & 0x00f80000u) >> 8) |
+              ((color & 0x0000fc00u) >> 5) |
+              ((color >> 3) & 0x1fu);
+    } else if (mock_mode == kMockUpper16ZeroLow) {
+        ret = 0xabcd0000u;
+    } else if (mock_mode == kMockUpper16NonZeroLow) {
+        ret = 0xabcd1234u;
+    } else {
+        ret = 0u;
+    }
+    push_event(kEv888To565, color, ret);
+    return ret;
+}
+
+std::uint32_t __cdecl render_color_888_to_1555_00572f5b(std::uint32_t color) {
+    U ret = 0u;
+    if (mock_mode == kMockReal) {
+        if (color != 0u) {
+            ret = 0x8000u |
+                  ((color & 0x00f80000u) >> 9) |
+                  ((color & 0x0000f800u) >> 6) |
+                  ((color >> 3) & 0x1fu);
+        }
+    } else if (mock_mode == kMockUpper16ZeroLow) {
+        ret = 0xabcd0000u;
+    } else if (mock_mode == kMockUpper16NonZeroLow) {
+        ret = 0xabcd1234u;
+    } else {
+        ret = 0u;
+    }
+    push_event(kEv888To1555, color, ret);
+    return ret;
+}
+
+} // namespace porsche
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+static void init_fixture() {
+    static const B body_570260[63] = {@BODY_00570260@};
+    static const B body_570330[56] = {@BODY_00570330@};
+    static const B body_570370[46] = {@BODY_00570370@};
+    static const B body_5704c0[68] = {@BODY_005704C0@};
+    static const B body_570510[46] = {@BODY_00570510@};
+    static const B body_570540[91] = {@BODY_00570540@};
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_570260 = code + 0x000u;
+    slot_570330 = code + 0x060u;
+    slot_570370 = code + 0x0b0u;
+    slot_5704c0 = code + 0x100u;
+    slot_570510 = code + 0x160u;
+    slot_570540 = code + 0x1b0u;
+
+    std::memcpy(slot_570260, body_570260, 63u);
+    std::memcpy(slot_570330, body_570330, 56u);
+    std::memcpy(slot_570370, body_570370, 46u);
+    std::memcpy(slot_5704c0, body_5704c0, 68u);
+    std::memcpy(slot_570510, body_570510, 46u);
+    std::memcpy(slot_570540, body_570540, 91u);
+
+    relocate_rel(slot_570330, 56u, 0x00570330u, 0x00572f5bu,
+                 address(reinterpret_cast<const void*>(&porsche::render_color_888_to_1555_00572f5b)),
+                 1u);
+    relocate_rel(slot_570370, 46u, 0x00570370u, 0x00572f5bu,
+                 address(reinterpret_cast<const void*>(&porsche::render_color_888_to_1555_00572f5b)),
+                 1u);
+    relocate_rel(slot_5704c0, 68u, 0x005704c0u, 0x00572f30u,
+                 address(reinterpret_cast<const void*>(&porsche::render_color_888_to_565_00572f30)),
+                 1u);
+    relocate_rel(slot_570510, 46u, 0x00570510u, 0x00572f30u,
+                 address(reinterpret_cast<const void*>(&porsche::render_color_888_to_565_00572f30)),
+                 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+}
+
+static void assert_traces_match() {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    require(trace.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < trace.event_count; ++i) {
+        require(trace.events[i].kind == expected.events[i].kind, "event kind");
+        require(trace.events[i].color == expected.events[i].color, "event color");
+        require(trace.events[i].ret == expected.events[i].ret, "event ret");
+    }
+    require(std::memcmp(trace.out_words, expected.out_words, sizeof trace.out_words) == 0,
+            "output words");
+    check_fpu_clean(expected.fp, trace.fp);
+}
+
+static void test_570260() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::render_palette_swap_rb555_00570260);
+    static const I counts[] = {-2147483647 - 1, -1, 0, 1, 2, 3, 15, 16, 64, 256};
+    enum Mode : U { kSeparate = 0u, kInPlace = 1u, kDstAhead = 2u, kSrcAhead = 3u };
+
+    for (I count : counts) {
+        for (U m = 0u; m < 4u; ++m) {
+            if (m != kSeparate && (count < 0 || count > 256)) {
+                continue;
+            }
+            ++cases;
+            for (U side = 0u; side < 2u; ++side) {
+                which = side;
+                std::memset(&trace, 0, sizeof trace);
+
+                H src_buf[kBufWords] = {};
+                H dst_buf[kBufWords] = {};
+                for (U i = 0u; i < kBufWords; ++i) {
+                    dst_buf[i] = static_cast<H>(0x5c00u + (i & 0xffu));
+                    if (i >= 8u && i < 24u) {
+                        src_buf[i] = static_cast<H>(1u << (i - 8u));
+                    } else if (i >= 24u && i < 40u) {
+                        src_buf[i] = static_cast<H>(~(1u << (i - 24u)));
+                    } else {
+                        src_buf[i] = static_cast<H>((i * 0x51a3u + 0x9b71u) & 0xffffu);
+                    }
+                }
+
+                H* dst_ptr = dst_buf + 8u;
+                const H* src_ptr = src_buf + 8u;
+                if (m == kInPlace) {
+                    dst_ptr = dst_buf + 8u;
+                    src_ptr = dst_buf + 8u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                } else if (m == kDstAhead) {
+                    dst_ptr = dst_buf + 9u;
+                    src_ptr = dst_buf + 8u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                } else if (m == kSrcAhead) {
+                    dst_ptr = dst_buf + 8u;
+                    src_ptr = dst_buf + 9u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                }
+
+                void* const fn = (side == 0u) ? slot_570260 : cpp_fn;
+                (void)invoke_cdecl3(fn, address(dst_ptr), address(src_ptr), static_cast<U>(count),
+                                    trace.fp, trace.abi_fail);
+                std::memcpy(trace.out_words, dst_buf, sizeof trace.out_words);
+                if (side == 0u) {
+                    expected = trace;
+                }
+            }
+            assert_traces_match();
+        }
+    }
+}
+
+static void fill_src32(U* src_u32, U total, U seed_offset) {
+    static const U fixed[] = {
+        0x00000000u, 0x00000001u, 0x00080408u, 0x00100810u,
+        0x00f8fcffu, 0x00ffffffu, 0x3fffffffu, 0x40000000u,
+        0x40000001u, 0x40010101u, 0x40070307u, 0x40f8fcffu,
+        0x7fffffffu, 0x80000000u, 0x80000001u, 0xabcdef01u,
+        0xff000000u, 0xff010101u, 0xff080408u, 0xffffffffu,
+    };
+    const U fixed_count = static_cast<U>(sizeof fixed / sizeof fixed[0]);
+    U rng = 0x13572468u + seed_offset * 0x9e3779b9u;
+    for (U i = 0u; i < total; ++i) {
+        if (i < fixed_count) {
+            src_u32[i] = fixed[i];
+        } else if (i < fixed_count + 32u) {
+            src_u32[i] = 1u << (i - fixed_count);
+        } else if (i < fixed_count + 64u) {
+            src_u32[i] = ~(1u << (i - fixed_count - 32u));
+        } else {
+            rng = rng * 1664525u + 1013904223u;
+            src_u32[i] = rng;
+        }
+    }
+}
+
+static void test_u32_to_u16(void* orig_fn, void* cpp_fn, U mode_limit) {
+    static const I counts[] = {-2147483647 - 1, -1, 0, 1, 2, 3, 15, 16, 64, 160};
+    enum BufMode : U { kSeparate = 0u, kInPlace = 1u, kDstAhead = 2u, kSrcAhead = 3u };
+
+    for (U mm = 0u; mm < mode_limit; ++mm) {
+        for (I count : counts) {
+            for (U bm = 0u; bm < 4u; ++bm) {
+                if (bm != kSeparate && (count < 0 || count > 160)) {
+                    continue;
+                }
+                if (mm != kMockReal && bm != kSeparate) {
+                    continue;
+                }
+                ++cases;
+                for (U side = 0u; side < 2u; ++side) {
+                    which = side;
+                    mock_mode = mm;
+                    std::memset(&trace, 0, sizeof trace);
+
+                    H src_words[kBufWords] = {};
+                    H dst_words[kBufWords] = {};
+                    for (U i = 0u; i < kBufWords; ++i) {
+                        dst_words[i] = static_cast<H>(0xa300u + (i & 0xffu));
+                        src_words[i] = static_cast<H>(0x3b00u + (i & 0xffu));
+                    }
+
+                    U raw_u32[256] = {};
+                    fill_src32(raw_u32, 256u, mm + bm * 17u);
+
+                    H* dst_ptr = dst_words + 8u;
+                    const B* src_bytes = nullptr;
+                    if (bm == kSeparate) {
+                        std::memcpy(src_words + 8u, raw_u32, sizeof raw_u32);
+                        src_bytes = reinterpret_cast<const B*>(src_words + 8u);
+                    } else if (bm == kInPlace) {
+                        std::memcpy(dst_words + 8u, raw_u32, sizeof raw_u32);
+                        dst_ptr = dst_words + 8u;
+                        src_bytes = reinterpret_cast<const B*>(dst_words + 8u);
+                    } else if (bm == kDstAhead) {
+                        std::memcpy(dst_words + 8u, raw_u32, sizeof raw_u32);
+                        dst_ptr = dst_words + 9u;
+                        src_bytes = reinterpret_cast<const B*>(dst_words + 8u);
+                    } else {
+                        std::memcpy(dst_words + 9u, raw_u32, sizeof raw_u32);
+                        dst_ptr = dst_words + 8u;
+                        src_bytes = reinterpret_cast<const B*>(dst_words + 9u);
+                    }
+
+                    void* const fn = (side == 0u) ? orig_fn : cpp_fn;
+                    (void)invoke_cdecl3(fn, address(dst_ptr), address(src_bytes),
+                                        static_cast<U>(count), trace.fp, trace.abi_fail);
+                    std::memcpy(trace.out_words, dst_words, sizeof trace.out_words);
+                    if (side == 0u) {
+                        expected = trace;
+                    }
+                }
+                assert_traces_match();
+            }
+        }
+    }
+    mock_mode = kMockReal;
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    init_fixture();
+    test_570260();
+    test_u32_to_u16(
+        slot_570330,
+        reinterpret_cast<void*>(&porsche::render_palette_8888_to_1555_alpha_00570330),
+        4u);
+    test_u32_to_u16(
+        slot_570370,
+        reinterpret_cast<void*>(&porsche::render_palette_888_to_1555_00570370),
+        4u);
+    test_u32_to_u16(
+        slot_5704c0,
+        reinterpret_cast<void*>(&porsche::render_palette_8888_to_565_alpha_005704c0),
+        4u);
+    test_u32_to_u16(
+        slot_570510,
+        reinterpret_cast<void*>(&porsche::render_palette_888_to_565_00570510),
+        4u);
+    test_u32_to_u16(
+        slot_570540,
+        reinterpret_cast<void*>(&porsche::render_palette_8888_to_4444_00570540),
+        1u);
+    std::printf("render_palette_expand_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

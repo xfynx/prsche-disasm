@@ -1,0 +1,417 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "render_palette_convert_686.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using H = std::uint16_t;
+using B = std::uint8_t;
+
+enum : U {
+    kBufWords = 640u,
+    kBufDwords = 320u,
+    kBufBytes = 1280u,
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    H out_words[kBufWords];
+    U out_dwords[kBufDwords];
+    B out_bytes[kBufBytes];
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512] = {};
+static B fp_env[28] = {};
+
+static B* code = nullptr;
+static B* slot_5702a0 = nullptr;
+static B* slot_570920 = nullptr;
+static B* slot_570990 = nullptr;
+static B* slot_570ff0 = nullptr;
+static B* slot_571160 = nullptr;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu() {
+    const unsigned short cw = 0x037fu;
+    __asm {
+        fninit
+        fldcw cw
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    __asm {
+        fxsave fp_area
+        fnstenv fp_env
+        fldenv fp_env
+    }
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void check_fpu_clean(const FpuSnapshot& orig_fp, const FpuSnapshot& cpp_fp) {
+    require(orig_fp.control == cpp_fp.control, "FPU control");
+    require(orig_fp.status == cpp_fp.status, "FPU status");
+    require(orig_fp.tag == cpp_fp.tag, "FPU tag");
+    require(orig_fp.mxcsr == cpp_fp.mxcsr, "FPU mxcsr");
+    require(std::memcmp(orig_fp.values, cpp_fp.values, sizeof orig_fp.values) == 0, "FPU stack");
+}
+
+static void invoke_cdecl3(void* fn, U arg0, U arg1, U arg2, FpuSnapshot& fp_out, U& abi_fail) {
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg2
+        push arg1
+        push arg0
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 12
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+}
+
+static void assert_traces_match() {
+    require(trace.abi_fail == 0u, "cpp ABI fail");
+    require(expected.abi_fail == 0u, "orig ABI fail");
+    check_fpu_clean(expected.fp, trace.fp);
+    require(std::memcmp(trace.out_words, expected.out_words, sizeof trace.out_words) == 0, "out_words");
+    require(std::memcmp(trace.out_dwords, expected.out_dwords, sizeof trace.out_dwords) == 0, "out_dwords");
+    require(std::memcmp(trace.out_bytes, expected.out_bytes, sizeof trace.out_bytes) == 0, "out_bytes");
+}
+
+static void init_fixture() {
+    static const B body_5702a0[68] = {@BODY_005702A0@};
+    static const B body_570920[102] = {@BODY_00570920@};
+    static const B body_570990[101] = {@BODY_00570990@};
+    static const B body_570ff0[184] = {@BODY_00570FF0@};
+    static const B body_571160[78] = {@BODY_00571160@};
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_5702a0 = code + 0x000u;
+    slot_570920 = code + 0x060u;
+    slot_570990 = code + 0x0e0u;
+    slot_570ff0 = code + 0x160u;
+    slot_571160 = code + 0x240u;
+
+    std::memcpy(slot_5702a0, body_5702a0, 68u);
+    std::memcpy(slot_570920, body_570920, 102u);
+    std::memcpy(slot_570990, body_570990, 101u);
+    std::memcpy(slot_570ff0, body_570ff0, 184u);
+    std::memcpy(slot_571160, body_571160, 78u);
+
+    FlushInstructionCache(GetCurrentProcess(), code, 4096u);
+}
+
+static void test_5702a0() {
+    void* const cpp_fn =
+        reinterpret_cast<void*>(&porsche::render_palette_565_to_1555_005702a0);
+    static const I counts[] = {-2147483647 - 1, -1, 0, 1, 2, 3, 15, 16, 64, 256};
+    enum Mode : U { kSeparate = 0u, kInPlace = 1u, kDstAhead = 2u, kSrcAhead = 3u };
+
+    for (I count : counts) {
+        for (U m = 0u; m < 4u; ++m) {
+            if (m != kSeparate && (count < 0 || count > 256)) {
+                continue;
+            }
+            ++cases;
+            for (U side = 0u; side < 2u; ++side) {
+                which = side;
+                std::memset(&trace, 0, sizeof trace);
+
+                H src_buf[kBufWords] = {};
+                H dst_buf[kBufWords] = {};
+                U rng = 0x517cc1b7u;
+                for (U i = 0u; i < kBufWords; ++i) {
+                    dst_buf[i] = static_cast<H>(0xc300u + (i & 0xffu));
+                    if (i == 8u) {
+                        src_buf[i] = 0u;
+                    } else if (i >= 9u && i < 25u) {
+                        src_buf[i] = static_cast<H>(1u << (i - 9u));
+                    } else if (i >= 25u && i < 41u) {
+                        src_buf[i] = static_cast<H>(~(1u << (i - 25u)));
+                    } else if (i >= 41u && i < 45u) {
+                        src_buf[i] = static_cast<H>((i - 41u) << 5u);
+                    } else {
+                        rng = rng * 1664525u + 1013904223u;
+                        src_buf[i] = static_cast<H>((rng >> 16) & 0xffffu);
+                    }
+                }
+
+                H* dst_ptr = dst_buf + 8u;
+                const H* src_ptr = src_buf + 8u;
+                if (m == kInPlace) {
+                    dst_ptr = dst_buf + 8u;
+                    src_ptr = dst_buf + 8u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                } else if (m == kDstAhead) {
+                    dst_ptr = dst_buf + 9u;
+                    src_ptr = dst_buf + 8u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                } else if (m == kSrcAhead) {
+                    dst_ptr = dst_buf + 8u;
+                    src_ptr = dst_buf + 9u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                }
+
+                void* const fn = (side == 0u) ? slot_5702a0 : cpp_fn;
+                invoke_cdecl3(fn, address(dst_ptr), address(src_ptr), static_cast<U>(count),
+                              trace.fp, trace.abi_fail);
+                std::memcpy(trace.out_words, dst_buf, sizeof trace.out_words);
+                if (side == 0u) {
+                    expected = trace;
+                }
+            }
+            assert_traces_match();
+        }
+    }
+}
+
+static void test_32_to_32(void* orig_fn, void* cpp_fn) {
+    static const I counts[] = {-2147483647 - 1, -1, 0, 1, 2, 3, 15, 16, 64, 256};
+    enum Mode : U { kSeparate = 0u, kInPlace = 1u, kDstAhead = 2u, kSrcAhead = 3u };
+
+    for (I count : counts) {
+        for (U m = 0u; m < 4u; ++m) {
+            if (m != kSeparate && (count < 0 || count > 256)) {
+                continue;
+            }
+            ++cases;
+            for (U side = 0u; side < 2u; ++side) {
+                which = side;
+                std::memset(&trace, 0, sizeof trace);
+
+                U src_buf[kBufDwords] = {};
+                U dst_buf[kBufDwords] = {};
+                U rng = 0x243f6a88u;
+                for (U i = 0u; i < kBufDwords; ++i) {
+                    dst_buf[i] = 0xa5a50000u + i;
+                    if (i == 8u) {
+                        src_buf[i] = 0u;
+                    } else if (i >= 9u && i < 41u) {
+                        src_buf[i] = 1u << (i - 9u);
+                    } else if (i >= 41u && i < 73u) {
+                        src_buf[i] = ~(1u << (i - 41u));
+                    } else if (i == 73u) {
+                        src_buf[i] = 0x00ff8000u;
+                    } else if (i == 74u) {
+                        src_buf[i] = 0xff00ffffu;
+                    } else {
+                        rng = rng * 1664525u + 1013904223u;
+                        src_buf[i] = rng;
+                    }
+                }
+
+                U* dst_ptr = dst_buf + 8u;
+                const U* src_ptr = src_buf + 8u;
+                if (m == kInPlace) {
+                    dst_ptr = dst_buf + 8u;
+                    src_ptr = dst_buf + 8u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                } else if (m == kDstAhead) {
+                    dst_ptr = dst_buf + 9u;
+                    src_ptr = dst_buf + 8u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                } else if (m == kSrcAhead) {
+                    dst_ptr = dst_buf + 8u;
+                    src_ptr = dst_buf + 9u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                }
+
+                void* const fn = (side == 0u) ? orig_fn : cpp_fn;
+                invoke_cdecl3(fn, address(dst_ptr), address(src_ptr), static_cast<U>(count),
+                              trace.fp, trace.abi_fail);
+                std::memcpy(trace.out_dwords, dst_buf, sizeof trace.out_dwords);
+                if (side == 0u) {
+                    expected = trace;
+                }
+            }
+            assert_traces_match();
+        }
+    }
+}
+
+static void test_rgb3_to_bgra4(void* orig_fn, void* cpp_fn) {
+    static const I counts[] = {-2147483647 - 1, -1, 0, 1, 2, 3, 15, 16, 64, 255, 256, 260};
+    enum Mode : U {
+        kSeparate = 0u,
+        kInPlace = 1u,
+        kDstAhead4 = 2u,
+        kSrcAhead4 = 3u,
+        kDstAhead1 = 4u,
+    };
+
+    for (I count : counts) {
+        for (U m = 0u; m < 5u; ++m) {
+            if (m != kSeparate && (count < 0 || count > 260)) {
+                continue;
+            }
+            ++cases;
+            for (U side = 0u; side < 2u; ++side) {
+                which = side;
+                std::memset(&trace, 0, sizeof trace);
+
+                B src_buf[kBufBytes] = {};
+                B dst_buf[kBufBytes] = {};
+                U rng = 0x85ebca6bu;
+                for (U i = 0u; i < kBufBytes; ++i) {
+                    dst_buf[i] = static_cast<B>(0x5au ^ (i & 0xffu));
+                    if (i >= 16u && i < 16u + 256u * 3u) {
+                        const U off = i - 16u;
+                        const U idx = off / 3u;
+                        const U ch = off % 3u;
+                        if (idx < 64u) {
+                            src_buf[i] = static_cast<B>((idx + ch * 21u) & 63u);
+                        } else if (idx == 254u || idx == 255u) {
+                            src_buf[i] = static_cast<B>((idx + ch * 17u) & 0xffu);
+                        } else {
+                            src_buf[i] = static_cast<B>((idx * 3u + ch * 79u) & 0xffu);
+                        }
+                    } else {
+                        rng = rng * 1664525u + 1013904223u;
+                        src_buf[i] = static_cast<B>((rng >> 24) & 0xffu);
+                    }
+                }
+
+                B* dst_ptr = dst_buf + 16u;
+                const B* src_ptr = src_buf + 16u;
+                if (m == kInPlace) {
+                    dst_ptr = dst_buf + 16u;
+                    src_ptr = dst_buf + 16u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                } else if (m == kDstAhead4) {
+                    dst_ptr = dst_buf + 20u;
+                    src_ptr = dst_buf + 16u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                } else if (m == kSrcAhead4) {
+                    dst_ptr = dst_buf + 16u;
+                    src_ptr = dst_buf + 20u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                } else if (m == kDstAhead1) {
+                    dst_ptr = dst_buf + 17u;
+                    src_ptr = dst_buf + 16u;
+                    std::memcpy(dst_buf, src_buf, sizeof dst_buf);
+                }
+
+                void* const fn = (side == 0u) ? orig_fn : cpp_fn;
+                invoke_cdecl3(fn, static_cast<U>(count), address(src_ptr), address(dst_ptr),
+                              trace.fp, trace.abi_fail);
+                std::memcpy(trace.out_bytes, dst_buf, sizeof trace.out_bytes);
+                if (side == 0u) {
+                    expected = trace;
+                }
+            }
+            assert_traces_match();
+        }
+    }
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    init_fixture();
+    test_5702a0();
+    test_32_to_32(
+        slot_570920, reinterpret_cast<void*>(&porsche::render_palette_a555_to_8888_00570920));
+    test_32_to_32(
+        slot_570990, reinterpret_cast<void*>(&porsche::render_palette_a565_to_8888_00570990));
+    test_rgb3_to_bgra4(
+        slot_570ff0, reinterpret_cast<void*>(&porsche::render_palette_vga6_to_8888_00570ff0));
+    test_rgb3_to_bgra4(
+        slot_571160, reinterpret_cast<void*>(&porsche::render_palette_rgb24_to_8888_00571160));
+    std::printf("render_palette_convert_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

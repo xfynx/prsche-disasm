@@ -4,24 +4,22 @@ Updated 2026-11-18. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run684](iterations/v2/001-original-recovery/runs/684-render-clock-and-input-ff-callers-integration/README.md)
-compiles 392 C++ translation units across 8 projects. The link has 69 unresolved names /
-73 references (closing `render_clock_00555bc0` and `render_mode_clock_00555bc0` with zero
-new unresolved names). **There is no recovered playable C++ game executable yet.**
+[Run687](iterations/v2/001-original-recovery/runs/687-render-palette-leaves-integration/README.md)
+compiles 394 C++ translation units across 8 projects. The link has 69 unresolved names /
+73 references (adding unlocker providers with zero new unresolved names). **There is no
+recovered playable C++ game executable yet.**
 
-Run684 integrates ten partial functions (1571 code bytes total: `005a1ebf`, `005a1f4a`,
-`00555bc0` in `682/002` plus `005330a0`, `00533320`, `00533360`, `00572f30`, `00572f5b`,
-`00570420`, `00570490` in `683/001`), `60B` `.data` (`005deae4..005deb0f`, `005deb20`,
-`005deb28..005deb2f`, `005deb3c`), `4B` `.bss` (`0069cb08..0069cb0b`), and zero owned
-`.rdata`. Native comparisons pass 2704 measured cases / 54 material controls at `/Od`/`/O2`.
-Canonical owners are reused. Shared audit verifies 972 source pins; registry 1103 retains
-partial domains.
+Run687 integrates eleven partial functions (903 code bytes total: `00570260`..`00570540`
+in `685/001` plus `005702a0`, `00570920`, `00570990`, `00570ff0`, `00571160` in
+`686/002`) and zero owned `.data`/`.rdata`/`.bss`. Native comparisons pass 1060 measured
+cases / 47 material controls at `/Od`/`/O2`. Canonical owners are reused. Shared audit
+verifies 977 source pins; registry 1114 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run682 (`002`), Run683 (`001`), and Run684 (`001`) integration are accepted within their stated bounds.
+Run685 (`001`), Run686 (`002`), and Run687 (`001`) integration are accepted within their stated bounds.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.

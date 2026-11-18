@@ -1,0 +1,87 @@
+{
+  "run": 686,
+  "functions": [
+    "render_palette_565_to_1555_005702a0",
+    "render_palette_a555_to_8888_00570920",
+    "render_palette_a565_to_8888_00570990",
+    "render_palette_vga6_to_8888_00570ff0",
+    "render_palette_rgb24_to_8888_00571160"
+  ],
+  "originals": [
+    {
+      "function": "render_palette_565_to_1555_005702a0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (std::uint16_t* dst, const std::uint16_t* src, std::int32_t count; ret 0; void)",
+      "entry": "005702a0",
+      "body_ranges_inclusive": [["005702a0", "005702e3"]],
+      "body_bytes": 68,
+      "body_sha256": "a85aaaaadbc9a0ed417f4b56f2553f102979942eabd780dfcdccd0601a3adb97",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 3 sites in references.jsonl (00534193 in 00534010, 00562909 in 00562810, 0056355d in 00563440) and referenced in .data table entries 005de364 and 005de378; pure leaf converting count 16-bit RGB565 entries to ARGB1555 (0 -> 0, else 0x8000 | ((v >> 1) & 0xffe0) | (v & 0x1f)); zero internal .data/.rdata accesses."
+    },
+    {
+      "function": "render_palette_a555_to_8888_00570920",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (std::uint32_t* dst, const std::uint32_t* src, std::int32_t count; ret 0; void)",
+      "entry": "00570920",
+      "body_ranges_inclusive": [["00570920", "00570985"]],
+      "body_bytes": 102,
+      "body_sha256": "1f11fee70c3f52dc5865807f277b3fc6d324870d73a3b63d9d2550dfce931c1c",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 2 sites in references.jsonl (0053479f in 005346d0, 00534ab1 in 005349e0); pure leaf expanding count 32-bit entries preserving top byte [31:24] and expanding 5-5-5 bits [14:0] to 8-8-8 via bit replication (c5 << 3) | (c5 >> 2), ignoring bits [23:15]; zero .data/.rdata accesses."
+    },
+    {
+      "function": "render_palette_a565_to_8888_00570990",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (std::uint32_t* dst, const std::uint32_t* src, std::int32_t count; ret 0; void)",
+      "entry": "00570990",
+      "body_ranges_inclusive": [["00570990", "005709f4"]],
+      "body_bytes": 101,
+      "body_sha256": "3f94c5932e0e43f6111f90afe34e17559743d9dc26e772fa2c2830dd7677ea19",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 1 site in references.jsonl (00534782 in 005346d0); pure leaf expanding count 32-bit entries preserving top byte [31:24] and expanding 5-6-5 bits [15:0] to 8-8-8 via bit replication ((c5 << 3) | (c5 >> 2) and (c6 << 2) | (c6 >> 4)), ignoring bits [23:16]; zero .data/.rdata accesses."
+    },
+    {
+      "function": "render_palette_vga6_to_8888_00570ff0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (std::int32_t count, const std::uint8_t* src, std::uint8_t* dst; ret 0; void)",
+      "entry": "00570ff0",
+      "body_ranges_inclusive": [["00570ff0", "005710a7"]],
+      "body_bytes": 184,
+      "body_sha256": "d9e8948b93fe6a1330e2b2754cf3cc4613b0095abd2a0ffe8be207fdc80a1bcf",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 3 sites in references.jsonl (005347bc in 005346d0, 00534941 in 00534830, 00534ae5 in 005349e0); pure leaf scaling count 3-byte VGA RGB triplets (c * 255 + 32) / 63 into 4-byte BGRA entries with alpha 0xff (0x00 at index 255) in original read/write order; zero .data/.rdata accesses."
+    },
+    {
+      "function": "render_palette_rgb24_to_8888_00571160",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (std::int32_t count, const std::uint8_t* src, std::uint8_t* dst; ret 0; void)",
+      "entry": "00571160",
+      "body_ranges_inclusive": [["00571160", "005711ad"]],
+      "body_bytes": 78,
+      "body_sha256": "0db3819527e2e6e4db943bbbbdb8c6a4232c94bfdc43e216da40a8db9987644d",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "callers_note": "Called by 3 sites in references.jsonl (0053472b in 005346d0, 0053488b in 00534830, 00534a3c in 005349e0); pure leaf packing count 3-byte RGB triplets into 4-byte BGRA entries with alpha 0xff (0x00 at index 255) in original read/write order; zero .data/.rdata accesses."
+    }
+  ],
+  "owned_rdata": [],
+  "owned_data": [],
+  "owned_bss": [],
+  "reused_canonical_symbols": [],
+  "scope_boundary": "PARTIAL: Bounded native x86-vs-C++ proof for 005702a0, 00570920, 00570990, 00570ff0, and 00571160 (533 code bytes total, zero callees, zero .data/.rdata/.bss accesses), exercising positive counts up to 260 (crossing index 255 transparency threshold in 00570ff0/00571160), non-positive counts (INT32_MIN, -1, 0), full single-bit/inverted-bit/ignored-middle-bit/byte-0..255 walks, guard canaries before and after destination buffers, and in-place/overlapping buffer aliasing; null/unmapped src or dst pointers, huge counts overflowing 32-bit pointer offsets, concurrent mutation, and production CMake/registry integration remain open."
+}
