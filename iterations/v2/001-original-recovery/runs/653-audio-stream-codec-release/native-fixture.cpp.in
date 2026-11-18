@@ -1,0 +1,1140 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "audio_stream_codec_release_653.hpp"
+#include "porsche/application_audio_device.hpp"
+
+namespace porsche {
+ApplicationAudioDeviceStateStorage application_audio_device_state_006b48c0{};
+AudioStreamServiceStorage561 audio_stream_service_storage_006b7740{};
+} // namespace porsche
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+enum : U {
+    kArenaBytes = 8192u,
+    kMaxEvents = 64u,
+    kMsgCap = 128u,
+};
+
+enum EventTag : U {
+    kEvHeapEnter = 1u,
+    kEvHeapLeave = 2u,
+    kEvHeapLockDestroy = 3u,
+    kEvClose = 4u,
+    kEvCurrentThread = 5u,
+    kEvFilePump = 6u,
+    kEvFileSleep = 7u,
+    kEvSetGroup = 8u,
+    kEvDiagnostic = 9u,
+    kEvRefill = 10u,
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U file_word;
+    U line_word;
+    U extra0;
+    U extra1;
+    char msg[kMsgCap];
+};
+
+struct Trace {
+    U ret;
+    U abi_fail;
+    U count;
+    Event events[kMaxEvents];
+    U final_file_word;
+    U final_line_word;
+    U storage_hash;
+    FpuSnapshot fp;
+    B memory[kArenaBytes];
+};
+
+alignas(256) static B arena[kArenaBytes];
+alignas(16) static B fp_area[512];
+static B fp_env[28];
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events_total = 0u;
+static U which = 0u;
+static U captured_return = 0u;
+
+static U active_stream_va = 0u;
+static U active_tap_va = 0u;
+static U enter_mutates_lock = 0u;
+static U new_lock_value = 0u;
+static I mock_thread_ret = 0;
+static U mock_close_ret = 0u;
+static U destroy_wait_iters = 0u;
+static U destroy_wait_counter = 0u;
+
+static B* code = nullptr;
+static B* orig_566e10 = nullptr;
+static B* orig_56b3b0 = nullptr;
+static B* orig_56c140 = nullptr;
+static B* orig_56c420 = nullptr;
+static B* orig_56c620 = nullptr;
+
+static const B raw_str_005bdaa0[] = {@STR_005BDAA0@};
+static const B raw_str_005bdd30[] = {@STR_005BDD30@};
+static const B raw_str_005bdd60[] = {@STR_005BDD60@};
+static const B raw_str_005bddac[] = {@STR_005BDDAC@};
+static const B raw_str_005bdde8[] = {@STR_005BDDE8@};
+static const B raw_str_005bde1c[] = {@STR_005BDE1C@};
+static const B raw_str_005bd978[] = {@STR_005BD978@};
+
+static U address(const void* p) { return reinterpret_cast<U>(p); }
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static U rd_va(U va) {
+    U v = 0u;
+    std::memcpy(&v, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(va)), 4u);
+    return v;
+}
+static void wr_va(U va, U v) {
+    std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(va)), &v, 4u);
+}
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", why, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip, cases, which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void capture_fp(FpuSnapshot& fp) {
+    __asm fxsave fp_area
+    __asm fnstenv fp_env
+    __asm fldenv fp_env
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void copy_bounded(char* dst, U cap, const char* src) {
+    std::memset(dst, 0, cap);
+    if (src == nullptr) {
+        return;
+    }
+    for (U i = 0u; i + 1u < cap && src[i] != '\0'; ++i) {
+        dst[i] = src[i];
+    }
+}
+
+static U hash_storage() {
+    U h = 2166136261u;
+    const auto* bytes = reinterpret_cast<const B*>(&porsche::audio_stream_service_storage_006b7740);
+    for (U i = 0u; i < sizeof porsche::audio_stream_service_storage_006b7740; ++i) {
+        h ^= bytes[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void __cdecl mock_diagnostic_fn(const char* fmt, ...) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvDiagnostic;
+    e.file_word = porsche::shared_runtime_word_005deb74;
+    e.line_word = porsche::shared_runtime_word_005deb78;
+    copy_bounded(e.msg, sizeof e.msg, fmt);
+}
+
+namespace porsche {
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvHeapEnter;
+    e.arg0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(lock));
+    if (active_stream_va != 0u) {
+        e.extra0 = rd_va(active_stream_va + 0x3cu);
+        if (enter_mutates_lock != 0u) {
+            wr_va(active_stream_va + 0x04u, new_lock_value);
+        }
+    }
+    if (active_tap_va != 0u) {
+        e.extra1 = rd_va(active_tap_va + 0x08u);
+    }
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvHeapLeave;
+    e.arg0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(lock));
+    if (active_stream_va != 0u) {
+        e.extra0 = rd_va(active_stream_va + 0x3cu);
+    }
+    if (active_tap_va != 0u) {
+        e.extra1 = rd_va(active_tap_va + 0x08u);
+    }
+}
+
+void __cdecl heap_lock_destroy_005322d0(void* lock) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvHeapLockDestroy;
+    e.arg0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(lock));
+}
+
+std::uint32_t __cdecl close_00533da0(void* handle, std::uint32_t group) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvClose;
+    e.arg0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(handle));
+    e.arg1 = group;
+    return mock_close_ret;
+}
+
+std::int32_t __cdecl file_current_thread_0055f780(std::uint32_t identity) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvCurrentThread;
+    e.arg0 = identity;
+    return mock_thread_ret;
+}
+
+std::uint32_t __cdecl file_pump_005366e0(std::uint32_t zero) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvFilePump;
+    e.arg0 = zero;
+    return 0u;
+}
+
+std::uint32_t __cdecl file_sleep_0055f740(std::uint32_t ms) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvFileSleep;
+    e.arg0 = ms;
+    if (destroy_wait_counter > 0u) {
+        --destroy_wait_counter;
+        if (destroy_wait_counter == 0u && active_stream_va != 0u) {
+            wr_va(active_stream_va + 0x28u, 0u);
+        }
+    }
+    return 0u;
+}
+
+void __cdecl file_operation_set_group_005681b0(std::uint32_t id, std::uint32_t group) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvSetGroup;
+    e.arg0 = id;
+    e.arg1 = group;
+    if (active_stream_va != 0u) {
+        e.extra0 = rd_va(active_stream_va + 0x38u);
+    }
+}
+
+void __cdecl audio_stream_codec_refill_0056baf0(void* codec, std::uint32_t offset) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof e);
+    e.tag = kEvRefill;
+    e.arg0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(codec));
+    e.arg1 = offset;
+    if (active_stream_va != 0u) {
+        e.extra0 = rd_va(active_stream_va + 0x28u);
+    }
+}
+
+void (__cdecl* diagnostic_handler_005debf0)(const char*) =
+    reinterpret_cast<void(__cdecl*)(const char*)>(mock_diagnostic_fn);
+
+// Unused symbols referenced by audio_codec_access_565.cpp and audio_stream_codec_create_629.cpp; fail closed.
+std::uint32_t __cdecl audio_stream_codec_bytes_0056afc0(std::uint32_t, std::uint32_t, std::uint32_t) {
+    ExitProcess(90);
+    return 0u;
+}
+void* __cdecl heap_lock_create_005321f0() {
+    ExitProcess(90);
+    return nullptr;
+}
+std::uint32_t __cdecl audio_stream_service_lookup_00566d60(std::int32_t) {
+    ExitProcess(90);
+    return 0u;
+}
+void __cdecl audio_stream_greedy_transition_0056b540(std::uint32_t, std::uint32_t) {
+    ExitProcess(90);
+}
+
+} // namespace porsche
+
+static U invoke_1(void* fn, U a0) {
+    U saved_sp = 0u;
+    U saved_bp = 0u;
+    U fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp, esp
+        mov saved_bp, ebp
+        push a0
+        mov ebx, 0x13579bdf
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        call fn
+        mov captured_return, eax
+        add esp, 4
+        cmp esp, saved_sp
+        jne bad_abi
+        cmp ebp, saved_bp
+        jne bad_abi
+        cmp ebx, 0x13579bdf
+        jne bad_abi
+        cmp esi, 0x2468ace0
+        jne bad_abi
+        cmp edi, 0x10203040
+        je ok_abi
+    bad_abi:
+        mov fail, 1
+    ok_abi:
+        mov esp, saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_2(void* fn, U a0, U a1) {
+    U saved_sp = 0u;
+    U saved_bp = 0u;
+    U fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp, esp
+        mov saved_bp, ebp
+        push a1
+        push a0
+        mov ebx, 0x13579bdf
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        call fn
+        mov captured_return, eax
+        add esp, 8
+        cmp esp, saved_sp
+        jne bad_abi
+        cmp ebp, saved_bp
+        jne bad_abi
+        cmp ebx, 0x13579bdf
+        jne bad_abi
+        cmp esi, 0x2468ace0
+        jne bad_abi
+        cmp edi, 0x10203040
+        je ok_abi
+    bad_abi:
+        mov fail, 1
+    ok_abi:
+        mov esp, saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static void init_original_code() {
+    const B body_00566e10[] = {@BODY_00566E10@};
+    const B body_0056b3b0[] = {@BODY_0056B3B0@};
+    const B body_0056c140[] = {@BODY_0056C140@};
+    const B body_0056c420[] = {@BODY_0056C420@};
+    const B body_0056c620[] = {@BODY_0056C620@};
+    static_assert(sizeof body_00566e10 == 36u, "00566e10 size");
+    static_assert(sizeof body_0056b3b0 == 175u, "0056b3b0 size");
+    static_assert(sizeof body_0056c140 == 568u, "0056c140 size");
+    static_assert(sizeof body_0056c420 == 280u, "0056c420 size");
+    static_assert(sizeof body_0056c620 == 287u, "0056c620 size");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    std::memset(code, 0xcc, 4096u);
+
+    orig_566e10 = code + 0x000u;
+    orig_56b3b0 = code + 0x100u;
+    orig_56c140 = code + 0x200u;
+    orig_56c420 = code + 0x500u;
+    orig_56c620 = code + 0x700u;
+
+    std::memcpy(orig_566e10, body_00566e10, sizeof body_00566e10);
+    std::memcpy(orig_56b3b0, body_0056b3b0, sizeof body_0056b3b0);
+    std::memcpy(orig_56c140, body_0056c140, sizeof body_0056c140);
+    std::memcpy(orig_56c420, body_0056c420, sizeof body_0056c420);
+    std::memcpy(orig_56c620, body_0056c620, sizeof body_0056c620);
+
+    auto reloc_rel = [&](B* fn, U off, U expected_disp, const void* target) {
+        require(rd(fn, off) == expected_disp, "rel disp");
+        wr(fn, off, address(target) - (address(fn) + off + 4u));
+    };
+    auto reloc_abs = [&](B* fn, U off, U expected_va, const void* target) {
+        require(rd(fn, off) == expected_va, "abs va");
+        wr(fn, off, address(target));
+    };
+
+    // 00566e10 relocations
+    reloc_abs(orig_566e10, 0x013u, 0x006b7740u, &porsche::audio_stream_service_storage_006b7740);
+    reloc_rel(orig_566e10, 0x01cu, 0x000057f0u, orig_56c620);
+
+    // 0056b3b0 relocations
+    reloc_rel(orig_56b3b0, 0x012u, 0xffffffbau, reinterpret_cast<const void*>(&porsche::audio_stream_handle_validate_0056b380));
+    reloc_abs(orig_56b3b0, 0x01eu, 0x005bdaa0u, porsche::stream_err_destroy_invalid_handle_005bdaa0);
+    reloc_abs(orig_56b3b0, 0x024u, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    reloc_abs(orig_56b3b0, 0x028u, 0x005bd978u, porsche::stream_source_file_005bd978);
+    reloc_abs(orig_56b3b0, 0x02eu, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    reloc_abs(orig_56b3b0, 0x038u, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    reloc_rel(orig_56b3b0, 0x044u, 0x00001028u, orig_56c420);
+    reloc_rel(orig_56b3b0, 0x05cu, 0xffff4370u, reinterpret_cast<const void*>(&porsche::file_current_thread_0055f780));
+    reloc_rel(orig_56b3b0, 0x06au, 0xfffcb2c2u, reinterpret_cast<const void*>(&porsche::file_pump_005366e0));
+    reloc_rel(orig_56b3b0, 0x074u, 0xffff4318u, reinterpret_cast<const void*>(&porsche::file_sleep_0055f740));
+    reloc_rel(orig_56b3b0, 0x093u, 0xfffc6e89u, reinterpret_cast<const void*>(&porsche::heap_lock_destroy_005322d0));
+    reloc_rel(orig_56b3b0, 0x0a5u, 0xfffc8947u, reinterpret_cast<const void*>(&porsche::close_00533da0));
+
+    // 0056c140 relocations
+    reloc_rel(orig_56c140, 0x016u, 0xfffff226u, reinterpret_cast<const void*>(&porsche::audio_stream_handle_validate_0056b380));
+    reloc_abs(orig_56c140, 0x022u, 0x005bdd30u, porsche::stream_err_cancelrequest_invalid_handle_005bdd30);
+    reloc_abs(orig_56c140, 0x028u, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    reloc_abs(orig_56c140, 0x02cu, 0x005bd978u, porsche::stream_source_file_005bd978);
+    reloc_abs(orig_56c140, 0x032u, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    reloc_abs(orig_56c140, 0x03cu, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    reloc_rel(orig_56c140, 0x053u, 0xfffc6119u, reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    reloc_rel(orig_56c140, 0x062u, 0x0000023au, reinterpret_cast<const void*>(&porsche::audio_stream_request_lookup_0056c3e0));
+    reloc_rel(orig_56c140, 0x087u, 0xfffffb45u, reinterpret_cast<const void*>(&porsche::audio_stream_request_unlink_0056bd10));
+    reloc_rel(orig_56c140, 0x0e6u, 0xfffc6096u, reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+    reloc_rel(orig_56c140, 0x12eu, 0xfffffa6eu, reinterpret_cast<const void*>(&porsche::audio_stream_ring_contains_0056bce0));
+    reloc_rel(orig_56c140, 0x17cu, 0xfffc5ff0u, reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    reloc_rel(orig_56c140, 0x195u, 0xfffc5fe7u, reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+    reloc_rel(orig_56c140, 0x1a0u, 0x0000009cu, reinterpret_cast<const void*>(&porsche::audio_stream_consume_bytes_0056c380));
+    reloc_rel(orig_56c140, 0x1cdu, 0xfffff9cfu, reinterpret_cast<const void*>(&porsche::audio_stream_ring_contains_0056bce0));
+    reloc_rel(orig_56c140, 0x1deu, 0x0000021eu, reinterpret_cast<const void*>(&porsche::audio_stream_get_0056c540));
+    reloc_rel(orig_56c140, 0x1e9u, 0x000002f3u, orig_56c620);
+    reloc_rel(orig_56c140, 0x202u, 0xfffff99au, reinterpret_cast<const void*>(&porsche::audio_stream_ring_contains_0056bce0));
+
+    // 0056c420 relocations
+    reloc_rel(orig_56c420, 0x012u, 0xffffef4au, reinterpret_cast<const void*>(&porsche::audio_stream_handle_validate_0056b380));
+    reloc_abs(orig_56c420, 0x01eu, 0x005bdd60u, porsche::stream_err_kill_invalid_handle_005bdd60);
+    reloc_abs(orig_56c420, 0x024u, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    reloc_abs(orig_56c420, 0x028u, 0x005bd978u, porsche::stream_source_file_005bd978);
+    reloc_abs(orig_56c420, 0x02eu, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    reloc_abs(orig_56c420, 0x038u, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    reloc_rel(orig_56c420, 0x063u, 0xfffffcb9u, orig_56c140);
+    reloc_rel(orig_56c420, 0x080u, 0xfffff86cu, reinterpret_cast<const void*>(&porsche::audio_stream_request_unlink_0056bd10));
+    reloc_rel(orig_56c420, 0x0ccu, 0xfffffe90u, reinterpret_cast<const void*>(&porsche::audio_stream_consume_bytes_0056c380));
+
+    // 0056c620 relocations
+    reloc_rel(orig_56c620, 0x011u, 0xffffed4bu, reinterpret_cast<const void*>(&porsche::audio_stream_handle_validate_0056b380));
+    reloc_abs(orig_56c620, 0x01du, 0x005bde1cu, porsche::stream_err_release_invalid_handle_005bde1c);
+    reloc_abs(orig_56c620, 0x023u, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    reloc_abs(orig_56c620, 0x027u, 0x005bd978u, porsche::stream_source_file_005bd978);
+    reloc_abs(orig_56c620, 0x02du, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    reloc_abs(orig_56c620, 0x037u, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    reloc_abs(orig_56c620, 0x065u, 0x005bdde8u, porsche::stream_err_release_already_released_005bdde8);
+    reloc_abs(orig_56c620, 0x06bu, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    reloc_abs(orig_56c620, 0x06fu, 0x005bd978u, porsche::stream_source_file_005bd978);
+    reloc_abs(orig_56c620, 0x075u, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    reloc_abs(orig_56c620, 0x07fu, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    reloc_rel(orig_56c620, 0x095u, 0xfffffcc7u, reinterpret_cast<const void*>(&porsche::audio_stream_consume_bytes_0056c380));
+    reloc_rel(orig_56c620, 0x0a2u, 0xfffc5beau, reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    reloc_rel(orig_56c620, 0x0c5u, 0xfffc5bd7u, reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+    reloc_rel(orig_56c620, 0x0e3u, 0xfffff3e9u, reinterpret_cast<const void*>(&porsche::audio_stream_codec_refill_0056baf0));
+    reloc_rel(orig_56c620, 0x0f2u, 0xfffff3dau, reinterpret_cast<const void*>(&porsche::audio_stream_codec_refill_0056baf0));
+    reloc_abs(orig_56c620, 0x0fcu, 0x005bddacu, porsche::stream_err_release_wrong_stream_005bddac);
+    reloc_abs(orig_56c620, 0x102u, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    reloc_abs(orig_56c620, 0x106u, 0x005bd978u, porsche::stream_source_file_005bd978);
+    reloc_abs(orig_56c620, 0x10cu, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    reloc_abs(orig_56c620, 0x116u, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+}
+
+static void prepare_arena() {
+    for (U i = 0u; i < kArenaBytes; ++i) {
+        arena[i] = static_cast<B>((i * 41u + 0x5au) & 0xffu);
+    }
+    std::memset(&porsche::audio_stream_service_storage_006b7740, 0,
+                sizeof porsche::audio_stream_service_storage_006b7740);
+    porsche::shared_runtime_word_005deb74 = 0x11223344u;
+    porsche::shared_runtime_word_005deb78 = 0x55667788u;
+    porsche::diagnostic_handler_005debf0 =
+        reinterpret_cast<void(__cdecl*)(const char*)>(mock_diagnostic_fn);
+    destroy_wait_counter = destroy_wait_iters;
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "abi");
+    require(trace.count == expected.count, "event_count");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "ev_tag");
+        require(trace.events[i].arg0 == expected.events[i].arg0, "ev_arg0");
+        require(trace.events[i].arg1 == expected.events[i].arg1, "ev_arg1");
+        require(trace.events[i].file_word == expected.events[i].file_word, "ev_file_word");
+        require(trace.events[i].line_word == expected.events[i].line_word, "ev_line_word");
+        require(trace.events[i].extra0 == expected.events[i].extra0, "ev_extra0");
+        require(trace.events[i].extra1 == expected.events[i].extra1, "ev_extra1");
+        require(std::memcmp(trace.events[i].msg, expected.events[i].msg, kMsgCap) == 0, "ev_msg");
+    }
+    require(trace.final_file_word == expected.final_file_word, "final_file_word");
+    require(trace.final_line_word == expected.final_line_word, "final_line_word");
+    require(trace.storage_hash == expected.storage_hash, "storage_hash");
+    require(std::memcmp(&trace.fp, &expected.fp, sizeof trace.fp) == 0, "fp");
+    require(std::memcmp(trace.memory, expected.memory, kArenaBytes) == 0, "arena_memory");
+
+    ++cases;
+    events_total += trace.count;
+}
+
+struct ChunkSpec {
+    U off;
+    U word0;
+    U word4;
+};
+
+struct ReqSpec {
+    U id;
+    U status;
+    U buf_off;
+};
+
+static void setup_stream_base(
+    U stream_va, U tap_va, U req_base, U ring_start, U ring_end,
+    U lock_val, U state28, U val2c, U val30, U thresh34, U flag38, U avail3c,
+    U read40, U write44, U num_taps, U file_handle160, U op_id168) {
+    wr_va(stream_va + 0x00u, 0x4d525453u); // 'STRM'
+    wr_va(stream_va + 0x04u, lock_val);
+    wr_va(stream_va + 0x08u, req_base);
+    wr_va(stream_va + 0x0cu, 8u);
+    wr_va(stream_va + 0x18u, tap_va);
+    wr_va(stream_va + 0x1cu, num_taps);
+    wr_va(stream_va + 0x20u, ring_start);
+    wr_va(stream_va + 0x24u, ring_end);
+    wr_va(stream_va + 0x28u, state28);
+    wr_va(stream_va + 0x2cu, val2c);
+    wr_va(stream_va + 0x30u, val30);
+    wr_va(stream_va + 0x34u, thresh34);
+    wr_va(stream_va + 0x38u, flag38);
+    wr_va(stream_va + 0x3cu, avail3c);
+    wr_va(stream_va + 0x40u, read40);
+    wr_va(stream_va + 0x44u, write44);
+    wr_va(stream_va + 0x4cu, 0u);
+    wr_va(stream_va + 0x50u, 0u);
+    wr_va(stream_va + 0x54u, 0u);
+    wr_va(stream_va + 0x58u, 0u);
+    wr_va(stream_va + 0x160u, file_handle160);
+    wr_va(stream_va + 0x168u, op_id168);
+}
+
+static void run_release_invalid(U handle_mode, U magic_word) {
+    active_stream_va = 0u;
+    active_tap_va = 0u;
+    enter_mutates_lock = 0u;
+    destroy_wait_iters = 0u;
+    const U stream_va = address(arena);
+    const U tap_va = stream_va + 0x200u;
+    const U chunk_va = stream_va + 0x400u;
+    for (int side = 0; side < 2; ++side) {
+        which = static_cast<U>(side);
+        prepare_arena();
+        wr_va(stream_va + 0x00u, magic_word);
+        wr_va(tap_va + 0x00u, stream_va);
+        const U handle = (handle_mode == 0u) ? 0u : tap_va;
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_release_chunk_0056c620)
+                        : reinterpret_cast<void*>(orig_56c620);
+        trace.abi_fail = invoke_2(fn, handle, chunk_va);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        trace.storage_hash = hash_storage();
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+static void run_release_chunk(
+    U chunk_off_signed_mode, U chunk_word0, U chunk_word4,
+    U state28, U val2c, U val30, U thresh34, U flag38, U avail3c,
+    U mutate_lock = 0u, U next_lock = 0u) {
+    const U stream_va = address(arena);
+    const U tap_va = stream_va + 0x200u;
+    const U ring_start = stream_va + 0x400u;
+    const U ring_end = stream_va + 0x500u;
+    active_stream_va = stream_va;
+    active_tap_va = 0u;
+    enter_mutates_lock = mutate_lock;
+    new_lock_value = next_lock;
+    destroy_wait_iters = 0u;
+
+    U chunk_va = ring_start;
+    if (chunk_off_signed_mode == 1u) {
+        chunk_va = ring_start - 4u; // below ring_start
+    } else if (chunk_off_signed_mode == 2u) {
+        chunk_va = ring_end - 8u; // exact inclusive upper bound
+    } else if (chunk_off_signed_mode == 3u) {
+        chunk_va = ring_end - 7u; // 1 byte above upper bound
+    }
+
+    for (int side = 0; side < 2; ++side) {
+        which = static_cast<U>(side);
+        prepare_arena();
+        setup_stream_base(stream_va, tap_va, stream_va + 0x800u, ring_start, ring_end,
+                          0x20010001u, state28, val2c, val30, thresh34, flag38, avail3c,
+                          ring_start, ring_start + 0x40u, 1u, 0x44440001u, 0x77u);
+        wr_va(tap_va + 0x00u, stream_va);
+        wr_va(tap_va + 0x04u, 1u);
+        wr_va(chunk_va + 0x00u, chunk_word0);
+        wr_va(chunk_va + 0x04u, chunk_word4);
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_release_chunk_0056c620)
+                        : reinterpret_cast<void*>(orig_56c620);
+        trace.abi_fail = invoke_2(fn, tap_va, chunk_va);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        trace.storage_hash = hash_storage();
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+static void run_service_release(U slot_idx, U header_word0, U header_word4, U state28) {
+    const U stream_va = address(arena);
+    const U tap_va = stream_va + 0x200u;
+    const U ring_start = stream_va + 0x400u;
+    const U ring_end = stream_va + 0x500u;
+    const U channel_va = stream_va + 0x600u;
+    const U bad_channel_va = stream_va + 0x620u;
+    const U chunk_header_va = ring_start + 0x04u;
+    const U chunk_data_va = stream_va + 0x700u;
+    active_stream_va = stream_va;
+    active_tap_va = 0u;
+    enter_mutates_lock = 0u;
+    destroy_wait_iters = 0u;
+
+    for (int side = 0; side < 2; ++side) {
+        which = static_cast<U>(side);
+        prepare_arena();
+        setup_stream_base(stream_va, tap_va, stream_va + 0x800u, ring_start, ring_end,
+                          0x30010001u, state28, 0x96u, 0x32u, 16u, 0u, 64u,
+                          ring_start, ring_start + 0x60u, 1u, 0x55550001u, 0x88u);
+        wr_va(tap_va + 0x00u, stream_va);
+        wr_va(tap_va + 0x04u, 1u);
+        wr_va(channel_va + 0x00u, 0u); // wrong offset 0 if mutated
+        wr_va(channel_va + 0x04u, tap_va);
+        wr_va(bad_channel_va + 0x00u, 0u);
+        wr_va(bad_channel_va + 0x04u, 0u);
+        wr_va(chunk_data_va - 4u, chunk_header_va);
+        wr_va(chunk_header_va + 0x00u, header_word0);
+        wr_va(chunk_header_va + 0x04u, header_word4);
+        porsche::audio_stream_service_storage_006b7740.slots[4u] = bad_channel_va;
+        porsche::audio_stream_service_storage_006b7740.slots[slot_idx] = channel_va;
+
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_service_release_00566e10)
+                        : reinterpret_cast<void*>(orig_566e10);
+        trace.abi_fail = invoke_1(fn, chunk_data_va);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        trace.storage_hash = hash_storage();
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+static void run_abort_invalid(U handle_mode, U magic_word) {
+    active_stream_va = 0u;
+    active_tap_va = 0u;
+    enter_mutates_lock = 0u;
+    destroy_wait_iters = 0u;
+    const U stream_va = address(arena);
+    const U tap_va = stream_va + 0x200u;
+    for (int side = 0; side < 2; ++side) {
+        which = static_cast<U>(side);
+        prepare_arena();
+        wr_va(stream_va + 0x00u, magic_word);
+        wr_va(tap_va + 0x00u, stream_va);
+        const U handle = (handle_mode == 0u) ? 0u : tap_va;
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_abort_node_0056c140)
+                        : reinterpret_cast<void*>(orig_56c140);
+        trace.abi_fail = invoke_2(fn, handle, 0u);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        trace.storage_hash = hash_storage();
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+static void run_abort_scenario(
+    U num_taps,
+    U tap0_id, U tap0_rem, U tap0_cur_off,
+    U tap1_id, U tap1_rem, U tap1_cur_off,
+    U read40_off, U write44_off,
+    U avail3c, U thresh34, U state28,
+    std::initializer_list<ReqSpec> reqs,
+    U head_idx, U active_idx, U tail_idx,
+    U target_req_id,
+    std::initializer_list<ChunkSpec> chunks) {
+    const U stream_va = address(arena);
+    const U tap_base = stream_va + 0x200u;
+    const U ring_start = stream_va + 0x400u;
+    const U ring_end = stream_va + 0x800u;
+    const U req_base = stream_va + 0x900u; // 8 * 0x128 = 0x940 -> fits inside 8 KiB arena!
+    active_stream_va = stream_va;
+    active_tap_va = tap_base;
+    enter_mutates_lock = 0u;
+    destroy_wait_iters = 0u;
+
+    for (int side = 0; side < 2; ++side) {
+        which = static_cast<U>(side);
+        prepare_arena();
+        setup_stream_base(stream_va, tap_base, req_base, ring_start, ring_end,
+                          0x40010001u, state28, 0x96u, 0x32u, thresh34, 0u, avail3c,
+                          ring_start + read40_off, ring_start + write44_off,
+                          num_taps, 0x66660001u, 0x99u);
+        wr_va(stream_va + 0x0cu, static_cast<U>(reqs.size()));
+
+        U idx = 0u;
+        const U nreq = static_cast<U>(reqs.size());
+        for (const ReqSpec& r : reqs) {
+            const U node = req_base + idx * 0x128u;
+            wr_va(node + 0x00u, r.id);
+            wr_va(node + 0x04u, r.status);
+            wr_va(node + 0x08u, (idx > 0u) ? (req_base + (idx - 1u) * 0x128u) : 0u);
+            wr_va(node + 0x0cu, (idx + 1u < nreq) ? (req_base + (idx + 1u) * 0x128u) : 0u);
+            wr_va(node + 0x124u, ring_start + r.buf_off);
+            ++idx;
+        }
+        if (nreq > 0u) {
+            wr_va(stream_va + 0x4cu, req_base + head_idx * 0x128u);
+            wr_va(stream_va + 0x50u, req_base + active_idx * 0x128u);
+            wr_va(stream_va + 0x54u, req_base + tail_idx * 0x128u);
+        }
+
+        wr_va(tap_base + 0x00u, stream_va);
+        if (num_taps > 0u) {
+            wr_va(tap_base + 0x04u, tap0_id);
+            wr_va(tap_base + 0x08u, tap0_rem);
+            wr_va(tap_base + 0x0cu, ring_start + tap0_cur_off);
+        }
+        if (num_taps > 1u) {
+            wr_va(tap_base + 0x10u, stream_va);
+            wr_va(tap_base + 0x14u, tap1_id);
+            wr_va(tap_base + 0x18u, tap1_rem);
+            wr_va(tap_base + 0x1cu, ring_start + tap1_cur_off);
+        }
+
+        for (const ChunkSpec& c : chunks) {
+            wr_va(ring_start + c.off + 0x00u, c.word0);
+            wr_va(ring_start + c.off + 0x04u, c.word4);
+        }
+
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_abort_node_0056c140)
+                        : reinterpret_cast<void*>(orig_56c140);
+        trace.abi_fail = invoke_2(fn, tap_base, target_req_id);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        trace.storage_hash = hash_storage();
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+static void run_reset_invalid(U handle_mode, U magic_word) {
+    active_stream_va = 0u;
+    active_tap_va = 0u;
+    enter_mutates_lock = 0u;
+    destroy_wait_iters = 0u;
+    const U stream_va = address(arena);
+    const U tap_va = stream_va + 0x200u;
+    for (int side = 0; side < 2; ++side) {
+        which = static_cast<U>(side);
+        prepare_arena();
+        wr_va(stream_va + 0x00u, magic_word);
+        wr_va(tap_va + 0x00u, stream_va);
+        const U handle = (handle_mode == 0u) ? 0u : tap_va;
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_reset_0056c420)
+                        : reinterpret_cast<void*>(orig_56c420);
+        trace.abi_fail = invoke_1(fn, handle);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        trace.storage_hash = hash_storage();
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+static void run_reset_scenario(
+    U num_taps, U tap0_rem, U tap0_cur_off, U tap1_rem, U tap1_cur_off,
+    U read40_off, U write44_off,
+    U avail3c, U thresh34, U state28,
+    std::initializer_list<ReqSpec> reqs,
+    U head_idx, U active_idx, U tail_idx,
+    std::initializer_list<ChunkSpec> chunks) {
+    const U stream_va = address(arena);
+    const U tap_base = stream_va + 0x200u;
+    const U ring_start = stream_va + 0x400u;
+    const U ring_end = stream_va + 0x800u;
+    const U req_base = stream_va + 0x900u;
+    active_stream_va = stream_va;
+    active_tap_va = 0u;
+    enter_mutates_lock = 0u;
+    destroy_wait_iters = 0u;
+
+    for (int side = 0; side < 2; ++side) {
+        which = static_cast<U>(side);
+        prepare_arena();
+        setup_stream_base(stream_va, tap_base, req_base, ring_start, ring_end,
+                          0x50010001u, state28, 0x96u, 0x32u, thresh34, 0u, avail3c,
+                          ring_start + read40_off, ring_start + write44_off,
+                          num_taps, 0x77770001u, 0xaau);
+        wr_va(stream_va + 0x0cu, static_cast<U>(reqs.size()));
+
+        U idx = 0u;
+        const U nreq = static_cast<U>(reqs.size());
+        for (const ReqSpec& r : reqs) {
+            const U node = req_base + idx * 0x128u;
+            wr_va(node + 0x00u, r.id);
+            wr_va(node + 0x04u, r.status);
+            wr_va(node + 0x08u, (idx > 0u) ? (req_base + (idx - 1u) * 0x128u) : 0u);
+            wr_va(node + 0x0cu, (idx + 1u < nreq) ? (req_base + (idx + 1u) * 0x128u) : 0u);
+            wr_va(node + 0x124u, ring_start + r.buf_off);
+            ++idx;
+        }
+        if (nreq > 0u) {
+            wr_va(stream_va + 0x4cu, req_base + head_idx * 0x128u);
+            wr_va(stream_va + 0x50u, req_base + active_idx * 0x128u);
+            wr_va(stream_va + 0x54u, req_base + tail_idx * 0x128u);
+        }
+
+        wr_va(tap_base + 0x00u, stream_va);
+        if (num_taps > 0u) {
+            wr_va(tap_base + 0x04u, 1u);
+            wr_va(tap_base + 0x08u, tap0_rem);
+            wr_va(tap_base + 0x0cu, ring_start + tap0_cur_off);
+        }
+        if (num_taps > 1u) {
+            wr_va(tap_base + 0x10u, stream_va);
+            wr_va(tap_base + 0x14u, 2u);
+            wr_va(tap_base + 0x18u, tap1_rem);
+            wr_va(tap_base + 0x1cu, ring_start + tap1_cur_off);
+        }
+
+        for (const ChunkSpec& c : chunks) {
+            wr_va(ring_start + c.off + 0x00u, c.word0);
+            wr_va(ring_start + c.off + 0x04u, c.word4);
+        }
+
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_reset_0056c420)
+                        : reinterpret_cast<void*>(orig_56c420);
+        trace.abi_fail = invoke_1(fn, tap_base);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        trace.storage_hash = hash_storage();
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+static void run_destroy_invalid(U handle_mode, U magic_word) {
+    active_stream_va = 0u;
+    active_tap_va = 0u;
+    enter_mutates_lock = 0u;
+    destroy_wait_iters = 0u;
+    const U stream_va = address(arena);
+    const U tap_va = stream_va + 0x200u;
+    for (int side = 0; side < 2; ++side) {
+        which = static_cast<U>(side);
+        prepare_arena();
+        wr_va(stream_va + 0x00u, magic_word);
+        wr_va(tap_va + 0x00u, stream_va);
+        const U handle = (handle_mode == 0u) ? 0u : tap_va;
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_destroy_0056b3b0)
+                        : reinterpret_cast<void*>(orig_56b3b0);
+        trace.abi_fail = invoke_1(fn, handle);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        trace.storage_hash = hash_storage();
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+static void run_destroy_valid(U state28, I thread_ret, U wait_iters, U with_queue) {
+    const U stream_va = address(arena);
+    const U tap_base = stream_va + 0x200u;
+    const U ring_start = stream_va + 0x400u;
+    const U ring_end = stream_va + 0x800u;
+    const U req_base = stream_va + 0x900u;
+    active_stream_va = stream_va;
+    active_tap_va = 0u;
+    enter_mutates_lock = 0u;
+    mock_thread_ret = thread_ret;
+    mock_close_ret = 1u;
+    destroy_wait_iters = wait_iters;
+
+    for (int side = 0; side < 2; ++side) {
+        which = static_cast<U>(side);
+        prepare_arena();
+        setup_stream_base(stream_va, tap_base, req_base, ring_start, ring_end,
+                          0x60010001u, state28, 0x96u, 0x32u, 10u, 0u, 32u,
+                          ring_start, ring_start + 32u, 1u, 0x88880001u, 0xbbu);
+        wr_va(tap_base + 0x00u, stream_va);
+        wr_va(tap_base + 0x04u, 1u);
+        wr_va(tap_base + 0x08u, 32u);
+        wr_va(tap_base + 0x0cu, ring_start);
+        if (with_queue != 0u) {
+            wr_va(stream_va + 0x0cu, 1u);
+            wr_va(req_base + 0x00u, 0u);
+            wr_va(req_base + 0x04u, 3u);
+            wr_va(req_base + 0x124u, ring_start);
+            wr_va(stream_va + 0x4cu, req_base);
+            wr_va(stream_va + 0x50u, req_base);
+            wr_va(stream_va + 0x54u, req_base);
+            wr_va(ring_start + 0x00u, 0x11111111u);
+            wr_va(ring_start + 0x04u, (1u << 24u) | 32u);
+        }
+
+        std::memset(&trace, 0, sizeof trace);
+        __asm fninit
+        void* fn = side ? reinterpret_cast<void*>(&porsche::audio_stream_codec_destroy_0056b3b0)
+                        : reinterpret_cast<void*>(orig_56b3b0);
+        trace.abi_fail = invoke_1(fn, tap_base);
+        trace.final_file_word = porsche::shared_runtime_word_005deb74;
+        trace.final_line_word = porsche::shared_runtime_word_005deb78;
+        trace.storage_hash = hash_storage();
+        capture_fp(trace.fp);
+        std::memcpy(trace.memory, arena, kArenaBytes);
+        if (side == 0) {
+            std::memcpy(&expected, &trace, sizeof trace);
+        }
+    }
+    compare_traces();
+}
+
+int main() {
+    SetUnhandledExceptionFilter(fault_handler);
+
+    // Check initial production state before any fixture writes.
+    require(porsche::shared_runtime_word_005deb74 == 0u, "initial_005deb74");
+    require(porsche::shared_runtime_word_005deb78 == 0u, "initial_005deb78");
+    {
+        B zero_storage[sizeof porsche::audio_stream_service_storage_006b7740]{};
+        require(std::memcmp(&porsche::audio_stream_service_storage_006b7740,
+                            zero_storage, sizeof zero_storage) == 0,
+                "initial_006b7740");
+    }
+
+    // Check exact .rdata bytes against raw PE before relocation.
+    require(sizeof porsche::stream_err_destroy_invalid_handle_005bdaa0 == sizeof raw_str_005bdaa0 &&
+            std::memcmp(porsche::stream_err_destroy_invalid_handle_005bdaa0, raw_str_005bdaa0, sizeof raw_str_005bdaa0) == 0,
+            "rdata_005bdaa0");
+    require(sizeof porsche::stream_err_cancelrequest_invalid_handle_005bdd30 == sizeof raw_str_005bdd30 &&
+            std::memcmp(porsche::stream_err_cancelrequest_invalid_handle_005bdd30, raw_str_005bdd30, sizeof raw_str_005bdd30) == 0,
+            "rdata_005bdd30");
+    require(sizeof porsche::stream_err_kill_invalid_handle_005bdd60 == sizeof raw_str_005bdd60 &&
+            std::memcmp(porsche::stream_err_kill_invalid_handle_005bdd60, raw_str_005bdd60, sizeof raw_str_005bdd60) == 0,
+            "rdata_005bdd60");
+    require(sizeof porsche::stream_err_release_wrong_stream_005bddac == sizeof raw_str_005bddac &&
+            std::memcmp(porsche::stream_err_release_wrong_stream_005bddac, raw_str_005bddac, sizeof raw_str_005bddac) == 0,
+            "rdata_005bddac");
+    require(sizeof porsche::stream_err_release_already_released_005bdde8 == sizeof raw_str_005bdde8 &&
+            std::memcmp(porsche::stream_err_release_already_released_005bdde8, raw_str_005bdde8, sizeof raw_str_005bdde8) == 0,
+            "rdata_005bdde8");
+    require(sizeof porsche::stream_err_release_invalid_handle_005bde1c == sizeof raw_str_005bde1c &&
+            std::memcmp(porsche::stream_err_release_invalid_handle_005bde1c, raw_str_005bde1c, sizeof raw_str_005bde1c) == 0,
+            "rdata_005bde1c");
+    require(sizeof porsche::stream_source_file_005bd978 == sizeof raw_str_005bd978 &&
+            std::memcmp(porsche::stream_source_file_005bd978, raw_str_005bd978, sizeof raw_str_005bd978) == 0,
+            "rdata_005bd978");
+
+    init_original_code();
+
+    // 1. 0056c620: STREAM_release invalid handles, range checks, sentinel check, consume, and refill paths.
+    run_release_invalid(0u, 0x4d525453u);
+    run_release_invalid(1u, 0x00000000u);
+    run_release_invalid(1u, 0x4d525452u);
+    run_release_chunk(1u, 0x11111111u, 32u, 0u, 150u, 50u, 20u, 0u, 64u); // below ring_start
+    run_release_chunk(3u, 0x11111111u, 32u, 0u, 150u, 50u, 20u, 0u, 64u); // above ring_end - 8
+    run_release_chunk(2u, 0x11111111u, 8u, 0u, 150u, 50u, 20u, 0u, 64u);  // exact ring_end - 8 valid
+    run_release_chunk(0u, 0xfffffffeu, 32u, 0u, 150u, 50u, 20u, 0u, 64u); // already released
+    run_release_chunk(0u, 0x11111111u, 32u, 1u, 150u, 50u, 40u, 0u, 64u); // state28 == 1, threshold crossed
+    run_release_chunk(0u, 0x22222222u, 24u, 2u, 150u, 50u, 10u, 0u, 64u); // state28 == 2, flag38 == 0 -> refill(val2c)
+    run_release_chunk(0u, 0x33333333u, 24u, 2u, 150u, 50u, 10u, 1u, 64u); // state28 == 2, flag38 != 0 -> refill(val30)
+    run_release_chunk(0u, 0x44444444u, 16u, 2u, 150u, 50u, 50u, 0u, 64u, 1u, 0x70070007u); // lock re-read + threshold
+
+    // 2. 00566e10: service release indirection through chunk_data_va[-4] and audio_stream_service_storage_006b7740.
+    run_service_release(0u, 0x00000000u, 32u, 0u);
+    run_service_release(3u, 0xdead0003u, 24u, 2u);
+    run_service_release(15u, 0x4455000fu, 16u, 1u);
+
+    // 3. 0056c140: STREAM_cancelrequest invalid handles, status 1/4/lookup miss, Case A (walk/wrap/skip/empty), Case B (get+release).
+    run_abort_invalid(0u, 0x4d525453u);
+    run_abort_invalid(1u, 0x4d525452u);
+    run_abort_scenario(1u, 1u, 32u, 0u, 0u, 0u, 0u, 0u, 32u, 32u, 10u, 1u,
+                       {{0u, 3u, 0u}}, 0u, 0u, 0u, 99u, {}); // lookup miss
+    run_abort_scenario(1u, 1u, 32u, 0u, 0u, 0u, 0u, 0u, 32u, 32u, 10u, 1u,
+                       {{5u, 4u, 0u}}, 0u, 0u, 0u, 5u, {}); // status == 4 guard
+    run_abort_scenario(1u, 1u, 32u, 0u, 0u, 0u, 0u, 0u, 32u, 32u, 10u, 1u,
+                       {{5u, 1u, 0u}}, 0u, 0u, 0u, 5u, {}); // status == 1 -> unlink only
+    run_abort_scenario(1u, 1u, 32u, 0u, 0u, 0u, 0u, 0u, 0u, 32u, 10u, 1u,
+                       {{5u, 2u, 0u}}, 0u, 0u, 0u, 5u,
+                       {{0u, 0x11111111u, (1u << 24u) | 16u}, {16u, 0xffffffffu, 0u}}); // Case A empty range (start==end)
+    run_abort_scenario(2u,
+                       1u, 48u, 16u,
+                       2u, 32u, 16u,
+                       0u, 32u, 80u, 40u, 1u,
+                       {{0u, 3u, 0u}, {1u, 2u, 48u}, {2u, 1u, 112u}},
+                       0u, 0u, 2u, 1u,
+                       {
+                           {48u, 0xaaaa1111u, (1u << 24u) | 16u},
+                           {64u, 0xbbbb2222u, (2u << 24u) | 16u},
+                           {80u, 0xffffffffu, 0u},
+                           {0u, 0xcccc3333u, (1u << 24u) | 16u},
+                           {16u, 0xdddd4444u, (9u << 24u) | 16u},
+                       }); // next->status == 1 -> end_ptr=write44, Case A wrap + tag match/skip
+    run_abort_scenario(1u, 1u, 64u, 64u, 0u, 0u, 0u,
+                       0u, 128u, 64u, 20u, 1u,
+                       {{0u, 3u, 0u}, {1u, 2u, 48u}, {2u, 3u, 96u}},
+                       0u, 0u, 2u, 1u,
+                       {
+                           {64u, 0x11111111u, (1u << 24u) | 16u},
+                           {80u, 0x22222222u, (1u << 24u) | 16u},
+                           {96u, 0x33333333u, (1u << 24u) | 16u},
+                       }); // Case B: tap_cur inside [start_ptr, end_ptr), calls get + release until outside [48, 96)
+    run_abort_scenario(1u, 1u, 24u, 64u, 0u, 0u, 0u,
+                       0u, 128u, 64u, 20u, 1u,
+                       {{0u, 3u, 0u}, {1u, 2u, 48u}, {2u, 3u, 112u}},
+                       0u, 0u, 2u, 1u,
+                       {
+                           {64u, 0x11111111u, (1u << 24u) | 24u},
+                           {88u, 0x22222222u, (1u << 24u) | 16u},
+                       }); // Case B: stops when tap_rem hits 0
+    run_abort_scenario(0u, 0u, 0u, 0u, 0u, 0u, 0u,
+                       0u, 32u, 32u, 10u, 1u,
+                       {{0u, 2u, 0u}}, 0u, 0u, 0u, 0u, {}); // num_taps == 0
+
+    // 4. 0056c420: STREAM_kill invalid handles, empty tail early return, abort loop, unlink loop, ring mark+wrap, state28 clear.
+    run_reset_invalid(0u, 0x4d525453u);
+    run_reset_invalid(1u, 0x4d525452u);
+    run_reset_scenario(1u, 32u, 0u, 0u, 0u, 0u, 32u, 32u, 10u, 2u, {}, 0u, 0u, 0u, {}); // tail == 0 -> early return, keeps state28=2
+    run_reset_scenario(2u, 32u, 0u, 16u, 48u, 48u, 32u, 64u, 20u, 2u,
+                       {{0u, 3u, 0u}, {1u, 3u, 48u}, {2u, 2u, 64u}, {3u, 1u, 96u}},
+                       0u, 1u, 3u,
+                       {
+                           {48u, 0x11111111u, (3u << 24u) | 16u},
+                           {64u, 0xffffffffu, 0u},
+                           {0u, 0x22222222u, (1u << 24u) | 32u},
+                       }); // aborts status=1 then status=2, unlinks head!=active, marks ring + clears state28 2->0
+    run_reset_scenario(1u, 16u, 0u, 0u, 0u, 0u, 0u, 16u, 5u, 1u,
+                       {{0u, 3u, 0u}}, 0u, 0u, 0u, {}); // read==write, state28=1 preserved
+
+    // 5. 0056b3b0: STREAM_destroy invalid handles, non-waiting teardown, waiting loop (thread=0 and thread=1).
+    run_destroy_invalid(0u, 0x4d525453u);
+    run_destroy_invalid(1u, 0x4d525452u);
+    run_destroy_valid(0u, 0, 0u, 0u);  // state28==0, empty queue
+    run_destroy_valid(2u, 0, 0u, 1u);  // state28==2 -> reset clears to 0 -> skips wait loop
+    run_destroy_valid(1u, 0, 2u, 1u);  // state28==1, thread_ret==0 -> sleeps twice without pump
+    run_destroy_valid(1u, 1, 2u, 1u);  // state28==1, thread_ret==1 -> pumps + sleeps twice
+
+    std::printf("audio_stream_codec_release_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events_total);
+    return 0;
+}

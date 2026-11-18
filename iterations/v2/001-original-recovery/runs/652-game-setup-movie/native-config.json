@@ -1,0 +1,146 @@
+{
+  "run": 652,
+  "experiment": "local/experiments/v2-game-setup-movie-652",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/652-game-setup-movie",
+    "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table",
+    "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers",
+    "iterations/v2/001-original-recovery/runs/290-frame-service-cluster",
+    "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves",
+    "iterations/v2/001-original-recovery/runs/334-resource-open",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/652-game-setup-movie/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00472860",
+      "bytes": 321,
+      "sha256": "02f61f97c2890efc7718fb14a84d2849a7fdd8d1dae6db9b59537fe634908e86",
+      "token": "@BODY_00472860@"
+    },
+    {
+      "va": "0059e440",
+      "bytes": 526,
+      "sha256": "5f5568a434e3d03d610a096d78f2811bd5c184c992f79d2519d3f0ddcaa42b91",
+      "token": "@BODY_0059E440@"
+    },
+    {
+      "va": "004dd4a0",
+      "bytes": 341,
+      "sha256": "ceab0a5696de70e73b6fadb044d62a656a47468f76e9f9dcefab668c0028dd02",
+      "token": "@BODY_004DD4A0@"
+    },
+    {
+      "va": "005d998c",
+      "bytes": 14,
+      "sha256": "6166617283015610aefb4485e5a1a2082d551729fc120098e3424dd83080494f",
+      "token": "@BODY_005D998C@"
+    },
+    {
+      "va": "005d999c",
+      "bytes": 14,
+      "sha256": "e2ccf2d2fa61bc2ccfc01a9c72aacfc07439d6ee344112c5aa7f5bcc37277694",
+      "token": "@BODY_005D999C@"
+    }
+  ],
+  "pass_marker": "game_setup_movie_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-472860-max-len-check",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "    const std::uint32_t max_len = (end - begin) - 1u;",
+      "new": "    const std::uint32_t max_len = (end - begin) - 2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-472860-small-pool-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "        if (old_bytes > 0x100u) {",
+      "new": "        if (old_bytes >= 0x100u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-472860-bucket-shift",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "            const std::uint32_t head_off = (((old_bytes - 1u) >> 3u) * 4u) + 0x0cu;",
+      "new": "            const std::uint32_t head_off = (((old_bytes - 1u) >> 2u) * 4u) + 0x0cu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-59e440-roots-inverted",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "    if (file_roots_enabled_006af370 == 0) {",
+      "new": "    if (file_roots_enabled_006af370 != 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-59e440-missing-code",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "        missing_file_006afbe4(path, -2);",
+      "new": "        missing_file_006afbe4(path, -1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-59e440-return-true-on-miss",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "    return false;",
+      "new": "    return true;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4dd4a0-fsh-flags",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "    (void)resource_open_quiet_0059d9b0(fsh_path, 0u);",
+      "new": "    (void)resource_open_quiet_0059d9b0(fsh_path, 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4dd4a0-render-iterations",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "        for (std::uint32_t i = 0u; i < 3u; ++i) {",
+      "new": "        for (std::uint32_t i = 0u; i < 2u; ++i) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4dd4a0-render-mode",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "            game_setup_render_begin_006bd9b0(2u);",
+      "new": "            game_setup_render_begin_006bd9b0(1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4dd4a0-movie-arg3",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "        game_setup_movie_004dc850(stream, &stop, 0u, 3u, 0u);",
+      "new": "        game_setup_movie_004dc850(stream, &stop, 0u, 2u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4dd4a0-small-pool-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/652-game-setup-movie/game_setup_movie_652.cpp",
+      "old": "            if (bytes > 0x100u) {",
+      "new": "            if (bytes >= 0x100u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

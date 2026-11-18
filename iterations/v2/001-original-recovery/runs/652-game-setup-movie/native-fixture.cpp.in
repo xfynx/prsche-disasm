@@ -1,0 +1,928 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "game_setup_movie_652.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::game_setup_movie_mad_fmt_005d998c) == 14u);
+static_assert(sizeof(porsche::game_setup_porsche_fsh_fmt_005d999c) == 14u);
+static_assert(sizeof(porsche::file_null_name_005e8e50) == 1u);
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static B* code = nullptr;
+static B* slot_472860 = nullptr;
+static B* slot_59e440 = nullptr;
+static B* slot_4dd4a0 = nullptr;
+
+static const char orig_str_5cc588[] = "%s%s";
+static B orig_str_5d998c[14] = {};
+static B orig_str_5d999c[14] = {};
+
+static U cases = 0u;
+alignas(16) static B floating[512] = {};
+
+// Controlled arenas shared across original x86 and C++ runs.
+static void* fixture_heap_state_005e4fe8 = nullptr;
+static const char* fixture_earts_base = nullptr;
+static const char* fixture_load_base = nullptr;
+
+static B mgr_arena[0x100] = {};
+static B str_buf_a[0x200] = {};
+static B member_buf_arena[0x400] = {};
+static B input_scratch[0x200] = {};
+static B movie_service_holder_a[16] = {};
+static B movie_service_holder_b[16] = {};
+static B movie_service_obj_a[32] = {};
+static B movie_service_obj_b[32] = {};
+
+struct StringObj {
+    U begin;
+    U current;
+    U end;
+};
+static_assert(sizeof(StringObj) == 12u);
+static StringObj shared_obj{};
+
+enum EventTag : U {
+    kEvMove = 1u,
+    kEvMemberAlloc4211d0 = 2u,
+    kEvRelease59ecd0 = 3u,
+    kEvHeapEnter = 4u,
+    kEvHeapLeave = 5u,
+    kEvFormat = 6u,
+    kEvExists561b80 = 7u,
+    kEvMissing = 8u,
+    kEvUpdate560030 = 9u,
+    kEvResOpenQuiet = 10u,
+    kEvMovieBegin = 11u,
+    kEvMovieEnd = 12u,
+    kEvFileExists59dc30 = 13u,
+    kEvObjInit = 14u,
+    kEvRenderBegin = 15u,
+    kEvRenderReset = 16u,
+    kEvRenderPrepare = 17u,
+    kEvRenderUpdate = 18u,
+    kEvRenderFinish = 19u,
+    kEvMoviePlay = 20u,
+};
+
+struct Event {
+    U tag;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+    char text[128];
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U count;
+    Event events[48];
+    StringObj final_obj;
+    B final_str_buf[0x200];
+    B final_member_buf[0x400];
+    B final_mgr[0x100];
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+struct StubCfg {
+    U exists_mask; // bit 0: P:\ match, bit 1: F:\ match
+    bool mutate_missing_on_exists;
+    U setup_file_exists_ret;
+    U init_cap;
+    bool switch_service_on_play;
+    U movie_stop_out;
+};
+
+static StubCfg stub_cfg{};
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U normalize_ptr(U p) {
+    if (p == 0u) return 0u;
+    if (p >= address(str_buf_a) && p < address(str_buf_a) + sizeof(str_buf_a)) {
+        return 0xa1000000u + (p - address(str_buf_a));
+    }
+    if (p >= address(member_buf_arena) && p < address(member_buf_arena) + sizeof(member_buf_arena)) {
+        return 0xa2000000u + (p - address(member_buf_arena));
+    }
+    if (p >= address(mgr_arena) && p < address(mgr_arena) + sizeof(mgr_arena)) {
+        return 0xa3000000u + (p - address(mgr_arena));
+    }
+    if (p == address(movie_service_obj_a)) return 0xa4000001u;
+    if (p == address(movie_service_obj_b)) return 0xa4000002u;
+    if (p == address(&shared_obj)) return 0xa5000000u;
+    return p;
+}
+
+static void copy_text(char* dst, std::size_t cap, const char* src) {
+    if (src == nullptr) {
+        std::snprintf(dst, cap, "<null>");
+        return;
+    }
+    std::snprintf(dst, cap, "%s", src);
+}
+
+static Event& push_event(U tag, U a0 = 0u, U a1 = 0u, U a2 = 0u, U a3 = 0u, const char* text = nullptr) {
+    require(trace.count < 48u, "event capacity");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof(e));
+    e.tag = tag;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+    e.a3 = a3;
+    if (text != nullptr) {
+        copy_text(e.text, sizeof(e.text), text);
+    }
+    return e;
+}
+
+static void __cdecl fixture_missing_a(const char* name, std::int32_t code_arg) {
+    push_event(kEvMissing, 1u, static_cast<U>(code_arg), 0u, 0u, name);
+}
+
+static void __cdecl fixture_missing_b(const char* name, std::int32_t code_arg) {
+    push_event(kEvMissing, 2u, static_cast<U>(code_arg), 0u, 0u, name);
+}
+
+namespace porsche {
+
+const char*& game_setup_earts_base_0065b32c = fixture_earts_base;
+const char*& game_setup_load_base_0065b334 = fixture_load_base;
+void* game_setup_movie_service_0069ed0c = nullptr;
+
+char file_root_006af168[260] = {};
+char file_fallback_006af26c[260] = {};
+char file_roots_enabled_006af370 = 0;
+void (__cdecl* missing_file_006afbe4)(const char*, std::int32_t) = nullptr;
+char file_null_name_005e8e50[1] = {0};
+
+void* __cdecl context_move_005a1a40(void* destination, const void* source, std::uint32_t bytes) {
+    push_event(kEvMove, normalize_ptr(address(destination)), bytes, 0u, 0u);
+    if (bytes != 0u) {
+        std::memmove(destination, source, bytes);
+    }
+    return destination;
+}
+
+void* __cdecl application_context_member_storage_004211d0(std::uint32_t bytes, std::uint32_t mode) {
+    push_event(kEvMemberAlloc4211d0, bytes, mode, 0u, 0u);
+    return static_cast<void*>(member_buf_arena);
+}
+
+void __cdecl context_table_release_0059ecd0(void* block) {
+    push_event(kEvRelease59ecd0, normalize_ptr(address(block)), 0u, 0u, 0u);
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    push_event(kEvHeapEnter, address(lock), 0u, 0u, 0u);
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    push_event(kEvHeapLeave, address(lock), 0u, 0u, 0u);
+}
+
+void* __cdecl application_context_heap_state_005e4fe8() {
+    return fixture_heap_state_005e4fe8;
+}
+
+std::int32_t __cdecl file_exists_00561b80(const char* path) {
+    std::int32_t hit = 0;
+    if (path != nullptr) {
+        if (std::strncmp(path, "P:\\", 3) == 0 && (stub_cfg.exists_mask & 1u) != 0u) {
+            hit = 1;
+        } else if (std::strncmp(path, "F:\\", 3) == 0 && (stub_cfg.exists_mask & 2u) != 0u) {
+            hit = 1;
+        }
+    }
+    if (stub_cfg.mutate_missing_on_exists) {
+        missing_file_006afbe4 = &fixture_missing_b;
+    }
+    push_event(kEvExists561b80, static_cast<U>(hit), 0u, 0u, 0u, path);
+    return hit;
+}
+
+std::int32_t __cdecl formatter_entry_005a0fbf(char* output, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    const int n = std::vsnprintf(output, 256u, format, args);
+    va_end(args);
+    push_event(kEvFormat, 0u, 0u, 0u, 0u, output);
+    return static_cast<std::int32_t>(n);
+}
+
+void __cdecl game_setup_update_00560030() {
+    push_event(kEvUpdate560030);
+}
+
+void* __cdecl resource_open_quiet_0059d9b0(const char* name, std::uint32_t flags) {
+    push_event(kEvResOpenQuiet, flags, 0u, 0u, 0u, name);
+    return nullptr;
+}
+
+void __cdecl game_setup_movie_service_begin_00536080(void* self) {
+    push_event(kEvMovieBegin, normalize_ptr(address(self)));
+}
+
+void __cdecl game_setup_movie_service_end_00536050(void* self) {
+    push_event(kEvMovieEnd, normalize_ptr(address(self)));
+}
+
+std::uint32_t __cdecl game_setup_file_exists_0059dc30(const char* path) {
+    push_event(kEvFileExists59dc30, stub_cfg.setup_file_exists_ret, 0u, 0u, 0u, path);
+    return stub_cfg.setup_file_exists_ret;
+}
+
+void __cdecl game_setup_object_init_00403520(void* object, std::uint32_t bytes) {
+    push_event(kEvObjInit, object != nullptr ? 1u : 0u, bytes);
+    auto* obj = static_cast<StringObj*>(object);
+    if (stub_cfg.init_cap == 0u) {
+        obj->begin = 0u;
+        obj->current = 0u;
+        obj->end = 0u;
+    } else {
+        obj->begin = address(str_buf_a);
+        obj->current = address(str_buf_a);
+        obj->end = address(str_buf_a) + stub_cfg.init_cap;
+        str_buf_a[0] = 0x7fu; // verify 004dd4a0 clears *movie.current = 0
+    }
+}
+
+void __stdcall game_setup_render_begin_006bd9b0(std::uint32_t mode) {
+    push_event(kEvRenderBegin, mode);
+}
+
+void __stdcall game_setup_render_reset_006bd91c() {
+    push_event(kEvRenderReset);
+}
+
+void __stdcall game_setup_render_prepare_006bd970() {
+    push_event(kEvRenderPrepare);
+}
+
+void __stdcall game_setup_render_update_006bd948() {
+    push_event(kEvRenderUpdate);
+}
+
+void __stdcall game_setup_render_finish_006bd978(std::uint32_t zero) {
+    push_event(kEvRenderFinish, zero);
+}
+
+void __cdecl game_setup_movie_004dc850(void* stream, std::uint32_t* stop,
+                                       std::uint32_t arg2, std::uint32_t arg3,
+                                       std::uint32_t arg4) {
+    const U stop_in = (stop != nullptr) ? *stop : 0xdeadbeefu;
+    push_event(kEvMoviePlay, normalize_ptr(address(stream)), stop_in, arg2, (arg3 & 0xffffu) | ((arg4 & 0xffffu) << 16),
+               static_cast<const char*>(stream));
+    if (stop != nullptr) {
+        *stop = stub_cfg.movie_stop_out;
+    }
+    if (stub_cfg.switch_service_on_play) {
+        game_setup_movie_service_0069ed0c = static_cast<void*>(movie_service_holder_b);
+    }
+}
+
+} // namespace porsche
+
+// Naked __thiscall -> __stdcall adapters for raw x86 004dd4a0 callees.
+static void __stdcall helper_movie_begin(void* self) {
+    porsche::game_setup_movie_service_begin_00536080(self);
+}
+static void __stdcall helper_movie_end(void* self) {
+    porsche::game_setup_movie_service_end_00536050(self);
+}
+static void __stdcall helper_object_init(void* self, U bytes) {
+    porsche::game_setup_object_init_00403520(self, bytes);
+}
+
+static __declspec(naked) void orig_movie_service_begin_thiscall() {
+    __asm {
+        pop eax
+        push ecx
+        push eax
+        jmp helper_movie_begin
+    }
+}
+
+static __declspec(naked) void orig_movie_service_end_thiscall() {
+    __asm {
+        pop eax
+        push ecx
+        push eax
+        jmp helper_movie_end
+    }
+}
+
+static __declspec(naked) void orig_object_init_thiscall() {
+    __asm {
+        pop eax
+        push ecx
+        push eax
+        jmp helper_object_init
+    }
+}
+
+// Indirect IAT cells for 004dd4a0.
+static void (__stdcall* iat_render_begin_006bd9b0)(std::uint32_t) = &porsche::game_setup_render_begin_006bd9b0;
+static void (__stdcall* iat_render_reset_006bd91c)() = &porsche::game_setup_render_reset_006bd91c;
+static void (__stdcall* iat_render_prepare_006bd970)() = &porsche::game_setup_render_prepare_006bd970;
+static void (__stdcall* iat_render_update_006bd948)() = &porsche::game_setup_render_update_006bd948;
+static void (__stdcall* iat_render_finish_006bd978)(std::uint32_t) = &porsche::game_setup_render_finish_006bd978;
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static U invoke_thiscall2(void* fn, void* ecx_ptr, U arg1, U arg2, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg2
+        push arg1
+        mov ecx, ecx_ptr
+        call fn
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static U invoke_cdecl0(void* fn) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_cdecl2(void* fn, U arg0, U arg1, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg1
+        push arg0
+        call fn
+        add esp, 8
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U base_va, U off, U orig_target, const void* target) {
+    const U insn_va = base_va + off + 4u;
+    const U expected_rel = orig_target - insn_va;
+    require(word(slot, off) == expected_rel, "exact relative offset");
+    const U new_rel = address(target) - (address(slot) + off + 4u);
+    put(slot, off, new_rel);
+}
+
+static void init() {
+    static const B data_5d998c[] = {@BODY_005D998C@};
+    static const B data_5d999c[] = {@BODY_005D999C@};
+    require(sizeof data_5d998c == 14u, "14-byte original .data 005d998c");
+    require(sizeof data_5d999c == 14u, "14-byte original .data 005d999c");
+    std::memcpy(orig_str_5d998c, data_5d998c, sizeof data_5d998c);
+    std::memcpy(orig_str_5d999c, data_5d999c, sizeof data_5d999c);
+
+    // Assert production .data strings and BSS zero cell before any fixture reset.
+    require(std::memcmp(porsche::game_setup_movie_mad_fmt_005d998c, data_5d998c, 14u) == 0,
+            "initial .data 005d998c");
+    require(std::memcmp(porsche::game_setup_porsche_fsh_fmt_005d999c, data_5d999c, 14u) == 0,
+            "initial .data 005d999c");
+    require(porsche::file_null_name_005e8e50[0] == '\0', "initial .data BSS 005e8e50");
+
+    static const B body_472860[] = {@BODY_00472860@};
+    static const B body_59e440[] = {@BODY_0059E440@};
+    static const B body_4dd4a0[] = {@BODY_004DD4A0@};
+    require(sizeof body_472860 == 321u, "321-byte original body 00472860");
+    require(sizeof body_59e440 == 526u, "526-byte original body 0059e440");
+    require(sizeof body_4dd4a0 == 341u, "341-byte original body 004dd4a0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+
+    slot_472860 = code;
+    slot_59e440 = code + 0x200u;
+    slot_4dd4a0 = code + 0x500u;
+    std::memcpy(slot_472860, body_472860, sizeof body_472860);
+    std::memcpy(slot_59e440, body_59e440, sizeof body_59e440);
+    std::memcpy(slot_4dd4a0, body_4dd4a0, sizeof body_4dd4a0);
+
+    // Relocate 00472860.
+    relocate_rel32(slot_472860, 0x00472860u, 0x05fu, 0x004211d0u,
+                   reinterpret_cast<const void*>(&porsche::application_context_member_storage_004211d0));
+    relocate_rel32(slot_472860, 0x00472860u, 0x086u, 0x005a1a40u,
+                   reinterpret_cast<const void*>(&porsche::context_move_005a1a40));
+    relocate_abs32(slot_472860, 0x0acu, 0x005e4fe8u, address(&fixture_heap_state_005e4fe8));
+    relocate_rel32(slot_472860, 0x00472860u, 0x0bdu, 0x0059ecd0u,
+                   reinterpret_cast<const void*>(&porsche::context_table_release_0059ecd0));
+    relocate_rel32(slot_472860, 0x00472860u, 0x0cbu, 0x005322b0u,
+                   reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    relocate_rel32(slot_472860, 0x00472860u, 0x0e5u, 0x005322c0u,
+                   reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+    relocate_rel32(slot_472860, 0x00472860u, 0x119u, 0x005a1a40u,
+                   reinterpret_cast<const void*>(&porsche::context_move_005a1a40));
+
+    // Relocate 0059e440.
+    relocate_abs32(slot_59e440, 0x001u, 0x006af370u, address(&porsche::file_roots_enabled_006af370));
+    relocate_rel32(slot_59e440, 0x0059e440u, 0x09au, 0x005a1a40u,
+                   reinterpret_cast<const void*>(&porsche::context_move_005a1a40));
+    relocate_abs32(slot_59e440, 0x0c4u, 0x006af168u, address(&porsche::file_root_006af168));
+    relocate_abs32(slot_59e440, 0x0c9u, 0x005cc588u, address(orig_str_5cc588));
+    relocate_rel32(slot_59e440, 0x0059e440u, 0x0cfu, 0x005a0fbfu,
+                   reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_rel32(slot_59e440, 0x0059e440u, 0x0d9u, 0x00561b80u,
+                   reinterpret_cast<const void*>(&porsche::file_exists_00561b80));
+    relocate_abs32(slot_59e440, 0x0e9u, 0x006af26cu, address(&porsche::file_fallback_006af26c));
+    relocate_abs32(slot_59e440, 0x0f3u, 0x006af26cu, address(&porsche::file_fallback_006af26c));
+    relocate_abs32(slot_59e440, 0x0fcu, 0x005cc588u, address(orig_str_5cc588));
+    relocate_rel32(slot_59e440, 0x0059e440u, 0x102u, 0x005a0fbfu,
+                   reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_rel32(slot_59e440, 0x0059e440u, 0x10cu, 0x00561b80u,
+                   reinterpret_cast<const void*>(&porsche::file_exists_00561b80));
+    relocate_abs32(slot_59e440, 0x11cu, 0x006afbe4u, address(&porsche::missing_file_006afbe4));
+    relocate_abs32(slot_59e440, 0x12du, 0x005e8e50u, address(porsche::file_null_name_005e8e50));
+    relocate_abs32(slot_59e440, 0x14bu, 0x005e8e50u, address(porsche::file_null_name_005e8e50));
+    relocate_abs32(slot_59e440, 0x154u, 0x005e8e50u, address(porsche::file_null_name_005e8e50));
+    relocate_abs32(slot_59e440, 0x15fu, 0x005e8e50u, address(porsche::file_null_name_005e8e50));
+    relocate_rel32(slot_59e440, 0x0059e440u, 0x189u, 0x005a1a40u,
+                   reinterpret_cast<const void*>(&porsche::context_move_005a1a40));
+    relocate_rel32(slot_59e440, 0x0059e440u, 0x1c8u, 0x00472860u, slot_472860);
+    relocate_abs32(slot_59e440, 0x1dbu, 0x005e8e50u, address(porsche::file_null_name_005e8e50));
+    relocate_abs32(slot_59e440, 0x1f2u, 0x005e8e50u, address(porsche::file_null_name_005e8e50));
+    relocate_rel32(slot_59e440, 0x0059e440u, 0x1feu, 0x00472860u, slot_472860);
+
+    // Relocate 004dd4a0.
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x00bu, 0x00560030u,
+                   reinterpret_cast<const void*>(&porsche::game_setup_update_00560030));
+    relocate_abs32(slot_4dd4a0, 0x010u, 0x0065b334u, address(&fixture_load_base));
+    relocate_abs32(slot_4dd4a0, 0x01du, 0x005d999cu, address(orig_str_5d999c));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x023u, 0x005a0fbfu,
+                   reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x033u, 0x0059d9b0u,
+                   reinterpret_cast<const void*>(&porsche::resource_open_quiet_0059d9b0));
+    relocate_abs32(slot_4dd4a0, 0x039u, 0x0065b32cu, address(&fixture_earts_base));
+    relocate_abs32(slot_4dd4a0, 0x048u, 0x005d998cu, address(orig_str_5d998c));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x04eu, 0x005a0fbfu,
+                   reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_abs32(slot_4dd4a0, 0x053u, 0x0069ed0cu, address(&porsche::game_setup_movie_service_0069ed0c));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x05eu, 0x00536080u,
+                   reinterpret_cast<const void*>(&orig_movie_service_begin_thiscall));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x068u, 0x0059dc30u,
+                   reinterpret_cast<const void*>(&porsche::game_setup_file_exists_0059dc30));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x08au, 0x00403520u,
+                   reinterpret_cast<const void*>(&orig_object_init_thiscall));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x09fu, 0x0059e440u, slot_59e440);
+    relocate_abs32(slot_4dd4a0, 0x0afu, 0x006bd9b0u, address(&iat_render_begin_006bd9b0));
+    relocate_abs32(slot_4dd4a0, 0x0b5u, 0x006bd91cu, address(&iat_render_reset_006bd91c));
+    relocate_abs32(slot_4dd4a0, 0x0bbu, 0x006bd970u, address(&iat_render_prepare_006bd970));
+    relocate_abs32(slot_4dd4a0, 0x0c1u, 0x006bd948u, address(&iat_render_update_006bd948));
+    relocate_abs32(slot_4dd4a0, 0x0c8u, 0x006bd978u, address(&iat_render_finish_006bd978));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x0e2u, 0x004dc850u,
+                   reinterpret_cast<const void*>(&porsche::game_setup_movie_004dc850));
+    relocate_abs32(slot_4dd4a0, 0x0ffu, 0x005e4fe8u, address(&fixture_heap_state_005e4fe8));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x110u, 0x0059ecd0u,
+                   reinterpret_cast<const void*>(&porsche::context_table_release_0059ecd0));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x11du, 0x005322b0u,
+                   reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x136u, 0x005322c0u,
+                   reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+    relocate_abs32(slot_4dd4a0, 0x13eu, 0x0069ed0cu, address(&porsche::game_setup_movie_service_0069ed0c));
+    relocate_rel32(slot_4dd4a0, 0x004dd4a0u, 0x146u, 0x00536050u,
+                   reinterpret_cast<const void*>(&orig_movie_service_end_thiscall));
+}
+
+static void reset_common() {
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(str_buf_a, 0x33, sizeof str_buf_a);
+    std::memset(member_buf_arena, 0x44, sizeof member_buf_arena);
+    std::memset(mgr_arena, 0, sizeof mgr_arena);
+    fixture_heap_state_005e4fe8 = static_cast<void*>(mgr_arena);
+    put(mgr_arena, 0x28u, 0x778899aau); // pool lock
+    for (U b = 0u; b < 32u; ++b) {
+        put(mgr_arena, 0x28u + 0x0cu + b * 4u, 0x90000000u + b);
+    }
+    std::memset(movie_service_holder_a, 0, sizeof movie_service_holder_a);
+    std::memset(movie_service_holder_b, 0, sizeof movie_service_holder_b);
+    std::memset(movie_service_obj_a, 0x11, sizeof movie_service_obj_a);
+    std::memset(movie_service_obj_b, 0x22, sizeof movie_service_obj_b);
+    put(movie_service_holder_a, 4u, address(movie_service_obj_a));
+    put(movie_service_holder_b, 4u, address(movie_service_obj_b));
+    porsche::game_setup_movie_service_0069ed0c = static_cast<void*>(movie_service_holder_a);
+}
+
+static void snapshot_state() {
+    trace.final_obj = shared_obj;
+    trace.final_obj.begin = normalize_ptr(shared_obj.begin);
+    trace.final_obj.current = normalize_ptr(shared_obj.current);
+    trace.final_obj.end = normalize_ptr(shared_obj.end);
+    std::memcpy(trace.final_str_buf, str_buf_a, sizeof str_buf_a);
+    std::memcpy(trace.final_member_buf, member_buf_arena, sizeof member_buf_arena);
+    std::memcpy(trace.final_mgr, mgr_arena, sizeof mgr_arena);
+}
+
+static void verify_trace(bool check_obj) {
+    require(trace.abi_fail == 0u, "x86 ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.ret_eax == expected.ret_eax, "ret_eax");
+    require(trace.count == expected.count, "event count");
+    for (U i = 0u; i < trace.count; ++i) {
+        const Event& a = trace.events[i];
+        const Event& b = expected.events[i];
+        require(a.tag == b.tag, "event tag");
+        require(a.a0 == b.a0, "event a0");
+        require(a.a1 == b.a1, "event a1");
+        require(a.a2 == b.a2, "event a2");
+        require(a.a3 == b.a3, "event a3");
+        require(std::strcmp(a.text, b.text) == 0, "event text");
+    }
+    if (check_obj) {
+        require(trace.final_obj.begin == expected.final_obj.begin, "obj.begin");
+        require(trace.final_obj.current == expected.final_obj.current, "obj.current");
+        require(trace.final_obj.end == expected.final_obj.end, "obj.end");
+        require(std::memcmp(trace.final_str_buf, expected.final_str_buf, sizeof str_buf_a) == 0, "str_buf");
+        require(std::memcmp(trace.final_member_buf, expected.final_member_buf, sizeof member_buf_arena) == 0, "member_buf");
+    }
+    require(std::memcmp(trace.final_mgr, expected.final_mgr, sizeof mgr_arena) == 0, "mgr_arena");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0, "FPU");
+}
+
+static void setup_insert_env(const char* init_text, U cap_bytes, const char* insert_src) {
+    reset_common();
+    std::memset(&shared_obj, 0, sizeof shared_obj);
+    if (cap_bytes != 0u) {
+        const U init_len = (init_text != nullptr) ? static_cast<U>(std::strlen(init_text)) : 0u;
+        shared_obj.begin = address(str_buf_a);
+        if (init_len != 0u) {
+            std::memcpy(str_buf_a, init_text, init_len);
+        }
+        str_buf_a[init_len] = 0u;
+        shared_obj.current = address(str_buf_a) + init_len;
+        shared_obj.end = address(str_buf_a) + cap_bytes;
+    }
+    std::memset(input_scratch, 0x55, sizeof input_scratch);
+    if (insert_src != nullptr) {
+        std::memcpy(input_scratch, insert_src, std::strlen(insert_src) + 1u);
+    }
+}
+
+static void run_insert_case(const char* init_text, U cap_bytes, const char* insert_src, U first_off, U last_off) {
+    const char* first = reinterpret_cast<const char*>(input_scratch + first_off);
+    const char* last = reinterpret_cast<const char*>(input_scratch + last_off);
+    if (first_off >= 0x80000000u) {
+        // Use str_buf_a self-overlap view when requested.
+        const U lo = first_off - 0x80000000u;
+        const U hi = last_off - 0x80000000u;
+        first = reinterpret_cast<const char*>(str_buf_a + lo);
+        last = reinterpret_cast<const char*>(str_buf_a + hi);
+    }
+
+    setup_insert_env(init_text, cap_bytes, insert_src);
+    seed_fpu();
+    trace.abi_fail = invoke_thiscall2(slot_472860, &shared_obj, address(first), address(last), trace.ret_eax);
+    capture_fpu(trace.fpu);
+    trace.ret_eax = normalize_ptr(trace.ret_eax);
+    snapshot_state();
+    expected = trace;
+
+    setup_insert_env(init_text, cap_bytes, insert_src);
+    seed_fpu();
+    void* cpp_ret = nullptr;
+    {
+        auto* fn = &porsche::context_string_insert_00472860;
+        U eax_out = 0u;
+        trace.abi_fail = invoke_thiscall2(reinterpret_cast<void*>(fn), &shared_obj,
+                                          address(first), address(last), eax_out);
+        cpp_ret = reinterpret_cast<void*>(static_cast<std::uintptr_t>(eax_out));
+    }
+    capture_fpu(trace.fpu);
+    trace.ret_eax = normalize_ptr(address(cpp_ret));
+    snapshot_state();
+    verify_trace(true);
+    ++cases;
+}
+
+struct OpenCase {
+    const char* init_text;
+    U cap_bytes;
+    bool roots_enabled;
+    const char* root_path;
+    const char* fallback_path;
+    U exists_mask;
+    bool mutate_missing;
+    void (__cdecl* missing_cb)(const char*, std::int32_t);
+    const char* path;
+};
+
+static void setup_open_env(const OpenCase& c) {
+    reset_common();
+    stub_cfg = {};
+    stub_cfg.exists_mask = c.exists_mask;
+    stub_cfg.mutate_missing_on_exists = c.mutate_missing;
+
+    porsche::file_roots_enabled_006af370 = c.roots_enabled ? 1 : 0;
+    std::memset(porsche::file_root_006af168, 0, sizeof porsche::file_root_006af168);
+    std::memset(porsche::file_fallback_006af26c, 0, sizeof porsche::file_fallback_006af26c);
+    if (c.root_path != nullptr) {
+        std::snprintf(porsche::file_root_006af168, sizeof porsche::file_root_006af168, "%s", c.root_path);
+    }
+    if (c.fallback_path != nullptr) {
+        std::snprintf(porsche::file_fallback_006af26c, sizeof porsche::file_fallback_006af26c, "%s", c.fallback_path);
+    }
+    porsche::missing_file_006afbe4 = c.missing_cb;
+
+    const U init_len = static_cast<U>(std::strlen(c.init_text));
+    shared_obj.begin = address(str_buf_a);
+    std::memcpy(str_buf_a, c.init_text, init_len + 1u);
+    shared_obj.current = address(str_buf_a) + init_len;
+    shared_obj.end = address(str_buf_a) + c.cap_bytes;
+}
+
+static void run_open_case(const OpenCase& c) {
+    setup_open_env(c);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl2(slot_59e440, address(c.path), address(&shared_obj), trace.ret_eax);
+    capture_fpu(trace.fpu);
+    trace.ret_eax &= 0xffu;
+    snapshot_state();
+    expected = trace;
+
+    setup_open_env(c);
+    seed_fpu();
+    U eax_out = 0u;
+    trace.abi_fail = invoke_cdecl2(
+        reinterpret_cast<void*>(&porsche::game_setup_resource_open_result_0059e440),
+        address(c.path), address(&shared_obj), eax_out);
+    capture_fpu(trace.fpu);
+    trace.ret_eax = eax_out & 0xffu;
+    snapshot_state();
+    verify_trace(true);
+
+    // Also exercise the canonical void entry point declared in porsche/game_setup.hpp.
+    setup_open_env(c);
+    seed_fpu();
+    U void_eax = 0u;
+    trace.abi_fail = invoke_cdecl2(
+        reinterpret_cast<void*>(&porsche::game_setup_resource_open_0059e440),
+        address(c.path), address(&shared_obj), void_eax);
+    capture_fpu(trace.fpu);
+    trace.ret_eax = expected.ret_eax; // void entry has no semantic return value
+    snapshot_state();
+    verify_trace(true);
+    ++cases;
+}
+
+struct MovieCase {
+    const char* load_base;
+    const char* earts_base;
+    bool roots_enabled;
+    const char* root_path;
+    const char* fallback_path;
+    U exists_mask;
+    void (__cdecl* missing_cb)(const char*, std::int32_t);
+    U setup_exists;
+    U init_cap;
+    bool switch_service;
+    U movie_stop_out;
+};
+
+static void setup_movie_env(const MovieCase& c) {
+    reset_common();
+    stub_cfg = {};
+    stub_cfg.exists_mask = c.exists_mask;
+    stub_cfg.setup_file_exists_ret = c.setup_exists;
+    stub_cfg.init_cap = c.init_cap;
+    stub_cfg.switch_service_on_play = c.switch_service;
+    stub_cfg.movie_stop_out = c.movie_stop_out;
+
+    fixture_load_base = c.load_base;
+    fixture_earts_base = c.earts_base;
+    porsche::file_roots_enabled_006af370 = c.roots_enabled ? 1 : 0;
+    std::memset(porsche::file_root_006af168, 0, sizeof porsche::file_root_006af168);
+    std::memset(porsche::file_fallback_006af26c, 0, sizeof porsche::file_fallback_006af26c);
+    if (c.root_path != nullptr) {
+        std::snprintf(porsche::file_root_006af168, sizeof porsche::file_root_006af168, "%s", c.root_path);
+    }
+    if (c.fallback_path != nullptr) {
+        std::snprintf(porsche::file_fallback_006af26c, sizeof porsche::file_fallback_006af26c, "%s", c.fallback_path);
+    }
+    porsche::missing_file_006afbe4 = c.missing_cb;
+    std::memset(&shared_obj, 0, sizeof shared_obj);
+}
+
+static void run_movie_case(const MovieCase& c) {
+    setup_movie_env(c);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl0(slot_4dd4a0);
+    capture_fpu(trace.fpu);
+    snapshot_state();
+    expected = trace;
+
+    setup_movie_env(c);
+    seed_fpu();
+    trace.abi_fail = invoke_cdecl0(reinterpret_cast<void*>(&porsche::game_setup_movie_004dd4a0));
+    capture_fpu(trace.fpu);
+    snapshot_state();
+    verify_trace(false);
+    ++cases;
+}
+
+int main() {
+    init();
+
+    // 1. context_string_insert_00472860 cases.
+    run_insert_case("abc", 16u, "XYZ", 0u, 0u);          // empty [first, last)
+    run_insert_case("abc", 16u, "X", 0u, 1u);            // in-place 1-byte insert (tail_len == 0 still calls 005a1a40)
+    run_insert_case("abc", 16u, "XYZ", 0u, 3u);          // in-place multi-byte insert
+    run_insert_case("abc", 7u, "XYZ", 0u, 3u);           // exact max_len boundary (3+3 == 7-1 -> in-place)
+    run_insert_case("abc", 6u, "XYZ", 0u, 3u);           // grow by 1 past max_len (3+3 > 6-1 -> bucket 0 free)
+    run_insert_case("abcdef", 16u, "1234567890", 0u, 10u); // grow with insert_len > old_len (bucket 1 free)
+    run_insert_case("0123456789ab", 17u, "Z", 0u, 1u);   // grow with old_len > insert_len (bucket 2 free)
+    {
+        // Build long initial string of length 255 in 0x100 (256B) vs 256 in 0x101 (257B) buffers.
+        char big[260];
+        std::memset(big, 'A', 255);
+        big[255] = '\0';
+        run_insert_case(big, 0x100u, "XY", 0u, 2u);     // old_bytes == 0x100u -> small pool freelist bucket 31
+        big[255] = 'A';
+        big[256] = '\0';
+        run_insert_case(big, 0x101u, "XY", 0u, 2u);     // old_bytes == 0x101u -> context_table_release_0059ecd0
+    }
+    run_insert_case("hello", 16u, "", 0x80000001u, 0x80000004u); // overlapping self-slice [begin+1, begin+4)
+
+    // 2. game_setup_resource_open_0059e440 / _result cases.
+    run_open_case({"", 8u, false, "", "", 0u, false, nullptr, "inPC-av.mad"});             // unrooted grow (0 -> 11 > 7)
+    run_open_case({"long_existing_path_0123", 32u, false, "", "", 0u, false, nullptr, "a.mad"}); // unrooted shrink (calls 005a1a40)
+    run_open_case({"a.mad", 16u, false, "", "", 0u, false, nullptr, "b.mad"});              // unrooted same length (no 005a1a40)
+    run_open_case({"", 32u, true, "P:\\", "F:\\", 1u, false, &fixture_missing_a, "m.mad"}); // primary root hit
+    run_open_case({"", 32u, true, "P:\\", "F:\\", 2u, false, &fixture_missing_a, "m.mad"}); // fallback root hit
+    run_open_case({"", 32u, true, "P:\\", "", 0u, false, &fixture_missing_a, "m.mad"});     // miss, empty fallback, cb a
+    run_open_case({"", 32u, true, "P:\\", "F:\\", 0u, true, &fixture_missing_a, "m.mad"});  // miss, fallback miss, cb mutated to b
+    run_open_case({"long_existing_path", 32u, true, "P:\\", "F:\\", 0u, false, nullptr, "m.mad"}); // miss shrink to 005e8e50 ""
+    run_open_case({"", 8u, true, "P:\\", "F:\\", 0u, false, &fixture_missing_a, "m.mad"});  // miss on empty string (cur_len==0, len==0)
+
+    // 3. game_setup_movie_004dd4a0 cases.
+    run_movie_case({"L:\\", "E:\\", false, "", "", 0u, nullptr, 0u, 8u, false, 0u});        // file_exists == 0
+    run_movie_case({"L:\\", "E:\\", false, "", "", 0u, nullptr, 1u, 8u, false, 1u});        // unrooted play, grow 8B->15B, free bucket 1
+    run_movie_case({"L:\\", "E:\\", true, "P:\\", "F:\\", 1u, &fixture_missing_a, 1u, 8u, true, 0u}); // rooted primary hit + service switch
+    run_movie_case({"L:\\", "E:\\", true, "P:\\", "F:\\", 2u, &fixture_missing_a, 1u, 64u, false, 0u}); // rooted fallback hit, fits 64B
+    run_movie_case({"L:\\", "E:\\", true, "P:\\", "F:\\", 0u, &fixture_missing_a, 1u, 8u, false, 0u});  // rooted miss -> 005e8e50, 8B free bucket 0
+    run_movie_case({"L:\\", "E:\\", false, "", "", 0u, nullptr, 1u, 0x100u, false, 0u});    // bytes == 0x100u -> small pool bucket 31
+    run_movie_case({"L:\\", "E:\\", false, "", "", 0u, nullptr, 1u, 0x101u, false, 0u});    // bytes == 0x101u -> context_table_release_0059ecd0
+
+    std::printf("game_setup_movie_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

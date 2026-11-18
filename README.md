@@ -31,9 +31,9 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run651](iterations/v2/001-original-recovery/runs/651-resource-table-text-fallbacks-integration/README.md)
-  integrates the partial startup sequence resource table and startup text fallback providers.
-  The shared build has 84 unresolved names across 371 TUs.
+  [Run654](iterations/v2/001-original-recovery/runs/654-movie-setup-codec-release-integration/README.md)
+  integrates the partial game setup movie and audio stream codec release providers.
+  The shared build has 80 unresolved names across 373 TUs.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

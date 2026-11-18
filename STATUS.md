@@ -4,24 +4,25 @@ Updated 2026-11-18. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run651](iterations/v2/001-original-recovery/runs/651-resource-table-text-fallbacks-integration/README.md)
-compiles 371 C++ translation units across 8 projects. The link has 84 unresolved names /
-88 references (closing `startup_sequence_call_004690d0` and `startup_text_fallback_0_0044df70`..`0044dfa0`
-with zero new unresolved names).
+[Run654](iterations/v2/001-original-recovery/runs/654-movie-setup-codec-release-integration/README.md)
+compiles 373 C++ translation units across 8 projects. The link has 80 unresolved names /
+85 references (closing `game_setup_movie_004dd4a0`, `game_setup_resource_open_0059e440`,
+`audio_stream_service_release_00566e10`, `audio_stream_codec_destroy_0056b3b0`, and
+`audio_stream_codec_reset_0056c420`, while `0056c620` exposes `audio_stream_codec_refill_0056baf0`).
 **There is no recovered playable C++ game executable yet.**
 
-Run651 integrates eleven partial functions (749 code bytes total: `00561e00`/`0059d9b0`/`00452590`/`004690d0`
-in `649/002` plus `0044de50`/`0044de60`/`0044df70`..`0044dfa0`/`0044dfe0` in `650/001`), 295B `.data`
-(264B fallback tables `005ce658..005ce763` + 31B loader-zero BSS), and 0B new `.rdata`. Native comparisons
-pass 338 measured cases / 22 material controls at `/Od`/`/O2`. Canonical owners are reused. Shared audit
-verifies 919 source pins; registry 1008 retains partial domains.
+Run654 integrates eight partial functions (2534 code bytes total: `00472860`/`0059e440`/`004dd4a0`
+in `652/003` plus `00566e10`/`0056b3b0`/`0056c140`/`0056c420`/`0056c620` in `653/008`), 28B `.data`
+(`005d998c`/`005d999c`), and 273B `.rdata` (`005bdaa0`, `005bdd30..005bde43`). Native comparisons
+pass 122 measured cases / 24 material controls at `/Od`/`/O2`. Canonical owners are reused. Shared
+audit verifies 924 source pins; registry 1016 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run649 (`002`), Run650 (`001`), and Run651 (`001`) integration are accepted within their stated bounds.
-Run652 (`00472860` + `0059e440` + `004dd4a0`) is active for integration in Run654.
+Run652 (`003`), Run653 (`008`), and Run654 (`001`) integration are accepted within their stated bounds.
+Run655 (`0055ff60` + `0048d350` + `0048cdf0`) is active for integration in Run657.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.
