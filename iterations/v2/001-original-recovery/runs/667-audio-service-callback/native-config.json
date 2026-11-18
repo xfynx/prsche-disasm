@@ -1,0 +1,245 @@
+{
+  "run": 667,
+  "experiment": "local/experiments/v2-audio-service-callback-667",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/667-audio-service-callback",
+    "iterations/v2/001-original-recovery/runs/638-render-seed-prng",
+    "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status",
+    "iterations/v2/001-original-recovery/runs/607-frame-audio-stream-ramp",
+    "iterations/v2/001-original-recovery/runs/561-audio-stream-creation",
+    "iterations/v2/001-original-recovery/runs/556-application-audio-lifecycle",
+    "iterations/v2/001-original-recovery/runs/501-audio-pcm-stream-lookup",
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/667-audio-service-callback/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/667-audio-service-callback/original-index-supplement.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00590d80",
+      "bytes": 104,
+      "sha256": "8d05ef0d7dc7fb01f6ff07f3f64ab901b4890eeaf97e23870cff21218485acbe",
+      "token": "@BODY_00590D80@"
+    },
+    {
+      "va": "00590df0",
+      "bytes": 48,
+      "sha256": "3126b8aefba75d0ce69e086636d63e1f55194d18fe3b2e570152594c9944177f",
+      "token": "@BODY_00590DF0@"
+    },
+    {
+      "va": "00590e20",
+      "bytes": 70,
+      "sha256": "1c113e1fd292ae26b1de3d9b5633b5d7aacd12527f257ef82977f12ce8266195",
+      "token": "@BODY_00590E20@"
+    },
+    {
+      "va": "005616b0",
+      "bytes": 20,
+      "sha256": "8454f13e18341fff4b667c812cfede9856f5c3c323a8508fe17a3124450ae117",
+      "token": "@BODY_005616B0@"
+    },
+    {
+      "va": "00566a40",
+      "bytes": 156,
+      "sha256": "7e0cb2106195ba17c37772484b72d5d7e46577a3b38b855ead3d0de57de6ccbc",
+      "token": "@BODY_00566A40@"
+    },
+    {
+      "va": "00566910",
+      "bytes": 289,
+      "sha256": "7105ede4827ddbec607c7f6ba7f4df3dac588fb58add9f65a2ec3f031fd5e94d",
+      "token": "@BODY_00566910@"
+    },
+    {
+      "va": "004ad950",
+      "bytes": 101,
+      "sha256": "9799fa1351b18bda7d713eed1d273852f7b4617e28663eb702718625693582a7",
+      "token": "@BODY_004AD950@"
+    },
+    {
+      "va": "004ad9c0",
+      "bytes": 1114,
+      "sha256": "5f2705f6a9c0969a8dd25e851ec1dacc131263f2edad7a0122c795ca25d207e5",
+      "token": "@BODY_004AD9C0@"
+    },
+    {
+      "va": "005d1bd4",
+      "bytes": 4,
+      "sha256": "c7a09fc120ab81ee344ce8fb6dbf068d17f9269b4840f1c4e96a842574fb8f61",
+      "token": "@STR_005D1BD4@"
+    },
+    {
+      "va": "005d1bd8",
+      "bytes": 4,
+      "sha256": "20ac7ff5c3b32ba590374983fc75ad4cbc87d528ddddf1ca110b2cdd1a1a2fc8",
+      "token": "@STR_005D1BD8@"
+    },
+    {
+      "va": "005d1bdc",
+      "bytes": 5,
+      "sha256": "a6107ac6200f4d64e697049b9ef412cf8a35615edd9cf3335854dec666e959d8",
+      "token": "@STR_005D1BDC@"
+    }
+  ],
+  "pass_marker": "audio_service_callback_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-mul64-narrow-32",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "    return static_cast<std::uint64_t>(lhs) * static_cast<std::uint64_t>(rhs);",
+      "new": "    return static_cast<std::uint64_t>(lhs * rhs);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-div32-step-count",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "    for (U i = 0u; i < 0x20u; ++i) {",
+      "new": "    for (U i = 0u; i < 0x1fu; ++i) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-stream-lookup-negative-guard",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "std::uint32_t __cdecl audio_service_stream_lookup_00590e20(std::int32_t stream_handle) {\n    if (stream_handle < 0) {",
+      "new": "std::uint32_t __cdecl audio_service_stream_lookup_00590e20(std::int32_t stream_handle) {\n    if (stream_handle == 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-stream-lookup-stride",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "        entry += 0x2cu;",
+      "new": "        entry += 0x28u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-total-offset",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "    return read_u32(slot_ptr + 0x24u) + read_u32(slot_ptr + 0x20u);",
+      "new": "    return read_u32(slot_ptr + 0x24u) + read_u32(slot_ptr + 0x1cu);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-info-inactive-ret",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "    write_u32(out_va + 0x00u, 0u);\n    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -10;\n    }\n    const U chan = audio_stream_service_lookup_00566d60(slot);",
+      "new": "    write_u32(out_va + 0x00u, 0u);\n    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -8;\n    }\n    const U chan = audio_stream_service_lookup_00566d60(slot);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-info-signed-denom",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "        const U denom = static_cast<U>(read_u16(chan + 0x2cu));\n        if (denom != 0u) {\n            const U total = audio_stream_slot_total_005616b0(read_u32(chan + 0x0cu));",
+      "new": "        const U denom = static_cast<U>(static_cast<I>(static_cast<std::int16_t>(read_u16(chan + 0x2cu))));\n        if (denom != 0u) {\n            const U total = audio_stream_slot_total_005616b0(read_u32(chan + 0x0cu));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-stream-info-match-code",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "    if (read_u32(chan + 0x00u) == entry) {\n        write_u32(out_va + 0x00u, 2u);",
+      "new": "    if (read_u32(chan + 0x00u) == entry) {\n        write_u32(out_va + 0x00u, 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-stream-info-unmatched-code",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "    if (entry == 0u) {\n        write_u32(out_va + 0x00u, 3u);",
+      "new": "    if (entry == 0u) {\n        write_u32(out_va + 0x00u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-split-maxlen",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "        } else if (len < 0x1f) {",
+      "new": "        } else if (len < 0x20) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-split-second-dash",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "            if (seen_dash != 0u) {\n                ++s;\n                write_u32(obj + 0x08u, s);\n                break;\n            }",
+      "new": "            if (seen_dash != 0u) {\n                ++s;\n                write_u32(obj + 0x08u, s - 1u);\n                break;\n            }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-rem-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "        static_cast<I>(read_u32(root + 0xa4u)) < 0x226) {",
+      "new": "        static_cast<I>(read_u32(root + 0xa4u)) <= 0x226) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-tag-lose-len",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "            (formatter_text_compare_n_005a2210(tag_lose, audio_service_tag_lose_005d1bdc, 4u) == 0);",
+      "new": "            (formatter_text_compare_n_005a2210(tag_lose, audio_service_tag_lose_005d1bdc, 3u) == 0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-tag-win-len",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "                (formatter_text_compare_n_005a2210(tag_win, audio_service_tag_win_005d1bd8, 3u) == 0);",
+      "new": "                (formatter_text_compare_n_005a2210(tag_win, audio_service_tag_win_005d1bd8, 4u) == 0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-locate-signed-idx",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "    const I entry_idx = static_cast<I>(static_cast<std::int8_t>(read_u8(root + cur_idx + 0xe8u)));",
+      "new": "    const I entry_idx = static_cast<I>(read_u8(root + cur_idx + 0xe8u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-abs32-sign-mask",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "    const U sign_mask = (static_cast<I>(sum) < 0) ? 0xffffffffu : 0u;",
+      "new": "    const U sign_mask = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-zero-slot-184",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "    write_u32(split_base + 0x18u, 0u);\n    write_u32(split_base + 0x20u, 0u);",
+      "new": "    write_u32(split_base + 0x18u, 0u);\n    write_u32(split_base + 0x1cu, 0u);\n    write_u32(split_base + 0x20u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-state0-count1",
+      "source": "iterations/v2/001-original-recovery/runs/667-audio-service-callback/audio_service_callback_667.cpp",
+      "old": "        if (count == 1) {\n            write_u32(root + 0x0cu, 0u);",
+      "new": "        if (count == 2) {\n            write_u32(root + 0x0cu, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

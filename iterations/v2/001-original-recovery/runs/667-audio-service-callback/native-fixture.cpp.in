@@ -1,0 +1,1185 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "audio_service_callback_667.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::audio_service_tag_vic_005d1bd4) == 4u, "4-byte vic tag");
+static_assert(sizeof(porsche::audio_service_tag_win_005d1bd8) == 4u, "4-byte win tag");
+static_assert(sizeof(porsche::audio_service_tag_lose_005d1bdc) == 5u, "5-byte lose tag");
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static B root_a_buf[0x200] = {};
+static B root_b_buf[0x200] = {};
+static B chan_buf[0x80] = {};
+static B entries_buf[0x100] = {};
+static B slot_rec_buf[0x100] = {};
+static B split_buf[0x80] = {};
+static U out_words[4] = {};
+static char tag_buf[128] = {};
+alignas(16) static B floating[512] = {};
+
+static const char orig_str_5d1bd4[4] = {@STR_005D1BD4@};
+static const char orig_str_5d1bd8[4] = {@STR_005D1BD8@};
+static const char orig_str_5d1bdc[5] = {@STR_005D1BDC@};
+
+static U cases = 0u;
+static bool cpp_side = false;
+
+static B* code = nullptr;
+static B* slot_590d80 = nullptr;
+static B* slot_590df0 = nullptr;
+static B* slot_590e20 = nullptr;
+static B* slot_5616b0 = nullptr;
+static B* slot_566a40 = nullptr;
+static B* slot_566910 = nullptr;
+static B* slot_4ad950 = nullptr;
+static B* slot_4ad9c0 = nullptr;
+static U iat_get_tick_count = 0u;
+
+enum EventTag : U {
+    kEvLookup = 1u,
+    kEvLock = 2u,
+    kEvUnlock = 3u,
+    kEvActive565560 = 4u,
+    kEvRamp = 5u,
+    kEvEnd4ad6c0 = 6u,
+    kEvCompareN = 7u,
+    kEvStatus = 8u,
+    kEvReset = 9u,
+    kEvLocate = 10u,
+    kEvStreamStart = 11u,
+    kEvPrng = 12u,
+    kEvTick = 13u,
+    kEvVolume = 14u,
+    kEvPlay4ad8b0 = 15u,
+};
+
+struct Event {
+    U tag;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+    char s0[48];
+    char s1[16];
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_lo;
+    U ret_hi;
+    U count;
+    Event events[64];
+    B final_root_a[0x200];
+    B final_root_b[0x200];
+    B final_split[0x80];
+    U final_out_words[4];
+    U final_root_ptr;
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+struct ScenarioCfg {
+    U window_active;
+    U lookup_null;
+    I status_ret;
+    I start_ret;
+    U end_4ad6c0_ret;
+    U locate_ret;
+    U locate_size;
+    U prng_seq[4];
+    U prng_len;
+    U tick_seq[4];
+    U tick_len;
+    U switch_root_in_ramp;
+    U switch_root_in_end;
+    U switch_root_in_status;
+    U switch_root_in_reset;
+    U switch_root_in_locate;
+    U switch_root_in_start;
+    U switch_root_in_volume;
+    U switch_root_in_play;
+};
+
+static ScenarioCfg cfg{};
+static U prng_idx = 0u;
+static U tick_idx = 0u;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u cpp=%u\n", msg, cases, static_cast<U>(cpp_side));
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U normalize_root_ptr(U p) {
+    if (p == 0u) return 0u;
+    if (p == address(root_a_buf)) return 0xa0000001u;
+    if (p == address(root_b_buf)) return 0xa0000002u;
+    const U base_a = address(root_a_buf);
+    if (p > base_a && p < base_a + sizeof(root_a_buf)) {
+        return 0xa1000000u + (p - base_a);
+    }
+    const U base_b = address(root_b_buf);
+    if (p > base_b && p < base_b + sizeof(root_b_buf)) {
+        return 0xa2000000u + (p - base_b);
+    }
+    return p;
+}
+
+static void record_event(U tag, U a0 = 0u, U a1 = 0u, U a2 = 0u, U a3 = 0u,
+                         const char* s0 = nullptr, const char* s1 = nullptr) {
+    require(trace.count < 64u, "event capacity");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof(e));
+    e.tag = tag;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+    e.a3 = a3;
+    if (s0 != nullptr) {
+        std::snprintf(e.s0, sizeof(e.s0), "%s", s0);
+    }
+    if (s1 != nullptr) {
+        std::snprintf(e.s1, sizeof(e.s1), "%s", s1);
+    }
+}
+
+static char ascii_lower(char c) {
+    return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + 32) : c;
+}
+
+namespace porsche {
+
+ApplicationAudioDeviceStateStorage application_audio_device_state_006b48c0{};
+std::uint32_t audio_resource_query_root_00656ab4 = 0u;
+std::uint32_t audio_stream_slots_006b7cc0[16] = {};
+
+static std::array<std::uint32_t, 5> frame_services_words_storage_005d1740 = {
+    0x12345678u, 0u, 0u, 0u, 0u
+};
+std::array<std::uint32_t, 5>& frame_services_words_005d1740 =
+    frame_services_words_storage_005d1740;
+
+std::uint32_t __cdecl audio_stream_service_lookup_00566d60(std::int32_t slot) {
+    record_event(kEvLookup, static_cast<U>(slot));
+    if (cfg.lookup_null != 0u) {
+        return 0u;
+    }
+    return address(chan_buf);
+}
+
+std::int32_t __cdecl audio_stream_service_reset_00567740(std::uint32_t slot) {
+    record_event(kEvReset, slot);
+    if (cfg.switch_root_in_reset != 0u) {
+        audio_resource_query_root_00656ab4 = address(root_b_buf);
+    }
+    return 0;
+}
+
+void __cdecl audio_backend_lock_005896d0() {
+    record_event(kEvLock);
+}
+
+void __cdecl audio_backend_unlock_005896f0() {
+    record_event(kEvUnlock);
+}
+
+std::uint32_t __cdecl splash_progress_resource_end_004ad6c0() {
+    record_event(kEvEnd4ad6c0, cfg.end_4ad6c0_ret);
+    if (cfg.switch_root_in_end != 0u) {
+        audio_resource_query_root_00656ab4 = address(root_b_buf);
+    }
+    return cfg.end_4ad6c0_ret;
+}
+
+void __cdecl audio_service_play_004ad8b0() {
+    record_event(kEvPlay4ad8b0);
+    if (cfg.switch_root_in_play != 0u) {
+        audio_resource_query_root_00656ab4 = address(root_b_buf);
+    }
+}
+
+std::uint32_t __cdecl audio_resource_locate_005666f0(
+    std::uint32_t source, std::uint32_t name, std::uint32_t index,
+    std::uint32_t out1, std::uint32_t out2) {
+    record_event(kEvLocate, source, name, index, out1 != 0u ? 1u : 0u);
+    if (out1 != 0u) {
+        U* const p = reinterpret_cast<U*>(static_cast<std::uintptr_t>(out1));
+        *p = cfg.locate_size;
+    }
+    (void)out2;
+    if (cfg.switch_root_in_locate != 0u) {
+        audio_resource_query_root_00656ab4 = address(root_b_buf);
+    }
+    return cfg.locate_ret;
+}
+
+std::int32_t __cdecl audio_service_stream_start_00567720(
+    std::uint32_t channel, std::uint32_t mode,
+    std::uint32_t data, std::uint32_t size) {
+    record_event(kEvStreamStart, channel, mode, normalize_root_ptr(data), size);
+    if (cfg.switch_root_in_start != 0u) {
+        audio_resource_query_root_00656ab4 = address(root_b_buf);
+    }
+    return cfg.start_ret;
+}
+
+std::uint32_t __cdecl render_seed_prng_next_00538040() {
+    const U v = cfg.prng_seq[prng_idx % cfg.prng_len];
+    ++prng_idx;
+    record_event(kEvPrng, v);
+    return v;
+}
+
+std::uint32_t __cdecl window_worker_activation_00565560() {
+    record_event(kEvActive565560, cfg.window_active);
+    return cfg.window_active;
+}
+
+std::int32_t __cdecl audio_stream_service_ramp_00566ae0(
+    std::int32_t slot, std::int32_t ms, std::int32_t target) {
+    record_event(kEvRamp, static_cast<U>(slot), static_cast<U>(ms), static_cast<U>(target));
+    if (cfg.switch_root_in_ramp != 0u) {
+        audio_resource_query_root_00656ab4 = address(root_b_buf);
+    }
+    return 0;
+}
+
+std::int32_t __cdecl audio_stream_service_volume_00567810(
+    std::int32_t slot, std::uint32_t volume) {
+    record_event(kEvVolume, static_cast<U>(slot), volume);
+    if (cfg.switch_root_in_volume != 0u) {
+        audio_resource_query_root_00656ab4 = address(root_b_buf);
+    }
+    return 0;
+}
+
+std::int32_t __cdecl audio_stream_service_status_00567850(std::int32_t slot) {
+    record_event(kEvStatus, static_cast<U>(slot), static_cast<U>(cfg.status_ret));
+    if (cfg.switch_root_in_status != 0u) {
+        audio_resource_query_root_00656ab4 = address(root_b_buf);
+    }
+    return cfg.status_ret;
+}
+
+int __cdecl formatter_text_compare_n_005a2210(
+    const char* first, const char* second, std::uint32_t n) {
+    int diff = 0;
+    if (n != 0u) {
+        U i = 0u;
+        do {
+            const char c1 = ascii_lower(first[i]);
+            const char c2 = ascii_lower(second[i]);
+            diff = static_cast<int>(static_cast<unsigned char>(c1)) -
+                   static_cast<int>(static_cast<unsigned char>(c2));
+            if (diff != 0 || c1 == '\0') {
+                break;
+            }
+            ++i;
+        } while (i < n);
+    }
+    record_event(kEvCompareN, n, static_cast<U>(diff), 0u, 0u, first, second);
+    return diff;
+}
+
+std::uint32_t __stdcall platform_get_tick_count() {
+    const U v = cfg.tick_seq[tick_idx % cfg.tick_len];
+    ++tick_idx;
+    record_event(kEvTick, v);
+    return v;
+}
+
+} // namespace porsche
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+__declspec(noinline) static U invoke_cdecl1(void* fn, U a0, U& ret_lo) {
+    U before = 0u, frame = 0u, fail = 0u, lo = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push a0
+        call fn
+        add esp, 4
+        mov lo, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_lo = lo;
+    return fail;
+}
+
+__declspec(noinline) static U invoke_cdecl2(void* fn, U a0, U a1, U& ret_lo) {
+    U before = 0u, frame = 0u, fail = 0u, lo = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push a1
+        push a0
+        call fn
+        add esp, 8
+        mov lo, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_lo = lo;
+    return fail;
+}
+
+__declspec(noinline) static U invoke_cdecl2_u64(void* fn, U a0, U a1, U& ret_lo, U& ret_hi) {
+    U before = 0u, frame = 0u, fail = 0u, lo = 0u, hi = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push a1
+        push a0
+        call fn
+        add esp, 8
+        mov lo, eax
+        mov hi, edx
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_lo = lo;
+    ret_hi = hi;
+    return fail;
+}
+
+__declspec(noinline) static U invoke_cdecl3(void* fn, U a0, U a1, U a2, U& ret_lo) {
+    U before = 0u, frame = 0u, fail = 0u, lo = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push a2
+        push a1
+        push a0
+        call fn
+        add esp, 12
+        mov lo, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_lo = lo;
+    return fail;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_call(B* slot, U off, U orig_va, U orig_target, const void* target) {
+    const U actual = orig_va + 4u + word(slot, off);
+    require(actual == orig_target, "exact relative call target");
+    put(slot, off, address(target) - (address(slot) + off + 4u));
+}
+
+static void setup_original_code() {
+    static const B bytes_590d80[104] = {@BODY_00590D80@};
+    static const B bytes_590df0[48]  = {@BODY_00590DF0@};
+    static const B bytes_590e20[70]  = {@BODY_00590E20@};
+    static const B bytes_5616b0[20]  = {@BODY_005616B0@};
+    static const B bytes_566a40[156] = {@BODY_00566A40@};
+    static const B bytes_566910[289] = {@BODY_00566910@};
+    static const B bytes_4ad950[101] = {@BODY_004AD950@};
+    static const B bytes_4ad9c0[1114] = {@BODY_004AD9C0@};
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 8192u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "rwx alloc");
+
+    slot_590d80 = code + 0x0000u;
+    slot_590df0 = code + 0x0100u;
+    slot_590e20 = code + 0x0200u;
+    slot_5616b0 = code + 0x0300u;
+    slot_566a40 = code + 0x0400u;
+    slot_566910 = code + 0x0600u;
+    slot_4ad950 = code + 0x0800u;
+    slot_4ad9c0 = code + 0x0a00u;
+
+    std::memcpy(slot_590d80, bytes_590d80, sizeof(bytes_590d80));
+    std::memcpy(slot_590df0, bytes_590df0, sizeof(bytes_590df0));
+    std::memcpy(slot_590e20, bytes_590e20, sizeof(bytes_590e20));
+    std::memcpy(slot_5616b0, bytes_5616b0, sizeof(bytes_5616b0));
+    std::memcpy(slot_566a40, bytes_566a40, sizeof(bytes_566a40));
+    std::memcpy(slot_566910, bytes_566910, sizeof(bytes_566910));
+    std::memcpy(slot_4ad950, bytes_4ad950, sizeof(bytes_4ad950));
+    std::memcpy(slot_4ad9c0, bytes_4ad9c0, sizeof(bytes_4ad9c0));
+
+    iat_get_tick_count = address(reinterpret_cast<const void*>(&porsche::platform_get_tick_count));
+
+    // 00590e20 relocations/calls
+    relocate_call(slot_590e20, 0x13u, 0x00590e33u, 0x00566d60u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_lookup_00566d60));
+
+    // 005616b0 relocations
+    relocate_abs32(slot_5616b0, 0x07u, 0x006b7cc0u, address(porsche::audio_stream_slots_006b7cc0));
+
+    // 00566a40 relocations/calls
+    relocate_abs32(slot_566a40, 0x01u, 0x006b499cu,
+                   address(&porsche::application_audio_device_state_006b48c0[0xdcu]));
+    relocate_call(slot_566a40, 0x32u, 0x00566a72u, 0x00566d60u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_lookup_00566d60));
+    relocate_call(slot_566a40, 0x49u, 0x00566a89u, 0x005896d0u,
+                  reinterpret_cast<const void*>(&porsche::audio_backend_lock_005896d0));
+    relocate_call(slot_566a40, 0x71u, 0x00566ab1u, 0x005616b0u, slot_5616b0);
+    relocate_call(slot_566a40, 0x92u, 0x00566ad2u, 0x005896f0u,
+                  reinterpret_cast<const void*>(&porsche::audio_backend_unlock_005896f0));
+
+    // 00566910 relocations/calls
+    relocate_abs32(slot_566910, 0x01u, 0x006b499cu,
+                   address(&porsche::application_audio_device_state_006b48c0[0xdcu]));
+    relocate_call(slot_566910, 0x44u, 0x00566954u, 0x00566d60u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_lookup_00566d60));
+    relocate_call(slot_566910, 0x5cu, 0x0056696cu, 0x005896d0u,
+                  reinterpret_cast<const void*>(&porsche::audio_backend_lock_005896d0));
+    relocate_call(slot_566910, 0x62u, 0x00566972u, 0x00590e20u, slot_590e20);
+    relocate_call(slot_566910, 0x7eu, 0x0056698eu, 0x005896f0u,
+                  reinterpret_cast<const void*>(&porsche::audio_backend_unlock_005896f0));
+    relocate_call(slot_566910, 0xb4u, 0x005669c4u, 0x00590d80u, slot_590d80);
+    relocate_call(slot_566910, 0xbeu, 0x005669ceu, 0x00590df0u, slot_590df0);
+    relocate_call(slot_566910, 0xd8u, 0x005669e8u, 0x00590d80u, slot_590d80);
+    relocate_call(slot_566910, 0xe2u, 0x005669f2u, 0x00590df0u, slot_590df0);
+    relocate_call(slot_566910, 0x103u, 0x00566a13u, 0x005896f0u,
+                  reinterpret_cast<const void*>(&porsche::audio_backend_unlock_005896f0));
+    relocate_call(slot_566910, 0x116u, 0x00566a26u, 0x005896f0u,
+                  reinterpret_cast<const void*>(&porsche::audio_backend_unlock_005896f0));
+
+    // 004ad9c0 absolute relocations to 00656ab4
+    static const U root_reloc_offs[] = {
+        0x002u, 0x024u, 0x046u, 0x075u, 0x0e8u, 0x123u, 0x12bu, 0x134u, 0x15cu, 0x197u,
+        0x19fu, 0x1a8u, 0x1b2u, 0x1bcu, 0x1c9u, 0x1e1u, 0x216u, 0x22bu, 0x23au, 0x257u,
+        0x274u, 0x290u, 0x2a5u, 0x2b6u, 0x2e6u, 0x2f9u, 0x304u, 0x311u, 0x336u, 0x341u,
+        0x364u, 0x36fu, 0x378u, 0x39fu, 0x407u, 0x41bu, 0x42bu, 0x43du, 0x446u
+    };
+    for (U off : root_reloc_offs) {
+        relocate_abs32(slot_4ad9c0, off, 0x00656ab4u, address(&porsche::audio_resource_query_root_00656ab4));
+    }
+    relocate_abs32(slot_4ad9c0, 0x241u, 0x005d1bdcu, address(orig_str_5d1bdc));
+    relocate_abs32(slot_4ad9c0, 0x25eu, 0x005d1bd8u, address(orig_str_5d1bd8));
+    relocate_abs32(slot_4ad9c0, 0x27bu, 0x005d1bd4u, address(orig_str_5d1bd4));
+    relocate_abs32(slot_4ad9c0, 0x29fu, 0x005d1740u, address(&porsche::frame_services_words_005d1740[0]));
+    relocate_abs32(slot_4ad9c0, 0x3e9u, 0x005b2080u, address(&iat_get_tick_count));
+
+    // 004ad9c0 relative calls
+    relocate_call(slot_4ad9c0, 0x016u, 0x004ad9d6u, 0x00565560u,
+                  reinterpret_cast<const void*>(&porsche::window_worker_activation_00565560));
+    relocate_call(slot_4ad9c0, 0x040u, 0x004ada00u, 0x00566a40u, slot_566a40);
+    relocate_call(slot_4ad9c0, 0x064u, 0x004ada24u, 0x00566910u, slot_566910);
+    relocate_call(slot_4ad9c0, 0x115u, 0x004adad5u, 0x00566ae0u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_ramp_00566ae0));
+    relocate_call(slot_4ad9c0, 0x11du, 0x004adaddu, 0x004ad6c0u,
+                  reinterpret_cast<const void*>(&porsche::splash_progress_resource_end_004ad6c0));
+    relocate_call(slot_4ad9c0, 0x189u, 0x004adb49u, 0x00566ae0u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_ramp_00566ae0));
+    relocate_call(slot_4ad9c0, 0x191u, 0x004adb51u, 0x004ad6c0u,
+                  reinterpret_cast<const void*>(&porsche::splash_progress_resource_end_004ad6c0));
+    relocate_call(slot_4ad9c0, 0x235u, 0x004adbf5u, 0x004ad950u, slot_4ad950);
+    relocate_call(slot_4ad9c0, 0x24au, 0x004adc0au, 0x005a2210u,
+                  reinterpret_cast<const void*>(&porsche::formatter_text_compare_n_005a2210));
+    relocate_call(slot_4ad9c0, 0x267u, 0x004adc27u, 0x005a2210u,
+                  reinterpret_cast<const void*>(&porsche::formatter_text_compare_n_005a2210));
+    relocate_call(slot_4ad9c0, 0x284u, 0x004adc44u, 0x005a2210u,
+                  reinterpret_cast<const void*>(&porsche::formatter_text_compare_n_005a2210));
+    relocate_call(slot_4ad9c0, 0x2b1u, 0x004adc71u, 0x00566ae0u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_ramp_00566ae0));
+    relocate_call(slot_4ad9c0, 0x2d5u, 0x004adc95u, 0x00567850u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_status_00567850));
+    relocate_call(slot_4ad9c0, 0x2f3u, 0x004adcb3u, 0x00567740u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_reset_00567740));
+    relocate_call(slot_4ad9c0, 0x330u, 0x004adcf0u, 0x005666f0u,
+                  reinterpret_cast<const void*>(&porsche::audio_resource_locate_005666f0));
+    relocate_call(slot_4ad9c0, 0x35eu, 0x004add1eu, 0x00567720u,
+                  reinterpret_cast<const void*>(&porsche::audio_service_stream_start_00567720));
+    relocate_call(slot_4ad9c0, 0x3e1u, 0x004adda1u, 0x00538040u,
+                  reinterpret_cast<const void*>(&porsche::render_seed_prng_next_00538040));
+    relocate_call(slot_4ad9c0, 0x425u, 0x004adde5u, 0x00567810u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_volume_00567810));
+    relocate_call(slot_4ad9c0, 0x438u, 0x004addf8u, 0x004ad8b0u,
+                  reinterpret_cast<const void*>(&porsche::audio_service_play_004ad8b0));
+}
+
+static void compare_traces(bool check_ret_lo, bool check_ret_hi) {
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "abi");
+    if (check_ret_lo) {
+        require(trace.ret_lo == expected.ret_lo, "ret_lo");
+    }
+    if (check_ret_hi) {
+        require(trace.ret_hi == expected.ret_hi, "ret_hi");
+    }
+    require(trace.count == expected.count, "event count");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0, "event");
+    }
+    require(std::memcmp(trace.final_root_a, expected.final_root_a, sizeof(trace.final_root_a)) == 0,
+            "final_root_a");
+    require(std::memcmp(trace.final_root_b, expected.final_root_b, sizeof(trace.final_root_b)) == 0,
+            "final_root_b");
+    require(std::memcmp(trace.final_split, expected.final_split, sizeof(trace.final_split)) == 0,
+            "final_split");
+    require(std::memcmp(trace.final_out_words, expected.final_out_words,
+                        sizeof(trace.final_out_words)) == 0,
+            "final_out_words");
+    require(trace.final_root_ptr == expected.final_root_ptr, "final_root_ptr");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0, "fpu");
+}
+
+static void snapshot_trace() {
+    std::memcpy(trace.final_root_a, root_a_buf, sizeof(root_a_buf));
+    std::memcpy(trace.final_root_b, root_b_buf, sizeof(root_b_buf));
+    std::memcpy(trace.final_split, split_buf, sizeof(split_buf));
+    std::memcpy(trace.final_out_words, out_words, sizeof(out_words));
+    trace.final_root_ptr = normalize_root_ptr(porsche::audio_resource_query_root_00656ab4);
+}
+
+static void reset_env(const ScenarioCfg& c) {
+    cfg = c;
+    prng_idx = 0u;
+    tick_idx = 0u;
+    std::memset(&trace, 0, sizeof(trace));
+    std::memset(root_a_buf, 0xaa, sizeof(root_a_buf));
+    std::memset(root_b_buf, 0xbb, sizeof(root_b_buf));
+    std::memset(chan_buf, 0xcc, sizeof(chan_buf));
+    std::memset(entries_buf, 0xdd, sizeof(entries_buf));
+    std::memset(slot_rec_buf, 0xee, sizeof(slot_rec_buf));
+    std::memset(split_buf, 0x77, sizeof(split_buf));
+    std::memset(out_words, 0x55, sizeof(out_words));
+    std::memset(tag_buf, 0, sizeof(tag_buf));
+    std::memset(porsche::audio_stream_slots_006b7cc0, 0, sizeof(porsche::audio_stream_slots_006b7cc0));
+    porsche::application_audio_device_state_006b48c0.backing.fill(0u);
+    porsche::audio_resource_query_root_00656ab4 = address(root_a_buf);
+}
+
+static ScenarioCfg default_cfg() {
+    ScenarioCfg c{};
+    c.window_active = 1u;
+    c.lookup_null = 0u;
+    c.status_ret = 0;
+    c.start_ret = 0x42;
+    c.end_4ad6c0_ret = 0x11223344u;
+    c.locate_ret = 0x55667788u;
+    c.locate_size = 0x9000u;
+    c.prng_seq[0] = 0x11u;
+    c.prng_seq[1] = 0x22u;
+    c.prng_len = 2u;
+    c.tick_seq[0] = 0x100u;
+    c.tick_seq[1] = 0x200u;
+    c.tick_len = 2u;
+    return c;
+}
+
+static void test_mul64(U a, U b) {
+    ++cases;
+    auto run_one = [&](bool use_cpp) {
+        cpp_side = use_cpp;
+        reset_env(default_cfg());
+        void* fn = use_cpp
+            ? reinterpret_cast<void*>(&porsche::audio_u32_mul64_00590d80)
+            : slot_590d80;
+        seed_fpu();
+        trace.abi_fail = invoke_cdecl2_u64(fn, a, b, trace.ret_lo, trace.ret_hi);
+        capture_fpu(trace.fpu);
+        snapshot_trace();
+    };
+    run_one(false);
+    expected = trace;
+    run_one(true);
+    compare_traces(true, true);
+}
+
+static void test_div32(U lo, U hi, U divisor) {
+    ++cases;
+    auto run_one = [&](bool use_cpp) {
+        cpp_side = use_cpp;
+        reset_env(default_cfg());
+        void* fn = use_cpp
+            ? reinterpret_cast<void*>(&porsche::audio_u64_div32_00590df0)
+            : slot_590df0;
+        seed_fpu();
+        trace.abi_fail = invoke_cdecl3(fn, lo, hi, divisor, trace.ret_lo);
+        capture_fpu(trace.fpu);
+        snapshot_trace();
+    };
+    run_one(false);
+    expected = trace;
+    run_one(true);
+    compare_traces(true, false);
+}
+
+static void test_slot_total(U index, U v20, U v24) {
+    ++cases;
+    auto run_one = [&](bool use_cpp) {
+        cpp_side = use_cpp;
+        reset_env(default_cfg());
+        porsche::audio_stream_slots_006b7cc0[index] = address(slot_rec_buf);
+        put(slot_rec_buf, 0x20u, v20);
+        put(slot_rec_buf, 0x24u, v24);
+        void* fn = use_cpp
+            ? reinterpret_cast<void*>(&porsche::audio_stream_slot_total_005616b0)
+            : slot_5616b0;
+        seed_fpu();
+        trace.abi_fail = invoke_cdecl1(fn, index, trace.ret_lo);
+        capture_fpu(trace.fpu);
+        snapshot_trace();
+    };
+    run_one(false);
+    expected = trace;
+    run_one(true);
+    compare_traces(true, false);
+}
+
+static void test_stream_lookup(I handle, U lookup_null, B count_byte, I match_idx) {
+    ++cases;
+    auto run_one = [&](bool use_cpp) {
+        cpp_side = use_cpp;
+        ScenarioCfg c = default_cfg();
+        c.lookup_null = lookup_null;
+        reset_env(c);
+        put(chan_buf, 0x00u, address(entries_buf));
+        chan_buf[0x16u] = count_byte;
+        for (I i = 0; i < 4; ++i) {
+            put(entries_buf, static_cast<U>(i) * 0x2cu + 0x04u,
+                (i == match_idx) ? static_cast<U>(handle) : static_cast<U>(0x7000 + i));
+        }
+        void* fn = use_cpp
+            ? reinterpret_cast<void*>(&porsche::audio_service_stream_lookup_00590e20)
+            : slot_590e20;
+        seed_fpu();
+        trace.abi_fail = invoke_cdecl1(fn, static_cast<U>(handle), trace.ret_lo);
+        capture_fpu(trace.fpu);
+        snapshot_trace();
+    };
+    run_one(false);
+    expected = trace;
+    run_one(true);
+    compare_traces(true, false);
+}
+
+static void test_slot_info(B active, U lookup_null, I slot, B count_byte,
+                           std::uint16_t denom, U pcm_idx, U v20, U v24) {
+    ++cases;
+    auto run_one = [&](bool use_cpp) {
+        cpp_side = use_cpp;
+        ScenarioCfg c = default_cfg();
+        c.lookup_null = lookup_null;
+        reset_env(c);
+        porsche::application_audio_device_state_006b48c0[0xdcu] = active;
+        put(chan_buf, 0x00u, address(entries_buf));
+        put(chan_buf, 0x0cu, pcm_idx);
+        chan_buf[0x16u] = count_byte;
+        std::memcpy(chan_buf + 0x2cu, &denom, 2u);
+        put(entries_buf, 0x04u, 0x12340102u);
+        porsche::audio_stream_slots_006b7cc0[pcm_idx & 0xfu] = address(slot_rec_buf);
+        put(slot_rec_buf, 0x20u, v20);
+        put(slot_rec_buf, 0x24u, v24);
+        void* fn = use_cpp
+            ? reinterpret_cast<void*>(&porsche::audio_service_slot_info_00566a40)
+            : slot_566a40;
+        seed_fpu();
+        trace.abi_fail = invoke_cdecl2(fn, static_cast<U>(slot), address(out_words), trace.ret_lo);
+        capture_fpu(trace.fpu);
+        snapshot_trace();
+    };
+    run_one(false);
+    expected = trace;
+    run_one(true);
+    compare_traces(true, false);
+}
+
+static void test_stream_info(B active, U lookup_null, I handle, B count_byte,
+                             I match_idx, U entry_s08, U entry_14, U entry_18, U entry_1c,
+                             std::uint16_t denom2c, std::uint16_t denom30) {
+    ++cases;
+    auto run_one = [&](bool use_cpp) {
+        cpp_side = use_cpp;
+        ScenarioCfg c = default_cfg();
+        c.lookup_null = lookup_null;
+        reset_env(c);
+        porsche::application_audio_device_state_006b48c0[0xdcu] = active;
+        put(chan_buf, 0x00u, address(entries_buf));
+        chan_buf[0x16u] = count_byte;
+        std::memcpy(chan_buf + 0x2cu, &denom2c, 2u);
+        std::memcpy(chan_buf + 0x30u, &denom30, 2u);
+        for (I i = 0; i < 4; ++i) {
+            const U off = static_cast<U>(i) * 0x2cu;
+            put(entries_buf, off + 0x04u,
+                (i == match_idx) ? static_cast<U>(handle) : static_cast<U>(0x8000 + i));
+            put(entries_buf, off + 0x08u, entry_s08);
+            put(entries_buf, off + 0x14u, entry_14);
+            put(entries_buf, off + 0x18u, entry_18);
+            put(entries_buf, off + 0x1cu, entry_1c);
+        }
+        void* fn = use_cpp
+            ? reinterpret_cast<void*>(&porsche::audio_service_stream_info_00566910)
+            : slot_566910;
+        seed_fpu();
+        trace.abi_fail = invoke_cdecl2(fn, static_cast<U>(handle), address(out_words), trace.ret_lo);
+        capture_fpu(trace.fpu);
+        snapshot_trace();
+    };
+    run_one(false);
+    expected = trace;
+    run_one(true);
+    compare_traces(true, false);
+}
+
+static void test_split(const char* input) {
+    ++cases;
+    auto run_one = [&](bool use_cpp) {
+        cpp_side = use_cpp;
+        reset_env(default_cfg());
+        std::snprintf(tag_buf, sizeof(tag_buf), "%s", input);
+        put(split_buf, 0x00u, address(tag_buf));
+        void* fn = use_cpp
+            ? reinterpret_cast<void*>(&porsche::audio_service_split_004ad950)
+            : slot_4ad950;
+        seed_fpu();
+        trace.abi_fail = invoke_cdecl1(fn, address(split_buf), trace.ret_lo);
+        capture_fpu(trace.fpu);
+        snapshot_trace();
+    };
+    run_one(false);
+    expected = trace;
+    run_one(true);
+    compare_traces(false, false);
+}
+
+template <typename SetupFn>
+static void test_callback(const ScenarioCfg& c_in, SetupFn setup_fn) {
+    ++cases;
+    auto run_one = [&](bool use_cpp) {
+        cpp_side = use_cpp;
+        reset_env(c_in);
+        porsche::application_audio_device_state_006b48c0[0xdcu] = 1u;
+        put(chan_buf, 0x00u, address(entries_buf));
+        put(chan_buf, 0x0cu, 2u);
+        chan_buf[0x16u] = 2u;
+        const std::uint16_t d2c = 0x1000u;
+        const std::uint16_t d30 = 0x2000u;
+        std::memcpy(chan_buf + 0x2cu, &d2c, 2u);
+        std::memcpy(chan_buf + 0x30u, &d30, 2u);
+        porsche::audio_stream_slots_006b7cc0[2] = address(slot_rec_buf);
+        put(slot_rec_buf, 0x20u, 100u);
+        put(slot_rec_buf, 0x24u, 200u);
+        put(entries_buf, 0x04u, 0x101u);
+        put(entries_buf, 0x08u, 1u);
+        put(entries_buf, 0x14u, 0x4000u);
+        put(entries_buf, 0x18u, 0x8000u);
+        put(entries_buf, 0x1cu, 0x120u);
+        setup_fn();
+        void* fn = use_cpp
+            ? reinterpret_cast<void*>(&porsche::application_audio_service_callback_004ad9c0)
+            : slot_4ad9c0;
+        seed_fpu();
+        trace.abi_fail = invoke_cdecl2(fn, 0x1111u, 0x2222u, trace.ret_lo);
+        capture_fpu(trace.fpu);
+        snapshot_trace();
+    };
+    run_one(false);
+    expected = trace;
+    run_one(true);
+    compare_traces(true, false);
+}
+
+static void init_root(B* buf, U source, U state, I slot, I count, I cur_idx,
+                      U f00 = 0x7fu, U f10 = 0u, U f18 = 0u, U f1c = 0u,
+                      U f24 = 0u, U f6c = 1u, U f84 = 1u, U f90 = 0x101u) {
+    put(buf, 0x00u, f00);
+    put(buf, 0x08u, static_cast<U>(count));
+    put(buf, 0x0cu, static_cast<U>(cur_idx));
+    put(buf, 0x10u, f10);
+    put(buf, 0x14u, state);
+    put(buf, 0x18u, f18);
+    put(buf, 0x1cu, f1c);
+    put(buf, 0x20u, 0u);
+    put(buf, 0x24u, f24);
+    put(buf, 0x28u, address(tag_buf));
+    put(buf, 0x6cu, f6c);
+    put(buf, 0x70u, static_cast<U>(slot));
+    put(buf, 0x74u, 0u);
+    put(buf, 0x84u, f84);
+    put(buf, 0x88u, source);
+    put(buf, 0x8cu, 0u);
+    put(buf, 0x90u, f90);
+}
+
+int main() {
+    require(sizeof(porsche::audio_service_tag_vic_005d1bd4) == sizeof(orig_str_5d1bd4) &&
+                std::memcmp(porsche::audio_service_tag_vic_005d1bd4, orig_str_5d1bd4, 4u) == 0,
+            "raw str 5d1bd4");
+    require(sizeof(porsche::audio_service_tag_win_005d1bd8) == sizeof(orig_str_5d1bd8) &&
+                std::memcmp(porsche::audio_service_tag_win_005d1bd8, orig_str_5d1bd8, 4u) == 0,
+            "raw str 5d1bd8");
+    require(sizeof(porsche::audio_service_tag_lose_005d1bdc) == sizeof(orig_str_5d1bdc) &&
+                std::memcmp(porsche::audio_service_tag_lose_005d1bdc, orig_str_5d1bdc, 5u) == 0,
+            "raw str 5d1bdc");
+
+    setup_original_code();
+
+    // 1. 00590d80 (32x32->64 unsigned multiply)
+    test_mul64(0u, 0u);
+    test_mul64(0x12345678u, 1000u);
+    test_mul64(0xffffffffu, 0xffffffffu);
+    test_mul64(0xdeadbeefu, 0xfeedfaceu);
+
+    // 2. 00590df0 (64/32 restoring division)
+    test_div32(0u, 0u, 1000u);
+    test_div32(0x12345678u, 0x00000100u, 0x00010000u);
+    test_div32(0xffffffffu, 0x80000000u, 3u);
+    test_div32(0x12345678u, 0x00000001u, 0u);
+
+    // 3. 005616b0 (slot total)
+    test_slot_total(0u, 0x10u, 0x20u);
+    test_slot_total(15u, 0xfffffff0u, 0x20u);
+
+    // 4. 00590e20 (stream lookup)
+    test_stream_lookup(-1, 0u, 2, 0);
+    test_stream_lookup(0x101, 1u, 2, 0);
+    test_stream_lookup(0x101, 0u, 0, 0);
+    test_stream_lookup(0x101, 0u, static_cast<B>(-1), 0);
+    test_stream_lookup(0x101, 0u, 3, 2);
+    test_stream_lookup(0x101, 0u, 3, 5);
+
+    // 5. 00566a40 (slot info)
+    test_slot_info(0u, 0u, 1, 2, 1000u, 2u, 10u, 20u);
+    test_slot_info(1u, 1u, 1, 2, 1000u, 2u, 10u, 20u);
+    test_slot_info(1u, 0u, 1, 0, 1000u, 2u, 10u, 20u);
+    test_slot_info(1u, 0u, 1, 2, 0u, 2u, 10u, 20u);
+    test_slot_info(1u, 0u, 1, static_cast<B>(-2), 0x8000u, 2u, 0x00500000u, 0x00100000u);
+
+    // 6. 00566910 (stream info)
+    test_stream_info(0u, 0u, 0x101, 2, 0, 0, 100u, 300u, 50u, 1000u, 2000u);
+    test_stream_info(1u, 0u, -5, 2, 0, 0, 100u, 300u, 50u, 1000u, 2000u);
+    test_stream_info(1u, 1u, 0x101, 2, 0, 0, 100u, 300u, 50u, 1000u, 2000u);
+    test_stream_info(1u, 0u, 0x101, 2, 5, 0, 100u, 300u, 50u, 1000u, 2000u);
+    test_stream_info(1u, 0u, 0x101, 2, 0, 0xffffffffu, 100u, 300u, 50u, 1000u, 2000u);
+    test_stream_info(1u, 0u, 0x101, 2, 0, 1u, 0x00500000u, 0x00900000u, 0x00500000u, 0x8000u, 0x4000u);
+    test_stream_info(1u, 0u, 0x101, 2, 1, 1u, 0x00500000u, 0x00100000u, 0x00500000u, 0x8000u, 0xc000u);
+
+    // 7. 004ad950 (split)
+    test_split("");
+    test_split("alpha");
+    test_split("foo-bar");
+    test_split("foo-win-tail");
+    test_split("a-b-c-d");
+    test_split("12345678901234567890123456789012345-xyz");
+    test_split("a-12345678901234567890123456789012345");
+
+    // 8. 004ad9c0 (service callback)
+    // Early exits
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 0u, 0u, 1, 2, 0);
+    });
+    {
+        ScenarioCfg c = default_cfg();
+        c.window_active = 0u;
+        test_callback(c, [] {
+            init_root(root_a_buf, 1u, 0u, 1, 2, 0);
+        });
+    }
+    // Pre-transition ramp-out triggered (root[0xa0] > root[0xa4] && root[0xa4] < 550)
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 1u, 1, 2, 0, 0x7fu, 0u, 0u, 0u, 0u, 0u);
+        put(entries_buf, 0x14u, 0x1000u);
+        put(entries_buf, 0x18u, 0x2000u); // root[0xa0] = 1000
+        put(entries_buf, 0x1cu, 0x120u);  // root[0xa4] = 70 < 550 (0x226)
+        std::snprintf(tag_buf, sizeof(tag_buf), "other");
+    });
+    // Pre-transition boundary: root[0xa4] == 0x226 (550) must NOT trigger ramp-out
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 1u, 1, 2, 0, 0x7fu, 0u, 0u, 0u, 0u, 1u);
+        put(entries_buf, 0x14u, 0x1000u);
+        put(entries_buf, 0x18u, 0x2000u); // root[0xa0] = 1000 > 550
+        put(entries_buf, 0x1cu, 0x8d0u);  // root[0xa4] = (2256*1000)/4096 = 550 == 0x226!
+    });
+    // State 2: root[0x6c] == 0 -> -4 stop
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 2u, 1, 2, 0, 0x7fu, 0u, 0u, 0u, 0u, 0u);
+    });
+    // State 2: root[0x6c] != 0 && slot < 0 -> -3 stop
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 2u, -1, 2, 0, 0x7fu, 0u, 0u, 0u, 0u, 1u);
+    });
+    // State 2: root[0x6c] != 0 && slot >= 0 && count==0 (00566a40 sets 008c=0) -> exit 0
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 2u, 1, 2, 0, 0x7fu, 0u, 0u, 0u, 0u, 1u);
+        chan_buf[0x16u] = 0u;
+    });
+    // State 2: tag comparisons ("LOSE-1", "los", "WIN-2", "VIC-3", "other")
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 2u, 1, 2, 0);
+        std::snprintf(tag_buf, sizeof(tag_buf), "LOSE-1");
+    });
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 2u, 1, 2, 0);
+        std::snprintf(tag_buf, sizeof(tag_buf), "los");
+    });
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 2u, 1, 2, 0);
+        std::snprintf(tag_buf, sizeof(tag_buf), "WIN-2");
+    });
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 2u, 1, 2, 0);
+        std::snprintf(tag_buf, sizeof(tag_buf), "VIC-3");
+    });
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 2u, 1, 2, 0);
+        std::snprintf(tag_buf, sizeof(tag_buf), "trk-other");
+    });
+    // State != 0 && != 2: status nonzero -> return 0
+    {
+        ScenarioCfg c = default_cfg();
+        c.status_ret = 1;
+        test_callback(c, [] {
+            init_root(root_a_buf, 1u, 1u, 1, 2, 0);
+        });
+    }
+    // State == 3, status == 0 -> reset, state becomes 0
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 3u, 1, 2, 0);
+    });
+    // State == 1, status == 0 -> locate (including signed int8_t entry byte!) & start stream
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 1u, 1, 2, 1);
+        root_a_buf[0xe8u + 1u] = 0xfeu; // signed -2 -> 0xfffffffe
+    });
+    // State == 0: 0x8c != 0 -> return 0
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 0u, 1, 2, 0);
+    });
+    // State == 0, 0x8c == 0, cur_idx == -1 -> return 0
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 0u, 1, 2, -1);
+        chan_buf[0x16u] = 0u;
+    });
+    // State == 0, count == 1 -> cur_idx = 0, volume, play
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 0u, 1, 1, 3);
+        chan_buf[0x16u] = 0u;
+    });
+    // State == 0, count == 2, random -> PRNG + tickCount, next_idx = 1
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 0u, 1, 2, 0, 0x7fu, 0u, 0u, 0u, 1u);
+        chan_buf[0x16u] = 0u;
+    });
+    // State == 0, count == 0 -> skip index update, volume, skip play
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 0u, 1, 0, 0);
+        chan_buf[0x16u] = 0u;
+    });
+    // State == 0, count == 5, sequential wrap
+    test_callback(default_cfg(), [] {
+        init_root(root_a_buf, 1u, 0u, 1, 5, 4, 0x7fu, 0u, 0u, 0u, 0u);
+        chan_buf[0x16u] = 0u;
+    });
+    // State == 0, count == 5, random with negative sum & INT_MIN sum
+    {
+        ScenarioCfg c = default_cfg();
+        c.prng_seq[0] = 0x80000001u;
+        c.tick_seq[0] = 0x00000000u;
+        test_callback(c, [] {
+            init_root(root_a_buf, 1u, 0u, 1, 5, 2, 0x7fu, 0u, 0u, 0u, 1u);
+            chan_buf[0x16u] = 0u;
+        });
+    }
+    {
+        ScenarioCfg c = default_cfg();
+        c.prng_seq[0] = 0x80000000u;
+        c.tick_seq[0] = 0x00000000u;
+        test_callback(c, [] {
+            init_root(root_a_buf, 1u, 0u, 1, 5, 2, 0x7fu, 0u, 0u, 0u, 1u);
+            chan_buf[0x16u] = 0u;
+        });
+    }
+    // Root-switch reload tests across calls
+    {
+        ScenarioCfg c = default_cfg();
+        c.switch_root_in_ramp = 1u;
+        c.switch_root_in_end = 1u;
+        test_callback(c, [] {
+            init_root(root_a_buf, 1u, 2u, 1, 2, 0, 0x7fu, 0u, 0u, 0u, 0u, 0u);
+            init_root(root_b_buf, 2u, 2u, 3, 2, 0, 0x7fu, 0u, 0u, 0u, 0u, 0u);
+        });
+    }
+    {
+        ScenarioCfg c = default_cfg();
+        c.switch_root_in_reset = 1u;
+        c.switch_root_in_locate = 1u;
+        c.switch_root_in_start = 1u;
+        test_callback(c, [] {
+            init_root(root_a_buf, 1u, 1u, 1, 2, 0);
+            init_root(root_b_buf, 2u, 1u, 3, 2, 1);
+            root_b_buf[0xe8u + 1u] = 7u;
+        });
+    }
+    {
+        ScenarioCfg c = default_cfg();
+        c.switch_root_in_volume = 1u;
+        c.switch_root_in_play = 1u;
+        test_callback(c, [] {
+            init_root(root_a_buf, 1u, 0u, 1, 3, 1);
+            init_root(root_b_buf, 2u, 0u, 3, 3, 1);
+            chan_buf[0x16u] = 0u;
+        });
+    }
+
+    std::printf("audio_service_callback_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}
+

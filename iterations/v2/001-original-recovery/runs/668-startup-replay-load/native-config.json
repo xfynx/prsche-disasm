@@ -1,0 +1,218 @@
+{
+  "run": 668,
+  "experiment": "local/experiments/v2-startup-replay-load-668",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_main_globals.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/install_paths_storage.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/668-startup-replay-load",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/668-startup-replay-load/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004146f0",
+      "bytes": 284,
+      "sha256": "e780f9a0607e0cbf6fa4eebd43f2f1578b9b410acd1f71708d64582055982cf4",
+      "token": "@BODY_004146F0@"
+    },
+    {
+      "va": "00413cf0",
+      "bytes": 420,
+      "sha256": "1ece6f8692fa7e940c3b1acdeb21fff576f0847f06823b9ee184e7bf69dc5346",
+      "token": "@BODY_00413CF0@"
+    },
+    {
+      "va": "005cc588",
+      "bytes": 5,
+      "sha256": "0c12582270939f383c07b5f8439aa0cbe33fb62008e8bc2f39fd5953e3e7b584",
+      "token": "@STR_005CC588@"
+    },
+    {
+      "va": "005cc68c",
+      "bytes": 11,
+      "sha256": "a5dc8c0446dbd7a846e85675403c0967b2c0a209415ec3769683c4a6c08ef0e1",
+      "token": "@STR_005CC68C@"
+    },
+    {
+      "va": "005cc698",
+      "bytes": 16,
+      "sha256": "9714a0ba604349599862b738b46ead3875fe05672da581e9f90758203f4f757f",
+      "token": "@STR_005CC698@"
+    },
+    {
+      "va": "005cc6a8",
+      "bytes": 24,
+      "sha256": "f0830732bffce0a9f9219e160836f479a758fb289922b39b8eb7692b371e184f",
+      "token": "@STR_005CC6A8@"
+    },
+    {
+      "va": "005cc6c0",
+      "bytes": 26,
+      "sha256": "7fdf83362d031fada2b7c1e8dce5590525160ea0961dddeacfe8a00d93f83616",
+      "token": "@STR_005CC6C0@"
+    },
+    {
+      "va": "005cc6dc",
+      "bytes": 31,
+      "sha256": "b2b4e3d95a477b9eccadbd79775449da31215c01e3521022524e83ca028f08d7",
+      "token": "@STR_005CC6DC@"
+    }
+  ],
+  "pass_marker": "startup_replay_load_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-4146f0-handle-test",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    (void)open_0059e040(path, 1u, 0x64u, &handle);\n    if (handle != nullptr) {",
+      "new": "    const bool opened = open_0059e040(path, 1u, 0x64u, &handle);\n    if (opened && handle != nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4146f0-open-mode",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    (void)open_0059e040(path, 1u, 0x64u, &handle);\n    if (handle != nullptr) {",
+      "new": "    (void)open_0059e040(path, 0u, 0x64u, &handle);\n    if (handle != nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4146f0-open-group",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    (void)open_0059e040(path, 1u, 0x64u, &handle);\n    if (handle == nullptr) {",
+      "new": "    (void)open_0059e040(path, 1u, 0x63u, &handle);\n    if (handle == nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4146f0-fallback-literal",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    (void)formatter_entry_005a0fbf(\n        path, \"%s%s\", engine_service_root_0065b360, \"replay.rpl\");",
+      "new": "    (void)formatter_entry_005a0fbf(\n        path, \"%s%s\", engine_service_root_0065b360, \"default.rpl\");",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4146f0-miss-keep-mode",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "        global_005e99f4 = 0u;",
+      "new": "        global_005e99f4 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4146f0-read-offset",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "        (void)read_00533bf0(\n            handle, 0u, replay_snapshot_005e9a20, static_cast<std::uint32_t>(size), 0x64u);",
+      "new": "        (void)read_00533bf0(\n            handle, 1u, replay_snapshot_005e9a20, static_cast<std::uint32_t>(size), 0x64u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4146f0-skip-close",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    (void)close_00533da0(handle, 0x64u);\n    (void)formatter_stdio_printf_005a177b(replay_msg_default_loaded_005cc6a8);",
+      "new": "    (void)formatter_stdio_printf_005a177b(replay_msg_default_loaded_005cc6a8);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4146f0-loaded-fmt",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "        (void)formatter_stdio_printf_005a177b(replay_msg_file_loaded_005cc698, path);",
+      "new": "        (void)formatter_stdio_printf_005a177b(replay_msg_default_loaded_005cc6a8);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413cf0-mode-check",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    if (mode != 2u) {",
+      "new": "    if (mode != 1u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413cf0-entry-flag-store",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    global_005e99f4 = mode;\n    replay_mode_flag_00606858 = state_flag;",
+      "new": "    global_005e99f4 = mode;\n    replay_mode_flag_00606858 = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413cf0-clear-5e99fc",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    replay_state_005e99fc = 0u;",
+      "new": "    replay_state_005e99fc = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413cf0-block-count",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    std::copy_n(\n        saved_block_00657c84.data(),\n        0x36u,",
+      "new": "    std::copy_n(\n        saved_block_00657c84.data(),\n        0x35u,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413cf0-word-00657a48",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    application_state_006573e8.word(0x00657a48u) = saved_00657a48;",
+      "new": "    application_state_006573e8.word(0x00657a48u) = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413cf0-word-00657d5c",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    application_state_006573e8.word(0x00657d5cu) = saved_00657d5c;",
+      "new": "    application_state_006573e8.word(0x00657d5cu) = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413cf0-word-00657db4",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    application_state_006573e8.word(0x00657db4u) = saved_00657db4;",
+      "new": "    application_state_006573e8.word(0x00657db4u) = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413cf0-tail-word-606a80",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    replay_saved_word_00606a80 = replay_tail_word_005ed844;",
+      "new": "    replay_saved_word_00606a80 = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413cf0-reread-flag-606858",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "    replay_mode_flag_00606858 = application_state_006573e8.word(0x0065741cu);",
+      "new": "    replay_mode_flag_00606858 = state_flag;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413cf0-else-copy-size",
+      "source": "iterations/v2/001-original-recovery/runs/668-startup-replay-load/startup_replay_load_668.cpp",
+      "old": "        std::copy_n(\n            application_state_006573e8.words().data(),\n            application_state_word_count,\n            replay_snapshot_005e9a20);",
+      "new": "        std::copy_n(\n            application_state_006573e8.words().data(),\n            application_state_word_count - 1u,\n            replay_snapshot_005e9a20);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
