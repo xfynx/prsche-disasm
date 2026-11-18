@@ -4,23 +4,23 @@ Updated 2026-11-18. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run642](iterations/v2/001-original-recovery/runs/642-pattern-match-codec-leaves-integration/README.md)
-compiles 365 C++ translation units across 8 projects. The link remains at 88 unresolved
-names / 91 references while supplying verified dependencies for `004ae4d0`/`004ae8c0` and
-`0056c140`/`0056c420`/`0056b3b0`. **There is no recovered playable C++ game executable yet.**
+[Run645](iterations/v2/001-original-recovery/runs/645-audio-transition-text-leaves-integration/README.md)
+compiles 367 C++ translation units across 8 projects. The link has 86 unresolved names /
+89 references (closing `004ae4d0` x2 and `004ae8c0`, while pulling `564` exposes `00567550`).
+**There is no recovered playable C++ game executable yet.**
 
-Run642 integrates six partial functions (957 code bytes total: `004a5f90` in `640/001` plus
-`0056bce0`/`0056bd10`/`0056c380`/`0056c3e0`/`0056c540` in `641/003`), 6B file-backed `.data`
-(`005d13bc..005d13c1`), and 36B `.rdata` (`005bdd88..005bddab`). Native comparisons pass
-332 measured cases / 18 material controls at `/Od`/`/O2`. Canonical owners are reused.
-Shared audit verifies 904 source pins; registry 985 retains partial domains.
+Run645 integrates seven partial functions (1455 code bytes total: `004ae4d0`/`004ae8c0` in
+`643/002` plus `0053c640`/`00556370`/`005563b0`/`00554930`/`00555640` in `644/001`), 9B `.data`
+(`005d1c1c..005d1c20`, `0065b928..0065b92b`), and 0B new `.rdata`. Native comparisons pass
+182 measured cases / 20 material controls at `/Od`/`/O2`. Canonical owners are reused.
+Shared audit verifies 909 source pins; registry 992 retains partial domains.
 
 Run566 also compiles six partial callback/resource entries (384 comparisons/four
 controls, exact98B readonly data) into an unreferenced archive member. This does
 not close a reachable game dependency; real stream-start semantics remain open.
 
-Run640 (`001`), Run641 (`003`), and Run642 (`001`) integration are accepted within their stated bounds.
-Run643 (`004ae4d0` + `004ae8c0`) and Run644 (`0053c640`..`00555640`) are pending integration in Run645.
+Run643 (`002`), Run644 (`001`), and Run645 (`001`) integration are accepted within their stated bounds.
+Run646 (`0044b830`..`0047f040`) and Run647 (`0044e010` + `0044df10`) are pending integration in Run648.
 Run569 remains unaccepted deferred
 research. Later draft directories do not supersede accepted build metrics. Active
 iteration remains v2/001; numbered runs are recovery packets within it.

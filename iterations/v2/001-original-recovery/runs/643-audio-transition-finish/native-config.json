@@ -1,0 +1,131 @@
+{
+  "run": 643,
+  "experiment": "local/experiments/v2-audio-transition-finish-643",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/643-audio-transition-finish",
+    "iterations/v2/001-original-recovery/runs/640-pattern-match",
+    "iterations/v2/001-original-recovery/runs/638-render-seed-prng",
+    "iterations/v2/001-original-recovery/runs/637-audio-stream-channel-status",
+    "iterations/v2/001-original-recovery/runs/607-frame-audio-stream-ramp",
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls",
+    "iterations/v2/001-original-recovery/runs/561-audio-stream-creation",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004ae4d0",
+      "bytes": 995,
+      "sha256": "27ecec51cc35cf224f517e0118bfddb570c61d1da214b9043441c67db1bdb8f8",
+      "token": "@BODY_004AE4D0@"
+    },
+    {
+      "va": "004ae8c0",
+      "bytes": 198,
+      "sha256": "57f95780bf516b9675752b33690814dcdab2e2cb2ed37ea1dd85dd3afcc1c306",
+      "token": "@BODY_004AE8C0@"
+    },
+    {
+      "va": "005d1c1c",
+      "bytes": 5,
+      "sha256": "b36afdab285bc9e84db530a17a7aabae6776c3ce10adb4b928efdac585135d1e",
+      "token": "@BODY_005D1C1C@"
+    }
+  ],
+  "pass_marker": "audio_transition_finish_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-mode1-cur-count-guard",
+      "source": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp",
+      "old": "    if (mode == 1u && cur_count > 0) {",
+      "new": "    if (mode == 1u && cur_count > 1) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-fallback-strlen-limit",
+      "source": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp",
+      "old": "            if (len < 0x3du) {",
+      "new": "            if (len <= 0x3du) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-0065b928-override-value",
+      "source": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp",
+      "old": "    if (audio_transition_word_0065b928 != 0u) {\n        *reinterpret_cast<std::uint32_t*>(ptr_from_va(root) + 0x24u) = 1u;",
+      "new": "    if (audio_transition_word_0065b928 != 0u) {\n        *reinterpret_cast<std::uint32_t*>(ptr_from_va(root) + 0x24u) = audio_transition_word_0065b928;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-abs32-sign-mask",
+      "source": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp",
+      "old": "    const std::uint32_t sign_mask =\n        (static_cast<std::int32_t>(sum) < 0) ? 0xffffffffu : 0u;",
+      "new": "    const std::uint32_t sign_mask = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-entry-sign-extension",
+      "source": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp",
+      "old": "        const std::int32_t entry_id = static_cast<std::int32_t>(\n            static_cast<std::int8_t>(ptr_from_va(root)[0xe8u + idx]));",
+      "new": "        const std::int32_t entry_id = static_cast<std::int32_t>(ptr_from_va(root)[0xe8u + idx]);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-crossfade-ramp-ms",
+      "source": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp",
+      "old": "        (void)audio_stream_service_ramp_00566ae0(slot, 500, 0);",
+      "new": "        (void)audio_stream_service_ramp_00566ae0(slot, 400, 0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tail-zero-offset",
+      "source": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp",
+      "old": "        *reinterpret_cast<std::uint32_t*>(ptr_from_va(root) + 0x188u) = 0u;",
+      "new": "        *reinterpret_cast<std::uint32_t*>(ptr_from_va(root) + 0x184u) = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4ae8c0-pending-state-guard",
+      "source": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp",
+      "old": "            *reinterpret_cast<const std::uint32_t*>(ptr_from_va(root) + 0x14u) != 2u) {",
+      "new": "            *reinterpret_cast<const std::uint32_t*>(ptr_from_va(root) + 0x14u) == 2u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4ae8c0-start-vol-divisor",
+      "source": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp",
+      "old": "                        const std::int32_t start_vol = prod2 / ramp_ms;",
+      "new": "                        const std::int32_t start_vol = prod2 / cur_vol;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4ae8c0-zero-old-vol-trigger",
+      "source": "iterations/v2/001-original-recovery/runs/643-audio-transition-finish/audio_transition_finish_643.cpp",
+      "old": "    if (old_vol == 0u) {\n        application_audio_transition_finish_004ae4d0(0u, 0u);\n    }",
+      "new": "    if (old_vol != 0u) {\n        application_audio_transition_finish_004ae4d0(0u, 0u);\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

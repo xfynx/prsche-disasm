@@ -1,0 +1,147 @@
+{
+  "run": 644,
+  "experiment": "local/experiments/v2-render-startup-text-leaves-644",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+    "iterations/v2/001-original-recovery/runs/579-texture-format-comparator/format_preferences_579.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves",
+    "iterations/v2/001-original-recovery/runs/611-splash-sprite-horizflip",
+    "iterations/v2/001-original-recovery/runs/579-texture-format-comparator",
+    "iterations/v2/001-original-recovery/runs/577-render-texture-transfer",
+    "iterations/v2/001-original-recovery/runs/546-render-resource-allocation",
+    "iterations/v2/001-original-recovery/runs/537-render-resource-descriptor-cleanup",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0053c640",
+      "bytes": 63,
+      "sha256": "1fe0282d153ec649985395c4268d00a03d7ebe04dabe7b74e2bb9590c6fb8e44",
+      "token": "@BODY_0053C640@"
+    },
+    {
+      "va": "00556370",
+      "bytes": 61,
+      "sha256": "c12c9c9d5915787318e64cf669a9a5b456953b75f535ac11a77f08ad6fb4e98d",
+      "token": "@BODY_00556370@"
+    },
+    {
+      "va": "005563b0",
+      "bytes": 24,
+      "sha256": "47751c5602ae077354ba167ccdadd22adc369c89e36e1eff2f3b3118dc4e7301",
+      "token": "@BODY_005563B0@"
+    },
+    {
+      "va": "00554930",
+      "bytes": 19,
+      "sha256": "f0371c0f73abddc0371be14aa211249c37993dcaeebf13c0bed76aada43ee513",
+      "token": "@BODY_00554930@"
+    },
+    {
+      "va": "00555640",
+      "bytes": 95,
+      "sha256": "02dadddf4d21375ee725664664ec7593c9ecccb5abb039d48c5fe2f05941ab8b",
+      "token": "@BODY_00555640@"
+    },
+    {
+      "va": "005dedf4",
+      "bytes": 4,
+      "sha256": "26b25d457597a7b0463f9620f666dd10aa2c4373a505967c7c8d70922a2d6ece",
+      "token": "@BODY_005DEDF4@"
+    }
+  ],
+  "pass_marker": "render_startup_text_leaves_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-shape-scan-direction",
+      "source": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+      "old": "    while (count > 0u) {\n        --count;\n        const std::uint32_t entry_off = 0x10u + count * 8u;\n        if (read_u32(base + entry_off) == key) {\n            const std::uint32_t data_off = read_u32(base + entry_off + 4u);\n            return const_cast<std::uint8_t*>(base + data_off);\n        }\n    }",
+      "new": "    for (std::uint32_t idx = 0u; idx < count; ++idx) {\n        const std::uint32_t entry_off = 0x10u + idx * 8u;\n        if (read_u32(base + entry_off) == key) {\n            const std::uint32_t data_off = read_u32(base + entry_off + 4u);\n            return const_cast<std::uint8_t*>(base + data_off);\n        }\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-shape-key-bytes",
+      "source": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+      "old": "    const std::uint32_t key = render_buffer_read_word_0056e2a8(tag, 4);",
+      "new": "    const std::uint32_t key = render_buffer_read_word_0056e2a8(tag, 2);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-memmove-end-inclusive",
+      "source": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+      "old": "    if (dst_addr > src_addr && dst_addr < src_end) {",
+      "new": "    if (dst_addr > src_addr && dst_addr <= src_end) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-memmove-start-inclusive",
+      "source": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+      "old": "    if (dst_addr > src_addr && dst_addr < src_end) {",
+      "new": "    if (dst_addr >= src_addr && dst_addr < src_end) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-copy-bytes-arg-order",
+      "source": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+      "old": "    render_memmove_00556370(dst, src, size);",
+      "new": "    render_memmove_00556370(const_cast<void*>(src), dst, size);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-16bit-mode-values",
+      "source": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+      "old": "    render_texture_format_preferences_005dedcc[10] = (mode_flag != 0) ? 2u : 4u;",
+      "new": "    render_texture_format_preferences_005dedcc[10] = (mode_flag != 0) ? 4u : 2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-bind-power-of-two",
+      "source": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+      "old": "    if (width == 0u || width != height || (width & (width - 1u)) != 0u) {",
+      "new": "    if (width == 0u || width != height) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-bind-stage-upper-bound",
+      "source": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+      "old": "    if (stage_index >= 3 || stage_index < 0) {",
+      "new": "    if (stage_index > 3 || stage_index < 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-bind-stride",
+      "source": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+      "old": "    const std::uint32_t offset = slot * 48u + 0x18u + static_cast<std::uint32_t>(stage_index) * 4u;",
+      "new": "    const std::uint32_t offset = slot * 44u + 0x18u + static_cast<std::uint32_t>(stage_index) * 4u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-bind-field-base",
+      "source": "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves/render_startup_text_leaves_644.cpp",
+      "old": "    const std::uint32_t offset = slot * 48u + 0x18u + static_cast<std::uint32_t>(stage_index) * 4u;",
+      "new": "    const std::uint32_t offset = slot * 48u + 0x14u + static_cast<std::uint32_t>(stage_index) * 4u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

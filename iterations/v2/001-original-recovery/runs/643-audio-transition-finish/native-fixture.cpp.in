@@ -1,0 +1,866 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "audio_transition_finish_643.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::audio_transition_wildcard_fmt_005d1c1c) == 5u,
+              "5-byte wildcard format string");
+static_assert(sizeof(porsche::audio_transition_word_0065b928) == 4u,
+              "4-byte transition override word");
+
+static U address(const void* p) { return static_cast<U>(reinterpret_cast<std::uintptr_t>(p)); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+static B root_a_buf[0x200] = {};
+static B root_b_buf[0x200] = {};
+static char pattern_buf[128] = {};
+alignas(16) static B floating[512] = {};
+
+static U cases = 0u;
+static bool cpp_side = false;
+
+static B* code = nullptr;
+static B* slot_4ae4d0 = nullptr;
+static B* slot_4ae8c0 = nullptr;
+static U iat_get_tick_count = 0u;
+
+enum EventTag : U {
+    kEvLocate = 1u,
+    kEvPatMatch = 2u,
+    kEvFormat = 3u,
+    kEvPrng = 4u,
+    kEvTick = 5u,
+    kEvRamp = 6u,
+    kEvVolume = 7u,
+    kEvStreamStart = 8u,
+    kEvStatus = 9u,
+    kEvBoundary4ae3c0 = 10u,
+};
+
+struct Event {
+    U tag;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+    char s0[64];
+    char s1[80];
+};
+
+struct Fpu {
+    unsigned short control, status;
+    B tag, padding[3], values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U exception[3];
+    U count;
+    Event events[600];
+    B final_root_a[0x200];
+    B final_root_b[0x200];
+    U final_root_ptr;
+    U final_word_65b928;
+    U final_word_657a5c;
+    B final_fmt_5d1c1c[5];
+    char final_pattern[128];
+    Fpu fpu;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+struct ScenarioCfg {
+    U prng_seq[8];
+    U prng_len;
+    U tick_seq[8];
+    U tick_len;
+    I status_ret;
+    I start_ret;
+    U locate_switch_root_on_out;
+    U ramp_switch_root;
+    U volume_switch_root;
+    U entry_count_mode; // 0 = normal names, 1 = alt names (only "*-" matches)
+};
+
+static ScenarioCfg cfg{};
+static U prng_idx = 0u;
+static U tick_idx = 0u;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u cpp=%u\n", msg, cases, static_cast<U>(cpp_side));
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U normalize_root_ptr(U p) {
+    if (p == 0u) return 0u;
+    if (p == address(root_a_buf)) return 0xa0000001u;
+    if (p == address(root_b_buf)) return 0xa0000002u;
+    const U base_a = address(root_a_buf);
+    if (p > base_a && p < base_a + sizeof(root_a_buf)) {
+        return 0xa1000000u + (p - base_a);
+    }
+    const U base_b = address(root_b_buf);
+    if (p > base_b && p < base_b + sizeof(root_b_buf)) {
+        return 0xa2000000u + (p - base_b);
+    }
+    return p;
+}
+
+static void record_event(U tag, U a0 = 0u, U a1 = 0u, U a2 = 0u, U a3 = 0u,
+                         const char* s0 = nullptr, const char* s1 = nullptr) {
+    require(trace.count < 600u, "event capacity");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof(e));
+    e.tag = tag;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+    e.a3 = a3;
+    if (s0 != nullptr) {
+        std::strncpy(e.s0, s0, sizeof(e.s0) - 1u);
+    }
+    if (s1 != nullptr) {
+        std::strncpy(e.s1, s1, sizeof(e.s1) - 1u);
+    }
+}
+
+static bool wildcard_match_ci(const char* text, const char* pat) {
+    if (*pat == '\0') {
+        return *text == '\0';
+    }
+    if (*pat == '*') {
+        if (wildcard_match_ci(text, pat + 1)) {
+            return true;
+        }
+        return (*text != '\0') && wildcard_match_ci(text + 1, pat);
+    }
+    if (*pat == '?') {
+        return (*text != '\0') && wildcard_match_ci(text + 1, pat + 1);
+    }
+    auto lower_ch = [](char c) -> char {
+        return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + 32) : c;
+    };
+    return (*text != '\0') && (lower_ch(*text) == lower_ch(*pat)) &&
+           wildcard_match_ci(text + 1, pat + 1);
+}
+
+static const char* const kEntryNames[8] = {
+    "menu_loop",
+    "race_fast",
+    "trk-boss",
+    "trk-menu",
+    "sfx_hit",
+    "win_fanfare",
+    "trk-win",
+    "end_credits",
+};
+
+namespace porsche {
+
+ApplicationStateArena application_state_006573e8{};
+std::uint32_t audio_resource_query_root_00656ab4 = 0u;
+
+std::uint32_t& ApplicationStateArena::word(std::uint32_t va) {
+    require(va >= application_state_base_va, "arena va low");
+    const std::size_t off = static_cast<std::size_t>(va - application_state_base_va);
+    require(off + 4u <= application_state_bytes && (off % 4u) == 0u, "arena va bounds");
+    return words_[off / 4u];
+}
+
+std::uint32_t __cdecl audio_resource_locate_005666f0(
+    std::uint32_t source, std::uint32_t name, std::uint32_t index,
+    std::uint32_t out1, std::uint32_t out2) {
+    record_event(kEvLocate, source, name, index, out1 != 0u ? 1u : 0u);
+    if (out1 != 0u) {
+        U* const out_ptr = reinterpret_cast<U*>(static_cast<std::uintptr_t>(out1));
+        const U prev_val = *out_ptr;
+        record_event(kEvLocate, 0xeeeeeeeeu, prev_val, out2, 0u);
+        *out_ptr = 0x400u + (index & 0xffu);
+        if (cfg.locate_switch_root_on_out != 0u) {
+            audio_resource_query_root_00656ab4 = address(root_b_buf);
+        }
+        return 0x22000000u + (source ^ index);
+    }
+    const char* entry = kEntryNames[index % 8u];
+    return address(entry);
+}
+
+std::uint32_t __cdecl audio_transition_pattern_match_004a5f90(
+    const char* text, char* pattern) {
+    require(text != nullptr && pattern != nullptr, "pattern match non-null");
+    const char saved0 = pattern[0];
+    pattern[0] = saved0; // Assert writable pattern buffer.
+    const U res = wildcard_match_ci(text, pattern) ? 1u : 0u;
+    record_event(kEvPatMatch, res, 0u, 0u, 0u, text, pattern);
+    return res;
+}
+
+std::int32_t __cdecl formatter_entry_raw_005a0fbf(
+    char* output, const char* format, const std::uint32_t* raw_arguments) {
+    require(output != nullptr && format != nullptr && raw_arguments != nullptr, "formatter non-null");
+    const char* arg = reinterpret_cast<const char*>(static_cast<std::uintptr_t>(raw_arguments[0]));
+    const int n = std::snprintf(output, 128u, format, arg);
+    record_event(kEvFormat, static_cast<U>(n), 0u, 0u, 0u, format, output);
+    return static_cast<std::int32_t>(n);
+}
+
+std::uint32_t __cdecl render_seed_prng_next_00538040() {
+    const U v = cfg.prng_seq[prng_idx % cfg.prng_len];
+    ++prng_idx;
+    record_event(kEvPrng, v);
+    return v;
+}
+
+std::uint32_t __stdcall platform_get_tick_count() {
+    const U v = cfg.tick_seq[tick_idx % cfg.tick_len];
+    ++tick_idx;
+    record_event(kEvTick, v);
+    return v;
+}
+
+std::int32_t __cdecl audio_stream_service_ramp_00566ae0(
+    std::int32_t slot, std::int32_t ms, std::int32_t target) {
+    record_event(kEvRamp, static_cast<U>(slot), static_cast<U>(ms), static_cast<U>(target));
+    if (cfg.ramp_switch_root != 0u) {
+        audio_resource_query_root_00656ab4 = address(root_b_buf);
+    }
+    return 0;
+}
+
+std::int32_t __cdecl audio_stream_service_volume_00567810(
+    std::int32_t slot, std::uint32_t volume) {
+    record_event(kEvVolume, static_cast<U>(slot), volume);
+    if (cfg.volume_switch_root != 0u) {
+        audio_resource_query_root_00656ab4 = address(root_b_buf);
+    }
+    return 0;
+}
+
+std::int32_t __cdecl audio_stream_service_status_00567850(std::int32_t slot) {
+    record_event(kEvStatus, static_cast<U>(slot), static_cast<U>(cfg.status_ret));
+    return cfg.status_ret;
+}
+
+std::int32_t __cdecl audio_service_stream_start_00567720(
+    std::uint32_t channel, std::uint32_t mode,
+    std::uint32_t data, std::uint32_t size) {
+    record_event(kEvStreamStart, channel, mode, normalize_root_ptr(data), size);
+    return cfg.start_ret;
+}
+
+std::uint32_t __cdecl frame_services_boundary_004ae3c0(std::uint32_t zero) {
+    record_event(kEvBoundary4ae3c0, zero);
+    return audio_resource_query_root_00656ab4;
+}
+
+} // namespace porsche
+
+static std::int32_t __cdecl stub_formatter_entry_005a0fbf(
+    char* output, const char* format, ...) {
+    std::va_list args;
+    va_start(args, format);
+    const auto* raw = reinterpret_cast<const std::uint32_t*>(args);
+    const std::int32_t r = porsche::formatter_entry_raw_005a0fbf(output, format, raw);
+    va_end(args);
+    return r;
+}
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if (f.tag & (1u << physical)) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu() {
+    __asm {
+        fninit
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+__declspec(noinline) static U invoke_cdecl2(void* fn, U a0, U a1) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push a1
+        push a0
+        call fn
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+__declspec(noinline) static U invoke_cdecl1(void* fn, U a0) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push a0
+        call fn
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_call(B* slot, U off, U orig_va, U orig_target, const void* target) {
+    const U actual = orig_va + 4u + word(slot, off);
+    require(actual == orig_target, "exact relative call target");
+    const U rel = address(target) - (address(slot) + off + 4u);
+    put(slot, off, rel);
+}
+
+static void init() {
+    // Assert production initial .data state against raw PE bytes before any fixture reset.
+    static const B orig_fmt_5d1c1c[] = {@BODY_005D1C1C@};
+    require(sizeof orig_fmt_5d1c1c == 5u, "5-byte original .data 005d1c1c..005d1c20");
+    require(std::memcmp(porsche::audio_transition_wildcard_fmt_005d1c1c, orig_fmt_5d1c1c, 5u) == 0,
+            "initial .data 005d1c1c..005d1c20");
+    require(porsche::audio_transition_word_0065b928 == 0u,
+            "initial loader-zero .data 0065b928");
+
+    static const B body_4ae4d0[] = {@BODY_004AE4D0@};
+    static const B body_4ae8c0[] = {@BODY_004AE8C0@};
+    require(sizeof body_4ae4d0 == 995u, "995-byte original body 004ae4d0");
+    require(sizeof body_4ae8c0 == 198u, "198-byte original body 004ae8c0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_4ae4d0 = code;
+    slot_4ae8c0 = code + 1024u;
+    std::memcpy(slot_4ae4d0, body_4ae4d0, sizeof body_4ae4d0);
+    std::memcpy(slot_4ae8c0, body_4ae8c0, sizeof body_4ae8c0);
+
+    iat_get_tick_count = address(reinterpret_cast<const void*>(&porsche::platform_get_tick_count));
+
+    const U root_ptr = address(&porsche::audio_resource_query_root_00656ab4);
+    static const U kRootOffs4ae4d0[] = {
+        0x002u, 0x054u, 0x08au, 0x099u, 0x0a2u, 0x0d8u, 0x0e8u, 0x122u,
+        0x131u, 0x13au, 0x179u, 0x19bu, 0x1cau, 0x1dcu, 0x1e5u, 0x20bu,
+        0x22au, 0x233u, 0x257u, 0x285u, 0x29fu, 0x2c1u, 0x2d1u, 0x2dau,
+        0x2e2u, 0x2f3u, 0x302u, 0x310u, 0x32fu, 0x33bu, 0x35fu, 0x36bu,
+        0x378u, 0x39eu, 0x3a7u, 0x3b7u, 0x3c4u,
+    };
+    for (U off : kRootOffs4ae4d0) {
+        relocate_abs32(slot_4ae4d0, off, 0x00656ab4u, root_ptr);
+    }
+    relocate_abs32(slot_4ae4d0, 0x0ccu, 0x005d1c1cu,
+                   address(porsche::audio_transition_wildcard_fmt_005d1c1c));
+    relocate_abs32(slot_4ae4d0, 0x156u, 0x0065b928u,
+                   address(&porsche::audio_transition_word_0065b928));
+    relocate_abs32(slot_4ae4d0, 0x169u, 0x00657a5cu,
+                   address(&porsche::application_state_006573e8.word(0x00657a5cu)));
+
+    static const U kTickOffs4ae4d0[] = { 0x193u, 0x203u, 0x24fu, 0x272u };
+    for (U off : kTickOffs4ae4d0) {
+        relocate_abs32(slot_4ae4d0, off, 0x005b2080u, address(&iat_get_tick_count));
+    }
+
+    relocate_call(slot_4ae4d0, 0x075u, 0x004ae545u, 0x005666f0u,
+                  reinterpret_cast<const void*>(&porsche::audio_resource_locate_005666f0));
+    relocate_call(slot_4ae4d0, 0x07eu, 0x004ae54eu, 0x004a5f90u,
+                  reinterpret_cast<const void*>(&porsche::audio_transition_pattern_match_004a5f90));
+    relocate_call(slot_4ae4d0, 0x0d2u, 0x004ae5a2u, 0x005a0fbfu,
+                  reinterpret_cast<const void*>(&stub_formatter_entry_005a0fbf));
+    relocate_call(slot_4ae4d0, 0x10du, 0x004ae5ddu, 0x005666f0u,
+                  reinterpret_cast<const void*>(&porsche::audio_resource_locate_005666f0));
+    relocate_call(slot_4ae4d0, 0x116u, 0x004ae5e6u, 0x004a5f90u,
+                  reinterpret_cast<const void*>(&porsche::audio_transition_pattern_match_004a5f90));
+    relocate_call(slot_4ae4d0, 0x18bu, 0x004ae65bu, 0x00538040u,
+                  reinterpret_cast<const void*>(&porsche::render_seed_prng_next_00538040));
+    relocate_call(slot_4ae4d0, 0x1fbu, 0x004ae6cbu, 0x00538040u,
+                  reinterpret_cast<const void*>(&porsche::render_seed_prng_next_00538040));
+    relocate_call(slot_4ae4d0, 0x247u, 0x004ae717u, 0x00538040u,
+                  reinterpret_cast<const void*>(&porsche::render_seed_prng_next_00538040));
+    relocate_call(slot_4ae4d0, 0x26au, 0x004ae73au, 0x00538040u,
+                  reinterpret_cast<const void*>(&porsche::render_seed_prng_next_00538040));
+    relocate_call(slot_4ae4d0, 0x2bcu, 0x004ae78cu, 0x00566ae0u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_ramp_00566ae0));
+    relocate_call(slot_4ae4d0, 0x2fdu, 0x004ae7cdu, 0x00567810u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_volume_00567810));
+    relocate_call(slot_4ae4d0, 0x329u, 0x004ae7f9u, 0x005666f0u,
+                  reinterpret_cast<const void*>(&porsche::audio_resource_locate_005666f0));
+    relocate_call(slot_4ae4d0, 0x359u, 0x004ae829u, 0x00567720u,
+                  reinterpret_cast<const void*>(&porsche::audio_service_stream_start_00567720));
+
+    static const U kRootOffs4ae8c0[] = { 0x002u, 0x046u, 0x07cu, 0x0aau };
+    for (U off : kRootOffs4ae8c0) {
+        relocate_abs32(slot_4ae8c0, off, 0x00656ab4u, root_ptr);
+    }
+    relocate_call(slot_4ae8c0, 0x025u, 0x004ae8e5u, 0x004ae3c0u,
+                  reinterpret_cast<const void*>(&porsche::frame_services_boundary_004ae3c0));
+    relocate_call(slot_4ae8c0, 0x040u, 0x004ae900u, 0x00567850u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_status_00567850));
+    relocate_call(slot_4ae8c0, 0x076u, 0x004ae936u, 0x00567810u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_volume_00567810));
+    relocate_call(slot_4ae8c0, 0x088u, 0x004ae948u, 0x00566ae0u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_ramp_00566ae0));
+    relocate_call(slot_4ae8c0, 0x0a1u, 0x004ae961u, 0x00567810u,
+                  reinterpret_cast<const void*>(&porsche::audio_stream_service_volume_00567810));
+    relocate_call(slot_4ae8c0, 0x0bdu, 0x004ae97du, 0x004ae4d0u, slot_4ae4d0);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+struct RootInit {
+    bool nonnull = true;
+    U vol = 0x100u;
+    I total_entries = 8;
+    I cur_count = 3;
+    I cur_slot = -1;
+    U state_14 = 0u;
+    U flag_18 = 0x11111111u;
+    U flag_1c = 0x22222222u;
+    U ramp_ms_20 = 0u;
+    U word_24 = 0x33333333u;
+    U word_28 = 0x44444444u;
+    I channel_70 = 5;
+    U source_88 = 0x80000001u;
+    U sentinel_184 = 0x778899aau;
+    B entries[128] = { 1, 2, 3 };
+    U word_65b928 = 0u;
+    U word_657a5c = 7u;
+};
+
+static void setup_state(const RootInit& ri, const char* pat_str) {
+    std::memcpy(porsche::audio_transition_wildcard_fmt_005d1c1c, "*-%s", 5u);
+    porsche::audio_transition_word_0065b928 = ri.word_65b928;
+    porsche::application_state_006573e8.word(0x00657a5cu) = ri.word_657a5c;
+
+    std::memset(root_a_buf, 0x5au, sizeof(root_a_buf));
+    std::memset(root_b_buf, 0x6bu, sizeof(root_b_buf));
+
+    auto fill_root = [&](B* r) {
+        put(r, 0x00u, ri.vol);
+        put(r, 0x04u, static_cast<U>(ri.total_entries));
+        put(r, 0x08u, static_cast<U>(ri.cur_count));
+        put(r, 0x0cu, static_cast<U>(ri.cur_slot));
+        put(r, 0x10u, 0x12121212u);
+        put(r, 0x14u, ri.state_14);
+        put(r, 0x18u, ri.flag_18);
+        put(r, 0x1cu, ri.flag_1c);
+        put(r, 0x20u, ri.ramp_ms_20);
+        put(r, 0x24u, ri.word_24);
+        put(r, 0x28u, ri.word_28);
+        put(r, 0x70u, static_cast<U>(ri.channel_70));
+        put(r, 0x74u, 0x55667788u);
+        put(r, 0x88u, ri.source_88);
+        put(r, 0x184u, ri.sentinel_184);
+        std::memcpy(r + 0xe8u, ri.entries, 128u);
+    };
+    fill_root(root_a_buf);
+    fill_root(root_b_buf);
+
+    porsche::audio_resource_query_root_00656ab4 = ri.nonnull ? address(root_a_buf) : 0u;
+
+    std::memset(pattern_buf, 0xbbu, sizeof(pattern_buf));
+    if (pat_str != nullptr) {
+        const std::size_t len = std::strlen(pat_str);
+        require(len < sizeof(pattern_buf), "pattern bounds");
+        std::memcpy(pattern_buf, pat_str, len + 1u);
+    }
+
+    prng_idx = 0u;
+    tick_idx = 0u;
+}
+
+static void capture_trace() {
+    std::memcpy(trace.final_root_a, root_a_buf, sizeof(root_a_buf));
+    std::memcpy(trace.final_root_b, root_b_buf, sizeof(root_b_buf));
+    trace.final_root_ptr = normalize_root_ptr(porsche::audio_resource_query_root_00656ab4);
+    trace.final_word_65b928 = porsche::audio_transition_word_0065b928;
+    trace.final_word_657a5c = porsche::application_state_006573e8.word(0x00657a5cu);
+    std::memcpy(trace.final_fmt_5d1c1c, porsche::audio_transition_wildcard_fmt_005d1c1c, 5u);
+    std::memcpy(trace.final_pattern, pattern_buf, sizeof(pattern_buf));
+    capture_fpu(trace.fpu);
+}
+
+static void compare_traces() {
+    require(expected.abi_fail == 0u, "original ABI");
+    require(trace.abi_fail == 0u, "cpp ABI");
+    require(expected.exception[0] == 0u && trace.exception[0] == 0u, "no exceptions");
+    require(trace.count == expected.count, "event count mismatch");
+    require(std::memcmp(trace.events, expected.events, trace.count * sizeof(Event)) == 0,
+            "event trace mismatch");
+    require(std::memcmp(trace.final_root_a, expected.final_root_a, sizeof(root_a_buf)) == 0,
+            "root_a mismatch");
+    require(std::memcmp(trace.final_root_b, expected.final_root_b, sizeof(root_b_buf)) == 0,
+            "root_b mismatch");
+    require(trace.final_root_ptr == expected.final_root_ptr, "root ptr mismatch");
+    require(trace.final_word_65b928 == expected.final_word_65b928, "word 65b928 mismatch");
+    require(trace.final_word_657a5c == expected.final_word_657a5c, "word 657a5c mismatch");
+    require(std::memcmp(trace.final_fmt_5d1c1c, expected.final_fmt_5d1c1c, 5u) == 0,
+            "fmt 5d1c1c mismatch");
+    require(std::memcmp(trace.final_pattern, expected.final_pattern, sizeof(pattern_buf)) == 0,
+            "pattern buf mismatch");
+    require(std::memcmp(&trace.fpu, &expected.fpu, sizeof(Fpu)) == 0,
+            "x87/MXCSR mismatch");
+}
+
+static void run_4ae4d0_pair(const RootInit& ri, const char* pat_str, U mode, bool use_alias = false) {
+    ++cases;
+    const U pat_arg = (pat_str != nullptr) ? address(pattern_buf) : 0u;
+
+    cpp_side = false;
+    std::memset(&trace, 0, sizeof(trace));
+    setup_state(ri, pat_str);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl2(slot_4ae4d0, pat_arg, mode);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_trace();
+    expected = trace;
+
+    cpp_side = true;
+    std::memset(&trace, 0, sizeof(trace));
+    setup_state(ri, pat_str);
+    seed_fpu();
+    void* target = use_alias
+        ? reinterpret_cast<void*>(&porsche::frame_services_boundary_004ae4d0)
+        : reinterpret_cast<void*>(&porsche::application_audio_transition_finish_004ae4d0);
+    __try {
+        trace.abi_fail = invoke_cdecl2(target, pat_arg, mode);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_trace();
+    compare_traces();
+}
+
+static void run_4ae8c0_pair(const RootInit& ri, U shifted_product) {
+    ++cases;
+
+    cpp_side = false;
+    std::memset(&trace, 0, sizeof(trace));
+    setup_state(ri, nullptr);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl1(slot_4ae8c0, shifted_product);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_trace();
+    expected = trace;
+
+    cpp_side = true;
+    std::memset(&trace, 0, sizeof(trace));
+    setup_state(ri, nullptr);
+    seed_fpu();
+    __try {
+        trace.abi_fail = invoke_cdecl1(
+            reinterpret_cast<void*>(&porsche::frame_services_boundary_004ae8c0), shifted_product);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_trace();
+    compare_traces();
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    cfg = ScenarioCfg{};
+    cfg.prng_seq[0] = 5u; cfg.prng_seq[1] = 0xffffff00u; cfg.prng_seq[2] = 0x80000000u;
+    cfg.prng_len = 3u;
+    cfg.tick_seq[0] = 12u; cfg.tick_seq[1] = 0x00000001u; cfg.tick_seq[2] = 0u;
+    cfg.tick_len = 3u;
+    cfg.status_ret = 40;
+    cfg.start_ret = 99;
+
+    // 1. 004ae4d0 early exits & saved_count boundary.
+    {
+        RootInit ri{};
+        ri.nonnull = false;
+        run_4ae4d0_pair(ri, nullptr, 0u);
+        run_4ae4d0_pair(ri, "boss", 1u, true);
+    }
+    {
+        RootInit ri{};
+        ri.vol = 0u;
+        ri.cur_count = 0;
+        run_4ae4d0_pair(ri, nullptr, 0u);
+        ri.vol = 0x80u;
+        run_4ae4d0_pair(ri, nullptr, 0u);
+        ri.cur_count = -2;
+        run_4ae4d0_pair(ri, nullptr, 0u);
+    }
+
+    // 2. 004ae4d0 pattern matching: direct hit, fallback "*-...", length >= 61, 128-entry cap.
+    {
+        RootInit ri{};
+        ri.cur_count = 2;
+        ri.entries[0] = 1; ri.entries[1] = 4;
+        run_4ae4d0_pair(ri, "*_loop", 0u);
+        run_4ae4d0_pair(ri, "boss", 0u); // 0 hits in pass 1 -> "*-boss" matches "trk-boss"
+        run_4ae4d0_pair(ri, "nomatch_item", 0u); // 0 hits in both passes -> early return
+        run_4ae4d0_pair(ri, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0u); // len == 61 -> skip pass 2
+        run_4ae4d0_pair(ri, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0u);  // len == 60 -> runs pass 2
+    }
+    {
+        RootInit ri{};
+        ri.total_entries = 135;
+        ri.cur_count = 3;
+        run_4ae4d0_pair(ri, "*", 0u); // hits 0x80 cap in pass 1
+        ri.total_entries = 0;
+        run_4ae4d0_pair(ri, "boss", 0u); // total_entries <= 0 skips loops
+        ri.total_entries = -3;
+        run_4ae4d0_pair(ri, "boss", 0u);
+    }
+
+    // 3. 0065b928 vs 00657a5c gate.
+    {
+        RootInit ri{};
+        ri.word_65b928 = 0u;
+        ri.word_657a5c = 42u;
+        ri.cur_count = 1;
+        run_4ae4d0_pair(ri, nullptr, 0u);
+        ri.word_65b928 = 9u;
+        run_4ae4d0_pair(ri, nullptr, 0u, true);
+    }
+
+    // 4. Mode 1, Mode 2, Mode 0 (cur_count == 1, pattern != 0, pattern == 0), negative sums + INT32_MIN, sign-extended entry_id.
+    {
+        RootInit ri{};
+        ri.total_entries = 8;
+        ri.cur_count = 5;
+        ri.entries[0] = 0x85u; ri.entries[1] = 0x90u; ri.entries[2] = 0xa0u;
+        ri.entries[3] = 0xb0u; ri.entries[4] = 0xc0u;
+        // Mode 1 with saved_count = 5 (tests rep movsd/movsb 5 bytes + restore loop + append + signed byte).
+        run_4ae4d0_pair(ri, "*_*", 1u);
+        // Mode 1 with cur_count == 1 (1 pattern hit) and saved_count = 5.
+        run_4ae4d0_pair(ri, "menu_loop", 1u);
+        // Mode 1 with saved_count = 0.
+        ri.cur_count = 0;
+        run_4ae4d0_pair(ri, "*_*", 1u);
+        // Mode 1 with saved_count = -1.
+        ri.cur_count = -1;
+        run_4ae4d0_pair(ri, "*_*", 1u);
+        // Mode 2.
+        ri.cur_count = 5;
+        run_4ae4d0_pair(ri, "*_*", 2u);
+        // Mode 0 with pattern != 0 and multiple hits.
+        run_4ae4d0_pair(ri, "*_*", 0u);
+        // Mode 0 with pattern == 0 and multiple entries, wraparound cur_slot.
+        ri.cur_slot = 3;
+        run_4ae4d0_pair(ri, nullptr, 0u);
+        ri.cur_slot = -1;
+        run_4ae4d0_pair(ri, nullptr, 0u);
+        // Negative sum abs32 + INT32_MIN test.
+        cfg.prng_seq[0] = 0xffffff03u; cfg.tick_seq[0] = 0u; // sum = -253
+        run_4ae4d0_pair(ri, "*_*", 0u);
+        run_4ae4d0_pair(ri, "*_*", 1u);
+        cfg.prng_seq[0] = 0x80000000u; cfg.tick_seq[0] = 0u; // sum = INT32_MIN
+        run_4ae4d0_pair(ri, nullptr, 0u);
+        cfg.prng_seq[0] = 5u; cfg.tick_seq[0] = 12u;
+    }
+
+    // 5. Play/crossfade branches & negative channel & callback root mutation.
+    {
+        RootInit ri{};
+        ri.cur_count = 2;
+        ri.entries[0] = 0x85u; ri.entries[1] = 0x90u;
+        ri.state_14 = 2u;
+        run_4ae4d0_pair(ri, nullptr, 0u); // state_14 != 0 -> sets state_14 = 1
+
+        ri.state_14 = 0u;
+        ri.cur_slot = 0;
+        run_4ae4d0_pair(ri, nullptr, 0u); // cur_slot > -1 -> ramp 500
+
+        ri.cur_slot = -1;
+        ri.channel_70 = 4;
+        run_4ae4d0_pair(ri, nullptr, 0u); // cur_slot <= -1, channel >= 0 -> volume(0), locate, start, state_14=2, zero 0x170..0x18c
+
+        ri.channel_70 = -3;
+        run_4ae4d0_pair(ri, nullptr, 0u); // cur_slot <= -1, channel < 0 -> skips stream_start
+
+        // Callback mutating root pointer during locate & ramp.
+        ri.channel_70 = 4;
+        cfg.locate_switch_root_on_out = 1u;
+        run_4ae4d0_pair(ri, nullptr, 0u, true);
+        cfg.locate_switch_root_on_out = 0u;
+
+        ri.cur_slot = 1;
+        cfg.ramp_switch_root = 1u;
+        run_4ae4d0_pair(ri, nullptr, 0u);
+        cfg.ramp_switch_root = 0u;
+    }
+
+    // 6. 004ae8c0 all paths & edge cases.
+    {
+        RootInit ri{};
+        ri.nonnull = false;
+        run_4ae8c0_pair(ri, 50u); // root == 0
+
+        ri.nonnull = true;
+        ri.vol = 100u;
+        run_4ae8c0_pair(ri, 100u); // vol == shifted_product -> early exit
+        run_4ae8c0_pair(ri, 0u);   // shifted_product == 0 -> sets vol=0, calls 004ae3c0(0)
+
+        // Ramp branch (ramp_ms != 0, channel >= 0, status > 0, cur_vol > 0, rem_ms != 0).
+        ri.vol = 100u;
+        ri.ramp_ms_20 = 500u;
+        ri.channel_70 = 2;
+        cfg.status_ret = 40;
+        run_4ae8c0_pair(ri, 80u);
+
+        // 32-bit imul wraparound test in 004ae8c0.
+        ri.vol = 1000u;
+        ri.ramp_ms_20 = 50000u;
+        cfg.status_ret = 100000;
+        run_4ae8c0_pair(ri, 60000u);
+        cfg.status_ret = 40;
+
+        // Fallback conditions from ramp check.
+        ri.ramp_ms_20 = 0u;
+        ri.state_14 = 0u;
+        run_4ae8c0_pair(ri, 80u); // ramp_ms == 0, state_14 != 2 -> sets volume
+
+        ri.state_14 = 2u;
+        run_4ae8c0_pair(ri, 80u); // state_14 == 2 -> skips volume
+
+        ri.state_14 = 1u;
+        ri.ramp_ms_20 = 500u;
+        ri.channel_70 = -1;
+        run_4ae8c0_pair(ri, 80u); // channel < 0 -> skips both
+
+        ri.channel_70 = 2;
+        cfg.status_ret = 0;
+        run_4ae8c0_pair(ri, 80u); // status <= 0 -> fallback
+        cfg.status_ret = -5;
+        run_4ae8c0_pair(ri, 80u); // status < 0 -> fallback
+
+        cfg.status_ret = 1;
+        ri.ramp_ms_20 = 10u;
+        ri.vol = 100u; // (10 * 1) / 100 == 0 -> rem_ms == 0 -> fallback
+        run_4ae8c0_pair(ri, 80u);
+
+        // old_vol == 0 triggers 004ae4d0(0, 0) after setting obj[+0] = shifted_product!
+        ri.vol = 0u;
+        ri.ramp_ms_20 = 500u;
+        cfg.status_ret = 40;
+        ri.cur_count = 3;
+        ri.cur_slot = -1;
+        ri.state_14 = 0u;
+        run_4ae8c0_pair(ri, 120u);
+
+        // old_vol < 0 (signed) falls back and does NOT call 004ae4d0.
+        ri.vol = 0xffffff00u;
+        run_4ae8c0_pair(ri, 120u);
+
+        // Callback mutating root during volume in 004ae8c0.
+        ri.vol = 100u;
+        ri.ramp_ms_20 = 0u;
+        ri.state_14 = 1u;
+        cfg.volume_switch_root = 1u;
+        run_4ae8c0_pair(ri, 80u);
+        cfg.volume_switch_root = 0u;
+    }
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    __asm fninit
+    std::printf("audio_transition_finish_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}
