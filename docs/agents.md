@@ -25,6 +25,12 @@
   blocker that needs stronger reasoning.
 - Select the smallest adequate available model. Speed and limit savings require
   measurement before making quantitative claims.
+- Уточнение 2026-11-20: модели субагентов берутся из фактически доступного
+  набора подписки opencode-go; конкретную модель выбирает координатор по
+  сложности задачи (по умолчанию сейчас glm-5.3-flash). Сильная glm-5.3
+  остаётся на оркестрации и приёмке. Проверяй фактическую доступность в
+  подписке перед spawn; другой провайдер — только если в подписке нет
+  подходящей простой модели.
 
 ## Назначать по сложности, а не по названию файла
 
