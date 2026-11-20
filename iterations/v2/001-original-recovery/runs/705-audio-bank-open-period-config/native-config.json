@@ -1,0 +1,145 @@
+{
+  "run": 705,
+  "experiment": "local/experiments/v2-audio-bank-open-period-config-705",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00565b60",
+      "bytes": 71,
+      "sha256": "b77e31407e3ce22bb40c669c441399c20e43448b9cacd825d7db23dfa1331476",
+      "token": "@BODY_00565B60@"
+    },
+    {
+      "va": "00598d10",
+      "bytes": 354,
+      "sha256": "36ccef70f6124699f511a27f88fe78bd7d6e18d85f6278d4f299f0f76e9ab10b",
+      "token": "@BODY_00598D10@"
+    },
+    {
+      "va": "00598e80",
+      "bytes": 40,
+      "sha256": "0684adc59023d03022778b092c03a25c035f813e66396a581320ce6766fbac39",
+      "token": "@BODY_00598E80@"
+    }
+  ],
+  "pass_marker": "audio_bank_period_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-bank-active-check",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "    if (device_word(0xdcu) == 0u) {\n        return -10;",
+      "new": "    if (device_word(0xdcu) != 0u) {\n        return -10;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-bank-callback-va",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "    device_set_word(0x130u, 0x5659f0u);",
+      "new": "    device_set_word(0x130u, 0x5659f1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-bank-entry-stride",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "static_cast<std::uint32_t>(index) * 12u;",
+      "new": "static_cast<std::uint32_t>(index) * 16u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-bank-entry-byte",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "    *reinterpret_cast<std::uint8_t*>(entry + 0xau) = 0u;",
+      "new": "    *reinterpret_cast<std::uint8_t*>(entry + 0xau) = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "skip-bank-out-index",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "    *out_index = static_cast<std::uint32_t>(index);",
+      "new": "    (void)out_index;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-bank-tail-return",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "    return audio_bank_open_tail_005900b0(handle, handle);",
+      "new": "    (void)audio_bank_open_tail_005900b0(handle, handle);\n    return 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-reset-stride",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "    for (; slot < end; slot += 0x24u) {",
+      "new": "    for (; slot < end; slot += 0x20u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-reset-bound",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "        reinterpret_cast<const std::uint8_t*>(&audio_reverb_slots_006b08e0[11]) + 0xcu;",
+      "new": "        reinterpret_cast<const std::uint8_t*>(&audio_reverb_slots_006b08e0[10]) + 0xcu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-reset-null-check",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "        if (value != 0u) {",
+      "new": "        if (value == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-reverb-const1",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "    const float k1 = float_from_bits(0x3c010204u);",
+      "new": "    const float k1 = float_from_bits(0x3c010205u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-reverb-slot-index",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "            ++slot_index;",
+      "new": "            slot_index += 2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-reverb-query-kind",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "                audio_reverb_query_00598cd0(kind_word, query);",
+      "new": "                audio_reverb_query_00598cd0(kind_word + 1u, query);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-reverb-scale-offset",
+      "source": "iterations/v2/001-original-recovery/runs/705-audio-bank-open-period-config/audio_bank_period_705.cpp",
+      "old": "static_cast<std::uint32_t>(record[7u]) + 100u);",
+      "new": "static_cast<std::uint32_t>(record[7u]) + 99u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

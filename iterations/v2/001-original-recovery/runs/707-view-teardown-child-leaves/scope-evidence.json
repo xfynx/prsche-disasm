@@ -1,0 +1,79 @@
+{
+  "run": 707,
+  "functions": [
+    "buffer_cell_release_00539eb0",
+    "registry_item_noop_00514990",
+    "teardown_secondary_destroy_0059f1c0"
+  ],
+  "originals": [
+    {
+      "function": "buffer_cell_release_00539eb0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__fastcall (void* self in ECX, void* unused_edx in EDX; ret 0; void)",
+      "entry": "00539eb0",
+      "body_ranges_inclusive": [["00539eb0", "00539ebd"]],
+      "body_bytes": 14,
+      "body_sha256": "0cac20a41b626fdad61736c75f8c473d21d0f25e99fd96d130e8eeb45cf3e161",
+      "binary_index_functions": "iterations/v2/001-original-recovery/source/catalog/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "callers_note": "Accepted caller 00538d80 (view_teardown_release_00538d80, Run701) calls it twice with base+0x5c then base. Reads [ECX], null-tests, and on non-null pushes the cell and CALL 0059f050 (canonical release), POP ECX, RET. Owned neighbour 00539e50 spans 00539e50..00539ea8; no body overlap. Unowned in recovered functions.json and catalog."
+    },
+    {
+      "function": "registry_item_noop_00514990",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (void* item; ret 0; void)",
+      "entry": "00514990",
+      "body_ranges_inclusive": [["00514990", "00514990"]],
+      "body_bytes": 1,
+      "body_sha256": "ae3f4619b0413d70d3004b9131c3752153074e45725be13b9a148978895e359e",
+      "binary_index_functions": "iterations/v2/001-original-recovery/source/catalog/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "callers_note": "Accepted caller 0047f190 (view_teardown_finish_0047f190, Run701) invokes it once per dword of the +0xa4 vector; application_core_candidate also references 00514990 at 004d5133/004d5202. Body is a single C3 RET: no state, no calls, no used return. Unowned in recovered functions.json and catalog."
+    },
+    {
+      "function": "teardown_secondary_destroy_0059f1c0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__fastcall (void* self in ECX, void* unused_edx in EDX; ret 0; void)",
+      "entry": "0059f1c0",
+      "body_ranges_inclusive": [["0059f1c0", "0059f1c4"]],
+      "body_bytes": 5,
+      "body_sha256": "c001fa5623328321ab94cacd5f145bc27eab23ff4e07f47991edcb160e9c5ea9",
+      "binary_index_functions": "iterations/v2/001-original-recovery/source/catalog/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "callers_note": "Accepted caller 00465e20 (view_teardown_probe_00465e20, Run701) invokes it on the 0x0062810c object before releasing via 0059f050. Body is E9 rel32 (JMP 0x0053f120), a pure tail thunk preserving ECX. Unowned in recovered functions.json and catalog."
+    }
+  ],
+  "excluded": [
+    {
+      "function": "entry_fe_service_00465790",
+      "entry": "00465790",
+      "body_bytes": 592,
+      "body_ranges_inclusive": [["00465790", "004659df"]],
+      "body_sha256": "af1fdd1d8d412d3925e89cc78579f5fd5572eb23ab861d7c6cefad6f47c309ad",
+      "reason": "Large heterogeneous entry/initializer service, excluded from this packet with evidence. The 592B body writes eight loader-zero globals (006280e0..00628100), indexes three unproved tables (base 0x627f3c stride computed from arg0; 0x5cf610 + word*0x10; 0x658294 + index*0x80), stores ~20 float/vector constants, and calls 00465cf0, 00463260 and 004618b0 with distinct contracts. Caller 004659e0 (Run702 entry_fe_call_004659e0) declares it void __cdecl(uint,uint). Table extents/writability and global ownership are unproved; recovering it would require invented arrays/callbacks. No provider is defined here; it remains an explicit unresolved boundary."
+    }
+  ],
+  "owned_rdata": [],
+  "owned_data": [],
+  "owned_bss": [],
+  "reused_canonical_symbols": [
+    {
+      "name": "application_release_0059f050",
+      "va": "0059f050",
+      "declaration_header": "iterations/v2/001-original-recovery/runs/701-view-teardown-route-family/view_teardown_route_family_701.hpp",
+      "provider_source": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_alloc.cpp"
+    }
+  ],
+  "new_typed_children": [
+    {
+      "name": "secondary_destroy_body_0053f120",
+      "va": "0053f120",
+      "body_bytes": 59,
+      "note": "Tail-jump target of 0059f1c0; unowned in recovered functions.json and catalog. Its virtual delete / vtable (0x5b3c94) algorithm is NOT recovered here; declared extern and controlled by the native fixture."
+    }
+  ],
+  "scope_boundary": "PARTIAL: Bounded native x86-vs-C++ proof for the three recovered children (00539eb0, 00514990, 0059f1c0) with controlled 0059f050/0053f120 endpoints, null/non-null cell pointers, interior pointers, ABI checks and material mutations. The full 0053f120 virtual-delete algorithm, the large 00465790 entry service, real allocator/vtable state, fault/lifetime/concurrency domains and production CMake/registry integration remain open."
+}

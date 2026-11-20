@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "run": 706,
+  "module": "Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "accepted_caller_externs": [
+    "runs/700-scene-reset-leaf-chain/scene_stage_reset_700.hpp",
+    "runs/701-view-teardown-route-family/view_teardown_route_family_701.hpp",
+    "runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.hpp"
+  ],
+  "bodies": [
+    {
+      "va": "00469b50",
+      "range": ["00469b50", "00469b56"],
+      "bytes": 7,
+      "abi": "__fastcall uint(ECX object, unused EDX); return [object+0xc0]",
+      "decision": "recovered",
+      "callers": ["0046d890 (Run702 entry_fe_call_0046d890)"]
+    },
+    {
+      "va": "0044fb40",
+      "range": ["0044fb40", "0044fc25"],
+      "bytes": 230,
+      "abi": "__fastcall ptr(ECX self, unused EDX, stack root), RET 4",
+      "decision": "recovered",
+      "callers": ["0044fae0 (Run702 scene_route_root_0044fae0)"],
+      "raw_data": [
+        "005ceacc 19B '%s%s_backwards.key'",
+        "005ceab8 17B '%s%s_forward.key'",
+        "005cea80 54B 'Old version of keyframes detected (v. %d)...ignoring\\n'",
+        "005cea78 8B 'RdrKeys'"
+      ],
+      "controlled_calls": ["005a0fbf", "0059d9b0", "005a177b", "0059ecd0", "0059ecb0", "0044fc30"],
+      "owned_cells_reused": ["install_paths_table_0065b2a0[6] (Run116/647)", "application_state_006573e8.word(00657430)"]
+    },
+    {
+      "va": "004211d0",
+      "range": ["004211d0", "0042125d"],
+      "bytes": 142,
+      "abi": "__cdecl ptr(uint size, uint zero)",
+      "decision": "typed-binding-only",
+      "callers": ["0044b960 (Run702 scene_transfer_slot_0044b960)"],
+      "canonical_provider": "application_context_member_storage_004211d0 in source/recovered/Porsche.exe/context_effects.cpp (registry entry_va 004211d0, native-differential-verified)",
+      "note": "scene_slot_object_004211d0 is a pure forwarder to the already-owned canonical body; no second original body is defined."
+    }
+  ],
+  "read_only_rtti_references": [
+    {
+      "va": "005cf908",
+      "symbol": "rtti_scene_elem_005cf908",
+      "bytes": 8,
+      "raw": "f8185c0000000000",
+      "decision": "typed extern data only, no constructor"
+    },
+    {
+      "va": "005cf928",
+      "symbol": "rtti_camera_elem_005cf928",
+      "bytes": 8,
+      "raw": "f8185c0000000000",
+      "decision": "typed extern data only, no constructor"
+    }
+  ],
+  "excluded": [
+    {
+      "va": "00458c90",
+      "range": ["00458c90", "00459019"],
+      "bytes": 906,
+      "reason": "Large heterogeneous constructor: x87 constant tables, three 0x8858 allocations and 00456ed0 copies, two 0044d320 string lookups ('snow'/'rain', 'PLST'), reads 006197f4/006197f0/00613e08/00613e04 and 0x5ceeb8/0x5ceec8 tables; catalog warning_count=1. Separate packet with concrete table/state ownership."
+    },
+    {
+      "va": "004522b0",
+      "range": ["004522b0", "00452496"],
+      "bytes": 487,
+      "reason": "Heterogeneous array-building constructor: formats 0065b30c, walks a [begin,end) element range, allocates 0xc/0x8c records with 0x42c80000/0xffffffff/'nulln' initialization, copies 0x23 dwords, calls 00452120/004524a0, frees old array and reallocates the slot vector. Separate packet."
+    },
+    {
+      "va": "00475c80",
+      "range": ["00475c80", "00475d61"],
+      "bytes": 226,
+      "reason": "Fixed 0x108-byte copy to 0x00628a20 overlaps the already-owned 2-byte cell startup_night_shape_enabled_00628a28 (Run649, 00628a28..00628a29) and unowned tail cells 00628b28/00628b2c; cross-run data-overlap ownership must be resolved in a separate packet. Catalog warning_count=1."
+    }
+  ],
+  "body_ranges_source": "iterations/v2/001-original-recovery/source/catalog/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+  "ownership_search": "source/recovered/functions.json, source/include, all runs/* source and header closures; only 004211d0 had an existing canonical owner.",
+  "proof": {
+    "receipt": "local/experiments/v2-scene-child-ctor-slot-binding-706/017/receipt.json",
+    "attempt": "017",
+    "status": "PASS",
+    "variants": ["od", "o2"],
+    "cases_per_variant": 31,
+    "measured_comparisons": 62,
+    "material_mutation_controls": 9,
+    "detected_mutations": 9,
+    "source_pins": 233,
+    "command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/706-scene-child-ctor-and-slot-binding/native-config.json --attempt 017"
+  },
+  "translation_boundary": "Native fixture controls 005a0fbf/0059d9b0/005a177b/0059ecd0/0044fc30 and the manager callback slots; real key-resource loading, stale-element diagnostics, live heap manager and full scene startup remain outside this proof. Excluded bodies stay unresolved by design."
+}

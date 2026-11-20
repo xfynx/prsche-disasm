@@ -1,0 +1,530 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+
+#include "scene_children_706.hpp"
+#include "porsche/application_context_base.hpp"
+#include "porsche/application_state.hpp"
+#include "porsche/context_effects.hpp"
+#include "porsche/formatter_entry.hpp"
+#include "porsche/install_paths.hpp"
+
+namespace porsche {
+void __cdecl scene_texture_alloc_report_005a177b(const char* format,
+                                                  std::uint32_t value);
+void __fastcall scene_root_finish_0044fc30(void* self, void* unused_edx,
+                                           std::uint32_t zero);
+void* __cdecl resource_open_quiet_0059d9b0(const char* name,
+                                           std::uint32_t flags);
+} // namespace porsche
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+enum : U {
+    kEvFormat = 1u, kEvOpen = 2u, kEvReport = 3u, kEvRelease = 4u,
+    kEvAllocate = 5u, kEvHead = 6u, kEvEnter = 7u, kEvLeave = 8u,
+    kEvFinish = 9u, kEvSelect = 10u,
+};
+enum : U { kMaxEvents = 128u, kPoolBytes = 0x1000u, kMaxCases = 64u };
+
+struct Event { U kind, a, b, c, d, e; };
+struct Spec {
+    U fn, a0, a1;
+    U arena, elem_mode, head_present, kind_value;
+};
+
+static Event events[kMaxEvents];
+static U event_count = 0u;
+static B self_buf[0x200];
+static B block_pool[kPoolBytes];
+static B heap_area[0x400];
+static U heap_state_cell = 0u;
+static U selector_cell = 0u;
+static U alloc_call = 0u;
+static U head_call = 0u;
+static B* code = nullptr;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U load_dword(const void* p, U offset = 0u) {
+    U value = 0u;
+    std::memcpy(&value, static_cast<const B*>(p) + offset, 4u);
+    return value;
+}
+static void store_dword(void* p, U offset, U value) {
+    std::memcpy(static_cast<B*>(p) + offset, &value, 4u);
+}
+
+static U g_case = 0u, g_side = 0u, g_fn = 0u, g_elem_mode = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u fn=%u\n", why, g_case, g_side, g_fn);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u side=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip,
+                g_case, g_side);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+static void record(U kind, U a, U b, U c, U d, U e) {
+    require(event_count < kMaxEvents, "event overflow");
+    Event& out = events[event_count++];
+    out.kind = kind; out.a = a; out.b = b; out.c = c; out.d = d; out.e = e;
+}
+
+// ---- Exact raw .rdata transported strings (hosts for original relocations) --
+static const char host_fmt_backwards[19u] = "%s%s_backwards.key";
+static const char host_fmt_forward[17u] = "%s%s_forward.key";
+static const char host_fmt_old[54u] =
+    "Old version of keyframes detected (v. %d)...ignoring\n";
+static const char host_reader_name[8u] = "RdrKeys";
+static const char host_install_path[] = "C:\\PORSCHE\\";
+
+const char* porsche::install_paths_table_0065b2a0[60u] = {};
+porsche::ApplicationStateArena porsche::application_state_006573e8;
+
+std::uint32_t& porsche::ApplicationStateArena::word(std::uint32_t va) {
+    return words_[(va - application_state_base_va) / 4u];
+}
+
+// ---- Controlled opaque callees used by the C++ side --------------------------
+static void* __cdecl controlled_allocate(const char* source, U bytes, U heap) {
+    (void)source;
+    ++alloc_call;
+    U result = address(block_pool);
+    // Normalize the opaque source token: original 004211d0 passes raw VA
+    // 0x005cbdb4, 0044fb40 passes the transported "RdrKeys" string.
+    U src_id = 0u;
+    if (source == reinterpret_cast<const char*>(0x005cbdb4u)) src_id = 1u;
+    else if (std::strcmp(source, host_reader_name) == 0) src_id = 2u;
+    record(kEvAllocate, bytes, heap, src_id, result, alloc_call);
+    return reinterpret_cast<void*>(result);
+}
+static void __cdecl controlled_release(void* block) {
+    record(kEvRelease, address(block), 0u, 0u, 0u, 0u);
+}
+
+std::int32_t __cdecl porsche::formatter_entry_005a0fbf(char* output,
+                                                       const char* format, ...) {
+    std::va_list args;
+    va_start(args, format);
+    const char* const path = va_arg(args, const char*);
+    const U value = va_arg(args, U);
+    va_end(args);
+    U fmt_id = 0u;
+    if (std::strcmp(format, host_fmt_backwards) == 0) fmt_id = 1u;
+    else if (std::strcmp(format, host_fmt_forward) == 0) fmt_id = 2u;
+    else if (std::strcmp(format, host_fmt_old) == 0) fmt_id = 3u;
+    else if (std::strcmp(format, host_reader_name) == 0) fmt_id = 4u;
+    record(kEvFormat, address(output), fmt_id, address(path), value, 0u);
+    char text[24] = {};
+    std::snprintf(text, sizeof text, "K%08x", value);
+    std::memcpy(output, text, sizeof text);
+    return 0;
+}
+
+void* __cdecl porsche::application_context_heap_state_005e4fe8() {
+    return reinterpret_cast<void*>(heap_state_cell);
+}
+void* __cdecl porsche::context_selector_pointer_005e4fec() {
+    // Value stored at original 0x005e4fec: pointer to the selector table.
+    return reinterpret_cast<void*>(selector_cell);
+}
+std::uint32_t __cdecl porsche::application_context_heap_selector_005e4fec() {
+    return selector_cell;
+}
+void __cdecl porsche::heap_enter_005322b0(void* lock) {
+    record(kEvEnter, address(lock), 0u, 0u, 0u, 0u);
+}
+void __cdecl porsche::heap_leave_005322c0(void* lock) {
+    record(kEvLeave, address(lock), 0u, 0u, 0u, 0u);
+}
+void __cdecl porsche::application_context_new_head_0059eeb0(U kind, U slot) {
+    ++head_call;
+    store_dword(heap_area, 0x28u + 0xcu + kind * 4u, address(heap_area + 0x100u));
+    record(kEvHead, kind, slot, head_call, 0u, 0u);
+}
+void* __cdecl porsche::resource_open_quiet_0059d9b0(const char* name, U flags) {
+    U result = 0u;
+    if (g_elem_mode == 1u) result = address(heap_area + 0x200u);
+    else if (g_elem_mode == 2u) result = address(heap_area + 0x220u);
+    record(kEvOpen, address(name), flags, result, g_elem_mode, 0u);
+    return reinterpret_cast<void*>(result);
+}
+void __cdecl porsche::scene_texture_alloc_report_005a177b(const char* format, U value) {
+    U fmt_id = 0u;
+    if (std::strcmp(format, host_fmt_old) == 0) fmt_id = 1u;
+    record(kEvReport, fmt_id, value, 0u, 0u, 0u);
+}
+void __fastcall porsche::scene_root_finish_0044fc30(void* self, void* unused, U zero) {
+    (void)unused;
+    record(kEvFinish, address(self), zero, 0u, 0u, 0u);
+}
+
+// ---- Original body slots -----------------------------------------------------
+static const B body_00469b50[] = {@BODY_00469B50@};
+static const B body_0044fb40[] = {@BODY_0044FB40@};
+static const B body_004211d0[] = {@BODY_004211D0@};
+static B* slot_00469b50;
+static B* slot_0044fb40;
+static B* slot_004211d0;
+
+static void set_abs(B* body, U size, U old_value, const void* replacement, U expected) {
+    U found = 0u;
+    const U target = address(replacement);
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (load_dword(body, i) == old_value) {
+            store_dword(body, i, target);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected, "absolute relocation count");
+}
+static void set_rel(B* body, U size, U original_va, U target_va,
+                    const void* replacement, U expected) {
+    U found = 0u;
+    const U target = address(replacement);
+    for (U i = 0u; i + 5u <= size; ++i) {
+        if (body[i] == 0xe8u &&
+            ((original_va + i + 5u +
+              static_cast<I>(load_dword(body, i + 1u))) & 0xffffffffu) == target_va) {
+            store_dword(body, i + 1u, target - address(body + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected, "relative relocation count");
+}
+
+static void init_bodies() {
+    code = static_cast<B*>(VirtualAlloc(nullptr, 0x1000u,
+                                        MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    slot_00469b50 = code + 0x000u;
+    slot_0044fb40 = code + 0x080u;
+    slot_004211d0 = code + 0x180u;
+    std::memcpy(slot_00469b50, body_00469b50, sizeof body_00469b50);
+    std::memcpy(slot_0044fb40, body_0044fb40, sizeof body_0044fb40);
+    std::memcpy(slot_004211d0, body_004211d0, sizeof body_004211d0);
+
+    set_abs(slot_0044fb40, sizeof body_0044fb40, 0x00657430u,
+            &application_state_006573e8.word(0x00657430u), 1u);
+    set_abs(slot_0044fb40, sizeof body_0044fb40, 0x0065b2b8u,
+            &install_paths_table_0065b2a0[6u], 2u);
+    set_abs(slot_0044fb40, sizeof body_0044fb40, 0x005ceaccu, host_fmt_backwards, 1u);
+    set_abs(slot_0044fb40, sizeof body_0044fb40, 0x005ceab8u, host_fmt_forward, 1u);
+    set_abs(slot_0044fb40, sizeof body_0044fb40, 0x005cea80u, host_fmt_old, 1u);
+    set_abs(slot_0044fb40, sizeof body_0044fb40, 0x005cea78u, host_reader_name, 1u);
+    set_rel(slot_0044fb40, sizeof body_0044fb40, 0x0044fb40u, 0x005a0fbfu,
+            reinterpret_cast<const void*>(&formatter_entry_005a0fbf), 1u);
+    set_rel(slot_0044fb40, sizeof body_0044fb40, 0x0044fb40u, 0x0059d9b0u,
+            reinterpret_cast<const void*>(&resource_open_quiet_0059d9b0), 1u);
+    set_rel(slot_0044fb40, sizeof body_0044fb40, 0x0044fb40u, 0x005a177bu,
+            reinterpret_cast<const void*>(&scene_texture_alloc_report_005a177b), 1u);
+    set_rel(slot_0044fb40, sizeof body_0044fb40, 0x0044fb40u, 0x0059ecd0u,
+            reinterpret_cast<const void*>(&context_table_release_0059ecd0), 1u);
+    set_rel(slot_0044fb40, sizeof body_0044fb40, 0x0044fb40u, 0x0059ecb0u,
+            reinterpret_cast<const void*>(&application_context_member_block_0059ecb0), 1u);
+    set_rel(slot_0044fb40, sizeof body_0044fb40, 0x0044fb40u, 0x0044fc30u,
+            reinterpret_cast<const void*>(&scene_root_finish_0044fc30), 1u);
+
+    set_abs(slot_004211d0, sizeof body_004211d0, 0x005e4fe8u, &heap_state_cell, 1u);
+    set_abs(slot_004211d0, sizeof body_004211d0, 0x005e4fecu, &selector_cell, 1u);
+    set_rel(slot_004211d0, sizeof body_004211d0, 0x004211d0u, 0x0059ecb0u,
+            reinterpret_cast<const void*>(&application_context_member_block_0059ecb0), 1u);
+    set_rel(slot_004211d0, sizeof body_004211d0, 0x004211d0u, 0x005322b0u,
+            reinterpret_cast<const void*>(&heap_enter_005322b0), 1u);
+    set_rel(slot_004211d0, sizeof body_004211d0, 0x004211d0u, 0x0059eeb0u,
+            reinterpret_cast<const void*>(&application_context_new_head_0059eeb0), 1u);
+    set_rel(slot_004211d0, sizeof body_004211d0, 0x004211d0u, 0x005322c0u,
+            reinterpret_cast<const void*>(&heap_leave_005322c0), 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 0x1000u) != 0,
+            "FlushInstructionCache");
+}
+
+struct Snapshot {
+    U event_count, abi_fail, eax;
+    Event events[kMaxEvents];
+    B self[0x140];
+    B pool[0xc90];
+    B heap[0x120];
+    U arena;
+};
+static void capture(Snapshot& out, U abi_fail, U eax) {
+    out.event_count = event_count; out.abi_fail = abi_fail; out.eax = eax;
+    std::memcpy(out.events, events, event_count * sizeof(Event));
+    std::memcpy(out.self, self_buf, sizeof out.self);
+    std::memcpy(out.pool, block_pool, sizeof out.pool);
+    std::memcpy(out.heap, heap_area, sizeof out.heap);
+    out.arena = application_state_006573e8.word(0x00657430u);
+}
+static void assert_same(const Snapshot& expected, const Snapshot& actual) {
+    require(actual.abi_fail == 0u, "original abi");
+    if (actual.event_count != expected.event_count) {
+        std::printf("counts expected=%u actual=%u fn=%u\n",
+                    expected.event_count, actual.event_count, g_fn);
+        for (U i = 0u; i < expected.event_count && i < 12u; ++i) {
+            std::printf(" exp[%u] k=%u a=%u b=%u\n", i,
+                        expected.events[i].kind, expected.events[i].a,
+                        expected.events[i].b);
+        }
+        for (U i = 0u; i < actual.event_count && i < 12u; ++i) {
+            std::printf(" act[%u] k=%u a=%u b=%u\n", i,
+                        actual.events[i].kind, actual.events[i].a,
+                        actual.events[i].b);
+        }
+    }
+    require(actual.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < expected.event_count; ++i) {
+        require(actual.events[i].kind == expected.events[i].kind, "event kind");
+        require(actual.events[i].a == expected.events[i].a, "event a");
+        require(actual.events[i].b == expected.events[i].b, "event b");
+        require(actual.events[i].c == expected.events[i].c, "event c");
+        require(actual.events[i].d == expected.events[i].d, "event d");
+        require(actual.events[i].e == expected.events[i].e, "event e");
+    }
+    require(actual.eax == expected.eax, "return value");
+    require(std::memcmp(actual.self, expected.self, sizeof expected.self) == 0,
+            "self object bytes");
+    require(std::memcmp(actual.pool, expected.pool, sizeof expected.pool) == 0,
+            "allocation block bytes");
+    require(std::memcmp(actual.heap, expected.heap, sizeof expected.heap) == 0,
+            "heap state bytes");
+    require(actual.arena == expected.arena, "arena word");
+}
+
+static U invoke_fast2(void* fn, U self, U& fail) {
+    U before = 0u, frame = 0u, result = 0u, bad = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        mov ecx, self
+        mov edx, 0deadc0deh
+        call fn
+        mov result, eax
+        cmp esp, before
+        jne bad_label
+        cmp ebp, frame
+        jne bad_label
+        cmp ebx, 13579bdfh
+        jne bad_label
+        cmp esi, 2468ace0h
+        jne bad_label
+        cmp edi, 10203040h
+        je done
+    bad_label:
+        mov bad, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    fail = bad;
+    return result;
+}
+static U invoke_fast3(void* fn, U self, U arg, U& fail) {
+    U before = 0u, frame = 0u, result = 0u, bad = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg
+        mov eax, 0a5a5a500h
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        mov ecx, self
+        mov edx, 0deadc0deh
+        call fn
+        mov result, eax
+        cmp esp, before
+        jne bad_label
+        cmp ebp, frame
+        jne bad_label
+        cmp ebx, 13579bdfh
+        jne bad_label
+        cmp esi, 2468ace0h
+        jne bad_label
+        cmp edi, 10203040h
+        je done
+    bad_label:
+        mov bad, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    fail = bad;
+    return result;
+}
+static U invoke_cdecl2(void* fn, U a0, U a1, U& fail) {
+    U before = 0u, frame = 0u, result = 0u, bad = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a1
+        push a0
+        mov eax, 0a5a5a500h
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        add esp, 8
+        cmp esp, before
+        jne bad_label
+        cmp ebp, frame
+        jne bad_label
+        cmp ebx, 13579bdfh
+        jne bad_label
+        cmp esi, 2468ace0h
+        jne bad_label
+        cmp edi, 10203040h
+        je done
+    bad_label:
+        mov bad, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    fail = bad;
+    return result;
+}
+
+static void reset_runtime(const Spec& spec) {
+    event_count = 0u;
+    alloc_call = 0u;
+    head_call = 0u;
+    g_elem_mode = spec.elem_mode;
+    std::memset(self_buf, 0xa5, sizeof self_buf);
+    store_dword(self_buf, 0xc0u, spec.kind_value);
+    std::memset(block_pool, 0xd0, sizeof block_pool);
+    std::memset(heap_area, 0, sizeof heap_area);
+    heap_state_cell = address(heap_area);
+    selector_cell = address(heap_area + 0x380u);
+    // Original 0059ecb0/0059ecd0 callback slots are manager+4 / manager+8;
+    // the small-block pool starts at manager+0x28.
+    store_dword(heap_area, 0x4u, address(controlled_allocate));
+    store_dword(heap_area, 0x8u, address(controlled_release));
+    store_dword(heap_area, 0x28u, address(heap_area + 0x10u));
+    store_dword(heap_area, 0x380u, 0x77u);
+    for (U kind = 0u; kind < 32u; ++kind) {
+        store_dword(heap_area, 0x34u + kind * 4u,
+                    spec.head_present != 0u ? address(heap_area + 0x100u) : 0u);
+    }
+    store_dword(heap_area + 0x100u, 0u, 0u);
+    store_dword(heap_area + 0x200u, 0u, 1u);
+    store_dword(heap_area + 0x220u, 0u, 7u);
+    install_paths_table_0065b2a0[6u] = host_install_path;
+    application_state_006573e8.word(0x00657430u) = spec.arena;
+}
+
+static void invoke_original(const Spec& spec, U& abi, U& eax) {
+    switch (spec.fn) {
+        case 0u: eax = invoke_fast2(slot_00469b50, address(self_buf), abi); break;
+        case 1u: eax = invoke_fast3(slot_0044fb40, address(self_buf), spec.a0, abi); break;
+        case 2u: eax = invoke_cdecl2(slot_004211d0, spec.a0, spec.a1, abi); break;
+        default: require(false, "bad case function");
+    }
+}
+static void invoke_cpp(const Spec& spec, U& abi, U& eax) {
+    switch (spec.fn) {
+        case 0u: eax = invoke_fast2(reinterpret_cast<void*>(&scene_elem_kind_00469b50),
+                                    address(self_buf), abi); break;
+        case 1u: eax = invoke_fast3(reinterpret_cast<void*>(&scene_root_constructor_0044fb40),
+                                    address(self_buf), spec.a0, abi); break;
+        case 2u: eax = invoke_cdecl2(reinterpret_cast<void*>(&scene_slot_object_004211d0),
+                                     spec.a0, spec.a1, abi); break;
+        default: require(false, "bad case function");
+    }
+}
+
+static Spec all_cases[kMaxCases];
+static U build_cases() {
+    Spec* const cases = all_cases;
+    U built = 0u;
+    const U kinds[5] = {0u, 1u, 2u, 0xffffffffu, 0x7fffffffu};
+    for (U i = 0u; i < 5u; ++i) {
+        Spec s{}; s.fn = 0u; s.kind_value = kinds[i];
+        cases[built++] = s;
+    }
+    const U sizes[4] = {0x1cu, 0x58u, 0x101u, 0x200u};
+    for (U e = 0u; e < 3u; ++e) {
+        for (U a = 0u; a < 2u; ++a) {
+            for (U r = 0u; r < 3u; ++r) {
+                Spec s{}; s.fn = 1u; s.elem_mode = e; s.arena = a;
+                s.a0 = 0x1000u + r * 0x111u;
+                cases[built++] = s;
+            }
+        }
+    }
+    for (U i = 0u; i < 4u; ++i) {
+        for (U h = 0u; h < 2u; ++h) {
+            Spec s{}; s.fn = 2u; s.a0 = sizes[i]; s.a1 = 0u;
+            s.head_present = h;
+            cases[built++] = s;
+        }
+    }
+    require(built <= kMaxCases, "case capacity");
+    return built;
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    require(application_state_006573e8.word(0x00657430u) == 0u, "init arena");
+    require(install_paths_table_0065b2a0[6u] == nullptr, "init install path");
+    init_bodies();
+    const U case_count = build_cases();
+    U count = 0u;
+    for (U i = 0u; i < case_count; ++i) {
+        const Spec& spec = all_cases[i];
+        ++count;
+        g_case = i; g_fn = spec.fn;
+        U original_abi = 0u, cpp_abi = 0u, original_eax = 0u, cpp_eax = 0u;
+        g_side = 0u;
+        reset_runtime(spec);
+        invoke_original(spec, original_abi, original_eax);
+        Snapshot expected{};
+        capture(expected, original_abi, original_eax);
+        g_side = 1u;
+        reset_runtime(spec);
+        invoke_cpp(spec, cpp_abi, cpp_eax);
+        Snapshot actual{};
+        capture(actual, cpp_abi, cpp_eax);
+        assert_same(expected, actual);
+    }
+    std::printf("scene_children_706_original_x86_vs_cpp=PASS cases=%u\n", count);
+    return 0;
+}

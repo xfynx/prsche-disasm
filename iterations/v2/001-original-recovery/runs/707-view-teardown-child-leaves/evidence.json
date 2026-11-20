@@ -1,0 +1,69 @@
+{
+  "run": 707,
+  "batch": "unowned typed children newly exposed by the integrated Run704 (buffer release, registry noop, secondary destroy thunk)",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "targets": [
+    {
+      "va": "00539eb0",
+      "end_exclusive": "00539ebe",
+      "bytes": 14,
+      "sha256": "0cac20a41b626fdad61736c75f8c473d21d0f25e99fd96d130e8eeb45cf3e161",
+      "abi": "fastcall(void* self in ECX, void* unused_edx in EDX), RET 0, void; preserves EBX,ESI,EDI,EBP,ESP",
+      "summary": "reads the receiver's first dword; when non-null, PUSH cell / CALL canonical 0059f050 / POP ECX. C++ releases the same cell via application_release_0059f050(self->cell)."
+    },
+    {
+      "va": "00514990",
+      "end_exclusive": "00514991",
+      "bytes": 1,
+      "sha256": "ae3f4619b0413d70d3004b9131c3752153074e45725be13b9a148978895e359e",
+      "abi": "cdecl(void* item), RET 0, void; no registers or memory touched",
+      "summary": "single C3 RET: no-op; no calls, no state, no used return."
+    },
+    {
+      "va": "0059f1c0",
+      "end_exclusive": "0059f1c5",
+      "bytes": 5,
+      "sha256": "c001fa5623328321ab94cacd5f145bc27eab23ff4e07f47991edcb160e9c5ea9",
+      "abi": "fastcall(void* self in ECX, void* unused_edx in EDX), RET 0 via tail jump, void",
+      "summary": "E9 rel32 tail jump to 0053f120, preserving ECX and the caller return address; C++ delegates to the declared secondary_destroy_body_0053f120(self) child."
+    }
+  ],
+  "excluded": [
+    {
+      "va": "00465790",
+      "end_exclusive": "004659e0",
+      "bytes": 592,
+      "sha256": "af1fdd1d8d412d3925e89cc78579f5fd5572eb23ab861d7c6cefad6f47c309ad",
+      "reason": "Large heterogeneous 592B entry service: writes eight loader-zero globals (006280e0..00628100), indexes three unproved tables (0x627f3c stride from arg0; 0x5cf610 + signed word*0x10; 0x658294 + index*0x80), stores ~20 float/vector constants and calls 00465cf0, 00463260 and 004618b0 with distinct contracts. Table extents/writability and global ownership are unproved; no provider defined, no invented arrays/callbacks. Caller 004659e0 (Run702) keeps void __cdecl(uint,uint) declaration."
+    }
+  ],
+  "ownership_decisions": {
+    "unowned_before": true,
+    "excluded": [
+      {"va": "00465790", "reason": "large/heterogeneous 592B body with unproved tables/globals/callees; excluded with evidence"}
+    ],
+    "notes": [
+      "All three recovered VAs are unowned in source/recovered/functions.json and the catalog; no entry_va or body_ranges overlap (neighbour 00539e50 spans 00539e50..00539ea8, 00539eb0 starts 8 bytes later).",
+      "Extern names/signatures are exactly those in view_teardown_route_family_701.hpp / entry_fe_scene_leaves_702.hpp / canonical-map 692; this TU supplies only the three previously-unowned definitions and does not redefine accepted callers or owned cells.",
+      "application_release_0059f050 is reused as the accepted canonical provider (Run078, application_alloc.cpp); no state owned here (owned_data/rdata/bss all empty).",
+      "0053f120 is an unowned 59B tail-jump target exposed as a new typed child (secondary_destroy_body_0053f120); its virtual-delete/vtable algorithm is not recovered or invented here."
+    ]
+  },
+  "native_proof": {
+    "config": "iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves/native-config.json",
+    "command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves/native-config.json --attempt 001",
+    "receipt": "local/experiments/v2-view-teardown-child-leaves-707/001/receipt.json",
+    "status": "PASS",
+    "cases_per_variant": 17,
+    "variants": ["/Od", "/O2"],
+    "material_mutations": 5,
+    "mutations_detected": 5
+  },
+  "boundaries": [
+    "All three recovered bodies are void: EAX after return is only an opaque volatile result and is not compared; call order, tagged arguments, ABI (ESP/EBP/EBX/ESI/EDI) and no-op event absence are compared.",
+    "0059f050 and 0053f120 are controlled endpoints in the native fixture; real allocator and virtual-delete/vtable state are outside this proof.",
+    "Null receiver dereference (self==nullptr) is not exercised because the original unconditionally reads [ECX]; it would fault and is outside the bounded domain.",
+    "The full 0053f120 algorithm, the large 00465790 entry service, fault/lifetime/concurrency domains and production CMake/registry integration remain open; no game-link claim is made."
+  ]
+}

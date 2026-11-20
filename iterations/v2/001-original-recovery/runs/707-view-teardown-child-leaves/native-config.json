@@ -1,0 +1,81 @@
+{
+  "run": 707,
+  "experiment": "local/experiments/v2-view-teardown-child-leaves-707",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves/view_teardown_child_leaves_707.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00539eb0",
+      "bytes": 14,
+      "sha256": "0cac20a41b626fdad61736c75f8c473d21d0f25e99fd96d130e8eeb45cf3e161",
+      "token": "@BODY_00539EB0@"
+    },
+    {
+      "va": "00514990",
+      "bytes": 1,
+      "sha256": "ae3f4619b0413d70d3004b9131c3752153074e45725be13b9a148978895e359e",
+      "token": "@BODY_00514990@"
+    },
+    {
+      "va": "0059f1c0",
+      "bytes": 5,
+      "sha256": "c001fa5623328321ab94cacd5f145bc27eab23ff4e07f47991edcb160e9c5ea9",
+      "token": "@BODY_0059F1C0@"
+    }
+  ],
+  "pass_marker": "view_teardown_child_leaves_707_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-539eb0-always-release",
+      "source": "iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves/view_teardown_child_leaves_707.cpp",
+      "old": "    if (cell != nullptr) {\n        (void)application_release_0059f050(cell);\n    }",
+      "new": "    if (true) {\n        (void)application_release_0059f050(cell);\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-539eb0-release-self",
+      "source": "iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves/view_teardown_child_leaves_707.cpp",
+      "old": "        (void)application_release_0059f050(cell);",
+      "new": "        (void)application_release_0059f050(self);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-539eb0-drop-read",
+      "source": "iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves/view_teardown_child_leaves_707.cpp",
+      "old": "    void* cell = nullptr;\n    std::memcpy(&cell, self, sizeof cell);",
+      "new": "    void* cell = static_cast<void*>(self);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-514990-add-release",
+      "source": "iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves/view_teardown_child_leaves_707.cpp",
+      "old": "void __cdecl registry_item_noop_00514990(void* item) {\n    (void)item;\n}",
+      "new": "void __cdecl registry_item_noop_00514990(void* item) {\n    (void)application_release_0059f050(item);\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-59f1c0-null-self",
+      "source": "iterations/v2/001-original-recovery/runs/707-view-teardown-child-leaves/view_teardown_child_leaves_707.cpp",
+      "old": "    secondary_destroy_body_0053f120(self);",
+      "new": "    secondary_destroy_body_0053f120(nullptr);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "scene_texture_callback_708.hpp"
+#include "texture_process_575.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+// Harness instance of the owned cell 0x006a3a50 (Run575 canonical type).
+namespace porsche {
+TextureNotifyCallback575 render_texture_notify_callback_006a3a50 = nullptr;
+}
+
+static TextureNotifyCallback575 g_saved = nullptr;
+
+static void require(bool ok, const char* why) {
+    if (!ok) { std::printf("divergence %s\n", why); std::fflush(stdout); ExitProcess(7); }
+}
+
+static U address(const void* p) { return static_cast<U>(reinterpret_cast<std::uintptr_t>(p)); }
+
+static U load_dword(const void* base, U off) { U v; std::memcpy(&v, static_cast<const B*>(base)+off, 4u); return v; }
+static void store_dword(void* base, U off, U v) { std::memcpy(static_cast<B*>(base)+off, &v, 4u); }
+
+static const B body_005556a0[10] = {@BODY_005556A0@};
+static B* slot_005556a0 = nullptr;
+
+static void set_abs(B* body, U size, U old_value, const void* replacement, U expected) {
+    U found = 0u; const U target = address(replacement);
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (load_dword(body, i) == old_value) { store_dword(body, i, target); ++found; i += 3u; }
+    }
+    require(found == expected, "absolute relocation count");
+}
+
+static void prepare_code() {
+    B* const code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+    slot_005556a0 = code + 0x000u;
+    std::memcpy(slot_005556a0, body_005556a0, sizeof body_005556a0);
+    set_abs(slot_005556a0, 10u, 0x006a3a50u, &render_texture_notify_callback_006a3a50, 1u);
+    require(FlushInstructionCache(GetCurrentProcess(), slot_005556a0, 4096u) != 0, "FlushInstructionCache");
+}
+
+// ABI wrapper: cdecl void(void*), one arg.
+static U invoke(void* fn, void* arg, U& abi_fail) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg
+        call fn
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return 0u;
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* info) {
+    std::printf("native-fault code=%08lx eip=%08lx\n", info->ExceptionRecord->ExceptionCode, info->ContextRecord->Eip);
+    std::fflush(stdout); ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+int main(int argc, char** argv) {
+    (void)argc; (void)argv;
+    AddVectoredExceptionHandler(1u, fault_handler);
+    prepare_code();
+
+    const void* values[] = {nullptr, reinterpret_cast<const void*>(0x004677d0u),
+                           reinterpret_cast<const void*>(0x12345678u),
+                           reinterpret_cast<const void*>(0xffffffffu)};
+    U cases = 0u;
+    for (const void* v : values) {
+        // original
+        render_texture_notify_callback_006a3a50 = reinterpret_cast<TextureNotifyCallback575>(0xdeadbeefu);
+        U af0 = 0u;
+        invoke(slot_005556a0, const_cast<void*>(v), af0);
+        TextureNotifyCallback575 after_orig = render_texture_notify_callback_006a3a50;
+        require(af0 == 0u, "original abi");
+        require(after_orig == reinterpret_cast<TextureNotifyCallback575>(v), "original store");
+
+        // cpp
+        render_texture_notify_callback_006a3a50 = reinterpret_cast<TextureNotifyCallback575>(0xdeadbeefu);
+        U af1 = 0u;
+        invoke(reinterpret_cast<void*>(&scene_texture_callback_005556a0), const_cast<void*>(v), af1);
+        TextureNotifyCallback575 after_cpp = render_texture_notify_callback_006a3a50;
+        require(af1 == 0u, "cpp abi");
+        require(after_cpp == reinterpret_cast<TextureNotifyCallback575>(v), "cpp store");
+
+        require(after_orig == after_cpp, "mismatch");
+        ++cases;
+    }
+    std::printf("scene_texture_callback_708_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

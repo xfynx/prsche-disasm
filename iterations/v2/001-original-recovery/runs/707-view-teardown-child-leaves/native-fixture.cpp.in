@@ -1,0 +1,346 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "view_teardown_child_leaves_707.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+enum : U { kMaxEvents = 16u };
+
+enum EventKind : U {
+    kEvRelease = 1u,
+    kEvSecondaryDestroy = 2u,
+};
+
+struct Event {
+    U kind;
+    U arg;
+    U ret;
+};
+
+struct Trace {
+    U abi_fail;
+    U event_count;
+    Event events[kMaxEvents];
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+static B* code = nullptr;
+static B* slot_539eb0 = nullptr;
+static B* slot_514990 = nullptr;
+static B* slot_59f1c0 = nullptr;
+
+static B receiver_a[64] = {};
+static B receiver_b[64] = {};
+static B cell_buf[64] = {};
+static B secondary_self[64] = {};
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static U tag_pointer(const void* p) {
+    struct Span { const void* base; U span; U tag; };
+    const Span spans[] = {
+        {receiver_a, sizeof receiver_a, 1u},
+        {receiver_b, sizeof receiver_b, 2u},
+        {cell_buf, sizeof cell_buf, 3u},
+        {secondary_self, sizeof secondary_self, 4u},
+    };
+    if (p == nullptr) return 0xffffffffu;
+    const U value = address(p);
+    for (const Span& s : spans) {
+        const U base = address(s.base);
+        if (value >= base && value - base < s.span) {
+            return (s.tag << 16u) | (value - base);
+        }
+    }
+    std::printf("divergence untagged-pointer case=%u which=%u\n", cases, which);
+    std::fflush(stdout);
+    ExitProcess(1);
+}
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", why, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void push_event(U kind, U arg, U ret) {
+    require(trace.event_count < kMaxEvents, "event overflow");
+    Event& ev = trace.events[trace.event_count++];
+    ev.kind = kind;
+    ev.arg = arg;
+    ev.ret = ret;
+}
+
+// Controlled endpoint implementations (harness only). Both the injected
+// original bytes and the compiled C++ call these same mocks.
+namespace porsche {
+
+std::uint32_t __cdecl application_release_0059f050(void* object) {
+    push_event(kEvRelease, tag_pointer(object), 1u);
+    return 1u;
+}
+
+void __fastcall secondary_destroy_body_0053f120(void* self) {
+    push_event(kEvSecondaryDestroy, tag_pointer(self), 0u);
+}
+
+} // namespace porsche
+
+// ABI-checking invoke helpers: ESP/EBP/EBX/ESI/EDI preserved across the call;
+// ECX/EDX are the fastcall argument registers and are intentionally volatile.
+static void invoke_cdecl1(void* fn, U arg0, U& abi_fail) {
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+}
+
+static void invoke_fastcall2(void* fn, U arg0, U arg1, U& abi_fail) {
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ecx, arg0
+        mov edx, arg1
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+}
+
+static void relocate_call(B* p, U n, U va_base, U target_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "call relocation count");
+}
+
+static void relocate_jmp(B* p, U n, U va_base, U target_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe9u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "jmp relocation count");
+}
+
+static void init_fixture() {
+    static const B body_539eb0[14] = {@BODY_00539EB0@};
+    static const B body_514990[1] = {@BODY_00514990@};
+    static const B body_59f1c0[5] = {@BODY_0059F1C0@};
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_539eb0 = code + 0x000u;
+    slot_514990 = code + 0x040u;
+    slot_59f1c0 = code + 0x080u;
+
+    std::memcpy(slot_539eb0, body_539eb0, 14u);
+    std::memcpy(slot_514990, body_514990, 1u);
+    std::memcpy(slot_59f1c0, body_59f1c0, 5u);
+
+    relocate_call(slot_539eb0, 14u, 0x00539eb0u, 0x0059f050u,
+                  address(reinterpret_cast<const void*>(&porsche::application_release_0059f050)),
+                  1u);
+    relocate_jmp(slot_59f1c0, 5u, 0x0059f1c0u, 0x0053f120u,
+                 address(reinterpret_cast<const void*>(&porsche::secondary_destroy_body_0053f120)),
+                 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+}
+
+static void assert_traces_match() {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    require(trace.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < trace.event_count; ++i) {
+        require(trace.events[i].kind == expected.events[i].kind, "event kind");
+        require(trace.events[i].arg == expected.events[i].arg, "event arg");
+        require(trace.events[i].ret == expected.events[i].ret, "event ret");
+    }
+}
+
+static void seed_buffers() {
+    for (U i = 0u; i < sizeof receiver_a; ++i) {
+        receiver_a[i] = static_cast<B>(0x11u + (i & 0x0fu));
+        receiver_b[i] = static_cast<B>(0xa1u + (i & 0x0fu));
+        cell_buf[i] = static_cast<B>(0x51u + (i & 0x0fu));
+        secondary_self[i] = static_cast<B>(0x81u + (i & 0x0fu));
+    }
+}
+
+static void test_539eb0() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::buffer_cell_release_00539eb0);
+    void* receivers[] = {receiver_a, receiver_b};
+    void* cells[] = {nullptr, cell_buf, cell_buf + 16u, receiver_a};
+
+    for (void* receiver : receivers) {
+        for (void* cell : cells) {
+            ++cases;
+            for (U side = 0u; side < 2u; ++side) {
+                which = side;
+                std::memset(&trace, 0, sizeof trace);
+                seed_buffers();
+                wr(receiver, 0u, address(cell));
+
+                void* const fn = (side == 0u) ? slot_539eb0 : cpp_fn;
+                invoke_fastcall2(fn, address(receiver), 0xdeadbeefu, trace.abi_fail);
+                if (side == 0u) expected = trace;
+            }
+            assert_traces_match();
+        }
+    }
+}
+
+static void test_514990() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::registry_item_noop_00514990);
+    void* items[] = {nullptr, cell_buf, receiver_a, secondary_self, receiver_b + 8u};
+
+    for (void* item : items) {
+        ++cases;
+        for (U side = 0u; side < 2u; ++side) {
+            which = side;
+            std::memset(&trace, 0, sizeof trace);
+            seed_buffers();
+
+            void* const fn = (side == 0u) ? slot_514990 : cpp_fn;
+            invoke_cdecl1(fn, address(item), trace.abi_fail);
+            if (side == 0u) expected = trace;
+        }
+        assert_traces_match();
+        require(expected.event_count == 0u, "noop must not call out");
+    }
+}
+
+static void test_59f1c0() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::teardown_secondary_destroy_0059f1c0);
+    void* selves[] = {secondary_self, secondary_self + 8u, receiver_a, receiver_b};
+
+    for (void* self : selves) {
+        ++cases;
+        for (U side = 0u; side < 2u; ++side) {
+            which = side;
+            std::memset(&trace, 0, sizeof trace);
+            seed_buffers();
+
+            void* const fn = (side == 0u) ? slot_59f1c0 : cpp_fn;
+            invoke_fastcall2(fn, address(self), 0xdeadbeefu, trace.abi_fail);
+            if (side == 0u) expected = trace;
+        }
+        assert_traces_match();
+        require(expected.event_count == 1u, "thunk must tail-call once");
+        require(expected.events[0].kind == kEvSecondaryDestroy, "thunk target");
+    }
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    init_fixture();
+    test_539eb0();
+    test_514990();
+    test_59f1c0();
+    std::printf("view_teardown_child_leaves_707_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

@@ -1,0 +1,429 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include "audio_bank_period_705.hpp"
+#include "porsche/application_audio_device.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+namespace porsche {
+// Fixture-local canonical owner (game build: provided by accepted audio TUs).
+ApplicationAudioDeviceStateStorage application_audio_device_state_006b48c0{};
+} // namespace porsche
+
+enum : U { kMaxEvents = 64u, kBanks = 8u, kSlots = 11u };
+enum EventTag : U {
+    kBankSlot = 1u, kBankTail = 2u, kRelease = 3u, kIntRead = 4u,
+    kReverbQuery = 5u, kAllocate = 6u, kFinalize = 7u,
+};
+
+struct StateSnapshot {
+    B device[0x18cu];
+    U count_words[3u];
+    B slots[kSlots * 36u];
+    U bank_table[kBanks * 3u];
+    B alloc_echo[64u];
+    U out_index;
+};
+
+struct Event {
+    U tag, a0, a1, a2, a3;
+    StateSnapshot state;
+};
+
+struct Trace {
+    U abi_fail, ret_eax, exception[3], count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u, events_total = 0u;
+
+// Scenario knobs (harness only; reset before each side of a case).
+static U active_scenario = 1u, slot_scenario = 0u, tail_scenario = 0u;
+static U query_scenario = 1u, read_scenario = 0u, alloc_scenario = 0u;
+static U release_seed[kSlots] = {};
+static B record_seed[64] = {};
+static U kind_scenario = 0u, target_scenario = 0u;
+static U bank_table[kBanks * 3u] = {};
+static U handle_storage[8u] = {};
+static B alloc_scratch[4096u] = {};
+
+static B* code = nullptr;
+static B* slot_565b60 = nullptr;
+static B* slot_598d10 = nullptr;
+static B* slot_598e80 = nullptr;
+static B* consts = nullptr; // 4 aligned float constants (k1,k2,k3,one)
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U word_at(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    std::memcpy(s.device, application_audio_device_state_006b48c0.preceding_data(),
+                sizeof s.device);
+    std::memcpy(s.count_words, audio_reverb_count_words_006b08c0,
+                sizeof s.count_words);
+    std::memcpy(s.slots, audio_reverb_slots_006b08e0, sizeof s.slots);
+    std::memcpy(s.bank_table, bank_table, sizeof s.bank_table);
+    std::memcpy(s.alloc_echo, alloc_scratch, sizeof s.alloc_echo);
+    s.out_index = 0u;
+}
+
+static Event& record_event(U tag, U a0, U a1, U a2, U a3 = 0u) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag; e.a0 = a0; e.a1 = a1; e.a2 = a2; e.a3 = a3;
+    capture_state(e.state);
+    return e;
+}
+
+namespace porsche {
+
+// Controlled callee endpoints. The original x86 side has its CALL rel32
+// operands patched to these shims; the compiled C++ side calls them directly.
+std::int32_t __cdecl audio_bank_find_free_slot_00590140() {
+    record_event(kBankSlot, slot_scenario, 0u, 0u);
+    return static_cast<std::int32_t>(slot_scenario);
+}
+std::int32_t __cdecl audio_bank_open_tail_005900b0(const void* a, const void* b) {
+    record_event(kBankTail, address(a), address(b), 0u);
+    return static_cast<std::int32_t>(tail_scenario);
+}
+std::int32_t __cdecl audio_backend_pool_release_0058ac30(std::uint32_t address_) {
+    record_event(kRelease, address_, 0u, 0u);
+    return 0;
+}
+std::int32_t __cdecl audio_integer_read_0059bd90(const void* bytes, std::uint32_t count) {
+    record_event(kIntRead, address(bytes), count,
+                 count ? static_cast<U>(static_cast<const B*>(bytes)[0]) : 0u);
+    return static_cast<std::int32_t>(read_scenario);
+}
+std::int32_t __cdecl audio_reverb_query_00598cd0(std::uint32_t kind_word, float value) {
+    U bits = 0u;
+    std::memcpy(&bits, &value, 4u);
+    record_event(kReverbQuery, kind_word, bits, 0u);
+    return static_cast<std::int32_t>(query_scenario);
+}
+void __cdecl audio_reverb_finalize_00598a70() {
+    record_event(kFinalize, 0u, 0u, 0u);
+}
+std::uint32_t __cdecl application_audio_backend_allocate_0058aae0(std::uint32_t bytes) {
+    record_event(kAllocate, bytes, address(alloc_scratch), 0u);
+    return address(alloc_scratch);
+}
+
+} // namespace porsche
+
+static U invoke_cdecl(void* fn, const U* args, U argc, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, argc
+        mov eax, args
+        test ecx, ecx
+        je call_target
+    push_args:
+        dec ecx
+        push dword ptr [eax + ecx * 4]
+        test ecx, ecx
+        jne push_args
+    call_target:
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov ecx, argc
+        lea esp, [esp + ecx * 4]
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        pushfd
+        pop eax
+        test eax, 400h
+        jz done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word_at(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+static void relocate_rel32(B* slot, U orig_va, U off, U expected_target_va,
+                           const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual = orig_va + off + 4u + word_at(slot, off);
+    require(actual == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void reset_tables() {
+    for (U i = 0u; i < sizeof(ApplicationAudioDeviceStateStorage); ++i) {
+        application_audio_device_state_006b48c0.preceding_data()[i] =
+            static_cast<B>(i * 7u + 3u);
+    }
+    std::memset(audio_reverb_count_words_006b08c0, 0,
+                sizeof audio_reverb_count_words_006b08c0);
+    std::memset(audio_reverb_slots_006b08e0, 0,
+                sizeof audio_reverb_slots_006b08e0);
+    std::memset(bank_table, 0, sizeof bank_table);
+    std::memset(handle_storage, 0, sizeof handle_storage);
+    std::memset(alloc_scratch, 0xa5, sizeof alloc_scratch);
+
+    put(application_audio_device_state_006b48c0.data(), 0xdcu, active_scenario);
+    put(application_audio_device_state_006b48c0.data(), 0x144u,
+        address(bank_table));
+    for (U i = 0u; i < kSlots; ++i) {
+        audio_reverb_slots_006b08e0[i].pointer_0c = release_seed[i];
+    }
+    std::memcpy(record_seed + 0x00u, &read_scenario, 4u);
+    record_seed[0x07u] = static_cast<B>(kind_scenario);
+    for (U i = 0u; i < kSlots && i < 12u; ++i) {
+        record_seed[0x0au + i] = static_cast<B>(i * 3u + 1u);
+    }
+}
+
+static void compare_traces(bool check_eax) {
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "original ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    if (check_eax) require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count && i < kMaxEvents; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag mismatch");
+        require(trace.events[i].a0 == expected.events[i].a0, "event a0 mismatch");
+        require(trace.events[i].a1 == expected.events[i].a1, "event a1 mismatch");
+        require(trace.events[i].a2 == expected.events[i].a2, "event a2 mismatch");
+        require(trace.events[i].a3 == expected.events[i].a3, "event a3 mismatch");
+        require(std::memcmp(&trace.events[i].state, &expected.events[i].state,
+                            sizeof(StateSnapshot)) == 0, "event state mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state,
+                        sizeof(StateSnapshot)) == 0, "final state mismatch");
+}
+
+static U out_index_storage = 0u;
+
+static void run_case(void* orig_fn, void* cpp_fn, const U* args, U argc,
+                     bool check_eax) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    out_index_storage = 0xdeadbeefu;
+    reset_tables();
+    __try { trace.abi_fail = invoke_cdecl(orig_fn, args, argc, trace.ret_eax); }
+    __except (exception_record(GetExceptionInformation())) {}
+    capture_state(trace.final_state);
+    trace.final_state.out_index = out_index_storage;
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    out_index_storage = 0xdeadbeefu;
+    reset_tables();
+    __try { trace.abi_fail = invoke_cdecl(cpp_fn, args, argc, trace.ret_eax); }
+    __except (exception_record(GetExceptionInformation())) {}
+    capture_state(trace.final_state);
+    trace.final_state.out_index = out_index_storage;
+    events_total += trace.count;
+    compare_traces(check_eax);
+}
+
+static void init() {
+    static const B body_565b60[] = {@BODY_00565B60@};
+    static const B body_598d10[] = {@BODY_00598D10@};
+    static const B body_598e80[] = {@BODY_00598E80@};
+    require(sizeof body_565b60 == 71u, "71-byte body 00565b60");
+    require(sizeof body_598d10 == 354u, "354-byte body 00598d10");
+    require(sizeof body_598e80 == 40u, "40-byte body 00598e80");
+
+    // Raw original constants, verified before relocation.
+    static const B raw_k1[] = {0x04, 0x02, 0x01, 0x3c};
+    static const B raw_k2[] = {0xe7, 0x3e, 0x3e, 0x3b};
+    static const B raw_k3[] = {0x6f, 0x12, 0x83, 0x3a};
+    static const B raw_one[] = {0x00, 0x00, 0x80, 0x3f};
+    require(word_at(raw_k1) == 0x3c010204u, "raw 005b4a78");
+    require(word_at(raw_k2) == 0x3b3e3ee7u, "raw 005b73f4");
+    require(word_at(raw_k3) == 0x3a83126fu, "raw 005b3060");
+    require(word_at(raw_one) == 0x3f800000u, "raw 005b24a8");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_565b60 = code + 0u;
+    slot_598d10 = code + 256u;
+    slot_598e80 = code + 768u;
+    consts = code + 896u;
+    std::memcpy(slot_565b60, body_565b60, sizeof body_565b60);
+    std::memcpy(slot_598d10, body_598d10, sizeof body_598d10);
+    std::memcpy(slot_598e80, body_598e80, sizeof body_598e80);
+    std::memcpy(consts, raw_k1, 4u);
+    std::memcpy(consts + 4u, raw_k2, 4u);
+    std::memcpy(consts + 8u, raw_k3, 4u);
+    std::memcpy(consts + 12u, raw_one, 4u);
+
+    B* const dev = application_audio_device_state_006b48c0.data();
+    const U dev_active = address(dev + 0xdcu);
+    const U dev_cb = address(dev + 0x130u);
+    const U dev_table = address(dev + 0x144u);
+    const U count_va = address(audio_reverb_count_words_006b08c0);
+    const U coeff_va = address(&audio_reverb_slots_006b08e0[0].f1_20);
+    const U count_end_va = address(audio_reverb_count_words_006b08c0 + 3u);
+    const U k1_va = address(consts);
+    const U k2_va = address(consts + 4u);
+    const U k3_va = address(consts + 8u);
+    const U one_va = address(consts + 12u);
+
+    // 00565b60 relocations.
+    relocate_abs32(slot_565b60, 0x01u, 0x006b499cu, dev_active);
+    relocate_rel32(slot_565b60, 0x00565b60u, 0x10u, 0x00590140u,
+                   reinterpret_cast<void*>(audio_bank_find_free_slot_00590140));
+    relocate_abs32(slot_565b60, 0x1du, 0x006b49f0u, dev_cb);
+    relocate_abs32(slot_565b60, 0x28u, 0x006b4a04u, dev_table);
+    relocate_rel32(slot_565b60, 0x00565b60u, 0x3fu, 0x005900b0u,
+                   reinterpret_cast<void*>(audio_bank_open_tail_005900b0));
+
+    // 00598e80 relocations.
+    relocate_abs32(slot_598e80, 0x02u, 0x006b08ecu,
+                   address(&audio_reverb_slots_006b08e0[0].pointer_0c));
+    relocate_rel32(slot_598e80, 0x00598e80u, 0x0eu, 0x0058ac30u,
+                   reinterpret_cast<void*>(audio_backend_pool_release_0058ac30));
+    relocate_abs32(slot_598e80, 0x20u, 0x006b0a78u,
+                   address(&audio_reverb_slots_006b08e0[0].pointer_0c) + 0x18cu);
+
+    // 00598d10 relocations.
+    relocate_rel32(slot_598d10, 0x00598d10u, 0x08u, 0x00598e80u, slot_598e80);
+    relocate_abs32(slot_598d10, 0x16u, 0x006b08c0u, count_va);
+    relocate_abs32(slot_598d10, 0x4au, 0x006b0900u, coeff_va);
+    relocate_abs32(slot_598d10, 0x6bu, 0x005b4a78u, k1_va);
+    relocate_abs32(slot_598d10, 0x82u, 0x005b24a8u, one_va);
+    relocate_abs32(slot_598d10, 0x9cu, 0x005b73f4u, k2_va);
+    relocate_abs32(slot_598d10, 0xa7u, 0x005b73f4u, k2_va);
+    relocate_abs32(slot_598d10, 0xb3u, 0x005b4a78u, k1_va);
+    relocate_rel32(slot_598d10, 0x00598d10u, 0xc0u, 0x0059bd90u,
+                   reinterpret_cast<void*>(audio_integer_read_0059bd90));
+    relocate_abs32(slot_598d10, 0xd5u, 0x005b3060u, k3_va);
+    relocate_rel32(slot_598d10, 0x00598d10u, 0xdeu, 0x00598cd0u,
+                   reinterpret_cast<void*>(audio_reverb_query_00598cd0));
+    relocate_rel32(slot_598d10, 0x00598d10u, 0xedu, 0x0058aae0u,
+                   reinterpret_cast<void*>(application_audio_backend_allocate_0058aae0));
+    relocate_abs32(slot_598d10, 0x143u, 0x006b08ccu, count_end_va);
+    relocate_rel32(slot_598d10, 0x00598d10u, 0x156u, 0x00598a70u,
+                   reinterpret_cast<void*>(audio_reverb_finalize_00598a70));
+}
+
+static void bank_open_cases() {
+    for (U active = 0u; active < 2u; ++active) {
+        for (U slot = 0u; slot < 8u; ++slot) {
+            active_scenario = active;
+            slot_scenario = active ? slot : 0u;
+            tail_scenario = (slot % 3u == 0u) ? 7u : (slot % 3u == 1u ? 8u : 0xfffffff6u);
+            U args[2u] = {address(&out_index_storage), address(handle_storage)};
+            run_case(slot_565b60,
+                     reinterpret_cast<void*>(audio_bank_open_00565b60),
+                     args, 2u, true);
+        }
+    }
+}
+
+static void reset_cases() {
+    for (U pattern = 0u; pattern < 8u; ++pattern) {
+        for (U i = 0u; i < kSlots; ++i) {
+            release_seed[i] = ((i + pattern) % 3u == 0u)
+                ? (0x1000u + (i * 4u + pattern) * 0x10u) : 0u;
+        }
+        run_case(slot_598e80,
+                 reinterpret_cast<void*>(audio_period_reset_00598e80),
+                 nullptr, 0u, false);
+    }
+}
+
+static void configure_cases() {
+    // record[4], record[5], record[6] = per-outer counts; record[7] = kind.
+    const U count_patterns[4][3] = {{0u,0u,0u},{1u,0u,0u},{2u,1u,0u},{1u,1u,1u}};
+    for (U p = 0u; p < 4u; ++p) {
+        for (U q = 0u; q < 2u; ++q) {
+            std::memset(record_seed, 0, sizeof record_seed);
+            record_seed[4u] = static_cast<B>(count_patterns[p][0]);
+            record_seed[5u] = static_cast<B>(count_patterns[p][1]);
+            record_seed[6u] = static_cast<B>(count_patterns[p][2]);
+            record_seed[7u] = static_cast<B>(q ? 3u : 1u);
+            read_scenario = 0x11223344u + p * 7u + q;
+            query_scenario = static_cast<I>(1u + (p + q) % 4u);
+            alloc_scenario = 0xa0000000u + p * 0x100u + q * 0x40u;
+            kind_scenario = 0x55u + p;
+            for (U i = 0u; i < kSlots && i < 12u; ++i) {
+                record_seed[0x0au + i] = static_cast<B>(i * 3u + 1u);
+            }
+            U args[2u] = {kind_scenario, address(record_seed)};
+            run_case(slot_598d10,
+                     reinterpret_cast<void*>(audio_period_configure_00598d10),
+                     args, 2u, false);
+        }
+    }
+}
+
+int main(int argc, char** argv) {
+    if (argc < 2) { std::printf("missing original PE argument\n"); return 2; }
+    init();
+    bank_open_cases();
+    reset_cases();
+    configure_cases();
+    require(word_at(consts) == 0x3c010204u && word_at(consts, 4u) == 0x3b3e3ee7u &&
+            word_at(consts, 8u) == 0x3a83126fu && word_at(consts, 12u) == 0x3f800000u,
+            "constant pin");
+    std::printf("audio_bank_period_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

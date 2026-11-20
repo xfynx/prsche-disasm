@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "run": 708,
+  "status": "native-differential-PASS",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "bodies": 1,
+  "body_bytes": 10,
+  "definition_source": "iterations/v2/001-original-recovery/runs/708-scene-texture-callback-leaf/scene_texture_callback_708.cpp",
+  "definition_header": "iterations/v2/001-original-recovery/runs/708-scene-texture-callback-leaf/scene_texture_callback_708.hpp",
+  "source_sha256": {
+    "scene_texture_callback_708.cpp": "e7a7246d6e4735305a3d4f37d3b24d986111671a8de06c585b28b0d7d3a69d84",
+    "scene_texture_callback_708.hpp": "2ce5396418955a712dfd1aba112f86fcbee0c5ef67bb88b32ace23c5c6db2198",
+    "native-config.json": "f8606f2e4bec84ec9e44851101fd6da9633201cbcd52a96532a2f91cb3feabaa",
+    "native-fixture.cpp.in": "bd91b2ab98a02ed8ba7096d79248450a57af331137dfbea3291924f5361710f9"
+  },
+  "verify_command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/708-scene-texture-callback-leaf/native-config.json --attempt 001",
+  "receipt": "local/experiments/v2-scene-texture-callback-leaf-708/001/receipt.json",
+  "receipt_sha256": "b26fb9165a3bd033aa3837ae3e70c0fc9f379f6da1b6eb3eba206c6330e4adb3",
+  "result": {
+    "status": "PASS",
+    "variants": ["/Od", "/O2"],
+    "pass_marker": "scene_texture_callback_708_original_x86_vs_cpp=PASS",
+    "cases": 4,
+    "case_breakdown": "005556a0: callback pointer values {null, 0x004677d0, 0x12345678, 0xffffffff} (4)",
+    "mutations": 2,
+    "mutations_detected": 2,
+    "warnings": 0,
+    "abi_checked": "ESP/EBP/EBX/ESI/EDI preserved; both original and C++ via identical call wrapper",
+    "intermediate_state": "loader-zero cell 0x006a3a50 (render_texture_notify_callback_006a3a50) value before/after",
+    "material_controls": "wrong-drop-store, wrong-store-constant"
+  },
+  "ownership": {
+    "registry_and_body_ranges_checked": "iterations/v2/001-original-recovery/source/recovered/functions.json: 005556a0 unrecovered; body_ranges 005556a0..005556a9 (10B) no overlap with owned entries",
+    "cells_owned": [],
+    "cells_reused": ["0x006a3a50 (render_texture_notify_callback_006a3a50, Run575)"],
+    "canonical_providers_reused": [],
+    "excluded": ["005a177b (already owned as formatter_stdio_printf_005a177b, formatter_stdio.cpp; reuse canonical, no redefine)", "005a134b (CRT __RTDynamicCast primitive; external, not game code)"]
+  },
+  "boundaries": "Real 005a177b formatter is reused via canonical formatter_stdio_printf_005a177b; 005a134b is CRT __RTDynamicCast and remains an external primitive. Production CMake/registry integration, alias symbol availability for scene_texture_alloc_report_005a177b and formatter_compare_005a134b, and live texture-pool state remain open."
+}

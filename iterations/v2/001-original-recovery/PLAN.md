@@ -1,6 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-20, Run704 shared audit PASS (001) for frozen 700/003+701/008+
+Current 2026-11-20, Run709 shared audit PASS (001) for frozen 705/006+706/017+
+707/001+708/001 on 704. Build001 compiles411TUs/8projects;108names115refs,
+noEXE. Ten namesclose; five children open (005900b0, 00598a70/00598cd0,
+0044fc30, 0053f120). Registry1161 adds nine full bodies907B; README709 owns
+commands/bounds: 168nativecases,29mutations,1016pins. Next wave: the five
+children + evidence-excluded heterogeneous packets; storage-gated
+00562810/00563440 need run-273 proof; complex parents (004152e0,
+application_main_*) await strong models when the Go window resets.
+
+Historical 2026-11-20, Run704 shared audit PASS (001) for frozen 700/003+701/008+
 702/011+703/005 on 699. Build001 compiles407TUs/8projects;113names119refs,
 noEXE. Eighteen namesclose; eighteen typed children open (audio bank/config,
 buffer release, FE service, formatter compare, RTTI scene/camera elems, scene

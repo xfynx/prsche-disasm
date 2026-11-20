@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "run": 705,
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "generation": "raw PE bytes read through section headers (imagebase 0x400000) before any relocation; SHA-256 verified; helper pe_read.py in this run",
+  "bodies": [
+    {
+      "va": "00565b60",
+      "end_va_exclusive": "00565ba7",
+      "bytes": 71,
+      "sha256": "b77e31407e3ce22bb40c669c441399c20e43448b9cacd825d7db23dfa1331476",
+      "disassembly_lines": "445809-445830",
+      "abi": "cdecl, int32 EAX return; 2 stack args (uint32* out_index, const void* handle); plain RET (C3)",
+      "callers": ["004a6bf0 (accepted Run703 004a6bc0)", "004a8505 (004a8490)", "004fd495 (004fd3d0)"],
+      "callees": ["00590140 (owned Run677 audio_bank_find_free_slot)", "005900b0 (unowned typed boundary)"]
+    },
+    {
+      "va": "00598d10",
+      "end_va_exclusive": "00598e72",
+      "bytes": 354,
+      "sha256": "36ccef70f6124699f511a27f88fe78bd7d6e18d85f6278d4f299f0f76e9ab10b",
+      "disassembly_lines": "502585-502694",
+      "abi": "cdecl, no used return; 2 stack args (uint kind_word, uint target_va); plain RET (C3)",
+      "callers": ["0059021b (accepted Run703 005901b0)"],
+      "callees": ["00598e80 (this batch)", "0059bd90 (owned Run451 audio_integer_read)", "00598cd0 (unowned typed boundary)", "0058aae0 (owned Run438 backend allocate)", "00598a70 (unowned typed boundary)"]
+    },
+    {
+      "va": "00598e80",
+      "end_va_exclusive": "00598ea8",
+      "bytes": 40,
+      "sha256": "0684adc59023d03022778b092c03a25c035f813e66396a581320ce6766fbac39",
+      "disassembly_lines": "502696-502710",
+      "abi": "cdecl, no used return; no stack args; plain RET (C3)",
+      "callers": ["005901f4 (accepted Run703 005901b0)", "00598d17 (this batch 00598d10)"],
+      "callees": ["0058ac30 (owned Run438 audio_backend_pool_release)"]
+    }
+  ],
+  "readonly_constants": [
+    {"va": "005b4a78", "bytes": 4, "raw_hex": "0402013c", "value_bits": "0x3c010204", "section": ".rdata", "use": "coefficient multiply in 00598d10"},
+    {"va": "005b73f4", "bytes": 4, "raw_hex": "e73e3b3b", "value_bits": "0x3b3e3ee7", "section": ".rdata", "use": "coefficient multiply in 00598d10"},
+    {"va": "005b3060", "bytes": 4, "raw_hex": "6f12833a", "value_bits": "0x3a83126f", "section": ".rdata", "use": "query scale in 00598d10"},
+    {"va": "005b24a8", "bytes": 4, "raw_hex": "0000803f", "value_bits": "0x3f800000", "section": ".rdata", "ownership": "accepted Run221 original 1.0f, reused not redefined"}
+  ],
+  "loader_zero_cells": [
+    {
+      "va": "006b08c0",
+      "bytes": 12,
+      "layout": "3 x uint32 reverb count words (006b08c0/c4/c8)",
+      "ownership": "unowned; .data RVA 0x2b08c0 exceeds raw section size -> loader zero-fill; no accepted owner defines this extent",
+      "note": "011 slot records span 006b08e0..006b0a6c (11 x 36B); pointer field at +0x0c is 006b08ec released by 00598e80; 00598d10 writes coeff base 006b0900 = slot0+0x20"
+    },
+    {
+      "va": "006b499c",
+      "bytes": 4,
+      "ownership": "inside already-owned ApplicationAudioDeviceStateStorage 006b48c0..006b4a4c at offset 0xdc; reused via device_word(0xdc)"
+    },
+    {
+      "va": "006b49f0",
+      "bytes": 4,
+      "ownership": "inside device state at offset 0x130; original stores callback VA 0x5659f0 (not relocated in production)"
+    },
+    {
+      "va": "006b4a04",
+      "bytes": 4,
+      "ownership": "inside device state at offset 0x144; bank table base reused"
+    }
+  ],
+  "reused_owners": [
+    "application_audio_device_state_006b48c0 (source/include/porsche/application_audio_device.hpp)",
+    "audio_bank_find_free_slot_00590140 (Run677)",
+    "audio_integer_read_0059bd90 (Run451)",
+    "application_audio_backend_allocate_0058aae0 (Run438)",
+    "audio_backend_pool_release_0058ac30 (Run438)",
+    "_DAT_005b24a8 = 1.0f (Run221)"
+  ],
+  "provider_boundaries": [
+    "005900b0: unowned two-argument bank open tail; typed boundary with controlled fixture return, no original body claimed",
+    "00598cd0: unowned reverb query (kind_word, float)->int; typed boundary with controlled fixture return",
+    "00598a70: unowned reverb finalizer; typed boundary, no original body claimed"
+  ],
+  "ownership_check": {
+    "registry_entries": 1152,
+    "entry_va_hits": {"00565b60": 0, "00598d10": 0, "00598e80": 0, "005900b0": 0, "00598cd0": 0, "00598a70": 0},
+    "body_range_overlaps": {"00565b60": 0, "00598d10": 0, "00598e80": 0},
+    "note": "all three targets unowned including body_ranges; owned callees 00590140/0059bd90/0058aae0/0058ac30 reused through their canonical declarations"
+  },
+  "scope_boundary": "FULL bodies for 00565b60/00598d10/00598e80 at /Od and /O2. Inputs bounded to owned slot range (bank index 0..7), 11 reverb slots and 3 outer count words, record bytes seeded in fixture. Bank index >7, wild upper flag/address bits, live backend/device effects, opaque callee semantics (005900b0/00598cd0/00598a70) and full startup/gameplay remain open. x87 contents compared as exact 32-bit float stores via pinned raw constants."
+}

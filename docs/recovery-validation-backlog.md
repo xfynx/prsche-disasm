@@ -1,5 +1,13 @@
 # Отложенные проверки восстановления v2
 
+Run709 integrates705-708 (9 bodies907B,168cases,29mutations,1016pins,411TUs;
+108names115refs,noEXE). Tenclose; five children open (005900b0 reverb/bank
+tails, 0044fc30 scene root finish, 0053f120 destroy body). Excluded packets
+remain: 0043ed00/00448b10/0044f240/00451490/004552b0/00455f60/00463c30/
+00466500/00413960/0045dbd0/00458c90/004522b0/00475c80/00465790; 00475c80
+needs Run649 cell overlap resolution. Storage-gated00562810/00563440 need
+run-273 proof. Fault/lifetime/RTTI, live devices andfullgame remain unproved.
+
 Run704 integrates700-703 (19 bodies1611B,3656cases,49mutations,1007pins,
 407TUs;113names119refs,noEXE). Eighteennamesclosed; eighteen children open.
 Storage-gated00562810/00563440 need run-273 proof (006bda20/006b3020).

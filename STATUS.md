@@ -4,20 +4,19 @@ Updated 2026-11-20. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run704](iterations/v2/001-original-recovery/runs/704-next-layer-integration/README.md)
-compiles 407 C++ translation units across 8 projects. The link has 113 unresolved
-names / 119 references. **There is no recovered playable C++ game executable yet.**
+[Run709](iterations/v2/001-original-recovery/runs/709-audio-scene-child-integration/README.md)
+compiles 411 C++ translation units across 8 projects. The link has 108 unresolved
+names / 115 references. **There is no recovered playable C++ game executable yet.**
 
-Run704 integrates 700-703: nineteen full original bodies (1,611 code bytes:
-scene reset leaves, view teardown/route family, entry FE + scene route/transfer
-leaves, audio finalize/period callback). Native comparisons pass 3,656 measured
-cases and 49 material mutation controls at `/Od`/`/O2`; shared audit PASS,
-1,007 source pins. Eighteen frontier names close; eighteen typed children open.
-`00562810`/`00563440` are storage-gated (run-273 proof required); eight
-excluded bodies are queued as separate packets.
+Run709 integrates 705-708: nine full original bodies (907 code bytes: audio
+bank open/period configure/reset, scene elem kind/root ctor, teardown children,
+texture callback leaf). Native comparisons pass 168 measured cases and 29
+material mutation controls at `/Od`/`/O2`; shared audit PASS, 1,016 source pins.
+Ten frontier names close; five typed children open. `004211d0` reused owned
+storage as a typed forwarder (no duplicate).
 
-Historical: Run699 integrated 695/696/697 (four bodies, 1,353B; 2,796 cases /
-49 mutations / 998 pins; 403 TUs).
+Historical: Run704 integrated 700-703 (nineteen bodies, 1,611B; 3,656 cases /
+49 mutations / 1,007 pins; 407 TUs).
 
 Historical: Run698 integrated 691/692/693 (eight full bodies, 2,479B; 374
 cases / 75 mutations / 991 pins; 400 TUs; FE main-loop `004152e0`

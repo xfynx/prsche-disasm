@@ -1,0 +1,46 @@
+{
+  "run": 708,
+  "experiment": "local/experiments/v2-scene-texture-callback-leaf-708",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/708-scene-texture-callback-leaf/scene_texture_callback_708.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/708-scene-texture-callback-leaf/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/708-scene-texture-callback-leaf",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/575-render-texture-scheduler"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/708-scene-texture-callback-leaf/scene_texture_callback_708.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "005556a0",
+      "bytes": 10,
+      "sha256": "e2213ec12450612a229790db591f3bd5af47df349e8ddcf000fe7f99922900c8",
+      "token": "@BODY_005556A0@"
+    }
+  ],
+  "pass_marker": "scene_texture_callback_708_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-drop-store",
+      "source": "iterations/v2/001-original-recovery/runs/708-scene-texture-callback-leaf/scene_texture_callback_708.cpp",
+      "old": "    render_texture_notify_callback_006a3a50 =\n        reinterpret_cast<TextureNotifyCallback575>(callback);",
+      "new": "    (void)callback;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-store-constant",
+      "source": "iterations/v2/001-original-recovery/runs/708-scene-texture-callback-leaf/scene_texture_callback_708.cpp",
+      "old": "        reinterpret_cast<TextureNotifyCallback575>(callback);",
+      "new": "        reinterpret_cast<TextureNotifyCallback575>(0x004677d4u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}
