@@ -1,0 +1,783 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "view_teardown_route_family_701.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+enum : U {
+    kEvNoop = 1u, kEvSecondaryDestroy = 2u, kEvRelease = 3u,
+    kEvRegistryItem = 4u, kEvBlockDestroy = 5u, kEvBufferCell = 6u,
+    kEvMovieDelete = 7u,
+};
+
+struct Event { U kind; U a; U b; U c; U d; };
+constexpr U kMaxEvents = 64u;
+constexpr U kRouteBytes = 0x400u;
+
+struct Fpu {
+    unsigned short control, status, tag;
+    B values[80];
+    U mxcsr;
+};
+
+// Controlled globals (harness instances of the canonical / owned cells).
+namespace porsche {
+std::uint8_t view_slot_table_00627e80[0x218u] = {}; // Run693-owned cell, harness instance
+}
+static B* const slot_table = porsche::view_slot_table_00627e80;
+static B route0[kRouteBytes];                // route object for slot zero
+static B route1[kRouteBytes];                // route object for slot one
+static float g_scale = -4.0f;                // raw 0x005b245c dword 0xc0800000
+static void* g_secondary = nullptr;          // 0x0062810c
+static void* g_context_root = nullptr;       // 0x00628bac
+static U g_teardown_state = 0u;              // 0x0065b398
+static void* g_movie_service = nullptr;      // 0x0069ed0c
+static B service_obj[0x30u];
+static B snap_src[0x40u];
+static B snap_dst[0x40u];
+static B tear_self[0x80u];
+static B movie_self[0x40u];
+static B inner_obj[0x20u];
+static void* inner_vtable[1];
+static B vec_buf[0x10u];
+static B root_buf[0xc0u];
+
+// Canonical / owned cell definitions bound to the harness instances.
+// render_secondary_object_0062810c is defined by the production TU; the three
+// canonical cells below are owned elsewhere and only referenced by production,
+// so the harness supplies their definitions here.
+namespace porsche {
+void* startup_context_table_00628bac = nullptr;
+std::uint32_t render_teardown_state_0065b398 = 0u;
+void* game_setup_movie_service_0069ed0c = nullptr;
+}
+// Alias harness pointers onto the canonical globals the C++ body uses.
+static void*& g_secondary_ref = porsche::render_secondary_object_0062810c;
+static void*& g_context_ref = porsche::startup_context_table_00628bac;
+static U& g_teardown_ref = porsche::render_teardown_state_0065b398;
+static void*& g_movie_ref = porsche::game_setup_movie_service_0069ed0c;
+
+struct Snapshot {
+    U event_count;
+    Event events[kMaxEvents];
+    U eax;
+    Fpu fpu;
+    B slots[0x218u];
+    U scale_bits;
+    U secondary, context_root, teardown_state, movie_service;
+    B route0[kRouteBytes];
+    B route1[kRouteBytes];
+    B service[0x30u];
+    B snap_src[0x40u];
+    B snap_dst[0x40u];
+    B tear_self[0x80u];
+    B movie_self[0x40u];
+    B inner[0x20u];
+    B vtable[8u];
+    B vec[0x10u];
+    B root[0xc0u];
+};
+
+// Original-body slots filled by prepare_code().
+static B* slot_00465cf0, *slot_00465e20, *slot_0047f190, *slot_004b7140;
+static B* slot_00473100, *slot_00473190, *slot_00538d80, *slot_00540420;
+
+static Event events[kMaxEvents];
+static U event_count = 0u;
+static U cases = 0u;
+static U which = 0u;
+static Snapshot saved{};
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u) {
+    if (event_count < kMaxEvents) {
+        events[event_count++] = Event{kind, a, b, c, d};
+    } else {
+        std::printf("divergence event-overflow case=%u which=%u\n", cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load_dword(const void* base, U offset) {
+    U value;
+    std::memcpy(&value, static_cast<const B*>(base) + offset, 4u);
+    return value;
+}
+
+static void store_dword(void* base, U offset, U value) {
+    std::memcpy(static_cast<B*>(base) + offset, &value, 4u);
+}
+
+static U encoded_pointer(const void* p) {
+    struct Span { const void* base; U span; U tag; };
+    const Span spans[] = {
+        {slot_table, 0x218u, 1u}, {route0, kRouteBytes, 2u},
+        {route1, kRouteBytes, 3u}, {service_obj, 0x30u, 4u},
+        {snap_src, 0x40u, 5u}, {snap_dst, 0x40u, 6u},
+        {tear_self, 0x80u, 7u}, {movie_self, 0x40u, 8u},
+        {inner_obj, 0x20u, 9u}, {inner_vtable, sizeof inner_vtable, 10u},
+        {vec_buf, 0x10u, 11u}, {root_buf, 0xc0u, 12u},
+    };
+    if (p == nullptr) return 0xffffffffu;
+    const U value = address(p);
+    for (const Span& s : spans) {
+        const U base = address(s.base);
+        if (value >= base && value - base < s.span) {
+            return (s.tag << 16u) | (value - base);
+        }
+    }
+    std::printf("divergence untagged-pointer case=%u which=%u\n", cases, which);
+    std::fflush(stdout);
+    ExitProcess(1);
+}
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", why, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Controlled endpoint implementations (harness only).
+// ---------------------------------------------------------------------------
+namespace porsche {
+void __cdecl startup_service_noop_00516950() { record_event(kEvNoop); }
+
+void __fastcall teardown_secondary_destroy_0059f1c0(void* self, void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvSecondaryDestroy, encoded_pointer(self));
+}
+
+std::uint32_t __cdecl application_release_0059f050(void* object) {
+    record_event(kEvRelease, encoded_pointer(object));
+    return 1u;
+}
+
+void __cdecl registry_item_noop_00514990(void* item) {
+    record_event(kEvRegistryItem, address(item));
+}
+
+void __cdecl application_context_member_destroy_block_00441200(
+    void* block, std::uint32_t bytes) {
+    record_event(kEvBlockDestroy, address(block), bytes);
+}
+
+void __fastcall buffer_cell_release_00539eb0(void* self, void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvBufferCell, encoded_pointer(self));
+}
+
+void __fastcall movie_service_delete_slot0(void* self, void* unused_edx, std::uint32_t arg) {
+    (void)unused_edx;
+    record_event(kEvMovieDelete, encoded_pointer(self), arg);
+}
+} // namespace porsche
+
+// ---------------------------------------------------------------------------
+// ABI-checking invoke helpers. Every side (original bytes and C++) is called
+// through the same helper; ESP delta, nonvolatile registers and FPU state are
+// compared as part of the snapshot.
+// ---------------------------------------------------------------------------
+alignas(16) static B fp_area[512] = {};
+
+static void seed_fpu() {
+    const unsigned short control = 0x037fu;
+    __asm {
+        fninit
+        fldcw control
+        cld
+    }
+}
+
+static void capture_fpu(Fpu& out) {
+    std::memset(&out, 0, sizeof out);
+    __asm {
+        fxsave fp_area
+    }
+    out.control = static_cast<unsigned short>(load_dword(fp_area, 0u) & 0xffffu);
+    out.status = static_cast<unsigned short>((load_dword(fp_area, 0u) >> 16u) & 0xffffu);
+    out.tag = fp_area[4u];
+    out.mxcsr = load_dword(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(out.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+    }
+}
+
+static U invoke_cdecl0(void* fn, U& abi_fail, Fpu& fpu) {
+    U before = 0u, frame = 0u, result = 0u, fail = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        jmp done
+    bad: mov fail, 1
+    done: mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fpu);
+    abi_fail = fail;
+    return result;
+}
+
+static U invoke_cdecl1(void* fn, U arg, U& abi_fail, Fpu& fpu) {
+    U before = 0u, frame = 0u, result = 0u, fail = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg
+        call fn
+        add esp, 4
+        mov result, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        jmp done
+    bad: mov fail, 1
+    done: mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fpu);
+    abi_fail = fail;
+    return result;
+}
+
+static U invoke_fastcall0(void* fn, void* self, void* unused, U& abi_fail, Fpu& fpu) {
+    U before = 0u, frame = 0u, result = 0u, fail = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ecx, self
+        mov edx, unused
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        jmp done
+    bad: mov fail, 1
+    done: mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fpu);
+    abi_fail = fail;
+    return result;
+}
+
+static U invoke_fastcall2(void* fn, void* self, void* unused, U arg,
+                          U& abi_fail, Fpu& fpu) {
+    U before = 0u, frame = 0u, result = 0u, fail = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ecx, self
+        mov edx, unused
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg
+        call fn
+        mov result, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        jmp done
+    bad: mov fail, 1
+    done: mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fpu);
+    abi_fail = fail;
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// Original-body relocation helpers.
+// ---------------------------------------------------------------------------
+static void set_abs(B* body, U size, U old_value, const void* replacement, U expected) {
+    U found = 0u;
+    const U target = address(replacement);
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (load_dword(body, i) == old_value) {
+            store_dword(body, i, target);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected, "absolute relocation count");
+}
+
+static void set_rel(B* body, U size, U original_va, U target_va,
+                    const void* replacement, U expected, B opcode) {
+    U found = 0u;
+    const U target = address(replacement);
+    for (U i = 0u; i + 5u <= size; ++i) {
+        if (body[i] == opcode &&
+            ((original_va + i + 5u + static_cast<I>(load_dword(body, i + 1u))) &
+             0xffffffffu) == target_va) {
+            store_dword(body, i + 1u, target - address(body + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected, "relative relocation count");
+}
+
+static void capture(Snapshot& out, U eax, U abi_fail, const Fpu& fpu) {
+    out.event_count = event_count;
+    std::memcpy(out.events, events, event_count * sizeof(Event));
+    out.eax = eax;
+    out.fpu = fpu;
+    (void)abi_fail;
+    std::memcpy(out.slots, slot_table, 0x218u);
+    out.scale_bits = load_dword(&g_scale, 0u);
+    out.secondary = encoded_pointer(g_secondary_ref);
+    out.context_root = encoded_pointer(g_context_ref);
+    out.teardown_state = g_teardown_ref;
+    out.movie_service = encoded_pointer(g_movie_ref);
+    std::memcpy(out.route0, route0, kRouteBytes);
+    std::memcpy(out.route1, route1, kRouteBytes);
+    std::memcpy(out.service, service_obj, 0x30u);
+    std::memcpy(out.snap_src, snap_src, 0x40u);
+    std::memcpy(out.snap_dst, snap_dst, 0x40u);
+    std::memcpy(out.tear_self, tear_self, 0x80u);
+    std::memcpy(out.movie_self, movie_self, 0x40u);
+    std::memcpy(out.inner, inner_obj, 0x20u);
+    std::memcpy(out.vtable, inner_vtable, sizeof inner_vtable);
+    std::memcpy(out.vec, vec_buf, 0x10u);
+    std::memcpy(out.root, root_buf, 0xc0u);
+}
+
+static void assert_same(const Snapshot& expected, const Snapshot& actual) {
+    require(actual.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < expected.event_count; ++i) {
+        require(actual.events[i].kind == expected.events[i].kind, "event kind");
+        require(actual.events[i].a == expected.events[i].a, "event a");
+        require(actual.events[i].b == expected.events[i].b, "event b");
+        require(actual.events[i].c == expected.events[i].c, "event c");
+        require(actual.events[i].d == expected.events[i].d, "event d");
+    }
+    // All eight bodies are void: EAX after return is only the volatile result
+    // of the last opaque endpoint, not a defined output, so it is not compared.
+    require(std::memcmp(&actual.fpu, &expected.fpu, sizeof(Fpu)) == 0, "fpu state");
+    require(std::memcmp(actual.slots, expected.slots, 0x218u) == 0, "slot table");
+    require(actual.scale_bits == expected.scale_bits, "scale constant");
+    require(actual.secondary == expected.secondary, "secondary global");
+    require(actual.context_root == expected.context_root, "context root global");
+    require(actual.teardown_state == expected.teardown_state, "teardown state global");
+    require(actual.movie_service == expected.movie_service, "movie global");
+    require(std::memcmp(actual.route0, expected.route0, kRouteBytes) == 0, "route0");
+    require(std::memcmp(actual.route1, expected.route1, kRouteBytes) == 0, "route1");
+    require(std::memcmp(actual.service, expected.service, 0x30u) == 0, "service object");
+    require(std::memcmp(actual.snap_src, expected.snap_src, 0x40u) == 0, "snapshot source");
+    require(std::memcmp(actual.snap_dst, expected.snap_dst, 0x40u) == 0, "snapshot target");
+    require(std::memcmp(actual.tear_self, expected.tear_self, 0x80u) == 0, "teardown self");
+    require(std::memcmp(actual.movie_self, expected.movie_self, 0x40u) == 0, "movie self");
+    require(std::memcmp(actual.inner, expected.inner, 0x20u) == 0, "inner object");
+    require(std::memcmp(actual.vtable, expected.vtable, sizeof inner_vtable) == 0, "vtable");
+    require(std::memcmp(actual.vec, expected.vec, 0x10u) == 0, "vector");
+    require(std::memcmp(actual.root, expected.root, 0xc0u) == 0, "root");
+}
+
+static void verify_original_data() {
+    // Raw PE dword at original VA 0x005b245c is 0xc0800000 (-4.0f).
+    const U witness = 0xc0800000u;
+    require(load_dword(&g_scale, 0u) == witness, "original 005b245c scale");
+    // Production initial states before any harness reset.
+    require(porsche::render_secondary_object_0062810c == nullptr, "0062810c init");
+    require(porsche::startup_context_table_00628bac == nullptr, "00628bac init");
+    require(porsche::render_teardown_state_0065b398 == 0u, "0065b398 init");
+    require(porsche::game_setup_movie_service_0069ed0c == nullptr, "0069ed0c init");
+}
+
+static void reset_state() {
+    event_count = 0u;
+    std::memset(slot_table, 0xcdu, 0x218u);
+    std::memset(route0, 0x11u, kRouteBytes);
+    std::memset(route1, 0x22u, kRouteBytes);
+    g_scale = -4.0f;
+    g_secondary_ref = nullptr;
+    g_context_ref = nullptr;
+    g_teardown_ref = 0u;
+    g_movie_ref = nullptr;
+    std::memset(service_obj, 0x33u, 0x30u);
+    for (U i = 0u; i < 0x40u; ++i) {
+        snap_src[i] = static_cast<B>(0x40u + i);
+        snap_dst[i] = static_cast<B>(0x80u + i);
+    }
+    std::memset(tear_self, 0x66u, 0x80u);
+    std::memset(movie_self, 0x77u, 0x40u);
+    std::memset(inner_obj, 0x88u, 0x20u);
+    inner_vtable[0] = nullptr;
+    std::memset(vec_buf, 0x99u, 0x10u);
+    std::memset(root_buf, 0xaau, 0xc0u);
+}
+
+static void seed_routes(U seed) {
+    for (U i = 0u; i < 0x10u; ++i) {
+        store_dword(route0, 0x37cu + i * 4u, 0x3f000000u + seed + i * 0x01010101u);
+        store_dword(route1, 0x37cu + i * 4u, 0x40000000u + seed * 2u + i * 0x02020202u);
+    }
+}
+
+static void run_route_case(U index) {
+    ++cases;
+    Snapshot cur{};
+    Fpu fpu[2] = {}; U abi[2] = {}; U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_state();
+        seed_routes(0x123u + index * 7u);
+        store_dword(slot_table, 0u, address(route0));
+        store_dword(slot_table, 0x10cu, address(route1));
+        void* const fn = (side == 0u) ? slot_00465cf0
+            : reinterpret_cast<void*>(&view_route_counter_00465cf0);
+        eax[side] = invoke_cdecl1(fn, index, abi[side], fpu[side]);
+        capture(cur, eax[side], abi[side], fpu[side]);
+        if (side == 0u) saved = cur;
+    }
+    require(abi[0] == 0u && abi[1] == 0u, "route abi");
+    assert_same(saved, cur);
+}
+
+static void run_secondary_case(U present) {
+    ++cases;
+    Snapshot cur{};
+    Fpu fpu[2] = {}; U abi[2] = {}; U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_state();
+        g_secondary_ref = present != 0u ? service_obj : nullptr;
+        void* const fn = (side == 0u) ? slot_00465e20
+            : reinterpret_cast<void*>(&view_teardown_probe_00465e20);
+        eax[side] = invoke_cdecl0(fn, abi[side], fpu[side]);
+        capture(cur, eax[side], abi[side], fpu[side]);
+        if (side == 0u) saved = cur;
+    }
+    require(abi[0] == 0u && abi[1] == 0u, "secondary abi");
+    assert_same(saved, cur);
+}
+
+static void run_finish_case(U root_present, U vec_present, U items) {
+    ++cases;
+    Snapshot cur{};
+    Fpu fpu[2] = {}; U abi[2] = {}; U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_state();
+        if (root_present != 0u) {
+            g_context_ref = root_buf;
+            if (vec_present != 0u) {
+                store_dword(root_buf, 0xa4u, address(vec_buf));
+                const U begin = address(vec_buf);
+                store_dword(vec_buf, 0u, begin);
+                store_dword(vec_buf, 4u, begin + items * 4u);
+                store_dword(vec_buf, 8u, begin + 8u);
+            } else {
+                store_dword(root_buf, 0xa4u, 0u);
+            }
+        } else {
+            g_context_ref = nullptr;
+        }
+        void* const fn = (side == 0u) ? slot_0047f190
+            : reinterpret_cast<void*>(&view_teardown_finish_0047f190);
+        eax[side] = invoke_cdecl0(fn, abi[side], fpu[side]);
+        capture(cur, eax[side], abi[side], fpu[side]);
+        if (side == 0u) saved = cur;
+    }
+    require(abi[0] == 0u && abi[1] == 0u, "finish abi");
+    assert_same(saved, cur);
+}
+
+static void run_sync_case() {
+    ++cases;
+    Snapshot cur{};
+    Fpu fpu[2] = {}; U abi[2] = {}; U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_state();
+        g_teardown_ref = 0xdeadbeefu;
+        void* const fn = (side == 0u) ? slot_004b7140
+            : reinterpret_cast<void*>(&view_teardown_sync_004b7140);
+        eax[side] = invoke_cdecl0(fn, abi[side], fpu[side]);
+        capture(cur, eax[side], abi[side], fpu[side]);
+        if (side == 0u) saved = cur;
+    }
+    require(abi[0] == 0u && abi[1] == 0u, "sync abi");
+    assert_same(saved, cur);
+}
+
+static void run_service_case(U mode) {
+    ++cases;
+    Snapshot cur{};
+    Fpu fpu[2] = {}; U abi[2] = {}; U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_state();
+        void* const fn = (side == 0u) ? slot_00473100
+            : reinterpret_cast<void*>(&view_slot_service_00473100);
+        eax[side] = invoke_fastcall2(fn, service_obj, reinterpret_cast<void*>(0xdeadc0deu),
+                                     mode, abi[side], fpu[side]);
+        capture(cur, eax[side], abi[side], fpu[side]);
+        if (side == 0u) saved = cur;
+    }
+    require(abi[0] == 0u && abi[1] == 0u, "service abi");
+    assert_same(saved, cur);
+}
+
+static void run_snapshot_case(U same) {
+    ++cases;
+    Snapshot cur{};
+    Fpu fpu[2] = {}; U abi[2] = {}; U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_state();
+        void* const target = same != 0u ? snap_src : snap_dst;
+        void* const source = snap_src;
+        void* const fn = (side == 0u) ? slot_00473190
+            : reinterpret_cast<void*>(&view_slot_snapshot_00473190);
+        eax[side] = invoke_fastcall2(fn, target, reinterpret_cast<void*>(0xdeadc0deu),
+                                     address(source), abi[side], fpu[side]);
+        capture(cur, eax[side], abi[side], fpu[side]);
+        if (side == 0u) saved = cur;
+    }
+    require(abi[0] == 0u && abi[1] == 0u, "snapshot abi");
+    assert_same(saved, cur);
+}
+
+static void run_cell_case(U variant) {
+    ++cases;
+    Snapshot cur{};
+    Fpu fpu[2] = {}; U abi[2] = {}; U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_state();
+        void* const self = variant != 0u ? (tear_self + 0x40u) : tear_self;
+        void* const fn = (side == 0u) ? slot_00538d80
+            : reinterpret_cast<void*>(&view_teardown_release_00538d80);
+        eax[side] = invoke_fastcall0(fn, self, reinterpret_cast<void*>(0xdeadc0deu),
+                                     abi[side], fpu[side]);
+        capture(cur, eax[side], abi[side], fpu[side]);
+        if (side == 0u) saved = cur;
+    }
+    require(abi[0] == 0u && abi[1] == 0u, "cell abi");
+    assert_same(saved, cur);
+}
+
+static void run_movie_case(U inner_present) {
+    ++cases;
+    Snapshot cur{};
+    Fpu fpu[2] = {}; U abi[2] = {}; U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_state();
+        inner_vtable[0] = reinterpret_cast<void*>(&movie_service_delete_slot0);
+        store_dword(inner_obj, 0u, address(inner_vtable));
+        store_dword(movie_self, 4u, inner_present != 0u ? address(inner_obj) : 0u);
+        g_movie_ref = reinterpret_cast<void*>(0x12345678u);
+        void* const fn = (side == 0u) ? slot_00540420
+            : reinterpret_cast<void*>(&view_teardown_release_00540420);
+        eax[side] = invoke_fastcall0(fn, movie_self, reinterpret_cast<void*>(0xdeadc0deu),
+                                     abi[side], fpu[side]);
+        capture(cur, eax[side], abi[side], fpu[side]);
+        if (side == 0u) saved = cur;
+    }
+    require(abi[0] == 0u && abi[1] == 0u, "movie abi");
+    assert_same(saved, cur);
+}
+
+static const B body_00465cf0[133] = {@BODY_00465CF0@};
+static const B body_00465e20[29] = {@BODY_00465E20@};
+static const B body_0047f190[119] = {@BODY_0047F190@};
+static const B body_004b7140[16] = {@BODY_004B7140@};
+static const B body_00473100[67] = {@BODY_00473100@};
+static const B body_00473190[117] = {@BODY_00473190@};
+static const B body_00538d80[20] = {@BODY_00538D80@};
+static const B body_00540420[24] = {@BODY_00540420@};
+
+static void prepare_code() {
+    B* const code = static_cast<B*>(VirtualAlloc(
+        nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+    slot_00465cf0 = code + 0x000u;
+    slot_00465e20 = code + 0x100u;
+    slot_0047f190 = code + 0x180u;
+    slot_004b7140 = code + 0x220u;
+    slot_00473100 = code + 0x240u;
+    slot_00473190 = code + 0x2c0u;
+    slot_00538d80 = code + 0x360u;
+    slot_00540420 = code + 0x380u;
+    std::memcpy(slot_00465cf0, body_00465cf0, sizeof body_00465cf0);
+    std::memcpy(slot_00465e20, body_00465e20, sizeof body_00465e20);
+    std::memcpy(slot_0047f190, body_0047f190, sizeof body_0047f190);
+    std::memcpy(slot_004b7140, body_004b7140, sizeof body_004b7140);
+    std::memcpy(slot_00473100, body_00473100, sizeof body_00473100);
+    std::memcpy(slot_00473190, body_00473190, sizeof body_00473190);
+    std::memcpy(slot_00538d80, body_00538d80, sizeof body_00538d80);
+    std::memcpy(slot_00540420, body_00540420, sizeof body_00540420);
+
+    // 00465cf0 absolute bindings.
+    set_abs(slot_00465cf0, 133u, 0x00627e80u, slot_table, 1u);
+    set_abs(slot_00465cf0, 133u, 0x00627f8cu, slot_table + 0x10cu, 1u);
+    set_abs(slot_00465cf0, 133u, 0x005b245cu, &g_scale, 6u);
+    set_abs(slot_00465cf0, 133u, 0x00627e88u, slot_table + 0x08u, 1u);
+    set_abs(slot_00465cf0, 133u, 0x00627e8cu, slot_table + 0x0cu, 1u);
+    set_abs(slot_00465cf0, 133u, 0x00627e90u, slot_table + 0x10u, 1u);
+    set_abs(slot_00465cf0, 133u, 0x00627f94u, slot_table + 0x114u, 1u);
+    set_abs(slot_00465cf0, 133u, 0x00627f98u, slot_table + 0x118u, 1u);
+    set_abs(slot_00465cf0, 133u, 0x00627f9cu, slot_table + 0x11cu, 1u);
+
+    // 00465e20 bindings.
+    set_abs(slot_00465e20, 29u, 0x0062810cu, &g_secondary_ref, 1u);
+    set_rel(slot_00465e20, 29u, 0x00465e20u, 0x0059f1c0u,
+            reinterpret_cast<const void*>(&teardown_secondary_destroy_0059f1c0), 1u, 0xe8u);
+    set_rel(slot_00465e20, 29u, 0x00465e20u, 0x0059f050u,
+            reinterpret_cast<const void*>(&application_release_0059f050), 1u, 0xe8u);
+
+    // 0047f190 bindings.
+    set_abs(slot_0047f190, 119u, 0x00628bacu, &g_context_ref, 3u);
+    set_rel(slot_0047f190, 119u, 0x0047f190u, 0x00514990u,
+            reinterpret_cast<const void*>(&registry_item_noop_00514990), 1u, 0xe8u);
+    set_rel(slot_0047f190, 119u, 0x0047f190u, 0x00441200u,
+            reinterpret_cast<const void*>(&application_context_member_destroy_block_00441200), 1u, 0xe8u);
+    set_rel(slot_0047f190, 119u, 0x0047f190u, 0x0059f050u,
+            reinterpret_cast<const void*>(&application_release_0059f050), 2u, 0xe8u);
+
+    // 004b7140 bindings.
+    set_abs(slot_004b7140, 16u, 0x0065b398u, &g_teardown_ref, 1u);
+    set_rel(slot_004b7140, 16u, 0x004b7140u, 0x00516950u,
+            reinterpret_cast<const void*>(&startup_service_noop_00516950), 1u, 0xe8u);
+
+    // 00473100 / 00473190 have no absolute or relative bindings.
+
+    // 00538d80 bindings.
+    set_rel(slot_00538d80, 20u, 0x00538d80u, 0x00539eb0u,
+            reinterpret_cast<const void*>(&buffer_cell_release_00539eb0), 2u, 0xe8u);
+
+    // 00540420 bindings.
+    set_abs(slot_00540420, 24u, 0x0069ed0cu, &g_movie_ref, 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0,
+            "FlushInstructionCache");
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* info) {
+    const CONTEXT& context = *info->ContextRecord;
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u "
+                "eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx esi=%08lx edi=%08lx\n",
+                info->ExceptionRecord->ExceptionCode, context.Eip, cases, which,
+                context.Eax, context.Ebx, context.Ecx, context.Edx, context.Esi,
+                context.Edi);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    verify_original_data();
+    prepare_code();
+
+    static const U indices[] = {0u, 1u, 2u, 3u, 0x81u, 0x7ffffffeu};
+    for (U index : indices) run_route_case(index);
+
+    for (U present = 0u; present < 2u; ++present) run_secondary_case(present);
+
+    for (U root = 0u; root < 2u; ++root)
+        for (U vec = 0u; vec < 2u; ++vec)
+            for (U items = 0u; items < 4u; ++items)
+                run_finish_case(root, vec, items);
+
+    run_sync_case();
+
+    static const U modes[] = {0u, 1u, 0x1234u, 0xffffu, 0x80000001u};
+    for (U mode : modes) run_service_case(mode);
+
+    for (U same = 0u; same < 2u; ++same) run_snapshot_case(same);
+    for (U variant = 0u; variant < 2u; ++variant) run_cell_case(variant);
+    for (U inner = 0u; inner < 2u; ++inner) run_movie_case(inner);
+
+    std::printf("view_teardown_route_family_701_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

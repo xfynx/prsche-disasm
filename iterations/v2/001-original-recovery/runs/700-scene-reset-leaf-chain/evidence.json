@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "run": 700,
+  "status": "native-differential-PASS",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "bodies": 2,
+  "body_bytes": 115,
+  "definition_source": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.cpp",
+  "definition_header": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.hpp",
+  "scope_evidence": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scope-evidence.json",
+  "source_sha256": {
+    "scene_stage_reset_700.cpp": "1dde341eeb00f91e8c185189ceac43c4255ca2efb7cb01f2f119c3b98d36982a",
+    "scene_stage_reset_700.hpp": "36db49d86be4da2e94e0018986b7e9d046fbb7e76234d47e98b2422b1a1bff26",
+    "native-config.json": "56ea1c6d760985353fb9f0b908f62f18f490df7e9c564c33e7a7996fab75a551",
+    "native-fixture.cpp.in": "8f07b86b54bdea8d549442711bd05df4cf7fbcc181218ef140c9e66f15ee85b9",
+    "scope-evidence.json": "49b0e0c50f89aca580b7ac2a67327cd6dffd1d66c2e4bed4d6ac0f86fafc01f3"
+  },
+  "verify_command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/native-config.json --attempt 003",
+  "receipt": "local/experiments/v2-scene-reset-leaf-chain-700/003/receipt.json",
+  "receipt_sha256": "9c29029b9a4d6e80dba9b163969313756ab1f4971c71eafba6f420e9272185c6",
+  "result": {
+    "status": "PASS",
+    "variants": ["/Od", "/O2"],
+    "pass_marker": "scene_reset_leaf_original_x86_vs_cpp=PASS",
+    "cases": 6,
+    "case_breakdown": "00458b80: alloc success + alloc failure (2); 00467f40: reserve result {0,1,-1,0x1800000} (4)",
+    "mutations": 8,
+    "mutations_detected": 8,
+    "warnings": 0,
+    "abi_checked": "ESP/EBP/EBX/ESI/EDI preserved; EAX compared; both original and C++ via identical call wrapper",
+    "raw_data_witness": "42B strings at 0x005cf848 and 0x005cf81c compared to pinned PE before pointer relocation",
+    "intermediate_state": "ordered event log (alloc size, ctor this, texture reset, reserve size, report format hash + size, callback literal) plus 0x627e08 stage pointer and 0x10B stage buffer",
+    "material_controls": "wrong-58b80-alloc-size, wrong-58b80-drop-ctor, wrong-58b80-fail-value, wrong-67f40-reserve-size, wrong-67f40-invert-branch, wrong-67f40-report-string, wrong-67f40-callback, wrong-67f40-drop-reset"
+  },
+  "ownership": {
+    "registry_and_body_ranges_checked": "iterations/v2/001-original-recovery/source/recovered/functions.json: all 8 entry VAs unowned; no overlap with any of 233 body_ranges intervals",
+    "cells_owned": ["0x00627e08", "0x005cf848", "0x005cf81c"],
+    "canonical_providers_reused": ["0059ef90", "0053c3d0", "00553fc0"],
+    "excluded": ["0043ed00", "00448b10", "0044f240", "00451490", "004552b0", "00455f60"]
+  },
+  "boundaries": "Real 00458c90/005a177b/005556a0 implementations, live texture-pool state, real allocator, full 00468fb0 composition, other six reset bodies and production CMake/registry integration remain open. Synthetic callsite setup and RET are harness code only. Raw original VAs are not host pointers; strings are transported as owned byte arrays, callback literal 0x004677d0 is compared as an opaque value."
+}

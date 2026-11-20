@@ -1,0 +1,277 @@
+// Native x86-vs-C++ differential fixture for Run700 scene-reset leaves.
+// The fixture owns the oracle and fail-closed callback boundaries. Original
+// body bytes are injected by scripts/research/verify-v2-native-batch.py.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "scene_stage_reset_700.hpp"
+#include "porsche/render_display.hpp"
+#include "porsche/render_startup.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+enum : U {
+    kEvAlloc = 1u, kEvCtor = 2u, kEvTextureReset = 3u,
+    kEvTextureReserve = 4u, kEvTextureReport = 5u, kEvTextureCallback = 6u,
+};
+enum : U { kMaxEvents = 32u };
+
+struct Event { U kind, a, b, c, d; };
+struct Snapshot { U event_count; Event events[kMaxEvents]; U stage_ptr; B stage[0x10u]; };
+
+static void require(bool ok, const char* why) {
+    if (!ok) { std::printf("divergence %s\n", why); std::fflush(stdout); ExitProcess(7); }
+}
+
+static U fnv(const void* p, U count) {
+    U h = 0x811c9dc5u; const B* b = static_cast<const B*>(p);
+    for (U i = 0u; i < count; ++i) h = (h ^ b[i]) * 0x01000193u;
+    return h;
+}
+static U address(const void* p) { return static_cast<U>(reinterpret_cast<std::uintptr_t>(p)); }
+static U load_dword(const void* base, U off) { U v; std::memcpy(&v, static_cast<const B*>(base) + off, 4u); return v; }
+static void store_dword(void* base, U off, U v) { std::memcpy(static_cast<B*>(base) + off, &v, 4u); }
+
+// ---- controlled endpoints -------------------------------------------------
+static Event events[kMaxEvents];
+static U event_count = 0u;
+static U cases = 0u;
+static U which = 0u;          // 0 = original x86, 1 = C++
+static U g_alloc_fail = 0u;
+static I g_reserve_result = 1;
+static B stage_buffer[0x10u];
+
+static void record(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u) {
+    require(event_count < kMaxEvents, "event overflow");
+    events[event_count++] = Event{kind, a, b, c, d};
+}
+static void reset_case() {
+    event_count = 0u;
+    std::memset(events, 0, sizeof events);
+    std::memset(stage_buffer, 0xcc, sizeof stage_buffer);
+    scene_stage_58b80_00627e08 = reinterpret_cast<void*>(0x5eed0001u);
+}
+
+namespace porsche {
+
+void* __cdecl render_allocate_0059ef90(std::uint32_t size) {
+    record(kEvAlloc, size);
+    if (g_alloc_fail != 0u || size != 0x10u) return nullptr;
+    return stage_buffer;
+}
+void* __fastcall scene_stage_58b80_ctor_00458c90(void* self, void* unused_edx) {
+    (void)unused_edx; record(kEvCtor, address(self)); return self;
+}
+void __cdecl render_display_texture_reset_0053c3d0() { record(kEvTextureReset); }
+int __cdecl render_display_texture_reserve_00553fc0(std::uint32_t bytes) {
+    record(kEvTextureReserve, bytes); return static_cast<int>(g_reserve_result);
+}
+void __cdecl scene_texture_alloc_report_005a177b(const char* fmt, std::uint32_t size) {
+    U n = 0u; while (n < 64u && fmt[n] != '\0') ++n;
+    record(kEvTextureReport, fnv(fmt, n), size);
+}
+void __cdecl scene_texture_callback_005556a0(void* cb) { record(kEvTextureCallback, address(cb)); }
+
+} // namespace porsche
+
+// ---- original byte slots and relocation ----------------------------------
+static const B body_00458b80[38] = {@BODY_00458B80@};
+static const B body_00467f40[77] = {@BODY_00467F40@};
+static B* slot_00458b80 = nullptr;
+static B* slot_00467f40 = nullptr;
+
+static void set_abs(B* body, U size, U old, const void* replacement, U expected) {
+    U found = 0u; const U target = address(replacement);
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (load_dword(body, i) == old) { store_dword(body, i, target); ++found; i += 3u; }
+    }
+    require(found == expected, "absolute relocation count");
+}
+static void set_rel(B* body, U size, U original_va, U target_va,
+                    const void* replacement, U expected, B opcode) {
+    U found = 0u; const U target = address(replacement);
+    for (U i = 0u; i + 5u <= size; ++i) {
+        if (body[i] == opcode &&
+            ((original_va + i + 5u + static_cast<I>(load_dword(body, i + 1u))) &
+             0xffffffffu) == target_va) {
+            store_dword(body, i + 1u, target - address(body + i + 5u));
+            ++found; i += 4u;
+        }
+    }
+    require(found == expected, "relative relocation count");
+}
+
+static void prepare_code() {
+    B* const code = static_cast<B*>(VirtualAlloc(
+        nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+    slot_00458b80 = code + 0x000u;
+    slot_00467f40 = code + 0x100u;
+    std::memcpy(slot_00458b80, body_00458b80, sizeof body_00458b80);
+    std::memcpy(slot_00467f40, body_00467f40, sizeof body_00467f40);
+
+    set_abs(slot_00458b80, 38u, 0x00627e08u, &scene_stage_58b80_00627e08, 2u);
+    set_rel(slot_00458b80, 38u, 0x00458b80u, 0x0059ef90u,
+            reinterpret_cast<const void*>(&render_allocate_0059ef90), 1u, 0xe8u);
+    set_rel(slot_00458b80, 38u, 0x00458b80u, 0x00458c90u,
+            reinterpret_cast<const void*>(&scene_stage_58b80_ctor_00458c90), 1u, 0xe8u);
+
+    set_abs(slot_00467f40, 77u, 0x005cf848u, texture_alloc_ok_005cf848, 1u);
+    set_abs(slot_00467f40, 77u, 0x005cf81cu, texture_alloc_fail_005cf81c, 1u);
+    set_rel(slot_00467f40, 77u, 0x00467f40u, 0x0053c3d0u,
+            reinterpret_cast<const void*>(&render_display_texture_reset_0053c3d0), 1u, 0xe8u);
+    set_rel(slot_00467f40, 77u, 0x00467f40u, 0x00553fc0u,
+            reinterpret_cast<const void*>(&render_display_texture_reserve_00553fc0), 1u, 0xe8u);
+    set_rel(slot_00467f40, 77u, 0x00467f40u, 0x005a177bu,
+            reinterpret_cast<const void*>(&scene_texture_alloc_report_005a177b), 2u, 0xe8u);
+    set_rel(slot_00467f40, 77u, 0x00467f40u, 0x005556a0u,
+            reinterpret_cast<const void*>(&scene_texture_callback_005556a0), 2u, 0xe8u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0,
+            "FlushInstructionCache");
+}
+
+// ---- raw PE witness -------------------------------------------------------
+static const B* pe_section(const B* img, U va, U& avail) {
+    U pe = load_dword(img, 0x3cu);
+    U sections = static_cast<U>((static_cast<const std::uint16_t*>(static_cast<const void*>(img + pe + 6)))[0]);
+    U optional = static_cast<U>((static_cast<const std::uint16_t*>(static_cast<const void*>(img + pe + 20)))[0]);
+    U base = load_dword(img, pe + 52u);
+    for (U i = 0u; i < sections; ++i) {
+        const B* off = img + pe + 24u + optional + i * 40u;
+        U vs = load_dword(off, 8u), rva = load_dword(off, 12u);
+        U rs = load_dword(off, 16u), raw = load_dword(off, 20u);
+        if (rva <= va - base && va - base < rva + (vs < rs ? vs : rs)) {
+            avail = (vs < rs ? vs : rs) - (va - base);
+            return img + raw + va - base - rva;
+        }
+    }
+    return nullptr;
+}
+static void verify_original_data(const char* path) {
+    FILE* f = nullptr; fopen_s(&f, path, "rb"); require(f != nullptr, "open PE");
+    require(fseek(f, 0, SEEK_END) == 0, "seek end");
+    long len = ftell(f); require(len > 0, "ftell"); rewind(f);
+    B* img = static_cast<B*>(std::malloc(static_cast<std::size_t>(len)));
+    require(img != nullptr, "alloc PE");
+    require(fread(img, 1u, static_cast<std::size_t>(len), f) == static_cast<std::size_t>(len), "read PE");
+    fclose(f);
+    U avail = 0u;
+    const B* ok = pe_section(img, 0x005cf848u, avail);
+    require(ok != nullptr && avail >= 42u, "ok string section");
+    require(std::memcmp(ok, texture_alloc_ok_005cf848, 42u) == 0, "ok string raw bytes");
+    const B* fail = pe_section(img, 0x005cf81cu, avail);
+    require(fail != nullptr && avail >= 42u, "fail string section");
+    require(std::memcmp(fail, texture_alloc_fail_005cf81c, 42u) == 0, "fail string raw bytes");
+    std::free(img);
+}
+
+// ---- ABI wrapper ----------------------------------------------------------
+static U invoke(void* fn, U& abi_fail) {
+    U before = 0u, frame = 0u, fail = 0u, result = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return result;
+}
+
+static void capture(Snapshot& out) {
+    out.event_count = event_count;
+    std::memcpy(out.events, events, event_count * sizeof(Event));
+    out.stage_ptr = address(scene_stage_58b80_00627e08);
+    std::memcpy(out.stage, stage_buffer, sizeof stage_buffer);
+}
+static void assert_same(const Snapshot& exp, const Snapshot& act) {
+    require(act.event_count == exp.event_count, "event count");
+    for (U i = 0u; i < exp.event_count; ++i) {
+        require(act.events[i].kind == exp.events[i].kind, "event kind");
+        require(act.events[i].a == exp.events[i].a, "event a");
+        require(act.events[i].b == exp.events[i].b, "event b");
+        require(act.events[i].c == exp.events[i].c, "event c");
+        require(act.events[i].d == exp.events[i].d, "event d");
+    }
+    require(act.stage_ptr == exp.stage_ptr, "stage pointer");
+    require(std::memcmp(act.stage, exp.stage, sizeof stage_buffer) == 0, "stage buffer");
+}
+
+static U abi_fail[2];
+static void run_case(void* original, void* cpp) {
+    Snapshot snap[2];
+    for (which = 0u; which < 2u; ++which) {
+        reset_case();
+        U af = 0u;
+        if (which == 0u) (void)invoke(original, af);
+        else             (void)invoke(cpp, af);
+        abi_fail[which] = af;
+        capture(snap[which]);
+    }
+    require(abi_fail[0] == 0u && abi_fail[1] == 0u, "abi fail");
+    assert_same(snap[0], snap[1]);
+    ++cases;
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* info) {
+    std::printf("native-fault code=%08lx case=%u which=%u eip=%08lx\n",
+        info->ExceptionRecord->ExceptionCode, cases, which, info->ContextRecord->Eip);
+    std::fflush(stdout); ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+int main(int argc, char** argv) {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    require(argc == 2, "argv PE path");
+    verify_original_data(argv[1]);
+    prepare_code();
+
+    for (U fail = 0u; fail < 2u; ++fail) {
+        g_alloc_fail = fail;
+        run_case(reinterpret_cast<void*>(slot_00458b80),
+                 reinterpret_cast<void*>(&scene_stage_reset_00458b80));
+    }
+    static const I reserves[] = {0, 1, -1, 0x01800000};
+    for (I r : reserves) {
+        g_reserve_result = r;
+        run_case(reinterpret_cast<void*>(slot_00467f40),
+                 reinterpret_cast<void*>(&scene_reset_00467f40));
+    }
+
+    std::printf("scene_reset_leaf_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

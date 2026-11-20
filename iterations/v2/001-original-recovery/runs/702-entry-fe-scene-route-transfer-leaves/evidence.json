@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "run": 702,
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "index_entry": "research/binary-index/README.md",
+  "original_source_evidence": {
+    "method": "PE section .text raw bytes read at VA via section table and hashed; disassembly cross-checked against raw bytes and Ghidra 179 export in runs/179-ghidra-declarations",
+    "callers": {
+      "0046d960": ["00413eeb in Run692 00413ea0", "00414629", "00414975", "00414a6e", "00463091"],
+      "0046d890": ["00413f0e in Run692 00413ea0", "004630bb"],
+      "004659e0": ["00413f49 and 00413f6a in Run692 00413ea0", "00414acd"],
+      "00413960": ["00413c23", "00413f24 in Run692 00413ea0", "004630d1"],
+      "00475d70": ["0046904f in Run693 00468fb0"],
+      "0044fae0": ["00469059 in Run693 00468fb0"],
+      "0045dbd0": ["0046908a in Run693 00468fb0"],
+      "004521c0": ["00469097 tail JMP in Run693 00468fb0"],
+      "0044b960": ["0046902b in Run693 00468fb0", "004d3520"]
+    }
+  },
+  "body_ranges": {
+    "0046d960": {"bytes": 17, "sha256": "54213dbea4b8bd23a08dffa601bebfb54ae198ae0ca8078df56b87bf9b9b7343"},
+    "0046d890": {"bytes": 195, "sha256": "e16de0f62ea391fd49b84a88bf4c20fd38359991bbadc3a429cdae367eba4af9"},
+    "004659e0": {"bytes": 116, "sha256": "22bb432b1cd27231a41c4ad6ae207e2ed6cc9b1be069d8dcef716cb7c5ee6fd6"},
+    "00475d70": {"bytes": 60, "sha256": "66dea84695db6f1a05652aaffd662af151bfc842b84898d7fc5546b7239a0588"},
+    "0044fae0": {"bytes": 46, "sha256": "a2dc06965492efbed714d04ab5ffe00fe439d8f65596ef123fe14ac0b0cdf377"},
+    "004521c0": {"bytes": 41, "sha256": "e601b9ef9a7b828ce2b087a9cbd27ca16b12d8cccf717cb62feae5508afc56f8"},
+    "0044b960": {"bytes": 150, "sha256": "1578ddef7287b9834219c7bfe91c4673adb13cea6879094f2556869354798893"},
+    "00413960": {"bytes": 536, "sha256": "0ac9ad224ef9b98a5cac06b966fe8aa41ff4c6b47b51f8966ad44524dd6f241b", "status": "excluded"},
+    "0045dbd0": {"bytes": 298, "sha256": "bbdcbbb4f152eedea4c669fc60b2ce824017b95c91359c0598bb1facb308ea25", "status": "excluded"}
+  },
+  "ownership": {
+    "registry_check": "source/recovered/functions.json (1133 entries): none of the nine target VAs is an entry_va and none falls inside any function body_ranges; checked 2026-11-20",
+    "closure_check": "all .cpp/.hpp/.h/.inc under iterations/v2/001-original-recovery contain no declaration of 0x0061bc38, 0x0061bcc0, 0x006280e0, 0x006280e4, 0x00606ad4, 0x00628168, 0x00628178 or 0x00627f40; all are loader-zero .data virtual tail",
+    "newly_owned": [
+      "scene_route_root_object_0061bc38 4B",
+      "scene_transfer_object_0061bcc0 4B",
+      "entry_fe_flag_word_006280e0 4B",
+      "entry_fe_flag_word_006280e4 4B",
+      "entry_fe_frame_word_00606ad4 4B",
+      "scene_elem_vector_00628168 4B",
+      "scene_elem_count_vector_00628178 4B"
+    ],
+    "reused_canonical": [
+      "view_slot_table_00627e80 (Run693; byte 0x627f40 = +0xc0)",
+      "frame_reset_word_006280f0/006280ec/006280e8/00628100/006280fc/006280f8 (Run400/692)",
+      "application_state_006573e8 word 0x00657430 (canonical arena)",
+      "render_allocate_0059ef90 (render_startup.hpp)"
+    ],
+    "explicitly_not_redefined": [
+      "fe_loop_word_*", "fe_replay_scratch_005ed848", "frame_reset_*", "route_object_registry_table_005e8c00"
+    ]
+  },
+  "exclusions": {
+    "00413960": "536B, ~40 distinct vtable method calls (00469a80..00469b20), six x87 FST/FSTP stores into 0x00627ea4..0x00627f4c, MOVSD.REP of nine dwords and two constructed stack objects. Contracts and ownership of the 20+ destination cells are not established; large/heterogeneous body excluded with evidence, not guessed.",
+    "0045dbd0": "298B with ten heterogeneous callees (formatter 0x005a0fbf, constructors 0x0059d9b0/0x0059d8e0/0x00460a50/0x0045d800, release 0x00531f90/0x0059f050, fastcall 0x00460cd0/0x0045db10) and three new .bss globals 0x00627e48/4c/50 with unproven lifetimes. Deferred to a dedicated packet."
+  },
+  "abi": {
+    "0046d960": "__cdecl int ret0",
+    "0046d890": "__cdecl unsigned ret0",
+    "004659e0": "__cdecl void ret0, two stack args",
+    "00475d70": "__cdecl void ret0, two stack args",
+    "0044fae0": "__cdecl void ret0, one stack arg",
+    "004521c0": "__cdecl void ret0",
+    "0044b960": "__fastcall void* ret0, ECX self, EDX unused"
+  },
+  "bounds": "Native domain bounds every vector count to <=6 elements, both 0x10c slot indices, selector index to 0..3, allocation-failure position to 0/1/2 and constructor return modes to self/pool/null. Null display, arbitrary pointers, real RTTI/vtable behaviour, multi-thread lifetime, fault injection and full game integration remain open. Native harness stubs and synthetic callsites are harness code only."
+}

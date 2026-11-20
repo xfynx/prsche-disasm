@@ -1,0 +1,147 @@
+{
+  "run": 701,
+  "module": "Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "targets": [
+    {
+      "va": "00465cf0",
+      "body_range": ["00465cf0", "00465d75"],
+      "body_bytes": 133,
+      "body_sha256": "ffe435dd56f6a30d7b2114da36cc395b1d03433bcdaa37573f6b10c1d1efd719",
+      "abi": "cdecl void(I index) RET 0; only the low byte of the stack argument is consulted; preserves EBX,ESI,EDI,EBP; ESP balanced",
+      "accepted_caller": {
+        "function": "004640b0 (application_main_function_004640b0, application_view_lifecycle_693.cpp)",
+        "declaration": "void __cdecl view_route_counter_00465cf0(std::int32_t index);"
+      },
+      "subsystem": "route counter: bit0 of the argument scales three floats at route-object +0x37c/+0x380/+0x384 by the raw 0x005b245c dword (0xc0800000 = -4.0f) into view slot zero +8/+0xc/+0x10; bit1 repeats for the slot at 0x00627f8c into +0x114/+0x118/+0x11c",
+      "reused_canonical": [
+        {"va": "00627e80", "owner": "view_slot_table_00627e80 (Run693, accepted)"},
+        {"va": "005b245c", "owner": "raw .rdata constant 0xc0800000 (-4.0f), verified before relocation"}
+      ]
+    },
+    {
+      "va": "00465e20",
+      "body_range": ["00465e20", "00465e3d"],
+      "body_bytes": 29,
+      "body_sha256": "d12fb9910a896abaa66c7a5ae6b6dfdee0c47b2f7a6e55892d2b757e248071de",
+      "abi": "cdecl void() RET 0; preserves ESI; ESP balanced",
+      "accepted_caller": {
+        "function": "00467740 (application_main_function_00467740, application_view_lifecycle_693.cpp)",
+        "declaration": "void __cdecl view_teardown_probe_00465e20();"
+      },
+      "subsystem": "secondary render-object teardown: destroys the 0x0062810c object via this-in-ECX 0059f1c0 and releases it via canonical 0059f050; the global is not cleared",
+      "opaque_callees": [
+        {"va": "0059f1c0", "abi": "thiscall(this), RET 0"},
+        {"callee": "0059f050", "provider": "application_release_0059f050 (accepted)"}
+      ]
+    },
+    {
+      "va": "0047f190",
+      "body_range": ["0047f190", "0047f207"],
+      "body_bytes": 119,
+      "body_sha256": "da05e3ddfe84b58e20e551048b73e784caf71f4d361a9880d2d026137ccd958c",
+      "abi": "cdecl void() RET 0; preserves EBX,ESI,EDI; ESP balanced",
+      "accepted_caller": {
+        "function": "00467740 (application_main_function_00467740, application_view_lifecycle_693.cpp)",
+        "declaration": "void __cdecl view_teardown_finish_0047f190();"
+      },
+      "subsystem": "context-table teardown: walks the +0xa4 vector of the 0x00628bac root (00514990 per dword from begin to end), frees the begin..+8 span via 00441200 when non-empty, releases vector and root via 0059f050, then clears 0x00628bac on both paths",
+      "reused_canonical": [
+        {"va": "00628bac", "owner": "startup_context_table_00628bac (Run646, accepted)"},
+        {"callee": "00441200", "provider": "application_context_member_destroy_block_00441200 (accepted)"},
+        {"callee": "0059f050", "provider": "application_release_0059f050 (accepted)"}
+      ],
+      "opaque_callees": [
+        {"va": "00514990", "abi": "cdecl(void* item), RET 0"}
+      ]
+    },
+    {
+      "va": "004b7140",
+      "body_range": ["004b7140", "004b7150"],
+      "body_bytes": 16,
+      "body_sha256": "ad66ed1056e820d21c2c48b121b0b876535c082f5039e4f37eba197c9df38988",
+      "abi": "cdecl void() RET 0; no callee-saved registers touched; ESP balanced",
+      "accepted_caller": {
+        "function": "00467740 (application_main_function_00467740, application_view_lifecycle_693.cpp)",
+        "declaration": "void __cdecl view_teardown_sync_004b7140();"
+      },
+      "subsystem": "teardown prefix: calls canonical no-op 00516950 and clears 0x0065b398",
+      "reused_canonical": [
+        {"callee": "00516950", "provider": "startup_service_noop_00516950 (accepted)"},
+        {"va": "0065b398", "owner": "render_teardown_state_0065b398 (Run601, accepted)"}
+      ]
+    },
+    {
+      "va": "00473100",
+      "body_range": ["00473100", "00473143"],
+      "body_bytes": 67,
+      "body_sha256": "9d667ff561079d6adca98d31acfbf8d44860df6dc58d413343994046d96755f3",
+      "abi": "fastcall(this=ECX, unused=EDX, U mode on stack) RET 4; no callee-saved registers touched",
+      "accepted_caller": {
+        "function": "004640b0 (application_main_function_004640b0, application_view_lifecycle_693.cpp)",
+        "declaration": "void __fastcall view_slot_service_00473100(void* self, void* unused_edx, std::uint32_t mode);"
+      },
+      "subsystem": "frame service object constructor: word[0]=mode, byte[2]=0, dword[4]=-1, bytes[8..10]=0, word[0x24]=0 (ECX zeroed before store), dwords[0x28,0x2c,0x14,0x0c,0x1c,0x18]=0, dwords[0x10,0x20]=0x3f800000"
+    },
+    {
+      "va": "00473190",
+      "body_range": ["00473190", "00473205"],
+      "body_bytes": 117,
+      "body_sha256": "588cd1c9befe29284d29577be8398189b6e398f27470b68fba903c3046e1991d",
+      "abi": "fastcall(this=ECX, unused=EDX, const void* source on stack) RET 4; preserves ESI,EDI; self==source is a no-op",
+      "accepted_caller": {
+        "function": "004640b0 (application_main_function_004640b0, application_view_lifecycle_693.cpp)",
+        "declaration": "void __fastcall view_slot_snapshot_00473190(void* self, void* unused_edx, const void* source);"
+      },
+      "subsystem": "service-object field snapshot: copies word[0], bytes[2],[8],[9],[0xa], dwords[0x0c..0x14], dwords[0x18..0x20], word[0x24], dwords[4],[0x28],[0x2c] from source into self"
+    },
+    {
+      "va": "00538d80",
+      "body_range": ["00538d80", "00538d94"],
+      "body_bytes": 20,
+      "body_sha256": "de8e86aee4df948a1e0ec4a82c737c9af8cecce23845d4c9d6367bc0af4d06e9",
+      "abi": "fastcall(this=ECX, unused=EDX) RET 0; preserves ESI; ESP balanced",
+      "accepted_caller": {
+        "function": "00467740 (application_main_function_00467740, application_view_lifecycle_693.cpp)",
+        "declaration": "void __fastcall view_teardown_release_00538d80(void* self, void* unused_edx);"
+      },
+      "subsystem": "releases the receiver's +0x5c cell then the receiver itself through this-in-ECX 00539eb0",
+      "opaque_callees": [
+        {"va": "00539eb0", "abi": "thiscall(this), RET 0"}
+      ]
+    },
+    {
+      "va": "00540420",
+      "body_range": ["00540420", "00540438"],
+      "body_bytes": 24,
+      "body_sha256": "b2c8ce219b82c9b7b52bb702804541ac5be5bedd4872f82fb2d892e199797ac6",
+      "abi": "fastcall(this=ECX, unused=EDX) RET 0; indirect vtable call with pushed argument 1 (stdcall RET 4); ESP balanced",
+      "accepted_caller": {
+        "function": "00467740 (application_main_function_00467740, application_view_lifecycle_693.cpp)",
+        "declaration": "void __fastcall view_teardown_release_00540420(void* self, void* unused_edx);"
+      },
+      "subsystem": "reads the movie service at self+4, calls its vtable slot zero with argument 1, then clears the canonical 0x0069ed0c global",
+      "reused_canonical": [
+        {"va": "0069ed0c", "owner": "game_setup_movie_service_0069ed0c (game_setup_globals.cpp, accepted)"}
+      ]
+    }
+  ],
+  "ownership_decisions": {
+    "excluded": [
+      {"va": "00463c30", "reason": "large heterogeneous route-finish routine: 00463c30 branches to 0x00464049 and spans hundreds of instructions with many distinct callees; beyond the small teardown-family leaf pattern", "evidence": "disassembly lines 121041..121370 (FUN_00463c30 ends before 004640b0 at line 121371)"},
+      {"va": "00466500", "reason": "340-byte multi-field destructor with six distinct callees (00466c30, 00466ca0, 00466d10, 00466d60, 004237d0, 0059f050) and internal pointer rewiring; beyond the family pattern", "evidence": "disassembly lines 124034..124171, 0x00466500..0x00466654"}
+    ],
+    "notes": [
+      "All eight recovered VAs are unowned in source/recovered/functions.json (no entry_va, no body_ranges overlap) before this batch; Python overlap check over 1133 entries returned [].",
+      "The eight extern declarations are exactly those in application_view_lifecycle_693.hpp; this TU only supplies the previously-unowned definitions and does not redefine any Run693 cell.",
+      "0062810c was unowned in the accepted closure; first defined here as a loader-zero cell. 00628bac (Run646), 0065b398 (Run601), 0069ed0c (game_setup_globals.cpp) and 00627e80 (Run693) are reused as extern references, never redefined by production.",
+      "0059f1c0, 00514990 and 00539eb0 are opaque controlled endpoints; 0059f050, 00516950, 00441200 and the four canonical globals reuse accepted providers."
+    ]
+  },
+  "boundaries": [
+    "Opaque callees are controlled endpoints with call-site ABI and, for 00473100/00473190, the field contracts read from their original bodies; their full algorithms remain unrecovered.",
+    "00465cf0 float arithmetic uses inline x87 to match the original FLD/FMUL/FSTP sequence and x87 stack/tag/status state; CPU-specific undefined flags and x87 precision remain explicit boundaries.",
+    "Raw 0x005b245c dword 0xc0800000 is verified before relocation so both sides cannot agree on an invented constant.",
+    "Null/unreachable producer states, fault/lifetime/concurrency and live device/component acceptance remain open; production CMake/registry integration and the game-link COFF audit are separate steps."
+  ]
+}

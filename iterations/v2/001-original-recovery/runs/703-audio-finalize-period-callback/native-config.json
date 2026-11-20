@@ -1,0 +1,145 @@
+{
+  "run": 703,
+  "experiment": "local/experiments/v2-audio-finalize-period-callback-703",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004a6bc0",
+      "bytes": 193,
+      "sha256": "b0be78b69a6822a5712cd10533bc52ad919f7ba1841dfe3a276f54a81fd34d7a",
+      "token": "@BODY_004A6BC0@"
+    },
+    {
+      "va": "005901b0",
+      "bytes": 153,
+      "sha256": "5003f1a3dffd0cb933a9946804b347dcb8b41cd2d9ff5d91dcc1c4d80e370445",
+      "token": "@BODY_005901B0@"
+    },
+    {
+      "va": "005d141c",
+      "bytes": 38,
+      "sha256": "10cdc8ae2b138a60d2a415b452232186d4242f40a32839b04453934701596798",
+      "token": "@STR_005D141C@"
+    }
+  ],
+  "pass_marker": "audio_finalize_period_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-finalize-backslash-scan",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "        if (*scan == '\\\\') {",
+      "new": "        if (*scan == '/') {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-record-index",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "    record.raw_00 = bank_index;",
+      "new": "    record.raw_00 = bank_index + 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-size-subtraction",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "        bank_result -= copied;",
+      "new": "        bank_result += copied;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-status-eight",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "    } else if (status != 8) {",
+      "new": "    } else if (status != 7) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-kind-scale",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "        application_audio_records_006564a0[kind];",
+      "new": "        application_audio_records_006564a0[kind + 1u];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-flag-80",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "    if ((selector & 0x80u) != 0u) {",
+      "new": "    if ((selector & 0x40u) != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-flag-20",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "    if ((selector & 0x20u) != 0u) {",
+      "new": "    if ((selector & 0x10u) != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-zero-branch",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "        if (period_value == 0u) {",
+      "new": "        if (period_value == 1u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-default-target",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "        if (period_value != 1u) {",
+      "new": "        if (period_value != 2u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-handler-constant",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "        audio_period_handler_slots_006b16b0[0] = 0x00598a70u;",
+      "new": "        audio_period_handler_slots_006b16b0[0] = 0x00598a71u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-kind-word-offset",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "        audio_period_configure_00598d10(device_halfword(0x1au), target);",
+      "new": "        audio_period_configure_00598d10(device_halfword(0x18u), target);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-device-b",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "        audio_ds_apply_property_0058e780(period_value, device_word(0x150u),\n                                         device_word(0x154u));",
+      "new": "        audio_ds_apply_property_0058e780(period_value, device_word(0x14cu),\n                                         device_word(0x154u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-late-unlock",
+      "source": "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/audio_finalize_period_703.cpp",
+      "old": "    audio_backend_unlock_005896f0();\n}\n\n} // namespace porsche",
+      "new": "    audio_backend_lock_005896d0();\n}\n\n} // namespace porsche",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

@@ -1,5 +1,12 @@
 # Отложенные проверки восстановления v2
 
+Run704 integrates700-703 (19 bodies1611B,3656cases,49mutations,1007pins,
+407TUs;113names119refs,noEXE). Eighteennamesclosed; eighteen children open.
+Storage-gated00562810/00563440 need run-273 proof (006bda20/006b3020).
+Evidence-excluded future packets: 0043ed00/00448b10/0044f240/00451490/
+004552b0/00455f60/00463c30/00466500/00413960/0045dbd0. Fault/lifetime/RTTI,
+live devices andfullgame remain unproved.
+
 Run699 integrates695/696/697 (4 bodies1353B,2796cases,49mutations,998pins,
 403TUs;113names118refs,noEXE). Two namesclose; children004a6bc0/005901b0
 and data owner006b499c open; 00562810/00563440 unlocked by696. Run400/695

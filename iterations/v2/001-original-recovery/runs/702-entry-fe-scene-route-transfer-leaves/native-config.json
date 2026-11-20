@@ -1,0 +1,201 @@
+{
+  "run": 702,
+  "experiment": "local/experiments/v2-entry-fe-scene-route-transfer-leaves-702",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0046d960",
+      "bytes": 17,
+      "sha256": "54213dbea4b8bd23a08dffa601bebfb54ae198ae0ca8078df56b87bf9b9b7343",
+      "token": "@BODY_0046D960@"
+    },
+    {
+      "va": "0046d890",
+      "bytes": 195,
+      "sha256": "e16de0f62ea391fd49b84a88bf4c20fd38359991bbadc3a429cdae367eba4af9",
+      "token": "@BODY_0046D890@"
+    },
+    {
+      "va": "004659e0",
+      "bytes": 116,
+      "sha256": "22bb432b1cd27231a41c4ad6ae207e2ed6cc9b1be069d8dcef716cb7c5ee6fd6",
+      "token": "@BODY_004659E0@"
+    },
+    {
+      "va": "00475d70",
+      "bytes": 60,
+      "sha256": "66dea84695db6f1a05652aaffd662af151bfc842b84898d7fc5546b7239a0588",
+      "token": "@BODY_00475D70@"
+    },
+    {
+      "va": "0044fae0",
+      "bytes": 46,
+      "sha256": "a2dc06965492efbed714d04ab5ffe00fe439d8f65596ef123fe14ac0b0cdf377",
+      "token": "@BODY_0044FAE0@"
+    },
+    {
+      "va": "004521c0",
+      "bytes": 41,
+      "sha256": "e601b9ef9a7b828ce2b087a9cbd27ca16b12d8cccf717cb62feae5508afc56f8",
+      "token": "@BODY_004521C0@"
+    },
+    {
+      "va": "0044b960",
+      "bytes": 150,
+      "sha256": "1578ddef7287b9834219c7bfe91c4673adb13cea6879094f2556869354798893",
+      "token": "@BODY_0044B960@"
+    }
+  ],
+  "pass_marker": "entry_fe_scene_leaves_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 300,
+  "mutations": [
+    {
+      "name": "wrong-d960-sar3",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "    return static_cast<U>(static_cast<I>(header[1] - header[0]) >> 2);",
+      "new": "    return static_cast<U>(static_cast<I>(header[1] - header[0]) >> 3);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-d890-first-kind",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "            if (first_kind == 1u &&",
+      "new": "            if (first_kind == 3u &&",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-d890-arena-gate",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "            if (first_kind == 1u &&\n                application_state_006573e8.word(0x00657430u) == 0u) {",
+      "new": "            if (first_kind == 1u &&\n                application_state_006573e8.word(0x00657430u) != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-d890-second-pass",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "        if (object != 0u) {\n            return index;",
+      "new": "        if (object == 0u) {\n            return index;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-659e0-slot-stride",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "    const std::size_t byte_index = 0xc0u + 0x10cu * static_cast<std::size_t>(first);",
+      "new": "    const std::size_t byte_index = 0xc0u + 0x100u * static_cast<std::size_t>(first);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-659e0-slot-bit",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "    if ((load_byte(view_slot_table_00627e80, byte_index) & 1u) == 0u) {",
+      "new": "    if ((load_byte(view_slot_table_00627e80, byte_index) & 2u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-659e0-drop-f0-clear",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "    frame_reset_word_006280f0 = 0u;",
+      "new": "    frame_reset_word_006280f0 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-75d70-index",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "    const U index = to + from * 2u;",
+      "new": "    const U index = to + from;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-75d70-selector",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "    scene_route_dispatch_00475c80(selector[index]);",
+      "new": "    scene_route_dispatch_00475c80(selector[index ^ 1u]);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4fae0-size",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "    void* const object = render_allocate_0059ef90(0x13cu);",
+      "new": "    void* const object = render_allocate_0059ef90(0x138u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4fae0-ctor-arg",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "            scene_root_constructor_0044fb40(object, nullptr, root);",
+      "new": "            scene_root_constructor_0044fb40(object, nullptr, object);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-521c0-size",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "    void* const object = render_allocate_0059ef90(0x328u);",
+      "new": "    void* const object = render_allocate_0059ef90(0x324u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-521c0-ctor-self",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "            scene_stage_constructor_004522b0(object, nullptr);",
+      "new": "            scene_stage_constructor_004522b0(nullptr, nullptr);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b960-first-sub-size",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "        void* const sub = scene_slot_object_004211d0(0x58u, 0u);",
+      "new": "        void* const sub = scene_slot_object_004211d0(0x54u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b960-second-sub-size",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "        void* const sub = scene_slot_object_004211d0(0x1cu, 0u);",
+      "new": "        void* const sub = scene_slot_object_004211d0(0x18u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b960-header-size",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "    void* first = render_allocate_0059ef90(0xcu);",
+      "new": "    void* first = render_allocate_0059ef90(0x8u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b960-return",
+      "source": "iterations/v2/001-original-recovery/runs/702-entry-fe-scene-route-transfer-leaves/entry_fe_scene_leaves_702.cpp",
+      "old": "    return self;\n}",
+      "new": "    return first;\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

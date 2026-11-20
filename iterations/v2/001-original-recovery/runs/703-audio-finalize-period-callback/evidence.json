@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "run": 703,
+  "status": "PASS",
+  "receipt": "local/experiments/v2-audio-finalize-period-callback-703/005/receipt.json",
+  "attempt": 5,
+  "verify_command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback/native-config.json --attempt 005",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "bodies": [
+    {"va": "004a6bc0", "bytes": 193, "sha256": "b0be78b69a6822a5712cd10533bc52ad919f7ba1841dfe3a276f54a81fd34d7a", "status": "FULL"},
+    {"va": "005901b0", "bytes": 153, "sha256": "5003f1a3dffd0cb933a9946804b347dcb8b41cd2d9ff5d91dcc1c4d80e370445", "status": "FULL"}
+  ],
+  "owned_data": [
+    {"va": "005d141c", "bytes": 38, "kind": "read-only literal", "sha256": "10cdc8ae2b138a60d2a415b452232186d4242f40a32839b04453934701596798"},
+    {"va": "006b16b0", "bytes": 12, "kind": "loader-zero BSS handler slots"},
+    {"va": "005e25b0", "bytes": 4, "kind": "opaque raw data cell, ADDRESS used"}
+  ],
+  "measurements": {
+    "cases_per_variant": 1728,
+    "total_cases": 3456,
+    "events_per_variant": 5472,
+    "case_split": {"004a6bc0": 1440, "005901b0": 288},
+    "variants": ["/Od", "/O2"],
+    "mutation_controls": 13,
+    "mutations_detected": 13,
+    "input_pins": 234,
+    "output_pins": 185,
+    "receipts": 62
+  },
+  "compared": [
+    "used EAX return of 004a6bc0",
+    "ESP/EBP/EBX/ESI/EDI callee-saved ABI after each original x86 and C++ call",
+    "ordered callee events: bank open (out index + handle), two bank-size reads, allocation (bytes, heap, basename), bank copy, free, no-op, diagnostic (format + basename), lock/unlock, DS property (period + two device words), period reset/configure (kind word + target address)",
+    "full 8 x 16B record table, 0x18cB device state, 3 handler slots and default-target cell before/after and at every event"
+  ],
+  "mutation_names": [
+    "wrong-finalize-backslash-scan", "wrong-finalize-record-index",
+    "wrong-finalize-size-subtraction", "wrong-finalize-status-eight",
+    "wrong-finalize-kind-scale", "wrong-period-flag-80",
+    "wrong-period-flag-20", "wrong-period-zero-branch",
+    "wrong-period-default-target", "wrong-period-handler-constant",
+    "wrong-period-kind-word-offset", "wrong-period-device-b",
+    "wrong-period-late-unlock"
+  ],
+  "harness_only": [
+    "synthetic cdecl callsite push/RET and callee-saved register probes in invoke_cdecl",
+    "controlled endpoint implementations for all callees",
+    "absolute/relative body relocations from original VAs to host addresses",
+    "scenario knobs and StateSnapshot/Event recording"
+  ],
+  "excluded": [
+    {
+      "vas": ["00562810", "00563440"],
+      "reason": "unproved reachable table storage (006bda20 1024-byte palette and 006b3020 sampler buffer have no accepted owner / extent proof; run 273 flags 006bda20 scalar_storage_proof_required). Internal callbacks 0x0058b22f/0x0058adae are original constants, not invented, but the table ownership blocker stands. See scope-evidence.json.",
+      "action": "exclude from this batch; no body, data cell or callback invented"
+    }
+  ],
+  "boundaries": [
+    "bank kind >7 overflows the 8-record table in the original (unchecked); not exercised",
+    "upper 24 bits of the period flags are preserved but unmapped; wild values not exercised",
+    "live file/device/DirectSound effects, real bank contents, concurrency and full startup/gameplay remain open",
+    "production CMake/registry integration intentionally out of scope for this batch"
+  ],
+  "attempt_note": "Attempts 001-003 are preserved setup failures (missing provider declaration, missing state header, wrong relocation offsets); no hypothesis was retried after a semantic divergence. Attempt 005 is the first clean PASS."
+}

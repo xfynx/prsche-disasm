@@ -4,23 +4,27 @@ Updated 2026-11-20. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run699](iterations/v2/001-original-recovery/runs/699-unlocked-callers-integration/README.md)
-compiles 403 C++ translation units across 8 projects. The link has 113 unresolved
-names / 118 references. **There is no recovered playable C++ game executable yet.**
+[Run704](iterations/v2/001-original-recovery/runs/704-next-layer-integration/README.md)
+compiles 407 C++ translation units across 8 projects. The link has 113 unresolved
+names / 119 references. **There is no recovered playable C++ game executable yet.**
 
-Run699 integrates 695/696/697: four full original bodies (1,353 code bytes: FF
-`00411d20`, CLUT dispatcher `005346d0`, audio `00590250`/`004a6c90`). Native
-comparisons pass 2,796 measured cases and 49 material mutation controls at
-`/Od`/`/O2`; shared audit PASS, 998 source pins. Two frontier names close;
-`004a6bc0`/`005901b0`/`006b499c` open; `00562810`/`00563440` unlocked.
-Next layer: the 50 typed children opened by Run698.
+Run704 integrates 700-703: nineteen full original bodies (1,611 code bytes:
+scene reset leaves, view teardown/route family, entry FE + scene route/transfer
+leaves, audio finalize/period callback). Native comparisons pass 3,656 measured
+cases and 49 material mutation controls at `/Od`/`/O2`; shared audit PASS,
+1,007 source pins. Eighteen frontier names close; eighteen typed children open.
+`00562810`/`00563440` are storage-gated (run-273 proof required); eight
+excluded bodies are queued as separate packets.
+
+Historical: Run699 integrated 695/696/697 (four bodies, 1,353B; 2,796 cases /
+49 mutations / 998 pins; 403 TUs).
 
 Historical: Run698 integrated 691/692/693 (eight full bodies, 2,479B; 374
-cases / 75 mutations / 991 pins; 400 TUs, 112 names / 116 refs; FE main-loop
-`004152e0` evidence-only).
+cases / 75 mutations / 991 pins; 400 TUs; FE main-loop `004152e0`
+evidence-only).
 
 Historical: Run694 integrated 688/689/690 (seven full bodies, 1,868B; 24,380
-cases / 72 mutations / 984 pins; 397 TUs, 69 names / 72 refs).
+cases / 72 mutations / 984 pins; 397 TUs).
 
 Historical: Run687 integrated eleven partial functions (903 code bytes: `00570260`..`00570540`
 in `685/001` plus `005702a0`, `00570920`, `00570990`, `00570ff0`, `00571160` in

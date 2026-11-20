@@ -1,0 +1,101 @@
+{
+  "run": 700,
+  "experiment": "local/experiments/v2-scene-reset-leaf-chain-700",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "00458b80",
+      "bytes": 38,
+      "sha256": "5f7024df69e4e24bea2fed2dabca34ba7fce328375c3c03623099688d65719c2",
+      "token": "@BODY_00458B80@"
+    },
+    {
+      "va": "00467f40",
+      "bytes": 77,
+      "sha256": "5ccc6766cf272339e922c9f87b794b28a1e8ee8b1917ee69daad8a0e85b9731b",
+      "token": "@BODY_00467F40@"
+    }
+  ],
+  "pass_marker": "scene_reset_leaf_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-58b80-alloc-size",
+      "source": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.cpp",
+      "old": "render_allocate_0059ef90(0x10u)",
+      "new": "render_allocate_0059ef90(0x8u)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-58b80-drop-ctor",
+      "source": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.cpp",
+      "old": "stage = scene_stage_58b80_ctor_00458c90(stage, nullptr);",
+      "new": "(void)0;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-58b80-fail-value",
+      "source": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.cpp",
+      "old": "    } else {\n        scene_stage_58b80_00627e08 = nullptr;\n    }",
+      "new": "    } else {\n        scene_stage_58b80_00627e08 = reinterpret_cast<void*>(0x1u);\n    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-67f40-reserve-size",
+      "source": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.cpp",
+      "old": "render_display_texture_reserve_00553fc0(0x01800000u)",
+      "new": "render_display_texture_reserve_00553fc0(0x01000000u)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-67f40-invert-branch",
+      "source": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.cpp",
+      "old": "if (reserved != 0)",
+      "new": "if (reserved == 0)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-67f40-report-string",
+      "source": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.cpp",
+      "old": "scene_texture_alloc_report_005a177b(texture_alloc_ok_005cf848,",
+      "new": "scene_texture_alloc_report_005a177b(texture_alloc_fail_005cf81c,",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-67f40-callback",
+      "source": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.cpp",
+      "old": "reinterpret_cast<void*>(0x004677d0u)",
+      "new": "reinterpret_cast<void*>(0x004677d4u)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-67f40-drop-reset",
+      "source": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/scene_stage_reset_700.cpp",
+      "old": "render_display_texture_reset_0053c3d0();",
+      "new": "(void)0;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

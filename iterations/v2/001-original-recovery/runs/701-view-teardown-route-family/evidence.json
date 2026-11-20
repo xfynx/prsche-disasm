@@ -1,0 +1,114 @@
+{
+  "run": 701,
+  "batch": "view teardown / route family leaves exposed by the Run693 application view lifecycle",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "targets": [
+    {
+      "va": "00465cf0",
+      "end_exclusive": "00465d75",
+      "bytes": 133,
+      "sha256": "ffe435dd56f6a30d7b2114da36cc395b1d03433bcdaa37573f6b10c1d1efd719",
+      "abi": "cdecl void(I index), RET 0; only low byte of the stack argument used; preserves EBX,ESI,EDI,EBP",
+      "summary": "route counter: bit0 scales three floats of view slot zero (+0x37c..+0x384 of the route object) by raw 0xc0800000 (-4.0f) into slot +8/+0xc/+0x10; bit1 repeats for slot 0x00627f8c into +0x114/+0x118/+0x11c"
+    },
+    {
+      "va": "00465e20",
+      "end_exclusive": "00465e3d",
+      "bytes": 29,
+      "sha256": "d12fb9910a896abaa66c7a5ae6b6dfdee0c47b2f7a6e55892d2b757e248071de",
+      "abi": "cdecl void(), RET 0; preserves ESI",
+      "summary": "destroys the 0x0062810c secondary object via this-in-ECX 0059f1c0 and releases it via canonical 0059f050; global pointer is not cleared"
+    },
+    {
+      "va": "0047f190",
+      "end_exclusive": "0047f207",
+      "bytes": 119,
+      "sha256": "da05e3ddfe84b58e20e551048b73e784caf71f4d361a9880d2d026137ccd958c",
+      "abi": "cdecl void(), RET 0; preserves EBX,ESI,EDI",
+      "summary": "walks the +0xa4 vector of the 0x00628bac root (00514990 per dword, begin..end), frees the begin..+8 span via 00441200 when non-empty, releases vector and root via 0059f050, clears 0x00628bac on both paths"
+    },
+    {
+      "va": "004b7140",
+      "end_exclusive": "004b7150",
+      "bytes": 16,
+      "sha256": "ad66ed1056e820d21c2c48b121b0b876535c082f5039e4f37eba197c9df38988",
+      "abi": "cdecl void(), RET 0; no callee-saved registers touched",
+      "summary": "calls canonical no-op 00516950 and clears 0x0065b398"
+    },
+    {
+      "va": "00473100",
+      "end_exclusive": "00473143",
+      "bytes": 67,
+      "sha256": "9d667ff561079d6adca98d31acfbf8d44860df6dc58d413343994046d96755f3",
+      "abi": "fastcall(this=ECX, unused=EDX, U mode on stack), RET 4",
+      "summary": "frame service object constructor: word[0]=mode, byte[2]=0, dword[4]=-1, bytes[8..10]=0, word[0x24]=0 (ECX zeroed before store), dwords[0x28,0x2c,0x14,0x0c,0x1c,0x18]=0, dwords[0x10,0x20]=0x3f800000"
+    },
+    {
+      "va": "00473190",
+      "end_exclusive": "00473205",
+      "bytes": 117,
+      "sha256": "588cd1c9befe29284d29577be8398189b6e398f27470b68fba903c3046e1991d",
+      "abi": "fastcall(this=ECX, unused=EDX, const void* source on stack), RET 4; preserves ESI,EDI; self==source is a no-op",
+      "summary": "service-object field snapshot: copies word[0], bytes[2],[8],[9],[0xa], dwords[0x0c..0x14], dwords[0x18..0x20], word[0x24], dwords[4],[0x28],[0x2c] from source into self"
+    },
+    {
+      "va": "00538d80",
+      "end_exclusive": "00538d94",
+      "bytes": 20,
+      "sha256": "de8e86aee4df948a1e0ec4a82c737c9af8cecce23845d4c9d6367bc0af4d06e9",
+      "abi": "fastcall(this=ECX, unused=EDX), RET 0; preserves ESI",
+      "summary": "releases the receiver's +0x5c cell then the receiver itself through this-in-ECX 00539eb0"
+    },
+    {
+      "va": "00540420",
+      "end_exclusive": "00540438",
+      "bytes": 24,
+      "sha256": "b2c8ce219b82c9b7b52bb702804541ac5be5bedd4872f82fb2d892e199797ac6",
+      "abi": "fastcall(this=ECX, unused=EDX), RET 0; indirect vtable slot zero with pushed argument 1 (ECX=this, RET 4)",
+      "summary": "reads the movie service at self+4, calls its vtable slot zero with argument 1, then clears canonical 0x0069ed0c"
+    }
+  ],
+  "owned_data": [
+    {"va": "0062810c", "bytes": 4, "kind": ".bss", "name": "render_secondary_object_0062810c", "note": "only newly owned cell; loader-zero, written by the 00465e40 producer chain"}
+  ],
+  "reused_canonical": [
+    {"va": "00627e80", "owner": "view_slot_table_00627e80 (Run693, accepted)"},
+    {"va": "00628bac", "owner": "startup_context_table_00628bac (Run646, accepted)"},
+    {"va": "0065b398", "owner": "render_teardown_state_0065b398 (Run601, accepted)"},
+    {"va": "0069ed0c", "owner": "game_setup_movie_service_0069ed0c (game_setup_globals.cpp, accepted)"},
+    {"callee": "0059f050", "provider": "application_release_0059f050 (accepted)"},
+    {"callee": "00516950", "provider": "startup_service_noop_00516950 (accepted)"},
+    {"callee": "00441200", "provider": "application_context_member_destroy_block_00441200 (accepted)"},
+    {"va": "005b245c", "owner": "raw .rdata constant dword 0xc0800000 (-4.0f), verified from pinned PE before relocation"}
+  ],
+  "native_proof": {
+    "attempt": "008",
+    "receipt": "local/experiments/v2-view-teardown-route-family-701/008/receipt.json",
+    "command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/701-view-teardown-route-family/native-config.json --attempt 008",
+    "marker": "view_teardown_route_family_701_original_x86_vs_cpp=PASS cases=36",
+    "variants": ["/Od", "/O2"],
+    "cases": 36,
+    "mutations_detected": 11,
+    "checks": "inputs/intermediate state/outputs/call order/used state/ABI (ESP, EBP, EBX, ESI, EDI) and full x87 state compared between relocated original bytes and the C++ bodies on both variants; 11 material mutations each detected"
+  },
+  "ownership_decisions": {
+    "unowned_before": true,
+    "excluded": [
+      {"va": "00463c30", "reason": "large heterogeneous route-finish routine (branch to 0x00464049, hundreds of instructions, many callees)"},
+      {"va": "00466500", "reason": "340-byte multi-field destructor with six distinct callees and internal pointer rewiring"}
+    ],
+    "notes": [
+      "All eight recovered VAs are unowned in source/recovered/functions.json before this batch (1133 entries checked; no entry_va or body_ranges overlap).",
+      "Extern names/signatures are exactly those in application_view_lifecycle_693.hpp; this TU supplies only the previously-unowned definitions and does not redefine Run693 cells.",
+      "One new loader-zero cell (0062810c) owned; the four other globals and three callees reuse accepted canonical providers."
+    ]
+  },
+  "boundaries": [
+    "All eight bodies are void: EAX after return is only the last opaque endpoint's volatile result and is not compared.",
+    "Opaque callees 0059f1c0/00514990/00539eb0 are controlled endpoints with call-site ABI; their full algorithms remain unrecovered.",
+    "00465cf0 uses inline x87 to match the original FLD/FMUL/FSTP sequence and x87 stack/tag/status state; CPU-specific undefined flags and x87 precision remain explicit boundaries.",
+    "Raw 0x005b245c dword 0xc0800000 is verified before relocation so both sides cannot agree on an invented constant.",
+    "Null/unreachable producer states, fault/lifetime/concurrency and live component acceptance remain open; production CMake/registry integration and the game-link COFF audit are separate steps."
+  ]
+}

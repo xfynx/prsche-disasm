@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "run": 703,
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "generation": "raw PE bytes read through section headers (imagebase 0x400000) before any relocation; SHA-256 verified",
+  "bodies": [
+    {
+      "va": "004a6bc0",
+      "end_va_exclusive": "004a6c80",
+      "bytes": 193,
+      "sha256": "b0be78b69a6822a5712cd10533bc52ad919f7ba1841dfe3a276f54a81fd34d7a",
+      "disassembly_lines": "206166-206234",
+      "abi": "cdecl, int32 EAX return; 4 stack args (text, bank_result, handle, kind); plain RET (C3)",
+      "callers": ["004a6d30 (accepted Run697 004a6c90)", "004acf9d"],
+      "callees": ["00565b60", "00565b30", "00531ca0", "00565ad0", "00531f90", "00516950", "005a177b"]
+    },
+    {
+      "va": "005901b0",
+      "end_va_exclusive": "00590248",
+      "bytes": 153,
+      "sha256": "5003f1a3dffd0cb933a9946804b347dcb8b41cd2d9ff5d91dcc1c4d80e370445",
+      "disassembly_lines": "491420-491464",
+      "abi": "cdecl, no used return; 2 stack args (flags, period_value); plain RET (C3)",
+      "callers": ["0059027d (accepted Run697 00590250)"],
+      "callees": ["005896d0", "0058e780", "00598e80", "005896f0", "00598d10"]
+    }
+  ],
+  "raw_literals": [
+    {
+      "va": "005d141c",
+      "bytes": 38,
+      "text": "AudioCmn_AddBank(): DID NOT ADD '%s'\\n",
+      "sha256": "10cdc8ae2b138a60d2a415b452232186d4242f40a32839b04453934701596798",
+      "raw_hex": "417564696f436d6e5f41646442616e6b28293a20444944204e4f542041444420272573270a00",
+      "ownership": "unowned; ends at 005d1441, Run697 owns 005d1444 (40B) and 005d146c (5B) - no overlap"
+    },
+    {
+      "va": "005e25b0",
+      "bytes": 4,
+      "raw_hex": "46580000",
+      "ownership": "unowned DAT_005e25b0 in run 179/184 index only; owned here as opaque 4B cell whose ADDRESS is passed to 00598d10"
+    }
+  ],
+  "loader_zero_cells": [
+    {
+      "va": "006b16b0",
+      "bytes": 12,
+      "layout": "3 x uint32 handler slots (006b16b0/b4/b8)",
+      "ownership": "unowned in accepted source; .data RVA 0x2b16b0 exceeds raw section size 0x1c000 -> loader zero-fill; no other accepted owner",
+      "note": "stores original code VA constants 0x00598a70/0x00598a90/0x00598ae0 (not relocated, same rule as Run697 0x005901b0)"
+    },
+    {
+      "va": "006b4a10",
+      "bytes": 4,
+      "ownership": "inside already-owned ApplicationAudioDeviceStateStorage 006b48c0..006b4a4c at offset 0x150; reused, not redefined"
+    },
+    {
+      "va": "006b4a14",
+      "bytes": 4,
+      "ownership": "inside already-owned device state at offset 0x154; reused"
+    },
+    {
+      "va": "006b48da",
+      "bytes": 2,
+      "ownership": "inside already-owned device state at offset 0x1a; reused as zero-extended word"
+    }
+  ],
+  "reused_owners": [
+    "application_audio_records_006564a0[8] (source/include/porsche/application_services.hpp)",
+    "application_audio_device_state_006b48c0 (source/include/porsche/application_audio_device.hpp)"
+  ],
+  "provider_boundaries": [
+    "00565b60 / 00565b30 / 00565ad0 (unowned typed boundaries; 00565b30/00565ad0 bodies owned by Run677)",
+    "00531ca0 / 00531f90 (Run004 canonical)",
+    "00516950 (Run098 canonical no-op)",
+    "005a177b (Run697 render_display.hpp declaration)",
+    "005896d0 / 005896f0 (Run434 canonical)",
+    "0058e780 (Run462 canonical)",
+    "00598d10 / 00598e80 (unowned typed boundaries)"
+  ],
+  "ownership_check": {
+    "registry_entries": 1133,
+    "entry_va_hits": {"00562810": 0, "00563440": 0, "004a6bc0": 0, "005901b0": 0},
+    "body_range_overlaps": {"004a6bc0": 0, "005901b0": 0, "00562810": 0, "00563440": 0},
+    "note": "all four targets unowned including body_ranges; 00562810/00563440 appear only as unrecovered_dependencies of 004dd600/004a4a70"
+  },
+  "exclusions": [
+    {
+      "vas": ["00562810", "00563440"],
+      "reason": "unproved reachable table storage:",
+      "evidence": [
+        "both bodies (~853B/897B indexed, disassembly 00562810..00562b64 / 00563440..005637c0) write a 1024-byte palette through 006bda20 (FUN_00570540/005702a0/005323e0 dst, 0x100/0x200 count) and use 006b3020 as an opaque sampler buffer (FUN_0058b800/0058ad90)",
+        "run 273-link-frontier-queue/summary.json flags 006bda20 as kind=data/action=scalar_storage_proof_required with only a 4B DAT_006bda20 candidate, accepted_owners=[]; no accepted owner defines the 1024-byte table extent",
+        "006b3020 appears only in canonical-map.json navigation (DAT_006b3020), no accepted definition",
+        "prior Run395 note: transport driver initializers 005607d0/00560a90 have unproved descriptor/registry storage; these draw routines are the same transport family",
+        "the indirect CALL [ESP+0x1c] resolves to internal constants 0x0058b22f / fallback 0x0058adae (decompiled.c FUN_00562810), so no callback is invented, but the palette/sampler table extent and writer ownership remain unproved"
+      ],
+      "decision": "excluded from this batch; recover only after the 006bda20/006b3020 table extent and writer chain are proved"
+    }
+  ],
+  "scope_boundary": "FULL bodies for 004a6bc0/005901b0 with bounded inputs: bank kind 0..7 (original unchecked high indexes not exercised), text/names bounded by observed callers, flags low-byte values from the Run690 caller family with upper-24-bit address bits preserved but unmapped, device state and record cells set directly before each case. Wild flag upper bytes, bank index >7, live file/device/thread effects, full startup and gameplay remain open."
+}

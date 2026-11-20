@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "run": 700,
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "source": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "caller": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp (00468fb0)",
+  "ownership": {
+    "registry": "iterations/v2/001-original-recovery/source/recovered/functions.json",
+    "result": "All eight target entry VAs are absent from functions.json entries and from every body_ranges interval (checked numeric overlap against all 233 body_ranges entries). No supplement file exists beside source/recovered. Only forward declarations in run693 and a mechanical candidate in application_context_core_candidate.cpp reference these VAs; neither owns a definition.",
+    "owned_cells_created": [
+      "0x00627e08 (4B writable stage pointer, 00458b80)",
+      "0x005cf848 (42B .rdata format string)",
+      "0x005cf81c (42B .rdata format string)"
+    ],
+    "reused_canonical_providers": [
+      "0059ef90 (render_allocate_0059ef90)",
+      "0053c3d0 (render_display_texture_reset_0053c3d0)",
+      "00553fc0 (render_display_texture_reserve_00553fc0)"
+    ]
+  },
+  "recovered": [
+    {
+      "va": "00458b80", "bytes": 38, "end": "00458ba5",
+      "sha256": "5f7024df69e4e24bea2fed2dabca34ba7fce328375c3c03623099688d65719c2",
+      "abi": "cdecl void(), RET 0",
+      "body": "PUSH 0x10; CALL 0059ef90; ADD ESP,4; TEST EAX,EAX; JZ clear; MOV ECX,EAX; CALL 00458c90; MOV [0x627e08],EAX; RET; clear: MOV [0x627e08],0; RET"
+    },
+    {
+      "va": "00467f40", "bytes": 77, "end": "00467f8c",
+      "sha256": "5ccc6766cf272339e922c9f87b794b28a1e8ee8b1917ee69daad8a0e85b9731b",
+      "abi": "thiscall/fastcall(void* self, void* unused_edx), ECX/EDX unused, RET 0",
+      "body": "CALL 0053c3d0; PUSH 0x1800000; CALL 00553fc0; ADD ESP,4; TEST EAX,EAX; PUSH 0x1800000; JZ fail; PUSH 0x5cf848; CALL 005a177b; ADD ESP,8; PUSH 0x4677d0; CALL 005556a0; POP ECX; RET; fail uses 0x5cf81c",
+      "raw_data": "0x5cf848 = 'Increased texture allocation passed [%d]\\n\\0' (42B); 0x5cf81c = 'Increased texture allocation FAILED [%d]\\n\\0' (42B); both verified against pinned PE before relocation"
+    }
+  ],
+  "excluded": [
+    {
+      "va": "0043ed00", "bytes": 148,
+      "reason": "Reads CL from caller-stack slot [ESP+0x13] after the 005322c0 cdecl call. The slot is the high byte of the entry ECX saved at function entry (0xcafebabe in any harness), i.e. caller garbage for a cdecl void() body; the unowned callee does not write it. Recording a fixed byte would invent behavior. Additionally 005322b0/005322c0 have conflicting accepted ABI declarations across heap/splash/window headers."
+    },
+    {
+      "va": "00455f60", "bytes": 130,
+      "reason": "Same [ESP+0x13] caller-stack byte capture after CALL 004211d0. Raw 004211d0 disassembly (heap member-storage, cdecl(bytes,mode) -> EAX) confirms it never writes the caller's saved ECX slot; CL is opaque entry-ECX garbage for a cdecl void() body."
+    },
+    {
+      "va": "00448b10", "bytes": 167,
+      "reason": "Heterogeneous eight-iteration loop: per-iteration 0xc-byte allocation + 0044d0b0 construction, 005a0fbf sprintf into a 0x100 stack frame, SCASB/REPNE strlen and MOVSD/MOVSB copy of an unowned global string at 0x5cdeac, and eight dword writes to unproven global range 0x613e04..0x613e20 plus reads of 0x628130+0x74, 0x65b30c, format string 0x5ccb84. Stack-string transport and global ownership are not proved; beyond the bounded leaf pattern."
+    },
+    {
+      "va": "0044f240", "bytes": 174,
+      "reason": "Large data domain: x87 FILD/FMUL/FSUB/FADD/FSTP loop rewrites the float table 0x619804..0x619c30 and shuffles the word table 0x619c30..0x61bc30 (over 0x8000 bytes) using raw constants 0x5b3ca4/0x5b23f0 and RNG callees 00538040/00538110. FPU precision/RC boundary and table ownership unproven; not a bounded leaf."
+    },
+    {
+      "va": "00451490", "bytes": 279,
+      "reason": "Heterogeneous multi-constructor body (0x28-byte alloc + 00468240, 0x18-byte alloc + 005379f0, 004685e0/00537a50/0044d320) that writes a broad unproven global matrix 0x61bc78..0x61bcb8 and reads 0x613e04. Large opaque state domain."
+    },
+    {
+      "va": "004552b0", "bytes": 311,
+      "reason": "Largest body: three nested allocation/failure branches with ctors 00455830/00455570/004558b0, globals 0x627df0/0x6221d8, and a 256-iteration 0x20-stride write over 0x624df8..0x626df0 (8KB matrix). Large data domain, beyond the bounded leaf pattern."
+    }
+  ],
+  "verification": {
+    "runner": "scripts/research/verify-v2-native-batch.py",
+    "config": "iterations/v2/001-original-recovery/runs/700-scene-reset-leaf-chain/native-config.json",
+    "cases": 6,
+    "mutations": 8,
+    "variants": ["/Od", "/O2"],
+    "controls": "allocator success/failure, reserve result {0,1,-1,0x1800000}, raw .rdata witness before relocation, ABI register/ESP/EBP preservation, event order with 8 material wrong-* mutations"
+  }
+}
