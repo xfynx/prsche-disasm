@@ -1,5 +1,13 @@
 # Отложенные проверки восстановления v2
 
+Run699 integrates695/696/697 (4 bodies1353B,2796cases,49mutations,998pins,
+403TUs;113names118refs,noEXE). Two namesclose; children004a6bc0/005901b0
+and data owner006b499c open; 00562810/00563440 unlocked by696. Run400/695
+state-name single-storage reconciliation open; fault/locale/vtable, live
+devices andfullgame remain unproved. Next layer: 50 children from698 +
+these four + 00534b90/00534d40; complex parents004152e0/application_main_*
+await strong models.
+
 Run698 integrates691/692/693 (8 bodies2479B,374cases,75mutations,991pins,
 400TUs;112names116refs,noEXE). Seven namesclose; fifty typed children open —
 scene stage/route/teardown cluster, FE-entry calls, sim boundaries, player

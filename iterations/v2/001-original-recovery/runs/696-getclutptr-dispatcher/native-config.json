@@ -1,0 +1,156 @@
+{
+  "run": 696,
+  "experiment": "local/experiments/v2-getclutptr-dispatcher-696",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+    "iterations/v2/001-original-recovery/runs/689-render-clut16-and-keyed-8888-leaves/render_clut16_689.cpp",
+    "iterations/v2/001-original-recovery/runs/685-render-palette-pixel-expand-leaves/render_palette_expand_685.cpp",
+    "iterations/v2/001-original-recovery/runs/686-render-palette-convert-leaf-table/render_palette_convert_686.cpp",
+    "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher",
+    "iterations/v2/001-original-recovery/runs/689-render-clut16-and-keyed-8888-leaves",
+    "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/runs/685-render-palette-pixel-expand-leaves",
+    "iterations/v2/001-original-recovery/runs/686-render-palette-convert-leaf-table",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/runs/380-pixel-helpers",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.hpp",
+    "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005346d0",
+      "bytes": 352,
+      "sha256": "2290080f477c0adae8a9361eed4bf4754b621d67289fb7e046380b3c8f6b5dc7",
+      "token": "@BODY_005346d0@"
+    }
+  ],
+  "pass_marker": "getclutptr_696_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "getclutptr-type-drop-mask",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "const std::uint32_t type = read_dword(clut, 0u) & 0xffu;",
+      "new": "const std::uint32_t type = read_dword(clut, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-2a-offset",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "const_cast<std::uint8_t*>(clut) + 0x10u);",
+      "new": "const_cast<std::uint8_t*>(clut) + 0x0cu);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-null-return",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "return render_pixel_palette_006b4b20;",
+      "new": "return palette;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-clear-wrong-index",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "palette[0xffu] = 0u;",
+      "new": "palette[0xfeu] = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-drop-clear",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "palette[0xffu] = 0u;",
+      "new": "(void)0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-count-off-by-one",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "const std::int32_t count = read_word_signed(clut, 4u);",
+      "new": "const std::int32_t count = read_word_signed(clut, 4u) + 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-case-29-wrong-leaf",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "case 0x29u:\n        render_palette_565_to_8888_key_00570820(",
+      "new": "case 0x29u:\n        render_palette_5551_to_8888_key_00570780(",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-case-2d-wrong-leaf",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "case 0x2du:\n        render_palette_5551_to_8888_key_00570780(",
+      "new": "case 0x2du:\n        render_palette_565_to_8888_key_00570820(",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-case-2e-wrong-leaf",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "case 0x2eu:\n        render_palette_a555_to_8888_00570920(",
+      "new": "case 0x2eu:\n        render_palette_a565_to_8888_00570990(",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-case-23-swap-count",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "reinterpret_cast<const std::uint16_t*>(clut + 0x10u), 0x100);",
+      "new": "reinterpret_cast<const std::uint16_t*>(clut + 0x10u), 0x80);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-case-24-wire",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "case 0x24u:\n        render_palette_rgb24_to_8888_00571160(\n            count, clut + 0x10u, reinterpret_cast<std::uint8_t*>(palette));",
+      "new": "case 0x24u:\n        render_palette_rgb24_to_8888_00571160(\n            count, reinterpret_cast<std::uint8_t*>(palette), const_cast<std::uint8_t*>(clut + 0x10u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-diagnostic-line",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "shared_runtime_word_005deb78 = 0xcau;",
+      "new": "shared_runtime_word_005deb78 = 0xc9u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-diagnostic-message",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "render_getclutptr_message_005bb3fc, type);",
+      "new": "render_clut16_file_005bb3e4, type);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "getclutptr-drop-file-store",
+      "source": "iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/getclutptr_696.cpp",
+      "old": "diagnostic_file_005deb74_set(render_clut16_file_005bb3e4);",
+      "new": "(void)render_clut16_file_005bb3e4;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

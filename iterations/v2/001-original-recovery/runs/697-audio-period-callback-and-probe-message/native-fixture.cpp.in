@@ -1,0 +1,483 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "audio_period_callback_probe_697.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+namespace porsche {
+// Fixture-local canonical state owners (game build: audio_directsound_state_462,
+// audio_device_lifecycle_455, frame_loop_clusters_400, device state TU).
+ApplicationAudioDeviceStateStorage application_audio_device_state_006b48c0{};
+std::int8_t audio_ds_notify_kind_006b4886 = 0;
+std::uint32_t audio_device_callback_006b4898 = 0u;
+std::uint8_t audio_system_active_006b499c = 0u;
+std::uint32_t& audio_ds_notify_value_006b4a08 =
+    *reinterpret_cast<std::uint32_t*>(application_audio_device_state_006b48c0.data() + 0x148u);
+} // namespace porsche
+
+enum : U {
+    kMaxEvents = 32u,
+    kNameWords = 16u,
+};
+
+enum EventTag : U {
+    kEvPeriodCallback = 1u,
+    kEvResourceOpen = 2u,
+    kEvDiagnostic = 3u,
+    kEvPredicate = 4u,
+    kEvBankFinalize = 5u,
+};
+
+struct StateSnapshot {
+    B device[0x18cu];
+    B notify_kind;
+    U device_callback;
+    U active;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    U name[kNameWords];
+    U detail[kNameWords];
+    StateSnapshot state;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_eax;
+    U exception[3];
+    U count;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events_total = 0u;
+
+// Controlled scenario knobs (harness only, reset before each side of a case).
+static U active_scenario = 1u;
+static U period_scenario = 0u;
+static U effect = 0u;
+static U open_fails = 0u;
+static U handle_value = 0x1111u;
+static U predicate_value = 1u;
+
+static B* code = nullptr;
+static B* slot_590250 = nullptr;
+static B* slot_4a6c90 = nullptr;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U word_at(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_state(StateSnapshot& s) {
+    std::memcpy(s.device, application_audio_device_state_006b48c0.backing.data(),
+                sizeof s.device);
+    s.notify_kind = static_cast<B>(audio_ds_notify_kind_006b4886);
+    s.device_callback = audio_device_callback_006b4898;
+    s.active = audio_system_active_006b499c;
+}
+
+static void record_words(U* dst, const char* text) {
+    std::memset(dst, 0, kNameWords * sizeof(U));
+    if (text != nullptr) {
+        U length = 0u;
+        while (length < kNameWords * sizeof(U) && text[length] != '\0') {
+            ++length;
+        }
+        std::memcpy(dst, text, length + 1u);
+    }
+}
+
+static Event& record_event(U tag, U arg0, U arg1, U arg2) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.arg0 = arg0;
+    e.arg1 = arg1;
+    e.arg2 = arg2;
+    std::memset(e.name, 0, sizeof e.name);
+    std::memset(e.detail, 0, sizeof e.detail);
+    capture_state(e.state);
+    return e;
+}
+
+namespace porsche {
+
+// Controlled endpoint for the unowned 005901b0 period callback.
+void __cdecl audio_period_callback_005901b0(std::int32_t flags,
+                                            std::uint32_t period_value) {
+    Event& e = record_event(kEvPeriodCallback, static_cast<U>(flags),
+                            period_value, 0u);
+    if ((effect & 1u) != 0u) {
+        application_audio_device_state_006b48c0[0x150u] =
+            static_cast<B>(period_value & 0xffu);
+    }
+    (void)e;
+}
+
+// Controlled endpoint for the accepted Run649 provider: records the built name
+// and the open flags, and returns the scenario handle (or null).
+void* __cdecl resource_open_quiet_0059d9b0(const char* name, std::uint32_t flags) {
+    Event& e = record_event(kEvResourceOpen, flags, 0u, 0u);
+    record_words(e.name, name);
+    if ((effect & 2u) != 0u) {
+        audio_system_active_006b499c =
+            static_cast<std::uint8_t>(audio_system_active_006b499c ^ 1u);
+    }
+    e.arg1 = open_fails != 0u ? 0u : handle_value;
+    return open_fails != 0u
+               ? nullptr
+               : reinterpret_cast<void*>(static_cast<std::uintptr_t>(handle_value));
+}
+
+// Controlled endpoint for the accepted resource predicate provider.
+std::int32_t __cdecl resource_predicate_0059dd00(const char* path) {
+    Event& e = record_event(kEvPredicate, 0u, 0u, 0u);
+    record_words(e.name, path);
+    if ((effect & 4u) != 0u) {
+        application_audio_device_state_006b48c0[0x160u] =
+            static_cast<B>(predicate_value & 0xffu);
+    }
+    return static_cast<std::int32_t>(predicate_value);
+}
+
+// Controlled endpoint for the diagnostic formatter.
+void __cdecl render_display_texture_report_005a177b(const char* format,
+                                                     std::uint32_t detail) {
+    // The stack buffer address differs between the original x86 frame and the
+    // compiler frame; record only the stable string contents, never the raw
+    // local pointer as an event argument.
+    Event& e = record_event(kEvDiagnostic, 0u, 0u, 0u);
+    record_words(e.name, format);
+    record_words(e.detail, reinterpret_cast<const char*>(detail));
+}
+
+// Controlled endpoint for the unowned 004a6bc0 bank-registration tail. The
+// original call site reuses the leftover argument area, so the four values are
+// (text, bank_result, handle, kind).
+std::int32_t __cdecl audio_bank_finalize_004a6bc0(const char* text,
+                                                  std::int32_t bank_result,
+                                                  const void* handle,
+                                                  std::uint32_t kind) {
+    Event& e = record_event(kEvBankFinalize, static_cast<U>(bank_result),
+                            address(handle), kind);
+    record_words(e.name, text);
+    return static_cast<std::int32_t>(predicate_value ^ 0x5a5au);
+}
+
+} // namespace porsche
+
+static U invoke_cdecl(void* fn, const U* args, U argc, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, argc
+        mov eax, args
+        test ecx, ecx
+        je call_target
+    push_args:
+        dec ecx
+        push dword ptr [eax + ecx * 4]
+        test ecx, ecx
+        jne push_args
+    call_target:
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov ecx, argc
+        lea esp, [esp + ecx * 4]
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        pushfd
+        pop eax
+        test eax, 400h
+        jz done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word_at(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_rel32(B* slot, U slot_va, U off, U expected_target_va,
+                           const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual_target = slot_va + off + 4u + word_at(slot, off);
+    require(actual_target == expected_target_va,
+            "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void reset_tables() {
+    for (U i = 0u; i < sizeof(ApplicationAudioDeviceStateStorage); ++i) {
+        application_audio_device_state_006b48c0.preceding_data()[i] =
+            static_cast<B>(i * 13u + 7u);
+    }
+    application_audio_device_state_006b48c0[0xdcu] =
+        static_cast<B>(active_scenario);
+    audio_system_active_006b499c = static_cast<std::uint8_t>(active_scenario);
+    audio_ds_notify_kind_006b4886 = 0;
+    audio_device_callback_006b4898 = 0u;
+    put(&application_audio_device_state_006b48c0[0x148u], 0u, period_scenario);
+    put(&application_audio_device_state_006b48c0[0x148u], 4u,
+        period_scenario ^ 0xa5a50000u);
+}
+
+static void compare_traces(bool check_eax) {
+    require(trace.abi_fail == 0u, "original ABI");
+    require(expected.abi_fail == 0u, "cpp ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u,
+            "no exceptions");
+    if (check_eax) {
+        require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    }
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count && i < kMaxEvents; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag,
+                "event tag mismatch");
+        require(trace.events[i].arg0 == expected.events[i].arg0,
+                "event arg0 mismatch");
+        require(trace.events[i].arg1 == expected.events[i].arg1,
+                "event arg1 mismatch");
+        require(trace.events[i].arg2 == expected.events[i].arg2,
+                "event arg2 mismatch");
+        require(std::memcmp(trace.events[i].name, expected.events[i].name,
+                            sizeof trace.events[i].name) == 0,
+                "event name mismatch");
+        require(std::memcmp(trace.events[i].detail, expected.events[i].detail,
+                            sizeof trace.events[i].detail) == 0,
+                "event detail mismatch");
+        require(std::memcmp(&trace.events[i].state, &expected.events[i].state,
+                            sizeof(StateSnapshot)) == 0,
+                "event state mismatch");
+    }
+    require(std::memcmp(&trace.final_state, &expected.final_state,
+                        sizeof(StateSnapshot)) == 0,
+            "final state mismatch");
+}
+
+static void run_case(void* orig_fn, void* cpp_fn, const U* args, U argc,
+                     bool check_eax) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    reset_tables();
+    __try {
+        trace.abi_fail = invoke_cdecl(orig_fn, args, argc, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    reset_tables();
+    __try {
+        trace.abi_fail = invoke_cdecl(cpp_fn, args, argc, trace.ret_eax);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_state(trace.final_state);
+    events_total += trace.count;
+    compare_traces(check_eax);
+}
+
+static void init() {
+    static const B body_590250[] = {@BODY_00590250@};
+    static const B body_4a6c90[] = {@BODY_004A6C90@};
+    static const B str_5d1444[] = {@STR_005D1444@};
+    static const B str_5d146c[] = {@STR_005D146C@};
+
+    require(sizeof body_590250 == 56u, "56-byte original body 00590250");
+    require(sizeof body_4a6c90 == 176u, "176-byte original body 004a6c90");
+    require(sizeof str_5d1444 == 40u && sizeof str_5d146c == 5u,
+            "raw literal sizes");
+
+    // Raw original literals are compared before any pointer relocation.
+    require(std::memcmp(str_5d1444, audio_bank_load_fail_text_005d1444, 40u) == 0,
+            "load-fail literal bytes");
+    require(std::memcmp(str_5d146c, audio_bank_suffix_text_005d146c, 5u) == 0,
+            "bnk suffix literal bytes");
+    require(audio_ds_notify_kind_006b4886 == 0 &&
+                audio_device_callback_006b4898 == 0u &&
+                audio_system_active_006b499c == 0u,
+            "initial canonical cell state");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u,
+                                        MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_590250 = code + 0u;
+    slot_4a6c90 = code + 512u;
+    std::memcpy(slot_590250, body_590250, sizeof body_590250);
+    std::memcpy(slot_4a6c90, body_4a6c90, sizeof body_4a6c90);
+
+    // 00590250: state cells, period cell base and the 005901b0 boundary.
+    // The immediate 0x005901b0 stored into 006b4898 at body offset 0x1c is a
+    // data constant on both sides and is deliberately NOT relocated.
+    relocate_abs32(slot_590250, 0x06u, 0x006b499cu,
+                   address(&audio_system_active_006b499c));
+    relocate_abs32(slot_590250, 0x12u, 0x006b4886u,
+                   address(&audio_ds_notify_kind_006b4886));
+    relocate_abs32(slot_590250, 0x18u, 0x006b4898u,
+                   address(&audio_device_callback_006b4898));
+    relocate_abs32(slot_590250, 0x27u, 0x006b4a08u,
+                   address(&audio_ds_notify_value_006b4a08));
+    relocate_rel32(slot_590250, 0x00590250u, 0x2eu, 0x005901b0u,
+                   reinterpret_cast<const void*>(
+                       &porsche::audio_period_callback_005901b0));
+
+    // 004a6c90: literals and the four controlled callees.
+    relocate_abs32(slot_4a6c90, 0x37u, 0x005d146cu,
+                   address(audio_bank_suffix_text_005d146c));
+    relocate_rel32(slot_4a6c90, 0x004a6c90u, 0x64u, 0x0059d9b0u,
+                   reinterpret_cast<const void*>(
+                       &porsche::resource_open_quiet_0059d9b0));
+    relocate_abs32(slot_4a6c90, 0x75u, 0x005d1444u,
+                   address(audio_bank_load_fail_text_005d1444));
+    relocate_rel32(slot_4a6c90, 0x004a6c90u, 0x7au, 0x005a177bu,
+                   reinterpret_cast<const void*>(
+                       &porsche::render_display_texture_report_005a177b));
+    relocate_rel32(slot_4a6c90, 0x004a6c90u, 0x97u, 0x0059dd00u,
+                   reinterpret_cast<const void*>(
+                       &porsche::resource_predicate_0059dd00));
+    relocate_rel32(slot_4a6c90, 0x004a6c90u, 0xa1u, 0x004a6bc0u,
+                   reinterpret_cast<const void*>(
+                       &porsche::audio_bank_finalize_004a6bc0));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0,
+            "instruction cache");
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    SetUnhandledExceptionFilter([](EXCEPTION_POINTERS* p) -> LONG {
+        std::printf("divergence fault=%08lx eip=%p case=%u\n",
+                    p->ExceptionRecord->ExceptionCode,
+                    p->ExceptionRecord->ExceptionAddress, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+        return EXCEPTION_EXECUTE_HANDLER;
+    });
+    init();
+
+    // Kind 0: 00590250 differential. Observed caller flags (Run690 period
+    // control) all select period group 0; active gate, period dword and
+    // controlled endpoint effects are swept.
+    U args1[1] = {};
+    for (U flags : {0x00u, 0x20u, 0x40u, 0x60u,
+                    0x80u, 0xa0u, 0xc0u, 0xe0u}) {
+        for (U act : {0u, 1u}) {
+            for (U per : {0u, 1u, 0x7fu, 0xffffffffu}) {
+                for (U eff : {0u, 1u, 2u, 3u}) {
+                    active_scenario = act;
+                    period_scenario = per;
+                    effect = eff;
+                    args1[0] = flags;
+                    run_case(
+                        slot_590250,
+                        reinterpret_cast<void*>(
+                            &porsche::audio_period_callback_set_00590250),
+                        args1, 1u, true);
+                }
+            }
+        }
+    }
+
+    // Kind 1: 004a6c90 differential. Both handle branches, the four-argument
+    // finalize tail and the built <text>.bnk name are swept.
+    static const char* const texts[] = {
+        "", "a", "bank", "sample", "C:\\GAMES\\bank", "Lil", "fesfx",
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    };
+    U args2[2] = {};
+    for (const char* text : texts) {
+        for (U fails : {0u, 1u}) {
+            for (U hnd : {0x1111u, 0xffffffffu}) {
+                for (U pred : {0u, 1u, 0x7fffffffu, 0xffffffffu}) {
+                    for (U kind : {0u, 1u, 7u, 0xffffffffu}) {
+                        for (U eff : {0u, 4u}) {
+                            open_fails = fails;
+                            handle_value = hnd;
+                            predicate_value = pred;
+                            effect = eff;
+                            args2[0] = address(text);
+                            args2[1] = kind;
+                            run_case(
+                                slot_4a6c90,
+                                reinterpret_cast<void*>(
+                                    &porsche::application_audio_probe_message_004a6c90),
+                                args2, 2u, false);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    std::printf("audio_period_probe_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

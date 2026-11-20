@@ -1,0 +1,43 @@
+{
+  "run": 696,
+  "module": "Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "subsystem": "\\real\\cmn\\depthconv.c getclutptr dispatcher: descriptor clut type decode -> BGRA8888 palette conversion",
+  "targets": [
+    {
+      "va": "005346d0",
+      "body_ranges": [["005346d0", "0053482f"]],
+      "body_bytes": 352,
+      "body_sha256": "2290080f477c0adae8a9361eed4bf4754b621d67289fb7e046380b3c8f6b5dc7",
+      "abi": "__cdecl, two stack args (const void* descriptor, uint32* palette), result pointer in EAX; 0x200-byte uninitialized local scratch (fully written by the 0x23 swap before use)",
+      "semantics": "clut = 00537fb0(descriptor). If null, return DAT_006b4b20 (default palette) with no palette write. type = dword[clut] & 0xff. If type==0x2a return clut+0x10 (in-place data, no palette write). count = MOVSX word[clut+4]; dword[palette+0x3fc] = 0 (palette[0xff]=0). 0x24: 00571160(count,clut+0x10,palette). 0x29: 00570820(palette,clut+0x10,count). 0x2d: 00570780(palette,clut+0x10,count). 0x2c: 00570990(palette,clut+0x10,count). 0x2e: 00570920(palette,clut+0x10,count). 0x22: 00570ff0(count,clut+0x10,palette). 0x23: 00570260(scratch,clut+0x10,0x100) then 00570780(palette,scratch,0x100). default: DAT_005deb74=&\"\\\\real\\\\cmn\\\\depthconv.c\"(005bb3e4), DAT_005deb78=0xca, [005debf0](\"getclutptr - UNSUPPORTED CLUT TYPE 0x%x\\n\"(005bb3fc), type); return palette.",
+      "evidence": "disassembly 005346d0..0053482f (research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm lines 389334-389455); raw PE bytes sha256 2290080f477c0adae8a9361eed4bf4754b621d67289fb7e046380b3c8f6b5dc7; decompiled.c FUN_005346d0 (line 205132) agrees on every branch and arg order; E8 census: 00537fb0 x1, 00571160 x1, 00570820 x1, 00570780 x2, 00570990 x1, 00570920 x1, 00570ff0 x1, 00570260 x1; absolute census: 005deb74/005deb78/005debf0/005bb3fc/005bb3e4/006b4b20 each x1",
+      "callers": [
+        "00534cb0-ish depth conversion consumer (decompiled.c 205344/205447; real 005350e0 path)",
+        "resource/texture path (decompiled.c 213518, caller DAT_0069ebb4)",
+        "depth conversion consumers (decompiled.c 231618, 232135)"
+      ],
+      "callees": ["00537fb0", "00571160", "00570820", "00570780", "00570990", "00570920", "00570ff0", "00570260", "005debf0 (indirect diagnostic)"]
+    }
+  ],
+  "ownership": [
+    {"cell": "005346d0..0053482f", "owner": "runs/696-getclutptr-dispatcher (new body; no registry functions.json entry and no body_ranges overlap in source/recovered/functions.json; nearest owned bodies 005345e0..00534629 and 00534830..005349d2)"},
+    {"cell": "005bb3fc", "owner": "runs/696-getclutptr-dispatcher (new 41B .rdata string; defined-data.jsonl bytes=41; no owner across manifest closure or run sources)"},
+    {"cell": "005bb3e4", "owner": "runs/689-render-clut16-and-keyed-8888-leaves (reused via render_clut16_file_005bb3e4 typed declaration; not redefined)"},
+    {"cell": "006a6420", "owner": "runs/689-render-clut16-and-keyed-8888-leaves (reused by keyed leaf providers; not redefined)"},
+    {"cell": "006b4b20", "owner": "runs/380-pixel-helpers pixel_helpers.hpp render_pixel_palette_006b4b20[256] (reused via typed declaration)"},
+    {"cell": "00537fb0", "owner": "runs/536/537 render resource descriptor (reused via typed declaration; controlled endpoint in this run's native fixture)"},
+    {"cell": "00570780/00570820", "owner": "runs/689-render-clut16-and-keyed-8888-leaves (reused via typed declarations; accepted production TUs compiled into test graph)"},
+    {"cell": "00570260", "owner": "runs/685-render-palette-pixel-expand-leaves (reused)"},
+    {"cell": "00570920/00570990/00570ff0/00571160", "owner": "runs/686-render-palette-convert-leaf-table (reused)"},
+    {"cell": "005deb74/005deb78/005debf0", "owner": "source/include/porsche/shared_runtime_globals.hpp + porsche/files.hpp diagnostic transport (reused; fixture defines storage and mock)"}
+  ],
+  "boundaries": [
+    "00537fb0 descriptor lookup is a controlled endpoint proving bounded transport only; real resource nodes and live lookup remain open",
+    "005debf0 diagnostic handler is a controlled endpoint; real diagnostic sink remains open",
+    "Original 0x200-byte scratch is uninitialized outside the 0x23 path and is not read there; no zeroing of opaque state invented",
+    "Counts are bounded to the signed int16 header domain and <=256 to stay inside the 1024-byte caller palette; larger counts preserving original unchecked overflow are not exercised",
+    "006a6420 runtime writer remains unrecovered (inherited from Run689)",
+    "005350e0 real depth-conversion caller remains open; no live device, asset or gameplay acceptance in this batch"
+  ]
+}

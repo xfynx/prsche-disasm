@@ -1,0 +1,438 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "porsche/shared_runtime_globals.hpp"
+#include "porsche/files.hpp"
+
+#include "getclutptr_696.hpp"
+#include "../689-render-clut16-and-keyed-8888-leaves/render_clut16_689.hpp"
+#include "../685-render-palette-pixel-expand-leaves/render_palette_expand_685.hpp"
+#include "../686-render-palette-convert-leaf-table/render_palette_convert_686.hpp"
+#include "../380-pixel-helpers/pixel_helpers.hpp"
+#include "../536-render-resource-nodes/render_resource_node_536.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using H = std::uint16_t;
+using B = std::uint8_t;
+
+enum : U {
+    kMaxEvents = 200u,
+    kPaletteBytes = 0x400u,
+    kDescriptorBytes = 0x800u,
+    kClutOffset = 0x40u,
+    kBodyBytes = 352u,
+};
+
+enum EventKind : U {
+    kEvLookup = 1u,
+    kEvDiagnostic = 2u,
+};
+
+enum LookupMode : U {
+    kLookupNull = 0u,
+    kLookupClut = 1u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret;
+    U file_word;
+    U line_word;
+    U event_count;
+    Event events[kMaxEvents];
+    B palette[kPaletteBytes];
+    B descriptor[kDescriptorBytes];
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512] = {};
+static B fp_env[28] = {};
+
+static B* code = nullptr;
+static B* slot_5346d0 = nullptr;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+static U lookup_mode = kLookupClut;
+static void* lookup_result = nullptr;
+static B palette_buffer[kPaletteBytes + 0x40u];
+static B descriptor_buffer[kDescriptorBytes + 0x40u];
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U word_at(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void put_word(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu() {
+    const unsigned short cw = 0x037fu;
+    __asm {
+        fninit
+        fldcw cw
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    __asm {
+        fxsave fp_area
+        fnstenv fp_env
+        fldenv fp_env
+    }
+    fp.control = static_cast<unsigned short>(word_at(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(word_at(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(word_at(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = word_at(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void check_fpu_clean(const FpuSnapshot& orig_fp, const FpuSnapshot& cpp_fp) {
+    require(orig_fp.control == cpp_fp.control, "FPU control");
+    require(orig_fp.status == cpp_fp.status, "FPU status");
+    require(orig_fp.tag == cpp_fp.tag, "FPU tag");
+    require(orig_fp.mxcsr == cpp_fp.mxcsr, "FPU mxcsr");
+    require(std::memcmp(orig_fp.values, cpp_fp.values, sizeof orig_fp.values) == 0, "FPU stack");
+}
+
+static U invoke_cdecl2(void* fn, U arg0, U arg1, FpuSnapshot& fp_out, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg1
+        push arg0
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    return out;
+}
+
+static void push_event(U kind, U a, U b, U c) {
+    require(trace.event_count < kMaxEvents, "event overflow");
+    Event& ev = trace.events[trace.event_count++];
+    ev.kind = kind;
+    ev.a = a;
+    ev.b = b;
+    ev.c = c;
+}
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, const void* replacement,
+                         U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u &&
+            (va_base + i + 5u + static_cast<I>(word_at(p, i + 1u))) == target_va) {
+            put_word(p, i + 1u,
+                     address(replacement) - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+static void relocate_abs(B* p, U n, U old_va, const void* replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 4u <= n; ++i) {
+        if (word_at(p, i) == old_va) {
+            put_word(p, i, address(replacement));
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected_count, "absolute relocation count");
+}
+
+namespace porsche {
+
+std::uint32_t render_pixel_palette_006b4b20[256]{};
+
+InputSlot input_slots_006be040[32] = {};
+
+std::uint32_t __cdecl input_slot_has_device_00532b50(std::int32_t) {
+    return 0u;
+}
+
+std::uint32_t __cdecl input_device_ff_command_00533160(InputDevice*, std::uint32_t) {
+    return 0u;
+}
+
+std::uint32_t __cdecl input_slot_reset_ff_00533120(std::int32_t) {
+    return 0u;
+}
+
+void* __cdecl fe_input_getstate_00532e10(std::uint32_t, std::uint32_t) {
+    return nullptr;
+}
+
+static void __cdecl diagnostic_record(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    const U type = va_arg(args, U);
+    va_end(args);
+    push_event(kEvDiagnostic, address(format), type, 0u);
+}
+
+void (__cdecl* diagnostic_handler_005debf0)(const char*) =
+    reinterpret_cast<void (__cdecl*)(const char*)>(&diagnostic_record);
+
+void* __cdecl render_resource_node_palette_00537fb0(const void* descriptor) {
+    void* const ret = (lookup_mode == kLookupClut) ? lookup_result : nullptr;
+    push_event(kEvLookup, address(descriptor), address(ret), 0u);
+    return ret;
+}
+
+} // namespace porsche
+
+static void fill_lcg(B* p, U n, U seed) {
+    U rng = seed * 0x9e3779b9u + 0x13572468u;
+    for (U i = 0u; i < n; ++i) {
+        rng = rng * 1664525u + 1013904223u;
+        p[i] = static_cast<B>(rng >> 13);
+    }
+}
+
+static void init_fixture() {
+    static const B body_5346d0[kBodyBytes] = {@BODY_005346d0@};
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 8192u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_5346d0 = code + 0x000u;
+    std::memcpy(slot_5346d0, body_5346d0, kBodyBytes);
+
+    relocate_rel(slot_5346d0, kBodyBytes, 0x005346d0u, 0x00537fb0u,
+                 reinterpret_cast<const void*>(&porsche::render_resource_node_palette_00537fb0),
+                 1u);
+    relocate_rel(slot_5346d0, kBodyBytes, 0x005346d0u, 0x00571160u,
+                 reinterpret_cast<const void*>(&porsche::render_palette_rgb24_to_8888_00571160),
+                 1u);
+    relocate_rel(slot_5346d0, kBodyBytes, 0x005346d0u, 0x00570820u,
+                 reinterpret_cast<const void*>(&porsche::render_palette_565_to_8888_key_00570820),
+                 1u);
+    relocate_rel(slot_5346d0, kBodyBytes, 0x005346d0u, 0x00570780u,
+                 reinterpret_cast<const void*>(&porsche::render_palette_5551_to_8888_key_00570780),
+                 2u);
+    relocate_rel(slot_5346d0, kBodyBytes, 0x005346d0u, 0x00570990u,
+                 reinterpret_cast<const void*>(&porsche::render_palette_a565_to_8888_00570990),
+                 1u);
+    relocate_rel(slot_5346d0, kBodyBytes, 0x005346d0u, 0x00570920u,
+                 reinterpret_cast<const void*>(&porsche::render_palette_a555_to_8888_00570920),
+                 1u);
+    relocate_rel(slot_5346d0, kBodyBytes, 0x005346d0u, 0x00570ff0u,
+                 reinterpret_cast<const void*>(&porsche::render_palette_vga6_to_8888_00570ff0),
+                 1u);
+    relocate_rel(slot_5346d0, kBodyBytes, 0x005346d0u, 0x00570260u,
+                 reinterpret_cast<const void*>(&porsche::render_palette_swap_rb555_00570260),
+                 1u);
+    relocate_abs(slot_5346d0, kBodyBytes, 0x005deb74u, &porsche::shared_runtime_word_005deb74, 1u);
+    relocate_abs(slot_5346d0, kBodyBytes, 0x005deb78u, &porsche::shared_runtime_word_005deb78, 1u);
+    relocate_abs(slot_5346d0, kBodyBytes, 0x005debf0u, &porsche::diagnostic_handler_005debf0, 1u);
+    relocate_abs(slot_5346d0, kBodyBytes, 0x005bb3fcu, porsche::render_getclutptr_message_005bb3fc, 1u);
+    relocate_abs(slot_5346d0, kBodyBytes, 0x005bb3e4u, porsche::render_clut16_file_005bb3e4, 1u);
+    relocate_abs(slot_5346d0, kBodyBytes, 0x006b4b20u, porsche::render_pixel_palette_006b4b20, 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 8192u) != 0, "FlushInstructionCache");
+}
+
+static void assert_traces_match() {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    require(trace.ret == expected.ret, "return pointer");
+    require(trace.file_word == expected.file_word, "diagnostic file word");
+    require(trace.line_word == expected.line_word, "diagnostic line word");
+    require(trace.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < trace.event_count; ++i) {
+        require(trace.events[i].kind == expected.events[i].kind, "event kind");
+        require(trace.events[i].a == expected.events[i].a, "event arg0");
+        require(trace.events[i].b == expected.events[i].b, "event arg1");
+        require(trace.events[i].c == expected.events[i].c, "event arg2");
+    }
+    require(std::memcmp(trace.palette, expected.palette, kPaletteBytes) == 0, "palette bytes");
+    require(std::memcmp(trace.descriptor, expected.descriptor, kDescriptorBytes) == 0,
+            "descriptor bytes");
+    check_fpu_clean(expected.fp, trace.fp);
+}
+
+static void snapshot_into(const B* palette, const B* descriptor) {
+    trace.file_word = porsche::shared_runtime_word_005deb74;
+    trace.line_word = porsche::shared_runtime_word_005deb78;
+    std::memcpy(trace.palette, palette, kPaletteBytes);
+    std::memcpy(trace.descriptor, descriptor, kDescriptorBytes);
+}
+
+static void fill_pixel_palette(U seed) {
+    U rng = seed * 0x2545f491u + 0x6a09e667u;
+    for (U i = 0u; i < 256u; ++i) {
+        rng = rng * 1664525u + 1013904223u;
+        put_word(porsche::render_pixel_palette_006b4b20, i * 4u, rng);
+    }
+}
+
+static void seed_case(I count, U header, U seed) {
+    fill_lcg(descriptor_buffer, sizeof descriptor_buffer, seed + 0x51u);
+    put_word(descriptor_buffer, kClutOffset, header);
+    put_word(descriptor_buffer, kClutOffset + 4u,
+             0x12340000u | static_cast<U>(static_cast<std::uint16_t>(count)));
+    fill_lcg(palette_buffer, sizeof palette_buffer, seed + 0x77u);
+    fill_pixel_palette(seed + 0x99u);
+    porsche::render_palette_color_key_006a6420 =
+        (seed & 1u) ? 0x00001234u : 0x0000f800u;
+    porsche::shared_runtime_word_005deb74 = 0u;
+    porsche::shared_runtime_word_005deb78 = 0x5a5a5a5au;
+}
+
+static void run_side(U side, I count, U header, LookupMode mode) {
+    std::memset(&trace, 0, sizeof trace);
+    lookup_mode = mode;
+    lookup_result = descriptor_buffer + kClutOffset;
+
+    seed_case(count, header, cases + (mode == kLookupNull ? 7u : 0u));
+
+    void* const fn = (side == 0u)
+                         ? static_cast<void*>(slot_5346d0)
+                         : reinterpret_cast<void*>(
+                               &porsche::render_getclutptr_from_resource_005346d0);
+    trace.ret = invoke_cdecl2(fn, address(descriptor_buffer), address(palette_buffer),
+                              trace.fp, trace.abi_fail);
+    snapshot_into(palette_buffer, descriptor_buffer);
+}
+
+static void one_case(I count, U header, LookupMode mode) {
+    ++cases;
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        run_side(side, count, header, mode);
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match();
+}
+
+static void test_5346d0() {
+    static const I counts[] = {-32768, -2, -1, 0, 1, 3, 16, 255, 256};
+    static const U types[] = {
+        0x2au, 0x24u, 0x29u, 0x2du, 0x2cu, 0x2eu, 0x22u, 0x23u,
+        0x21u, 0x00u, 0xffu,
+    };
+
+    for (I count : counts) {
+        for (U type : types) {
+            one_case(count, type, kLookupClut);
+        }
+    }
+
+    static const U high_headers[] = {0x55000029u, 0x2b000024u, 0xff00002au};
+    for (U header : high_headers) {
+        one_case(16, header, kLookupClut);
+    }
+
+    one_case(0, 0x2au, kLookupNull);
+    one_case(16, 0x24u, kLookupNull);
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    require(porsche::shared_runtime_word_005deb74 == 0u, "initial diagnostic file word");
+    require(porsche::shared_runtime_word_005deb78 == 0u, "initial diagnostic line word");
+    init_fixture();
+    test_5346d0();
+    std::printf("getclutptr_696_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

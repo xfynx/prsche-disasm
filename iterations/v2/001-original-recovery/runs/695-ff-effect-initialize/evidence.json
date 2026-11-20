@@ -1,0 +1,139 @@
+{
+  "run": 695,
+  "batch": "force-feedback effect initialization on the startup sequence path",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "queries": [
+    "00411d20 body in research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm (lines 19979..20177) and decompiled.c (FUN_00411d20)",
+    "CALL scan across the whole binary: 004121b1 is the sole caller (startup_sequence_call_004121b0, accepted)",
+    "callee ownership across functions.json, source/recovered and run sources (incl. body_ranges)",
+    "raw PE bytes at file offset 0x11d20 (0x300 bytes) vs pinned SHA-256"
+  ],
+  "targets": [
+    {
+      "va": "00411d20",
+      "end_exclusive": "00412021",
+      "bytes": 769,
+      "sha256": "803aba33930fa4caf35b47a41398bd6cade470407cc3452a20b49685cb921dd1",
+      "abi": "cdecl (no arguments), ret 0, void; preserves EBX/EBP/ESI/EDI and ESP",
+      "summary": "zeroes 0x134B at 005e9408 via 00532ff0, fills 0x40 dwords at 005e9420 with -1, clears enabled flag; if 004116d0 says no device attached returns; scans slots 0..31 via 00411710 / 00532e10(index,2) checking caps+4 bits 1 and 0 and 005330a0, recording last matching slot/device/enabled=1; if none, returns; builds four FeEffectParams blocks (types 0,3,4,9) with per-effect source words, gain cells 00657c28/00657be8/00657c08/100, repeat cell 00657c48 and a direction word derived from caps0 ((caps0&0xff00)==0x600 -> 90 else 0), calls accepted 005334e0 four times storing the low 16-bit result into table[slot] words +0/+2/+4/+6, then calls accepted 005333a0(slot, gain cell 00657bc8)."
+    }
+  ],
+  "callers": [
+    {
+      "function": "004121b0",
+      "evidence": "CALL 00411d20 at 004121b1; startup_sequence_call_004121b0 is accepted (source/recovered). No other caller in the binary."
+    }
+  ],
+  "callees": [
+    {
+      "va": "00532ff0",
+      "abi": "cdecl2 void RET0 (destination, bytes)",
+      "owner": "runs/676, partial-native-differential-verified; reused via typed declaration"
+    },
+    {
+      "va": "004116d0",
+      "abi": "cdecl0 bool RET0",
+      "owner": "runs/676, partial-native-differential-verified; reused via typed declaration"
+    },
+    {
+      "va": "00411710",
+      "abi": "cdecl1 bool RET0",
+      "owner": "runs/676, partial-native-differential-verified; reused via typed declaration"
+    },
+    {
+      "va": "00532e10",
+      "abi": "cdecl2 void* RET0 (index, mode=2)",
+      "owner": "source/recovered/Porsche.exe/input_state.cpp, partial-native-differential-verified; reused via fe_input_getstate_00532e10 declaration"
+    },
+    {
+      "va": "005330a0",
+      "abi": "cdecl1 uint32 RET0",
+      "owner": "runs/683, partial-native-differential-verified; reused via typed declaration"
+    },
+    {
+      "va": "005334e0",
+      "abi": "cdecl2 int32 RET0 (slot, const FeEffectParams*)",
+      "owner": "runs/688, accepted; FeEffectParams type from input_ff_frame_control_688.hpp reused without redefining 0069cb10 or the GUID blobs"
+    },
+    {
+      "va": "005333a0",
+      "abi": "cdecl2 void RET0 (slot, gain)",
+      "owner": "runs/688, accepted; reused via typed declaration"
+    }
+  ],
+  "owned_data": [
+    {
+      "va": "005e9408",
+      "end_exclusive": "005e953c",
+      "bytes": 308,
+      "kind": "loader-zero .bss state block: 005e9408 device pointer, 005e940c enabled, 005e9410 index, 005e9420..005e951f 32x8-byte result-word table, 005e9520..005e953b zero-only tail",
+      "readers": ["00411d20 (this run)", "00412030/00412090/004120f0 (run 400, cells 005e940c/005e9410/005e9420[0..3])"]
+    },
+    {
+      "va": "00657bc8",
+      "end_exclusive": "00657bcc",
+      "bytes": 4,
+      "kind": "loader-zero BSS gain cell read by 00411d20 and passed to 005333a0; no prior owner",
+      "readers": ["00411d20 (this run)"]
+    },
+    {
+      "va": "00657be8",
+      "end_exclusive": "00657bec",
+      "bytes": 4,
+      "kind": "loader-zero BSS gain cell for effect type 3; no prior owner",
+      "readers": ["00411d20 (this run)"]
+    },
+    {
+      "va": "00657c08",
+      "end_exclusive": "00657c0c",
+      "bytes": 4,
+      "kind": "loader-zero BSS gain cell for effect type 4; no prior owner",
+      "readers": ["00411d20 (this run)"]
+    },
+    {
+      "va": "00657c28",
+      "end_exclusive": "00657c2c",
+      "bytes": 4,
+      "kind": "loader-zero BSS gain cell for effect type 0; no prior owner",
+      "readers": ["00411d20 (this run)"]
+    },
+    {
+      "va": "00657c48",
+      "end_exclusive": "00657c4c",
+      "bytes": 4,
+      "kind": "loader-zero BSS repeat cell for effect type 9; no prior owner",
+      "readers": ["00411d20 (this run)"]
+    }
+  ],
+  "reused_providers": [
+    "input_zero_memory_00532ff0 / fe_input_any_attached_004116d0 / fe_input_device_attached_00411710 (runs/676)",
+    "fe_input_getstate_00532e10 (source/recovered input_state.cpp)",
+    "input_slot_enable_ff_005330a0 (runs/683)",
+    "frame_control_slot_create_005334e0 / input_slot_set_ff_gain_005333a0 and FeEffectParams (runs/688)",
+    "FrameControlIndexTuple_400 type (runs/400 frame_loop_clusters_400.hpp)"
+  ],
+  "ownership_decisions": [
+    "00411d20 has no functions.json entry and no body_ranges entry; unowned as of this batch start.",
+    "The 0x134-byte state block at 005e9408 has no defining symbol anywhere. Run400 declares extern frontier names for 005e940c/005e9410/005e9420[4] but provides no allocation; this run allocates the full block once (frame_control_ff_state_005e9408). Reconciling Run400's extern names to this single storage is an integration boundary, not a second allocation.",
+    "The five opaque config cells 00657bc8/00657be8/00657c08/00657c28/00657c48 are loader-zero BSS with 'no recovered owner' in runs/068 layout; owned here as 4-byte reads with unindexed writers.",
+    "No 0069cb10 record array, GUID blob or FeEffectParams redeclaration: all are reused from runs/688 via typed declarations."
+  ],
+  "confirmed_vs_hypothesis": {
+    "confirmed": [
+      "body bytes, size, ABI, callee list and absolute operands from pinned PE + disassembly + decompiled.c",
+      "all seven callees are accepted partial/full providers in the current manifest closure",
+      "effect request field values for all four blocks from raw assembly offsets cross-checked against decompiled.c",
+      "state/config cells are loader-zero BSS (run 068 layout and raw PE section map)"
+    ],
+    "hypotheses": [
+      "writers of the five config cells are unindexed; only the observed 4-byte reads are modelled",
+      "type_source bytes not written by 00411d20 for effect types 0/3/4 remain opaque stack; the harness seeds them deterministically on both sides"
+    ]
+  },
+  "boundaries": [
+    "Native proof uses controlled endpoints for all callees; live DirectInput devices, COM vtables and real effect objects are not exercised.",
+    "Single-storage reconciliation with Run400's extern state names remains an integration step.",
+    "Full startup/display/gameplay acceptance is outside this batch."
+  ]
+}

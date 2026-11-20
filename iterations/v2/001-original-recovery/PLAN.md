@@ -1,15 +1,19 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-20, Run698 shared audit PASS (001) for frozen 691/007+692/015+
-693/010 on 694. Build001 compiles400TUs/8projects;112names116refs,noEXE.
-Seven names close; fifty typed real children open (scene/route/teardown, FE
-calls, sim boundaries, player tables) — the next recovery layer. Registry1129
-adds eight full bodies2479B; README698 owns commands/bounds: 374nativecases,
-75mutations,991pins. 004152e0 FE main-loop is evidence-only (~70 callees).
-Accepted awaiting intake: 696/002 getclutptr352B (unlocks00562810/00563440);
-in flight: 695 (00411d20->004121b0), 697 (004a6c90+00590250). Next after:
-50 new children + unlocked 00562810/00563440, 00534b90/00534d40; complex
-parents on strong models once the Go window resets.
+Current 2026-11-20, Run699 shared audit PASS (001) for frozen 695/012+696/002+
+697/004 on 698. Build001 compiles403TUs/8projects;113names118refs,noEXE.
+Two namesclose (004a6c90,00590250); three children open (004a6bc0,
+005901b0, data006b499c). Registry1133 adds four full bodies1353B; README699
+owns commands/bounds: 2796nativecases,49mutations,998pins. Unlocked:
+00562810/00563440 by696; 004121b0 chain fed by695. Next recovery layer: the
+50 typed children from698 + 00562810/00563440/004a6bc0/005901b0 +
+00534b90/00534d40; complex parents (004152e0 FE main-loop, application_main_*)
+on strong models once the Go window resets.
+
+Historical 2026-11-20, Run698 shared audit PASS (001) for frozen 691/007+692/015+
+693/010 on 694: 400TUs,112names116refs; sevennamesclosed, fifty typed
+children opened; eightbodies2479B,374cases,75mutations,991pins.
+004152e0 FE main-loop is evidence-only (~70 callees).
 
 Historical 2026-11-20, Run694 shared audit PASS (001) for frozen 688/001+689/005+
 690/004: 397TUs,69names72refs; twonamesclosed, 004a6c90/00590250 opened;

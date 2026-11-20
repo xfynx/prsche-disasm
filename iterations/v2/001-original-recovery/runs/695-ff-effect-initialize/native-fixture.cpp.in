@@ -1,0 +1,510 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "ff_effect_initialize_695.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::FeEffectParams) == 0x4cu);
+static_assert(sizeof(porsche::frame_control_ff_state_005e9408) == 0x134u);
+
+enum : U { kMaxEvents = 96u };
+
+// Harness event kinds. Synthetic callsite setup (register/stack seeding, arg
+// pushes and RET framing in invoke_body) is harness code, not recovered
+// behavior; every event word records transport performed by the body under
+// test or by a shared controlled endpoint.
+enum EventKind : U {
+    kEvZero = 1u,
+    kEvAnyAttached = 2u,
+    kEvDevAttached = 3u,
+    kEvGetState = 4u,
+    kEvEnableFF = 5u,
+    kEvCreate = 6u,
+    kEvSetGain = 7u,
+};
+
+struct Event {
+    U kind;
+    U a[40];
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U event_count;
+    Event events[kMaxEvents];
+    B state[0x134];
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512] = {};
+static B fp_env[28] = {};
+
+static B* code = nullptr;
+static B* body_411d20 = nullptr;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;  // 0 = original x86, 1 = C++
+
+// Controlled endpoint configuration.
+struct MockDevice {
+    U caps0;  // read at +0 by the direction idiom
+    U caps4;  // read at +4 by the device scan
+};
+struct MockState {
+    U any_attached_ret;
+    U dev_attached[32];
+    U enable_ff[32];
+    U create_ret;
+    MockDevice devices[32];
+    void* device_ptr[32];
+};
+static MockState mock{};
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void divergence_exit(const char* msg) {
+    std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+    std::fflush(stdout);
+    ExitProcess(1);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        divergence_exit(msg);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu() {
+    const unsigned short cw = 0x037fu;
+    __asm {
+        fninit
+        fldcw cw
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    __asm {
+        fxsave fp_area
+        fnstenv fp_env
+        fldenv fp_env
+    }
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void check_fpu_clean(const FpuSnapshot& a, const FpuSnapshot& b) {
+    require(a.control == b.control, "FPU control");
+    require(a.status == b.status, "FPU status");
+    require(a.tag == b.tag, "FPU tag");
+    require(a.mxcsr == b.mxcsr, "FPU mxcsr");
+    require(std::memcmp(a.values, b.values, sizeof a.values) == 0, "FPU stack");
+}
+
+// Synthetic callsite harness: deterministic stack seed, callee-saved register
+// seeding, cdecl void call and ABI/frame checks. The original body is void
+// with no stack arguments, so the stack must be unchanged after RET.
+static void invoke_body(void* fn, FpuSnapshot& fp_out, U& abi_fail) {
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, esp
+        sub eax, 80h
+        mov edi, eax
+        mov ecx, 20h
+        mov eax, 0cccccccch
+        rep stosd
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        jmp done
+     bad:
+        mov fail, 1
+     done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+}
+
+static void push_event(U kind) {
+    require(trace.event_count < kMaxEvents, "event overflow");
+    Event& ev = trace.events[trace.event_count++];
+    ev.kind = kind;
+    std::memset(ev.a, 0, sizeof ev.a);
+}
+
+namespace porsche {
+
+// Controlled endpoint: 00532ff0 zero-fill. Records the byte count and the
+// destination offset relative to the owned state block (proves the raw VA
+// relocation and that the whole 0x134-byte block is cleared).
+void __cdecl input_zero_memory_00532ff0(void* destination, std::uint32_t bytes) {
+    push_event(kEvZero);
+    Event& ev = trace.events[trace.event_count - 1u];
+    ev.a[0] = bytes;
+    ev.a[1] = address(destination) - address(frame_control_ff_state_005e9408);
+    std::memset(destination, 0, bytes);
+}
+
+// Controlled endpoint: 004116d0 "any attached" predicate.
+bool __cdecl fe_input_any_attached_004116d0() {
+    push_event(kEvAnyAttached);
+    trace.events[trace.event_count - 1u].a[0] = mock.any_attached_ret;
+    return mock.any_attached_ret != 0u;
+}
+
+// Controlled endpoint: 00411710 per-slot attached predicate.
+bool __cdecl fe_input_device_attached_00411710(std::int32_t device_index) {
+    push_event(kEvDevAttached);
+    Event& ev = trace.events[trace.event_count - 1u];
+    ev.a[0] = static_cast<U>(device_index);
+    const U ret = (device_index >= 0 && device_index < 32)
+                      ? mock.dev_attached[device_index] : 0u;
+    ev.a[1] = ret;
+    return ret != 0u;
+}
+
+// Controlled endpoint: 00532e10 mode-2 capability fetch. Returns one of the
+// 32 controlled device objects; both the scan and the four direction reads go
+// through this endpoint.
+void* __cdecl fe_input_getstate_00532e10(std::uint32_t index, std::uint32_t mode) {
+    push_event(kEvGetState);
+    Event& ev = trace.events[trace.event_count - 1u];
+    ev.a[0] = index;
+    ev.a[1] = mode;
+    void* const device = (index < 32u) ? mock.device_ptr[index] : nullptr;
+    ev.a[2] = address(device);
+    return device;
+}
+
+// Controlled endpoint: 005330a0 FF-enable gate.
+std::uint32_t __cdecl input_slot_enable_ff_005330a0(std::int32_t slot_index) {
+    push_event(kEvEnableFF);
+    Event& ev = trace.events[trace.event_count - 1u];
+    ev.a[0] = static_cast<U>(slot_index);
+    const U ret = (slot_index >= 0 && slot_index < 32)
+                      ? mock.enable_ff[slot_index] : 0u;
+    ev.a[1] = ret;
+    return ret;
+}
+
+// Controlled endpoint: 005334e0 effect create. Records the slot, the full
+// 0x4c-byte request block and the configured return; the opaque untyped
+// type-source bytes are seeded deterministically by invoke_body's stack seed.
+std::int32_t __cdecl frame_control_slot_create_005334e0(
+    std::int32_t slot_index, const FeEffectParams* params) {
+    push_event(kEvCreate);
+    Event& ev = trace.events[trace.event_count - 1u];
+    ev.a[0] = static_cast<U>(slot_index);
+    for (U i = 0u; i < 0x4cu / 4u; ++i) {
+        ev.a[1u + i] = rd(params, i * 4u);
+    }
+    ev.a[20] = mock.create_ret;
+    return static_cast<std::int32_t>(mock.create_ret);
+}
+
+// Controlled endpoint: 005333a0 final gain set.
+void __cdecl input_slot_set_ff_gain_005333a0(std::int32_t slot_index,
+                                             std::int32_t gain) {
+    push_event(kEvSetGain);
+    Event& ev = trace.events[trace.event_count - 1u];
+    ev.a[0] = static_cast<U>(slot_index);
+    ev.a[1] = static_cast<U>(gain);
+}
+
+} // namespace porsche
+
+static void relocate_abs(B* p, U n, U old_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 4u <= n; ++i) {
+        if (rd(p, i) == old_va) {
+            wr(p, i, replacement);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected_count, "abs relocation count");
+}
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, U replacement,
+                         U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+static void init_fixture() {
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+    body_411d20 = code;
+
+    static const B body[769] = {@BODY_00411D20@};
+    std::memcpy(body_411d20, body, 769u);
+
+    // Absolute operands (all loader-zero BSS / opaque config cells).
+    const U state = address(porsche::frame_control_ff_state_005e9408);
+    relocate_abs(body_411d20, 769u, 0x005e9408u, state, 2u);
+    relocate_abs(body_411d20, 769u, 0x005e940cu, state + 0x04u, 4u);
+    relocate_abs(body_411d20, 769u, 0x005e9410u, state + 0x08u, 14u);
+    relocate_abs(body_411d20, 769u, 0x005e9420u, state + 0x18u, 2u);
+    relocate_abs(body_411d20, 769u, 0x005e9422u, state + 0x1au, 1u);
+    relocate_abs(body_411d20, 769u, 0x005e9424u, state + 0x1cu, 1u);
+    relocate_abs(body_411d20, 769u, 0x005e9426u, state + 0x1eu, 1u);
+    relocate_abs(body_411d20, 769u, 0x00657bc8u,
+                 address(&porsche::ff_init_gain_00657bc8), 1u);
+    relocate_abs(body_411d20, 769u, 0x00657be8u,
+                 address(&porsche::ff_init_config_00657be8), 1u);
+    relocate_abs(body_411d20, 769u, 0x00657c08u,
+                 address(&porsche::ff_init_config_00657c08), 1u);
+    relocate_abs(body_411d20, 769u, 0x00657c28u,
+                 address(&porsche::ff_init_config_00657c28), 1u);
+    relocate_abs(body_411d20, 769u, 0x00657c48u,
+                 address(&porsche::ff_init_config_00657c48), 1u);
+
+    // Call relocations (cdecl args are pushed by the body itself).
+    relocate_rel(body_411d20, 769u, 0x00411d20u, 0x00532ff0u,
+                 address(reinterpret_cast<const void*>(&porsche::input_zero_memory_00532ff0)), 1u);
+    relocate_rel(body_411d20, 769u, 0x00411d20u, 0x004116d0u,
+                 address(reinterpret_cast<const void*>(&porsche::fe_input_any_attached_004116d0)), 1u);
+    relocate_rel(body_411d20, 769u, 0x00411d20u, 0x00411710u,
+                 address(reinterpret_cast<const void*>(&porsche::fe_input_device_attached_00411710)), 1u);
+    relocate_rel(body_411d20, 769u, 0x00411d20u, 0x00532e10u,
+                 address(reinterpret_cast<const void*>(&porsche::fe_input_getstate_00532e10)), 5u);
+    relocate_rel(body_411d20, 769u, 0x00411d20u, 0x005330a0u,
+                 address(reinterpret_cast<const void*>(&porsche::input_slot_enable_ff_005330a0)), 1u);
+    relocate_rel(body_411d20, 769u, 0x00411d20u, 0x005334e0u,
+                 address(reinterpret_cast<const void*>(&porsche::frame_control_slot_create_005334e0)), 4u);
+    relocate_rel(body_411d20, 769u, 0x00411d20u, 0x005333a0u,
+                 address(reinterpret_cast<const void*>(&porsche::input_slot_set_ff_gain_005333a0)), 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0,
+            "FlushInstructionCache");
+
+    for (U i = 0u; i < 32u; ++i) {
+        mock.device_ptr[i] = &mock.devices[i];
+    }
+}
+
+struct Case {
+    U any_attached;
+    U attached_mask;       // bit i = device i attached
+    U enable_mask;         // bit i = enable_ff(i) returns 1
+    U caps0_select;        // caps0 written to the selected device
+    U caps4_base;          // caps4 written to device i = base + i
+    U create_ret;
+    U gain;
+    U cfg_be8;
+    U cfg_c08;
+    U cfg_c28;
+    U cfg_c48;
+};
+
+static void seed_case(const Case& c) {
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(porsche::frame_control_ff_state_005e9408, 0xa5,
+                sizeof porsche::frame_control_ff_state_005e9408);
+    porsche::ff_init_gain_00657bc8 = c.gain;
+    porsche::ff_init_config_00657be8 = c.cfg_be8;
+    porsche::ff_init_config_00657c08 = c.cfg_c08;
+    porsche::ff_init_config_00657c28 = c.cfg_c28;
+    porsche::ff_init_config_00657c48 = c.cfg_c48;
+
+    mock.any_attached_ret = c.any_attached;
+    mock.create_ret = c.create_ret;
+    for (U i = 0u; i < 32u; ++i) {
+        mock.dev_attached[i] = (c.attached_mask >> i) & 1u;
+        mock.enable_ff[i] = (c.enable_mask >> i) & 1u;
+        mock.devices[i].caps0 = (i == 5u) ? c.caps0_select : 0x0000u;
+        mock.devices[i].caps4 = c.caps4_base + i;
+    }
+}
+
+static void capture_state() {
+    std::memcpy(trace.state, porsche::frame_control_ff_state_005e9408, 0x134u);
+}
+
+static void assert_match() {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    require(trace.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < trace.event_count; ++i) {
+        if (trace.events[i].kind != expected.events[i].kind) {
+            std::printf("event-kind mismatch idx=%u exp=%u got=%u case=%u which=%u\n",
+                        i, expected.events[i].kind, trace.events[i].kind, cases, which);
+            divergence_exit("event kind");
+        }
+        if (std::memcmp(trace.events[i].a, expected.events[i].a,
+                        sizeof expected.events[i].a) != 0) {
+            for (U w = 0u; w < 21u; ++w) {
+                if (trace.events[i].a[w] != expected.events[i].a[w]) {
+                    std::printf("event-word mismatch idx=%u kind=%u word=%u exp=%08x got=%08x case=%u which=%u\n",
+                                i, trace.events[i].kind, w, expected.events[i].a[w],
+                                trace.events[i].a[w], cases, which);
+                    break;
+                }
+            }
+            divergence_exit("event words");
+        }
+    }
+    require(std::memcmp(trace.state, expected.state, sizeof trace.state) == 0,
+            "state block");
+    check_fpu_clean(expected.fp, trace.fp);
+}
+
+static void run_case(const Case& c) {
+    ++cases;
+
+    // Original x86 side.
+    which = 0u;
+    seed_case(c);
+    U abi = 0u;
+    FpuSnapshot fp{};
+    invoke_body(reinterpret_cast<void*>(body_411d20), fp, abi);
+    trace.abi_fail = abi;
+    trace.fp = fp;
+    capture_state();
+    expected = trace;
+
+    // C++ side.
+    which = 1u;
+    seed_case(c);
+    abi = 0u;
+    invoke_body(reinterpret_cast<void*>(&porsche::ff_effect_initialize_00411d20),
+                fp, abi);
+    trace.abi_fail = abi;
+    trace.fp = fp;
+    capture_state();
+
+    assert_match();
+}
+
+int main() {
+    SetUnhandledExceptionFilter(fault_handler);
+    init_fixture();
+
+    static const Case table[] = {
+        // No attached input device at all.
+        {0u, 0x00000000u, 0xffffffffu, 0x0600u, 0x0003u, 0u, 50u, 1u, 2u, 3u, 4u},
+        // Devices attached but none capable (caps4 base 0 => bits 1/0 clear).
+        {1u, 0xffffffffu, 0xffffffffu, 0x0600u, 0x0000u, 0u, 50u, 1u, 2u, 3u, 4u},
+        // Slot 0 selected, direction 0x5a (caps0&0xff00 == 0x600).
+        {1u, 0x00000001u, 0xffffffffu, 0x0600u, 0x0003u, 0u, 0u, 1u, 2u, 3u, 4u},
+        // Slot 5 selected, direction 0 (caps0&0xff00 != 0x600).
+        {1u, 0x00000020u, 0xffffffffu, 0x0700u, 0x0003u, 1u, 100u, 1u, 2u, 3u, 4u},
+        // Slot 31 selected, create returns 19, gain clamps not applied here.
+        {1u, 0x80000000u, 0xffffffffu, 0x0600u, 0x0003u, 19u, 10000u,
+         0x72e4u, 0x7d0u, 0x186a0u, 0x640u},
+        // Multiple attached: last matching slot wins (scan does not break).
+        {1u, 0x00000105u, 0xffffffffu, 0x0600u, 0x0003u, 7u, -1, 5u, 6u, 7u, 8u},
+        // Enable gate rejects the only attached slot.
+        {1u, 0x00000004u, 0x00000000u, 0x0600u, 0x0003u, 0u, 50u, 1u, 2u, 3u, 4u},
+        // Caps bit 0 only (no bit 1) -> not selected.
+        {1u, 0x00000002u, 0xffffffffu, 0x0600u, 0x0001u, 0u, 50u, 1u, 2u, 3u, 4u},
+        // Caps bit 1 only (no bit 0) -> not selected.
+        {1u, 0x00000002u, 0xffffffffu, 0x0600u, 0x0002u, 0u, 50u, 1u, 2u, 3u, 4u},
+        // Direction boundary: caps0 low byte/upper bits vary but &0xff00 == 0x600.
+        {1u, 0x00000020u, 0xffffffffu, 0x16ffu, 0x0003u, 31u, 55u, 9u, 8u, 7u, 6u},
+        // Large create return stored as 16-bit word.
+        {1u, 0x00000008u, 0xffffffffu, 0x0600u, 0x0003u, 0x1fffeu, 999u,
+         11u, 12u, 13u, 14u},
+        // All slots attached and enabled, caps0 != 0x600, negative gain.
+        {1u, 0xffffffffu, 0xffffffffu, 0x0500u, 0x0103u, 3u, -100,
+         21u, 22u, 23u, 24u},
+        // Sparse enable mask: only slot 9 enabled among attached.
+        {1u, 0xffffffffu, 0x00000200u, 0x0600u, 0x0003u, 12u, 7u,
+         31u, 32u, 33u, 34u},
+        // Zero config cells (loader-zero raw state) with any_attached = 1.
+        {1u, 0x00000001u, 0xffffffffu, 0x0600u, 0x0003u, 0u, 0u, 0u, 0u, 0u, 0u},
+    };
+    for (const Case& c : table) {
+        run_case(c);
+    }
+
+    std::printf("ff_effect_initialize_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    std::fflush(stdout);
+    return 0;
+}

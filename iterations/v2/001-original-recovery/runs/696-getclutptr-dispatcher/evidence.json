@@ -1,0 +1,69 @@
+{
+  "run": 696,
+  "batch": "getclutptr-dispatcher",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "bodies": [
+    {
+      "va": "005346d0",
+      "range_inclusive": ["005346d0", "0053482f"],
+      "bytes": 352,
+      "sha256": "2290080f477c0adae8a9361eed4bf4754b621d67289fb7e046380b3c8f6b5dc7",
+      "abi": "__cdecl (const void* descriptor, uint32_t* palette) -> uint32_t* in EAX; cdecl stack cleanup by caller, 0x200-byte local scratch",
+      "subsystem": "\\real\\cmn\\depthconv.c getclutptr: descriptor clut-type decode -> 1024-byte BGRA8888 palette conversion",
+      "caller": {"va": "00534cb0/00534f00-ish", "parent": "real 005350e0 depth conversion", "binding": "porsche::render_getclutptr_from_resource_005346d0"},
+      "callers": ["decompiled.c 205344/205447 (005350e0 depth conversion)", "decompiled.c 213518 (resource/texture path)", "decompiled.c 231618/232135 (depth conversion consumers)"],
+      "callees": ["00537fb0", "00571160", "00570820", "00570780 (x2)", "00570990", "00570920", "00570ff0", "00570260", "005debf0 (indirect)"],
+      "state": [
+        "00537fb0 returns clut: type in dword[clut]&0xff, signed int16 count in word[clut+4], clut payload at clut+0x10",
+        "Type 0x2a returns clut+0x10 with no palette write; null lookup returns render_pixel_palette_006b4b20[256] (Run380)",
+        "For other types clears dword at palette+0x3fc (palette[0xff]=0) before dispatch",
+        "0x24 rgb24 and 0x22 vga6 leaves take (count, src, dst) argument order; 0x29/0x2d/0x2c/0x2e take (dst, src, count)",
+        "0x23 swaps 0x100 RB555 words into a 0x200-byte scratch then expands 0x100 keyed 5551 words into the palette",
+        "Unsupported types write 005bb3e4 file pointer to 005deb74, 0xca to 005deb78 and call [005debf0] with 005bb3fc message and the type"
+      ]
+    }
+  ],
+  "literal_bytes": [
+    {"va": "005bb3fc", "bytes": 41, "hex": "676574636c7574707472202d20554e535550504f5254454420434c5554205459504520307825780a00", "text": "getclutptr - UNSUPPORTED CLUT TYPE 0x%x\\n\\0", "owner": "Run696 (new)"}
+  ],
+  "ownership": {
+    "registry": "source/recovered/functions.json: 005346d0 appears only in Run689 verification_boundary prose; zero entry/body_ranges overlaps (nearest owned bodies 005345e0..00534629 and 00534830..005349d2). 0x005bb3fc has no owner across source/recovered, all run TUs/headers and shared manifests",
+    "newly_owned_cells": ["005346d0..0053482f (352B body)", "005bb3fc (41B .rdata message)"],
+    "reused_providers": [
+      "runs/689 render_clut16_from_resource_00534830 plus render_clut16_file_005bb3e4 and render_palette_color_key_006a6420 typed declarations (not redefined)",
+      "runs/689 render_palette_5551_to_8888_key_00570780 / render_palette_565_to_8888_key_00570820",
+      "runs/685 render_palette_swap_rb555_00570260",
+      "runs/686 render_palette_a555_to_8888_00570920 / a565 / vga6 / rgb24",
+      "runs/536/537 render_resource_node_palette_00537fb0 (typed declaration)",
+      "runs/380 render_pixel_palette_006b4b20[256] (typed declaration)",
+      "source/include/porsche diagnostic transport 005deb74/005deb78/005debf0"
+    ],
+    "no_new_arrays_or_callbacks": true
+  },
+  "proof": {
+    "command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/696-getclutptr-dispatcher/native-config.json --attempt 002",
+    "receipt": "local/experiments/v2-getclutptr-dispatcher-696/002/receipt.json",
+    "status": "PASS",
+    "variants": ["/Od", "/O2"],
+    "cases_per_variant": 104,
+    "measured_case_runs": 208,
+    "material_mutations": 14,
+    "mutation_controls_detected": 14,
+    "pins": 227,
+    "receipts": 82,
+    "original_x86_vs_cpp": "relocated raw original body from pinned PE executed in RWX slot against the C++ production TU; compared lookup/diagnostic event order and args, used return pointer, ABI (ESP/EBP/EBX/ESI/EDI), FPU state and full 1024-byte palette plus 2048-byte descriptor bytes across 9 counts x 11 types, 3 high headers and 2 null-lookup cases"
+  },
+  "boundaries": [
+    "00537fb0 descriptor lookup and 005debf0 diagnostic sink are controlled endpoints proving bounded transport only",
+    "Counts bounded to signed int16 header domain and <=256 for the 1024-byte caller palette; original unchecked overflow at larger counts not exercised",
+    "Original 0x200 scratch is uninitialized outside the 0x23 path and never read there; no invented zeroing",
+    "006a6420 runtime writer remains unrecovered (inherited Run689 boundary)",
+    "Real 005350e0 depth conversion, live device/asset, full startup and gameplay acceptance remain open"
+  ],
+  "attempt_history": [
+    {"attempt": "001", "result": "failed: getclutptr-count-dword mutation read a 32-bit count and crashed with AV instead of a bounded divergence marker; base /Od and /O2 variants passed"},
+    {"attempt": "002", "result": "PASS, final inputs (count control replaced with bounded off-by-one mutation)"}
+  ]
+}

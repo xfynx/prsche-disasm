@@ -1,0 +1,175 @@
+{
+  "run": 697,
+  "experiment": "local/experiments/v2-audio-period-callback-and-probe-message-697",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00590250",
+      "bytes": 56,
+      "sha256": "941bc12ee93b6a85c61f21c7cd88e887c9180c36015ff5c6480b1ef64bbbbfda",
+      "token": "@BODY_00590250@"
+    },
+    {
+      "va": "004a6c90",
+      "bytes": 176,
+      "sha256": "c6b4dc0f14b0041bfc02853bb07072e4d60c01851ff56422174d92ed055c4753",
+      "token": "@BODY_004A6C90@"
+    },
+    {
+      "va": "005d1444",
+      "bytes": 40,
+      "sha256": "aaa3ccc5e9695f906f60f3e09e576968018c24587c393c7c4b3b0d6f777e3626",
+      "token": "@STR_005D1444@"
+    },
+    {
+      "va": "005d146c",
+      "bytes": 5,
+      "sha256": "06c1fd6af7b9d480ac9e89c7b6fea8eb8c6e95d2cd96ee20222324bfcd4792fb",
+      "token": "@STR_005D146C@"
+    }
+  ],
+  "pass_marker": "audio_period_probe_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 300,
+  "mutations": [
+    {
+      "name": "wrong-notify-byte",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    notify[selector] = static_cast<std::uint8_t>(flags);",
+      "new": "    notify[selector] = static_cast<std::uint8_t>(selector);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "drop-callback-store",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    audio_device_callback_006b4898 = 0x005901b0u;",
+      "new": "    // mutated: callback pointer store dropped.",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-constant",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    audio_device_callback_006b4898 = 0x005901b0u;",
+      "new": "    audio_device_callback_006b4898 = 0x005901b1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "inverted-active-gate",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    if (audio_system_active_006b499c != 0u) {",
+      "new": "    if (audio_system_active_006b499c == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-offset",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "            (&audio_ds_notify_value_006b4a08)[selector << 2u];",
+      "new": "            (&audio_ds_notify_value_006b4a08)[(selector << 2u) + 1u];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-args",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "        audio_period_callback_005901b0(static_cast<std::int32_t>(flags),\n                                       period_value);",
+      "new": "        audio_period_callback_005901b0(static_cast<std::int32_t>(period_value),\n                                       flags);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-return",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    return 0;",
+      "new": "    return 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "drop-period-callback-call",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "        audio_period_callback_005901b0(static_cast<std::int32_t>(flags),\n                                       period_value);",
+      "new": "        // mutated: period callback call dropped.",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-suffix",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    append_string(buffer, audio_bank_suffix_text_005d146c);",
+      "new": "    append_string(buffer, \".bnx\");",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-open-flags",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    void* const handle = resource_open_quiet_0059d9b0(buffer, 0x10u);",
+      "new": "    void* const handle = resource_open_quiet_0059d9b0(buffer, 0x11u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "inverted-handle-gate",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    if (handle == nullptr) {",
+      "new": "    if (handle != nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-diag-format",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "            audio_bank_load_fail_text_005d1444,\n            reinterpret_cast<std::uint32_t>(buffer));",
+      "new": "            \".bad\",\n            reinterpret_cast<std::uint32_t>(buffer));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-predicate-name",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    const std::int32_t bank_result = resource_predicate_0059dd00(buffer);",
+      "new": "    const std::int32_t bank_result = resource_predicate_0059dd00(text);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-kind",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    (void)audio_bank_finalize_004a6bc0(text, bank_result, handle, kind);",
+      "new": "    (void)audio_bank_finalize_004a6bc0(text, bank_result, handle, kind + 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-text",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    (void)audio_bank_finalize_004a6bc0(text, bank_result, handle, kind);",
+      "new": "    (void)audio_bank_finalize_004a6bc0(buffer, bank_result, handle, kind);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "drop-finalize",
+      "source": "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+      "old": "    (void)audio_bank_finalize_004a6bc0(text, bank_result, handle, kind);",
+      "new": "    // mutated: bank finalize call dropped.",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

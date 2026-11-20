@@ -4,18 +4,20 @@ Updated 2026-11-20. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run698](iterations/v2/001-original-recovery/runs/698-app-startup-cluster-integration/README.md)
-compiles 400 C++ translation units across 8 projects. The link has 112 unresolved
-names / 116 references. **There is no recovered playable C++ game executable yet.**
+[Run699](iterations/v2/001-original-recovery/runs/699-unlocked-callers-integration/README.md)
+compiles 403 C++ translation units across 8 projects. The link has 113 unresolved
+names / 118 references. **There is no recovered playable C++ game executable yet.**
 
-Run698 integrates 691/692/693: eight full original bodies (2,479 code bytes: sim
-teardown `004a88a0`/`004a8cd0`/`004b68f0`, FE-entry `00413ea0`/`00414eb0`, view
-lifecycle `004640b0`/`00467740`/`00468fb0`). Native comparisons pass 374 measured
-cases and 75 material mutation controls at `/Od`/`/O2`; shared audit PASS, 991
-source pins. Seven frontier names close; fifty typed real children (scene/route/
-teardown, FE calls, sim boundaries) open as the next layer. `004152e0` (2,674B
-FE main-loop) is evidence-only, ~70 callees open. Accepted awaiting intake:
-Run696 getclutptr. In flight: 695, 697.
+Run699 integrates 695/696/697: four full original bodies (1,353 code bytes: FF
+`00411d20`, CLUT dispatcher `005346d0`, audio `00590250`/`004a6c90`). Native
+comparisons pass 2,796 measured cases and 49 material mutation controls at
+`/Od`/`/O2`; shared audit PASS, 998 source pins. Two frontier names close;
+`004a6bc0`/`005901b0`/`006b499c` open; `00562810`/`00563440` unlocked.
+Next layer: the 50 typed children opened by Run698.
+
+Historical: Run698 integrated 691/692/693 (eight full bodies, 2,479B; 374
+cases / 75 mutations / 991 pins; 400 TUs, 112 names / 116 refs; FE main-loop
+`004152e0` evidence-only).
 
 Historical: Run694 integrated 688/689/690 (seven full bodies, 1,868B; 24,380
 cases / 72 mutations / 984 pins; 397 TUs, 69 names / 72 refs).

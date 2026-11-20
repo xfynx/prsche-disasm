@@ -1,0 +1,185 @@
+{
+  "run": 695,
+  "experiment": "local/experiments/v2-ff-effect-initialize-695",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize",
+    "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain",
+    "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves",
+    "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00411d20",
+      "bytes": 769,
+      "sha256": "803aba33930fa4caf35b47a41398bd6cade470407cc3452a20b49685cb921dd1",
+      "token": "@BODY_00411D20@"
+    }
+  ],
+  "pass_marker": "ff_effect_initialize_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-zero-size",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "frame_control_ff_state_005e9408, 0x134u",
+      "new": "frame_control_ff_state_005e9408, 0x133u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-fill-count",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "for (std::int32_t i = 0; i < 0x40; ++i)",
+      "new": "for (std::int32_t i = 0; i < 0x3f; ++i)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-fill-value",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "words[i] = 0xffffffffu;",
+      "new": "words[i] = 0xfffffffeu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "skip-any-attached-gate",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "if (!fe_input_any_attached_004116d0()) {",
+      "new": "if (false) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scan-bound",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "for (std::int32_t slot = 0; slot < 32; ++slot) {",
+      "new": "for (std::int32_t slot = 0; slot < 31; ++slot) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-caps-bit1",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "if ((caps & 2u) == 0u || (caps & 1u) == 0u) {",
+      "new": "if ((caps & 4u) == 0u || (caps & 1u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-caps-bit0",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "if ((caps & 2u) == 0u || (caps & 1u) == 0u) {",
+      "new": "if ((caps & 2u) == 0u || (caps & 8u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "skip-enable-gate",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "if (input_slot_enable_ff_005330a0(slot) == 0u) {",
+      "new": "if (false) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-index-store",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "*u32_at(kIndexOff) = static_cast<std::uint32_t>(slot);",
+      "new": "*u32_at(kIndexOff) = static_cast<std::uint32_t>(slot ^ 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-enabled-value",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "*u32_at(kEnabledOff) = 1u;",
+      "new": "*u32_at(kEnabledOff) = 2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-direction-condition",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "const std::uint32_t flag = (diff == 0u) ? 0u : 0xffffffffu;",
+      "new": "const std::uint32_t flag = (diff != 0u) ? 0u : 0xffffffffu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-direction-constant",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "return (flag & 0xffffffa6u) + 0x5au;",
+      "new": "return (flag & 0xffffffa6u) + 0x5bu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-effect0-type",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "p.type_00 = 0u;",
+      "new": "p.type_00 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-effect1-source",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "set_source(p, 3u, 0x72e4u);",
+      "new": "set_source(p, 3u, 0x72e5u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-effect2-gain-cell",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "p.gain_38 = ff_init_config_00657c08;",
+      "new": "p.gain_38 = ff_init_config_00657c28;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-effect3-repeat-cell",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "p.repeat_44 = ff_init_config_00657c48;",
+      "new": "p.repeat_44 = ff_init_config_00657c28;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-result-word-index",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "store_result_word(selected, 1u,",
+      "new": "store_result_word(selected, 2u,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "skip-final-gain",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "input_slot_set_ff_gain_005333a0(static_cast<std::int32_t>(selected),",
+      "new": "if (false) input_slot_set_ff_gain_005333a0(static_cast<std::int32_t>(selected),",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-final-gain-arg",
+      "source": "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp",
+      "old": "static_cast<std::int32_t>(ff_init_gain_00657bc8));",
+      "new": "static_cast<std::int32_t>(ff_init_gain_00657bc8) + 1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

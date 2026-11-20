@@ -1,0 +1,54 @@
+{
+  "run": 697,
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "query": "unowned typed boundaries declared by accepted Run690: audio_period_callback_set_00590250 and application_audio_probe_message_004a6c90",
+  "bodies": [
+    {
+      "va": "00590250",
+      "end_va": "00590287",
+      "bytes": 56,
+      "sha256": "941bc12ee93b6a85c61f21c7cd88e887c9180c36015ff5c6480b1ef64bbbbfda",
+      "abi": "cdecl1 int32 RET0 (one stack arg at ESP+4; plain RET; EAX=0)",
+      "note": "This resolves the Run690 extern declaration exactly; the (uint,uint) pair in the task note is the 005901b0 callee call, not 00590250's own signature."
+    },
+    {
+      "va": "004a6c90",
+      "end_va": "004a6d3f",
+      "bytes": 176,
+      "sha256": "c6b4dc0f14b0041bfc02853bb07072e4d60c01851ff56422174d92ed055c4753",
+      "abi": "cdecl2 void (caller ignores EAX; accepted Run690 declares void)",
+      "note": "EAX is 0 on the diagnostic path and the 004a6bc0 return on the success path; no scalar is claimed, matching Run690."
+    }
+  ],
+  "data_cells": [
+    {"va": "005d1444", "bytes": 40, "sha256": "aaa3ccc5e9695f906f60f3e09e576968018c24587c393c7c4b3b0d6f777e3626", "content": "AudioCmn_LoadBank(): DID NOT LOAD '%s'\\n", "owner": "new in this TU (was unowned Ghidra s_AudioCmn_LoadBank():_DID_NOT_LOA_005d1444)"},
+    {"va": "005d146c", "bytes": 5, "sha256": "06c1fd6af7b9d480ac9e89c7b6fea8eb8c6e95d2cd96ee20222324bfcd4792fb", "content": ".bnk", "owner": "new in this TU (was unowned DAT_005d146c)"}
+  ],
+  "reused_canonical_state": [
+    {"va": "006b499c", "symbol": "audio_system_active_006b499c", "owner": "frame_loop_clusters_400", "role": "read: active gate in 00590250"},
+    {"va": "006b4886", "symbol": "audio_ds_notify_kind_006b4886", "owner": "audio_directsound_state_462", "role": "write: low byte of flags at +selector"},
+    {"va": "006b4898", "symbol": "audio_device_callback_006b4898", "owner": "audio_device_lifecycle_455", "role": "write: constant 0x005901b0"},
+    {"va": "006b4a08", "symbol": "audio_ds_notify_value_006b4a08", "owner": "audio_directsound_state_462", "role": "read: period dword at +selector*16 (device state +0x148)"}
+  ],
+  "callees": [
+    {"va": "005901b0", "abi": "cdecl2 void(int32 flags, uint32 period_value)", "decision": "unowned typed boundary; no body or callback invented"},
+    {"va": "0059d9b0", "abi": "cdecl2 void*(const char* name, uint32 flags)", "decision": "reuse accepted Run649 resource_open_quiet_0059d9b0"},
+    {"va": "0059dd00", "abi": "cdecl1 int32(const char* path)", "decision": "reuse accepted resource_predicate_0059dd00"},
+    {"va": "005a177b", "abi": "cdecl2 void(const char* format, uint32 detail)", "decision": "reuse existing declared diagnostic boundary render_display_texture_report_005a177b"},
+    {"va": "004a6bc0", "abi": "cdecl4 int32(const char* text, int32 bank_result, const void* handle, uint32 kind)", "decision": "unowned typed boundary; four stack args confirmed from callee prologue and caller argument-area reuse"}
+  ],
+  "callers": [
+    {"va": "00565c70", "call": "00590250(period_flags)", "owner": "Run690 accepted period control"},
+    {"va": "004a8b80", "call": "004a6c90(buffer, 7)", "owner": "Run690 accepted probe start"}
+  ],
+  "semantics": {
+    "00590250": "selector = flags & 0xffffff1f (AND AL,0x1f preserves upper 24 bits); store CL at 006b4886+selector; store 0x005901b0 at 006b4898; if byte 006b499c nonzero, read [006b4a08+selector*16] and call 005901b0(flags, period)",
+    "004a6c90": "build <text>.bnk in 0x50-byte stack buffer; open with 0059d9b0(name,0x10); if null report 005a177b(format,buffer) and return; else predicate 0059dd00(name) and finalize 004a6bc0(text,result,handle,kind)"
+  },
+  "boundaries": [
+    "00590250 selector != 0 / upper-24-bit wild addresses have no accepted host mapping (same boundary as Run690 group 1..31); proof domain is observed period group 0",
+    "004a6c90 0x50-byte local has no original bounds check; proof text inputs fit with the 4-byte .bnk suffix",
+    "live file/device effects, real bank registration and 005901b0/004a6bc0 bodies remain unrecovered and explicit"
+  ]
+}
