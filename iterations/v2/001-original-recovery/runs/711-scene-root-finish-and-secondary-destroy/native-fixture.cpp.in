@@ -1,0 +1,481 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "scene_root_finish_secondary_destroy_711.hpp"
+#include "porsche/application_state.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+enum : U { kMaxEvents = 64u, kMaxFinishCases = 256u, kMaxDestroyCases = 16u };
+enum EventKind : U { kEvDestroy = 1u };
+
+struct Event { U node; U arg; };
+struct Trace {
+    U abi_fail;
+    U count;
+    Event events[kMaxEvents];
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+static U g_case = 0u;
+
+static B* code = nullptr;
+static B* slot_finish = nullptr;
+static B* slot_destroy = nullptr;
+
+static B self_finish[0x40];
+static B bound_table[0x400];
+static B self_destroy[0x40];
+static B nodes[8][0x20];
+static U controlled_vtable[2];
+
+static U g_write_target = 0u;
+static U g_write_next = 0u;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* p, U offset = 0u) {
+    U value = 0u;
+    std::memcpy(&value, static_cast<const B*>(p) + offset, 4u);
+    return value;
+}
+
+static void store32(void* p, U offset, U value) {
+    std::memcpy(static_cast<B*>(p) + offset, &value, 4u);
+}
+
+static U tag_pointer(const void* p) {
+    struct Span { const void* base; U span; U tag; };
+    const Span spans[] = {
+        {self_finish, sizeof self_finish, 1u},
+        {bound_table, sizeof bound_table, 2u},
+        {self_destroy, sizeof self_destroy, 3u},
+        {nodes[0], sizeof nodes[0], 0x10u},
+        {nodes[1], sizeof nodes[1], 0x11u},
+        {nodes[2], sizeof nodes[2], 0x12u},
+        {nodes[3], sizeof nodes[3], 0x13u},
+        {nodes[4], sizeof nodes[4], 0x14u},
+        {nodes[5], sizeof nodes[5], 0x15u},
+        {nodes[6], sizeof nodes[6], 0x16u},
+        {nodes[7], sizeof nodes[7], 0x17u},
+    };
+    if (p == nullptr) return 0xffffffffu;
+    const U value = address(p);
+    for (const Span& s : spans) {
+        const U base = address(s.base);
+        if (value >= base && value - base < s.span) {
+            return (s.tag << 16u) | (value - base);
+        }
+    }
+    std::printf("divergence untagged-pointer case=%u which=%u value=%08x\n",
+                g_case, which, value);
+    std::fflush(stdout);
+    ExitProcess(1);
+}
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u fn=%s\n",
+                    why, g_case, which, which == 0u ? "original" : "cpp");
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip,
+                g_case, which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+// ---- Canonical arena storage (same layout as the accepted Run706 fixture) ---
+porsche::ApplicationStateArena porsche::application_state_006573e8;
+
+std::uint32_t& porsche::ApplicationStateArena::word(std::uint32_t va) {
+    return words_[(va - application_state_base_va) / 4u];
+}
+
+// ---- Controlled virtual-delete endpoint --------------------------------------
+// Both the injected original bytes and the compiled C++ call this same thunk
+// through the vtable slot at original VA 0x005b3c98. It is harness code only.
+static void __cdecl mock_destroy_handler(void* node, U arg) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& ev = trace.events[trace.count++];
+    ev.node = tag_pointer(node);
+    ev.arg = arg;
+    if (g_write_target != 0u) {
+        store32(reinterpret_cast<void*>(static_cast<std::uintptr_t>(g_write_target)),
+                8u, g_write_next);
+    }
+}
+
+// __thiscall-like: ECX=node, one stack dword (1) pushed by the caller, callee
+// pops that dword with RET 4. ECX is volatile; EBX/ESI/EDI/EBP are preserved.
+static void __declspec(naked) mock_destroy_thunk() {
+    __asm {
+        push ebp
+        mov ebp, esp
+        push dword ptr [ebp + 8]
+        push ecx
+        call mock_destroy_handler
+        add esp, 8
+        pop ebp
+        ret 4
+    }
+}
+
+// ---- Original bodies --------------------------------------------------------
+static const B body_finish[] = {@BODY_0044FC30@};
+static const B body_destroy[] = {@BODY_0053F120@};
+
+static void set_abs(B* body, U size, U old_value, const void* replacement, U expected) {
+    U found = 0u;
+    const U target = address(replacement);
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (load32(body, i) == old_value) {
+            store32(body, i, target);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected, "absolute relocation count");
+}
+
+static void init_fixture() {
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 0x1000u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_finish = code + 0x000u;
+    slot_destroy = code + 0x200u;
+    std::memcpy(slot_finish, body_finish, sizeof body_finish);
+    std::memcpy(slot_destroy, body_destroy, sizeof body_destroy);
+
+    // Verify the raw original vtable immediate before any transport is applied.
+    require(load32(slot_destroy, 8u) == 0x005b3c94u, "raw vtable immediate");
+
+    // 0053f120 stores that raw VA into [self] but dispatches through the
+    // caller-provided vtable pointer of each node. Supply a controlled host
+    // table through node+0 on both sides; no fixed-address mapping is needed.
+    controlled_vtable[0] = 0x0053f120u;
+    controlled_vtable[1] = address(&mock_destroy_thunk);
+
+    set_abs(slot_finish, sizeof body_finish, 0x00657430u,
+            &porsche::application_state_006573e8.word(0x00657430u), 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 0x1000u) != 0,
+            "FlushInstructionCache code");
+}
+
+// ---- ABI-checking invoke helpers (harness code) ------------------------------
+static U invoke_fast3(void* fn, U self, U arg, U& fail) {
+    U before = 0u, frame = 0u, result = 0u, bad = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg
+        mov eax, 0a5a5a500h
+        mov ecx, self
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        cmp esp, before
+        jne bad_label
+        cmp ebp, frame
+        jne bad_label
+        cmp ebx, 13579bdfh
+        jne bad_label
+        cmp esi, 2468ace0h
+        jne bad_label
+        cmp edi, 10203040h
+        je done
+    bad_label:
+        mov bad, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    fail = bad;
+    return result;
+}
+
+static void invoke_fast1(void* fn, U self, U& fail) {
+    U before = 0u, frame = 0u, bad = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ecx, self
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad_label
+        cmp ebp, frame
+        jne bad_label
+        cmp ebx, 13579bdfh
+        jne bad_label
+        cmp esi, 2468ace0h
+        jne bad_label
+        cmp edi, 10203040h
+        je done
+    bad_label:
+        mov bad, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    fail = bad;
+}
+
+// ---- 0044fc30 proof ---------------------------------------------------------
+struct FinishSpec { U reverse, count, pattern, value; };
+static FinishSpec finish_cases[kMaxFinishCases];
+
+struct FinishSnapshot {
+    U abi;
+    U arena;
+    B self[sizeof self_finish];
+    B table[sizeof bound_table];
+};
+
+static void seed_finish(const FinishSpec& spec) {
+    std::memset(self_finish, 0xa5u, sizeof self_finish);
+    store32(self_finish, 0u, address(bound_table));
+    store32(self_finish, 4u, 0xdeadbeefu);
+    std::memset(bound_table, 0xccu, sizeof bound_table);
+    store32(bound_table, 4u, spec.count);
+    static const I mixed[8] = {-5, -5, 0, 0, 7, 7, 100, 100};
+    for (U i = 0u; i < spec.count + 3u; ++i) {
+        I bound = 0;
+        switch (spec.pattern) {
+            case 0u: bound = static_cast<I>(i) * 10 - 20; break;
+            case 1u: bound = -1; break;
+            case 2u: bound = mixed[i % 8u]; break;
+            default: bound = 20 - static_cast<I>(i) * 7; break;
+        }
+        store32(bound_table, 8u + i * 8u, static_cast<U>(bound));
+    }
+    porsche::application_state_006573e8.word(0x00657430u) = spec.reverse;
+}
+
+static FinishSnapshot capture_finish(U abi) {
+    FinishSnapshot out{};
+    out.abi = abi;
+    out.arena = porsche::application_state_006573e8.word(0x00657430u);
+    std::memcpy(out.self, self_finish, sizeof out.self);
+    std::memcpy(out.table, bound_table, sizeof out.table);
+    return out;
+}
+
+static void assert_finish(const FinishSnapshot& expected, const FinishSnapshot& actual) {
+    require(expected.abi == 0u, "original finish abi");
+    require(actual.abi == 0u, "cpp finish abi");
+    require(actual.arena == expected.arena, "arena word");
+    require(std::memcmp(actual.self, expected.self, sizeof expected.self) == 0,
+            "finish self bytes");
+    require(std::memcmp(actual.table, expected.table, sizeof expected.table) == 0,
+            "finish table bytes");
+}
+
+static U build_finish_cases() {
+    const U reverses[2] = {0u, 1u};
+    const U counts[5] = {1u, 2u, 3u, 5u, 8u};
+    const U patterns[4] = {0u, 1u, 2u, 3u};
+    const U values[5] = {0u, 7u, 0xfffffffdu, 0x7fffffffu, 0x80000000u};
+    U n = 0u;
+    for (U r : reverses) {
+        for (U c : counts) {
+            for (U p : patterns) {
+                for (U v : values) {
+                    require(n < kMaxFinishCases, "finish case capacity");
+                    finish_cases[n++] = FinishSpec{r, c, p, v};
+                }
+            }
+        }
+    }
+    return n;
+}
+
+static void test_finish(U count) {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::scene_root_finish_0044fc30);
+    for (U i = 0u; i < count; ++i) {
+        const FinishSpec& spec = finish_cases[i];
+        ++cases;
+        g_case = i;
+        which = 0u;
+        std::memset(&trace, 0, sizeof trace);
+        seed_finish(spec);
+        U abi = 0u;
+        (void)invoke_fast3(slot_finish, address(self_finish), spec.value, abi);
+        FinishSnapshot exp = capture_finish(abi);
+
+        which = 1u;
+        std::memset(&trace, 0, sizeof trace);
+        seed_finish(spec);
+        U cpp_abi = 0u;
+        (void)invoke_fast3(cpp_fn, address(self_finish), spec.value, cpp_abi);
+        FinishSnapshot act = capture_finish(cpp_abi);
+
+        assert_finish(exp, act);
+    }
+}
+
+// ---- 0053f120 proof ---------------------------------------------------------
+struct DestroySpec { U shape, write_node, write_next_mode; };
+static DestroySpec destroy_cases[kMaxDestroyCases];
+
+struct DestroySnapshot {
+    U abi;
+    U count;
+    Event events[kMaxEvents];
+    B self[sizeof self_destroy];
+    B nodes[8][sizeof nodes[0]];
+};
+
+static void seed_destroy(const DestroySpec& spec) {
+    std::memset(self_destroy, 0x5au, sizeof self_destroy);
+    store32(self_destroy, 0u, 0x11223344u);
+    store32(self_destroy, 4u, spec.shape == 0u ? 0u : address(nodes[0]));
+    for (U i = 0u; i < 8u; ++i) {
+        std::memset(nodes[i], 0x6bu, sizeof nodes[i]);
+        store32(nodes[i], 0u, address(controlled_vtable));
+        store32(nodes[i], 4u, 0u);
+        store32(nodes[i], 8u, 0u);
+    }
+    U length = 0u;
+    switch (spec.shape) {
+        case 0u: length = 0u; break;
+        case 1u: length = 1u; break;
+        case 2u: length = 2u; break;
+        case 3u: length = 3u; break;
+        case 4u: length = 3u; store32(nodes[1], 4u, address(nodes[4])); break;
+        case 5u: length = 4u;
+            store32(nodes[1], 4u, address(nodes[4]));
+            store32(nodes[2], 4u, address(nodes[5]));
+            break;
+        case 6u: length = 3u; store32(nodes[1], 4u, address(nodes[4])); break;
+        default: length = 3u; store32(nodes[1], 4u, address(nodes[4])); break;
+    }
+    for (U i = 0u; i + 1u < length; ++i) {
+        store32(nodes[i], 8u, address(nodes[i + 1u]));
+    }
+    g_write_target = spec.write_node < 8u ? address(nodes[spec.write_node]) : 0u;
+    switch (spec.write_next_mode) {
+        case 0u: g_write_next = 0u; break;
+        case 1u: g_write_next = address(nodes[5]); break;
+        case 2u: g_write_next = address(nodes[2]); break;
+        default: g_write_next = 0u; break;
+    }
+}
+
+static DestroySnapshot capture_destroy(U abi) {
+    DestroySnapshot out{};
+    out.abi = abi;
+    out.count = trace.count;
+    std::memcpy(out.events, trace.events, trace.count * sizeof(Event));
+    std::memcpy(out.self, self_destroy, sizeof out.self);
+    std::memcpy(out.nodes, nodes, sizeof out.nodes);
+    return out;
+}
+
+static void assert_destroy(const DestroySnapshot& exp, const DestroySnapshot& act) {
+    require(exp.abi == 0u, "original destroy abi");
+    require(act.abi == 0u, "cpp destroy abi");
+    require(act.count == exp.count, "destroy call count");
+    for (U i = 0u; i < exp.count; ++i) {
+        require(act.events[i].node == exp.events[i].node, "destroy node order");
+        require(act.events[i].arg == exp.events[i].arg, "destroy arg");
+    }
+    require(std::memcmp(act.self, exp.self, sizeof exp.self) == 0,
+            "destroy self bytes");
+    require(std::memcmp(act.nodes, exp.nodes, sizeof exp.nodes) == 0,
+            "destroy node bytes");
+}
+
+static U build_destroy_cases() {
+    U n = 0u;
+    const DestroySpec specs[] = {
+        {0u, 8u, 0u},
+        {1u, 8u, 0u},
+        {2u, 8u, 0u},
+        {3u, 8u, 0u},
+        {4u, 8u, 0u},
+        {5u, 8u, 0u},
+        {6u, 1u, 0u},
+        {7u, 1u, 1u},
+        {4u, 4u, 0u},
+        {5u, 5u, 0u},
+    };
+    for (const DestroySpec& spec : specs) {
+        require(n < kMaxDestroyCases, "destroy case capacity");
+        destroy_cases[n++] = spec;
+    }
+    return n;
+}
+
+static void test_destroy(U count) {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::secondary_destroy_body_0053f120);
+    for (U i = 0u; i < count; ++i) {
+        const DestroySpec& spec = destroy_cases[i];
+        ++cases;
+        g_case = i;
+        which = 0u;
+        std::memset(&trace, 0, sizeof trace);
+        seed_destroy(spec);
+        U abi = 0u;
+        invoke_fast1(slot_destroy, address(self_destroy), abi);
+        DestroySnapshot exp = capture_destroy(abi);
+
+        which = 1u;
+        std::memset(&trace, 0, sizeof trace);
+        seed_destroy(spec);
+        U cpp_abi = 0u;
+        invoke_fast1(cpp_fn, address(self_destroy), cpp_abi);
+        DestroySnapshot act = capture_destroy(cpp_abi);
+
+        assert_destroy(exp, act);
+    }
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    require(porsche::application_state_006573e8.word(0x00657430u) == 0u,
+            "init arena");
+    init_fixture();
+    const U finish_count = build_finish_cases();
+    const U destroy_count = build_destroy_cases();
+    test_finish(finish_count);
+    test_destroy(destroy_count);
+    std::printf("scene_root_finish_secondary_destroy_711_original_x86_vs_cpp=PASS cases=%u\n",
+                cases);
+    return 0;
+}

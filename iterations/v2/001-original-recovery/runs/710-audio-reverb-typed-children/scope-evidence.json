@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "bodies": [
+    {
+      "va": "005900b0",
+      "end": "00590135",
+      "bytes": 133,
+      "sha256": "cdb96b88486179a93899b794f235c8e0fc55e0aee28545a4904206ca9a018a92",
+      "abi": "cdecl int(const void*, const void*); EAX return 7 (default) or 8 (any decoded item returned != 7)",
+      "callers": ["00565b60 (Run705 accepted audio bank open)"],
+      "callees": ["00590170 (Run448 accepted audio group select)", "00590a80 (unowned typed decoder boundary)"],
+      "relocations": [
+        {"off": "0x3d", "kind": "rel32", "original_target": "00590170"},
+        {"off": "0x50", "kind": "rel32", "original_target": "00590a80"}
+      ]
+    },
+    {
+      "va": "00598a70",
+      "end": "00598a8d",
+      "bytes": 29,
+      "sha256": "1a3fdd555d85890acab7e0cc7ed86bf0a9cfd2a3802a6f9b23b1cf8c2f30f262",
+      "abi": "cdecl void()",
+      "callers": ["00598d10 (Run705 accepted period configure)", "005901b0 (Run703 accepted finalize callback slot)"],
+      "callees": ["0058fef0 (Run434 accepted backend configure/zero)"],
+      "relocations": [
+        {"off": "0x06", "kind": "abs32", "original_value": "006b0a80"},
+        {"off": "0x0c", "kind": "abs32", "original_value": "006b1680"},
+        {"off": "0x15", "kind": "rel32", "original_target": "0058fef0"}
+      ]
+    },
+    {
+      "va": "00598cd0",
+      "end": "00598d02",
+      "bytes": 50,
+      "sha256": "52b2da743a3f73e97ad89c608a042b73eca95fcd7437163ddcb8413a38e2a588",
+      "abi": "cdecl int(uint32 kind_word, float value); returns smallest prime >= max(trunc(kind_word*value), 2)",
+      "callers": ["00598d10 (Run705 accepted period configure)"],
+      "callees": ["005a0f98 (Run522 accepted __ftol, live ST0)"],
+      "relocations": [
+        {"off": "0x0a", "kind": "rel32", "original_target": "005a0f98"}
+      ]
+    }
+  ],
+  "ownership": {
+    "new_cells": [
+      {"va": "006b0a80", "bytes": 1024, "kind": "loader-zero .data beyond SizeOfRawData", "owner": "audio_reverb_mix_buffer_006b0a80 (this run)"},
+      {"va": "006b1680", "bytes": 4, "kind": "loader-zero .data beyond SizeOfRawData", "owner": "audio_reverb_finalize_counter_006b1680 (this run)"}
+    ],
+    "raw_pe": {
+      "006b0a80:1024": "section .data, loader-zero, sha256 5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+      "006b1680:4": "section .data loader-zero 00000000"
+    },
+    "reused_not_redefined": {
+      "006b08c0..006b0a6c": "Run705 audio reverb count words and 11 slot records; untouched by this batch"
+    },
+    "closure_search": "No definition of 006b0a80 or 006b1680 in iterations/v2/001-original-recovery/source or accepted run TUs; only Ghidra/canonical-map data labels (179/692) with 00598a70 consumer.",
+    "registry_overlap": "functions.json body_ranges checked for 005900b0/00598a70/00598cd0: no entry contains these addresses; 1161 entries scanned."
+  },
+  "declarations": {
+    "source": "runs/705-audio-bank-open-period-config/audio_bank_period_705.hpp",
+    "tail": "std::int32_t __cdecl audio_bank_open_tail_005900b0(const void* a, const void* b);",
+    "finalize": "void __cdecl audio_reverb_finalize_00598a70();",
+    "query": "std::int32_t __cdecl audio_reverb_query_00598cd0(std::uint32_t kind_word, float value);"
+  },
+  "scope_boundary": "FULL bodies at /Od and /O2. Harness mocks stand in for the unowned decoder 00590a80 and for controlled canonical callees (00590170/0058fef0/005a0f98). Query domain is finite products with truncations in [-10, 127] and x87 precision control modes 0..3; NaN/Inf, out-of-range x87, live device/backend, full producer and game startup remain open."
+}

@@ -1,0 +1,145 @@
+{
+  "run": 710,
+  "experiment": "local/experiments/v2-audio-reverb-typed-children-710",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005900b0",
+      "bytes": 133,
+      "sha256": "cdb96b88486179a93899b794f235c8e0fc55e0aee28545a4904206ca9a018a92",
+      "token": "@BODY_005900B0@"
+    },
+    {
+      "va": "00598a70",
+      "bytes": 29,
+      "sha256": "1a3fdd555d85890acab7e0cc7ed86bf0a9cfd2a3802a6f9b23b1cf8c2f30f262",
+      "token": "@BODY_00598A70@"
+    },
+    {
+      "va": "00598cd0",
+      "bytes": 50,
+      "sha256": "52b2da743a3f73e97ad89c608a042b73eca95fcd7437163ddcb8413a38e2a588",
+      "token": "@BODY_00598CD0@"
+    }
+  ],
+  "pass_marker": "audio_reverb_children_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-tail-scratch-init",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "write_u32(scratch + i * 8u, 0xffffffffu);",
+      "new": "write_u32(scratch + i * 8u, 0xfffffffeu);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tail-default-return",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "std::int32_t result = 7;\n    std::uint32_t item = 0u;",
+      "new": "std::int32_t result = 6;\n    std::uint32_t item = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tail-decode-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "if (audio_group_decode_00590a80(source, b, scratch) != 7) {",
+      "new": "if (audio_group_decode_00590a80(source, b, scratch) != 8) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tail-initial-count-offset",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "read_u16(static_cast<const std::uint8_t*>(a) + 6u) == 0u",
+      "new": "read_u16(static_cast<const std::uint8_t*>(a) + 4u) == 0u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-tail-loop-bound",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "if (item >= unsigned_count(a)) {",
+      "new": "if (item > unsigned_count(a)) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-counter",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "audio_reverb_finalize_counter_006b1680 = 0x7d0u;",
+      "new": "audio_reverb_finalize_counter_006b1680 = 0x7d1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-buffer-size",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "        0x400u);",
+      "new": "        0x200u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-buffer-address",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "audio_reverb_mix_buffer_006b0a80)),",
+      "new": "audio_reverb_mix_buffer_006b0a80 + 4)),",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-query-truncated-start",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "std::int32_t candidate = truncated;",
+      "new": "std::int32_t candidate = truncated + 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-query-divisor-start",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "std::int32_t divisor = 2;",
+      "new": "std::int32_t divisor = 3;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-query-candidate-step",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "++candidate;",
+      "new": "candidate += 2;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-query-product",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "volatile float factor = value;",
+      "new": "volatile float factor = value + 1.0f;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-query-prime-break",
+      "source": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/audio_reverb_children_710.cpp",
+      "old": "if (divisor == candidate) {",
+      "new": "if (divisor != candidate) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

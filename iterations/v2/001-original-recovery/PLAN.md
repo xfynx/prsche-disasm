@@ -1,6 +1,14 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-20, Run709 shared audit PASS (001) for frozen 705/006+706/017+
+Current 2026-11-20, Run712 shared audit PASS (001) for frozen 710/007+711/004 on
+709. Build001 compiles413TUs/8projects;104names111refs,noEXE. Five close;
+one child opens (00590a80 audio group decode). Registry1166 adds five full
+bodies392B; README712 owns commands/bounds: 658nativecases,26mutations,
+1021pins. Next: 00590a80 + evidence-excluded packets; storage-gated
+00562810/00563440 need run-273 proof; complex parents (004152e0,
+application_main_*) await strong models when the Go window resets.
+
+Historical 2026-11-20, Run709 shared audit PASS (001) for frozen 705/006+706/017+
 707/001+708/001 on 704. Build001 compiles411TUs/8projects;108names115refs,
 noEXE. Ten namesclose; five children open (005900b0, 00598a70/00598cd0,
 0044fc30, 0053f120). Registry1161 adds nine full bodies907B; README709 owns

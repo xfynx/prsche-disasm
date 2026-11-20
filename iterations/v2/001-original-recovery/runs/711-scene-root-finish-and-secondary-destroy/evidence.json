@@ -1,0 +1,50 @@
+{
+  "run": 711,
+  "batch": "unowned typed children newly exposed by the integrated Run706 scene-root constructor and Run707 teardown thunk",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "targets": [
+    {
+      "va": "0044fc30",
+      "end_exclusive": "0044fca9",
+      "bytes": 121,
+      "sha256": "5d77e2467a81dfd019efee8cfec6c6ef63294f4cc86d8313e37ac379148610e4",
+      "abi": "fastcall(void* self in ECX, void* unused_edx in EDX, uint value on stack), RET 4, void; preserves EBX,ESI,EDI,EBP,ESP",
+      "summary": "Reads REVERSE arena word 0x00657430; forward mode starts at index count-1 and steps down comparing signed [table+idx*8] and [table+idx*8+8]; reverse mode starts at index 0, compares signed [table+idx*8+8] and [table+idx*8+0x10] and steps up while next index < count-2. Each probed index is stored to [self+4]. C++ reproduces the same signed compares, index writes and table reads."
+    },
+    {
+      "va": "0053f120",
+      "end_exclusive": "0053f15b",
+      "bytes": 59,
+      "sha256": "66c16bbac4b3d4d376abf72dc1570aa8326b2cb9641c934a0906f8db0baac1ef",
+      "abi": "fastcall(void* self in ECX), RET 0, void; PUSH ESI/POP ESI, preserves EBX,ESI,EDI,EBP,ESP",
+      "summary": "Stores raw vtable VA 0x005b3c94 into [self]; walks [self+4] then [node+8] siblings, calls vtable+4 of a non-null [node+4] child, reloads [node+8] after that call, and finally calls vtable+4 of the last sibling. Each call uses ECX=node, one stack dword 1 and callee RET 4."
+    }
+  ],
+  "excluded": [],
+  "ownership_decisions": {
+    "unowned_before": true,
+    "notes": [
+      "Both VAs are absent as entry_va and body_ranges in source/recovered/functions.json (1161 entries) and the catalog marks them automatic-pseudo-c/unrecovered; a direct body_ranges overlap scan against all owned entries returned zero hits.",
+      "scene_root_finish_0044fc30 and secondary_destroy_body_0053f120 are only declared extern by the accepted Run706/Run707 callers; this TU supplies the two previously-unowned definitions and does not redefine owned cells or accepted callers.",
+      "No new owned .data/.rdata/.bss: application_state_006573e8 is the canonical arena; 005b3c94 is existing raw vtable data transported at its original VA in the harness.",
+      "application_state.hpp is reused; no invented keyframe arrays, no invented callbacks and no fabricated vtable contents enter production code."
+    ]
+  },
+  "native_proof": {
+    "config": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/native-config.json",
+    "command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/native-config.json --attempt 004",
+    "receipt": "local/experiments/v2-scene-root-finish-secondary-destroy-711/004/receipt.json",
+    "status": "PASS",
+    "cases_per_variant": 210,
+    "variants": ["/Od", "/O2"],
+    "material_mutations": 13,
+    "mutations_detected": 13
+  },
+  "boundaries": [
+    "0044fc30 comparison uses the full 0x40-byte receiver, full 0x400-byte bound table, arena word, ordered call absence and nonvolatile/stack ABI; EAX is a volatile scratch result and is not compared.",
+    "0053f120 comparison uses ordered tagged vtable calls, one stack argument per call, full receiver and 8-node state, raw vtable-immediate check plus nonvolatile/stack ABI.",
+    "The raw vtable immediate 0x005b3c94 is verified before transport; the +4 dispatch slot is a controlled harness thunk supplied through caller-owned node vtable pointers, proving bounded transport rather than live virtual destructors or allocator state. Failed attempts 001 (fixed-address vtable page unavailable), 002 (double caller stack cleanup in the fastcall helper) and 003 (C++ called the vtable slot address instead of dereferencing [vtable+4]) are preserved; all were harness/production-binding defects, not algorithm divergence.",
+    "Real keyframe resources, live vtable/object state, null-receiver faults, unmasked FP, lifetime/concurrency domains and production CMake/registry integration remain open."
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "run": 711,
+  "experiment": "local/experiments/v2-scene-root-finish-secondary-destroy-711",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.hpp",
+    "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0044fc30",
+      "bytes": 121,
+      "sha256": "5d77e2467a81dfd019efee8cfec6c6ef63294f4cc86d8313e37ac379148610e4",
+      "token": "@BODY_0044FC30@"
+    },
+    {
+      "va": "0053f120",
+      "bytes": 59,
+      "sha256": "66c16bbac4b3d4d376abf72dc1570aa8326b2cb9641c934a0906f8db0baac1ef",
+      "token": "@BODY_0053F120@"
+    }
+  ],
+  "pass_marker": "scene_root_finish_secondary_destroy_711_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 300,
+  "mutations": [
+    {
+      "name": "wrong-4fc30-reverse-branch",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "    if (application_state_006573e8.word(0x00657430u) != 0u) {",
+      "new": "    if (application_state_006573e8.word(0x00657430u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4fc30-index-init",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "        I idx = static_cast<I>(load32(table, 4u)) - 1;",
+      "new": "        I idx = static_cast<I>(load32(table, 4u)) - 2;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4fc30-forward-lower-cmp",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "                bool step_down = (lower >= value);",
+      "new": "                bool step_down = (lower > value);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4fc30-forward-upper-cmp",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "                    if (value <= upper) return;",
+      "new": "                    if (value < upper) return;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4fc30-forward-step",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "                --idx;\n                store32(self, 4u, static_cast<U>(idx));",
+      "new": "                ++idx;\n                store32(self, 4u, static_cast<U>(idx));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4fc30-reverse-limit",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "    const I limit = static_cast<I>(load32(table, 4u)) - 2;",
+      "new": "    const I limit = static_cast<I>(load32(table, 4u)) - 1;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4fc30-reverse-bound",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "        const I bound = static_cast<I>(load32(table, static_cast<U>(idx) * 8u + 8u));",
+      "new": "        const I bound = static_cast<I>(load32(table, static_cast<U>(idx) * 8u + 0x10u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4fc30-reverse-loop-end",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "        if (idx >= limit) return;",
+      "new": "        if (idx > limit) return;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4fc30-reverse-initial-index",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "    store32(self, 4u, 0u);",
+      "new": "    store32(self, 4u, 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-53f120-vtable-constant",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "    store32(self, 0u, kSecondaryDestroyVtable_005b3c94);",
+      "new": "    store32(self, 0u, 0x005b3c98u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-53f120-skip-grandchild",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "        if (grandchild != nullptr) {\n            invoke_destroy(grandchild);\n        }",
+      "new": "        if (grandchild != nullptr) {\n        }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-53f120-destroy-arg",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "    slot(node, 1u);",
+      "new": "    slot(node, 2u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-53f120-final-node",
+      "source": "iterations/v2/001-original-recovery/runs/711-scene-root-finish-and-secondary-destroy/scene_root_finish_secondary_destroy_711.cpp",
+      "old": "        next = ptr32(load32(child, 8u));\n        if (next == nullptr) {\n            invoke_destroy(child);\n            return;",
+      "new": "        next = ptr32(load32(child, 8u));\n        if (next == nullptr) {\n            invoke_destroy(ptr32(load32(self, 4u)));\n            return;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

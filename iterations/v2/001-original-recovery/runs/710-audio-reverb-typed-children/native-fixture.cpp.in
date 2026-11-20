@@ -1,0 +1,454 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "audio_reverb_children_710.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+enum : U { kMaxEvents = 48u };
+enum EventTag : U {
+    kSelect = 1u, kDecode = 2u, kConfigure = 3u, kFtol = 4u,
+};
+
+struct FpuSnapshot {
+    U cw;
+    U sw;
+    U mxcsr;
+};
+
+struct StateSnapshot {
+    U counter;
+    B header[64u];
+    B ctx[64u];
+    B scratch[0x800u];
+    B mix[1024u];
+};
+
+struct Event {
+    U tag, a0, a1, a2, a3, a4;
+    FpuSnapshot fp;
+    StateSnapshot state;
+};
+
+struct Trace {
+    U abi_fail, ret_eax, exception[3], count;
+    FpuSnapshot fp;
+    Event events[kMaxEvents];
+    StateSnapshot final_state;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u, events_total = 0u;
+static U precision_mode = 0u;
+
+// Harness-owned scenario controls (reset before each side of a case).
+static U header_count = 0u;
+static U select_results[16u] = {};
+static I decode_results[16u] = {};
+static I current_item = 0;
+static U mutate_count = 0u, mutated_count = 0u;
+static U counter_seed = 0u, mix_pattern = 0u;
+static U pointer_pool[16u] = {};
+static B source_nodes[16u][16u] = {};
+static B header_storage[64u] = {};
+static B ctx_storage[64u] = {};
+static B scratch_echo[0x800u] = {};
+
+static B* code = nullptr;
+static B* slot_5900b0 = nullptr;
+static B* slot_598a70 = nullptr;
+static B* slot_598cd0 = nullptr;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+static U word_at(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+static void put16(void* p, U o, U v) {
+    const std::uint16_t w = static_cast<std::uint16_t>(v);
+    std::memcpy(static_cast<B*>(p) + o, &w, 2u);
+}
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    unsigned short cw = 0u, sw = 0u;
+    U mx = 0u;
+    __asm {
+        fnstcw cw
+        fnstsw sw
+        stmxcsr mx
+    }
+    fp.cw = cw;
+    fp.sw = sw;
+    fp.mxcsr = mx;
+}
+
+static void capture_state(StateSnapshot& s) {
+    s.counter = audio_reverb_finalize_counter_006b1680;
+    std::memcpy(s.header, header_storage, sizeof s.header);
+    std::memcpy(s.ctx, ctx_storage, sizeof s.ctx);
+    std::memcpy(s.scratch, scratch_echo, sizeof s.scratch);
+    std::memcpy(s.mix, audio_reverb_mix_buffer_006b0a80, sizeof s.mix);
+}
+
+static Event& record_event(U tag, U a0, U a1, U a2, U a3, U a4 = 0u) {
+    require(trace.count < kMaxEvents, "bounded event count");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag; e.a0 = a0; e.a1 = a1; e.a2 = a2; e.a3 = a3; e.a4 = a4;
+    capture_fpu(e.fp);
+    capture_state(e.state);
+    return e;
+}
+
+namespace porsche {
+
+// Controlled callee endpoints. The original x86 side has its CALL rel32
+// operands patched to these shims; the compiled C++ side calls them directly.
+std::uint32_t __cdecl audio_group_select_00590170(std::uint32_t header,
+                                                  std::int32_t item) {
+    current_item = item;
+    U result = 0u;
+    if (item >= 0 && item < 16) {
+        result = select_results[item];
+    }
+    record_event(kSelect, header, static_cast<U>(item), result, 0u);
+    return result;
+}
+
+std::int32_t __cdecl audio_group_decode_00590a80(const void* source,
+                                                 const void* ctx,
+                                                 void* scratch) {
+    // Only the first dword of every 8-byte group is written by the original;
+    // the interleaved dwords stay uninitialized and are excluded explicitly.
+    const auto* scratch_bytes = static_cast<const B*>(scratch);
+    for (U i = 0u; i < 0x100u; ++i) {
+        put(scratch_echo, i * 4u, word_at(scratch_bytes, i * 8u));
+    }
+    const I result = (current_item >= 0 && current_item < 16)
+        ? decode_results[current_item] : 7;
+    record_event(kDecode, address(source), address(ctx),
+                 static_cast<U>(result), static_cast<U>(current_item));
+    if (mutate_count != 0u && ctx != nullptr) {
+        put16(const_cast<void*>(ctx), 6u, mutated_count);
+    }
+    return result;
+}
+
+void __cdecl application_audio_backend_configure_0058fef0(
+    std::uint32_t buffer_va, std::uint32_t buffer_bytes) {
+    record_event(kConfigure, buffer_va, buffer_bytes, 0u, 0u);
+    if (buffer_va == address(audio_reverb_mix_buffer_006b0a80) &&
+        buffer_bytes <= sizeof audio_reverb_mix_buffer_006b0a80) {
+        std::memset(reinterpret_cast<void*>(buffer_va), 0, buffer_bytes);
+    }
+}
+
+std::int64_t __cdecl audio_stream_ftol_005a0f98() {
+    std::int64_t v = 0;
+    unsigned short cw = 0u, ncw = 0u;
+    __asm {
+        fnstcw cw
+        wait
+        mov ax, cw
+        or ah, 0ch
+        mov ncw, ax
+        fldcw ncw
+        fistp qword ptr [v]
+        fldcw cw
+    }
+    const U lo = static_cast<U>(v);
+    const U hi = static_cast<U>(static_cast<std::uint64_t>(v) >> 32);
+    record_event(kFtol, lo, hi, 0u, 0u);
+    return v;
+}
+
+} // namespace porsche
+
+static U invoke_cdecl(void* fn, const U* args, U argc, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, argc
+        mov eax, args
+        test ecx, ecx
+        je call_target
+    push_args:
+        dec ecx
+        push dword ptr [eax + ecx * 4]
+        test ecx, ecx
+        jne push_args
+    call_target:
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov ecx, argc
+        lea esp, [esp + ecx * 4]
+        mov eax_out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        pushfd
+        pop eax
+        test eax, 400h
+        jz done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = eax_out;
+    return fail;
+}
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word_at(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+static void relocate_rel32(B* slot, U orig_va, U off, U expected_target_va,
+                           const void* target) {
+    require(off >= 1u && (slot[off - 1u] == 0xe8u || slot[off - 1u] == 0xe9u),
+            "exact relative call/jump opcode");
+    const U actual = orig_va + off + 4u + word_at(slot, off);
+    require(actual == expected_target_va, "exact relative relocation target");
+    const U next_ip = address(slot + off + 4u);
+    put(slot, off, address(target) - next_ip);
+}
+
+static void seed_fpu() {
+    const U cw = 0x037fu | (precision_mode << 8);
+    __asm {
+        fninit
+        fldcw cw
+    }
+}
+
+static void reset_tables() {
+    for (U i = 0u; i < sizeof header_storage; ++i) {
+        header_storage[i] = static_cast<B>(i * 7u + 3u);
+        ctx_storage[i] = static_cast<B>(i * 5u + 11u);
+    }
+    put16(header_storage, 6u, header_count);
+    for (U i = 0u; i < sizeof audio_reverb_mix_buffer_006b0a80; ++i) {
+        audio_reverb_mix_buffer_006b0a80[i] =
+            static_cast<B>(i * 3u + mix_pattern);
+    }
+    audio_reverb_finalize_counter_006b1680 = counter_seed;
+    std::memset(scratch_echo, 0, sizeof scratch_echo);
+    current_item = 0;
+}
+
+static void compare_traces(bool check_eax) {
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "original ABI");
+    require(trace.exception[0] == 0u && expected.exception[0] == 0u, "no exceptions");
+    if (check_eax) {
+        require(trace.ret_eax == expected.ret_eax, "return value mismatch");
+    }
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count && i < kMaxEvents; ++i) {
+        require(trace.events[i].tag == expected.events[i].tag, "event tag mismatch");
+        require(trace.events[i].a0 == expected.events[i].a0, "event a0 mismatch");
+        require(trace.events[i].a1 == expected.events[i].a1, "event a1 mismatch");
+        require(trace.events[i].a2 == expected.events[i].a2, "event a2 mismatch");
+        require(trace.events[i].a3 == expected.events[i].a3, "event a3 mismatch");
+        require(trace.events[i].a4 == expected.events[i].a4, "event a4 mismatch");
+        require(std::memcmp(&trace.events[i].fp, &expected.events[i].fp,
+                            sizeof(FpuSnapshot)) == 0, "event fpu mismatch");
+        require(std::memcmp(&trace.events[i].state, &expected.events[i].state,
+                            sizeof(StateSnapshot)) == 0, "event state mismatch");
+    }
+    require(std::memcmp(&trace.fp, &expected.fp, sizeof(FpuSnapshot)) == 0,
+            "final fpu mismatch");
+    require(std::memcmp(&trace.final_state, &expected.final_state,
+                        sizeof(StateSnapshot)) == 0, "final state mismatch");
+}
+
+static void run_case(void* orig_fn, void* cpp_fn, const U* args, U argc,
+                     bool check_eax) {
+    ++cases;
+    std::memset(&trace, 0, sizeof trace);
+    reset_tables();
+    seed_fpu();
+    __try { trace.abi_fail = invoke_cdecl(orig_fn, args, argc, trace.ret_eax); }
+    __except (exception_record(GetExceptionInformation())) {}
+    capture_state(trace.final_state);
+    capture_fpu(trace.fp);
+    expected = trace;
+
+    std::memset(&trace, 0, sizeof trace);
+    reset_tables();
+    seed_fpu();
+    __try { trace.abi_fail = invoke_cdecl(cpp_fn, args, argc, trace.ret_eax); }
+    __except (exception_record(GetExceptionInformation())) {}
+    capture_state(trace.final_state);
+    capture_fpu(trace.fp);
+    events_total += trace.count;
+    compare_traces(check_eax);
+}
+
+static void init() {
+    static const B body_5900b0[] = {@BODY_005900B0@};
+    static const B body_598a70[] = {@BODY_00598A70@};
+    static const B body_598cd0[] = {@BODY_00598CD0@};
+    require(sizeof body_5900b0 == 133u, "133-byte body 005900b0");
+    require(sizeof body_598a70 == 29u, "29-byte body 00598a70");
+    require(sizeof body_598cd0 == 50u, "50-byte body 00598cd0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_5900b0 = code + 0u;
+    slot_598a70 = code + 256u;
+    slot_598cd0 = code + 512u;
+    std::memcpy(slot_5900b0, body_5900b0, sizeof body_5900b0);
+    std::memcpy(slot_598a70, body_598a70, sizeof body_598a70);
+    std::memcpy(slot_598cd0, body_598cd0, sizeof body_598cd0);
+
+    for (U i = 0u; i < 16u; ++i) {
+        pointer_pool[i] = address(source_nodes[i]);
+    }
+
+    // 005900b0 relocations: two direct CALL rel32 operands.
+    relocate_rel32(slot_5900b0, 0x005900b0u, 0x3du, 0x00590170u,
+                   reinterpret_cast<void*>(audio_group_select_00590170));
+    relocate_rel32(slot_5900b0, 0x005900b0u, 0x50u, 0x00590a80u,
+                   reinterpret_cast<void*>(audio_group_decode_00590a80));
+
+    // 00598a70 relocations: two absolute immediates and the configure CALL.
+    relocate_abs32(slot_598a70, 0x06u, 0x006b0a80u,
+                   address(audio_reverb_mix_buffer_006b0a80));
+    relocate_abs32(slot_598a70, 0x0cu, 0x006b1680u,
+                   address(&audio_reverb_finalize_counter_006b1680));
+    relocate_rel32(slot_598a70, 0x00598a70u, 0x15u, 0x0058fef0u,
+                   reinterpret_cast<void*>(application_audio_backend_configure_0058fef0));
+
+    // 00598cd0 relocation: __ftol CALL rel32.
+    relocate_rel32(slot_598cd0, 0x00598cd0u, 0x0au, 0x005a0f98u,
+                   reinterpret_cast<void*>(audio_stream_ftol_005a0f98));
+}
+
+static void tail_cases() {
+    const U counts[7u] = {0u, 1u, 2u, 3u, 5u, 7u, 8u};
+    for (U ci = 0u; ci < 7u; ++ci) {
+        for (U pattern = 0u; pattern < 4u; ++pattern) {
+            header_count = counts[ci];
+            for (U i = 0u; i < 16u; ++i) {
+                select_results[i] = (pattern == 0u) ? 0u
+                    : (pattern == 1u) ? ((i & 1u) ? 0u : pointer_pool[i])
+                    : (pattern == 2u) ? pointer_pool[i]
+                    : ((i == 2u) ? 0u : pointer_pool[i]);
+                decode_results[i] = (pattern & 1u)
+                    ? ((i % 3u == 0u) ? 0 : 8) : 7;
+            }
+            mutate_count = (ci == 6u && pattern == 3u) ? 1u : 0u;
+            mutated_count = 3u;
+            mix_pattern = 0u;
+            U args[2u] = {address(header_storage), address(header_storage)};
+            run_case(slot_5900b0,
+                     reinterpret_cast<void*>(audio_bank_open_tail_005900b0),
+                     args, 2u, true);
+        }
+    }
+    // Distinct source/context buffers and a different mutation seed.
+    header_count = 4u;
+    for (U i = 0u; i < 16u; ++i) {
+        select_results[i] = (i < 4u) ? pointer_pool[i] : 0u;
+        decode_results[i] = (i == 1u) ? 0 : 7;
+    }
+    mutate_count = 0u;
+    U args2[2u] = {address(header_storage), address(ctx_storage)};
+    run_case(slot_5900b0,
+             reinterpret_cast<void*>(audio_bank_open_tail_005900b0),
+             args2, 2u, true);
+}
+
+static void finalize_cases() {
+    for (U seed = 0u; seed < 6u; ++seed) {
+        mix_pattern = seed * 17u + 1u;
+        counter_seed = 0x13572468u + seed * 0x111u;
+        run_case(slot_598a70,
+                 reinterpret_cast<void*>(audio_reverb_finalize_00598a70),
+                 nullptr, 0u, false);
+    }
+}
+
+struct QueryCase { U kind; float value; };
+
+static void query_cases() {
+    const QueryCase table[] = {
+        {0u, 1.0f}, {1u, 2.5f}, {2u, 2.0f}, {3u, 1.0f}, {4u, 1.0f},
+        {5u, 1.0f}, {6u, 1.0f}, {7u, 1.0f}, {8u, 1.0f}, {9u, 1.0f},
+        {10u, 1.0f}, {11u, 1.0f}, {12u, 1.0f}, {13u, 1.0f}, {16u, 1.0f},
+        {25u, 1.0f}, {49u, 1.0f}, {121u, 1.0f},
+        {0xffffffffu, 1.0f}, {0xfffffff6u, 1.0f}, {0x80000000u, 1.0f},
+        {3u, -1.0f}, {7u, 0.5f}, {1u, 0.25f}, {127u, 2.0f},
+        {0x7fu, 2.0f}, {0u, -3.5f}, {33u, 3.0f},
+    };
+    for (U pc = 0u; pc < 3u; ++pc) {
+        precision_mode = pc;
+        for (const QueryCase& q : table) {
+            U value_bits = 0u;
+            std::memcpy(&value_bits, &q.value, 4u);
+            const U args[2u] = {q.kind, value_bits};
+            run_case(slot_598cd0,
+                     reinterpret_cast<void*>(audio_reverb_query_00598cd0),
+                     args, 2u, true);
+        }
+    }
+    precision_mode = 0u;
+}
+
+int main(int argc, char** argv) {
+    if (argc < 2) { std::printf("missing original PE argument\n"); return 2; }
+    init();
+    tail_cases();
+    finalize_cases();
+    query_cases();
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    std::printf("audio_reverb_children_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

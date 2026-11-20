@@ -1,0 +1,61 @@
+{
+  "run": 710,
+  "batch": "unowned typed children newly exposed by integrated Run705 audio bodies: bank open tail and reverb finalize/query",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "targets": [
+    {
+      "va": "005900b0",
+      "end_exclusive": "00590135",
+      "bytes": 133,
+      "sha256": "cdb96b88486179a93899b794f235c8e0fc55e0aee28545a4904206ca9a018a92",
+      "abi": "cdecl int(const void* a, const void* b), EAX return 7 default / 8 when any decoded item returns != 7; ESP/EBP/EBX/ESI/EDI preserved",
+      "summary": "Initializes the first dword of each 8-byte group of the 2048-byte stack scratch to -1 (interleaved dwords stay opaque); reads the unsigned word at a+6 each iteration, calls accepted 00590170(a, item), and for a non-null source calls 00590a80(source, b, scratch); any return other than 7 sets result 8."
+    },
+    {
+      "va": "00598a70",
+      "end_exclusive": "00598a8d",
+      "bytes": 29,
+      "sha256": "1a3fdd555d85890acab7e0cc7ed86bf0a9cfd2a3802a6f9b23b1cf8c2f30f262",
+      "abi": "cdecl void(), RET 0, no GPR changes",
+      "summary": "Writes 0x7d0 (2000) to counter 006b1680 and calls the accepted 0058fef0 backend-zero provider with buffer VA 006b0a80 and byte count 0x400."
+    },
+    {
+      "va": "00598cd0",
+      "end_exclusive": "00598d02",
+      "bytes": 50,
+      "sha256": "52b2da743a3f73e97ad89c608a042b73eca95fcd7437163ddcb8413a38e2a588",
+      "abi": "cdecl int(uint32 kind_word, float value), EAX return; live ST0 passed to accepted __ftol 005a0f98",
+      "summary": "FILD of the signed dword kind word times the float argument, truncated by canonical __ftol; returns the smallest prime >= max(truncated, 2) with divisors tried 2..candidate in order and the candidate incremented on a composite."
+    }
+  ],
+  "excluded": [],
+  "ownership_decisions": {
+    "unowned_before": true,
+    "new_cells": [
+      {"va": "006b0a80", "bytes": 1024, "kind": "loader-zero .data beyond SizeOfRawData", "owner": "audio_reverb_mix_buffer_006b0a80 (this run)"},
+      {"va": "006b1680", "bytes": 4, "kind": "loader-zero .data beyond SizeOfRawData", "owner": "audio_reverb_finalize_counter_006b1680 (this run)"}
+    ],
+    "notes": [
+      "All three target VAs are absent as entry_va and outside every body_ranges entry in source/recovered/functions.json (1161 entries scanned, including manually supplemented ranges).",
+      "No definition of 006b0a80 or 006b1680 exists in the manifest source/header closure or accepted run TUs; only Ghidra/canonical-map data labels with 00598a70 consumer evidence.",
+      "Run705 reverb storage 006b08c0..006b0a6c (count words and 11 slots) is reused untouched and is not redefined here.",
+      "Accepted canonical providers are reused as extern declarations only: 00590170 (Run448 group select), 0058fef0 (Run434 backend zero), 005a0f98 (Run522 __ftol). No owned cell or accepted body is redefined.",
+      "00590a80 is an unowned 205B decoder left as a new typed child (audio_group_decode_00590a80); no algorithm or callback is invented."
+    ]
+  },
+  "native_proof": {
+    "config": "iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/native-config.json",
+    "command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/710-audio-reverb-typed-children/native-config.json --attempt 007",
+    "receipt": "local/experiments/v2-audio-reverb-typed-children-710/007/receipt.json",
+    "status": "PASS",
+    "cases_per_variant": 119,
+    "events_per_variant": 255,
+    "variants": ["/Od", "/O2"],
+    "material_mutations": 13,
+    "mutations_detected": 13,
+    "input_pins": 182,
+    "output_pins": 185
+  },
+  "boundary": "Extern declarations match runs/705-audio-bank-open-period-config/audio_bank_period_705.hpp exactly (query takes float by value). The fixture mocks the unowned decoder 00590a80 and provides controlled canonical endpoints for select/configure/ftol, with raw original bytes relocated and checked against the immutable PE. Compared inputs, callee arguments/order, counter and mix-buffer state, initialized scratch dwords, integer returns, x87 CW/SW/MXCSR and ESP/EBP/EBX/ESI/EDI at both optimizations; interleaved uninitialized scratch dwords stay opaque. Domains bounded: finite item counts 0..8, 16 select/decode scenarios, 6 finalize seeds, 28 query products (truncations roughly -10..127) at PC modes 0..3. Live decoder/backend/device, NaN/Inf and out-of-range x87, faults, concurrency and full game integration remain open. No registry/CMake/manifest change."
+}
