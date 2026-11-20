@@ -1,0 +1,175 @@
+{
+  "run": 690,
+  "experiment": "local/experiments/v2-audio-probe-start-and-period-control-690",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+    "iterations/v2/001-original-recovery/runs/610-frame-audio-send-level/frame_audio_send_level_610.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control",
+    "iterations/v2/001-original-recovery/runs/610-frame-audio-send-level",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00565c70",
+      "bytes": 90,
+      "sha256": "c56a238afd144bc4a1576587eab2dde73d4685f5e12c950f54dca9eb2b097754",
+      "token": "@BODY_00565C70@"
+    },
+    {
+      "va": "004a8b80",
+      "bytes": 332,
+      "sha256": "25e69719e702b1fed6bd91bfe3322deadcbeffa9ae789a6c3f9cbcefede46cfd",
+      "token": "@BODY_004A8B80@"
+    },
+    {
+      "va": "005cce90",
+      "bytes": 7,
+      "sha256": "ea56e7e95bc9f1eef1dda7317758aee83875f5580c61fb3135d5e03c5ddbffb3",
+      "token": "@STR_005CCE90@"
+    },
+    {
+      "va": "005d1a04",
+      "bytes": 5,
+      "sha256": "4973c3db8030cf5ccbc437853d626919ad0462fd0854118026befd439385ded3",
+      "token": "@STR_005D1A04@"
+    },
+    {
+      "va": "005d1a14",
+      "bytes": 6,
+      "sha256": "4843a85e54b560b620f2040310749d64cb08dd65f8540e9bb93841efd696034e",
+      "token": "@STR_005D1A14@"
+    },
+    {
+      "va": "005d1a1c",
+      "bytes": 4,
+      "sha256": "5c159a3694c530588a2686822ce41f048fe53fb350b752ec471b469b7a6e9e67",
+      "token": "@STR_005D1A1C@"
+    }
+  ],
+  "pass_marker": "audio_probe_start_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 300,
+  "mutations": [
+    {
+      "name": "wrong-period-third-store-offset",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "    *words = third;",
+      "new": "    *(words + 1) = third;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-arg4-store-offset",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "    *(words + 2) = fourth;",
+      "new": "    *(words + 3) = fourth;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-arg5-store-offset",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "    *(words + 3) = fifth;",
+      "new": "    *(words + 2) = fifth;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-e0-mask",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "    if ((flags & 0xe0u) == 0u) {",
+      "new": "    if ((flags & 0x20u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-callback-argument",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "    (void)audio_period_callback_set_00590250(period_flags);",
+      "new": "    (void)audio_period_callback_set_00590250(captured_third);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-forward-branch",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "    if (captured_third == 0u) {",
+      "new": "    if (captured_third != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period-forward-value",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "        frame_services_boundary_00565cd0(period_flags, value);",
+      "new": "        frame_services_boundary_00565cd0(period_flags, fourth);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-probe-mode-gate",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "            application_state_006573e8.word(0x00657c98u)) > 2) {",
+      "new": "            application_state_006573e8.word(0x00657c98u)) > 1) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-probe-lil-gate",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "            application_state_006573e8.word(0x00657c98u)) > 1) {",
+      "new": "            application_state_006573e8.word(0x00657c98u)) > 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-probe-loadat-max",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "&frame_services_word_005d14b0, 0x3cu);",
+      "new": "&frame_services_word_005d14b0, 0x3du);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-probe-loadat-buffer",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "buffer, &frame_services_word_005d14b0, 0x3cu);",
+      "new": "buffer, application_audio_path_prefix_0065b318, 0x3cu);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-probe-reuse-first-name",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "    // Original 004a8c26 re-copies the prefix pointer after the load call.\n    copy_string(buffer, application_audio_path_prefix_0065b318);",
+      "new": "    // mutated: the post-load prefix re-copy is dropped.",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-probe-spl-suffix",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "    append_string(buffer, application_audio_spl_text_005d1a04);",
+      "new": "    append_string(buffer, application_audio_lil_text_005d1a1c);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-probe-message-kind",
+      "source": "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control/application_audio_probe_690.cpp",
+      "old": "    application_audio_probe_message_004a6c90(buffer, 7u);",
+      "new": "    application_audio_probe_message_004a6c90(buffer, 6u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

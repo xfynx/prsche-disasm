@@ -1,5 +1,13 @@
 # Отложенные проверки восстановления v2
 
+Run694 integrates688/689/690 (7 bodies1868B,24380cases,72mutations,984pins,
+397TUs;69names72refs,noEXE). Two namesclose/two real children open:
+004a6c90 probe message and00590250 period callbackset are unowned bodies.
+Boundaries:006a6420 runtime writer,0065b318 writers unindexed; 688 0069cb10
+record-array readers00533910/00533b40/005365xx must reuse the688 extern;
+494 semantic cells +0x80/+0x88/+0x8c vs 688 host arrays need single-storage
+reconciliation. COM transport,live devices andfullgame remain unproved.
+
 Run582 accepts five bounded driver-state bodies with controlled359/523 endpoints
 and actual516950 no-op, originalRET4/cdecl transports andlate table changes.
 Real540500 remains unresolved in this build. Its separate583native proof awaits

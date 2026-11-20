@@ -1,0 +1,737 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "input_ff_frame_control_688.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::FeEffectEntry) == 0x90u);
+static_assert(sizeof(porsche::frame_control_effects_0069cb10) == 32u * 0x90u);
+static_assert(sizeof(porsche::FeEffectParams) == 0x4cu);
+static_assert(sizeof(porsche::InputSlot) == 0x10cu);
+static_assert(sizeof(porsche::frame_control_effect_guid_table_005bb3b0) == 13u * 4u);
+static_assert(sizeof(porsche::frame_control_effect_guids_005bf9d0) == 12u * 16u);
+
+enum : U {
+    kMaxEvents = 128u,
+};
+
+// Harness event kinds. Synthetic callsite setup (arg pushes, mock seeding) and
+// the RET framing inside the invoke helpers below are harness code; every
+// event word records transport performed by the body under test or by a
+// shared controlled endpoint.
+enum EventKind : U {
+    kEvHasDevice = 1u,
+    kEvFindFree = 2u,
+    kEvUnload = 3u,
+    kEvDownload = 4u,
+    kEvHeapCopy = 5u,
+    kEvSetProp = 6u,
+    kEvCreateEffect = 7u,
+};
+
+struct Event {
+    U kind;
+    U a[32];
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_u32;
+    U event_count;
+    Event events[kMaxEvents];
+    B fe_slots[32u * 0x90u];
+    B slots[32u * 0x10cu];
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512] = {};
+static B fp_env[28] = {};
+
+static B* code = nullptr;
+static B* slot_5333a0 = nullptr;
+static B* slot_5334e0 = nullptr;
+static U* jump_table_5336f4 = nullptr;
+static const void** guid_table_5bb3b0 = nullptr;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U which = 0u;
+
+struct MockState {
+    U has_device_ret;
+    U find_free_id;
+    U set_prop_hr;
+    U create_hr;
+    U effect_object;
+};
+
+static MockState mock{};
+static porsche::InputDevice mock_dev_even{};
+static porsche::InputDevice mock_dev_odd{};
+static void* fe_stub_entries[19] = {};
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void divergence_exit(const char* msg) {
+    std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+    std::fflush(stdout);
+    ExitProcess(1);
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void seed_fpu() {
+    const unsigned short cw = 0x037fu;
+    __asm {
+        fninit
+        fldcw cw
+        fldpi
+        fld1
+        faddp st(1), st(0)
+        fstp st(0)
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    __asm {
+        fxsave fp_area
+        fnstenv fp_env
+        fldenv fp_env
+    }
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void check_fpu_clean(const FpuSnapshot& orig_fp, const FpuSnapshot& cpp_fp) {
+    require(orig_fp.control == cpp_fp.control, "FPU control");
+    require(orig_fp.status == cpp_fp.status, "FPU status");
+    require(orig_fp.tag == cpp_fp.tag, "FPU tag");
+    require(orig_fp.mxcsr == cpp_fp.mxcsr, "FPU mxcsr");
+    require(std::memcmp(orig_fp.values, cpp_fp.values, sizeof orig_fp.values) == 0, "FPU stack");
+}
+
+// Synthetic callsite harness: seeds callee-saved registers, pushes two 32-bit
+// stack arguments and calls the body. The stack/EBP/EBX/ESI/EDI/FPU framing
+// checks below assert the original __cdecl ABI and are harness code, not
+// recovered behavior.
+static U invoke_cdecl2(void* fn, U arg0, U arg1, FpuSnapshot& fp_out, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg1
+        push arg0
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 8
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+    return out;
+}
+
+static void push_event(U kind) {
+    require(trace.event_count < kMaxEvents, "event overflow");
+    Event& ev = trace.events[trace.event_count++];
+    ev.kind = kind;
+    std::memset(ev.a, 0, sizeof ev.a);
+}
+
+namespace porsche {
+
+// Host stand-in for the original .bss slot array 006be040 (zero-initialized).
+InputSlot input_slots_006be040[32] = {};
+
+// Controlled endpoint: device vtable entry +0x18 (stdcall, three 32-bit
+// arguments, callee-cleaned). Records the gain block contents and the
+// configured HRESULT. Proves bounded transport only; the interface identity
+// behind the vtable is not established here.
+static U __stdcall set_prop_stub(void* device, U block_id, void* block) {
+    push_event(kEvSetProp);
+    Event& ev = trace.events[trace.event_count - 1u];
+    ev.a[0] = block_id;
+    ev.a[1] = rd(block, 0x00u);
+    ev.a[2] = rd(block, 0x04u);
+    ev.a[3] = rd(block, 0x08u);
+    ev.a[4] = rd(block, 0x0cu);
+    ev.a[5] = rd(block, 0x10u);
+    ev.a[6] = mock.set_prop_hr;
+    (void)device;
+    return mock.set_prop_hr;
+}
+
+// Controlled endpoint: device vtable entry +0x48 (stdcall, five 32-bit
+// arguments, callee-cleaned). Records the GUID bytes, the descriptor canon
+// (scalars plus dereferenced axes/directions/type-parameter storage) and the
+// outer pointer, stores the configured effect object through ppdeff, and
+// returns the configured HRESULT. Proves bounded transport only.
+static U __stdcall create_effect_stub(void* device, const void* guid,
+                                      void* descriptor, void** out_effect,
+                                      void* outer) {
+    push_event(kEvCreateEffect);
+    Event& ev = trace.events[trace.event_count - 1u];
+    for (U i = 0u; i < 16u; ++i) {
+        ev.a[0u + (i >> 2u)] |= static_cast<U>(static_cast<const B*>(guid)[i]) << ((i & 3u) * 8u);
+    }
+    ev.a[4] = rd(descriptor, 0x00u);
+    ev.a[5] = rd(descriptor, 0x04u);
+    ev.a[6] = rd(descriptor, 0x08u);
+    ev.a[7] = rd(descriptor, 0x0cu);
+    ev.a[8] = rd(descriptor, 0x10u);
+    ev.a[9] = rd(descriptor, 0x14u);
+    ev.a[10] = rd(descriptor, 0x18u);
+    const U axes_count = rd(descriptor, 0x1cu);
+    ev.a[11] = axes_count;
+    const void* axes_ptr = reinterpret_cast<const void*>(rd(descriptor, 0x20u));
+    const void* dirs_ptr = reinterpret_cast<const void*>(rd(descriptor, 0x24u));
+    ev.a[16] = rd(descriptor, 0x28u);
+    const U type_bytes = rd(descriptor, 0x2cu);
+    ev.a[17] = type_bytes;
+    const void* type_ptr = reinterpret_cast<const void*>(rd(descriptor, 0x30u));
+    if (axes_count >= 1u) {
+        ev.a[12] = rd(axes_ptr, 0u);
+    }
+    if (axes_count >= 2u) {
+        ev.a[13] = rd(axes_ptr, 4u);
+    }
+    if (axes_count >= 1u) {
+        ev.a[14] = rd(dirs_ptr, 0u);
+    }
+    if (axes_count >= 2u) {
+        ev.a[15] = rd(dirs_ptr, 4u);
+    }
+    for (U i = 0u; i < 12u && i * 4u < type_bytes; ++i) {
+        ev.a[18u + i] = rd(type_ptr, i * 4u);
+    }
+    ev.a[30] = address(outer);
+    *out_effect = reinterpret_cast<void*>(mock.effect_object);
+    ev.a[31] = mock.create_hr;
+    (void)device;
+    return mock.create_hr;
+}
+
+static U __stdcall poison_stub_3(void*, U, void*) {
+    divergence_exit("poison-vtable-3");
+    return 0u;
+}
+
+static U __stdcall poison_stub_5(void*, const void*, void*, void**, void*) {
+    divergence_exit("poison-vtable-5");
+    return 0u;
+}
+
+std::uint32_t __cdecl input_slot_has_device_00532b50(std::int32_t index) {
+    const U ret = (index >= 0 && index < 32) ? mock.has_device_ret : 0u;
+    push_event(kEvHasDevice);
+    trace.events[trace.event_count - 1u].a[0] = static_cast<U>(index);
+    trace.events[trace.event_count - 1u].a[1] = ret;
+    return ret;
+}
+
+std::int32_t __cdecl frame_control_slot_find_free_00533730() {
+    push_event(kEvFindFree);
+    trace.events[trace.event_count - 1u].a[0] = mock.find_free_id;
+    return static_cast<std::int32_t>(mock.find_free_id);
+}
+
+void __cdecl frame_control_slot_unload_005337e0(std::int32_t slot) {
+    push_event(kEvUnload);
+    trace.events[trace.event_count - 1u].a[0] = static_cast<U>(slot);
+}
+
+void __cdecl frame_control_slot_download_00533760(std::int32_t slot) {
+    push_event(kEvDownload);
+    trace.events[trace.event_count - 1u].a[0] = static_cast<U>(slot);
+}
+
+void __cdecl heap_copy_dispatch_005323e0(void* destination, const void* source,
+                                         std::uint32_t bytes) {
+    push_event(kEvHeapCopy);
+    Event& ev = trace.events[trace.event_count - 1u];
+    ev.a[0] = bytes;
+    for (U i = 0u; i < 32u && i < bytes; ++i) {
+        ev.a[1u + (i >> 2u)] |= static_cast<U>(static_cast<const B*>(source)[i]) << ((i & 3u) * 8u);
+    }
+    std::memcpy(destination, source, bytes);
+}
+
+} // namespace porsche
+
+static void relocate_abs(B* p, U n, U old_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 4u <= n; ++i) {
+        if (rd(p, i) == old_va) {
+            wr(p, i, replacement);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected_count, "abs relocation count");
+}
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+// Rebuilds every 0x69cbxx displacement of body 005334e0 against the recovered
+// .bss array: displacement D becomes array_base + (D - 0x69cb10), preserving
+// the ESI = record * 0x90 addressing.
+static void relocate_fe_displacements(B* p) {
+    static const U disp[] = {
+        0x69cb10u, 0x69cb14u, 0x69cb18u, 0x69cb1cu, 0x69cb20u, 0x69cb24u,
+        0x69cb28u, 0x69cb2cu, 0x69cb30u, 0x69cb34u, 0x69cb38u, 0x69cb3cu,
+        0x69cb40u, 0x69cb44u, 0x69cb88u, 0x69cb8cu, 0x69cb90u, 0x69cb94u,
+        0x69cb98u, 0x69cb9cu,
+    };
+    static const U counts[] = {1u, 1u, 1u, 1u, 1u, 1u, 1u, 3u, 3u, 1u,
+                               1u, 5u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u};
+    const U base = address(porsche::frame_control_effects_0069cb10);
+    for (U k = 0u; k < sizeof disp / sizeof disp[0]; ++k) {
+        U found = 0u;
+        for (U i = 0u; i + 4u <= 532u; ++i) {
+            if (rd(p, i) == disp[k]) {
+                wr(p, i, base + (disp[k] - 0x69cb10u));
+                ++found;
+                i += 3u;
+            }
+        }
+        require(found == counts[k], "fe displacement count");
+    }
+}
+
+static void seed_fe_loaded(U pattern) {
+    std::memset(porsche::frame_control_effects_0069cb10, 0x55,
+                sizeof porsche::frame_control_effects_0069cb10);
+    for (U i = 0u; i < 32u; ++i) {
+        U loaded = 0x55555555u;
+        if (pattern == 0u) {
+            loaded = 0xffffffffu;
+        } else if (pattern == 2u) {
+            loaded = (i & 1u) ? 0x55555555u : 0xffffffffu;
+        } else if (pattern == 3u) {
+            loaded = (i == 0u || i == 7u || i == 31u) ? 0x55555555u : 0xffffffffu;
+        }
+        porsche::frame_control_effects_0069cb10[i].input_slot_8c =
+            static_cast<std::int32_t>(loaded);
+    }
+}
+
+static void seed_slots_bit0(U slot, U flags) {
+    std::memset(porsche::input_slots_006be040, 0x55, sizeof porsche::input_slots_006be040);
+    for (U i = 0u; i < 32u; ++i) {
+        porsche::input_slots_006be040[i].device =
+            (i & 1u) ? &mock_dev_odd : &mock_dev_even;
+        porsche::input_slots_006be040[i].flags_04 = (i << 4u);
+        porsche::input_slots_006be040[i].type_08 = 0x100u + i;
+    }
+    if (slot < 32u) {
+        porsche::input_slots_006be040[slot].flags_04 = flags;
+    }
+}
+
+// Compares one 0x90-byte effect record. The three descriptor pointer fields
+// at +0x20/+0x24/+0x30 point at per-side stack storage (axes) or at the same
+// relative offsets inside the record (directions, type parameters); their
+// contents are pinned by the kEvCreateEffect event instead.
+static bool fe_record_equal(const B* a, const B* b) {
+    if (std::memcmp(a, b, 0x20u) != 0) {
+        return false;
+    }
+    if (std::memcmp(a + 0x24u, b + 0x24u, 0x0cu) != 0) {
+        return false;
+    }
+    if (std::memcmp(a + 0x34u, b + 0x34u, 0x5cu) != 0) {
+        return false;
+    }
+    return true;
+}
+
+static void assert_traces_match(U ret_mask) {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    if (ret_mask != 0u) {
+        require((trace.ret_u32 & ret_mask) == (expected.ret_u32 & ret_mask), "return value");
+    }
+    require(trace.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < trace.event_count; ++i) {
+        require(trace.events[i].kind == expected.events[i].kind, "event kind");
+        require(std::memcmp(trace.events[i].a, expected.events[i].a,
+                            sizeof expected.events[i].a) == 0,
+                "event words");
+    }
+    for (U i = 0u; i < 32u; ++i) {
+        require(fe_record_equal(trace.fe_slots + i * 0x90u,
+                                expected.fe_slots + i * 0x90u),
+                "effect record");
+    }
+    require(std::memcmp(trace.slots, expected.slots, sizeof trace.slots) == 0, "input slots");
+    check_fpu_clean(expected.fp, trace.fp);
+}
+
+static void init_fixture() {
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_5333a0 = code + 0x000u;
+    slot_5334e0 = code + 0x0e0u;
+    jump_table_5336f4 = reinterpret_cast<U*>(code + 0x300u);
+    guid_table_5bb3b0 = reinterpret_cast<const void**>(code + 0x380u);
+
+    static const B body_5333a0[219] = {@BODY_005333A0@};
+    static const B body_5334e0[532] = {@BODY_005334E0@};
+
+    std::memcpy(slot_5333a0, body_5333a0, 219u);
+    std::memcpy(slot_5334e0, body_5334e0, 532u);
+
+    // 005333a0 relocations
+    relocate_abs(slot_5333a0, 219u, 0x006be044u,
+                 address(&porsche::input_slots_006be040[0].flags_04), 1u);
+    relocate_abs(slot_5333a0, 219u, 0x006be040u,
+                 address(porsche::input_slots_006be040), 1u);
+    relocate_abs(slot_5333a0, 219u, 0x0069cb9cu,
+                 address(&porsche::frame_control_effects_0069cb10[0].input_slot_8c), 2u);
+    relocate_abs(slot_5333a0, 219u, 0x0069dd9cu,
+                 address(&porsche::frame_control_effects_0069cb10[0].input_slot_8c) + 0x1200u, 2u);
+    relocate_rel(slot_5333a0, 219u, 0x005333a0u, 0x00532b50u,
+                 address(reinterpret_cast<const void*>(&porsche::input_slot_has_device_00532b50)), 1u);
+    relocate_rel(slot_5333a0, 219u, 0x005333a0u, 0x005337e0u,
+                 address(reinterpret_cast<const void*>(&porsche::frame_control_slot_unload_005337e0)), 1u);
+    relocate_rel(slot_5333a0, 219u, 0x005333a0u, 0x00533760u,
+                 address(reinterpret_cast<const void*>(&porsche::frame_control_slot_download_00533760)), 1u);
+
+    // 005334e0 relocations
+    relocate_fe_displacements(slot_5334e0);
+    relocate_abs(slot_5334e0, 532u, 0x006be044u,
+                 address(&porsche::input_slots_006be040[0].flags_04), 1u);
+    relocate_abs(slot_5334e0, 532u, 0x006be040u,
+                 address(porsche::input_slots_006be040), 1u);
+
+    // Switch table 0x5336f4: 13 targets, all inside the body; rebase each
+    // target onto the relocated body copy. Raw PE dword order: type 0 and 1
+    // dedicated handlers, types 2..6 share 00533684, type 7 and 9..12 share
+    // 00533690, type 8 owns 0053369c (0x30 bytes + direction 0x2328).
+    static const U jump_targets[13] = {
+        0x53366cu, 0x533678u, 0x533684u, 0x533684u, 0x533684u, 0x533684u,
+        0x533684u, 0x533690u, 0x53369cu, 0x533690u, 0x533690u, 0x533690u,
+        0x533690u,
+    };
+    for (U i = 0u; i < 13u; ++i) {
+        jump_table_5336f4[i] = address(slot_5334e0) + (jump_targets[i] - 0x5334e0u);
+    }
+    relocate_abs(slot_5334e0, 532u, 0x5336f4u, address(jump_table_5336f4), 1u);
+
+    // GUID table 0x5bb3b0: harness copy of the pinned original .rdata blobs;
+    // type 2 addresses the last blob (005bfa80), types 8 and 9 share
+    // 005bfa40.
+    static const B orig_guids[12][16] = {
+        {0x20, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x21, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x22, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x23, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x24, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x25, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x26, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x27, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x28, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x29, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x2a, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+        {0x2b, 0x1c, 0x54, 0x13, 0x38, 0x8e, 0xd0, 0x11,
+         0x9a, 0xd0, 0x00, 0xa0, 0xc9, 0xa0, 0x6e, 0x35},
+    };
+    static const U guid_blob_map[13] = {0u, 1u, 11u, 2u, 3u, 4u, 5u, 6u, 7u, 7u, 8u, 9u, 10u};
+    for (U i = 0u; i < 13u; ++i) {
+        guid_table_5bb3b0[i] = orig_guids[guid_blob_map[i]];
+    }
+    relocate_abs(slot_5334e0, 532u, 0x5bb3b0u, address(guid_table_5bb3b0), 1u);
+
+    relocate_rel(slot_5334e0, 532u, 0x005334e0u, 0x00533730u,
+                 address(reinterpret_cast<const void*>(&porsche::frame_control_slot_find_free_00533730)), 1u);
+    relocate_rel(slot_5334e0, 532u, 0x005334e0u, 0x00532b50u,
+                 address(reinterpret_cast<const void*>(&porsche::input_slot_has_device_00532b50)), 1u);
+    relocate_rel(slot_5334e0, 532u, 0x005334e0u, 0x005323e0u,
+                 address(reinterpret_cast<const void*>(&porsche::heap_copy_dispatch_005323e0)), 1u);
+    relocate_rel(slot_5334e0, 532u, 0x005334e0u, 0x005337e0u,
+                 address(reinterpret_cast<const void*>(&porsche::frame_control_slot_unload_005337e0)), 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+
+    for (U i = 0u; i < 19u; ++i) {
+        fe_stub_entries[i] = reinterpret_cast<void*>(&porsche::poison_stub_5);
+    }
+    fe_stub_entries[6u] = reinterpret_cast<void*>(&porsche::set_prop_stub);
+    fe_stub_entries[7u] = reinterpret_cast<void*>(&porsche::poison_stub_3);
+    fe_stub_entries[18u] = reinterpret_cast<void*>(&porsche::create_effect_stub);
+    mock_dev_even.vtable = reinterpret_cast<porsche::InputVtable*>(fe_stub_entries);
+    mock_dev_odd.vtable = reinterpret_cast<porsche::InputVtable*>(fe_stub_entries);
+    mock.effect_object = 0x0e571a500u;
+}
+
+static void test_5333a0() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::input_slot_set_ff_gain_005333a0);
+    struct Case5333a0 {
+        I slot;
+        I gain;
+        U has_dev;
+        U flags;
+        U loaded_pattern;
+        U set_prop_hr;
+    };
+    static const Case5333a0 table[] = {
+        {0, 0, 1u, 0xffffffffu, 0u, 0u},
+        {0, 1, 1u, 1u, 1u, 0u},
+        {5, 50, 1u, 1u, 2u, 1u},
+        {31, 100, 1u, 1u, 3u, 0x8007000cu},
+        {31, 101, 1u, 1u, 1u, 0u},
+        {0, -1, 1u, 1u, 2u, 0u},
+        {0, 0x7fffffff, 1u, 1u, 0u, 0u},
+        {0, -0x7fffffff - 1, 1u, 1u, 3u, 0u},
+        {0, 2, 1u, 1u, 1u, 0x00000001u},
+        {7, 99, 1u, 1u, 0u, 0x80004005u},
+        {-1, 5, 1u, 1u, 1u, 0u},
+        {32, 5, 1u, 1u, 1u, 0u},
+        {5, 5, 0u, 1u, 1u, 0u},
+        {5, 5, 1u, 0u, 1u, 0u},
+        {5, 5, 1u, 0xfffffffeu, 2u, 0u},
+        {5, 5, 1u, 0xffffffffu, 0u, 0u},
+    };
+
+    for (const auto& c : table) {
+        ++cases;
+        for (U side = 0u; side < 2u; ++side) {
+            which = side;
+            std::memset(&trace, 0, sizeof trace);
+            std::memset(&mock, 0, sizeof mock);
+            mock.has_device_ret = c.has_dev;
+            mock.set_prop_hr = c.set_prop_hr;
+            seed_fe_loaded(c.loaded_pattern);
+            seed_slots_bit0(static_cast<U>(c.slot < 0 ? 32u : static_cast<U>(c.slot)),
+                            c.flags);
+
+            void* const fn = (side == 0u) ? slot_5333a0 : cpp_fn;
+            (void)invoke_cdecl2(fn, static_cast<U>(c.slot), static_cast<U>(c.gain),
+                                trace.fp, trace.abi_fail);
+            std::memcpy(trace.fe_slots, porsche::frame_control_effects_0069cb10,
+                        sizeof trace.fe_slots);
+            std::memcpy(trace.slots, porsche::input_slots_006be040, sizeof trace.slots);
+            if (side == 0u) {
+                expected = trace;
+            }
+        }
+        assert_traces_match(0u);
+    }
+}
+
+static void test_5334e0() {
+    void* const cpp_fn = reinterpret_cast<void*>(&porsche::frame_control_slot_create_005334e0);
+    struct Case5334e0 {
+        I slot;
+        U has_dev;
+        U flags;
+        U find_free_id;
+        U type;
+        U axes;
+        U button;
+        U duration;
+        U gain;
+        U repeat;
+        U direction;
+        U create_hr;
+        U ts_fill;
+    };
+    static const Case5334e0 table[] = {
+        // type sweep (axes/create_hr cross) on slot 0 / record 7
+        {0, 1u, 1u, 7u, 0u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 1u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 2u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 3u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 4u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 5u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 6u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 7u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 8u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 9u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 10u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 11u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 12u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 13u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 0xffffffffu, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        // axes cross on type 9 (0x18-byte type after the raw jump-table mapping)
+        {0, 1u, 1u, 7u, 9u, 0u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 9u, 2u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {0, 1u, 1u, 7u, 9u, 3u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        // create failure on types 0 and 9
+        {0, 1u, 1u, 7u, 0u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 1u, 0x11u},
+        {0, 1u, 1u, 7u, 9u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0x8007000cu, 0x11u},
+        // slots and records
+        {5, 1u, 1u, 0u, 0u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {31, 1u, 1u, 31u, 0u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {5, 1u, 1u, 31u, 0u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {-1, 1u, 1u, 7u, 0u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {32, 1u, 1u, 7u, 0u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {5, 0u, 1u, 7u, 0u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        {5, 1u, 0u, 7u, 0u, 1u, 0xffffffffu, 0u, 25u, 0x1234u, 100u, 0u, 0x11u},
+        // duration/gain/button/repeat/direction corners on type 0
+        {0, 1u, 1u, 3u, 0u, 1u, 0xffffffffu, 0xffffffffu, 0u, 0x1234u, 100u, 0u, 0x22u},
+        {0, 1u, 1u, 3u, 0u, 1u, 0xffffffffu, 0x7fffffffu, 1u, 0x1234u, 100u, 0u, 0x22u},
+        {0, 1u, 1u, 3u, 0u, 1u, 0xffffffffu, 0u, 0x7fffffffu, 0x1234u, 100u, 0u, 0x22u},
+        {0, 1u, 1u, 3u, 0u, 1u, 0u, 0u, 0u, 0x1234u, 100u, 0u, 0x22u},
+        {0, 1u, 1u, 3u, 0u, 1u, 3u, 0u, 0u, 0x1234u, 100u, 0u, 0x22u},
+        {0, 1u, 1u, 3u, 0u, 1u, 0xfffffffeu, 0u, 0u, 0x1234u, 100u, 0u, 0x22u},
+        {0, 1u, 1u, 3u, 0u, 1u, 0xffffffffu, 0u, 0u, 0x1234u, 0xffffffffu, 0u, 0x22u},
+        {0, 1u, 1u, 3u, 0u, 1u, 0xffffffffu, 0u, 0u, 0x1234u, 100u, 0xffffffffu, 0x22u},
+    };
+
+    for (const auto& c : table) {
+        ++cases;
+        for (U side = 0u; side < 2u; ++side) {
+            which = side;
+            std::memset(&trace, 0, sizeof trace);
+            std::memset(&mock, 0, sizeof mock);
+            mock.has_device_ret = c.has_dev;
+            mock.find_free_id = c.find_free_id;
+            mock.create_hr = c.create_hr;
+
+            seed_fe_loaded(0u);
+            seed_slots_bit0(static_cast<U>(c.slot < 0 ? 32u : static_cast<U>(c.slot)),
+                            c.flags);
+
+            porsche::FeEffectParams params;
+            std::memset(&params, 0, sizeof params);
+            params.type_00 = c.type;
+            std::memset(params.type_source_04, static_cast<B>(c.ts_fill),
+                        sizeof params.type_source_04);
+            params.type_source_04[0] = static_cast<B>(c.ts_fill + 1u);
+            params.duration_34 = c.duration;
+            params.gain_38 = c.gain;
+            params.axes_3c = c.axes;
+            params.button_40 = c.button;
+            params.repeat_44 = c.repeat;
+            params.direction_48 = c.direction;
+
+            void* const fn = (side == 0u) ? slot_5334e0 : cpp_fn;
+            trace.ret_u32 = invoke_cdecl2(fn, static_cast<U>(c.slot),
+                                          address(&params), trace.fp, trace.abi_fail);
+            std::memcpy(trace.fe_slots, porsche::frame_control_effects_0069cb10,
+                        sizeof trace.fe_slots);
+            std::memcpy(trace.slots, porsche::input_slots_006be040, sizeof trace.slots);
+            if (side == 0u) {
+                expected = trace;
+            }
+        }
+        assert_traces_match(0xffffffffu);
+    }
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    init_fixture();
+    test_5333a0();
+    test_5334e0();
+    std::printf("frame_control_create_gain_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

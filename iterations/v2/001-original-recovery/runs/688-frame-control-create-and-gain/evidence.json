@@ -1,0 +1,104 @@
+{
+  "run": 688,
+  "batch": "input force-feedback frame control: slot gain set and effect create",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "queries": [
+    "005333a0 / 005334e0 bodies in research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+    "callers: full-binary CALL scan for 005333a0 and 005334e0",
+    "consumers of 005bf9d0 / 005bb3b0 / 005336f4 / 0069cb10..0069dd0f via absolute-reference scan",
+    "raw PE bytes vs pinned SHA-256 (rdata blobs, pointer table, jump table, body bytes)"
+  ],
+  "targets": [
+    {
+      "va": "005333a0",
+      "end_exclusive": "0053347b",
+      "bytes": 219,
+      "sha256": "0213f5258a30f577c267534e261bd3be071422201a6c09675b98453656fb5a06",
+      "abi": "cdecl (int32 slot_index, int32 gain), ret 0, void",
+      "summary": "gates via 00532b50 and input_slots_006be040[slot].flags_04 bit0; builds 0x14-byte gain block (0x14,0x10,0,0,clamped gain*100, clamps: >100 -> 10000, <0 -> 0); unloads every loaded effect record (0069cb9c stride 0x90, 32 records, state != -1 -> 005337e0(i)); sends block via device vtable +0x18 (stdcall, (device,7,&block)); re-downloads loaded records via 00533760(i)."
+    },
+    {
+      "va": "005334e0",
+      "end_exclusive": "005336f4",
+      "bytes": 532,
+      "sha256": "d72769c2d01bc09afd298358e5ba28e8359912674b9da9a034521a567ace84b1",
+      "abi": "cdecl (int32 slot_index, const FeEffectParams* params), ret int32 record index 0..31 or -1",
+      "summary": "claims record via 00533730, gates slot via 00532b50 and flags bit0; fills the 0x90 record at 0069cb10 + record*0x90 (duration kept as-is incl. -1 via OR EAX,EAX flag idiom, gain*100, button (-1 kept else +0x30), repeat, direction*100 mod 2^32, axes {0}/{4}/{0,4} from params+0x3c, 0x30-byte type block copied from params+0x04 via 005323e0, descriptor 0x34/0x22/0x7d0, directions->+0x78, +0x7c/+0x80=0, type->+0x84, slot->+0x8c); switch table 005336f4: type 0 -> 4, 1 -> 8, 2..6 -> 0x10, 7 and 9..12 -> 0x18, 8 -> 0x30 + direction 0x2328; type > 12 unsigned -> -1 with record left claimed; GUID from table 005bb3b0[type], device vtable +0x48 (stdcall, (device,guid,&entry,&entry+0x88,0)); HRESULT != 0 -> -1, else 005337e0(record) and return record."
+    }
+  ],
+  "callers": [
+    {
+      "function": "00411d20",
+      "evidence": "only caller of both targets in the whole binary: CALL 005334e0 at 00411e35/00411eaf/00411f34/00411fe5 (word result stored at 0x5e9420+slot*8+2*i), CALL 005333a0 at 00412011 (ADD ESP,8 after call). Confirms 2-dword cdecl ABI of both targets; caller itself remains unowned frontier reached from accepted startup_sequence_call_004121b0 chain."
+    }
+  ],
+  "owned_data": [
+    {
+      "va": "005bf9d0",
+      "end_exclusive": "005bfa90",
+      "bytes": 192,
+      "kind": ".rdata twelve 16-byte effect GUID blobs {13541C20..13541C2B}-38E8-11D0-9AD0-00A0C9A06E35, raw bytes extracted from the pinned PE",
+      "readers": ["005334e0 only (indirect through 005bb3b0)"]
+    },
+    {
+      "va": "005bb3b0",
+      "end_exclusive": "005bb3cc",
+      "bytes": 52,
+      "kind": ".rdata 13-dword pointer table; addresses [0x5bf9d0,0x5bf9e0,0x5bfa80,0x5bf9f0,0x5bfa00,0x5bfa10,0x5bfa20,0x5bfa30,0x5bfa40,0x5bfa40,0x5bfa50,0x5bfa60,0x5bfa70]; types 8 and 9 share blob 005bfa40, type 2 addresses blob 005bfa80",
+      "readers": ["005334e0 only"]
+    },
+    {
+      "va": "0069cb10",
+      "end_exclusive": "0069dd10",
+      "bytes": 4608,
+      "kind": ".bss 32 x 0x90-byte effect records, zero-initialized in the original image",
+      "readers": [
+        "005333a0/005334e0 (this run, full records)",
+        "00533730/00533760/005337e0/00533810-region (run 680, cells +0x88/+0x8c)",
+        "00533480 (run 676, cell +0x80 zero sweep)",
+        "005330a0-region (run 683, cells +0x88/+0x8c)",
+        "00533910 and 00533980-region, 00533b40-region (unowned frontier, cells +0x08/+0x10/+0x14/+0x2c/+0x30/+0x34..0x3f/+0x68..0x77/+0x88/+0x8c)",
+        "005365xx-region (unowned frontier, record 4 cells +0x10..+0x1c)"
+      ]
+    }
+  ],
+  "reused_providers": [
+    "input_slot_has_device_00532b50 (runs/676, partial-native-differential-verified)",
+    "heap_copy_dispatch_005323e0 (source/recovered/Porsche.exe/heap.cpp, native-differential-verified)",
+    "frame_control_slot_find_free_00533730 / frame_control_slot_download_00533760 / frame_control_slot_unload_005337e0 (runs/680, partial-native-differential-verified)",
+    "input_slots_006be040 / InputDevice / InputSlot (porsche/input_state.hpp)"
+  ],
+  "ownership_decisions": [
+    "Targets 005333a0/005334e0 unowned in functions.json (incl. body_ranges) as of this batch start; no other registry entry references them.",
+    "GUID blobs 005bf9d0..005bfa8f and pointer table 005bb3b0..005bb3cb had no prior owner in registry or run sources; owned here.",
+    "Full 0x90-byte record array 0069cb10..0069dd0f had no prior full-record owner (only run 494 semantic cells 0069cb90+0x90*i+{0,8,12} = record +0x80 active / +0x88 effect object / +0x8c slot via frame_control_slot_fields_494, plus run 184 legacy mention). Full-record storage is owned here; the 494 cells remain the canonical representation for run 680's functions, so single-storage reconciliation of +0x80/+0x88/+0x8c is an integration boundary for the coordinator (the two host arrays must not be linked as independent storages).",
+    "The previous worker's partial GUID array was wrong: blob 0 held {13541C59} (Sine) instead of the raw-PE {13541C20} (ConstantForce); fixed from pinned PE bytes. Its switch mapping was also wrong (it placed type 7 with the 0x10 group and swapped types 8/9); fixed against the raw jump table 005336f4."
+  ],
+  "confirmed_vs_hypothesis": {
+    "confirmed": [
+      "body bytes, sizes, ABI and callee list from the pinned PE",
+      "gain block contents, clamp order and vtable +0x18 transport",
+      "record field offsets and write order, axes/direction/button arithmetic",
+      "jump table mapping from raw PE dwords at 005336f4",
+      "GUID blob bytes and pointer table from raw PE",
+      "caller count and cdecl arg counts (00411d20 call sites)"
+    ],
+    "boundaries": [
+      "the interface identity behind device vtable +0x18/+0x48 stays unproved (COM transport only)",
+      "axes_20 points at per-call stack storage in the original too; contents pinned during the call, pointer value itself is per-side",
+      "caller 00411d20 body (params construction, 0x5e9420 result table) is unowned frontier; only its call sites/ABI used here",
+      "unowned consumers of record cells (00533910-region, 005365xx-region) still to recover; they should reuse the record extern declared here",
+      "+0x64..0x77 record bytes are written/read only by unowned frontier functions, so the spare label is descriptive, not semantic",
+      "single-storage reconciliation with run 494's frame_control_slot_fields_494 at integration",
+      "CPU-specific flag/x87 and live DirectInput hardware behavior outside the bounded harness domain"
+    ]
+  },
+  "native_proof": {
+    "runner": "scripts/research/verify-v2-native-batch.py",
+    "config": "native-config.json",
+    "fixture": "native-fixture.cpp.in",
+    "attempts": ["001"],
+    "previous_partial_work": "input sources and fixture template survived the dead provider session; both contained the GUID blob 0 and type-7/8/9 mapping errors and were corrected against the raw PE before any proof run; scripts/research/tmp-run688-extract.py was left untouched for the coordinator."
+  }
+}

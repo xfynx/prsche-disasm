@@ -1,0 +1,63 @@
+{
+  "run": 690,
+  "batch": "audio-probe-start-and-period-control",
+  "original": {
+    "module": "Porsche.exe",
+    "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+    "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+    "decompiled": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/decompiled.c"
+  },
+  "targets": [
+    {
+      "va": "00565c70",
+      "end_va": "00565cc9",
+      "bytes": 90,
+      "sha256": "c56a238afd144bc4a1576587eab2dde73d4685f5e12c950f54dca9eb2b097754",
+      "callers": ["004ab470", "004ab4b0", "00565890"],
+      "call_sites": ["004ab486", "004ab498", "004ab4ba", "005658a9"],
+      "callees": ["00590250", "00565cd0"],
+      "state": [
+        "period cell group base 006b4a08 + (flags & 0xffffff1f) << 4; dword stores at +0/+8/+0xc",
+        "group 0 dwords alias accepted device state 006b48c0 data offsets 0x148/0x150/0x154",
+        "observed caller flags 0x80/0x20/0 all select group 0 (run558 recorded the same witness)"
+      ]
+    },
+    {
+      "va": "004a8b80",
+      "end_va": "004a8ccb",
+      "bytes": 332,
+      "sha256": "25e69719e702b1fed6bd91bfe3322deadcbeffa9ae789a6c3f9cbcefede46cfd",
+      "callers": ["004a6840", "004a6a00"],
+      "call_sites": ["004a68d4", "004a6b17"],
+      "callees": ["0059db50", "004a6c90"],
+      "state": [
+        "mode cell 00657c98 (application_state arena word, accepted owner)",
+        "prefix pointer 0065b318 (BSS, newly owned in this batch)",
+        "literals 005cce90 'replay', 005d1a04 '.spl', 005d1a1c 'Lil', 005d1a14 'fesfx' (newly owned)",
+        "load buffer 005d14b0 (accepted frame_services dword cell alias, 0x3c byte bound)"
+      ]
+    }
+  ],
+  "ownership": {
+    "reused_accepted": [
+      "00565cd0 frame_services_boundary_00565cd0 (Run610)",
+      "0059db50 resource_loadat_quiet_0059db50 (Run658)",
+      "006b48c0 device state storage (Run434/462 chain)",
+      "005d14b0 frame_services_word_005d14b0"
+    ],
+    "newly_owned": [
+      "0065b318 char* prefix pointer",
+      "005cce90[7] 005d1a04[5] 005d1a14[6] 005d1a1c[4] literal bytes"
+    ],
+    "typed_boundaries_unowned": [
+      "00590250 audio_period_callback_set (run558 draft unaccepted)",
+      "004a6c90 probe message endpoint (unindexed body, caller ignores EAX)"
+    ]
+  },
+  "excluded": [],
+  "notes": [
+    "00565c70 selector arithmetic keeps AND AL,1F semantics; differential domain is the observed group-0 caller set; broader address groups and the upper-24-bit wild-address domain remain unrecovered (run558 sparse mapping is unaccepted research).",
+    "004a8b80 first strcpy/strcat chain builds '<prefix>replay.spl' for the resource load; the buffer load effect is a controlled fixture endpoint; the second chain rebuilds '<prefix>[Lil]fesfx' for the unowned message endpoint.",
+    "005901b0 stays an unowned callback provider behind the 00590250 boundary; 004a8cd0/004a8660/004acc10/004affd0 remain unrecovered consumers of the new cells."
+  ]
+}

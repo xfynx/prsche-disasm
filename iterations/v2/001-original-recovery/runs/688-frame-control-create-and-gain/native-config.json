@@ -1,0 +1,262 @@
+{
+  "run": 688,
+  "experiment": "local/experiments/v2-frame-control-create-gain-688",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain",
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005333a0",
+      "bytes": 219,
+      "sha256": "0213f5258a30f577c267534e261bd3be071422201a6c09675b98453656fb5a06",
+      "token": "@BODY_005333A0@"
+    },
+    {
+      "va": "005334e0",
+      "bytes": 532,
+      "sha256": "d72769c2d01bc09afd298358e5ba28e8359912674b9da9a034521a567ace84b1",
+      "token": "@BODY_005334E0@"
+    }
+  ],
+  "pass_marker": "frame_control_create_gain_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-5333a0-props-size",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    props.size_00 = 0x14u;",
+      "new": "    props.size_00 = 0x18u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5333a0-props-header",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    props.header_size_04 = 0x10u;",
+      "new": "    props.header_size_04 = 0x14u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5333a0-clamp-high",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "        props.gain_10 = 10000u;",
+      "new": "        props.gain_10 = 9999u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5333a0-clamp-low",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "        props.gain_10 = 0u;",
+      "new": "        props.gain_10 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5333a0-gain-scale",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "        props.gain_10 = static_cast<std::uint32_t>(gain) * 100u;",
+      "new": "        props.gain_10 = static_cast<std::uint32_t>(gain) * 101u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5333a0-block-id",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "        device, 7u, &props);",
+      "new": "        device, 6u, &props);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5333a0-vtable-entry",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "reinterpret_cast<FeSetPropertyFn>(device_vtable_words(device)[6])(",
+      "new": "reinterpret_cast<FeSetPropertyFn>(device_vtable_words(device)[5])(",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5333a0-unload-loop-bound",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    for (std::int32_t i = 0; i < 32; ++i) {\n        if (frame_control_effects_0069cb10[i].input_slot_8c != -1) {\n            frame_control_slot_unload_005337e0(i);",
+      "new": "    for (std::int32_t i = 0; i + 1 < 32; ++i) {\n        if (frame_control_effects_0069cb10[i].input_slot_8c != -1) {\n            frame_control_slot_unload_005337e0(i);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5333a0-download-loop-gate",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "        if (frame_control_effects_0069cb10[i].input_slot_8c != -1) {\n            frame_control_slot_download_00533760(i);",
+      "new": "        if (frame_control_effects_0069cb10[i].input_slot_8c != -2) {\n            frame_control_slot_download_00533760(i);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-drop-has-device-gate",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    if (input_slot_has_device_00532b50(slot_index) == 0u) {\n        return -1;\n    }",
+      "new": "    if (false) {\n        return -1;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-axes-case1-value",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "        entry.axes_count_1c = 1u;\n        entry.axes_20 = axes;\n        axes[0] = 0u;",
+      "new": "        entry.axes_count_1c = 1u;\n        entry.axes_20 = axes;\n        axes[0] = 4u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-axes-case2-value",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "        entry.axes_count_1c = 1u;\n        entry.axes_20 = axes;\n        axes[0] = 4u;",
+      "new": "        entry.axes_count_1c = 1u;\n        entry.axes_20 = axes;\n        axes[0] = 8u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-axes-else-count",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "        entry.axes_count_1c = 2u;",
+      "new": "        entry.axes_count_1c = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-button-offset",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "                                  : params->button_40 + 0x30u;",
+      "new": "                                  : params->button_40 + 0x31u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-gain-scale",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    entry.gain_10 = params->gain_38 * 100u;",
+      "new": "    entry.gain_10 = params->gain_38 * 101u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-direction-scale",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "        static_cast<std::uint32_t>(params->direction_48) * 100u);",
+      "new": "        static_cast<std::uint32_t>(params->direction_48) * 101u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-type-copy-size",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    heap_copy_dispatch_005323e0(entry.type_specific_34, params->type_source_04,\n                                0x30u);",
+      "new": "    heap_copy_dispatch_005323e0(entry.type_specific_34, params->type_source_04,\n                                0x2cu);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-type-params-cell",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    entry.type_params_30 = &entry.type_specific_34;",
+      "new": "    entry.type_params_30 = &entry.direction_78;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-descriptor-size",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    entry.size_00 = 0x34u;",
+      "new": "    entry.size_00 = 0x38u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-descriptor-flags",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    entry.flags_04 = 0x22u;",
+      "new": "    entry.flags_04 = 0x2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-sample-period",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    entry.sample_period_0c = 0x7d0u;",
+      "new": "    entry.sample_period_0c = 0x7d1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-type2-group-size",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    case 5u:\n    case 6u:\n        entry.type_bytes_2c = 0x10u;",
+      "new": "    case 5u:\n    case 6u:\n        entry.type_bytes_2c = 0x14u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-type7-group-size",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    case 12u:\n        entry.type_bytes_2c = 0x18u;",
+      "new": "    case 12u:\n        entry.type_bytes_2c = 0x1cu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-type8-size",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    case 8u:\n        entry.type_bytes_2c = 0x30u;",
+      "new": "    case 8u:\n        entry.type_bytes_2c = 0x34u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-type8-direction",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "        entry.direction_78 = 0x2328;",
+      "new": "        entry.direction_78 = 0x2329;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-create-fail-inverted",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    if (created != 0u) {\n        return -1;\n    }",
+      "new": "    if (created == 0u) {\n        return -1;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-drop-final-unload",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    frame_control_slot_unload_005337e0(record);\n    return record;",
+      "new": "    return record;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5334e0-slot-cell",
+      "source": "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+      "old": "    entry.input_slot_8c = slot_index;",
+      "new": "    entry.input_slot_8c = 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

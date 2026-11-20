@@ -1,0 +1,62 @@
+{
+  "run": 689,
+  "module": "Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "subsystem": "\\real\\cmn\\depthconv.c clut expansion: keyed RGB555/RGB565-to-BGRA8888 leaves and the getclut16ptr dispatcher",
+  "targets": [
+    {
+      "va": "00570780",
+      "body_ranges": [["00570780", "00570813"]],
+      "body_bytes": 148,
+      "abi": "__cdecl, three stack args (uint32* dst, const uint16* src, int32 count), ret 0; void",
+      "semantics": "Loop while signed count > 0: v = zero-extended src16; if v == full 32-bit DAT_006a6420 write 0 else write (alpha<<24)|(r8<<16)|(g8<<8)|b8 with r5=(v>>10)&0x1f, g5=(v>>5)&0x1f, b5=v&0x1f, 5-bit replication (c<<3)|(c>>2), alpha=0xff when bit15 set else 0x00; dst+=4, src+=2 per entry.",
+      "evidence": "disassembly 00570780..00570813; raw PE bytes sha256 53bda55f1b2adff4eb1ef63c03925c9cd545c6e0ee2259c55118622c28c6ac91; exact instruction-chain simulation matches field replication and SAR alpha composition",
+      "callers": ["005346d0 (00534765, 005347f1)", "005349e0 (00534a83)"],
+      "data": ["DAT_006a6420 read (0057079f)"]
+    },
+    {
+      "va": "00570820",
+      "body_ranges": [["00570820", "0057089f"]],
+      "body_bytes": 128,
+      "abi": "__cdecl, three stack args (uint32* dst, const uint16* src, int32 count), ret 0; void",
+      "semantics": "Loop while signed count > 0: v = zero-extended src16; if v == full 32-bit DAT_006a6420 write 0 else write 0xff000000|((r5<<3|r5>>2)<<16)|((g6<<2|g6>>4)<<8)|(b5<<3|b5>>2) with r5=(v>>11)&0x1f, g6=(v>>5)&0x3f, b5=v&0x1f; dst+=4, src+=2 per entry.",
+      "evidence": "disassembly 00570820..0057089f; raw PE bytes sha256 0d012823f91ad760d88fd957cc2f9106eb3dd627d1731c4a6727bde976fbee25; OR-chain with 0xffffffe0 sign-extension composes opaque alpha",
+      "callers": ["005346d0 (00534748)", "005349e0 (00534a55, 00534b1b)"],
+      "data": ["DAT_006a6420 read (00570829)"]
+    },
+    {
+      "va": "00534830",
+      "body_ranges": [["00534830", "005349d2"]],
+      "body_bytes": 419,
+      "abi": "__cdecl, two stack args (const void* descriptor, uint16* palette), result pointer in EAX; 0x400-byte uninitialized local scratch",
+      "semantics": "clut = 00537fb0(descriptor); if null: 005704c0(palette, DAT_006b4b20, 0x100), return palette. type = dword[clut]&0xff; if type==0x29 return clut+0x10. count = MOVSX word[clut+4]; word[palette+0x1fe]=0. 0x24: 00571160(count,clut+0x10,scratch); 005704c0(palette,scratch,count). 0x2c: 00570490(palette,clut+0x10,count). 0x2e: 00570490(scratch,clut+0x10,count); 00570420(palette,scratch,count). 0x2d: 00570420(palette,clut+0x10,count). 0x2a: 005704c0(palette,clut+0x10,count). 0x22: 00570ff0(count,clut+0x10,scratch); 005704c0(palette,scratch,count). 0x23: 00570260(palette,clut+0x10,count). default: DAT_005deb74=&\"\\\\real\\\\cmn\\\\depthconv.c\"(005bb3e4), DAT_005deb78=0x137, [005debf0](\"getclut16ptr - UNSUPPORTED CLUT TYPE 0x%x\\n\"(005bb428), type); return palette.",
+      "evidence": "disassembly 00534830..005349d2; raw PE bytes sha256 4024816ccb9a29903d1c8e3d27e423c621286ba4192cae6c727d6b0347e94b62; E8/absolute reference census: 005704c0 x4, 00570490 x2, 00570420 x2, 00570260, 00570ff0, 00571160, 00537fb0, absolutes 005deb74/005deb78/005debf0/005bb3e4/005bb428/006b4b20 each x1",
+      "callers": ["00562810 (005628eb)", "00563440 (0056353f)"],
+      "diagnostic_path": "0053497e..005349a1; line 0x137 matches \\real\\cmn\\depthconv.c getclut16ptr failure"
+    },
+    {
+      "va": "005346d0",
+      "note": "Unlocked next: getclutptr caller at 005346d0 needs 00570780/00570820 (this run) plus already-owned 00570260/00570920/00570990/00570ff0/00571160; then 00562810/00563440 need 005346d0 and 00534830."
+    }
+  ],
+  "ownership": [
+    {"cell": "00570780", "owner": "runs/689-render-clut16-and-keyed-8888-leaves (new; absent from registry functions.json and all run TUs)"},
+    {"cell": "00570820", "owner": "runs/689-render-clut16-and-keyed-8888-leaves (new; absent from registry functions.json and all run TUs)"},
+    {"cell": "00534830", "owner": "runs/689-render-clut16-and-keyed-8888-leaves (new; absent from registry functions.json and all run TUs)"},
+    {"cell": "006a6420", "owner": "runs/689-render-clut16-and-keyed-8888-leaves (new 4B .data cell; no writer indexed in references.jsonl - reads at 005705b3/0057079f/00570829 only; writer stays an explicit boundary)"},
+    {"cell": "005bb3e4", "owner": "runs/689-render-clut16-and-keyed-8888-leaves (new 23B .rdata string)"},
+    {"cell": "005bb428", "owner": "runs/689-render-clut16-and-keyed-8888-leaves (new 43B .rdata string)"},
+    {"cell": "006b4b20", "owner": "runs/380-pixel-helpers pixel_helpers.hpp render_pixel_palette_006b4b20[256] (reused via typed declaration)"},
+    {"cell": "00537fb0", "owner": "runs/537-render-resource-descriptor-cleanup (reused via typed declaration; controlled endpoint in this run's native fixture)"},
+    {"cell": "00570420/00570490/00572f30/00572f5b", "owner": "runs/683-input-ff-slot-callers-and-render-leaves (reused)"},
+    {"cell": "00570260/005704c0", "owner": "runs/685-render-palette-pixel-expand-leaves (reused)"},
+    {"cell": "00571160/00570ff0", "owner": "runs/686-render-palette-convert-leaf-table (reused)"},
+    {"cell": "005deb74/005deb78/005debf0", "owner": "source/include/porsche/shared_runtime_globals.hpp + porsche/files.hpp diagnostic transport (reused; fixture defines storage)"}
+  ],
+  "boundaries": [
+    "006a6420 has no indexed writer; runtime writer remains unrecovered",
+    "scratch[0x400] overflow for signed count > 256 in 0x24/0x22/0x2e paths preserves original unchecked behavior; harness keeps counts within the buffer",
+    "00537fb0 descriptor lookup and 005debf0 diagnostic handler are controlled endpoints proving bounded transport only",
+    "no live device, asset or gameplay acceptance in this batch"
+  ]
+}

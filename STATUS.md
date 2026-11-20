@@ -1,15 +1,22 @@
 # Current project status
 
-Updated 2026-11-18. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-20. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run687](iterations/v2/001-original-recovery/runs/687-render-palette-leaves-integration/README.md)
-compiles 394 C++ translation units across 8 projects. The link has 69 unresolved names /
-73 references (adding unlocker providers with zero new unresolved names). **There is no
-recovered playable C++ game executable yet.**
+[Run694](iterations/v2/001-original-recovery/runs/694-input-ff-clut-audio-integration/README.md)
+compiles 397 C++ translation units across 8 projects. The link has 69 unresolved names /
+72 references. **There is no recovered playable C++ game executable yet.**
 
-Run687 integrates eleven partial functions (903 code bytes total: `00570260`..`00570540`
+Run694 integrates 688/689/690: seven full original bodies (1,868 code bytes:
+input FF `005333a0`/`005334e0`, CLUT `00570780`/`00570820`/`00534830`, audio
+`00565c70`/`004a8b80`). Native comparisons pass 24,380 measured cases and 72
+material mutation controls at `/Od`/`/O2`; shared audit PASS, 984 source pins.
+Two frontier names close; two real children (`004a6c90`, `00590250`) open.
+Workers 691-693 are in flight on the next clusters. Full-game, visual and
+device acceptance remain open.
+
+Historical: Run687 integrated eleven partial functions (903 code bytes: `00570260`..`00570540`
 in `685/001` plus `005702a0`, `00570920`, `00570990`, `00570ff0`, `00571160` in
 `686/002`) and zero owned `.data`/`.rdata`/`.bss`. Native comparisons pass 1060 measured
 cases / 47 material controls at `/Od`/`/O2`. Canonical owners are reused. Shared audit
