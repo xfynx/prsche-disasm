@@ -4,18 +4,18 @@ Updated 2026-11-20. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run712](iterations/v2/001-original-recovery/runs/712-reverb-scene-children-integration/README.md)
-compiles 413 C++ translation units across 8 projects. The link has 104 unresolved
+[Run714](iterations/v2/001-original-recovery/runs/714-audio-group-decode-integration/README.md)
+compiles 414 C++ translation units across 8 projects. The link has 104 unresolved
 names / 111 references. **There is no recovered playable C++ game executable yet.**
 
-Run712 integrates 710/711: five full original bodies (392 code bytes: reverb
-bank tail/finalize/query, scene root finish, secondary destroy). Native
-comparisons pass 658 measured cases and 26 material mutation controls at
-`/Od`/`/O2`; shared audit PASS, 1,021 source pins. Five frontier names close;
-`00590a80` (audio group decode) opens.
+Run714 integrates 713: one full original body (205B: audio group decode
+`00590a80`). Native comparisons pass 120 measured cases and 10 material
+mutation controls at `/Od`/`/O2`; shared audit PASS, 1,024 source pins.
+`00590a80` closes; `00599610` (group process/reload) opens.
 
-Historical: Run709 integrated 705-708 (nine bodies, 907B; 168 cases / 29
-mutations / 1,016 pins; 411 TUs).
+Historical: Run712 integrated 710/711 (five bodies, 392B; 658 cases / 26
+mutations / 1,021 pins; 413 TUs). Run709 integrated 705-708 (nine bodies,
+907B; 411 TUs).
 
 Historical: Run698 integrated 691/692/693 (eight full bodies, 2,479B; 374
 cases / 75 mutations / 991 pins; 400 TUs; FE main-loop `004152e0`

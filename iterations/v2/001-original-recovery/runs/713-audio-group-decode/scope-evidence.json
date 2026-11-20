@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "bodies": [
+    {
+      "va": "00590a80",
+      "end": "00590b4d",
+      "bytes": 205,
+      "sha256": "8845ef3770ea55e96b71b14781f43cf33f0e99dcc5c7830fb69647a314ff156c",
+      "abi": "cdecl int(const void* source, const void* ctx, void* scratch); EAX return is the reload child's value (00599610 always returns 8 in the original)",
+      "callers": ["005900b0 (Run710 accepted audio bank open tail, CALL rel at 0x50 of that body)"],
+      "callees": [
+        "00599100 audio record decode (Run451 canonical full body)",
+        "00599610 audio group process/reload (unowned typed child, 182B, calls 0058a970/0058f7a0/0058f220/0058f7e0)",
+        "indirect callback array at 006b49e0 (device state + 0x120) with signed-byte count at 006b49a2 (device state + 0xe2)"
+      ],
+      "relocations": [
+        {"off": "0x32", "kind": "rel32", "original_target": "00599100"},
+        {"off": "0x4e", "kind": "rel32", "original_target": "00599610"},
+        {"off": "0x62", "kind": "abs32-modrm-disp32", "original_value": "006b49a2"},
+        {"off": "0x9a", "kind": "abs32-modrm-disp32", "original_value": "006b49a2"},
+        {"off": "0x8e", "kind": "abs32-imm32", "original_value": "006b49e0"}
+      ]
+    }
+  ],
+  "ownership": {
+    "new_cells": [],
+    "raw_pe": {
+      "00590a80:205": "section .text file-backed; SHA-256 8845ef3770ea55e96b71b14781f43cf33f0e99dcc5c7830fb69647a314ff156c",
+      "006b49a2:1": "interior byte of loader-zero .data owner 006b48c0 (device state + 0xe2)",
+      "006b49e0:4": "interior dword array of loader-zero .data owner 006b48c0 (device state + 0x120)"
+    },
+    "reused_not_redefined": {
+      "006b48c0": "canonical ApplicationAudioDeviceStateStorage owner from source/include/porsche/application_audio_device.hpp; 006b49a2 and 006b49e0 are interior cells, not new owned data",
+      "00599100": "Run451 canonical full body, typed binding only",
+      "006b0a80/006b1680/006b08c0..006b0a6c": "Run710/Run705 owned cells; untouched by this batch"
+    },
+    "closure_search": "functions.json (1166 entries) has no entry with entry_va 00590a80 and no body_ranges containing 00590a80..00590b4d. 00590b50 begins at 00590b50 (Run448) with no overlap. 00599100 is owned by Run451; 00599610 and the 006b49a2/006b49e0 cells have no registry owner. The device state owner 006b48c0 is declared in the canonical header and defined by accepted run fixtures.",
+    "registry_overlap": "0 overlapping body_ranges before this batch; next owned body 00590b50 starts 3 bytes after this body's RET."
+  },
+  "declarations": {
+    "source": "runs/710-audio-reverb-typed-children/audio_reverb_children_710.hpp",
+    "decode": "std::int32_t __cdecl audio_group_decode_00590a80(const void* source, const void* ctx, void* scratch);"
+  },
+  "scope_boundary": "FULL body at /Od and /O2. Harness mocks stand in for the canonical decoder 00599100, the unowned reload child 00599610 and the callback array; the canonical device-state object is defined by the fixture and its interior bytes are relocated from the original absolute addresses. Record bytes not written by the decoder remain opaque. Run451/00599610 child interiors, live callbacks/devices, faults, concurrency and full game integration remain open."
+}

@@ -1,0 +1,367 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "audio_group_decode_713.hpp"
+#include "porsche/application_audio_device.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace porsche {
+ApplicationAudioDeviceStateStorage application_audio_device_state_006b48c0{};
+}
+using namespace porsche;
+
+enum : U { kMaxEvents = 256u, kMaxIter = 8u, kCallbackSlots = 4u };
+
+enum EventKind : U { kEvDecode = 1u, kEvProcess = 2u, kEvCallback = 3u };
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+    U d;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret;
+    U event_count;
+    Event events[kMaxEvents];
+};
+
+struct Scenario {
+    B source_flag;
+    I count[kMaxIter];
+    U p1[8];
+    U p2[8];
+    U advance[kMaxIter];
+    I more[kMaxIter];
+    I process_ret[kMaxIter];
+    I iterations;
+    B cb_count;
+    B cb_after;
+    B ctx[16];
+    B scratch[16];
+};
+
+static B* code = nullptr;
+static B* slot_590a80 = nullptr;
+
+static Trace trace{};
+static Trace expected{};
+static Scenario scenario{};
+static U cases = 0u;
+static U which = 0u;
+static U decode_index = 0u;
+static U process_index = 0u;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static U fingerprint(const void* p, U n) {
+    U h = 0x811c9dc5u;
+    const B* b = static_cast<const B*>(p);
+    for (U i = 0u; i < n; ++i) {
+        h = (h ^ b[i]) * 0x01000193u;
+    }
+    return h;
+}
+
+static void push_event(U kind, U a, U b, U c, U d) {
+    require(trace.event_count < kMaxEvents, "event overflow");
+    Event& ev = trace.events[trace.event_count++];
+    ev.kind = kind;
+    ev.a = a;
+    ev.b = b;
+    ev.c = c;
+    ev.d = d;
+}
+
+static U invoke_cdecl3(void* fn, U arg0, U arg1, U arg2, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg2
+        push arg1
+        push arg0
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 12
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return out;
+}
+
+namespace porsche {
+
+std::int32_t __cdecl audio_group_decode_00599100(std::uint32_t* cursor,
+                                                 void* record) {
+    const U i = decode_index++;
+    require(i < kMaxIter, "decode index");
+    const U before = *cursor;
+    *cursor = before + scenario.advance[i];
+    B* r = static_cast<B*>(record);
+    for (U k = 0u; k < 8u; ++k) {
+        wr(r, 0x34u + k * 4u, scenario.p1[k]);
+        wr(r, 0x44u + k * 4u, scenario.p2[k]);
+    }
+    r[0x17u] = static_cast<B>(scenario.count[i]);
+    push_event(kEvDecode, i, before, static_cast<U>(scenario.more[i]),
+               static_cast<U>(static_cast<std::int8_t>(scenario.count[i])));
+    return scenario.more[i];
+}
+
+std::int32_t __cdecl audio_group_process_reload_00599610(void* record,
+                                                         const void* ctx,
+                                                         void* scratch) {
+    const U i = process_index++;
+    require(i < kMaxIter, "process index");
+    const B* r = static_cast<const B*>(record);
+    push_event(kEvProcess, i, r[0x17u], fingerprint(ctx, 16u),
+               fingerprint(scratch, 16u));
+    return scenario.process_ret[i];
+}
+
+static void callback_common(U slot, std::uint32_t* payload) {
+    push_event(kEvCallback, slot, payload[0u], payload[1u], payload[2u]);
+    if (slot == 1u) {
+        application_audio_device_state_006b48c0[0xe2u] = scenario.cb_after;
+    }
+}
+
+void __cdecl audio_group_callback_0_713(std::uint32_t* payload) {
+    callback_common(0u, payload);
+}
+void __cdecl audio_group_callback_1_713(std::uint32_t* payload) {
+    callback_common(1u, payload);
+}
+void __cdecl audio_group_callback_2_713(std::uint32_t* payload) {
+    callback_common(2u, payload);
+}
+void __cdecl audio_group_callback_3_713(std::uint32_t* payload) {
+    callback_common(3u, payload);
+}
+
+} // namespace porsche
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, U replacement,
+                         U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+static void patch_abs(B* p, U n, const B* sig, U siglen, U disp_off, U target,
+                      U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + siglen <= n; ++i) {
+        if (std::memcmp(p + i, sig, siglen) == 0) {
+            wr(p, i + disp_off, target);
+            ++found;
+            i += siglen - 1u;
+        }
+    }
+    require(found == expected_count, "abs patch count");
+}
+
+static void init_fixture() {
+    static const B body_590a80[205] = {@BODY_00590A80@};
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+    slot_590a80 = code + 0x000u;
+    std::memcpy(slot_590a80, body_590a80, 205u);
+
+    relocate_rel(slot_590a80, 205u, 0x00590a80u, 0x00599100u,
+                 address(reinterpret_cast<const void*>(
+                     &porsche::audio_group_decode_00599100)), 1u);
+    relocate_rel(slot_590a80, 205u, 0x00590a80u, 0x00599610u,
+                 address(reinterpret_cast<const void*>(
+                     &porsche::audio_group_process_reload_00599610)), 1u);
+
+    static const B sig_count[6] = {0x8au, 0x15u, 0xa2u, 0x49u, 0x6bu, 0x00u};
+    static const B sig_table[5] = {0xbfu, 0xe0u, 0x49u, 0x6bu, 0x00u};
+    patch_abs(slot_590a80, 205u, sig_count, 6u, 2u,
+              address(application_audio_device_state_006b48c0.data() + 0xe2u), 2u);
+    patch_abs(slot_590a80, 205u, sig_table, 5u, 1u,
+              address(application_audio_device_state_006b48c0.data() + 0x120u), 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0,
+            "FlushInstructionCache");
+}
+
+static void reset_side(B source_flag) {
+    decode_index = 0u;
+    process_index = 0u;
+    std::memset(&trace, 0, sizeof trace);
+
+    ApplicationAudioDeviceStateStorage& state =
+        application_audio_device_state_006b48c0;
+    std::memset(&state, 0, sizeof state);
+    state[0xe2u] = scenario.cb_count;
+    const U callbacks[4] = {
+        address(reinterpret_cast<const void*>(&porsche::audio_group_callback_0_713)),
+        address(reinterpret_cast<const void*>(&porsche::audio_group_callback_1_713)),
+        address(reinterpret_cast<const void*>(&porsche::audio_group_callback_2_713)),
+        address(reinterpret_cast<const void*>(&porsche::audio_group_callback_3_713)),
+    };
+    for (U i = 0u; i < kCallbackSlots; ++i) {
+        wr(state.data() + 0x120u, i * 4u, callbacks[i]);
+    }
+    // Neighbouring count byte stays distinct so a wrong interior offset is
+    // detected; the callback table itself is left intact.
+    state[0xe3u] = static_cast<B>(scenario.cb_count + 40u);
+    (void)source_flag;
+}
+
+static void assert_traces_match() {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    require(trace.ret == expected.ret, "return value");
+    require(trace.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < trace.event_count; ++i) {
+        require(trace.events[i].kind == expected.events[i].kind, "event kind");
+        require(trace.events[i].a == expected.events[i].a, "event a");
+        require(trace.events[i].b == expected.events[i].b, "event b");
+        require(trace.events[i].c == expected.events[i].c, "event c");
+        require(trace.events[i].d == expected.events[i].d, "event d");
+    }
+}
+
+static void run_case(U id, B source_flag, I iterations, I cb_count, B cb_after) {
+    ++cases;
+    std::memset(&scenario, 0, sizeof scenario);
+    scenario.source_flag = source_flag;
+    scenario.iterations = iterations;
+    scenario.cb_count = static_cast<B>(cb_count);
+    scenario.cb_after = cb_after;
+    for (I i = 0; i < iterations; ++i) {
+        const U k = static_cast<U>(i);
+        scenario.count[k] = static_cast<I>(1u + ((id + k * 3u) % 4u));
+        scenario.more[k] = (k + 1u < static_cast<U>(iterations)) ? 1 : 0;
+        scenario.advance[k] = 4u + ((id + k) % 5u);
+        scenario.process_ret[k] = static_cast<I>(8u + ((id + k) % 3u));
+    }
+    for (U k = 0u; k < 8u; ++k) {
+        scenario.p1[k] = 0x1000u * (id + 1u) + k * 7u + 1u;
+        scenario.p2[k] = 0x2000u * (id + 1u) + k * 11u + 2u;
+    }
+    for (U k = 0u; k < 16u; ++k) {
+        scenario.ctx[k] = static_cast<B>(0x30u + id + k);
+        scenario.scratch[k] = static_cast<B>(0x50u + id * 3u + k);
+    }
+
+    B source[32];
+    for (U k = 0u; k < sizeof source; ++k) {
+        source[k] = static_cast<B>(0xa0u + id + k);
+    }
+    source[3u] = source_flag;
+    B ctx[16];
+    B scratch[16];
+    std::memcpy(ctx, scenario.ctx, sizeof ctx);
+    std::memcpy(scratch, scenario.scratch, sizeof scratch);
+
+    void* const cpp_fn = reinterpret_cast<void*>(
+        &porsche::audio_group_decode_00590a80);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_side(source_flag);
+        void* const fn = (side == 0u) ? slot_590a80 : cpp_fn;
+        trace.ret = invoke_cdecl3(fn, address(source), address(ctx),
+                                  address(scratch), trace.abi_fail);
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match();
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    init_fixture();
+
+    U id = 0u;
+    for (B flag : {static_cast<B>(0u), static_cast<B>(2u),
+                   static_cast<B>(3u), static_cast<B>(0xffu)}) {
+        for (I iterations = 1; iterations <= 3; ++iterations) {
+            for (I cb = 0; cb <= 4; ++cb) {
+                run_case(id++, flag, iterations, cb,
+                         static_cast<B>(cb > 2 ? 1 : cb));
+            }
+        }
+    }
+    std::printf("audio_group_decode_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

@@ -1,0 +1,42 @@
+{
+  "run": 713,
+  "batch": "unowned typed child newly exposed by integrated Run710: audio group decode 00590a80",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "targets": [
+    {
+      "va": "00590a80",
+      "end_exclusive": "00590b4d",
+      "bytes": 205,
+      "sha256": "8845ef3770ea55e96b71b14781f43cf33f0e99dcc5c7830fb69647a314ff156c",
+      "abi": "cdecl int(const void* source, const void* ctx, void* scratch); EAX return is the reload child's value (original 00599610 always returns 8); ESP/EBP/EBX/ESI/EDI preserved",
+      "summary": "Source flag byte source[3]&2 selects a 4- or 8-byte header advance; the resulting pointer replaces the first argument cell and is advanced in place by canonical 00599100. Each iteration runs 00599100 (decoder), then unowned 00599610 (process/reload), then, while signed record[0x17] > 0, builds a 3-dword payload [0, record+0x34+entry*4, record+0x44+entry*4] and calls the signed-byte-counted callback array at device-state+0x120, reloading the count after each callback. Outer loop repeats while the decoder 'more' flag is non-zero."
+    }
+  ],
+  "excluded": [],
+  "ownership_decisions": {
+    "unowned_before": true,
+    "new_cells": [],
+    "notes": [
+      "functions.json (1166 entries) has no entry_va 00590a80 and no body_ranges containing 00590a80..00590b4d; the next owned body 00590b50 (Run448) starts at 00590b50, three bytes after the RET at 00590b4c.",
+      "Only caller is accepted Run710 body 005900b0 (CALL rel32 at its offset 0x50); 00590a80 is the typed child that Run710 deliberately left unowned.",
+      "00599100 is a Run451 canonical full body; this batch uses a typed binding only and does not redefine it.",
+      "00599610 is unowned (182B, callees 0058a970/0058f7a0/0058f220/0058f7e0) and stays an unowned typed child; no decoder/process algorithm is invented here.",
+      "006b49a2 and 006b49e0 are interior cells of the canonical loader-zero .data owner 006b48c0 (device state + 0xe2 and + 0x120); they are reused through application_audio_device_state_006b48c0, not newly owned.",
+      "Run710/Run705 cells 006b0a80, 006b1680 and 006b08c0..006b0a6c are untouched and not redefined."
+    ]
+  },
+  "native_proof": {
+    "config": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/native-config.json",
+    "command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/713-audio-group-decode/native-config.json --attempt 001",
+    "receipt": "local/experiments/v2-audio-group-decode-713/001/receipt.json",
+    "status": "PASS",
+    "cases_per_variant": 60,
+    "variants": ["/Od", "/O2"],
+    "material_mutations": 10,
+    "mutations_detected": 10,
+    "input_pins": 221,
+    "output_pins": 149
+  },
+  "boundary": "Extern declaration matches runs/710-audio-reverb-typed-children/audio_reverb_children_710.hpp byte for byte. Harness mocks stand in for canonical 00599100, unowned 00599610 and the callback array, while the canonical device-state object is defined by the fixture; the two original absolute data references (0x006b49a2 twice, 0x006b49e0 once) and both relative calls are relocated from raw PE bytes and checked against the immutable SHA. Compared inputs, callee order/arguments, record and payload bytes read by the callback, callback slot/count reload, integer return and ESP/EBP/EBX/ESI/EDI at both optimizations. Domains bounded: source flag bytes {0,2,3,0xff}, 1..3 decode iterations, callback counts 0..4 and a callback-driven count reload, with record count 1..4 and four callback slots. Record bytes not written by the decoder remain opaque; real 00599100/00599610 interiors, live callbacks/devices, faults, concurrency, full game integration, registry/CMake/manifest acceptance remain open. No registry/CMake/manifest/plan/doc change."
+}

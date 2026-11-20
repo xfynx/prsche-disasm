@@ -1,5 +1,12 @@
 # Отложенные проверки восстановления v2
 
+Run714 integrates713 (1 body205B,120cases,10mutations,1024pins,414TUs;
+104names111refs,noEXE). 00590a80 closes; 00599610 opens. Excluded packets
+remain: 0043ed00/00448b10/0044f240/00451490/004552b0/00455f60/00463c30/
+00466500/00413960/0045dbd0/00458c90/004522b0/00475c80/00465790; 00475c80
+needs Run649 cell overlap resolution. Storage-gated00562810/00563440 need
+run-273 proof. Fault/lifetime/RTTI, live devices andfullgame remain unproved.
+
 Run712 integrates710/711 (5 bodies392B,658cases,26mutations,1021pins,413TUs;
 104names111refs,noEXE). Fiveclose; 00590a80 group decode opens. Excluded
 packets remain: 0043ed00/00448b10/0044f240/00451490/004552b0/00455f60/00463c30/

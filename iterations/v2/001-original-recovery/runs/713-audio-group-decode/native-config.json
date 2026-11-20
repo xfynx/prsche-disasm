@@ -1,0 +1,109 @@
+{
+  "run": 713,
+  "experiment": "local/experiments/v2-audio-group-decode-713",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/713-audio-group-decode",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/713-audio-group-decode/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00590a80",
+      "bytes": 205,
+      "sha256": "8845ef3770ea55e96b71b14781f43cf33f0e99dcc5c7830fb69647a314ff156c",
+      "token": "@BODY_00590A80@"
+    }
+  ],
+  "pass_marker": "audio_group_decode_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-source-flag-offset",
+      "source": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp",
+      "old": "const std::uint32_t advance = (bytes[3u] & 0x2u) != 0u ? 8u : 4u;",
+      "new": "const std::uint32_t advance = (bytes[3u] & 0x2u) != 0u ? 4u : 8u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-count-offset",
+      "source": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp",
+      "old": "std::int8_t count = signed_byte(record[0x17u]);",
+      "new": "std::int8_t count = signed_byte(record[0x16u]);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-payload1-offset",
+      "source": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp",
+      "old": "payload[1u] = read_u32(record + 0x34u + slot);",
+      "new": "payload[1u] = read_u32(record + 0x30u + slot);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-payload2-offset",
+      "source": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp",
+      "old": "payload[2u] = read_u32(record + 0x44u + slot);",
+      "new": "payload[2u] = read_u32(record + 0x40u + slot);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "drop-last-callback",
+      "source": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp",
+      "old": "} while (index < callbacks);",
+      "new": "} while (index + 1 < callbacks);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-payload0",
+      "source": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp",
+      "old": "payload[0u] = 0u;",
+      "new": "payload[0u] = 2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "hardcoded-result",
+      "source": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp",
+      "old": "result = audio_group_process_reload_00599610(record, ctx, scratch);",
+      "new": "audio_group_process_reload_00599610(record, ctx, scratch); result = 7;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "inverted-more-loop",
+      "source": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp",
+      "old": "if (more == 0) {",
+      "new": "if (more != 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-count-offset",
+      "source": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp",
+      "old": "std::int8_t callbacks = signed_byte(\n                    application_audio_device_state_006b48c0[0xe2u]);",
+      "new": "std::int8_t callbacks = signed_byte(\n                    application_audio_device_state_006b48c0[0xe3u]);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-callback-table-offset",
+      "source": "iterations/v2/001-original-recovery/runs/713-audio-group-decode/audio_group_decode_713.cpp",
+      "old": "0x120u + static_cast<std::uint32_t>(index) * 4u",
+      "new": "0x124u + static_cast<std::uint32_t>(index) * 4u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
