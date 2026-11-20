@@ -1,0 +1,146 @@
+{
+  "run": 693,
+  "experiment": "local/experiments/v2-view-setup-teardown-scene-enter-693",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/523-render-resource-buffer"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004640b0",
+      "bytes": 564,
+      "sha256": "14afbbc2ec3ef1ab4aba97bb216f197bb2ad658f03569ee6f9bd57b4c2bdb4c4",
+      "token": "@BODY_004640B0@"
+    },
+    {
+      "va": "00467740",
+      "bytes": 141,
+      "sha256": "20ef52a859d751ea47f188295a3c4e7b5b737b1b7adda77dc5ab6554a711d9f9",
+      "token": "@BODY_00467740@"
+    },
+    {
+      "va": "00468fb0",
+      "bytes": 236,
+      "sha256": "3b7479d88e11277e59210d4b69afc8258fe2982bee5a325343696962509ec7fd",
+      "token": "@BODY_00468FB0@"
+    }
+  ],
+  "pass_marker": "application_view_lifecycle_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 300,
+  "mutations": [
+    {
+      "name": "wrong-4640b0-slot-stride",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "static_cast<std::size_t>(index) * 0x10cu",
+      "new": "static_cast<std::size_t>(index) * 0x104u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4640b0-dl-shift",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "(extra << 7) | 0x20u",
+      "new": "(extra << 3) | 0x20u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4640b0-first-float",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "store_dword(slot, 0x38u, 0x42160000u);",
+      "new": "store_dword(slot, 0x38u, 0x42160001u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4640b0-payload-count",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "for (U field = 0u; field < 9u; ++field) {",
+      "new": "for (U field = 0u; field < 8u; ++field) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4640b0-mask",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "slot[0xc3u] &= 0xf0u;",
+      "new": "slot[0xc3u] &= 0xffu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4640b0-flag-bool",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "view_route_flag_005cf584 = (probe != 0) ? 1u : 0u;",
+      "new": "view_route_flag_005cf584 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-467740-state7c-field",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "const U state_7c = load_dword(display->bytes, 0x7cu);",
+      "new": "const U state_7c = load_dword(display->bytes, 0x78u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-467740-drop-clear",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "render_display_00628130 = nullptr;",
+      "new": "render_display_00628130 = reinterpret_cast<RenderDisplay*>(0x1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-467740-core-release-arg",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "release(pointer_of(core), nullptr, 1u);",
+      "new": "release(pointer_of(core), nullptr, 2u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-468fb0-copy-size",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "std::memcpy(buffer, static_cast<const B*>(pointer_of(payload)), 0x38u);",
+      "new": "std::memcpy(buffer, static_cast<const B*>(pointer_of(payload)), 0x30u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-468fb0-alloc-guard",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "if (small != nullptr) {",
+      "new": "if (small == nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-468fb0-splash-phase",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "splash_progress_004a4a70(3);",
+      "new": "splash_progress_004a4a70(4);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-468fb0-select-args",
+      "source": "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.cpp",
+      "old": "scene_route_select_00475d70(from, to);",
+      "new": "scene_route_select_00475d70(to, from);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "run": 691,
+  "batch": "app-sim-teardown-audio-unload",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "targets": [
+    {
+      "function": "application_main_function_004a88a0",
+      "entry": "004a88a0",
+      "body_ranges_inclusive": [["004a88a0", "004a8a76"]],
+      "body_bytes": 471,
+      "body_sha256": "e996148d2565f25b81922b6f603030f2bb856ac0503b6993f227e2fb556d5be6",
+      "calling_convention": "__cdecl void(void); accepted caller 004b6da5 in 004b6a50 (application_main.cpp), canonical facade application_main_function_004a88a0",
+      "callers_note": "Single indexed caller 004b6daa (CALL in 004b6a50 loop); no data-table references.",
+      "subsystem": "application startup: audio bank/frame teardown + load-progress pump + audio transition tail",
+      "state_cells": [
+        "006573e8 arena words 00657c94, 00657a24, 00658080, 00657cb8, 00657cbc and record span 0065808c+0x580*i (fields +0, +8; consumer re-reads the count cell every iteration)",
+        "00656528..00656828 owned here: 32 records x 0x18; fields +04 (channel), +08 (handle), +14 (pointer) released; +00/+0c/+10 opaque",
+        "00656180..006563c8 owned by canonical frame_services.cpp (73 DWORD pairs)",
+        "00656868/00656869 owned by canonical frame_services.cpp byte views",
+        "005d1734 owned by canonical application_services.cpp; 005d1740..005d1754 owned by canonical frame_services.cpp (index 4 used)",
+        "005e99f4 owned by canonical application_main_globals.cpp"
+      ]
+    },
+    {
+      "function": "startup_sequence_call_004a8cd0",
+      "entry": "004a8cd0",
+      "body_ranges_inclusive": [["004a8cd0", "004a8dba"]],
+      "body_bytes": 235,
+      "body_sha256": "1ffabd1bd6fc3d960e9b6e94df942d8f3ea004b40b24ed9f7cb48da230e76bbd",
+      "calling_convention": "__cdecl void(void); accepted caller 004b6849 in 004b67b0 (startup_sequence.cpp), canonical facade startup_sequence_call_004a8cd0",
+      "callers_note": "Single indexed caller 004b6849; no data-table references.",
+      "subsystem": "startup sequence: audio bank playlist path assembly (track path + optional 'Lil' + 'SND_coll')",
+      "state_cells": [
+        "0065b318 reused from accepted Run690 provider application_audio_path_prefix_0065b318 (loader-zero char* track path cell, outside the arena span); no second definition here",
+        "005d1a1c (4B 'Lil\\0') reused from accepted Run690 provider application_audio_lil_text_005d1a1c; 005d1a20 (12B 'SND_coll\\0\\0\\0\\0') newly owned here, raw .data literal",
+        "00657c98 arena word read twice (before and after the 004acc10/004ad4d0 boundaries)",
+        "00658374 passed by value as the original buffer VA to the 004acc10 boundary (arena storage, not dereferenced by this body)",
+        "006564f0 and 006564c0 are the raw_00 fields of existing canonical application_audio_records_006564a0[5] and [2]; written to 0xfffffffe/0xfffffffd, no new storage"
+      ]
+    },
+    {
+      "function": "application_main_function_004b68f0",
+      "entry": "004b68f0",
+      "body_ranges_inclusive": [["004b68f0", "004b6a40"]],
+      "body_bytes": 337,
+      "body_sha256": "19a24053c09ed8828f4eeb8c6cdc76bc5ee66035fd21673989be6bfd295b5960",
+      "calling_convention": "__cdecl void(void); accepted caller 004b6f2f in 004b6a50 (application_main.cpp), canonical facade application_main_function_004b68f0",
+      "callers_note": "Single indexed caller 004b6f2f; no data-table references.",
+      "subsystem": "application main: Sim De-init (per-player setup copy-out + teardown service sequence + Done log)",
+      "state_cells": [
+        "00658080 arena word drives the per-player loop",
+        "005e8b34 unbounded original BSS pointer table (per-player objects); extent unproved, explicit unresolved storage dependency (fixture owns a bounded allocation)",
+        "005e75a0 unbounded original BSS table (0x96-DWORD blocks, stride 0x258); extent unproved, explicit unresolved storage dependency",
+        "005d6e60 (6B 'Done\\n\\0') and 005d6e68 (13B 'Sim De-init \\0') owned here, raw .data literals passed to the canonical formatter_stdio_printf_005a177b"
+      ]
+    }
+  ],
+  "ownership_checks": [
+    "iterations/v2/001-original-recovery/source/recovered/functions.json: 004b68f0/004a88a0/004a8cd0 absent, no body_ranges overlap with any accepted entry",
+    "runs 688-693 are parallel batches; none of their assigned VAs (00413ea0/00414eb0/004152e0, 004640b0/00467740/00468fb0, frame-control targets) collide with these three entries or the newly owned cells",
+    "00656528 table consumers (004a8570, 004a8660, 004a83e0, 004ab360) are unowned; no compiled owner existed for the span",
+    "0065b318 and 005d1a1c are compiled owners in accepted Run690 (application_audio_probe_690.obj, confirmed by Run694 game-graph validation); bound by exact symbol, not redefined here",
+    "005d1a20, 005d6e60, 005d6e68 have no compiled owner (canonical-map.json lists alias names only); newly owned here"
+  ],
+  "accepted_providers_reused": [
+    "frame_services_boundary_004ad510 (run 478)",
+    "frame_services_boundary_004ae3c0 (run 607)",
+    "frame_services_boundary_004af900 (run 608)",
+    "frame_services_boundary_00565cd0 (run 610)",
+    "frame_services_boundary_004ae4d0 (run 643)",
+    "audio_channel_stop_00565d60 (run 434/435)",
+    "application_audio_shutdown_channels_005659f0 (application_services_next)",
+    "free_00531f90 (canonical heap.cpp)",
+    "startup_service_noop_00516950 (canonical)",
+    "timed_callbacks_005366e0 (canonical window_runtime.cpp)",
+    "audio_probe_clock_0053c2e0 (run 464)",
+    "formatter_stdio_printf_005a177b (canonical formatter_stdio.cpp)",
+    "application_state_006573e8 arena (canonical application_state.cpp)",
+    "application_audio_path_prefix_0065b318 and application_audio_lil_text_005d1a1c (accepted Run690 provider application_audio_probe_690.cpp)"
+  ],
+  "boundaries": [
+    "004afd30, 004a8660, 004b0a20, 004a8570, 004b04d0, 004af5c0, 004ae470, 004acc10, 004ad4d0, 004a6c90, 004690f0, 00413fd0, 004a8a80, 004afe50, 004a4760, 00414f80, 00471c40, 004642f0, 00425330, 00412cd0, 00412e60 remain unrecovered typed boundaries with callsite-observed ABI only",
+    "004a8570/004b04d0 return values are scenario-controlled in the proof; their real semantics are not assumed",
+    "0065808c per-player arena records are accessed through the unchecked arena byte view; the fixture bounds the count scenarios to the arena span (<= 14 records), matching the original's unchecked reads without inventing a production bound",
+    "004b68f0 loop uses the low 16 bits of the counter (MOVSX); proven domain count in [0, 0x7fff]",
+    "004a8cd0 REP copies read the track path to NUL; fixture track strings stay within the 100-byte stack buffer domain"
+  ]
+}

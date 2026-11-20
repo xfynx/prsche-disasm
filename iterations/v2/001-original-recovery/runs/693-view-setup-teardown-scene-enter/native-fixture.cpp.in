@@ -1,0 +1,1109 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "application_view_lifecycle_693.hpp"
+#include "porsche/application_state.hpp"
+#include "porsche/application_main.hpp"
+#include "porsche/startup_sequence.hpp"
+#include "porsche/render_startup.hpp"
+#include "porsche/application_alloc.hpp"
+#include "render_buffer_523.hpp"
+#include "porsche/render_mode.hpp"
+#include "porsche/render_display.hpp"
+#include "porsche/splash_progress.hpp"
+#include "porsche/startup_service_516950.hpp"
+#include "porsche/formatter_search.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+enum : U {
+    kTagNone = 0u, kTagSlotTable = 1u, kTagRegistry = 2u, kTagArena = 3u,
+    kTagRouteObject = 4u, kTagDisplay = 5u, kTagDevice = 6u,
+    kTagDeviceVtable = 7u, kTagCore = 8u, kTagCoreVtable = 9u,
+    kTagPool = 10u, kTagCamera = 11u, kTagCastle = 12u,
+};
+
+enum : U {
+    kEvViewSlotService = 1u, kEvViewSlotSnapshot = 2u, kEvRouteCounter = 3u,
+    kEvRouteProbe = 4u, kEvRouteFinish = 5u, kEvTeardownSync = 6u,
+    kEvTeardownProbe = 7u, kEvAppRelease7c = 8u, kEvDeviceRelease = 9u,
+    kEvAppRelease6c = 10u, kEvTeardownReset34 = 11u, kEvTeardownReset14 = 12u,
+    kEvAppReleaseDisplay = 13u, kEvTeardownFinish = 14u, kEvCoreRelease = 15u,
+    kEvAlloc38 = 16u, kEvBufferCtor = 17u, kEvModeUpdate = 18u,
+    kEvServiceNoop = 19u, kEvService36080 = 20u, kEvThrCleanup = 21u,
+    kEvSceneReset = 22u, kEvAlloc8 = 23u, kEvSceneSlot = 24u,
+    kEvRouteSelect = 25u, kEvRouteRoot = 26u, kEvRouteBind = 27u,
+    kEvSplash = 28u, kEvStageF240 = 29u, kEvStage51490 = 30u,
+    kEvStage552b0 = 31u, kEvStage3ed00 = 32u, kEvStage55f60 = 33u,
+    kEvStage58b80 = 34u, kEvTransferEnter = 35u, kEvTeardownRelease7c = 36u,
+    kEvTeardownRelease6c = 37u, kEvAllocOther = 38u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+    U d;
+};
+
+constexpr U kMaxEvents = 128u;
+constexpr U kPoolBytes = 0x200u;
+constexpr U kRouteObjectBytes = 0x1100u;
+
+struct Fpu {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    B values[80];
+    U mxcsr;
+};
+
+struct Snapshot {
+    U event_count;
+    Event events[kMaxEvents];
+    B slots[0x218u];
+    U camera[3u];
+    U flag;
+    B string_byte;
+    B scene_flag;
+    U scene_buffer;
+    U transfer_state;
+    B castle[7u];
+    B service_mirror[0x30u];
+    B pool[kPoolBytes];
+    U pool_used;
+    B route_object[kRouteObjectBytes];
+    B display[0x80u];
+    B device[0x40u];
+    B core[4u];
+    U display_ptr;
+    U core_ptr;
+    U eax;
+};
+
+static void require(bool ok, const char* why);
+
+static void __fastcall device_release_slot0(void* self, void* unused_edx,
+                                            U argument);
+static void __fastcall core_release_slot1(void* self, void* unused_edx,
+                                          U argument);
+
+static B pool[kPoolBytes];
+static U pool_used = 0u;
+static B route_object[kRouteObjectBytes];
+static RenderDisplay display_object = {};
+static B device_object[0x40u];
+static U device_vtable[2u] = {};
+static B core_object[4u];
+static U core_vtable[2u] = {};
+static B service_object_mirror[0x30u];
+// Bytes of the service object that the original 00473100 writes; the four
+// gap bytes (0x03, 0x0b, 0x26, 0x27) keep caller-stack garbage in the
+// original and are never read by the downstream snapshot copy, so the
+// fixture compares and hashes only the observed bytes.
+static const U service_observed[44u] = {
+    0u, 1u, 2u, 4u, 5u, 6u, 7u, 8u, 9u, 10u, 12u, 13u, 14u, 15u,
+    16u, 17u, 18u, 19u, 20u, 21u, 22u, 23u, 24u, 25u, 26u, 27u, 28u, 29u,
+    30u, 31u, 32u, 33u, 34u, 35u, 36u, 37u, 40u, 41u, 42u, 43u, 44u, 45u,
+    46u, 47u,
+};
+static U service_hash(const B* object) {
+    U hash = 0x811c9dc5u;
+    for (U offset : service_observed) {
+        hash = (hash ^ object[offset]) * 0x01000193u;
+    }
+    return hash;
+}
+static bool service_equal(const B* left, const B* right) {
+    for (U offset : service_observed) {
+        if (left[offset] != right[offset]) {
+            return false;
+        }
+    }
+    return true;
+}
+static U case_fail_alloc38 = 0u;
+static U case_fail_alloc8 = 0u;
+
+static Event events[kMaxEvents];
+static U event_count = 0u;
+static U cases = 0u;
+static U which = 0u;
+
+static Snapshot saved{};
+
+static B* slot_004640b0 = nullptr;
+static B* slot_00467740 = nullptr;
+static B* slot_00468fb0 = nullptr;
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u) {
+    if (event_count < kMaxEvents) {
+        events[event_count++] = Event{kind, a, b, c, d};
+    } else {
+        require(false, "event overflow");
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load_dword(const void* base, U offset) {
+    U value;
+    std::memcpy(&value, static_cast<const B*>(base) + offset, 4u);
+    return value;
+}
+
+static void store_dword(void* base, U offset, U value) {
+    std::memcpy(static_cast<B*>(base) + offset, &value, 4u);
+}
+
+static void store_word16(void* base, U offset, std::uint16_t value) {
+    std::memcpy(static_cast<B*>(base) + offset, &value, 2u);
+}
+
+static U fnv(const void* p, U count) {
+    U hash = 0x811c9dc5u;
+    const B* bytes = static_cast<const B*>(p);
+    for (U i = 0u; i < count; ++i) {
+        hash = (hash ^ bytes[i]) * 0x01000193u;
+    }
+    return hash;
+}
+
+static U tag_of(const void* p) {
+    struct Span { const void* base; U span; U tag; };
+    const Span spans[] = {
+        {view_slot_table_00627e80, 0x218u, kTagSlotTable},
+        {route_object_registry_table_005e8c00, 36u, kTagRegistry},
+        {&application_state_006573e8, sizeof(ApplicationStateArena), kTagArena},
+        {route_object, kRouteObjectBytes, kTagRouteObject},
+        {&display_object, 0x80u, kTagDisplay},
+        {device_object, 0x40u, kTagDevice},
+        {device_vtable, sizeof device_vtable, kTagDeviceVtable},
+        {core_object, 4u, kTagCore},
+        {core_vtable, sizeof core_vtable, kTagCoreVtable},
+        {pool, kPoolBytes, kTagPool},
+        {view_setup_camera_005cf620, 12u, kTagCamera},
+        {view_castle_string_005cf760, 7u, kTagCastle},
+    };
+    const U value = address(p);
+    for (const Span& span : spans) {
+        const U base = address(span.base);
+        if (value >= base && value - base < span.span) {
+            return (span.tag << 16u) | (value - base);
+        }
+    }
+    return kTagNone;
+}
+
+static U required_tag(const void* p, const char* why) {
+    const U tag = tag_of(p);
+    if (tag == kTagNone) {
+        std::printf("divergence untagged-pointer %s case=%u which=%u\n", why,
+                    cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+    return tag;
+}
+
+static U encoded_pointer(const void* p) {
+    if (p == nullptr) {
+        return 0xffffffffu;
+    }
+    return required_tag(p, "unknown pointer");
+}
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", why, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+// Controlled endpoint with the original 00473100 body contract:
+// word[0]=mode, byte[2]=0, dword[4]=-1, bytes[8..10]=0, word[0x24]=0,
+// dwords[0x28,0x2c,0x14,0x0c,0x1c,0x18]=0, dwords[0x10,0x20]=0x3f800000.
+namespace porsche {
+void __fastcall view_slot_service_00473100(void* self, void* unused_edx,
+                                           U mode) {
+    (void)unused_edx;
+    B* const object = static_cast<B*>(self);
+    store_word16(object, 0x00u, static_cast<std::uint16_t>(mode & 0xffffu));
+    object[0x02u] = 0u;
+    store_dword(object, 0x04u, 0xffffffffu);
+    object[0x08u] = 0u;
+    object[0x09u] = 0u;
+    object[0x0au] = 0u;
+    store_word16(object, 0x24u, 0u);
+    store_dword(object, 0x28u, 0u);
+    store_dword(object, 0x2cu, 0u);
+    store_dword(object, 0x14u, 0u);
+    store_dword(object, 0x0cu, 0u);
+    store_dword(object, 0x10u, 0x3f800000u);
+    store_dword(object, 0x1cu, 0u);
+    store_dword(object, 0x18u, 0u);
+    store_dword(object, 0x20u, 0x3f800000u);
+    std::memcpy(service_object_mirror, object, 0x30u);
+    record_event(kEvViewSlotService, mode, service_hash(object));
+}
+
+// Controlled endpoint with the original 00473190 field-snapshot copy.
+void __fastcall view_slot_snapshot_00473190(void* self, void* unused_edx,
+                                            const void* source) {
+    (void)unused_edx;
+    B* const target = static_cast<B*>(self);
+    const B* const from = static_cast<const B*>(source);
+    const U self_tag = required_tag(self, "snapshot target");
+    if (target != from) {
+        std::uint16_t word;
+        std::memcpy(&word, from + 0x00u, 2u);
+        std::memcpy(target + 0x00u, &word, 2u);
+        target[0x02u] = from[0x02u];
+        target[0x08u] = from[0x08u];
+        target[0x09u] = from[0x09u];
+        target[0x0au] = from[0x0au];
+        for (U field = 0u; field < 3u; ++field) {
+            store_dword(target, 0x0cu + field * 4u,
+                        load_dword(from, 0x0cu + field * 4u));
+        }
+        for (U field = 0u; field < 3u; ++field) {
+            store_dword(target, 0x18u + field * 4u,
+                        load_dword(from, 0x18u + field * 4u));
+        }
+        std::uint16_t tail_word;
+        std::memcpy(&tail_word, from + 0x24u, 2u);
+        std::memcpy(target + 0x24u, &tail_word, 2u);
+        store_dword(target, 0x04u, load_dword(from, 0x04u));
+        store_dword(target, 0x28u, load_dword(from, 0x28u));
+        store_dword(target, 0x2cu, load_dword(from, 0x2cu));
+    }
+    record_event(kEvViewSlotSnapshot, self_tag, service_hash(from));
+}
+
+void __cdecl view_route_counter_00465cf0(I index) {
+    record_event(kEvRouteCounter, static_cast<U>(index));
+}
+
+// Bounded fixture transport of the accepted locale-off case-folded compare
+// (formatter_search_compare_005ae3c0, formatter_search.cpp).
+std::int32_t __cdecl formatter_search_compare_005ae3c0(const char* left,
+                                                       const char* right) {
+    U a = 0xffu;
+    U b;
+    while (a != 0u) {
+        a = static_cast<U>(static_cast<B>(*right++));
+        b = static_cast<U>(static_cast<B>(*left++));
+        if (a == b) {
+            continue;
+        }
+        const U right_fold = (a >= 'A' && a <= 'Z') ? (a + 32u) : a;
+        a = (b >= 'A' && b <= 'Z') ? (b + 32u) : b;
+        if (a != right_fold) {
+            const std::int32_t result = (a < right_fold) ? -1 : 1;
+            record_event(kEvRouteProbe, static_cast<U>(result));
+            return result;
+        }
+    }
+    const std::int32_t result = static_cast<std::int8_t>(a);
+    record_event(kEvRouteProbe, static_cast<U>(result));
+    return result;
+}
+
+void __cdecl view_route_finish_00463c30() {
+    record_event(kEvRouteFinish);
+}
+
+void __cdecl view_teardown_sync_004b7140() {
+    record_event(kEvTeardownSync);
+}
+
+void __cdecl view_teardown_probe_00465e20() {
+    record_event(kEvTeardownProbe);
+}
+
+void __fastcall view_teardown_release_00538d80(void* self, void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvTeardownRelease7c, required_tag(self, "slot 7c object"));
+}
+
+void __fastcall view_teardown_release_00540420(void* self, void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvTeardownRelease6c, required_tag(self, "slot 6c object"));
+}
+
+void __fastcall view_teardown_reset_00466500(void* self, void* unused_edx) {
+    (void)unused_edx;
+    const U tag = required_tag(self, "reset target");
+    record_event(((tag & 0xffffu) == 0x34u) ? kEvTeardownReset34
+                                            : kEvTeardownReset14,
+                 tag);
+}
+
+void __cdecl view_teardown_finish_0047f190() {
+    record_event(kEvTeardownFinish);
+}
+
+std::uint32_t __cdecl application_release_0059f050(void* object) {
+    const U tag = encoded_pointer(object);
+    U kind = kEvAppReleaseDisplay;
+    if (tag != 0xffffffffu && (tag >> 16u) == kTagPool) {
+        kind = ((tag & 0xffffu) == 0x100u) ? kEvAppRelease7c : kEvAppRelease6c;
+    }
+    record_event(kind, tag);
+    return 1u;
+}
+
+void* __cdecl render_allocate_0059ef90(U size) {
+    void* result = nullptr;
+    if (!((size == 0x38u && case_fail_alloc38 != 0u) ||
+          (size == 8u && case_fail_alloc8 != 0u))) {
+        result = pool + pool_used;
+        pool_used += (size + 3u) & ~3u;
+    }
+    if (size == 0x38u) {
+        record_event(kEvAlloc38, case_fail_alloc38, pool_used);
+    } else if (size == 8u) {
+        record_event(kEvAlloc8, case_fail_alloc8, pool_used);
+    } else {
+        record_event(kEvAllocOther, size, pool_used);
+    }
+    return result;
+}
+
+void* __fastcall render_driver_buffer_ctor_00537700(void* self,
+                                                    void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvBufferCtor, required_tag(self, "scene buffer"));
+    return self;
+}
+
+void __cdecl render_mode_update_state_0044ed10() {
+    record_event(kEvModeUpdate);
+}
+
+void __cdecl startup_service_noop_00516950() {
+    record_event(kEvServiceNoop);
+}
+
+void __fastcall startup_sequence_service_00536080(void* self,
+                                                  void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvService36080, required_tag(self, "service receiver"));
+}
+
+void __cdecl render_display_thr_cleanup_00555390() {
+    record_event(kEvThrCleanup);
+}
+
+void __fastcall scene_reset_00467f40(void* self, void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvSceneReset, required_tag(self, "scene reset self"));
+}
+
+void* __fastcall scene_transfer_slot_0044b960(void* self, void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvSceneSlot, required_tag(self, "transfer slot"));
+    return self;
+}
+
+void __cdecl scene_route_select_00475d70(U from, U to) {
+    record_event(kEvRouteSelect, from, to);
+}
+
+void __cdecl scene_route_root_0044fae0(void* root) {
+    record_event(kEvRouteRoot, required_tag(root, "route root"));
+}
+
+void __cdecl scene_route_bind_0045dbd0(void* root, U mode) {
+    record_event(kEvRouteBind, required_tag(root, "route bind"), mode);
+}
+
+void __cdecl scene_stage_reset_00448b10() {
+    record_event(kEvThrCleanup + 100u);
+}
+
+void __cdecl splash_progress_004a4a70(I phase) {
+    record_event(kEvSplash, static_cast<U>(phase));
+}
+
+void __cdecl scene_stage_reset_0044f240() {
+    record_event(kEvStageF240);
+}
+
+void __cdecl scene_stage_reset_00451490() {
+    record_event(kEvStage51490);
+}
+
+void __cdecl scene_stage_reset_004552b0() {
+    record_event(kEvStage552b0);
+}
+
+void __cdecl scene_stage_reset_0043ed00() {
+    record_event(kEvStage3ed00);
+}
+
+void __cdecl scene_stage_reset_00455f60() {
+    record_event(kEvStage55f60);
+}
+
+void __cdecl scene_stage_reset_00458b80() {
+    record_event(kEvStage58b80);
+}
+
+void* __cdecl scene_transfer_enter_004521c0() {
+    record_event(kEvTransferEnter);
+    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(0x005a5a00u));
+}
+
+ApplicationStateArena application_state_006573e8{};
+RenderCore* render_core_0065b39c = nullptr;
+RenderDisplay* render_display_00628130 = nullptr;
+
+std::size_t ApplicationStateArena::checked_offset(U va, std::size_t length)
+    const {
+    if (va < application_state_base_va) {
+        return 0u;
+    }
+    const std::size_t offset =
+        static_cast<std::size_t>(va - application_state_base_va);
+    if (offset > application_state_bytes ||
+        length > application_state_bytes - offset) {
+        return 0u;
+    }
+    return offset;
+}
+
+U& ApplicationStateArena::word(U va) {
+    return words_[checked_offset(va, sizeof(U)) / sizeof(U)];
+}
+
+const U& ApplicationStateArena::word(U va) const {
+    return words_[checked_offset(va, sizeof(U)) / sizeof(U)];
+}
+} // namespace porsche
+
+// Display-device vtable slot zero: this=ECX, one pushed argument (value 1),
+// stdcall cleanup of 4 bytes. Transported through the fastcall form.
+static void __fastcall device_release_slot0(void* self, void* unused_edx,
+                                            U argument) {
+    (void)unused_edx;
+    record_event(kEvDeviceRelease, required_tag(self, "device self"),
+                 argument);
+}
+
+// Core vtable slot one, same transport.
+static void __fastcall core_release_slot1(void* self, void* unused_edx,
+                                          U argument) {
+    (void)unused_edx;
+    record_event(kEvCoreRelease, required_tag(self, "core self"), argument);
+}
+
+alignas(16) static B fp_area[512] = {};
+
+static void seed_fpu() {
+    const unsigned short control = 0x037fu;
+    __asm {
+        fninit
+        fldcw control
+        cld
+    }
+}
+
+static void capture_fpu(Fpu& out) {
+    std::memset(&out, 0, sizeof out);
+    __asm {
+        fxsave fp_area
+    }
+    out.control = static_cast<unsigned short>(load_dword(fp_area, 0u) & 0xffffu);
+    out.status =
+        static_cast<unsigned short>((load_dword(fp_area, 0u) >> 16u) & 0xffffu);
+    out.tag = fp_area[4u];
+    out.mxcsr = load_dword(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(out.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+    }
+}
+
+static U invoke_body(void* fn, U& abi_fail, Fpu& fpu) {
+    U before = 0u;
+    U frame = 0u;
+    U fail = 0u;
+    U result = 0u;
+    seed_fpu();
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+bad:
+        mov fail, 1
+done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fpu);
+    abi_fail = fail;
+    return result;
+}
+
+static void set_abs(B* body, U size, U old, const void* replacement,
+                    U expected) {
+    U found = 0u;
+    const U target = address(replacement);
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (load_dword(body, i) == old) {
+            store_dword(body, i, target);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected, "absolute relocation count");
+}
+
+static void set_rel(B* body, U size, U original_va, U target_va,
+                    const void* replacement, U expected, B opcode) {
+    U found = 0u;
+    const U target = address(replacement);
+    for (U i = 0u; i + 5u <= size; ++i) {
+        if (body[i] == opcode &&
+            ((original_va + i + 5u + static_cast<I>(load_dword(body, i + 1u))) &
+             0xffffffffu) == target_va) {
+            store_dword(body, i + 1u, target - address(body + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected, "relative relocation count");
+}
+
+static void capture(Snapshot& out) {
+    out.event_count = event_count;
+    std::memcpy(out.events, events, event_count * sizeof(Event));
+    std::memcpy(out.slots, view_slot_table_00627e80, 0x218u);
+    std::memcpy(out.camera, view_setup_camera_005cf620, 12u);
+    out.flag = view_route_flag_005cf584;
+    out.string_byte = view_route_string_005cf5d8;
+    out.scene_flag = scene_flag_00619800;
+    out.scene_buffer = encoded_pointer(scene_buffer_0062814c);
+    out.transfer_state = encoded_pointer(scene_transfer_state_0061976c);
+    std::memcpy(out.castle, view_castle_string_005cf760, 7u);
+    std::memcpy(out.service_mirror, service_object_mirror, 0x30u);
+    std::memcpy(out.pool, pool, kPoolBytes);
+    out.pool_used = pool_used;
+    std::memcpy(out.route_object, route_object, kRouteObjectBytes);
+    std::memcpy(out.display, display_object.bytes, 0x80u);
+    std::memcpy(out.device, device_object, 0x40u);
+    std::memcpy(out.core, core_object, 4u);
+    out.display_ptr = encoded_pointer(render_display_00628130);
+    out.core_ptr = encoded_pointer(render_core_0065b39c);
+}
+
+static void assert_same(const Snapshot& expected, const Snapshot& actual) {
+    require(actual.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < expected.event_count; ++i) {
+        require(actual.events[i].kind == expected.events[i].kind, "event kind");
+        require(actual.events[i].a == expected.events[i].a, "event a");
+        require(actual.events[i].b == expected.events[i].b, "event b");
+        require(actual.events[i].c == expected.events[i].c, "event c");
+        require(actual.events[i].d == expected.events[i].d, "event d");
+    }
+    require(std::memcmp(actual.slots, expected.slots, 0x218u) == 0,
+            "view slots");
+    require(std::memcmp(actual.camera, expected.camera, 12u) == 0, "camera");
+    require(actual.flag == expected.flag, "route flag");
+    require(actual.string_byte == expected.string_byte, "route string byte");
+    require(actual.scene_flag == expected.scene_flag, "scene flag");
+    require(actual.scene_buffer == expected.scene_buffer, "scene buffer");
+    require(actual.transfer_state == expected.transfer_state,
+            "transfer state");
+    require(std::memcmp(actual.castle, expected.castle, 7u) == 0, "castle");
+    require(service_equal(actual.service_mirror, expected.service_mirror),
+            "service object");
+    require(actual.pool_used == expected.pool_used, "pool used");
+    require(std::memcmp(actual.pool, expected.pool, kPoolBytes) == 0, "pool");
+    require(std::memcmp(actual.route_object, expected.route_object,
+                        kRouteObjectBytes) == 0,
+            "route object");
+    require(std::memcmp(actual.display, expected.display, 0x80u) == 0,
+            "display");
+    require(std::memcmp(actual.device, expected.device, 0x40u) == 0, "device");
+    require(std::memcmp(actual.core, expected.core, 4u) == 0, "core");
+    require(actual.display_ptr == expected.display_ptr, "display global");
+    require(actual.core_ptr == expected.core_ptr, "core global");
+}
+
+static void verify_original_data() {
+    // Raw original .data bytes from the pinned PE.
+    static const B flag_witness[4] = {0x01u, 0x00u, 0x00u, 0x00u};
+    static const B camera_witness[12] = {0x00u, 0x00u, 0x00u, 0x00u, 0xcdu,
+                                         0xccu, 0xccu, 0x3eu, 0x66u, 0x66u,
+                                         0x66u, 0x3fu};
+    static const B castle_witness[7] = {0x63u, 0x61u, 0x73u, 0x74u, 0x6cu,
+                                        0x65u, 0x00u};
+    U flag_init;
+    std::memcpy(&flag_init, flag_witness, 4u);
+    require(view_route_flag_005cf584 == flag_init, "original 005cf584 init");
+    require(view_route_string_005cf5d8 == 0x02u, "original 005cf5d8 init");
+    require(std::memcmp(view_setup_camera_005cf620, camera_witness, 12u) == 0,
+            "original 005cf620 bytes");
+    require(std::memcmp(view_castle_string_005cf760, castle_witness, 7u) == 0,
+            "original 005cf760 bytes");
+    require(scene_buffer_0062814c == nullptr, "original 0062814c init");
+    require(scene_transfer_state_0061976c == nullptr, "original 0061976c init");
+    require(scene_flag_00619800 == 0u, "original 00619800 init");
+}
+
+static void reset_state() {
+    std::memset(view_slot_table_00627e80, 0, 0x218u);
+    std::memset(route_object_registry_table_005e8c00, 0, 36u);
+    view_setup_camera_005cf620[0] = 0x00000000u;
+    view_setup_camera_005cf620[1] = 0x3eccccccu;
+    view_setup_camera_005cf620[2] = 0x3f666666u;
+    view_route_flag_005cf584 = 1u;
+    view_route_string_005cf5d8 = 2u;
+    std::memcpy(view_castle_string_005cf760, "castle", 7u);
+    scene_buffer_0062814c = nullptr;
+    scene_transfer_state_0061976c = nullptr;
+    scene_flag_00619800 = 0u;
+    std::memset(pool, 0xcdu, kPoolBytes);
+    pool_used = 0u;
+    std::memset(display_object.bytes, 0, 0x80u);
+    std::memset(device_object, 0, 0x40u);
+    std::memset(core_object, 0, 4u);
+    render_display_00628130 = nullptr;
+    render_core_0065b39c = nullptr;
+    event_count = 0u;
+    std::memset(service_object_mirror, 0, 0x30u);
+    std::memset(route_object, 0, kRouteObjectBytes);
+    application_state_006573e8.word(0x00657404u) = 0u;
+    application_state_006573e8.word(0x0065741cu) = 0u;
+    application_state_006573e8.word(0x00657a24u) = 0u;
+    application_state_006573e8.word(0x00657a30u) = 0u;
+    for (U i = 0u; i < 8u; ++i) {
+        application_state_006573e8.word(0x00657444u + i * 4u) = 0u;
+    }
+}
+
+static void fill_route_object(U seed) {
+    U state = 0x1234567u + seed * 0x9e3779b9u;
+    for (U i = 0u; i < kRouteObjectBytes; ++i) {
+        state = state * 1664525u + 1013904223u;
+        route_object[i] = static_cast<B>(state >> 24);
+    }
+}
+
+static void setup_view_case(U mode, U route_index, B camera_byte, U prefill,
+                            const char* name) {
+    reset_state();
+    case_fail_alloc38 = 0u;
+    case_fail_alloc8 = 0u;
+    application_state_006573e8.word(0x00657404u) = mode;
+    application_state_006573e8.word(0x0065741cu) = route_index;
+    view_route_string_005cf5d8 = camera_byte;
+    fill_route_object(route_index + prefill * 37u);
+    route_object_registry_table_005e8c00[route_index] = route_object;
+    if (prefill != 0u) {
+        for (U i = 0u; i < 0x218u; ++i) {
+            view_slot_table_00627e80[i] = static_cast<B>(0x31u + i);
+        }
+    }
+    // 0x00657444 is the arena name buffer handed to the compare endpoint.
+    std::memcpy(reinterpret_cast<B*>(&application_state_006573e8) +
+                    (0x00657444u - application_state_base_va),
+                name, std::strlen(name) + 1u);
+}
+
+static void run_view_case(U mode, U route_index, B camera_byte, U prefill,
+                          const char* name) {
+    ++cases;
+    Snapshot current{};
+    Fpu fpu[2] = {};
+    U abi_fail[2] = {};
+    U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        setup_view_case(mode, route_index, camera_byte, prefill, name);
+        void* const fn =
+            (side == 0u)
+                ? slot_004640b0
+                : reinterpret_cast<void*>(&application_main_function_004640b0);
+        eax[side] = invoke_body(fn, abi_fail[side], fpu[side]);
+        capture(current);
+        if (side == 0u) {
+            saved = current;
+        }
+    }
+    require(abi_fail[0] == 0u, "original abi fail");
+    require(abi_fail[1] == 0u, "cpp abi fail");
+    require(eax[0] == eax[1], "return value");
+    require(std::memcmp(&fpu[0], &fpu[1], sizeof(Fpu)) == 0, "fpu state");
+    assert_same(saved, current);
+}
+
+static void prepare_teardown_objects(U device_present, U state_7c,
+                                     U state_6c) {
+    device_vtable[0] = 0u;
+    device_vtable[1] = 0u;
+    core_vtable[0] = 0u;
+    core_vtable[1] =
+        address(reinterpret_cast<const void*>(&core_release_slot1));
+    store_dword(core_object, 0u, address(core_vtable));
+    render_core_0065b39c = reinterpret_cast<RenderCore*>(core_object);
+    device_vtable[0] =
+        address(reinterpret_cast<const void*>(&device_release_slot0));
+    store_dword(device_object, 0u, address(device_vtable));
+    store_dword(device_object, 0x04u, 0x11223344u);
+    store_dword(device_object, 0x08u, 0x55667788u);
+    render_display_00628130 = &display_object;
+    store_dword(display_object.bytes, 0x70u,
+                device_present != 0u ? address(device_object) : 0u);
+    store_dword(display_object.bytes, 0x74u, address(&display_object));
+    store_dword(display_object.bytes, 0x7cu,
+                state_7c != 0u ? address(pool + 0x100u) : 0u);
+    store_dword(display_object.bytes, 0x6cu,
+                state_6c != 0u ? address(pool + 0x140u) : 0u);
+}
+
+static void run_teardown_case(U display_present, U state_7c, U device_present,
+                              U state_6c, U core_present) {
+    ++cases;
+    Snapshot current{};
+    Fpu fpu[2] = {};
+    U abi_fail[2] = {};
+    U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_state();
+        case_fail_alloc38 = 0u;
+        case_fail_alloc8 = 0u;
+        // Reserved pool cells for the display-held objects.
+        store_dword(pool, 0x100u, 0x1a2b3c4du);
+        store_dword(pool, 0x140u, 0x5e6f7081u);
+        if (display_present != 0u) {
+            prepare_teardown_objects(device_present, state_7c, state_6c);
+        } else {
+            core_vtable[0] = 0u;
+            core_vtable[1] =
+                address(reinterpret_cast<const void*>(&core_release_slot1));
+            store_dword(core_object, 0u, address(core_vtable));
+            render_core_0065b39c = core_present != 0u
+                ? reinterpret_cast<RenderCore*>(core_object)
+                : nullptr;
+        }
+        void* const fn =
+            (side == 0u)
+                ? slot_00467740
+                : reinterpret_cast<void*>(&application_main_function_00467740);
+        eax[side] = invoke_body(fn, abi_fail[side], fpu[side]);
+        capture(current);
+        if (side == 0u) {
+            saved = current;
+        }
+    }
+    require(abi_fail[0] == 0u, "original abi fail");
+    require(abi_fail[1] == 0u, "cpp abi fail");
+    require(eax[0] == eax[1], "return value");
+    require(std::memcmp(&fpu[0], &fpu[1], sizeof(Fpu)) == 0, "fpu state");
+    assert_same(saved, current);
+}
+
+static void run_scene_case(U fail_alloc8, U seed) {
+    ++cases;
+    Snapshot current{};
+    Fpu fpu[2] = {};
+    U abi_fail[2] = {};
+    U eax[2] = {};
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_state();
+        case_fail_alloc38 = 0u;
+        case_fail_alloc8 = fail_alloc8;
+        application_state_006573e8.word(0x00657a24u) = 0x111u + seed;
+        application_state_006573e8.word(0x00657a30u) = 0x222u + seed * 3u;
+        // The original dereferences the display global without a null check;
+        // a non-null display with a populated device payload is the covered
+        // domain.
+        device_vtable[0] = 0u;
+        device_vtable[1] = 0u;
+        core_vtable[0] = 0u;
+        core_vtable[1] =
+            address(reinterpret_cast<const void*>(&core_release_slot1));
+        store_dword(core_object, 0u, address(core_vtable));
+        render_core_0065b39c = reinterpret_cast<RenderCore*>(core_object);
+        device_vtable[0] =
+            address(reinterpret_cast<const void*>(&device_release_slot0));
+        store_dword(device_object, 0u, address(device_vtable));
+        store_dword(device_object, 0x04u, address(device_object + 0x08u));
+        for (U field = 0u; field < 14u; ++field) {
+            store_dword(device_object, 0x08u + field * 4u,
+                        0x3a000000u + field * 0x010101u + seed * 0x1000u);
+        }
+        render_display_00628130 = &display_object;
+        store_dword(display_object.bytes, 0x70u, address(device_object));
+        store_dword(display_object.bytes, 0x74u, address(&display_object));
+        void* const fn =
+            (side == 0u)
+                ? slot_00468fb0
+                : reinterpret_cast<void*>(&startup_sequence_call_00468fb0);
+        eax[side] = invoke_body(fn, abi_fail[side], fpu[side]);
+        capture(current);
+        if (side == 0u) {
+            saved = current;
+        }
+    }
+    require(abi_fail[0] == 0u, "original abi fail");
+    require(abi_fail[1] == 0u, "cpp abi fail");
+    require(eax[0] == eax[1], "return value");
+    require(std::memcmp(&fpu[0], &fpu[1], sizeof(Fpu)) == 0, "fpu state");
+    assert_same(saved, current);
+}
+
+static const B body_004640b0[564] = {@BODY_004640B0@};
+static const B body_00467740[141] = {@BODY_00467740@};
+static const B body_00468fb0[236] = {@BODY_00468FB0@};
+
+static void prepare_code() {
+    B* const code = static_cast<B*>(VirtualAlloc(
+        nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+
+    slot_004640b0 = code + 0x000u;
+    slot_00467740 = code + 0x300u;
+    slot_00468fb0 = code + 0x400u;
+    std::memcpy(slot_004640b0, body_004640b0, sizeof body_004640b0);
+    std::memcpy(slot_00467740, body_00467740, sizeof body_00467740);
+    std::memcpy(slot_00468fb0, body_00468fb0, sizeof body_00468fb0);
+
+    // 004640b0 absolute bindings.
+    set_abs(slot_004640b0, 564u, 0x00657404u,
+            &application_state_006573e8.word(0x00657404u), 1u);
+    set_abs(slot_004640b0, 564u, 0x0065741cu,
+            &application_state_006573e8.word(0x0065741cu), 2u);
+    set_abs(slot_004640b0, 564u, 0x005e8c00u,
+            route_object_registry_table_005e8c00, 2u);
+    set_abs(slot_004640b0, 564u, 0x00627e94u,
+            view_slot_table_00627e80 + 0x14u, 1u);
+    set_abs(slot_004640b0, 564u, 0x005cf5d8u, &view_route_string_005cf5d8, 1u);
+    set_abs(slot_004640b0, 564u, 0x005cf620u, view_setup_camera_005cf620, 1u);
+    set_abs(slot_004640b0, 564u, 0x005cf624u, view_setup_camera_005cf620 + 1u,
+            1u);
+    set_abs(slot_004640b0, 564u, 0x005cf628u, view_setup_camera_005cf620 + 2u,
+            1u);
+    set_abs(slot_004640b0, 564u, 0x00627eccu, view_slot_table_00627e80 + 0x4cu,
+            1u);
+    set_abs(slot_004640b0, 564u, 0x00627ed0u, view_slot_table_00627e80 + 0x50u,
+            1u);
+    set_abs(slot_004640b0, 564u, 0x00627ed4u, view_slot_table_00627e80 + 0x54u,
+            1u);
+    set_abs(slot_004640b0, 564u, 0x005cf584u, &view_route_flag_005cf584, 1u);
+    set_abs(slot_004640b0, 564u, 0x005cf760u, view_castle_string_005cf760, 1u);
+    set_abs(slot_004640b0, 564u, 0x00657444u,
+            &application_state_006573e8.word(0x00657444u), 1u);
+    set_rel(slot_004640b0, 564u, 0x004640b0u, 0x00473100u,
+            reinterpret_cast<const void*>(&view_slot_service_00473100), 1u,
+            0xe8u);
+    set_rel(slot_004640b0, 564u, 0x004640b0u, 0x00473190u,
+            reinterpret_cast<const void*>(&view_slot_snapshot_00473190), 1u,
+            0xe8u);
+    set_rel(slot_004640b0, 564u, 0x004640b0u, 0x00465cf0u,
+            reinterpret_cast<const void*>(&view_route_counter_00465cf0), 1u,
+            0xe8u);
+    set_rel(slot_004640b0, 564u, 0x004640b0u, 0x005ae3c0u,
+            reinterpret_cast<const void*>(&formatter_search_compare_005ae3c0),
+            1u, 0xe8u);
+    set_rel(slot_004640b0, 564u, 0x004640b0u, 0x00463c30u,
+            reinterpret_cast<const void*>(&view_route_finish_00463c30), 1u,
+            0xe8u);
+    set_rel(slot_004640b0, 564u, 0x004640b0u, 0x00516950u,
+            reinterpret_cast<const void*>(&startup_service_noop_00516950), 1u,
+            0xe8u);
+
+    // 00467740 absolute bindings.
+    set_abs(slot_00467740, 141u, 0x00628130u, &render_display_00628130, 2u);
+    set_abs(slot_00467740, 141u, 0x0065b39cu, &render_core_0065b39c, 1u);
+    set_rel(slot_00467740, 141u, 0x00467740u, 0x004b7140u,
+            reinterpret_cast<const void*>(&view_teardown_sync_004b7140), 1u,
+            0xe8u);
+    set_rel(slot_00467740, 141u, 0x00467740u, 0x00465e20u,
+            reinterpret_cast<const void*>(&view_teardown_probe_00465e20), 1u,
+            0xe8u);
+    set_rel(slot_00467740, 141u, 0x00467740u, 0x00538d80u,
+            reinterpret_cast<const void*>(&view_teardown_release_00538d80),
+            1u, 0xe8u);
+    set_rel(slot_00467740, 141u, 0x00467740u, 0x0059f050u,
+            reinterpret_cast<const void*>(&application_release_0059f050), 3u,
+            0xe8u);
+    set_rel(slot_00467740, 141u, 0x00467740u, 0x00540420u,
+            reinterpret_cast<const void*>(&view_teardown_release_00540420),
+            1u, 0xe8u);
+    set_rel(slot_00467740, 141u, 0x00467740u, 0x00466500u,
+            reinterpret_cast<const void*>(&view_teardown_reset_00466500), 2u,
+            0xe8u);
+    set_rel(slot_00467740, 141u, 0x00467740u, 0x0047f190u,
+            reinterpret_cast<const void*>(&view_teardown_finish_0047f190), 1u,
+            0xe8u);
+
+    // 00468fb0 absolute bindings.
+    set_abs(slot_00468fb0, 236u, 0x00628130u, &render_display_00628130, 4u);
+    set_abs(slot_00468fb0, 236u, 0x0062814cu, &scene_buffer_0062814c, 1u);
+    set_abs(slot_00468fb0, 236u, 0x00619800u, &scene_flag_00619800, 1u);
+    set_abs(slot_00468fb0, 236u, 0x0061976cu, &scene_transfer_state_0061976c,
+            2u);
+    set_abs(slot_00468fb0, 236u, 0x00657a30u,
+            &application_state_006573e8.word(0x00657a30u), 1u);
+    set_abs(slot_00468fb0, 236u, 0x00657a24u,
+            &application_state_006573e8.word(0x00657a24u), 1u);
+    set_abs(slot_00468fb0, 236u, 0x00657444u,
+            &application_state_006573e8.word(0x00657444u), 2u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x0059ef90u,
+            reinterpret_cast<const void*>(&render_allocate_0059ef90), 2u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x00537700u,
+            reinterpret_cast<const void*>(&render_driver_buffer_ctor_00537700),
+            1u, 0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x0044ed10u,
+            reinterpret_cast<const void*>(&render_mode_update_state_0044ed10),
+            1u, 0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x00516950u,
+            reinterpret_cast<const void*>(&startup_service_noop_00516950), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x00536080u,
+            reinterpret_cast<const void*>(&startup_sequence_service_00536080),
+            1u, 0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x00555390u,
+            reinterpret_cast<const void*>(&render_display_thr_cleanup_00555390),
+            1u, 0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x00467f40u,
+            reinterpret_cast<const void*>(&scene_reset_00467f40), 1u, 0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x0044b960u,
+            reinterpret_cast<const void*>(&scene_transfer_slot_0044b960), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x00475d70u,
+            reinterpret_cast<const void*>(&scene_route_select_00475d70), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x0044fae0u,
+            reinterpret_cast<const void*>(&scene_route_root_0044fae0), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x00448b10u,
+            reinterpret_cast<const void*>(&scene_stage_reset_00448b10), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x004a4a70u,
+            reinterpret_cast<const void*>(&splash_progress_004a4a70), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x0044f240u,
+            reinterpret_cast<const void*>(&scene_stage_reset_0044f240), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x00451490u,
+            reinterpret_cast<const void*>(&scene_stage_reset_00451490), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x004552b0u,
+            reinterpret_cast<const void*>(&scene_stage_reset_004552b0), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x0043ed00u,
+            reinterpret_cast<const void*>(&scene_stage_reset_0043ed00), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x00455f60u,
+            reinterpret_cast<const void*>(&scene_stage_reset_00455f60), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x0045dbd0u,
+            reinterpret_cast<const void*>(&scene_route_bind_0045dbd0), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x00458b80u,
+            reinterpret_cast<const void*>(&scene_stage_reset_00458b80), 1u,
+            0xe8u);
+    set_rel(slot_00468fb0, 236u, 0x00468fb0u, 0x004521c0u,
+            reinterpret_cast<const void*>(&scene_transfer_enter_004521c0), 1u,
+            0xe9u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0,
+            "FlushInstructionCache");
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* info) {
+    const CONTEXT& context = *info->ContextRecord;
+    std::printf(
+        "native-fault %08lx eip=%08lx case=%u which=%u "
+        "eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx esi=%08lx edi=%08lx\n",
+        info->ExceptionRecord->ExceptionCode, context.Eip, cases, which,
+        context.Eax, context.Ebx, context.Ecx, context.Edx, context.Esi,
+        context.Edi);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    verify_original_data();
+    prepare_code();
+
+    static const U modes[] = {0u, 1u, 2u, 0x80000000u, 0x7fffffffu};
+    static const U route_indices[] = {0u, 3u, 8u};
+    static const B camera_bytes[] = {0u, 2u, 0xffu};
+    static const char* const names[] = {"castle", "CAStle", "harbor-town"};
+    for (U mode : modes) {
+        for (U route_index : route_indices) {
+            for (U camera = 0u; camera < 3u; ++camera) {
+                for (U prefill = 0u; prefill < 2u; ++prefill) {
+                    run_view_case(mode, route_index, camera_bytes[camera],
+                                  prefill, names[camera]);
+                }
+            }
+        }
+    }
+
+    for (U display = 0u; display < 2u; ++display) {
+        for (U state_7c = 0u; state_7c < 2u; ++state_7c) {
+            for (U device = 0u; device < 2u; ++device) {
+                for (U state_6c = 0u; state_6c < 2u; ++state_6c) {
+                    for (U core = 0u; core < 2u; ++core) {
+                        run_teardown_case(display, state_7c, device, state_6c,
+                                          core);
+                    }
+                }
+            }
+        }
+    }
+
+    for (U fail_alloc8 = 0u; fail_alloc8 < 2u; ++fail_alloc8) {
+        for (U seed = 0u; seed < 4u; ++seed) {
+            run_scene_case(fail_alloc8, seed);
+        }
+    }
+
+    std::printf(
+        "application_view_lifecycle_original_x86_vs_cpp=PASS cases=%u\n",
+        cases);
+    return 0;
+}

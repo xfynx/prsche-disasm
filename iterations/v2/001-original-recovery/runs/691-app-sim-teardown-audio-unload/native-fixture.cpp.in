@@ -1,0 +1,1177 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "application_sim_teardown_691.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U address(const void* p) { return static_cast<U>(reinterpret_cast<std::uintptr_t>(p)); }
+static U word(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+static void put(void* p, U o, U v) { std::memcpy(static_cast<B*>(p) + o, &v, 4u); }
+
+static const U kArenaBase = 0x006573e8u;
+static_assert((0x0065808cu - kArenaBase) == 0xca4u, "record offset constant");
+
+// Fixture allocations for the deliberately unbounded original BSS tables.
+std::uint32_t porsche::application_player_object_table_005e8b34[16]{};
+std::uint32_t porsche::application_player_setup_table_005e75a0[0x96u * 8u]{};
+
+// Canonical state owned by uncompiled canonical TUs; the fixture holds the
+// objects here with the raw original initial values.
+std::uint32_t porsche::application_audio_active_005d1734 = 0u;
+porsche::ApplicationAudioRecord006564a0 porsche::application_audio_records_006564a0[8]{};
+// Harness transport for the two cells owned by the accepted Run690 provider
+// application_audio_probe_690.cpp. Raw initial bytes are pinned in init().
+char* porsche::application_audio_path_prefix_0065b318 = nullptr;
+const char porsche::application_audio_lil_text_005d1a1c[4] = "Lil";
+
+static B object_buf[8][0x1000];
+static B descriptor_buf[8][0x600];
+static char track_buf[4][64];
+
+static U cases = 0u;
+static bool cpp_side = false;
+
+static B* code = nullptr;
+static B* slot_4a88a0 = nullptr;
+static B* slot_4a8cd0 = nullptr;
+static B* slot_4b68f0 = nullptr;
+
+enum EventTag : U {
+    kAd510 = 1u,
+    kAe3c0 = 2u,
+    kAf900 = 3u,
+    kAfd30 = 4u,
+    kShutdown5659f0 = 5u,
+    kFree531f90 = 6u,
+    kStop565d60 = 7u,
+    kCd0565cd0 = 8u,
+    kReset4a8660 = 9u,
+    kClock53c2e0 = 10u,
+    kB0a20 = 11u,
+    kPump5366e0 = 12u,
+    kA8570 = 13u,
+    kB04d0 = 14u,
+    kAf5c0 = 15u,
+    kAe470 = 16u,
+    kAe4d0 = 17u,
+    kAcc10 = 18u,
+    kAd4d0 = 19u,
+    kA6c90 = 20u,
+    kPrintf = 21u,
+    kNoop516950 = 22u,
+    k4690f0 = 23u,
+    k413fd0 = 24u,
+    k4a8a80 = 25u,
+    k4afe50 = 26u,
+    k4a4760 = 27u,
+    k414f80 = 28u,
+    k471c40 = 29u,
+    k4642f0 = 30u,
+    k425330 = 31u,
+    k412cd0 = 32u,
+    k412e60 = 33u,
+};
+
+struct Event {
+    U tag;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+    char s0[100];
+};
+
+struct Trace {
+    U abi_fail;
+    U exception[3];
+    U count;
+    Event events[512];
+    U final_arena[0xf89];
+    B final_records_656528[0x300];
+    U final_records_6564a0[32];
+    U final_frame_records[146];
+    B final_flag_656868[2];
+    U final_words_5d1740[5];
+    U final_active_5d1734;
+    U final_5e99f4;
+    U final_track_ptr;
+    U final_object_table[16];
+    U final_setup_table[0x96u * 8u];
+    B final_objects[8][0x1000];
+    B final_descriptors[8][0x600];
+    B final_track[256];
+};
+
+static Trace trace{};
+static Trace expected{};
+
+struct ScenarioCfg {
+    U clock_seq[8];
+    U clock_len;
+    I a8570_seq[8];
+    U a8570_len;
+    I b04d0_seq[8];
+    U b04d0_len;
+    U stop_ret;
+    U free_ret;
+    U pump_ret;
+    U noop_ret;
+    U a8570_decrements_count;
+    U acc10_bumps_mode;
+    U ae470_writes;
+};
+
+static ScenarioCfg cfg{};
+static U clock_idx = 0u;
+static U a8570_idx = 0u;
+static U b04d0_idx = 0u;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u cpp=%u\n", msg, cases, static_cast<U>(cpp_side));
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void record_event(U tag, U a0 = 0u, U a1 = 0u, U a2 = 0u, U a3 = 0u,
+                         const char* s0 = nullptr) {
+    require(trace.count < 512u, "event capacity");
+    Event& e = trace.events[trace.count++];
+    std::memset(&e, 0, sizeof(e));
+    e.tag = tag;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+    e.a3 = a3;
+    if (s0 != nullptr) {
+        std::strncpy(e.s0, s0, sizeof(e.s0) - 1u);
+    }
+}
+
+static U arena_word(U va) { return word(porsche::application_state_006573e8.words().data(), (va - kArenaBase) / 4u * 4u); }
+
+namespace porsche {
+
+void __cdecl frame_services_boundary_004ad510() { record_event(kAd510); }
+
+std::uint32_t __cdecl frame_services_boundary_004ae3c0(std::uint32_t zero) {
+    record_event(kAe3c0, zero);
+    return 0x5dc1u;
+}
+
+void __cdecl frame_services_boundary_004af900(std::uint32_t tag, std::uint32_t mode) {
+    record_event(kAf900, tag, mode);
+}
+
+void __cdecl frame_services_boundary_00565cd0(std::uint32_t a, std::uint32_t b) {
+    record_event(kCd0565cd0, a, b);
+}
+
+std::uint32_t __cdecl frame_services_boundary_00566340(std::uint32_t a, std::uint32_t b) {
+    record_event(kAf900, 0x5633400u, a, b);
+    return 0x3340u;
+}
+
+void __cdecl frame_services_boundary_004ae8c0(std::uint32_t product) {
+    record_event(kAf5c0, 0x4ae8c00u, product);
+}
+
+void __cdecl frame_services_boundary_004ae4d0(std::uint32_t a, std::uint32_t b) {
+    record_event(kAe4d0, a, b);
+}
+
+std::int32_t __cdecl audio_channel_stop_00565d60(std::uint32_t handle) {
+    record_event(kStop565d60, handle, cfg.stop_ret);
+    return static_cast<std::int32_t>(cfg.stop_ret);
+}
+
+void __cdecl application_audio_shutdown_channels_005659f0(std::int32_t channel) {
+    record_event(kShutdown5659f0, static_cast<U>(channel));
+}
+
+std::uint32_t __cdecl free_00531f90(void* resource) {
+    record_event(kFree531f90, address(resource), cfg.free_ret);
+    return cfg.free_ret;
+}
+
+void __cdecl startup_service_noop_00516950() { record_event(kNoop516950); }
+
+std::uint32_t __cdecl timed_callbacks_005366e0(std::uint32_t argument) {
+    record_event(kPump5366e0, argument, cfg.pump_ret);
+    return cfg.pump_ret;
+}
+
+std::uint32_t __cdecl audio_probe_clock_0053c2e0() {
+    const U value = (clock_idx < cfg.clock_len) ? cfg.clock_seq[clock_idx] : 0x7ffffff0u;
+    ++clock_idx;
+    record_event(kClock53c2e0, value);
+    return value;
+}
+
+int __cdecl formatter_stdio_printf_005a177b(const char* format, ...) {
+    record_event(kPrintf, 0u, 0u, 0u, 0u, format);
+    return 12;
+}
+
+void __cdecl application_sim_boundary_004afd30() { record_event(kAfd30); }
+void __cdecl application_sim_boundary_004a8660() { record_event(kReset4a8660); }
+void __cdecl application_sim_boundary_004b0a20() { record_event(kB0a20); }
+
+std::int32_t __cdecl application_sim_boundary_004a8570(std::int32_t first,
+                                                       std::int32_t second,
+                                                       std::int32_t flag) {
+    const I value = (a8570_idx < cfg.a8570_len) ? cfg.a8570_seq[a8570_idx] : 0;
+    ++a8570_idx;
+    if (cfg.a8570_decrements_count != 0u) {
+        put(porsche::application_state_006573e8.words().data(), (0x00658080u - kArenaBase), arena_word(0x00658080u) - 1u);
+    }
+    record_event(kA8570, static_cast<U>(first), static_cast<U>(second), static_cast<U>(flag),
+                 static_cast<U>(value));
+    return value;
+}
+
+std::int32_t __cdecl application_sim_boundary_004b04d0(std::int32_t first, std::int32_t second) {
+    const I value = (b04d0_idx < cfg.b04d0_len) ? cfg.b04d0_seq[b04d0_idx] : 0;
+    ++b04d0_idx;
+    record_event(kB04d0, static_cast<U>(first), static_cast<U>(second), static_cast<U>(value));
+    return value;
+}
+
+void __cdecl application_sim_boundary_004af5c0() { record_event(kAf5c0); }
+
+void __cdecl application_sim_boundary_004ae470(std::int32_t first, std::uint32_t* second) {
+    U wrote = 0u;
+    if (cfg.ae470_writes != 0u && second != nullptr) {
+        *second = 0x7777u;
+        wrote = 1u;
+    }
+    record_event(kAe470, static_cast<U>(first), address(second), wrote);
+}
+
+void __cdecl application_sim_boundary_004acc10(std::int32_t first, std::uint32_t buffer_va) {
+    if (cfg.acc10_bumps_mode != 0u) {
+        put(porsche::application_state_006573e8.words().data(), (0x00657c98u - kArenaBase), arena_word(0x00657c98u) + 1u);
+    }
+    record_event(kAcc10, static_cast<U>(first), buffer_va);
+}
+
+void __cdecl application_sim_boundary_004ad4d0() { record_event(kAd4d0); }
+
+void __cdecl application_sim_boundary_004a6c90(const char* path, std::int32_t kind) {
+    record_event(kA6c90, static_cast<U>(kind), 0u, 0u, 0u, path);
+}
+
+void __cdecl application_sim_boundary_004690f0() { record_event(k4690f0); }
+void __cdecl application_sim_boundary_00413fd0() { record_event(k413fd0); }
+void __cdecl application_sim_boundary_004a8a80() { record_event(k4a8a80); }
+void __cdecl application_sim_boundary_004afe50() { record_event(k4afe50); }
+void __cdecl application_sim_boundary_004a4760() { record_event(k4a4760); }
+void __cdecl application_sim_boundary_00414f80() { record_event(k414f80); }
+void __cdecl application_sim_boundary_00471c40() { record_event(k471c40); }
+void __cdecl application_sim_boundary_004642f0() { record_event(k4642f0); }
+void __cdecl application_sim_boundary_00425330() { record_event(k425330); }
+void __cdecl application_sim_boundary_00412cd0() { record_event(k412cd0); }
+void __cdecl application_sim_boundary_00412e60() { record_event(k412e60); }
+
+} // namespace porsche
+
+static int exception_record(EXCEPTION_POINTERS* e) {
+    trace.exception[0] = e->ExceptionRecord->ExceptionCode;
+    trace.exception[1] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[0]);
+    trace.exception[2] = static_cast<U>(e->ExceptionRecord->ExceptionInformation[1]);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void relocate_abs32(B* slot, U off, U orig, U replacement) {
+    require(word(slot, off) == orig, "exact absolute relocation offset");
+    put(slot, off, replacement);
+}
+
+static void relocate_call(B* slot, U off, U orig_va, U orig_target, const void* target) {
+    const U actual = orig_va + 4u + word(slot, off);
+    require(actual == orig_target, "exact relative call target");
+    const U rel = address(target) - (address(slot) + off + 4u);
+    put(slot, off, rel);
+}
+
+static U arena_word_address(U va) {
+    return address(&porsche::application_state_006573e8.words()[(va - kArenaBase) / 4u]);
+}
+
+static void init() {
+    // Assert production initial state against raw PE bytes before any reset.
+    static const B raw_5d1a1c[] = {@STR_005D1A1C@};
+    static const B raw_5d1a20[] = {@STR_005D1A20@};
+    static const B raw_5d6e60[] = {@STR_005D6E60@};
+    static const B raw_5d6e68[] = {@STR_005D6E68@};
+    require(sizeof raw_5d1a1c == 4u && std::memcmp(porsche::application_audio_lil_text_005d1a1c, raw_5d1a1c, 4u) == 0,
+            "raw .data 005d1a1c");
+    require(sizeof raw_5d1a20 == 12u && std::memcmp(porsche::application_audio_bank_suffix_005d1a20, raw_5d1a20, 12u) == 0,
+            "raw .data 005d1a20");
+    require(sizeof raw_5d6e60 == 6u && std::memcmp(porsche::sim_deinit_done_log_005d6e60, raw_5d6e60, 6u) == 0,
+            "raw .data 005d6e60");
+    require(sizeof raw_5d6e68 == 13u && std::memcmp(porsche::sim_deinit_log_005d6e68, raw_5d6e68, 13u) == 0,
+            "raw .data 005d6e68");
+    require(porsche::application_audio_path_prefix_0065b318 == nullptr, "loader-zero 0065b318");
+    for (U i = 0u; i < 32u; ++i) {
+        require(word(porsche::application_audio_records_00656528, i * 0x18u) == 0u,
+                "loader-zero 00656528 table");
+    }
+    for (U i = 0u; i < 8u; ++i) {
+        require(word(porsche::application_audio_records_006564a0, i * 0x10u) == 0u,
+                "loader-zero 006564a0 records");
+    }
+    require(word(porsche::frame_services_records_00656180.data()) == 0u, "loader-zero 00656180");
+    require(porsche::frame_services_byte_00656868 == 0 && porsche::frame_services_byte_00656869 == 0,
+            "loader-zero 00656868/69");
+    require(porsche::frame_services_words_005d1740[0] == 0x7fu &&
+            porsche::frame_services_words_005d1740[1] == 0x7fu &&
+            porsche::frame_services_words_005d1740[2] == 0x7fu &&
+            porsche::frame_services_words_005d1740[3] == 0x7fu &&
+            porsche::frame_services_words_005d1740[4] == 0x7fu, "raw .data 005d1740");
+    require(porsche::global_005e99f4 == 0u, "loader-zero 005e99f4");
+    require(porsche::application_audio_active_005d1734 == 0u, "loader-zero 005d1734");
+    require(arena_word(0x00657c94u) == 0u && arena_word(0x00657c98u) == 0u &&
+            arena_word(0x00657a24u) == 0u && arena_word(0x00658080u) == 0u &&
+            arena_word(0x00657cb8u) == 0u && arena_word(0x00657cbcu) == 0u,
+            "loader-zero arena words");
+    require(word(porsche::application_player_object_table_005e8b34) == 0u &&
+            word(porsche::application_player_setup_table_005e75a0) == 0u,
+            "loader-zero unbounded tables");
+
+    static const B body_4a88a0[] = {@BODY_004A88A0@};
+    static const B body_4a8cd0[] = {@BODY_004A8CD0@};
+    static const B body_4b68f0[] = {@BODY_004B68F0@};
+    require(sizeof body_4a88a0 == 471u, "471-byte original body 004a88a0");
+    require(sizeof body_4a8cd0 == 235u, "235-byte original body 004a8cd0");
+    require(sizeof body_4b68f0 == 337u, "337-byte original body 004b68f0");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "raw executable allocation");
+    slot_4a88a0 = code;
+    slot_4a8cd0 = code + 1024u;
+    slot_4b68f0 = code + 2048u;
+    std::memcpy(slot_4a88a0, body_4a88a0, sizeof body_4a88a0);
+    std::memcpy(slot_4a8cd0, body_4a8cd0, sizeof body_4a8cd0);
+    std::memcpy(slot_4b68f0, body_4b68f0, sizeof body_4b68f0);
+
+    // ---- 004a88a0 relocations (slot VA 0x004a88a0) ----
+    relocate_abs32(slot_4a88a0, 0x11u, 0x00657c94u, arena_word_address(0x00657c94u));
+    relocate_abs32(slot_4a88a0, 0x36u, 0x0065653cu,
+                   address(&porsche::application_audio_records_00656528[0].data_14));
+    relocate_abs32(slot_4a88a0, 0x72u, 0x0065683cu,
+                   address(&porsche::application_audio_records_00656528[0].data_14) + 32u * 0x18u);
+    relocate_abs32(slot_4a88a0, 0x79u, 0x00656180u,
+                   address(porsche::frame_services_records_00656180.data()));
+    relocate_abs32(slot_4a88a0, 0x96u, 0x006563c8u,
+                   address(porsche::frame_services_records_00656180.data()) + 146u * 4u);
+    relocate_abs32(slot_4a88a0, 0x9du, 0x00656868u, address(&porsche::frame_services_byte_00656868));
+    relocate_abs32(slot_4a88a0, 0xb3u, 0x00656869u, address(&porsche::frame_services_byte_00656869));
+    relocate_abs32(slot_4a88a0, 0xbau, 0x00656868u, address(&porsche::frame_services_byte_00656868));
+    relocate_abs32(slot_4a88a0, 0xc5u, 0x005d1734u, address(&porsche::application_audio_active_005d1734));
+    relocate_abs32(slot_4a88a0, 0xd2u, 0x005d1750u,
+                   address(&porsche::frame_services_words_005d1740[4]));
+    relocate_abs32(slot_4a88a0, 0x109u, 0x00657a24u, arena_word_address(0x00657a24u));
+    relocate_abs32(slot_4a88a0, 0x12cu, 0x00658080u, arena_word_address(0x00658080u));
+    relocate_abs32(slot_4a88a0, 0x137u, 0x0065808cu, arena_word_address(0x0065808cu));
+    relocate_abs32(slot_4a88a0, 0x18au, 0x00658080u, arena_word_address(0x00658080u));
+    relocate_abs32(slot_4a88a0, 0x1abu, 0x005e99f4u, address(&porsche::global_005e99f4));
+    relocate_abs32(slot_4a88a0, 0x1bau, 0x00657cb8u, arena_word_address(0x00657cb8u));
+    relocate_abs32(slot_4a88a0, 0x1bfu, 0x00657cbcu, arena_word_address(0x00657cbcu));
+
+    relocate_call(slot_4a88a0, 0x02u, 0x004a88a2u, 0x004ad510u,
+                  reinterpret_cast<const void*>(&porsche::frame_services_boundary_004ad510));
+    relocate_call(slot_4a88a0, 0x0cu, 0x004a88acu, 0x004ae3c0u,
+                  reinterpret_cast<const void*>(&porsche::frame_services_boundary_004ae3c0));
+    relocate_call(slot_4a88a0, 0x29u, 0x004a88c9u, 0x004af900u,
+                  reinterpret_cast<const void*>(&porsche::frame_services_boundary_004af900));
+    relocate_call(slot_4a88a0, 0x31u, 0x004a88d1u, 0x004afd30u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004afd30));
+    relocate_call(slot_4a88a0, 0x4bu, 0x004a88ebu, 0x005659f0u,
+                  reinterpret_cast<const void*>(&porsche::application_audio_shutdown_channels_005659f0));
+    relocate_call(slot_4a88a0, 0x5du, 0x004a88fdu, 0x00531f90u,
+                  reinterpret_cast<const void*>(&porsche::free_00531f90));
+    relocate_call(slot_4a88a0, 0x85u, 0x004a8925u, 0x00565d60u,
+                  reinterpret_cast<const void*>(&porsche::audio_channel_stop_00565d60));
+    relocate_call(slot_4a88a0, 0xaau, 0x004a894au, 0x00565cd0u,
+                  reinterpret_cast<const void*>(&porsche::frame_services_boundary_00565cd0));
+    relocate_call(slot_4a88a0, 0xc0u, 0x004a8960u, 0x004a8660u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004a8660));
+    relocate_call(slot_4a88a0, 0xdfu, 0x004a897fu, 0x0053c2e0u,
+                  reinterpret_cast<const void*>(&porsche::audio_probe_clock_0053c2e0));
+    relocate_call(slot_4a88a0, 0xf0u, 0x004a8990u, 0x0053c2e0u,
+                  reinterpret_cast<const void*>(&porsche::audio_probe_clock_0053c2e0));
+    relocate_call(slot_4a88a0, 0xfdu, 0x004a899du, 0x004b0a20u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004b0a20));
+    relocate_call(slot_4a88a0, 0x104u, 0x004a89a4u, 0x005366e0u,
+                  reinterpret_cast<const void*>(&porsche::timed_callbacks_005366e0));
+    relocate_call(slot_4a88a0, 0x11eu, 0x004a89beu, 0x004a8570u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004a8570));
+    relocate_call(slot_4a88a0, 0x147u, 0x004a89e7u, 0x004b04d0u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004b04d0));
+    relocate_call(slot_4a88a0, 0x158u, 0x004a89f8u, 0x004a8570u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004a8570));
+    relocate_call(slot_4a88a0, 0x16bu, 0x004a8a0bu, 0x004b04d0u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004b04d0));
+    relocate_call(slot_4a88a0, 0x17cu, 0x004a8a1cu, 0x004a8570u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004a8570));
+    relocate_call(slot_4a88a0, 0x1a6u, 0x004a8a46u, 0x004af5c0u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004af5c0));
+    relocate_call(slot_4a88a0, 0x1c5u, 0x004a8a65u, 0x004ae470u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004ae470));
+    relocate_call(slot_4a88a0, 0x1ceu, 0x004a8a6eu, 0x004ae4d0u,
+                  reinterpret_cast<const void*>(&porsche::frame_services_boundary_004ae4d0));
+
+    // ---- 004a8cd0 relocations (slot VA 0x004a8cd0) ----
+    relocate_abs32(slot_4a8cd0, 0x01u, 0x005d1734u, address(&porsche::application_audio_active_005d1734));
+    relocate_abs32(slot_4a8cd0, 0x12u, 0x00657c98u, arena_word_address(0x00657c98u));
+    // 0x00658374 is passed by value as the original buffer VA; left unpatched.
+    relocate_abs32(slot_4a8cd0, 0x36u, 0x0065b318u, address(&porsche::application_audio_path_prefix_0065b318));
+    relocate_abs32(slot_4a8cd0, 0x57u, 0x00657c98u, arena_word_address(0x00657c98u));
+    relocate_abs32(slot_4a8cd0, 0x66u, 0x005d1a1cu, address(porsche::application_audio_lil_text_005d1a1c));
+    relocate_abs32(slot_4a8cd0, 0x94u, 0x005d1a20u, address(porsche::application_audio_bank_suffix_005d1a20));
+    relocate_abs32(slot_4a8cd0, 0xd2u, 0x006564f0u, address(&porsche::application_audio_records_006564a0[5].raw_00));
+    relocate_abs32(slot_4a8cd0, 0xdcu, 0x006564c0u, address(&porsche::application_audio_records_006564a0[2].raw_00));
+
+    relocate_call(slot_4a8cd0, 0x28u, 0x004a8cf8u, 0x004acc10u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004acc10));
+    relocate_call(slot_4a8cd0, 0x30u, 0x004a8d00u, 0x004ad4d0u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004ad4d0));
+    relocate_call(slot_4a8cd0, 0xc9u, 0x004a8d99u, 0x004a6c90u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004a6c90));
+
+    // ---- 004b68f0 relocations (slot VA 0x004b68f0) ----
+    relocate_abs32(slot_4b68f0, 0x0cu, 0x00658080u, arena_word_address(0x00658080u));
+    static const U kObjectOffs[] = {0x22u, 0x58u, 0x6du, 0x83u, 0x96u, 0xcfu};
+    for (U off : kObjectOffs) {
+        relocate_abs32(slot_4b68f0, off, 0x005e8b34u,
+                       address(porsche::application_player_object_table_005e8b34));
+    }
+    relocate_abs32(slot_4b68f0, 0xe1u, 0x00658080u, arena_word_address(0x00658080u));
+    relocate_abs32(slot_4b68f0, 0xebu, 0x005e75a0u,
+                   address(porsche::application_player_setup_table_005e75a0));
+    relocate_abs32(slot_4b68f0, 0x111u, 0x005d6e68u, address(porsche::sim_deinit_log_005d6e68));
+    relocate_abs32(slot_4b68f0, 0x143u, 0x005d6e60u, address(porsche::sim_deinit_done_log_005d6e60));
+
+    relocate_call(slot_4b68f0, 0x02u, 0x004b68f2u, 0x004690f0u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004690f0));
+    relocate_call(slot_4b68f0, 0x07u, 0x004b68f7u, 0x00516950u,
+                  reinterpret_cast<const void*>(&porsche::startup_service_noop_00516950));
+    relocate_call(slot_4b68f0, 0x102u, 0x004b69f2u, 0x00413fd0u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_00413fd0));
+    relocate_call(slot_4b68f0, 0x107u, 0x004b69f7u, 0x004a8a80u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004a8a80));
+    relocate_call(slot_4b68f0, 0x10cu, 0x004b69fcu, 0x004afe50u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004afe50));
+    relocate_call(slot_4b68f0, 0x116u, 0x004b6a06u, 0x005a177bu,
+                  reinterpret_cast<const void*>(&porsche::formatter_stdio_printf_005a177b));
+    relocate_call(slot_4b68f0, 0x11bu, 0x004b6a0bu, 0x004a4760u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004a4760));
+    relocate_call(slot_4b68f0, 0x120u, 0x004b6a10u, 0x00516950u,
+                  reinterpret_cast<const void*>(&porsche::startup_service_noop_00516950));
+    relocate_call(slot_4b68f0, 0x125u, 0x004b6a15u, 0x00414f80u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_00414f80));
+    relocate_call(slot_4b68f0, 0x12au, 0x004b6a1au, 0x00471c40u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_00471c40));
+    relocate_call(slot_4b68f0, 0x12fu, 0x004b6a1fu, 0x004642f0u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_004642f0));
+    relocate_call(slot_4b68f0, 0x134u, 0x004b6a24u, 0x00425330u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_00425330));
+    relocate_call(slot_4b68f0, 0x139u, 0x004b6a29u, 0x00412cd0u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_00412cd0));
+    relocate_call(slot_4b68f0, 0x13eu, 0x004b6a2eu, 0x00412e60u,
+                  reinterpret_cast<const void*>(&porsche::application_sim_boundary_00412e60));
+    relocate_call(slot_4b68f0, 0x148u, 0x004b6a38u, 0x005a177bu,
+                  reinterpret_cast<const void*>(&porsche::formatter_stdio_printf_005a177b));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "instruction cache");
+}
+
+__declspec(noinline) static U invoke_cdecl0(void* fn) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        cld
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static void reset_common() {
+    std::memset(porsche::application_state_006573e8.words().data(), 0, 0x3e24u);
+    std::memset(porsche::application_audio_records_00656528, 0, 0x300u);
+    std::memset(porsche::application_audio_records_006564a0, 0, 0x80u);
+    std::memset(porsche::frame_services_records_00656180.data(), 0, 146u * 4u);
+    porsche::frame_services_byte_00656868 = 0;
+    porsche::frame_services_byte_00656869 = 0;
+    porsche::frame_services_words_005d1740[0] = 0x7fu;
+    porsche::frame_services_words_005d1740[1] = 0x7fu;
+    porsche::frame_services_words_005d1740[2] = 0x7fu;
+    porsche::frame_services_words_005d1740[3] = 0x7fu;
+    porsche::frame_services_words_005d1740[4] = 0x7fu;
+    porsche::application_audio_active_005d1734 = 0u;
+    porsche::global_005e99f4 = 0u;
+    porsche::application_audio_path_prefix_0065b318 = nullptr;
+    std::memset(porsche::application_player_object_table_005e8b34, 0, 16u * 4u);
+    std::memset(porsche::application_player_setup_table_005e75a0, 0,
+                0x96u * 8u * 4u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memset(object_buf[i], 0, 0x1000u);
+        std::memset(descriptor_buf[i], 0, 0x600u);
+    }
+    for (U i = 0u; i < 4u; ++i) {
+        std::memset(track_buf[i], 0, 64u);
+    }
+    std::strcpy(track_buf[0], "");
+    std::strcpy(track_buf[1], "abc");
+    std::strcpy(track_buf[2],
+                "track00track11track22track33track44track55track66track77track88");
+    std::strcpy(track_buf[3], "q");
+    clock_idx = 0u;
+    a8570_idx = 0u;
+    b04d0_idx = 0u;
+}
+
+static void capture_trace() {
+    std::memcpy(trace.final_arena, porsche::application_state_006573e8.words().data(),
+                0x3e24u);
+    std::memcpy(trace.final_records_656528, porsche::application_audio_records_00656528, 0x300u);
+    std::memcpy(trace.final_records_6564a0, porsche::application_audio_records_006564a0, 0x80u);
+    std::memcpy(trace.final_frame_records, porsche::frame_services_records_00656180.data(), 146u * 4u);
+    trace.final_flag_656868[0] = porsche::frame_services_byte_00656868;
+    trace.final_flag_656868[1] = porsche::frame_services_byte_00656869;
+    std::memcpy(trace.final_words_5d1740, porsche::frame_services_words_005d1740.data(), 20u);
+    trace.final_active_5d1734 = porsche::application_audio_active_005d1734;
+    trace.final_5e99f4 = porsche::global_005e99f4;
+    trace.final_track_ptr = address(porsche::application_audio_path_prefix_0065b318);
+    std::memcpy(trace.final_object_table, porsche::application_player_object_table_005e8b34, 16u * 4u);
+    std::memcpy(trace.final_setup_table, porsche::application_player_setup_table_005e75a0,
+                0x96u * 8u * 4u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(trace.final_objects[i], object_buf[i], 0x1000u);
+        std::memcpy(trace.final_descriptors[i], descriptor_buf[i], 0x600u);
+    }
+    std::memcpy(trace.final_track, track_buf, 256u);
+}
+
+static void compare_traces() {
+    require(trace.count == expected.count, "event count");
+    for (U i = 0u; i < expected.count; ++i) {
+        const Event& a = trace.events[i];
+        const Event& b = expected.events[i];
+        require(a.tag == b.tag && a.a0 == b.a0 && a.a1 == b.a1 && a.a2 == b.a2 && a.a3 == b.a3,
+                "event fields");
+        require(std::memcmp(a.s0, b.s0, sizeof(a.s0)) == 0, "event string");
+    }
+    require(trace.abi_fail == expected.abi_fail, "abi preservation");
+    require(trace.exception[0] == expected.exception[0] &&
+            trace.exception[1] == expected.exception[1] &&
+            trace.exception[2] == expected.exception[2], "exceptions");
+    require(std::memcmp(trace.final_arena, expected.final_arena, sizeof(trace.final_arena)) == 0,
+            "final arena");
+    require(std::memcmp(trace.final_records_656528, expected.final_records_656528, 0x300u) == 0,
+            "final 00656528 table");
+    require(std::memcmp(trace.final_records_6564a0, expected.final_records_6564a0, 0x80u) == 0,
+            "final 006564a0 records");
+    require(std::memcmp(trace.final_frame_records, expected.final_frame_records, 146u * 4u) == 0,
+            "final 00656180 records");
+    require(trace.final_flag_656868[0] == expected.final_flag_656868[0] &&
+            trace.final_flag_656868[1] == expected.final_flag_656868[1], "final 00656868 bytes");
+    require(std::memcmp(trace.final_words_5d1740, expected.final_words_5d1740, 20u) == 0,
+            "final 005d1740 words");
+    require(trace.final_active_5d1734 == expected.final_active_5d1734, "final 005d1734");
+    require(trace.final_5e99f4 == expected.final_5e99f4, "final 005e99f4");
+    require(trace.final_track_ptr == expected.final_track_ptr, "final 0065b318");
+    require(std::memcmp(trace.final_object_table, expected.final_object_table, 16u * 4u) == 0,
+            "final 005e8b34");
+    require(std::memcmp(trace.final_setup_table, expected.final_setup_table, 0x96u * 8u * 4u) == 0,
+            "final 005e75a0");
+    for (U i = 0u; i < 8u; ++i) {
+        require(std::memcmp(trace.final_objects[i], expected.final_objects[i], 0x1000u) == 0,
+                "final object bytes");
+        require(std::memcmp(trace.final_descriptors[i], expected.final_descriptors[i], 0x600u) == 0,
+                "final descriptor bytes");
+    }
+    require(std::memcmp(trace.final_track, expected.final_track, 256u) == 0, "final track strings");
+}
+
+// Per-record init for the 00656528 table; untouched records default to
+// channel=-1, handle=-1, data=0.
+struct UnloadRecord {
+    I channel;
+    I handle;
+    U data;
+};
+
+struct UnloadCfg {
+    U gate_657c94;
+    U active_5d1734;
+    I word_5d1750;
+    U mode_657a24;
+    I count_658080;
+    U arena_records[4][2]; // [i] = {object, mode} for the 0065808c records
+    U arena_record_count;
+    U state_5e99f4;
+    U word_657cb8;
+    U word_657cbc;
+    U byte_656868;
+    UnloadRecord table[32];
+    U frame_pairs[73][2];
+    U stop_ret;
+    U free_ret;
+    U pump_ret;
+    U clock_seq[8];
+    U clock_len;
+    I a8570_seq[8];
+    U a8570_len;
+    I b04d0_seq[8];
+    U b04d0_len;
+    U a8570_decrements_count;
+    U ae470_writes;
+};
+
+static void setup_unload(const UnloadCfg& s) {
+    reset_common();
+    put(porsche::application_state_006573e8.words().data(), (0x00657c94u - kArenaBase), s.gate_657c94);
+    put(porsche::application_state_006573e8.words().data(), (0x00657a24u - kArenaBase), s.mode_657a24);
+    put(porsche::application_state_006573e8.words().data(), (0x00658080u - kArenaBase), static_cast<U>(s.count_658080));
+    put(porsche::application_state_006573e8.words().data(), (0x00657cb8u - kArenaBase), s.word_657cb8);
+    put(porsche::application_state_006573e8.words().data(), (0x00657cbcu - kArenaBase), s.word_657cbc);
+    B* arena = porsche::application_state_006573e8.bytes();
+    for (U i = 0u; i < s.arena_record_count && i < 4u; ++i) {
+        put(arena, 0xca4u + i * 0x580u, s.arena_records[i][0]);
+        put(arena, 0xca4u + i * 0x580u + 8u, s.arena_records[i][1]);
+    }
+    porsche::frame_services_words_005d1740[4] = static_cast<U>(s.word_5d1750);
+    porsche::application_audio_active_005d1734 = s.active_5d1734;
+    porsche::global_005e99f4 = s.state_5e99f4;
+    porsche::frame_services_byte_00656868 = static_cast<B>(s.byte_656868 != 0u ? 1u : 0u);
+    porsche::frame_services_byte_00656869 = static_cast<B>(s.byte_656868 != 0u ? 1u : 0u);
+    for (U i = 0u; i < 32u; ++i) {
+        porsche::application_audio_records_00656528[i].channel_04 = s.table[i].channel;
+        porsche::application_audio_records_00656528[i].handle_08 = s.table[i].handle;
+        porsche::application_audio_records_00656528[i].data_14 = s.table[i].data;
+    }
+    for (U i = 0u; i < 73u; ++i) {
+        porsche::frame_services_records_00656180[i * 2u] = s.frame_pairs[i][0];
+        porsche::frame_services_records_00656180[i * 2u + 1u] = s.frame_pairs[i][1];
+    }
+    cfg = ScenarioCfg{};
+    cfg.stop_ret = s.stop_ret;
+    cfg.free_ret = s.free_ret;
+    cfg.pump_ret = s.pump_ret;
+    cfg.a8570_decrements_count = s.a8570_decrements_count;
+    cfg.ae470_writes = s.ae470_writes;
+    cfg.clock_len = s.clock_len;
+    for (U i = 0u; i < s.clock_len && i < 8u; ++i) cfg.clock_seq[i] = s.clock_seq[i];
+    cfg.a8570_len = s.a8570_len;
+    for (U i = 0u; i < s.a8570_len && i < 8u; ++i) cfg.a8570_seq[i] = s.a8570_seq[i];
+    cfg.b04d0_len = s.b04d0_len;
+    for (U i = 0u; i < s.b04d0_len && i < 8u; ++i) cfg.b04d0_seq[i] = s.b04d0_seq[i];
+}
+
+static void run_unload_pair(const UnloadCfg& s) {
+    ++cases;
+
+    cpp_side = false;
+    std::memset(&trace, 0, sizeof(trace));
+    setup_unload(s);
+    __try {
+        trace.abi_fail = invoke_cdecl0(slot_4a88a0);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_trace();
+    expected = trace;
+
+    cpp_side = true;
+    std::memset(&trace, 0, sizeof(trace));
+    setup_unload(s);
+    __try {
+        trace.abi_fail = invoke_cdecl0(
+            reinterpret_cast<void*>(&porsche::application_main_function_004a88a0));
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_trace();
+    compare_traces();
+}
+
+static UnloadCfg unload_base() {
+    UnloadCfg s{};
+    s.gate_657c94 = 0u;
+    s.active_5d1734 = 0u;
+    s.word_5d1750 = 0x7f;
+    s.mode_657a24 = 0u;
+    s.count_658080 = 0;
+    s.arena_record_count = 0u;
+    s.state_5e99f4 = 3u;
+    s.word_657cb8 = 0x1234u;
+    s.word_657cbc = 0x5678u;
+    s.byte_656868 = 0u;
+    for (U i = 0u; i < 32u; ++i) {
+        s.table[i].channel = -1;
+        s.table[i].handle = -1;
+        s.table[i].data = 0u;
+    }
+    for (U i = 0u; i < 73u; ++i) {
+        s.frame_pairs[i][0] = 0xffffffffu;
+        s.frame_pairs[i][1] = 0xffffffffu;
+    }
+    s.stop_ret = 7u;
+    s.free_ret = 9u;
+    s.pump_ret = 3u;
+    s.clock_len = 1u;
+    s.clock_seq[0] = 100u;
+    s.a8570_len = 1u;
+    s.a8570_seq[0] = 22;
+    s.b04d0_len = 1u;
+    s.b04d0_seq[0] = 33;
+    return s;
+}
+
+struct PlaylistCfg {
+    U active_5d1734;
+    I mode_657c98;
+    U track_index;
+    U preset_6564f0;
+    U preset_6564c0;
+    U acc10_bumps_mode;
+};
+
+static void setup_playlist(const PlaylistCfg& s) {
+    reset_common();
+    porsche::application_audio_active_005d1734 = s.active_5d1734;
+    put(porsche::application_state_006573e8.words().data(), (0x00657c98u - kArenaBase), static_cast<U>(s.mode_657c98));
+    porsche::application_audio_path_prefix_0065b318 = track_buf[s.track_index & 3u];
+    porsche::application_audio_records_006564a0[5].raw_00 = s.preset_6564f0;
+    porsche::application_audio_records_006564a0[2].raw_00 = s.preset_6564c0;
+    cfg = ScenarioCfg{};
+    cfg.acc10_bumps_mode = s.acc10_bumps_mode;
+}
+
+static void run_playlist_pair(const PlaylistCfg& s) {
+    ++cases;
+
+    cpp_side = false;
+    std::memset(&trace, 0, sizeof(trace));
+    setup_playlist(s);
+    __try {
+        trace.abi_fail = invoke_cdecl0(slot_4a8cd0);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_trace();
+    expected = trace;
+
+    cpp_side = true;
+    std::memset(&trace, 0, sizeof(trace));
+    setup_playlist(s);
+    __try {
+        trace.abi_fail = invoke_cdecl0(
+            reinterpret_cast<void*>(&porsche::startup_sequence_call_004a8cd0));
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_trace();
+    compare_traces();
+}
+
+struct DeinitPlayer {
+    const char* name_17c;
+    U descriptor_00;
+    U descriptor_08;
+    const char* name_534;
+    U object_52c;
+    U setup_block[0x96];
+};
+
+struct DeinitCfg {
+    I count_658080;
+    DeinitPlayer players[3];
+};
+
+static void setup_deinit(const DeinitCfg& s) {
+    reset_common();
+    put(porsche::application_state_006573e8.words().data(), (0x00658080u - kArenaBase), static_cast<U>(s.count_658080));
+    for (U i = 0u; i < 3u; ++i) {
+        std::uint8_t* const object = object_buf[i];
+        // Scenarios with count==0 leave the unused players default-constructed
+        // (null names). Keep their backing cells deterministic without reading
+        // a null string; the recovered bodies never index those players.
+        const char* const name_17c = s.players[i].name_17c ? s.players[i].name_17c : "";
+        const char* const name_534 = s.players[i].name_534 ? s.players[i].name_534 : "";
+        std::memcpy(descriptor_buf[i] + 0x17cu, name_17c,
+                    std::strlen(name_17c) + 1u);
+        put(descriptor_buf[i], 0x00u, s.players[i].descriptor_00);
+        put(descriptor_buf[i], 0x08u, s.players[i].descriptor_08);
+        std::memcpy(descriptor_buf[i] + 0x534u, name_534,
+                    std::strlen(name_534) + 1u);
+        put(object, 0x558u, address(descriptor_buf[i]));
+        put(object, 0x55cu, 0x7777u);
+        put(object, 0x52cu, s.players[i].object_52c);
+        put(object, 0xb6cu, 0x11110000u + i);
+        put(object, 0xb70u, 0x22220000u + i);
+        put(object, 0xb74u, 0x33330000u + i);
+        std::memset(object + 0xb78u, 0x5au, 0x40u);
+        std::memset(object + 0xbb8u, 0x5bu, 0x80u);
+        for (U k = 0u; k < 0x96u; ++k) {
+            put(object, 0xad4u + k * 4u, s.players[i].setup_block[k]);
+        }
+        porsche::application_player_object_table_005e8b34[i] = address(object);
+        for (U k = 0u; k < 0x96u; ++k) {
+            porsche::application_player_setup_table_005e75a0[i * 0x96u + k] = 0xdead0000u + k;
+        }
+    }
+}
+
+static void run_deinit_pair(const DeinitCfg& s) {
+    ++cases;
+
+    cpp_side = false;
+    std::memset(&trace, 0, sizeof(trace));
+    setup_deinit(s);
+    __try {
+        trace.abi_fail = invoke_cdecl0(slot_4b68f0);
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_trace();
+    expected = trace;
+
+    cpp_side = true;
+    std::memset(&trace, 0, sizeof(trace));
+    setup_deinit(s);
+    __try {
+        trace.abi_fail = invoke_cdecl0(
+            reinterpret_cast<void*>(&porsche::application_main_function_004b68f0));
+    } __except (exception_record(GetExceptionInformation())) {
+    }
+    capture_trace();
+    compare_traces();
+}
+
+static DeinitPlayer deinit_player(const char* name17c, U d0, U d8, const char* name534, U f52c) {
+    DeinitPlayer p{};
+    p.name_17c = name17c;
+    p.descriptor_00 = d0;
+    p.descriptor_08 = d8;
+    p.name_534 = name534;
+    p.object_52c = f52c;
+    for (U k = 0u; k < 0x96u; ++k) {
+        p.setup_block[k] = 0x5a5a0000u + k * 0x101u;
+    }
+    return p;
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init();
+
+    // ---- 004a88a0 scenarios ----
+    {
+        UnloadCfg s = unload_base();
+        s.gate_657c94 = 5u;
+        run_unload_pair(s);
+        s.gate_657c94 = 0u;
+        run_unload_pair(s); // empty everything: free loops, no load loop
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.table[0] = {5, -1, 0};
+        s.table[1] = {5, 7, 0x12345678u};
+        s.table[2] = {5, 0, 0u};
+        s.table[3] = {5, -2, 0x9abcdef0u};
+        s.table[4] = {-1, 7, 0x1111u};
+        s.table[5] = {-2, -1, 0};
+        s.table[31] = {5, 9, 0x2222u};
+        s.state_5e99f4 = 2u;
+        run_unload_pair(s);
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.frame_pairs[0][0] = 0u;
+        s.frame_pairs[0][1] = 44u;
+        s.frame_pairs[1][0] = 0x80000000u;
+        s.frame_pairs[1][1] = 0xffffffffu;
+        s.frame_pairs[72][0] = 0x11223344u;
+        s.frame_pairs[72][1] = 0x55667788u;
+        s.byte_656868 = 1u;
+        s.state_5e99f4 = 1u;
+        run_unload_pair(s);
+        s.byte_656868 = 0u;
+        run_unload_pair(s);
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.active_5d1734 = 1u;
+        s.word_5d1750 = 0u;
+        s.clock_len = 2u;
+        s.clock_seq[0] = 10u;
+        s.clock_seq[1] = 20u;
+        run_unload_pair(s); // <=0 word_5d1750: straight to tail
+        s.word_5d1750 = -1;
+        run_unload_pair(s);
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.active_5d1734 = 1u;
+        s.word_5d1750 = 0x7f;
+        s.clock_len = 3u;
+        s.clock_seq[0] = 10u;
+        s.clock_seq[1] = 20u;
+        s.clock_seq[2] = 20u; // second check equal to deadline-0x280+20 < 0x280
+        run_unload_pair(s); // one full iteration then success (no a8570 call, mode != 1)
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.active_5d1734 = 1u;
+        s.word_5d1750 = 0x7f;
+        s.mode_657a24 = 1u;
+        s.clock_len = 3u;
+        s.clock_seq[0] = 10u;
+        s.clock_seq[1] = 0x200u; // inside [0x180,0x280): distinguishes the timeout constant
+        s.clock_seq[2] = 0x80000000u; // deadline (0x290) <= now -> exit after retry
+        s.a8570_len = 4u;
+        s.a8570_seq[0] = -1;
+        s.a8570_seq[1] = -1;
+        s.a8570_seq[2] = 5;
+        run_unload_pair(s); // mode==1, a8570 fails twice then succeeds on retry
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.active_5d1734 = 1u;
+        s.word_5d1750 = 0x7f;
+        s.count_658080 = 2;
+        s.arena_record_count = 2u;
+        s.arena_records[0][0] = 0x41u;
+        s.arena_records[0][1] = 2u;
+        s.arena_records[1][0] = 0x42u;
+        s.arena_records[1][1] = 3u; // >2: original skips; a >=2 mutation would process it
+        s.mode_657a24 = 2u;
+        s.clock_len = 3u;
+        s.clock_seq[0] = 10u;
+        s.clock_seq[1] = 20u;
+        s.clock_seq[2] = 0x80000000u;
+        s.b04d0_len = 4u;
+        s.b04d0_seq[0] = 0x5555;
+        s.b04d0_seq[1] = -1;
+        s.b04d0_seq[2] = 0x6666;
+        s.a8570_len = 4u;
+        s.a8570_seq[0] = 11;
+        s.a8570_seq[1] = -1;
+        run_unload_pair(s); // record0: b04d0 ok both, record1: mode!=2 skip
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.active_5d1734 = 1u;
+        s.word_5d1750 = 0x7f;
+        s.count_658080 = 2;
+        s.arena_record_count = 2u;
+        s.arena_records[0][0] = 0x41u;
+        s.arena_records[0][1] = 2u;
+        s.arena_records[1][0] = 0x42u;
+        s.arena_records[1][1] = 2u;
+        s.mode_657a24 = 1u;
+        s.clock_len = 2u;
+        s.clock_seq[0] = 10u;
+        s.clock_seq[1] = 0x80000000u;
+        s.b04d0_len = 8u;
+        s.b04d0_seq[0] = 100;
+        s.b04d0_seq[1] = 200;
+        s.b04d0_seq[2] = 300;
+        s.b04d0_seq[3] = 400;
+        s.a8570_len = 8u;
+        s.a8570_seq[0] = -1;  // mode==1 path fails
+        s.a8570_seq[1] = -1;  // record0 second call fails
+        s.a8570_seq[2] = -1;  // record1 first call fails
+        s.a8570_seq[3] = -1;  // record1 second call fails -> retry
+        s.a8570_seq[4] = 1;
+        s.a8570_seq[5] = 2;
+        s.a8570_seq[6] = 3;
+        s.a8570_seq[7] = 4;
+        s.b04d0_seq[4] = 100;
+        s.b04d0_seq[5] = 200;
+        s.b04d0_seq[6] = 300;
+        s.b04d0_seq[7] = 400;
+        run_unload_pair(s); // full retry: all four a8570 calls fail, second round succeeds
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.active_5d1734 = 1u;
+        s.word_5d1750 = 0x7f;
+        s.count_658080 = 1;
+        s.arena_record_count = 1u;
+        s.arena_records[0][0] = 0x41u;
+        s.arena_records[0][1] = 2u;
+        s.mode_657a24 = 1u;
+        s.clock_len = 4u;
+        s.clock_seq[0] = 10u;
+        s.clock_seq[1] = 20u;
+        s.clock_seq[2] = 20u;
+        s.clock_seq[3] = 0x80000000u;
+        s.b04d0_len = 2u;
+        s.b04d0_seq[0] = 0x5555;
+        s.b04d0_seq[1] = 0x6666;
+        s.a8570_len = 2u;
+        s.a8570_seq[0] = -1;
+        s.a8570_seq[1] = -1;
+        s.a8570_decrements_count = 1u;
+        run_unload_pair(s); // stub decrements 00658080 -> loop shrinks
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.state_5e99f4 = 0xfffffffeu; // signed -2 < 2 -> tail runs
+        run_unload_pair(s);
+        s.state_5e99f4 = 2u;
+        run_unload_pair(s); // tail skipped
+        s.state_5e99f4 = 3u;
+        run_unload_pair(s);
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.ae470_writes = 1u;
+        run_unload_pair(s); // 004ae470 writes through the passed pointer
+    }
+    {
+        UnloadCfg s = unload_base();
+        s.stop_ret = 0xfeedf00du;
+        s.free_ret = 0xdeadbeefu;
+        s.pump_ret = 0x99999999u;
+        run_unload_pair(s); // unused returns recorded
+    }
+
+    // ---- 004a8cd0 scenarios ----
+    {
+        PlaylistCfg s{};
+        s.active_5d1734 = 0u;
+        s.mode_657c98 = 1;
+        s.track_index = 1u;
+        s.preset_6564f0 = 0x1234u;
+        s.preset_6564c0 = 0x5678u;
+        run_playlist_pair(s); // inactive -> untouched presets
+    }
+    {
+        PlaylistCfg s{};
+        s.active_5d1734 = 1u;
+        s.mode_657c98 = 3;
+        s.track_index = 1u;
+        s.preset_6564f0 = 0x1234u;
+        s.preset_6564c0 = 0x5678u;
+        run_playlist_pair(s); // mode > 2 -> untouched presets
+        s.mode_657c98 = static_cast<I>(0x80000003u);
+        run_playlist_pair(s); // signed > 2
+    }
+    {
+        PlaylistCfg s{};
+        s.active_5d1734 = 1u;
+        s.mode_657c98 = 0;
+        s.track_index = 1u;
+        s.preset_6564f0 = 5u;
+        s.preset_6564c0 = 6u;
+        run_playlist_pair(s); // no prefix
+        s.mode_657c98 = 1;
+        run_playlist_pair(s); // still no prefix (1 > 1 false)
+        s.mode_657c98 = 2;
+        run_playlist_pair(s); // prefix appended
+        s.mode_657c98 = static_cast<I>(0xfffffffeu);
+        run_playlist_pair(s); // signed -2: <=2 and not >1
+    }
+    {
+        PlaylistCfg s{};
+        s.active_5d1734 = 1u;
+        s.mode_657c98 = 2;
+        s.track_index = 0u;
+        run_playlist_pair(s); // empty track string
+        s.track_index = 2u;
+        run_playlist_pair(s); // 63-char track string
+        s.track_index = 3u;
+        run_playlist_pair(s); // 1-char track string
+    }
+    {
+        PlaylistCfg s{};
+        s.active_5d1734 = 1u;
+        s.mode_657c98 = 2;
+        s.track_index = 1u;
+        s.acc10_bumps_mode = 1u;
+        run_playlist_pair(s); // stub bumps 00657c98 between the two reads
+    }
+
+    // ---- 004b68f0 scenarios ----
+    {
+        DeinitCfg s{};
+        s.count_658080 = 0;
+        run_deinit_pair(s); // no players, only teardown calls + logs
+    }
+    {
+        DeinitCfg s{};
+        s.count_658080 = 1;
+        s.players[0] = deinit_player("carname", 11u, 22u, "sndname", 0x33445566u);
+        run_deinit_pair(s);
+    }
+    {
+        DeinitCfg s{};
+        s.count_658080 = 3;
+        s.players[0] = deinit_player("", 0u, 0u, "", 0u);
+        s.players[1] = deinit_player("a", 0xffffffffu, 0x80000000u, "b", 0x7fffffffu);
+        s.players[2] = deinit_player("long_track_name_here_0123456789012345678901234567890123456789012345",
+                                     3u, 4u, "long_snd_name_here_01234567890123456789012345678901234567",
+                                     0xf0f0f0f0u);
+        run_deinit_pair(s); // empty + short + long strings, REP tail shapes
+    }
+    {
+        DeinitCfg s{};
+        s.count_658080 = -1;
+        s.players[0] = deinit_player("carname", 1u, 2u, "sndname", 3u);
+        run_deinit_pair(s); // signed negative count skips the loop
+        s.count_658080 = 0x80000000u;
+        run_deinit_pair(s);
+    }
+    {
+        DeinitCfg s{};
+        s.count_658080 = 2;
+        s.players[0] = deinit_player("car", 7u, 8u, "snd", 9u);
+        s.players[1] = deinit_player("car2", 70u, 80u, "snd2", 90u);
+        run_deinit_pair(s);
+    }
+
+    require(VirtualFree(code, 0u, MEM_RELEASE) != 0, "raw cleanup");
+    std::printf("app_sim_teardown_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

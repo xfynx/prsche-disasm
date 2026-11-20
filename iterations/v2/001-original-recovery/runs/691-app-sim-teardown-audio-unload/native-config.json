@@ -1,0 +1,422 @@
+{
+  "run": 691,
+  "experiment": "local/experiments/v2-app-sim-teardown-audio-unload-691",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_main_globals.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/frame_services.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload",
+    "iterations/v2/001-original-recovery/runs/464-audio-probe-startup",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004a88a0",
+      "bytes": 471,
+      "sha256": "e996148d2565f25b81922b6f603030f2bb856ac0503b6993f227e2fb556d5be6",
+      "token": "@BODY_004A88A0@"
+    },
+    {
+      "va": "004a8cd0",
+      "bytes": 235,
+      "sha256": "1ffabd1bd6fc3d960e9b6e94df942d8f3ea004b40b24ed9f7cb48da230e76bbd",
+      "token": "@BODY_004A8CD0@"
+    },
+    {
+      "va": "004b68f0",
+      "bytes": 337,
+      "sha256": "19a24053c09ed8828f4eeb8c6cdc76bc5ee66035fd21673989be6bfd295b5960",
+      "token": "@BODY_004B68F0@"
+    },
+    {
+      "va": "005d1a1c",
+      "bytes": 4,
+      "sha256": "5c159a3694c530588a2686822ce41f048fe53fb350b752ec471b469b7a6e9e67",
+      "token": "@STR_005D1A1C@"
+    },
+    {
+      "va": "005d1a20",
+      "bytes": 12,
+      "sha256": "391483ad61527b591fd200901d8ea171cbaa5b154c45a033b89212ff21d53a3c",
+      "token": "@STR_005D1A20@"
+    },
+    {
+      "va": "005d6e60",
+      "bytes": 6,
+      "sha256": "7bd50fa0155988c8bec892d10bab0fc8cb5835d32d7585db014ed79ee351a168",
+      "token": "@STR_005D6E60@"
+    },
+    {
+      "va": "005d6e68",
+      "bytes": 13,
+      "sha256": "52e21d75f635117211db56088eb84f10fee2fbf3580f8a56cd850297b8901fa0",
+      "token": "@STR_005D6E68@"
+    }
+  ],
+  "pass_marker": "app_sim_teardown_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-4a88a0-gate-inverted",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    if (application_state_006573e8.word(0x00657c94u) != 0u) {\n        return;\n    }",
+      "new": "    if (application_state_006573e8.word(0x00657c94u) == 0u) {\n        return;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-ae3c0-arg",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "(void)frame_services_boundary_004ae3c0(0x5dcu);",
+      "new": "(void)frame_services_boundary_004ae3c0(0x5d0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-handle-clear-dropped",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "                const std::uint32_t data = record.data_14;\n                record.handle_08 = -1;",
+      "new": "                const std::uint32_t data = record.data_14;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-data-kept",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "                    record.data_14 = 0u;",
+      "new": "                    record.data_14 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-handle-guard-signed",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "            if (record.handle_08 != -1) {",
+      "new": "            if (record.handle_08 >= 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-channel-guard-signed",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "        if (record.channel_04 != -1) {",
+      "new": "        if (record.channel_04 >= 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-record-stride-31",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    for (std::uint32_t index = 0u; index < 32u; ++index) {",
+      "new": "    for (std::uint32_t index = 0u; index < 31u; ++index) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-frame-guard-zero",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "        if (first != 0xffffffffu) {",
+      "new": "        if (first != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-frame-second-kept",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "            frame_services_records_00656180[index * 2u + 1u] = 0xffffffffu;",
+      "new": "            frame_services_records_00656180[index * 2u + 1u] = 0xfffffffeu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-frame-stride-72",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    for (std::uint32_t index = 0u; index < 73u; ++index) {",
+      "new": "    for (std::uint32_t index = 0u; index < 72u; ++index) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-flag-kept",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "        frame_services_byte_00656869 = 0;\n        frame_services_byte_00656868 = 0;",
+      "new": "        frame_services_byte_00656869 = 0;\n        (void)frame_services_byte_00656868;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-cd0-args",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "        frame_services_boundary_00565cd0(0u, 0u);",
+      "new": "        frame_services_boundary_00565cd0(1u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-af900-args",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    frame_services_boundary_004af900(0u, 0u);",
+      "new": "    frame_services_boundary_004af900(0u, 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-deadline-0x180",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "        const std::uint32_t deadline = audio_probe_clock_0053c2e0() + 0x280u;",
+      "new": "        const std::uint32_t deadline = audio_probe_clock_0053c2e0() + 0x180u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-timeout-unsigned",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "            if (static_cast<std::int32_t>(deadline) <=\n                static_cast<std::int32_t>(audio_probe_clock_0053c2e0())) {",
+      "new": "            if (deadline <= audio_probe_clock_0053c2e0()) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-retry-dropped",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "            if (progressed) {\n                break;\n            }",
+      "new": "            if (true) {\n                break;\n            }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-mode-one-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "            if (application_state_006573e8.word(0x00657a24u) == 1u) {",
+      "new": "            if (application_state_006573e8.word(0x00657a24u) >= 1u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-record-mode-guard",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "                if (mode == 2u) {",
+      "new": "                if (mode >= 2u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-record-mode-offset",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "                std::memcpy(&mode, arena + offset + 8u, 4u);",
+      "new": "                std::memcpy(&mode, arena + offset, 4u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-record-object-offset",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "                    std::memcpy(&object, arena + offset, 4u);",
+      "new": "                    std::memcpy(&object, arena + offset + 8u, 4u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-record-stride-578",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "                    0xca4u + static_cast<std::size_t>(index) * 0x580u;",
+      "new": "                    0xca4u + static_cast<std::size_t>(index) * 0x578u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-count-loop-capped",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "            for (std::int32_t index = 0;; ++index) {",
+      "new": "            for (std::int32_t index = 0; index < 1; ++index) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-tail-threshold-le",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    if (static_cast<std::int32_t>(global_005e99f4) < 2) {",
+      "new": "    if (static_cast<std::int32_t>(global_005e99f4) <= 2) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a88a0-tail-first-arg",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "            static_cast<std::int32_t>(application_state_006573e8.word(0x00657cb8u)),",
+      "new": "            static_cast<std::int32_t>(application_state_006573e8.word(0x00657cbcu)),",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a8cd0-mode-threshold-ge",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    if (static_cast<std::int32_t>(application_state_006573e8.word(0x00657c98u)) > 2) {",
+      "new": "    if (static_cast<std::int32_t>(application_state_006573e8.word(0x00657c98u)) >= 2) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a8cd0-prefix-threshold-ge",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    if (static_cast<std::int32_t>(application_state_006573e8.word(0x00657c98u)) > 1) {",
+      "new": "    if (static_cast<std::int32_t>(application_state_006573e8.word(0x00657c98u)) >= 1) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a8cd0-prefix-suffix-swap",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "                        application_audio_lil_text_005d1a1c);",
+      "new": "                        application_audio_bank_suffix_005d1a20);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a8cd0-append-scan-dropped",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    std::size_t tail = 0u;\n    while (destination[tail] != '\\0') {\n        ++tail;\n    }",
+      "new": "    std::size_t tail = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a8cd0-suffix-dropped",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    append_c_string(reinterpret_cast<std::uint8_t*>(path),\n                    application_audio_bank_suffix_005d1a20);",
+      "new": "    (void)application_audio_bank_suffix_005d1a20;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a8cd0-kind-7",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    application_sim_boundary_004a6c90(path, 3);",
+      "new": "    application_sim_boundary_004a6c90(path, 7);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a8cd0-acc10-buffer-va",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    application_sim_boundary_004acc10(0, 0x00658374u);",
+      "new": "    application_sim_boundary_004acc10(0, 0x00658370u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4a8cd0-write-order",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    application_audio_records_006564a0[5].raw_00 = 0xfffffffeu;\n    application_audio_records_006564a0[2].raw_00 = 0xfffffffdu;",
+      "new": "    application_audio_records_006564a0[5].raw_00 = 0xfffffffdu;\n    application_audio_records_006564a0[2].raw_00 = 0xfffffffeu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-name-src-offset",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "        copy_c_string(object + 0xb78u, reinterpret_cast<const char*>(descriptor + 0x17cu));",
+      "new": "        copy_c_string(object + 0xb78u, reinterpret_cast<const char*>(descriptor + 0x180u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-b6c-src",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "        store_u32(object, 0xb6cu, load_u32(descriptor, 0x0u));",
+      "new": "        store_u32(object, 0xb6cu, load_u32(descriptor, 0x4u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-b70-src",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "        store_u32(object, 0xb70u, load_u32(descriptor, 0x8u));",
+      "new": "        store_u32(object, 0xb70u, load_u32(descriptor, 0x0u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-b74-src",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "        store_u32(object, 0xb74u, load_u32(object, 0x52cu));",
+      "new": "        store_u32(object, 0xb74u, load_u32(object, 0x530u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-snd-name-src",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "        copy_c_string(object + 0xbb8u, reinterpret_cast<const char*>(descriptor + 0x534u));",
+      "new": "        copy_c_string(object + 0xbb8u, reinterpret_cast<const char*>(descriptor + 0x538u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-descriptor-offset",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "            static_cast<std::uintptr_t>(load_u32(object, 0x558u)));",
+      "new": "            static_cast<std::uintptr_t>(load_u32(object, 0x55cu)));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-player-block-src-offset",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "            object + 0xad4u,",
+      "new": "            object + 0xad8u,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-player-block-count-95",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "            0x96u * sizeof(std::uint32_t));",
+      "new": "            0x95u * sizeof(std::uint32_t));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-player-block-dest-stride",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "                static_cast<std::size_t>(index) * 0x96u,",
+      "new": "                static_cast<std::size_t>(index) * 0x95u,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-loop-drops-last",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    for (std::int32_t index = 0; index < count; ++index) {",
+      "new": "    for (std::int32_t index = 0; index + 1 < count; ++index) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-log-swapped",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    (void)formatter_stdio_printf_005a177b(sim_deinit_log_005d6e68);",
+      "new": "    (void)formatter_stdio_printf_005a177b(sim_deinit_done_log_005d6e60);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-4b68f0-sync-call-dropped",
+      "source": "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/application_sim_teardown_691.cpp",
+      "old": "    application_sim_boundary_004a8a80();",
+      "new": "    (void)application_sim_boundary_004a8a80;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

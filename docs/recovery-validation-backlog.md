@@ -1,5 +1,13 @@
 # Отложенные проверки восстановления v2
 
+Run698 integrates691/692/693 (8 bodies2479B,374cases,75mutations,991pins,
+400TUs;112names116refs,noEXE). Seven namesclose; fifty typed children open —
+scene stage/route/teardown cluster, FE-entry calls, sim boundaries, player
+tables005e8b34/005e75a0 are the next layer. 004152e0 FE main-loop2674B stays
+evidence-only until its ~70 callees land. Null-display/fault/locale/vtable
+domains, real devices andfullgame remain unproved. 696/002 getclutptr352B
+PASS awaits intake (unlocks00562810/00563440).
+
 Run694 integrates688/689/690 (7 bodies1868B,24380cases,72mutations,984pins,
 397TUs;69names72refs,noEXE). Two namesclose/two real children open:
 004a6c90 probe message and00590250 period callbackset are unowned bodies.

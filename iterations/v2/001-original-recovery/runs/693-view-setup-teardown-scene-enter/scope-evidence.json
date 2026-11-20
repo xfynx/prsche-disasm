@@ -1,0 +1,139 @@
+{
+  "run": 693,
+  "module": "Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "targets": [
+    {
+      "va": "004640b0",
+      "body_range": ["004640b0", "004642e4"],
+      "body_bytes": 564,
+      "body_sha256": "14afbbc2ec3ef1ab4aba97bb216f197bb2ad658f03569ee6f9bd57b4c2bdb4c4",
+      "abi": "cdecl void(), no stack arguments; preserves EBX, ESI, EDI, EBP; ESP balanced (saved EBX at entry, saved-EBX pop + ADD ESP,0x3c epilogue)",
+      "accepted_caller": {
+        "function": "004b6a50 (app_main_004b6a50, application_main.cpp)",
+        "call_site": "004b6db9",
+        "symbol": "?application_main_function_004640b0@porsche@@YAXXZ",
+        "declaration": "void __cdecl application_main_function_004640b0(); (application_main.hpp line 53)"
+      },
+      "subsystem": "application view-slot setup: fills the one or two 0x10c-byte view slots at 0x00627e80/0x00627f8c from the route object registry cell selected by the arena word 0x0065741c, rebinds the projection pair 0x005cf620..0x005cf62b and slot tail 0x00627ecc..0x00627ed7 from the route object, sets route flag 0x005cf584 from the case-folded compare of the arena name buffer 0x00657444 against \"castle\" (0x005cf760), then calls 00463c30 and the no-op 00516950",
+      "owned_data": [
+        {"va": "00627e80", "bytes": 536, "kind": ".bss", "name": "view_slot_table_00627e80", "note": "two 0x10c view slots; 0x00627ecc..0x00627ed7 tail lives inside slot one at +0x4c"},
+        {"va": "005e8c00", "bytes": 36, "kind": ".bss", "name": "route_object_registry_table_005e8c00", "note": "route object registry cells; capacity bounded by the parallel registry table base 0x005e8c24 (append at [0x005e8bfc]*4+0x005e8c00)"},
+        {"va": "005cf620", "bytes": 12, "kind": ".data", "name": "view_setup_camera_005cf620", "original_bytes": "00 00 00 00 cd cc cc 3e 66 66 66 3f"},
+        {"va": "005cf584", "bytes": 4, "kind": ".data", "name": "view_route_flag_005cf584", "original_bytes": "01 00 00 00"},
+        {"va": "005cf5d8", "bytes": 1, "kind": ".data", "name": "view_route_string_005cf5d8", "original_bytes": "02"},
+        {"va": "005cf760", "bytes": 7, "kind": ".data", "name": "view_castle_string_005cf760", "original_bytes": "63 61 73 74 6c 65 00"}
+      ],
+      "reused_canonical": [
+        {"va": "00657404", "owner": "application_state_006573e8 arena (application_globals.cpp)"},
+        {"va": "0065741c", "owner": "application_state_006573e8 arena (application_globals.cpp)"},
+        {"va": "00657444", "owner": "application_state_006573e8 arena (application_globals.cpp)"},
+        {"callee": "005ae3c0", "provider": "formatter_search_compare_005ae3c0 (formatter_search.cpp, accepted)"},
+        {"callee": "00516950", "provider": "startup_service_noop_00516950 (startup_service_516950.cpp, accepted)"}
+      ],
+      "opaque_callees": [
+        {"va": "00473100", "abi": "thiscall(this, U arg), RET 4", "note": "writes this+0x00..+0x2f service object; frame-bounded local extent 0x30 reproduced in fixture"},
+        {"va": "00473190", "abi": "thiscall(this, const void* source), RET 4", "note": "copies the service object snapshot into slot +0xdc..+0x10b"},
+        {"va": "00465cf0", "abi": "cdecl(I index), RET 0"},
+        {"va": "00463c30", "abi": "cdecl void(), RET 0"}
+      ],
+      "call_order": [
+        "00473100(this=service_object, 0)",
+        "per slot iteration: [reload 0x65741c, reload registry cell, slot field writes, 00473190(slot+0xdc, service_object), 00465cf0(index+1)]",
+        "post-loop: [reload 0x65741c + registry cell, camera pair copies, 005ae3c0(&0x657444, \"castle\"), flag 0x5cf584 = (ret!=0), 00463c30(), 00516950()]"
+      ]
+    },
+    {
+      "va": "00467740",
+      "body_range": ["00467740", "004677cd"],
+      "body_bytes": 141,
+      "body_sha256": "20ef52a859d751ea47f188295a3c4e7b5b737b1b7adda77dc5ab6554a711d9f9",
+      "abi": "cdecl void(), no stack arguments; preserves ESI, EDI (EBX/EBP untouched); ESP balanced",
+      "accepted_caller": {
+        "function": "004b6a50 (app_main_004b6a50, application_main.cpp)",
+        "call_site": "004b6fcf",
+        "symbol": "?application_main_function_00467740@porsche@@YAXXZ",
+        "declaration": "void __cdecl application_main_function_00467740(); (application_main.hpp line 64)"
+      },
+      "subsystem": "display teardown: releases display fields 0x7c and 0x6c objects through 00538d80/00540420 + the canonical allocator 0059f050, releases the device object through display field 0x70 vtable slot zero with pushed argument 1 (this-in-ECX stdcall, RET 4 cleanup), resets display sub-objects at +0x34/+0x14 through 00466500, releases the display itself, clears render_display_00628130, calls 0047f190, and releases render_core_0065b39c through its vtable slot one with pushed argument 1",
+      "reused_canonical": [
+        {"va": "00628130", "owner": "render_display_00628130 (render_startup.cpp, accepted)"},
+        {"va": "0065b39c", "owner": "render_core_0065b39c (render_startup.cpp, accepted)"},
+        {"callee": "0059f050", "provider": "application_release_0059f050 (application_alloc.cpp, accepted)"}
+      ],
+      "opaque_callees": [
+        {"va": "004b7140", "abi": "cdecl void(), RET 0"},
+        {"va": "00465e20", "abi": "cdecl void(), RET 0"},
+        {"va": "00538d80", "abi": "thiscall(this), RET 0"},
+        {"va": "00540420", "abi": "thiscall(this), RET 0"},
+        {"va": "00466500", "abi": "thiscall(this), RET 0, called for display+0x34 and display+0x14"},
+        {"va": "0047f190", "abi": "cdecl void(), RET 0"}
+      ]
+    },
+    {
+      "va": "00468fb0",
+      "body_range": ["00468fb0", "0046909c"],
+      "body_bytes": 236,
+      "body_sha256": "3b7479d88e11277e59210d4b69afc8258fe2982bee5a325343696962509ec7fd",
+      "abi": "cdecl void(), no stack arguments; preserves ESI, EDI (EBX/EBP untouched); ends with a JMP rel32 tail transfer into 004521c0",
+      "accepted_caller": {
+        "function": "004b67b0 (startup_sequence_004b67b0, startup_sequence.cpp)",
+        "call_site": "004b6820",
+        "symbol": "?startup_sequence_call_00468fb0@porsche@@YAXXZ",
+        "declaration": "void __cdecl startup_sequence_call_00468fb0(); (startup_sequence.hpp line 34)"
+      },
+      "subsystem": "scene-enter transfer: allocates the 0x38-byte scene buffer through the canonical allocator 0059ef90, constructs it with 00537700, stores it at 0x0062814c, copies 14 dwords from display device field +0x70 payload +4 (REP MOVSD), clears 0x00619800, then runs the ordered scene stage reset chain (0044ed10, 00516950, 00536080 through display field 0x74, 00555390, 00467f40, second 0059ef90(8) + 0044b960 into 0x0061976c, 00475d70(0x657a24,0x657a30), 0044fae0(&0x657444), 00448b10, 004a4a70(3), 0044f240, 00451490, 004552b0, 0043ed00, 00455f60, 0045dbd0(&0x657444,0), 00458b80) and tail-jumps into 004521c0",
+      "owned_data": [
+        {"va": "0062814c", "bytes": 4, "kind": ".bss", "name": "scene_buffer_0062814c"},
+        {"va": "0061976c", "bytes": 4, "kind": ".bss", "name": "scene_transfer_state_0061976c"},
+        {"va": "00619800", "bytes": 1, "kind": ".bss", "name": "scene_flag_00619800"}
+      ],
+      "reused_canonical": [
+        {"va": "00628130", "owner": "render_display_00628130 (render_startup.cpp, accepted)"},
+        {"va": "00657a24", "owner": "application_state_006573e8 arena (application_globals.cpp)"},
+        {"va": "00657a30", "owner": "application_state_006573e8 arena (application_globals.cpp)"},
+        {"va": "00657444", "owner": "application_state_006573e8 arena (application_globals.cpp)"},
+        {"callee": "0059ef90", "provider": "render_allocate_0059ef90 (application_alloc.cpp, accepted)"},
+        {"callee": "00537700", "provider": "render_driver_buffer_ctor_00537700 (render_buffer_523.cpp run523, accepted)"},
+        {"callee": "0044ed10", "provider": "render_mode_update_state_0044ed10 (render_mode.cpp, accepted)"},
+        {"callee": "00516950", "provider": "startup_service_noop_00516950 (startup_service_516950.cpp, accepted)"},
+        {"callee": "00536080", "provider": "startup_sequence_service_00536080 (startup_sequence.cpp, accepted)"},
+        {"callee": "00555390", "provider": "render_display_thr_cleanup_00555390 (render_display.cpp, accepted)"},
+        {"callee": "004a4a70", "provider": "splash_progress_004a4a70 (splash_progress.cpp, accepted)"}
+      ],
+      "opaque_callees": [
+        {"va": "00467f40", "abi": "thiscall(this=display), RET 0"},
+        {"va": "0044b960", "abi": "thiscall(this), returns EAX, RET 0"},
+        {"va": "00475d70", "abi": "cdecl(U,U), RET 0; args (word 0x00657a24, word 0x00657a30)"},
+        {"va": "0044fae0", "abi": "cdecl(void* root), RET 0"},
+        {"va": "00448b10", "abi": "cdecl void(), RET 0"},
+        {"va": "0044f240", "abi": "cdecl void(), RET 0"},
+        {"va": "00451490", "abi": "cdecl void(), RET 0"},
+        {"va": "004552b0", "abi": "cdecl void(), RET 0"},
+        {"va": "0043ed00", "abi": "cdecl void(), RET 0"},
+        {"va": "00455f60", "abi": "cdecl void(), RET 0"},
+        {"va": "0045dbd0", "abi": "cdecl(void* root, U mode), RET 0"},
+        {"va": "00458b80", "abi": "cdecl void(), RET 0"},
+        {"va": "004521c0", "abi": "cdecl void*(), RET 0; tail transfer target; leaves the allocation result in EAX"}
+      ]
+    }
+  ],
+  "ownership_decisions": {
+    "excluded": [],
+    "notes": [
+      "All three VAs are unowned in source/recovered/functions.json (no entry, no body_ranges overlap) and appear only as unrecovered_dependencies of accepted entries 004b6a50 and 004b67b0.",
+      "No accepted run TU references any of the newly owned cells (0x00627e80 span, 0x005e8c00 slice, 0x005cf584, 0x005cf5d8, 0x005cf620 span, 0x005cf760, 0x0062814c, 0x0061976c, 0x00619800).",
+      "0x00628130/0x0065b39c and the arena words reuse the accepted canonical owners; no new definitions for them."
+    ]
+  },
+  "boundaries": [
+    "Opaque callees are controlled endpoints with call-site ABI and, for 00473100/00473190, the field-write contracts read from their original bodies; their full algorithms remain unrecovered.",
+    "005ae3c0 is proved through the accepted provider's locale-off case-folded compare path; the locale/lock branch is outside this fixture.",
+    "Registry table extent is bounded to nine cells by the adjacent parallel registry base 0x005e8c24; deeper extent and out-of-range indices remain open.",
+    "00468fb0's null-display dereference and first-allocation-failure paths fault in the original and are excluded from the comparable domain; second-allocation failure is covered.",
+    "The ambient ECX reload of render_display_00628130 before the no-op 00516950 call inside 00468fb0 is unobservable and not reproduced.",
+    "Device/core vtable transports use the fastcall(self, unused_edx, argument) form matching this-in-ECX stdcall RET 4 cleanup; live device acceptance remains open.",
+    "Original EAX after 00467740/004640b0 depends on the last opaque endpoint; the fixture compares EAX deterministically through the shared mocks.",
+    "CPU-specific undefined flags, x87 precision and native-memory assumptions remain boundaries; production CMake/registry integration and the game-link COFF audit are the next batch steps."
+  ]
+}

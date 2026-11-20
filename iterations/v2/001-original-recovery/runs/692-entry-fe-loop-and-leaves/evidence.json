@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "kind": "Run692 FE entry-region leaves: original evidence, ownership and native proof",
+  "module": "Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "original_path": "local/game/Porsche.exe",
+  "verified": {
+    "raw_pe_hashes": "All three body SHA-256 values re-extracted from the raw PE with the shared pe_at VA->file-offset mapping and independently matched (see bodies).",
+    "binary_index": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl and calls.jsonl",
+    "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm; per-instruction bytes/VAs in body-evidence.json",
+    "registry": "iterations/v2/001-original-recovery/source/recovered/functions.json: 00413ea0/00414eb0/004152e0 occur only in unrecovered_dependencies of entry 004b6a50 (application_main.cpp); no canonical provider owns any of the three."
+  },
+  "bodies": [
+    {
+      "va": "00413ea0",
+      "range": ["00413ea0", "00413fc7"],
+      "bytes": 296,
+      "sha256": "99fe96b4a6ba2dfbc9967c131a428789c7260f6ba376ae08827bc473efcff64c",
+      "abi": "__cdecl void(void); cdecl stack/EBX/ESI/EDI/EBP preserved; EAX=0 on all exits; RET C3",
+      "subsystem": "FE entry-region reset / startup replay scratch",
+      "callers": [
+        {"from_va": "004b6dbe", "from_function": "004b6a50", "source": "source/recovered/Porsche.exe/application_main.cpp:143"}
+      ],
+      "extern_decl": "void __cdecl porsche::application_main_function_00413ea0(); (source/include/porsche/application_main.hpp:54) - matches caller exactly, zero arguments",
+      "callees": [
+        {"va": "0046d960", "abi": "int __cdecl(void), ret EAX", "status": "new frontier"},
+        {"va": "0046d890", "abi": "uint __cdecl(void), ret EAX", "status": "new frontier"},
+        {"va": "00413960", "abi": "void __cdecl(uint), one pushed arg, ADD ESP,4", "status": "new frontier"},
+        {"va": "004659e0", "abi": "void __cdecl(uint,uint), push 0 then 0xa, ADD ESP,8 (2 sites)", "status": "new frontier"}
+      ],
+      "reused_owners": [
+        "global_005e99f4 (application_main.hpp:22)",
+        "replay_state_005e99fc / replay_mode_flag_00606858 (runs/668-startup-replay-load/startup_replay_load_668.hpp)",
+        "application_state_006573e8 words 006573e8 / 0065741c (porsche/application_state.hpp)",
+        "application_audio_source_storage_005e8bfc (application_services_next.hpp:26; cell 0 = count, cells 1.. = object pointers; extent explicitly deferred by that owner)"
+      ],
+      "owned_cells": [
+        "fe_loop_word_005e99f8, 005e9a00, 005e9a04, 00606850, 00606854, 00606860, 00606864, 00606868, 0060686c, 00606870 (10 x 4B)",
+        "fe_replay_scratch_005ed848[0x6400] (0x19000B, STOSD.REP 005ed848..00606847; Run668 owns adjacent 005ed844)"
+      ],
+      "status": "PROVEN (native differential)"
+    },
+    {
+      "va": "00414eb0",
+      "range": ["00414eb0", "00414f73"],
+      "bytes": 196,
+      "sha256": "873b8b28541ab06282cc34c34ce5219798ad11d8626635994bb30b8a2b2f51d0",
+      "abi": "__cdecl void(void); cdecl stack/nonvolatile preserved; RET C3",
+      "subsystem": "frame/session state reset on app_main path",
+      "callers": [
+        {"from_va": "004b6db4", "from_function": "004b6a50", "source": "source/recovered/Porsche.exe/application_main.cpp:141"}
+      ],
+      "extern_decl": "void __cdecl porsche::application_main_function_00414eb0(); (source/include/porsche/application_main.hpp:52) - matches caller exactly, zero arguments",
+      "callees": ["004a4780", "0044fd00", "004030b0", "004069d0", "004066d0", "004110a0", "00406710", "004069e0", "004690a0", "00412150"],
+      "production_source": "runs/400-frame-loop-clusters/00414eb0.cpp (unchanged canonical TU, first compiled here)",
+      "reused_owners": [
+        "frame_reset_* cells (declared extern in runs/400-frame-loop-clusters/frame_loop_clusters_400.hpp:81..95; canonical definitions newly provided in fe_entry_leaves_692.cpp - no prior definition anywhere in manifest closure)",
+        "frame_reset_source_005e99b8 (Run598/startup_clock_callback_598 owner)",
+        "startup_sequence_word_00606ac0/00606ac4 (porsche/startup_sequence.hpp)",
+        "application_state_006573e8 words 00657a34 / 00657e6c (porsche/application_state.hpp)"
+      ],
+      "status": "PROVEN (native differential)"
+    },
+    {
+      "va": "004152e0",
+      "range": ["004152e0", "00415d51"],
+      "bytes": 2674,
+      "sha256": "f613885233817f015cee7053db0436a6a33af6fe6e0f4f4ae3e00a90cbe0d749",
+      "abi": "__cdecl void(void); 0x1f4-byte frame, two constructed stack objects (00468e60/004689c0, 004d1a90/004d1ba0), 27-case dispatch",
+      "subsystem": "FE main loop / network-mode transition body",
+      "callers": [
+        {"from_va": "004b6ec8", "from_function": "004b6a50", "source": "source/recovered/Porsche.exe/application_main.cpp:154 and :166"}
+      ],
+      "extern_decl": "void __cdecl porsche::application_main_function_004152e0(); (source/include/porsche/application_main.hpp:59) - matches caller exactly, zero arguments",
+      "callee_analysis": "133 direct E8 calls to 85 unique targets; only 00531ca0/00531f90/00533f80/00534310/00534480/00534530/00534550/005345a0/00534d40/00535380/00535620/00535950/00536050/005366e0/005367b0/005a0fbf and the 004121b0-family are recovered-or-frontier; ~70 remaining callees in 0040xxxx..004bxxxx are unrecovered.",
+      "switch_tables": "00415d54 / 00415d9c (read-only .text, 18 dwords + 27 bytes + padding to 00415dc0), unowned, bytes captured in body-evidence.json",
+      "status": "DEFERRED - evidence pack only; no guessed implementation. Do not touch 00411d20/004121b0 (Run695 territory)."
+    }
+  ],
+  "ownership_search": "Search of the live source/header closure (source/include, source/recovered, all runs/) found no prior owner for the ten fe_loop_word_* cells, fe_replay_scratch_005ed848, or the fifteen frame_reset_* definitions; reused owners listed above are existing canonical declarations. No arrays, callbacks or table extents invented; the audio source storage extent remains explicitly deferred by its own owner.",
+  "native_proof": {
+    "command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/native-config.json --attempt 015",
+    "receipt": "local/experiments/v2-entry-fe-loop-and-leaves-692/015/receipt.json",
+    "status": "PASS",
+    "variants": ["od", "o2"],
+    "cases_per_variant": 23,
+    "measured_comparisons_total": 46,
+    "mutation_controls": 18,
+    "mutations_detected": 18,
+    "coverage": "Inputs (mode, arena words, source count, probe return, reset source), intermediate call order/arguments/returns of all 14 callees, and final owned/reused state (incl. 0x6400-dword replay scratch and per-object +0x10e4 writes). Cdecl stack/nonvolatile ABI canary on every invocation. Synthetic callsite setup and RET padding are harness code only."
+  },
+  "boundaries": [
+    "004152e0 body not recovered; deferred with verified evidence, pending its ~70 unrecovered callees and stack-object/switch layouts.",
+    "New frontier callees 0046d960, 0046d890, 00413960, 004659e0 are typed declarations only, not recovered providers.",
+    "application_audio_source_storage_005e8bfc extent remains deferred; harness exercises a bounded 5-cell view.",
+    "Production CMake/registry integration and COFF ownership audit are the coordinator's next step; this packet is native proof only.",
+    "Concurrency/fault/live-device domains and full-game startup/visual acceptance remain open."
+  ]
+}

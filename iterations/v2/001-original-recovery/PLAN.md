@@ -1,18 +1,21 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-20, Run694 shared audit PASS (001) for frozen 688/001+689/005+
-690/004. Build001 compiles397TUs/8projects;69names72refs,noEXE. Two old names
-close (00565c70,004a8b80); two real children open (004a6c90,00590250).
-Registry1121 adds seven full bodies1868B; README694 owns commands/bounds:
-24380nativecases,72mutations,984pins. Workers691/692/693 in flight
-(004b68f0/004a88a0/004a8cd0, 00413ea0/00414eb0/004152e0,
-004640b0/00467740/00468fb0) after provider-credit fallbacks; integrate next.
+Current 2026-11-20, Run698 shared audit PASS (001) for frozen 691/007+692/015+
+693/010 on 694. Build001 compiles400TUs/8projects;112names116refs,noEXE.
+Seven names close; fifty typed real children open (scene/route/teardown, FE
+calls, sim boundaries, player tables) — the next recovery layer. Registry1129
+adds eight full bodies2479B; README698 owns commands/bounds: 374nativecases,
+75mutations,991pins. 004152e0 FE main-loop is evidence-only (~70 callees).
+Accepted awaiting intake: 696/002 getclutptr352B (unlocks00562810/00563440);
+in flight: 695 (00411d20->004121b0), 697 (004a6c90+00590250). Next after:
+50 new children + unlocked 00562810/00563440, 00534b90/00534d40; complex
+parents on strong models once the Go window resets.
 
-Next after691-693: unlocked callers 00411d20->startup_sequence_call_004121b0,
-005346d0->00562810/00563440, plus 00534b90/00534d40; new children
-004a6c90/00590250.
+Historical 2026-11-20, Run694 shared audit PASS (001) for frozen 688/001+689/005+
+690/004: 397TUs,69names72refs; twonamesclosed, 004a6c90/00590250 opened;
+sevenbodies1868B,24380cases,72mutations,984pins.
 
-Historical 2026-11-19. Run687 shared audit (`001`) passes for frozen `685/001`+`686/002` (`686/001` preserved) on `684`.
+Historical 2026-11-19, Run687 shared audit (`001`) passes for frozen `685/001`+`686/002` (`686/001` preserved) on `684`.
 Build `001` compiles 394 TUs / 8 projects, 69 names / 73 refs, no EXE. Zero new
 unresolved names; zero new `.data`/`.rdata`/`.bss`. Registry 1114 adds eleven
 PARTIAL bodies (903B total). README 687 owns commands and bounds: 1060 native

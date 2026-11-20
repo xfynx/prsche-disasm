@@ -1,0 +1,86 @@
+{
+  "run": 691,
+  "batch": "app-sim-teardown-audio-unload",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "bodies": [
+    {
+      "va": "004a88a0",
+      "range_inclusive": ["004a88a0", "004a8a76"],
+      "bytes": 471,
+      "sha256": "e996148d2565f25b81922b6f603030f2bb856ac0503b6993f227e2fb556d5be6",
+      "abi": "cdecl void(void)",
+      "subsystem": "application main: audio/frame teardown, load-progress pump, transition tail",
+      "caller": {"va": "004b6daa", "parent": "004b6a50", "binding": "porsche::application_main_function_004a88a0"},
+      "callees": ["004ad510", "004ae3c0", "004af900", "004afd30", "005659f0", "00531f90", "00565d60", "00565cd0", "004a8660", "0053c2e0", "004b0a20", "005366e0", "004a8570", "004b04d0", "004af5c0", "004ae470", "004ae4d0"],
+      "state": ["006573e8 arena words 00657c94/00657a24/00658080/00657cb8/00657cbc and record span 0065808c+0x580*i (object +0, mode +8)", "00656528..00656828: 32 x 0x18 records, fields +04/+08/+14 released, +00/+0c/+10 opaque (newly owned here)", "00656180..006563c8: 73 DWORD pairs (canonical frame_services.cpp)", "00656868/00656869 byte flags (canonical frame_services.cpp)", "005d1734 / 005d1750[4] (canonical application_services / frame_services)", "005e99f4 (canonical application_main_globals.cpp)"]
+    },
+    {
+      "va": "004a8cd0",
+      "range_inclusive": ["004a8cd0", "004a8dba"],
+      "bytes": 235,
+      "sha256": "1ffabd1bd6fc3d960e9b6e94df942d8f3ea004b40b24ed9f7cb48da230e76bbd",
+      "abi": "cdecl void(void)",
+      "subsystem": "startup sequence: audio bank playlist path assembly (track + optional 'Lil' + 'SND_coll')",
+      "caller": {"va": "004b6849", "parent": "004b67b0", "binding": "porsche::startup_sequence_call_004a8cd0"},
+      "callees": ["004acc10", "004ad4d0", "004a6c90"],
+      "state": ["0065b318 pointer reused from Run690 application_audio_path_prefix_0065b318", "005d1a1c 'Lil' literal reused from Run690 application_audio_lil_text_005d1a1c", "005d1a20 'SND_coll' 12B literal newly owned here", "00657c98 arena word (signed gates, re-read after boundaries)", "006564a0[5].raw_00 / [2].raw_00 written 0xfffffffe / 0xfffffffd (canonical records)"]
+    },
+    {
+      "va": "004b68f0",
+      "range_inclusive": ["004b68f0", "004b6a40"],
+      "bytes": 337,
+      "sha256": "19a24053c09ed8828f4eeb8c6cdc76bc5ee66035fd21673989be6bfd295b5960",
+      "abi": "cdecl void(void)",
+      "subsystem": "application main: Sim De-init (per-player setup copy-out, teardown sequence, Done log)",
+      "caller": {"va": "004b6f2f", "parent": "004b6a50", "binding": "porsche::application_main_function_004b68f0"},
+      "callees": ["004690f0", "00516950", "00413fd0", "004a8a80", "004afe50", "005a177b", "004a4760", "00414f80", "00471c40", "004642f0", "00425330", "00412cd0", "00412e60"],
+      "state": ["00658080 drives the loop; counter is MOVSX of BX (low 16 bits, signed), bounded to [0,0x7fff]", "005e8b34 per-player object pointer table, unbounded original BSS (fixture owns bounded allocation; unresolved storage dependency)", "005e75a0 0x96-DWORD blocks at stride 0x258, unbounded original BSS (same treatment)", "005d6e68 'Sim De-init ' 13B and 005d6e60 'Done\\n' 6B literals newly owned here, passed to canonical formatter_stdio_printf_005a177b"]
+    }
+  ],
+  "literal_bytes": [
+    {"va": "005d1a1c", "bytes": 4, "hex": "4c696c00", "text": "Lil\\0", "owner": "Run690 application_audio_lil_text_005d1a1c (reused)"},
+    {"va": "005d1a20", "bytes": 12, "hex": "534e445f636f6c6c000000000000", "text": "SND_coll", "owner": "Run691 (new)"},
+    {"va": "005d6e60", "bytes": 6, "hex": "446f6e650a00", "text": "Done\\n", "owner": "Run691 (new)"},
+    {"va": "005d6e68", "bytes": 13, "hex": "53696d2044652d696e69742000", "text": "Sim De-init ", "owner": "Run691 (new)"}
+  ],
+  "ownership": {
+    "registry": "source/recovered/functions.json: the three entry VAs appear only in unrecovered_dependencies lists; 1114 entries checked programmatically, zero body_ranges/entry overlaps",
+    "newly_owned_cells": ["00656528..00656828 (0x300B record table)", "005d1a20 (12B)", "005d6e60 (6B)", "005d6e68 (13B)"],
+    "reused_providers": ["Run690 application_audio_path_prefix_0065b318", "Run690 application_audio_lil_text_005d1a1c", "canonical frame_services/audio/heap/clock/formatter/arena providers (see scope-evidence.json)"],
+    "unresolved_storage": ["005e8b34", "005e75a0"],
+    "no_new_arrays_or_callbacks": true
+  },
+  "proof": {
+    "command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload/native-config.json --attempt 007",
+    "receipt": "local/experiments/v2-app-sim-teardown-audio-unload-691/007/receipt.json",
+    "status": "PASS",
+    "variants": ["/Od", "/O2"],
+    "cases_per_variant": 34,
+    "measured_case_runs": 68,
+    "material_mutations": 44,
+    "mutation_controls_detected": 44,
+    "pins": 429,
+    "receipts": 198,
+    "original_x86_vs_cpp": "relocated original body bytes executed directly and compared to the C++ body on event order/args, used returns, ABI (ESP/EBP/EBX/ESI/EDI), exceptions and final arena/table/object bytes"
+  },
+  "boundaries": [
+    "Unowned typed boundaries with callsite-observed ABI only: 004afd30, 004a8660, 004b0a20, 004a8570, 004b04d0, 004af5c0, 004ae470, 004acc10, 004ad4d0, 004a6c90, 004690f0, 00413fd0, 004a8a80, 004afe50, 004a4760, 00414f80, 00471c40, 004642f0, 00425330, 00412cd0, 00412e60",
+    "004a8570 / 004b04d0 return values are scenario-controlled; real semantics not assumed",
+    "Arena per-player records use unchecked original reads; fixture bounds the count scenarios to the arena span, no production bound invented",
+    "004b68f0 loop counter uses the original signed 16-bit MOVSX domain; proven count in [0,0x7fff]",
+    "004a8cd0 REP copies read the track string to NUL; fixture strings stay within the 100-byte stack buffer domain",
+    "005e8b34 / 005e75a0 extents remain unproved; no game-graph storage claimed",
+    "Real subscribers, actual load/audio effects, live endpoints, broader parent composition and full startup remain open"
+  ],
+  "attempt_history": [
+    {"attempt": "001", "result": "failed: divergence final 006564a0 records case=20 (unsigned mode gate in earlier source)"},
+    {"attempt": "002", "result": "crashed: null name_17c/name_534 in count==0 deinit scenario (fixture)"},
+    {"attempt": "003", "result": "failed: mutation wrong-4a88a0-deadline-0x180 non-material"},
+    {"attempt": "004", "result": "failed: mutation wrong-4a88a0-record-mode-guard non-material"},
+    {"attempt": "005", "result": "PASS (superseded: 0065b318/005d1a1c duplicated Run690 ownership)"},
+    {"attempt": "006", "result": "failed at mutation anchor setup after reuse correction"},
+    {"attempt": "007", "result": "PASS, final inputs"}
+  ]
+}

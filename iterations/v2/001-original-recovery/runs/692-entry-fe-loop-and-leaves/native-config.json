@@ -1,0 +1,183 @@
+{
+  "run": 692,
+  "experiment": "local/experiments/v2-entry-fe-loop-and-leaves-692",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters/00414eb0.cpp",
+    "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves",
+    "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters",
+    "iterations/v2/001-original-recovery/runs/668-startup-replay-load",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00413ea0",
+      "bytes": 296,
+      "sha256": "99fe96b4a6ba2dfbc9967c131a428789c7260f6ba376ae08827bc473efcff64c",
+      "token": "@BODY_00413EA0@"
+    },
+    {
+      "va": "00414eb0",
+      "bytes": 196,
+      "sha256": "873b8b28541ab06282cc34c34ce5219798ad11d8626635994bb30b8a2b2f51d0",
+      "token": "@BODY_00414EB0@"
+    }
+  ],
+  "pass_marker": "fe_entry_leaves_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-413ea0-mode-one-misrouted",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "    if (mode == 0 || mode == 1) {",
+      "new": "    if (mode == 0 || mode == 2) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413ea0-mode-two-tail-only",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "    } else if (mode >= 2) {",
+      "new": "    } else if (mode > 2) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413ea0-stosd-count",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "        for (std::size_t index = 0; index < 0x6400u; ++index) {",
+      "new": "        for (std::size_t index = 0; index < 0x63ffu; ++index) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413ea0-606864-constant",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "        fe_loop_word_00606864 = 2u;",
+      "new": "        fe_loop_word_00606864 = 3u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413ea0-state-nine-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "            if (application_state_006573e8.word(0x006573e8u) == 9u) {",
+      "new": "            if (application_state_006573e8.word(0x006573e8u) == 8u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413ea0-probe-inverted",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "        if (entry_fe_call_0046d960() != 0) {",
+      "new": "        if (entry_fe_call_0046d960() == 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413ea0-loop-drops-last",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "                    for (std::int32_t index = 0; index < count; ++index) {",
+      "new": "                    for (std::int32_t index = 0; index + 1 < count; ++index) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413ea0-slot-offset",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "                        *reinterpret_cast<std::uint32_t*>(object + 0x10e4u) =",
+      "new": "                        *reinterpret_cast<std::uint32_t*>(object + 0x10e0u) =",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413ea0-tail-606854-zero",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "        fe_loop_word_00606854 = 0u;\n        fe_loop_word_005e9a04 = 0u;",
+      "new": "        fe_loop_word_00606854 = 1u;\n        fe_loop_word_005e9a04 = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413ea0-zero-probe-constant",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "            fe_loop_word_00606850 = 0xau;",
+      "new": "            fe_loop_word_00606850 = 0xbu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-413ea0-call-arg-second",
+      "source": "iterations/v2/001-original-recovery/runs/692-entry-fe-loop-and-leaves/fe_entry_leaves_692.cpp",
+      "old": "            fe_loop_word_00606850 = 0xau;\n            entry_fe_call_004659e0(0u, 0xau);",
+      "new": "            fe_loop_word_00606850 = 0xau;\n            entry_fe_call_004659e0(0u, 0xbu);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-414eb0-enable-one",
+      "source": "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters/00414eb0.cpp",
+      "old": "    frame_reset_word_00606ab8 = 1u;",
+      "new": "    frame_reset_word_00606ab8 = 2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-414eb0-56858-byte",
+      "source": "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters/00414eb0.cpp",
+      "old": "    frame_reset_byte_00656858 = 0u;",
+      "new": "    frame_reset_byte_00656858 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-414eb0-6ac0-not-cleared",
+      "source": "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters/00414eb0.cpp",
+      "old": "    startup_sequence_word_00606ac0 = 0u;",
+      "new": "    startup_sequence_word_00606ac0 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-414eb0-ac8-copy-dropped",
+      "source": "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters/00414eb0.cpp",
+      "old": "    frame_reset_word_00606ac8 = copied;",
+      "new": "    frame_reset_word_00606ac8 = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-414eb0-280f0-one",
+      "source": "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters/00414eb0.cpp",
+      "old": "    frame_reset_word_006280f0 = 0u;",
+      "new": "    frame_reset_word_006280f0 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-414eb0-657e6c-wrong-cell",
+      "source": "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters/00414eb0.cpp",
+      "old": "(0x00657e6cu - application_state_base_va)",
+      "new": "(0x00657e70u - application_state_base_va)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-414eb0-second-service-arg",
+      "source": "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters/00414eb0.cpp",
+      "old": "    frame_reset_service_0044fd00(\n        application_state_006573e8.words_[(0x00657a34u - application_state_base_va) / 4u]);",
+      "new": "    frame_reset_service_0044fd00(\n        application_state_006573e8.words_[(0x00657a38u - application_state_base_va) / 4u]);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
