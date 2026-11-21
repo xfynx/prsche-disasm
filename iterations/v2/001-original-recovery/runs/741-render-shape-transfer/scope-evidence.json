@@ -1,0 +1,143 @@
+{
+  "run": 741,
+  "functions": [
+    "render_shape_transfer_00571630",
+    "render_shape_two_stage_span_005719c0"
+  ],
+  "rea_sessions": [
+    {
+      "config": "iterations/v2/001-original-recovery/runs/734-render-fill/rea-queries.json",
+      "receipt": "local/experiments/v2-render-input-734-rea/001/receipt.json",
+      "validation": "iterations/v2/001-original-recovery/runs/734-render-fill/validation.json",
+      "dossiers": [
+        "local/experiments/v2-render-input-734-rea/001/function-00571630.json"
+      ]
+    },
+    {
+      "config": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/rea-queries.json",
+      "receipt": "local/experiments/v2-render-input-741-rea/001/receipt.json",
+      "validation": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/validation.json",
+      "dossiers": [
+        "local/experiments/v2-render-input-741-rea/001/function-005719c0.json",
+        "local/experiments/v2-render-input-741-rea/001/function-00534b90.json",
+        "local/experiments/v2-render-input-741-rea/001/function-00534d40.json"
+      ]
+    }
+  ],
+  "originals": [
+    {
+      "function": "render_shape_transfer_00571630",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (const void* shape, std::int32_t x, std::int32_t y, const void* const* table; ret 0; void)",
+      "entry": "00571630",
+      "body_ranges_inclusive": [
+        [
+          "00571630",
+          "00571984"
+        ]
+      ],
+      "body_bytes": 853,
+      "body_sha256": "8b6e6039bd809999b4b1d8f890df5cfc970362487e322b27db20aed37458c516",
+      "switch_tables": [
+        {
+          "name": "jump_table_00571988",
+          "range_inclusive": [
+            "00571988",
+            "0057199f"
+          ],
+          "bytes": 24,
+          "sha256": "87e75231cb9a1f3edacb2e8fb367887433e3c84a4ec7bf8720440a3a139c4715"
+        },
+        {
+          "name": "lookup_table_005719a0",
+          "range_inclusive": [
+            "005719a0",
+            "005719b8"
+          ],
+          "bytes": 25,
+          "sha256": "24fe4016ec7c252dc23df2de5ac73180c686d6c13d74554f92e26152b04c75dd"
+        }
+      ],
+      "callers_note": "Called by 6 sites in calls.jsonl (005354c0, 00537b40, 0053d570, 005400b0, 00562680, 0056d4c0); closes the child frontier opened by Run734."
+    },
+    {
+      "function": "render_shape_two_stage_span_005719c0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (void* dst, const void* src, std::uint32_t count; ret 0; void)",
+      "entry": "005719c0",
+      "body_ranges_inclusive": [
+        [
+          "005719c0",
+          "00571a04"
+        ]
+      ],
+      "body_bytes": 69,
+      "body_sha256": "8e2a46081883260e48e9be52e3e8203fc389f464fd6a81e0968045fc845df5f8",
+      "callers_note": "Referenced and called exclusively by 00571630 when two-stage conversion (006a6424 + 006a6428) is active."
+    }
+  ],
+  "owned_rdata": [
+    {
+      "name": "render_shape_invalid_fmt_005c073c",
+      "va": "005c073c",
+      "range_inclusive": [
+        "005c073c",
+        "005c0760"
+      ],
+      "bytes": 37,
+      "section": ".rdata"
+    },
+    {
+      "name": "render_shape_source_file_005c0764",
+      "va": "005c0764",
+      "range_inclusive": [
+        "005c0764",
+        "005c0775"
+      ],
+      "bytes": 18,
+      "section": ".rdata"
+    }
+  ],
+  "owned_bss": [
+    {
+      "name": "render_shape_stage1_fn_006a6424",
+      "va": "006a6424",
+      "range_inclusive": [
+        "006a6424",
+        "006a6427"
+      ],
+      "bytes": 4,
+      "section": ".bss"
+    },
+    {
+      "name": "render_shape_stage2_fn_006a6428",
+      "va": "006a6428",
+      "range_inclusive": [
+        "006a6428",
+        "006a642b"
+      ],
+      "bytes": 4,
+      "section": ".bss"
+    }
+  ],
+  "reused_canonical_symbols": [
+    "render_descriptor_bits_00537f90",
+    "splash_shape_row_stride_005712f0",
+    "render_pixel_offset_00574080",
+    "free_00531f90",
+    "window_shutdown_config_005de620",
+    "window_shutdown_state_005de64c",
+    "shared_runtime_word_005deb74",
+    "shared_runtime_word_005deb78",
+    "diagnostic_handler_005debf0"
+  ],
+  "unresolved_child_frontiers": [
+    "render_shape_row_converter_00534b90",
+    "render_shape_convert_type_00534d40"
+  ],
+  "scope_boundary": "PARTIAL: Bounded native x86-vs-C++ proof for 00571630 and 005719c0 with owned .rdata 005c073c/005c0764 and .bss 006a6424/006a6428, exercising invalid-type diagnostics, direct/row-converter/type-converter/two-stage branches, all 4-side clipping and stride combinations, fast-path vs per-row span dispatch, and bpp table selection. Downstream conversion helpers 00534b90 and 00534d40 remain explicit typed boundaries; uninitialized 6400-byte scratch bytes in 005719c0 beyond stage1 writes are bounded."
+}

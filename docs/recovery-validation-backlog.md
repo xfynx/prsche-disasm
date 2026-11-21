@@ -1,5 +1,13 @@
 # Отложенные проверки восстановления v2
 
+Run743 integrates `740/002`, `741/002`, and `742/001`: 10 bodies, 410 native
+comparisons, 37 mutations, 55B `.rdata` + 8B `.bss` (`741`), 435 TUs, 100 names
+/ 107 refs, no EXE (registry 1,227). `741` keeps `00534b90`, `00534d40` and
+uninitialized stack scratch bytes beyond stage-1 writes in `005719c0` as
+explicit `PARTIAL` bounds; `740` keeps `00566ea0`/`005612a0` and `742` keeps
+null-receiver/live virtual pass dispatch, live devices, startup and gameplay
+open.
+
 Run739 integrates `736/006`, `737/005`, and `738/001` (plus `Run739`'s
 param-4 `uint32_t` -> `void*` ABI bridge for `00468440`): 6 bodies, 478 native
 comparisons, 33 mutations, 0 new owned data, 432 TUs, 101 names / 108 refs, no

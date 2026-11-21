@@ -1,0 +1,635 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+
+#include "render_shape_transfer_741.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+namespace porsche {
+
+std::uint32_t window_shutdown_config_005de620[12] = {};
+std::uint32_t& window_shutdown_state_005de64c = window_shutdown_config_005de620[11];
+
+std::uint32_t shared_runtime_word_005deb74 = 0u;
+std::uint32_t shared_runtime_word_005deb78 = 0u;
+void(__cdecl* diagnostic_handler_005debf0)(const char*) = nullptr;
+
+// Satisfy unused extern declarations pulled in via input_ff_slot_render_680.hpp
+InputSlot input_slots_006be040[32] = {};
+FrameControlSlotFields_494 frame_control_slot_fields_494[32] = {};
+std::uint32_t __cdecl input_device_ff_command_00533160(InputDevice*, std::uint32_t) { return 0u; }
+
+} // namespace porsche
+
+enum : U {
+    kMaxEvents = 64u,
+    kShapeBufBytes = 256u,
+    kDstBufBytes = 1024u,
+};
+
+struct Event {
+    U kind;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+    U diag_line;
+    U stage1_ptr;
+    U stage2_ptr;
+};
+
+struct Trace {
+    U abi_fail;
+    U event_count;
+    Event events[kMaxEvents];
+    B dst_after[kDstBufBytes];
+    U diag_file_nonnull;
+    U diag_line_after;
+    U stage1_after;
+    U stage2_after;
+};
+
+alignas(16) static B primary_shape[kShapeBufBytes] = {};
+alignas(16) static B converted_shape[kShapeBufBytes] = {};
+alignas(16) static B dst_buf[kDstBufBytes] = {};
+
+static B* code = nullptr;
+static B* slot_571630 = nullptr;
+static B* slot_571988 = nullptr;
+static B* slot_5719a0 = nullptr;
+static B* slot_5719c0 = nullptr;
+static B* slot_574080 = nullptr;
+static B* str_5c073c = nullptr;
+static B* str_5c0764 = nullptr;
+
+static U iat_5debf0 = 0u;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U side = 0u;
+
+static U g_conv_mode = 0u; // 0=null, 1=row_conv, 2=type_conv
+
+static U ptr(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", msg, cases, side);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("divergence native-fault %08lx eip=%08lx case=%u side=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                side);
+    std::fflush(stdout);
+    ExitProcess(1);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void record_event(U kind, U a0, U a1 = 0u, U a2 = 0u, U a3 = 0u) {
+    require(trace.event_count < kMaxEvents, "event capacity");
+    trace.events[trace.event_count++] = {
+        kind, a0, a1, a2, a3,
+        shared_runtime_word_005deb78,
+        ptr(reinterpret_cast<const void*>(render_shape_stage1_fn_006a6424)),
+        ptr(reinterpret_cast<const void*>(render_shape_stage2_fn_006a6428))
+    };
+}
+
+static void __cdecl test_diag_handler(const char* fmt, U code_val) {
+    require(fmt != nullptr && std::strcmp(fmt, render_shape_invalid_fmt_005c073c) == 0, "diag fmt");
+    const auto* file = reinterpret_cast<const char*>(
+        static_cast<std::uintptr_t>(shared_runtime_word_005deb74));
+    require(file != nullptr && std::strcmp(file, render_shape_source_file_005c0764) == 0, "diag file");
+    record_event(1u, code_val);
+}
+
+static void __cdecl span_slot_fn(U slot_id, void* dst, const void* src, U count) {
+    const auto* s = static_cast<const B*>(src);
+    auto* d = static_cast<B*>(dst);
+    const U src_off = (s >= primary_shape && s < primary_shape + kShapeBufBytes)
+        ? static_cast<U>(s - primary_shape)
+        : ((s >= converted_shape && s < converted_shape + kShapeBufBytes)
+            ? (0x1000u + static_cast<U>(s - converted_shape))
+            : 0x9999u);
+    const U dst_off = static_cast<U>(d - dst_buf);
+    record_event(10u + slot_id, dst_off, src_off, count);
+    for (U i = 0u; i < count; ++i) {
+        d[i] = static_cast<B>((s[i] ^ (0x11u * (slot_id + 1u))) & 0xffu);
+    }
+}
+
+static void __cdecl span_0(void* d, const void* s, U c) { span_slot_fn(0u, d, s, c); }
+static void __cdecl span_1(void* d, const void* s, U c) { span_slot_fn(1u, d, s, c); }
+static void __cdecl span_2(void* d, const void* s, U c) { span_slot_fn(2u, d, s, c); }
+static void __cdecl span_3(void* d, const void* s, U c) { span_slot_fn(3u, d, s, c); }
+static void __cdecl span_4(void* d, const void* s, U c) { span_slot_fn(4u, d, s, c); }
+static void __cdecl span_override(void* d, const void* s, U c) { span_slot_fn(5u, d, s, c); }
+
+static void __cdecl row_conv_fn(void* dst, const void* src, U count) {
+    const auto* s = static_cast<const B*>(src);
+    auto* d = static_cast<B*>(dst);
+    const U src_off = static_cast<U>(s - primary_shape);
+    record_event(20u, src_off, count);
+    for (U i = 0u; i < count; ++i) {
+        d[i] = static_cast<B>((s[i] + 0x5au) & 0xffu);
+    }
+}
+
+static void __cdecl stage2_fn(void* dst, const void* src, U count) {
+    const auto* s = static_cast<const B*>(src);
+    auto* d = static_cast<B*>(dst);
+    const U dst_off = static_cast<U>(d - dst_buf);
+    record_event(21u, dst_off, count);
+    for (U i = 0u; i < count; ++i) {
+        d[i] = static_cast<B>((s[i] ^ 0x3cu) & 0xffu);
+    }
+}
+
+namespace porsche {
+
+std::uint32_t __cdecl render_descriptor_bits_00537f90(const void* shape) {
+    const B t = *static_cast<const B*>(shape);
+    if (t == 0x7au) return 4u;
+    if (t == 0x7bu) return 8u;
+    if (t == 0x7du) return 15u;
+    if (t == 0x7eu) return 16u;
+    if (t == 0x7fu) return 24u;
+    if (t == 0x6du) return 32u;
+    return 0u;
+}
+
+std::int32_t __cdecl splash_shape_row_stride_005712f0(const void* shape) {
+    const auto* const bytes = static_cast<const B*>(shape);
+    const I width = static_cast<I>(static_cast<std::int16_t>(
+        bytes[4] | (static_cast<U>(bytes[5]) << 8u)));
+    if (bytes[0] == 0x7bu) {
+        return width;
+    }
+    I bpp = static_cast<I>(render_descriptor_bits_00537f90(shape));
+    if (bpp == 15) {
+        bpp = 16;
+    }
+    return (bpp * width + 7) >> 3;
+}
+
+std::uint32_t __cdecl free_00531f90(void* p) {
+    record_event(4u, (p == converted_shape) ? 1u : 0u);
+    return 1u;
+}
+
+void* __cdecl render_shape_row_converter_00534b90(
+    const void* shape, std::uint32_t target_type, std::int32_t direct_mode) {
+    record_event(2u, *static_cast<const B*>(shape), target_type, static_cast<U>(direct_mode));
+    if (g_conv_mode == 1u) {
+        return reinterpret_cast<void*>(&row_conv_fn);
+    }
+    return nullptr;
+}
+
+void* __cdecl render_shape_convert_type_00534d40(
+    const void* shape, std::uint32_t target_type,
+    std::int32_t use_dither, std::int32_t direct_mode) {
+    record_event(3u, *static_cast<const B*>(shape), target_type,
+                 static_cast<U>(use_dither), static_cast<U>(direct_mode));
+    return converted_shape;
+}
+
+} // namespace porsche
+
+static __declspec(naked) void stub_chkstk_005a1e90() {
+    __asm {
+        pop ecx
+        cmp eax, 1000h
+        jb short done_probe
+    probe_loop:
+        sub esp, 1000h
+        test dword ptr [esp], eax
+        sub eax, 1000h
+        cmp eax, 1000h
+        jae short probe_loop
+    done_probe:
+        sub esp, eax
+        test dword ptr [esp], eax
+        jmp ecx
+    }
+}
+
+static void invoke_cdecl4_void(void* fn, U a0, U a1, U a2, U a3, U& abi_fail) {
+    U fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a3
+        push a2
+        push a1
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 16
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+}
+
+static void invoke_cdecl3_void(void* fn, U a0, U a1, U a2, U& abi_fail) {
+    U fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a2
+        push a1
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 12
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+}
+
+static void patch_abs(B* base, U size, U old_va, U new_va, U expected_hits) {
+    U hits = 0u;
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (rd(base, i) == old_va) {
+            wr(base, i, new_va);
+            ++hits;
+            i += 3u;
+        }
+    }
+    require(hits == expected_hits, "patch_abs count");
+}
+
+static void patch_rel(B* base, U offset, U va_start, U orig_target, U new_target) {
+    require(base[offset] == 0xe8u, "patch_rel opcode");
+    const U decoded = va_start + offset + 5u + rd(base, offset + 1u);
+    require(decoded == orig_target, "patch_rel orig target");
+    wr(base, offset + 1u, new_target - (ptr(base) + offset + 5u));
+}
+
+static void verify_initial_pe_state(const char* pe_path) {
+    require(render_shape_stage1_fn_006a6424 == nullptr, "C++ initial 006a6424");
+    require(render_shape_stage2_fn_006a6428 == nullptr, "C++ initial 006a6428");
+
+    FILE* f = std::fopen(pe_path, "rb");
+    require(f != nullptr, "open PE");
+    std::fseek(f, 0, SEEK_END);
+    const long len = std::ftell(f);
+    std::rewind(f);
+    auto* pe = new B[static_cast<std::size_t>(len)];
+    require(std::fread(pe, 1, static_cast<std::size_t>(len), f) == static_cast<std::size_t>(len), "read PE");
+    std::fclose(f);
+
+    const U nt = rd(pe, 0x3cu);
+    const U base = rd(pe, nt + 52u);
+    const U sections = pe[nt + 6u] | (static_cast<U>(pe[nt + 7u]) << 8u);
+    const U optional = pe[nt + 20u] | (static_cast<U>(pe[nt + 21u]) << 8u);
+
+    auto read_va_u32 = [&](U va) -> U {
+        for (U i = 0u; i < sections; ++i) {
+            const B* s = pe + nt + 24u + optional + i * 40u;
+            const U vs = rd(s, 8u), rva = rd(s, 12u), rawsize = rd(s, 16u), raw = rd(s, 20u);
+            const U delta = va - base - rva;
+            if (delta < vs && delta + 4u <= vs) {
+                if (delta + 4u <= rawsize) return rd(pe, raw + delta);
+                return 0u;
+            }
+        }
+        require(false, "VA not in PE");
+        return 0u;
+    };
+
+    require(read_va_u32(0x006a6424u) == 0u, "PE initial 006a6424");
+    require(read_va_u32(0x006a6428u) == 0u, "PE initial 006a6428");
+    delete[] pe;
+}
+
+static void init_fixture(const char* pe_path) {
+    verify_initial_pe_state(pe_path);
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    std::memset(code, 0xcc, 4096u);
+
+    const B b_571630[] = {@BODY_00571630@};
+    const B b_571988[] = {@JTBL_00571988@};
+    const B b_5719a0[] = {@LUT_005719A0@};
+    const B b_5719c0[] = {@BODY_005719C0@};
+    const B b_5c073c[] = {@STR_005C073C@};
+    const B b_5c0764[] = {@STR_005C0764@};
+    const B b_574080[] = {@BODY_00574080@};
+
+    slot_571630 = code + 0x000u;
+    slot_571988 = code + 0x380u;
+    slot_5719a0 = code + 0x3c0u;
+    slot_5719c0 = code + 0x400u;
+    str_5c073c = code + 0x480u;
+    str_5c0764 = code + 0x4c0u;
+    slot_574080 = code + 0x500u;
+
+    std::memcpy(slot_571630, b_571630, sizeof b_571630);
+    std::memcpy(slot_571988, b_571988, sizeof b_571988);
+    std::memcpy(slot_5719a0, b_5719a0, sizeof b_5719a0);
+    std::memcpy(slot_5719c0, b_5719c0, sizeof b_5719c0);
+    std::memcpy(str_5c073c, b_5c073c, sizeof b_5c073c);
+    std::memcpy(str_5c0764, b_5c0764, sizeof b_5c0764);
+    std::memcpy(slot_574080, b_574080, sizeof b_574080);
+
+    iat_5debf0 = ptr(reinterpret_cast<void*>(&test_diag_handler));
+
+    for (U i = 0u; i < 6u; ++i) {
+        const U old_t = rd(slot_571988, i * 4u);
+        require(old_t >= 0x00571630u && old_t < 0x00571985u, "jtbl range");
+        wr(slot_571988, i * 4u, ptr(slot_571630) + (old_t - 0x00571630u));
+    }
+
+    // Relocate 00571630
+    patch_rel(slot_571630, 0x12u, 0x00571630u, 0x00537f90u, ptr(reinterpret_cast<void*>(&render_descriptor_bits_00537f90)));
+    patch_abs(slot_571630, sizeof b_571630, 0x005deb74u, ptr(&shared_runtime_word_005deb74), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005c0764u, ptr(str_5c0764), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005deb78u, ptr(&shared_runtime_word_005deb78), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005c073cu, ptr(str_5c073c), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005debf0u, ptr(&iat_5debf0), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005de62cu, ptr(&window_shutdown_config_005de620[3]), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x006a6424u, ptr(&render_shape_stage1_fn_006a6424), 3u);
+    patch_rel(slot_571630, 0x8eu, 0x00571630u, 0x00534b90u, ptr(reinterpret_cast<void*>(&render_shape_row_converter_00534b90)));
+    patch_rel(slot_571630, 0xc1u, 0x00571630u, 0x00534d40u, ptr(reinterpret_cast<void*>(&render_shape_convert_type_00534d40)));
+    patch_rel(slot_571630, 0xe3u, 0x00571630u, 0x00537f90u, ptr(reinterpret_cast<void*>(&render_descriptor_bits_00537f90)));
+    patch_rel(slot_571630, 0xf9u, 0x00571630u, 0x005712f0u, ptr(reinterpret_cast<void*>(&splash_shape_row_stride_005712f0)));
+    patch_abs(slot_571630, sizeof b_571630, 0x005de638u, ptr(&window_shutdown_config_005de620[6]), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005de640u, ptr(&window_shutdown_config_005de620[8]), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005de634u, ptr(&window_shutdown_config_005de620[5]), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005de63cu, ptr(&window_shutdown_config_005de620[7]), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005de62eu, ptr(&window_shutdown_config_005de620[3]) + 2u, 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005de64cu, ptr(&window_shutdown_state_005de64c), 1u);
+    patch_rel(slot_571630, 0x1d5u, 0x00571630u, 0x00574080u, ptr(slot_574080));
+    patch_abs(slot_571630, sizeof b_571630, 0x005de644u, ptr(&window_shutdown_config_005de620[9]), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005de62du, ptr(&window_shutdown_config_005de620[3]) + 1u, 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005719a0u, ptr(slot_5719a0), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x00571988u, ptr(slot_571988), 1u);
+    patch_abs(slot_571630, sizeof b_571630, 0x005719c0u, ptr(slot_5719c0), 2u);
+    patch_abs(slot_571630, sizeof b_571630, 0x006a6428u, ptr(&render_shape_stage2_fn_006a6428), 1u);
+    patch_rel(slot_571630, 0x349u, 0x00571630u, 0x00531f90u, ptr(reinterpret_cast<void*>(&free_00531f90)));
+
+    // Relocate 005719c0
+    patch_rel(slot_5719c0, 0x05u, 0x005719c0u, 0x005a1e90u, ptr(reinterpret_cast<void*>(&stub_chkstk_005a1e90)));
+    patch_abs(slot_5719c0, sizeof b_5719c0, 0x006a6424u, ptr(&render_shape_stage1_fn_006a6424), 1u);
+    patch_abs(slot_5719c0, sizeof b_5719c0, 0x006a6428u, ptr(&render_shape_stage2_fn_006a6428), 1u);
+
+    // Relocate 00574080
+    patch_abs(slot_574080, sizeof b_574080, 0x005de62eu, ptr(&window_shutdown_config_005de620[3]) + 2u, 1u);
+    patch_abs(slot_574080, sizeof b_574080, 0x005de644u, ptr(&window_shutdown_config_005de620[9]), 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+}
+
+static void seed_shape(B* buf, B type_byte, std::int16_t w, std::int16_t h, B salt) {
+    std::memset(buf, 0, kShapeBufBytes);
+    buf[0] = type_byte;
+    std::memcpy(buf + 4, &w, 2u);
+    std::memcpy(buf + 6, &h, 2u);
+    for (U i = 0x10u; i < kShapeBufBytes; ++i) {
+        buf[i] = static_cast<B>((i * 29u + salt) & 0xffu);
+    }
+}
+
+static void prepare_state(
+    B dst_type, B dst_bpp, B dst_storage_bits, U pitch,
+    I clip_l, I clip_t, I clip_r, I clip_b,
+    B shape_type, std::int16_t shape_w, std::int16_t shape_h,
+    B conv_type, std::int16_t conv_w, std::int16_t conv_h,
+    U conv_mode) {
+    std::memset(&trace, 0, sizeof trace);
+    for (U i = 0u; i < 12u; ++i) {
+        window_shutdown_config_005de620[i] = 0x20000000u + i;
+    }
+    window_shutdown_config_005de620[3] =
+        static_cast<U>(dst_type) |
+        (static_cast<U>(dst_bpp) << 8u) |
+        (static_cast<U>(dst_storage_bits) << 16u);
+    window_shutdown_config_005de620[5] = static_cast<U>(clip_l);
+    window_shutdown_config_005de620[6] = static_cast<U>(clip_t);
+    window_shutdown_config_005de620[7] = static_cast<U>(clip_r);
+    window_shutdown_config_005de620[8] = static_cast<U>(clip_b);
+    window_shutdown_config_005de620[9] = pitch;
+    window_shutdown_state_005de64c = ptr(dst_buf + 64u);
+
+    shared_runtime_word_005deb74 = 0u;
+    shared_runtime_word_005deb78 = 0u;
+    diagnostic_handler_005debf0 = reinterpret_cast<void(__cdecl*)(const char*)>(&test_diag_handler);
+
+    render_shape_stage1_fn_006a6424 = reinterpret_cast<RenderShapeSpanFn>(0x12345678u);
+    render_shape_stage2_fn_006a6428 = reinterpret_cast<RenderShapeSpanFn>(0x87654321u);
+    g_conv_mode = conv_mode;
+
+    seed_shape(primary_shape, shape_type, shape_w, shape_h, 3u);
+    seed_shape(converted_shape, conv_type, conv_w, conv_h, 77u);
+    for (U i = 0u; i < kDstBufBytes; ++i) {
+        dst_buf[i] = static_cast<B>((i * 17u + 5u) & 0xffu);
+    }
+}
+
+static void snapshot_state() {
+    require(trace.abi_fail == 0u, "ABI check");
+    std::memcpy(trace.dst_after, dst_buf, sizeof trace.dst_after);
+    trace.diag_file_nonnull = (shared_runtime_word_005deb74 != 0u) ? 1u : 0u;
+    trace.diag_line_after = shared_runtime_word_005deb78;
+    trace.stage1_after = ptr(reinterpret_cast<const void*>(render_shape_stage1_fn_006a6424));
+    trace.stage2_after = ptr(reinterpret_cast<const void*>(render_shape_stage2_fn_006a6428));
+}
+
+static void run_571630_case(
+    B dst_type, B dst_bpp, B dst_storage_bits, U pitch,
+    I clip_l, I clip_t, I clip_r, I clip_b,
+    B shape_type, std::int16_t shape_w, std::int16_t shape_h,
+    B conv_type, std::int16_t conv_w, std::int16_t conv_h,
+    I x, I y,
+    bool use_override_fn, U mode_flag, U override_dst_type, U conv_mode) {
+    ++cases;
+    const void* table[8] = {
+        reinterpret_cast<const void*>(&span_0),
+        reinterpret_cast<const void*>(&span_1),
+        reinterpret_cast<const void*>(&span_2),
+        reinterpret_cast<const void*>(&span_3),
+        reinterpret_cast<const void*>(&span_4),
+        use_override_fn ? reinterpret_cast<const void*>(&span_override) : nullptr,
+        reinterpret_cast<const void*>(static_cast<std::uintptr_t>(mode_flag)),
+        reinterpret_cast<const void*>(static_cast<std::uintptr_t>(override_dst_type)),
+    };
+    for (side = 0u; side < 2u; ++side) {
+        prepare_state(dst_type, dst_bpp, dst_storage_bits, pitch,
+                      clip_l, clip_t, clip_r, clip_b,
+                      shape_type, shape_w, shape_h,
+                      conv_type, conv_w, conv_h, conv_mode);
+        void* const fn = (side == 0u)
+            ? static_cast<void*>(slot_571630)
+            : reinterpret_cast<void*>(&render_shape_transfer_00571630);
+        invoke_cdecl4_void(fn, ptr(primary_shape), static_cast<U>(x), static_cast<U>(y), ptr(table),
+                           trace.abi_fail);
+        snapshot_state();
+        if (side == 0u) {
+            expected = trace;
+        } else {
+            require(std::memcmp(&trace, &expected, sizeof trace) == 0, "00571630 trace match");
+        }
+    }
+}
+
+static void run_5719c0_case(U dst_off, U count) {
+    ++cases;
+    for (side = 0u; side < 2u; ++side) {
+        prepare_state(0x7bu, 8u, 8u, 64u, 0, 0, 64, 64,
+                      0x7bu, 8, 8, 0x7bu, 8, 8, 0u);
+        render_shape_stage1_fn_006a6424 = &row_conv_fn;
+        render_shape_stage2_fn_006a6428 = &stage2_fn;
+        void* const fn = (side == 0u)
+            ? static_cast<void*>(slot_5719c0)
+            : reinterpret_cast<void*>(&render_shape_two_stage_span_005719c0);
+        invoke_cdecl3_void(fn, ptr(dst_buf + dst_off), ptr(primary_shape + 0x10u), count, trace.abi_fail);
+        snapshot_state();
+        if (side == 0u) {
+            expected = trace;
+        } else {
+            require(std::memcmp(&trace, &expected, sizeof trace) == 0, "005719c0 trace match");
+        }
+    }
+}
+
+int main(int argc, char** argv) {
+    AddVectoredExceptionHandler(1, fault_handler);
+    require(argc == 2, "PE path argument");
+    init_fixture(argv[1]);
+
+    // 1. Direct transfer (shape type == target type) across all 5 bpp slots (8, 15, 16, 24, 32)
+    // and both fast-path (pitch==row_bytes, no clipping) and per-row (pitch > row_bytes)
+    const struct { B type; B bpp; B storage; } modes[] = {
+        {0x7bu, 8u, 8u},
+        {0x7du, 15u, 16u},
+        {0x7eu, 16u, 16u},
+        {0x7fu, 24u, 24u},
+        {0x6du, 32u, 32u},
+    };
+    for (const auto& m : modes) {
+        const U tight_pitch = (static_cast<U>(m.storage) * 6u) >> 3u;
+        // Fast path
+        run_571630_case(m.type, m.bpp, m.storage, tight_pitch,
+                        0, 0, 16, 16, m.type, 6, 4, m.type, 6, 4,
+                        0, 0, false, 0u, 0u, 0u);
+        // Strided + clipped all 4 sides
+        run_571630_case(m.type, m.bpp, m.storage, tight_pitch + 8u,
+                        2, 1, 6, 4, m.type, 8, 6, m.type, 8, 6,
+                        0, 0, false, 0u, 0u, 0u);
+        // Override fn (table[5] != null)
+        run_571630_case(m.type, m.bpp, m.storage, tight_pitch + 4u,
+                        0, 0, 16, 16, 0x7au, 6, 4, m.type, 6, 4,
+                        1, 1, true, 1u, 0u, 0u);
+    }
+
+    // 2. Conversion paths: row_conv (mode_flag=2 single-stage vs mode_flag=0/1 two-stage via 005719c0)
+    // and type_conv (00534d40 allocated shape + 00531f90 free, including use_dither=0/1)
+    for (U mode_flag : {0u, 1u, 2u}) {
+        // Row converter returned (conv_mode = 1)
+        run_571630_case(0x7eu, 16u, 16u, 16u, 0, 0, 16, 16,
+                        0x7bu, 5, 3, 0x7eu, 5, 3, 1, 1, false, mode_flag, 0u, 1u);
+        // Override dest type (table[7] != 0) with row converter
+        run_571630_case(0x7bu, 8u, 8u, 16u, 0, 0, 16, 16,
+                        0x7au, 6, 4, 0x7bu, 6, 4, 0, 0, false, mode_flag, 0x7eu, 1u);
+        // Type converter returned (conv_mode = 0 -> calls 00534d40 & frees via 00531f90)
+        run_571630_case(0x7eu, 16u, 16u, 16u, 0, 0, 16, 16,
+                        0x7bu, 5, 3, 0x7eu, 5, 3, 2, 1, false, mode_flag, 0u, 0u);
+    }
+
+    // 3. 4bpp sub-byte odd-width clipping (verifies sar3 rounding on left/right/top/bottom clip)
+    run_571630_case(0x7au, 8u, 8u, 16u, 3, 1, 8, 4,
+                    0x7au, 9, 5, 0x7au, 9, 5, 0, 0, true, 0u, 0u, 0u);
+
+    // 4. Fully clipped off-screen (width<=0 or height<=0), including freeing allocated converted shape
+    run_571630_case(0x7eu, 16u, 16u, 16u, 10, 10, 20, 20,
+                    0x7bu, 4, 4, 0x7eu, 4, 4, 0, 0, false, 1u, 0u, 0u);
+    run_571630_case(0x7bu, 8u, 8u, 16u, 10, 10, 20, 20,
+                    0x7bu, 4, 4, 0x7bu, 4, 4, 10, 25, false, 0u, 0u, 0u);
+
+    // 5. Invalid shape type diagnostic path (00537f90 == 0 -> sets 005deb74/78 & calls 005debf0)
+    // Clipped out afterwards so no pixel draw occurs
+    run_571630_case(0x7bu, 8u, 8u, 16u, 10, 10, 20, 20,
+                    0x99u, 4, 4, 0x7bu, 4, 4, 0, 0, false, 0u, 0u, 0u);
+
+    // 6. Direct 005719c0 cases across counts
+    for (U count : {1u, 4u, 15u, 64u, 128u}) {
+        run_5719c0_case(64u, count);
+    }
+
+    std::printf("render_shape_transfer_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

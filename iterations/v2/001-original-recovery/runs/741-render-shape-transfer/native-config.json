@@ -1,0 +1,161 @@
+{
+  "run": 741,
+  "experiment": "local/experiments/v2-render-shape-transfer-741",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/741-render-shape-transfer",
+    "iterations/v2/001-original-recovery/runs/734-render-fill",
+    "iterations/v2/001-original-recovery/runs/537-render-resource-descriptor-cleanup",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00571630",
+      "bytes": 853,
+      "sha256": "8b6e6039bd809999b4b1d8f890df5cfc970362487e322b27db20aed37458c516",
+      "token": "@BODY_00571630@"
+    },
+    {
+      "va": "00571988",
+      "bytes": 24,
+      "sha256": "87e75231cb9a1f3edacb2e8fb367887433e3c84a4ec7bf8720440a3a139c4715",
+      "token": "@JTBL_00571988@"
+    },
+    {
+      "va": "005719a0",
+      "bytes": 25,
+      "sha256": "24fe4016ec7c252dc23df2de5ac73180c686d6c13d74554f92e26152b04c75dd",
+      "token": "@LUT_005719A0@"
+    },
+    {
+      "va": "005719c0",
+      "bytes": 69,
+      "sha256": "8e2a46081883260e48e9be52e3e8203fc389f464fd6a81e0968045fc845df5f8",
+      "token": "@BODY_005719C0@"
+    },
+    {
+      "va": "005c073c",
+      "bytes": 37,
+      "sha256": "6ef88932a3cff648161158adc8317c9c166d186a2f1364193b15f38f0adef9a3",
+      "token": "@STR_005C073C@"
+    },
+    {
+      "va": "005c0764",
+      "bytes": 18,
+      "sha256": "b4e3903034cb4a21628689df555f8809b76db1c191158726525a6bf15116d71a",
+      "token": "@STR_005C0764@"
+    },
+    {
+      "va": "00574080",
+      "bytes": 29,
+      "sha256": "ba6fc95f4e370e8f4706ebf4d0a5dca0b24336a29e6e1afc0e7d51769ddce706",
+      "token": "@BODY_00574080@"
+    }
+  ],
+  "pass_marker": "render_shape_transfer_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-571630-diag-line",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "        shared_runtime_word_005deb78 = 0x2au;",
+      "new": "        shared_runtime_word_005deb78 = 0x2bu;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-571630-override-type",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "    if (override_type != 0u) {\n        target_type = override_type;\n    }",
+      "new": "    if (override_type != 0u) {\n        target_type = override_type + 1u;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-571630-direct-mode-cmp",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "        const std::int32_t direct_mode = (mode_flag != 2u) ? 1 : 0;",
+      "new": "        const std::int32_t direct_mode = (mode_flag == 2u) ? 1 : 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-571630-dither-cmp",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "            allocated_shape = render_shape_convert_type_00534d40(\n                shape, target_type, (mode_flag == 1u) ? 1 : 0, direct_mode);",
+      "new": "            allocated_shape = render_shape_convert_type_00534d40(\n                shape, target_type, 0, direct_mode);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-571630-clip-left-skip",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "        src_ptr += skip;\n        width -= left_delta;\n        x += left_delta;\n        src_stride_gap += skip;",
+      "new": "        src_ptr += skip;\n        width -= left_delta;\n        x += left_delta;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-571630-clip-right-gap",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "    if (right_delta > 0) {\n        src_stride_gap += sar3(right_delta * even_bpp);\n        width -= right_delta;\n    }",
+      "new": "    if (right_delta > 0) {\n        width -= right_delta;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-571630-bpp15-slot",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "            case 15u:\n                span_fn = table[1];",
+      "new": "            case 15u:\n                span_fn = table[2];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-571630-bpp24-slot",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "            case 24u:\n                span_fn = table[3];",
+      "new": "            case 24u:\n                span_fn = table[4];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-571630-fast-path-disable",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "        if (dst_stride_gap == 0 && src_stride_gap == 0 &&\n            fn != &render_shape_two_stage_span_005719c0) {",
+      "new": "        if (false && dst_stride_gap == 0 && src_stride_gap == 0 &&\n            fn != &render_shape_two_stage_span_005719c0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-571630-free-alloc",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "    if (allocated_shape != nullptr) {\n        (void)free_00531f90(allocated_shape);\n    }",
+      "new": "    if (allocated_shape != nullptr) {\n        (void)allocated_shape;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-5719c0-stage2-call",
+      "source": "iterations/v2/001-original-recovery/runs/741-render-shape-transfer/render_shape_transfer_741.cpp",
+      "old": "    render_shape_stage1_fn_006a6424(scratch, src, count);\n    render_shape_stage2_fn_006a6428(dst, scratch, count);",
+      "new": "    render_shape_stage1_fn_006a6424(scratch, src, count);\n    render_shape_stage2_fn_006a6428(dst, src, count);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

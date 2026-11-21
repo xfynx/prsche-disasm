@@ -4,15 +4,22 @@ Updated 2026-11-22. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run739](iterations/v2/001-original-recovery/runs/739-scene-program-integration/README.md)
-compiles 432 C++ translation units across eight projects. The shared link
-reports **101 unresolved names / 108 references**. There is no game EXE yet.
-The shared audit accepts Runs736/737/738 (plus the Run739 `00468440` param-4
-ABI bridge) within their bounded domains: 6 new registry entries (`1,217`
-total), 478 original-x86 comparisons, 33 mutations, 0 new owned bytes, and
-1,068 source pins. Two names close (`00468240`, `004685e0`) and six typed
-children open (`0053f380`, `0053f980`, `00537a70`, `00537a40`, `00537a30`,
-`00536470`).
+[Run743](iterations/v2/001-original-recovery/runs/743-audio-render-scene-integration/README.md)
+compiles 435 C++ translation units across eight projects. The shared link
+reports **100 unresolved names / 107 references**. There is no game EXE yet.
+The shared audit accepts Runs740/741/742 within their bounded domains: 10 new
+registry entries (`1,227` total), 410 original-x86 comparisons, 37 mutations,
+55B `.rdata` + 8B `.bss` (`Run741`), and 1,074 source pins. Three names close
+(`00567060`, `00571630`, `0059f070`) and two typed children open (`00534b90`,
+`00534d40`).
+
+Historical: [Run739](iterations/v2/001-original-recovery/runs/739-scene-program-integration/README.md)
+compiles 432 C++ translation units across eight projects (**101 unresolved names /
+108 references**), accepting Runs736/737/738 plus the Run739 `00468440` param-4
+ABI bridge: 6 new registry entries (`1,217` total), 478 original-x86 comparisons,
+33 mutations, 0 new owned bytes, and 1,068 source pins. Two names close
+(`00468240`, `004685e0`) and six typed children open (`0053f380`, `0053f980`,
+`00537a70`, `00537a40`, `00537a30`, `00536470`).
 
 Historical: [Run735](iterations/v2/001-original-recovery/runs/735-scene-audio-render-integration/README.md)
 compiles 428 C++ translation units across eight projects (**97 unresolved names /

@@ -1,0 +1,188 @@
+{
+  "run": 740,
+  "experiment": "local/experiments/v2-audio-stream-scdl-chunk-740",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk",
+    "iterations/v2/001-original-recovery/runs/733-audio-stream-service-tick",
+    "iterations/v2/001-original-recovery/runs/653-audio-stream-codec-release",
+    "iterations/v2/001-original-recovery/runs/641-audio-stream-codec-leaves",
+    "iterations/v2/001-original-recovery/runs/629-audio-stream-codec-create",
+    "iterations/v2/001-original-recovery/runs/565-audio-stream-codec-lifecycle",
+    "iterations/v2/001-original-recovery/runs/568-audio-greedy-transition",
+    "iterations/v2/001-original-recovery/runs/561-audio-stream-creation",
+    "iterations/v2/001-original-recovery/runs/559-audio-stream-service",
+    "iterations/v2/001-original-recovery/runs/556-application-audio-lifecycle",
+    "iterations/v2/001-original-recovery/runs/508-audio-stream-producer-lifecycle",
+    "iterations/v2/001-original-recovery/runs/505-audio-stream-buffer-delivery",
+    "iterations/v2/001-original-recovery/runs/501-audio-pcm-stream-lookup",
+    "iterations/v2/001-original-recovery/runs/493-audio-pcm-constructors",
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.hpp",
+    "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005615c0",
+      "bytes": 192,
+      "sha256": "5b2dfeb4f0724b3b69f8804223e1433fc4ba95e5c5e71a2a8a0405a2f3e02ea5",
+      "token": "@BODY_005615C0@"
+    },
+    {
+      "va": "00566b40",
+      "bytes": 508,
+      "sha256": "a7ee17baaa248714c2279073290bfb72c59b9f29c75bff12fc751c4153d5636e",
+      "token": "@BODY_00566B40@"
+    },
+    {
+      "va": "00567060",
+      "bytes": 210,
+      "sha256": "eef0cbe5d9cad364ddee312ee1dfbfa1e42c4df10ad51bac111b6ca5be862ad0",
+      "token": "@BODY_00567060@"
+    }
+  ],
+  "pass_marker": "audio_stream_scdl_chunk_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-push-inactive-ret",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -10;\n    }",
+      "new": "    if (application_audio_device_state_006b48c0[0xdcu] == 0u) {\n        return -9;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-push-full-cond",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "    if (used >= capacity - 1) {",
+      "new": "    if (used >= capacity) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-push-full-ret",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "        audio_backend_unlock_005896f0();\n        return -13;",
+      "new": "        audio_backend_unlock_005896f0();\n        return -12;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-push-sub-used-inc",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "        write_u16(used_off, static_cast<std::uint16_t>(read_u16(used_off) + 1u));",
+      "new": "        write_u16(used_off, static_cast<std::uint16_t>(read_u16(used_off) + 2u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-push-total-bytes-add",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "    write_u32(record_va + 0x20u, read_u32(record_va + 0x20u) + chunk_bytes);",
+      "new": "    write_u32(record_va + 0x20u, read_u32(record_va + 0x20u) + 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-push-wrap-cmp",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "              (next_write < capacity) ? static_cast<std::uint16_t>(next_write) : 0u);",
+      "new": "              (next_write <= capacity) ? static_cast<std::uint16_t>(next_write) : 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-deinterleave-mode3-mono-shift",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "                write_u8(data_va + 4u + static_cast<U>(i),\n                         read_u8(data_va + 8u + static_cast<U>(i)));",
+      "new": "                write_u8(data_va + 5u + static_cast<U>(i),\n                         read_u8(data_va + 8u + static_cast<U>(i)));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-deinterleave-mode3-nibble-lo",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "                write_u8(dst_addr, static_cast<B>(src << 4u));",
+      "new": "                write_u8(dst_addr, static_cast<B>(src & 0xf0u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-deinterleave-mode3-nibble-hi",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "                write_u8(dst_addr, static_cast<B>(read_u8(dst_addr) | (src >> 4u)));",
+      "new": "                write_u8(dst_addr, static_cast<B>(read_u8(dst_addr) | (src & 0xf0u)));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-deinterleave-mode2-stride",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "            write_u8(scratch_va + static_cast<U>(i),\n                     read_u8(data_va + 1u + static_cast<U>(i) * 2u));",
+      "new": "            write_u8(scratch_va + static_cast<U>(i),\n                     read_u8(data_va + static_cast<U>(i) * 2u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-deinterleave-mode0-alloc-size",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "        copy_bytes = chunk_len + chunk_len;",
+      "new": "        copy_bytes = chunk_len;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-deinterleave-alloc-flags",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "    void* const scratch = platform_virtual_alloc(nullptr, copy_bytes, 0x3000u, 4u);",
+      "new": "    void* const scratch = platform_virtual_alloc(nullptr, copy_bytes, 0x1000u, 4u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scdl-entry-stride",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "        static_cast<U>(entry_idx * 0x2c);",
+      "new": "        static_cast<U>(entry_idx * 0x28);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scdl-prev-chunk-backlink",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "    write_u32(items[3] - 4u, chunk_va);",
+      "new": "    write_u32(items[3], chunk_va);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scdl-negative-first-id",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "    if (static_cast<I>(read_u32(entry_va + 0x08u)) < 0) {",
+      "new": "    if (static_cast<I>(read_u32(entry_va + 0x08u)) <= 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scdl-return-value",
+      "source": "iterations/v2/001-original-recovery/runs/740-audio-stream-scdl-chunk/audio_stream_scdl_chunk_740.cpp",
+      "old": "    return 1;\n}",
+      "new": "    return push_res;\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

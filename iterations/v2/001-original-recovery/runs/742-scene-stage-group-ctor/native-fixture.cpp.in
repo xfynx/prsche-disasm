@@ -1,0 +1,445 @@
+// Native x86-vs-C++ differential fixture for Run742:
+//   0059f070..0059f1b8 (329B) porsche::scene_stage_group_ctor_0059f070
+//   0053f320..0053f340 (33B)  porsche::scene_pass_init_0053f320
+//   0053f600..0053f61c (29B)  porsche::scene_pass_init_alt_0053f600
+//   00537a20..00537a29 (10B)  porsche::scene_mode_set_c_00537a20
+//   00537a60..00537a69 (10B)  porsche::scene_mode_set_10_00537a60
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "porsche/render_startup.hpp"
+#include "scene_blur_stage_726.hpp"
+#include "scene_pass_children_737.hpp"
+#include "scene_stage_group_742.hpp"
+#include "scene_stage_stack_core_721.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+enum : U {
+    kEvModeCtor = 1u,
+    kEvAlloc = 2u,
+    kEvPassAppend = 3u,
+    kEvPassFinalize = 4u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+    U d;
+};
+
+enum : U { kMaxEvents = 32u };
+
+struct Snapshot {
+    U abi_fail;
+    U ret_eax;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    std::array<B, 0x4cu> group_bytes;
+    std::array<std::array<B, 0x30u>, 6> pass_bytes;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+static U g_alloc_index = 0u;
+static U g_fail_mask = 0u;
+
+static alignas(8) B g_group_buf[0x4cu];
+static alignas(8) B g_pass_bufs[6][0x30u];
+static alignas(8) B g_leaf_buf[0x30u];
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c, d};
+}
+
+namespace porsche {
+
+void* __fastcall scene_mode_ctor_005379f0(void* self, void*) {
+    // Verify [group+0x00..+0x08] were written before calling 005379f0 on group+0x0c.
+    record_event(kEvModeCtor, address(self),
+                 load32(g_group_buf, 0x00u),
+                 load32(g_group_buf, 0x04u),
+                 load32(g_group_buf, 0x08u));
+    store32(self, 0x00u, 1u);
+    store32(self, 0x04u, 2u);
+    store32(self, 0x08u, 0u);
+    store32(self, 0x0cu, 0u);
+    store32(self, 0x10u, 0u);
+    store32(self, 0x14u, 0xffffffffu);
+    return self;
+}
+
+void* __cdecl render_allocate_0059ef90(std::uint32_t size) {
+    const U idx = g_alloc_index++;
+    record_event(kEvAlloc, size, idx);
+    require(size == 0x30u && idx < 6u, "0059ef90 bound");
+    if ((g_fail_mask & (1u << idx)) != 0u) {
+        return nullptr;
+    }
+    return g_pass_bufs[idx];
+}
+
+void __fastcall scene_pass_append_0053f160(void* self, void*, void* pass) {
+    const U vtable = (pass != nullptr) ? load32(pass, 0x00u) : 0u;
+    const U kind = (pass != nullptr) ? load32(pass, 0x0cu) : 0u;
+    const U subkind = (pass != nullptr) ? load32(pass, 0x10u) : 0u;
+    record_event(kEvPassAppend, address(self), address(pass), vtable, (kind << 16u) | (subkind & 0xffffu));
+}
+
+void __fastcall scene_pass_finalize_0053f2a0(void* self, void*) {
+    record_event(kEvPassFinalize, address(self),
+                 load32(g_group_buf, 0x18u), load32(g_group_buf, 0x1cu));
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_0059f070 = nullptr;
+static B* slot_0053f320 = nullptr;
+static B* slot_0053f600 = nullptr;
+static B* slot_00537a20 = nullptr;
+static B* slot_00537a60 = nullptr;
+
+static void relocate_call_rel32(B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void init() {
+    static const B body_0059f070[] = {@BODY_0059F070@};
+    static const B body_0053f320[] = {@BODY_0053F320@};
+    static const B body_0053f600[] = {@BODY_0053F600@};
+    static const B body_00537a20[] = {@BODY_00537A20@};
+    static const B body_00537a60[] = {@BODY_00537A60@};
+    require(sizeof body_0059f070 == 329u, "329B 0059f070");
+    require(sizeof body_0053f320 == 33u, "33B 0053f320");
+    require(sizeof body_0053f600 == 29u, "29B 0053f600");
+    require(sizeof body_00537a20 == 10u, "10B 00537a20");
+    require(sizeof body_00537a60 == 10u, "10B 00537a60");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+    slot_0059f070 = code_page;
+    slot_0053f320 = code_page + 512u;
+    slot_0053f600 = code_page + 640u;
+    slot_00537a20 = code_page + 768u;
+    slot_00537a60 = code_page + 832u;
+
+    std::memcpy(slot_0059f070, body_0059f070, sizeof body_0059f070);
+    std::memcpy(slot_0053f320, body_0053f320, sizeof body_0053f320);
+    std::memcpy(slot_0053f600, body_0053f600, sizeof body_0053f600);
+    std::memcpy(slot_00537a20, body_00537a20, sizeof body_00537a20);
+    std::memcpy(slot_00537a60, body_00537a60, sizeof body_00537a60);
+
+    // Relocate all 22 CALLs inside raw 0059f070 (with raw leaf slots composed inside the oracle).
+    relocate_call_rel32(slot_0059f070, 0x0059f070u, 0x01eu, 0x005379f0u,
+                        reinterpret_cast<const void*>(&porsche::scene_mode_ctor_005379f0));
+    for (U off : {0x025u, 0x052u, 0x07fu, 0x0acu, 0x0d9u, 0x106u}) {
+        relocate_call_rel32(slot_0059f070, 0x0059f070u, off, 0x0059ef90u,
+                            reinterpret_cast<const void*>(&porsche::render_allocate_0059ef90));
+    }
+    for (U off : {0x039u, 0x066u, 0x093u, 0x0c0u, 0x0edu}) {
+        relocate_call_rel32(slot_0059f070, 0x0059f070u, off, 0x0053f320u, slot_0053f320);
+    }
+    for (U off : {0x04bu, 0x078u, 0x0a5u, 0x0d2u, 0x0ffu, 0x122u}) {
+        relocate_call_rel32(slot_0059f070, 0x0059f070u, off, 0x0053f160u,
+                            reinterpret_cast<const void*>(&porsche::scene_pass_append_0053f160));
+    }
+    relocate_call_rel32(slot_0059f070, 0x0059f070u, 0x116u, 0x0053f600u, slot_0053f600);
+    relocate_call_rel32(slot_0059f070, 0x0059f070u, 0x129u, 0x0053f2a0u,
+                        reinterpret_cast<const void*>(&porsche::scene_pass_finalize_0053f2a0));
+    relocate_call_rel32(slot_0059f070, 0x0059f070u, 0x132u, 0x00537a20u, slot_00537a20);
+    relocate_call_rel32(slot_0059f070, 0x0059f070u, 0x13bu, 0x00537a60u, slot_00537a60);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code_page, 4096u) != 0, "FlushInstructionCache");
+}
+
+static U invoke_thiscall0(void* fn, void* self_ptr, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        mov ecx, self_ptr
+        call fn
+        mov out_eax, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return fail;
+}
+
+static U invoke_thiscall1(void* fn, void* self_ptr, U arg0, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg0
+        mov ecx, self_ptr
+        call fn
+        mov out_eax, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return fail;
+}
+
+static U invoke_thiscall2(void* fn, void* self_ptr, U arg0, U arg1, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg1
+        push arg0
+        mov ecx, self_ptr
+        call fn
+        mov out_eax, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return fail;
+}
+
+static void run_leaf_set_case(void* orig_fn, void* cpp_fn, U val, B poison) {
+    std::array<B, 0x30u> exp_buf{};
+    std::array<B, 0x30u> act_buf{};
+    U exp_eax = 0u, act_eax = 0u;
+
+    std::memset(g_leaf_buf, poison, sizeof g_leaf_buf);
+    require(invoke_thiscall1(orig_fn, g_leaf_buf, val, exp_eax) == 0u, "leaf set orig abi");
+    std::memcpy(exp_buf.data(), g_leaf_buf, sizeof g_leaf_buf);
+
+    std::memset(g_leaf_buf, poison, sizeof g_leaf_buf);
+    require(invoke_thiscall1(cpp_fn, g_leaf_buf, val, act_eax) == 0u, "leaf set cpp abi");
+    std::memcpy(act_buf.data(), g_leaf_buf, sizeof g_leaf_buf);
+
+    require(act_buf == exp_buf, "leaf set buffer bytes");
+    ++cases;
+}
+
+static void run_pass_init_case(U kind, U subkind, B poison) {
+    std::array<B, 0x30u> exp_buf{};
+    std::array<B, 0x30u> act_buf{};
+    U exp_eax = 0u, act_eax = 0u;
+
+    std::memset(g_leaf_buf, poison, sizeof g_leaf_buf);
+    require(invoke_thiscall2(slot_0053f320, g_leaf_buf, kind, subkind, exp_eax) == 0u, "53f320 orig abi");
+    std::memcpy(exp_buf.data(), g_leaf_buf, sizeof g_leaf_buf);
+
+    std::memset(g_leaf_buf, poison, sizeof g_leaf_buf);
+    require(invoke_thiscall2(reinterpret_cast<void*>(&porsche::scene_pass_init_0053f320),
+                             g_leaf_buf, kind, subkind, act_eax) == 0u, "53f320 cpp abi");
+    std::memcpy(act_buf.data(), g_leaf_buf, sizeof g_leaf_buf);
+
+    require(act_eax == exp_eax && act_eax == address(g_leaf_buf), "53f320 EAX == self");
+    require(act_buf == exp_buf, "53f320 buffer bytes");
+    ++cases;
+}
+
+static void run_pass_alt_case(U subkind, B poison) {
+    std::array<B, 0x30u> exp_buf{};
+    std::array<B, 0x30u> act_buf{};
+    U exp_eax = 0u, act_eax = 0u;
+
+    std::memset(g_leaf_buf, poison, sizeof g_leaf_buf);
+    require(invoke_thiscall1(slot_0053f600, g_leaf_buf, subkind, exp_eax) == 0u, "53f600 orig abi");
+    std::memcpy(exp_buf.data(), g_leaf_buf, sizeof g_leaf_buf);
+
+    std::memset(g_leaf_buf, poison, sizeof g_leaf_buf);
+    require(invoke_thiscall1(reinterpret_cast<void*>(&porsche::scene_pass_init_alt_0053f600),
+                             g_leaf_buf, subkind, act_eax) == 0u, "53f600 cpp abi");
+    std::memcpy(act_buf.data(), g_leaf_buf, sizeof g_leaf_buf);
+
+    require(act_eax == exp_eax && act_eax == address(g_leaf_buf), "53f600 EAX == self");
+    require(act_buf == exp_buf, "53f600 buffer bytes");
+    ++cases;
+}
+
+static void reset_group(B poison, U fail_mask) {
+    g_event_count = 0u;
+    g_alloc_index = 0u;
+    g_fail_mask = fail_mask;
+    std::memset(g_events, 0, sizeof g_events);
+    std::memset(g_group_buf, poison, sizeof g_group_buf);
+    for (U i = 0u; i < 6u; ++i) {
+        std::memset(g_pass_bufs[i], static_cast<B>(poison ^ (0x11u * (i + 1u))), sizeof g_pass_bufs[i]);
+    }
+}
+
+static void capture_group(Snapshot& s) {
+    s.event_count = g_event_count;
+    for (U i = 0u; i < kMaxEvents; ++i) {
+        s.events[i] = g_events[i];
+    }
+    std::memcpy(s.group_bytes.data(), g_group_buf, sizeof g_group_buf);
+    for (U i = 0u; i < 6u; ++i) {
+        std::memcpy(s.pass_bytes[i].data(), g_pass_bufs[i], sizeof g_pass_bufs[i]);
+    }
+}
+
+static void run_group_case(U fail_mask, B poison) {
+    static Snapshot expected{};
+    static Snapshot actual{};
+
+    reset_group(poison, fail_mask);
+    expected.abi_fail = invoke_thiscall0(slot_0059f070, g_group_buf, expected.ret_eax);
+    capture_group(expected);
+
+    reset_group(poison, fail_mask);
+    actual.abi_fail = invoke_thiscall0(
+        reinterpret_cast<void*>(&porsche::scene_stage_group_ctor_0059f070),
+        g_group_buf, actual.ret_eax);
+    capture_group(actual);
+
+    require(expected.abi_fail == 0u && actual.abi_fail == 0u, "0059f070 abi");
+    require(actual.ret_eax == expected.ret_eax && actual.ret_eax == address(g_group_buf), "0059f070 EAX == self");
+    require(actual.event_count == expected.event_count, "0059f070 event count");
+    for (U i = 0u; i < expected.event_count; ++i) {
+        require(std::memcmp(&actual.events[i], &expected.events[i], sizeof(Event)) == 0,
+                "0059f070 ordered event");
+    }
+    require(actual.group_bytes == expected.group_bytes, "0059f070 group 0x4c bytes");
+    require(actual.pass_bytes == expected.pass_bytes, "0059f070 pass 6x0x30 bytes");
+    ++cases;
+}
+
+int main() {
+    init();
+
+    // 1. Isolated 10B setter leaves (00537a20, 00537a60)
+    static const U kVals[] = {0u, 1u, 0x12345678u, 0xffffffffu};
+    for (U i = 0u; i < 4u; ++i) {
+        const B poison = static_cast<B>(0x55u + i * 19u);
+        run_leaf_set_case(slot_00537a20, reinterpret_cast<void*>(&porsche::scene_mode_set_c_00537a20),
+                          kVals[i], poison);
+        run_leaf_set_case(slot_00537a60, reinterpret_cast<void*>(&porsche::scene_mode_set_10_00537a60),
+                          kVals[i], static_cast<B>(poison ^ 0x33u));
+    }
+
+    // 2. Isolated pass init leaves (0053f320, 0053f600)
+    static const U kPairs[][2] = {{1u, 7u}, {5u, 0u}, {2u, 0u}, {3u, 0u}, {7u, 0u}, {0xffffffffu, 0x12345678u}};
+    for (U i = 0u; i < 6u; ++i) {
+        const B poison = static_cast<B>(0xa3u + i * 13u);
+        run_pass_init_case(kPairs[i][0], kPairs[i][1], poison);
+        run_pass_alt_case(kPairs[i][1], static_cast<B>(poison ^ 0x5au));
+    }
+
+    // 3. Complete 0059f070 composed across all 64 allocation-failure masks (0..63) x 2 poison patterns (128 cases)
+    for (U mask = 0u; mask < 64u; ++mask) {
+        run_group_case(mask, static_cast<B>(0xa5u ^ (mask & 0xffu)));
+        run_group_case(mask, static_cast<B>(0x5au ^ ((mask * 7u) & 0xffu)));
+    }
+
+    std::printf("scene_stage_group_ctor_742_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

@@ -1,6 +1,19 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-22. [Run739](runs/739-scene-program-integration/README.md)
+Current 2026-11-22. [Run743](runs/743-audio-render-scene-integration/README.md)
+passes the shared audit (`build-002`) for frozen `740/002` (`005615c0`,
+`00566b40`, `00567060`), `741/002` (`00571630`, `005719c0`, partial), and
+`742/001` (`0059f070`, `0053f320`, `0053f600`, `00537a20`, `00537a60`): **435
+TUs / 8 projects**, **100 unresolved names / 107 references**, no game EXE.
+Three names close (`00567060`, `00571630`, `0059f070`) and two typed children
+open (`00534b90`, `00534d40`). 410 native comparisons, 37 mutations, 1,074
+source pins, 3 REA sessions (`v2-audio-740-rea/001`,
+`v2-render-input-741-rea/001`, `v2-scene-stage-group-742-rea/001`), 55B new
+`.rdata` + 8B new `.bss` (`741`). Registry **1,227** (`+10` entries;
+`004552b0` updates `0059f070` to recovered). Next shared wave awaits
+completed worker packets (`744`–`746`).
+
+Historical: [Run739](runs/739-scene-program-integration/README.md)
 passes the shared audit (`build-001`) for frozen `736/006` (`00468240`,
 `004685e0`), `737/005` (`0053f160`, `0053f230`, `0053f2a0`), and `738/001`
 (`00468440`), plus `scene_blur_stage_abi_bridge_739.cpp` bridging Run736's
