@@ -1,6 +1,39 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-20, Run714 shared audit PASS (001) for frozen 713/001 on 712.
+Current 2026-11-21. [Run730](runs/730-audio-copy-and-frame-control-integration/README.md)
+passes the shared audit (`build-002`) for `728/005`, `729/002` and `731/002` on
+the Run727 baseline: **425 TUs / 8 projects**, **97 unresolved names / 104
+references**, no game EXE. Six names close with zero new unresolved names;
+14,610 native cases and 24 mutations pass at `/Od`/`/O2`, 1,053 source pins and
+13 REA sessions pass. Registry **1,186**. `728` adds 4B readonly `005c1694`;
+`729` replaces unregistered `400-frame-loop-clusters/00412030.cpp` to consume
+Run695 `frame_control_ff_state_005e9408`; `731` adds two tree constructors
+(`00455830`, `004558b0`) with zero new data. Next wave (`732`–`734` -> `735`)
+targets remaining scene (`00455570`/`0059f070`/`00468240`/`004685e0`), audio
+and render/input frontier leaves; `00533050` still requires Run688/Run494/676/680
+slot-record reconciliation before cleanup composition.
+
+[Run727](runs/727-input-and-scene-integration/README.md)
+passes the shared audit for 725/003, 721/001 and 726/004. Build001 compiles
+423 TUs / 8 projects, 103 names / 110 refs. Registry 1182. The 004552b0
+binding is partial for the sole proved producer path. Run731 takes two tree
+constructors called by this scene reset.
+
+[Run724](runs/724-audio-slot-and-abi-integration/README.md) added two audio
+bodies and two canonical ABI bindings: 420 TUs, 100 names / 107 references.
+Run728 traces the reachable audio copier 0058e310. Run729 reconciles the three
+Run400 force-feedback reads with the single Run695 state allocation. The next
+input cleanup provider 00533050 scans the same 32 effect records that Run688
+writes. Run494/676/680 currently use a separate packed view of offsets 80/88/8c;
+reconcile every compiled consumer with the Run688 record storage and compare
+interleaved create/release before accepting cleanup composition.
+
+[Run720](runs/720-scene-audio-integration/README.md) accepted 715 through 719:
+six entries, 419 TUs, 103 names / 110 refs. Run715 stays partial for initial
+counts 1..4. Run716 restores ECX on all five exits. Run721 independently proved
+the 004552b0 core with four explicit stack bytes and both following scene calls.
+
+Previous 2026-11-20, Run714 shared audit PASS (001) for frozen 713/001 on 712.
 Build001 compiles414TUs/8projects;104names111refs,noEXE. One close; child
 00599610 opens. Registry1167 adds one full body205B; README714 owns commands/
 bounds: 120nativecases,10mutations,1024pins. Next: 00599610 + evidence-excluded

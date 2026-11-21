@@ -1,0 +1,131 @@
+{
+  "run": 716,
+  "experiment": "local/experiments/v2-scene-stage-reset-ecx-tag-716",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "0043ed00",
+      "bytes": 148,
+      "sha256": "f78eba8b57ba84c1ca666d4e06fce47994c6694ddf5c192e45323d22bb368c12",
+      "token": "@BODY_0043ED00@"
+    },
+    {
+      "va": "00455f60",
+      "bytes": 130,
+      "sha256": "4a978625782cf688970b66e838d1cd78f4bef97fe29d471b4bca010c05e83918",
+      "token": "@BODY_00455F60@"
+    }
+  ],
+  "pass_marker": "scene_stage_reset_ecx_tag_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-43ed00-alloc-size",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "void* holder = render_allocate_0059ef90(0x0cu);\n    if (holder == nullptr) {\n        scene_stage_root_006115c0 = nullptr;",
+      "new": "void* holder = render_allocate_0059ef90(0x8u);\n    if (holder == nullptr) {\n        scene_stage_root_006115c0 = nullptr;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-43ed00-tag-shift",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "const std::uint8_t tag = static_cast<std::uint8_t>(entry_ecx >> 24);\n\n    void* holder = render_allocate_0059ef90(0x0cu);",
+      "new": "const std::uint8_t tag = static_cast<std::uint8_t>(entry_ecx >> 16);\n\n    void* holder = render_allocate_0059ef90(0x0cu);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-43ed00-global",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "scene_stage_root_006115c0 = holder;",
+      "new": "scene_stage_root_006115c0 = node;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-43ed00-drop-leave",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "heap_leave_005322c0(load_dword(list_slot, 0u));",
+      "new": "(void)0;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-43ed00-wrong-newhead",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "application_context_new_head_0059eeb0(2u, 0u);",
+      "new": "application_context_new_head_0059eeb0(3u, 0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-43ed00-drop-pop",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "store_dword(free_slot, 0u, next);",
+      "new": "(void)0;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-43ed00-node-self",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "store_dword(node, 8u, node);",
+      "new": "store_dword(node, 8u, nullptr);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-55f60-first-alloc",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "void* root = render_allocate_0059ef90(4u);",
+      "new": "void* root = render_allocate_0059ef90(8u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-55f60-global",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "store_dword(root, 0u, holder);\n    scene_stage_root_00627dfc = root;",
+      "new": "store_dword(root, 0u, holder);\n    scene_stage_root_00627dfc = holder;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-55f60-member-size",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "application_context_member_storage_004211d0(0x18u, 0u)",
+      "new": "application_context_member_storage_004211d0(0x10u, 0u)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-55f60-tag-shift",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "const std::uint8_t tag = static_cast<std::uint8_t>(entry_ecx >> 24);\n\n    void* root = render_allocate_0059ef90(4u);",
+      "new": "const std::uint8_t tag = static_cast<std::uint8_t>(entry_ecx >> 16);\n\n    void* root = render_allocate_0059ef90(4u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-55f60-drop-member-init",
+      "source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+      "old": "store_dword(member, 4u, std::uint32_t{0u});",
+      "new": "(void)0;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

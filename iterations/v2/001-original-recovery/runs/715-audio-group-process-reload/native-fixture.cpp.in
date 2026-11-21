@@ -1,0 +1,363 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+
+#include "audio_group_process_reload_715.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+enum : U { kMaxIter = 8u, kMaxEvents = 256u, kRecord = 0xc0u };
+
+enum EventKind : U {
+    kEvStep = 1u, kEvSlot = 2u, kEvCfg = 3u, kEvCfgB = 4u,
+    kEvErase = 5u, kEvPost = 6u
+};
+
+struct Event {
+    U kind;
+    U a, b, c, d, e, f;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret;
+    U event_count;
+    Event events[kMaxEvents];
+};
+
+struct Scenario {
+    B count;
+    U offsets[8];
+    U key;
+    U at58, at5c, at60;
+    U word56;
+    B byte13;
+    U step_ret[8];
+    U step_out[8];
+    B count_seq[8];
+    U cfg_ret[8];
+    U erase_ret[8];
+    B ctx[16];
+    B scratch[16];
+    U nsteps;
+};
+
+static B* code = nullptr;
+static B* slot_599610 = nullptr;
+
+static Trace trace{};
+static Trace expected{};
+static Scenario scenario{};
+static U cases = 0u;
+static U which = 0u;
+static U step_index = 0u;
+static U slot_index = 0u;
+static U cfg_index = 0u;
+static U erase_index = 0u;
+static B record[kRecord];
+static B ctx[16];
+static B scratch[16];
+static B slot_mem[16];
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", msg, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static U fingerprint(const void* p, U n) {
+    U h = 0x811c9dc5u;
+    const B* b = static_cast<const B*>(p);
+    for (U i = 0u; i < n; ++i) {
+        h = (h ^ b[i]) * 0x01000193u;
+    }
+    return h;
+}
+
+static void push_event(U kind, U a, U b, U c, U d, U e, U f) {
+    require(trace.event_count < kMaxEvents, "event overflow");
+    Event& ev = trace.events[trace.event_count++];
+    ev.kind = kind;
+    ev.a = a;
+    ev.b = b;
+    ev.c = c;
+    ev.d = d;
+    ev.e = e;
+    ev.f = f;
+}
+
+static U invoke_cdecl3(void* fn, U arg0, U arg1, U arg2, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg2
+        push arg1
+        push arg0
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 12
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return out;
+}
+
+namespace porsche {
+
+std::uint32_t __cdecl audio_group_step_0058a970(std::uint32_t* out,
+                                                 const void* rec) {
+    const U i = step_index++;
+    require(i < kMaxIter, "step index");
+    const U before = *out;
+    push_event(kEvStep, i, before, address(rec), scenario.step_out[i],
+               static_cast<U>(scenario.count_seq[i]), scenario.step_ret[i]);
+    *out = scenario.step_out[i];
+    B* r = const_cast<B*>(static_cast<const B*>(rec));
+    r[3u] = scenario.count_seq[i];
+    return scenario.step_ret[i];
+}
+
+void* __cdecl audio_group_slot_0058f7a0(std::uint32_t key) {
+    const U i = slot_index++;
+    require(i < kMaxEvents, "slot index");
+    push_event(kEvSlot, i, key, address(slot_mem), 0u, 0u, 0u);
+    return slot_mem;
+}
+
+std::uint32_t __cdecl audio_group_configure_0058f220(std::uint32_t byte13,
+    std::uint32_t word56, std::uint32_t at58, std::uint32_t at5c,
+    std::uint32_t at60, std::uint32_t pointer0) {
+    const U i = cfg_index++;
+    require(i < kMaxIter, "configure index");
+    const U before = rd(slot_mem, 4u);
+    push_event(kEvCfg, i, byte13, word56, at58, at5c, at60);
+    push_event(kEvCfgB, i, pointer0, before, scenario.cfg_ret[i], 0u, 0u);
+    return scenario.cfg_ret[i];
+}
+
+std::uint32_t __cdecl audio_resource_erase_0058f7e0(std::uint32_t key) {
+    const U i = erase_index++;
+    require(i < kMaxIter, "erase index");
+    push_event(kEvErase, i, key, scenario.erase_ret[i], 0u, 0u, 0u);
+    return scenario.erase_ret[i];
+}
+
+} // namespace porsche
+
+static void relocate_rel(B* p, U n, U va_base, U target_va, U replacement,
+                         U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= n; ++i) {
+        if (p[i] == 0xe8u && (va_base + i + 5u + rd(p, i + 1u)) == target_va) {
+            wr(p, i + 1u, replacement - (address(p) + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "rel relocation count");
+}
+
+static void init_fixture() {
+    static const B body_599610[182] = {@BODY_00599610@};
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+    slot_599610 = code + 0x000u;
+    std::memcpy(slot_599610, body_599610, 182u);
+
+    relocate_rel(slot_599610, 182u, 0x00599610u, 0x0058a970u,
+                 address(reinterpret_cast<const void*>(
+                     &porsche::audio_group_step_0058a970)), 2u);
+    relocate_rel(slot_599610, 182u, 0x00599610u, 0x0058f7a0u,
+                 address(reinterpret_cast<const void*>(
+                     &porsche::audio_group_slot_0058f7a0)), 1u);
+    relocate_rel(slot_599610, 182u, 0x00599610u, 0x0058f220u,
+                 address(reinterpret_cast<const void*>(
+                     &porsche::audio_group_configure_0058f220)), 1u);
+    relocate_rel(slot_599610, 182u, 0x00599610u, 0x0058f7e0u,
+                 address(reinterpret_cast<const void*>(
+                     &porsche::audio_resource_erase_0058f7e0)), 1u);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0,
+            "FlushInstructionCache");
+}
+
+static void reset_side() {
+    step_index = 0u;
+    slot_index = 0u;
+    cfg_index = 0u;
+    erase_index = 0u;
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(slot_mem, 0xccu, sizeof slot_mem);
+
+    for (U i = 0u; i < kRecord; ++i) {
+        record[i] = static_cast<B>(0x40u + ((i * 7u + cases * 3u) & 0xffu));
+    }
+    record[3u] = scenario.count;
+    record[2u] = static_cast<B>(scenario.count + 0x31u);
+    for (U k = 0u; k < 8u; ++k) {
+        wr(record, 0x68u + k * 4u, scenario.offsets[k]);
+    }
+    wr(record, 0xa0u, scenario.key);
+    wr(record, 0x58u, scenario.at58);
+    wr(record, 0x5cu, scenario.at5c);
+    wr(record, 0x60u, scenario.at60);
+    wr(record, 0x54u, scenario.at58 + 0x1000u);
+    wr(record, 0x56u, scenario.word56);
+    record[0x13u] = scenario.byte13;
+    record[0x14u] = static_cast<B>(scenario.byte13 + 0x51u);
+    std::memcpy(ctx, scenario.ctx, sizeof ctx);
+    std::memcpy(scratch, scenario.scratch, sizeof scratch);
+}
+
+static void finish_trace() {
+    push_event(kEvPost, fingerprint(record, kRecord),
+               fingerprint(slot_mem, sizeof slot_mem),
+               fingerprint(ctx, sizeof ctx),
+               fingerprint(scratch, sizeof scratch),
+               step_index, erase_index);
+}
+
+static void assert_traces_match() {
+    require(expected.abi_fail == 0u, "original abi fail");
+    require(trace.abi_fail == 0u, "cpp abi fail");
+    require(trace.ret == expected.ret, "return value");
+    require(trace.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < trace.event_count; ++i) {
+        require(trace.events[i].kind == expected.events[i].kind, "event kind");
+        require(trace.events[i].a == expected.events[i].a, "event a");
+        require(trace.events[i].b == expected.events[i].b, "event b");
+        require(trace.events[i].c == expected.events[i].c, "event c");
+        require(trace.events[i].d == expected.events[i].d, "event d");
+        require(trace.events[i].e == expected.events[i].e, "event e");
+        require(trace.events[i].f == expected.events[i].f, "event f");
+    }
+}
+
+static void run_case(U id, B count, U mode, U count_seq_mode, U ctx_mode,
+                     U early) {
+    ++cases;
+    std::memset(&scenario, 0, sizeof scenario);
+    scenario.count = count;
+    scenario.nsteps = 2u + (mode % 3u);
+    for (U k = 0u; k < 8u; ++k) {
+        scenario.offsets[k] = 0x10u * (id + 1u) + k * 7u;
+        scenario.step_out[k] = 0x5000u + id * 13u + k * 7u;
+        scenario.step_ret[k] = (early != 0u)
+            ? 0u
+            : ((k + 1u < scenario.nsteps)
+                ? (((mode & 1u) != 0u) ? 3u : 2u) : 0u);
+        scenario.count_seq[k] = (count_seq_mode == 0u)
+            ? 1u : static_cast<B>(2u + (k % 2u));
+        scenario.cfg_ret[k] = (mode >= 2u) ? 0u : (0x10u + id + k);
+        scenario.erase_ret[k] = 0x20u + id + k;
+    }
+    scenario.key = 0x3000u + id * 11u;
+    scenario.at58 = 0x10000000u + id * 5u;
+    scenario.at5c = 0x20000000u + id * 7u;
+    scenario.at60 = 0x30000000u + id * 9u;
+    scenario.word56 = ((id & 8u) != 0u) ? 0x8003u : 0x0003u;
+    scenario.byte13 = static_cast<B>(0x80u + (id & 0x0fu));
+    for (U k = 0u; k < 16u; ++k) {
+        scenario.ctx[k] = static_cast<B>(0x30u + ctx_mode * 0x40u + id + k);
+        scenario.scratch[k] = static_cast<B>(0x70u + id * 3u + k);
+    }
+
+    void* const cpp_fn = reinterpret_cast<void*>(
+        &porsche::audio_group_process_reload_00599610);
+    for (U side = 0u; side < 2u; ++side) {
+        which = side;
+        reset_side();
+        void* const fn = (side == 0u) ? slot_599610 : cpp_fn;
+        trace.ret = invoke_cdecl3(fn, address(record), address(ctx),
+                                  address(scratch), trace.abi_fail);
+        finish_trace();
+        if (side == 0u) {
+            expected = trace;
+        }
+    }
+    assert_traces_match();
+}
+
+int main() {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    init_fixture();
+
+    U id = 0u;
+    for (B count : {static_cast<B>(1u), static_cast<B>(2u),
+                    static_cast<B>(3u), static_cast<B>(4u)}) {
+        for (U mode = 0u; mode < 4u; ++mode) {
+            for (U count_seq_mode = 0u; count_seq_mode < 2u; ++count_seq_mode) {
+                for (U ctx_mode = 0u; ctx_mode < 2u; ++ctx_mode) {
+                    for (U early = 0u; early < 2u; ++early) {
+                        run_case(id++, count, mode, count_seq_mode, ctx_mode,
+                                 early);
+                    }
+                }
+            }
+        }
+    }
+    std::printf("audio_group_process_reload_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

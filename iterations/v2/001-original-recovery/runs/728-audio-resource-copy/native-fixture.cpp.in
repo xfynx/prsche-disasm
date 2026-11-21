@@ -1,0 +1,129 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "audio_coded_constructors_504.hpp"
+#include "audio_resource_copy_728.hpp"
+#include "audio_resampler_kernel_553.hpp"
+#include "porsche/exit_registry.hpp"
+#include "network_callback_lifecycle_485.hpp"
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U read(U p){U x;std::memcpy(&x,reinterpret_cast<void*>(p),4);return x;}
+static void write(U p,U x){std::memcpy(reinterpret_cast<void*>(p),&x,4);}
+static void require(bool ok,const char* why){if(!ok){std::printf("divergence %s\n",why);std::fflush(stdout);ExitProcess(1);}}
+namespace porsche {
+// Dead dependencies of unchanged accepted owners are not fixture substitutes
+// for any production function exercised by this packet.
+void* __stdcall platform_create_thread(void*,U,ThreadBootstrap,void*,U,U*){ExitProcess(90);}
+U __stdcall platform_thread_priority(void*,I){ExitProcess(90);}
+void __stdcall audio_platform_sleep_455(U){ExitProcess(90);}
+void __cdecl audio_thread_mix_0058f8e0(){ExitProcess(90);}
+void __cdecl exit_registry_lock_api_005a4ba4(U){ExitProcess(90);}
+void __cdecl exit_registry_unlock_api_005a4c05(U){ExitProcess(90);}
+U __cdecl exit_registry_allocation_size_005a8161(const void*){ExitProcess(90);}
+void* __cdecl exit_registry_reallocate_005a8029(void*,U){ExitProcess(90);}
+void* __cdecl exit_registry_malloc_005a3be5(U){ExitProcess(90);}
+void __cdecl exit_registry_fatal_005a2e22(U){ExitProcess(90);}
+I __cdecl application_audio_probe_measure_00565890(){ExitProcess(90);}
+I __cdecl audio_device_initialize_ds_0058ebe0(){ExitProcess(90);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(90);}
+void __stdcall platform_initialize_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_delete_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_enter_critical_section(void*){ExitProcess(90);}
+void __stdcall platform_leave_critical_section(void*){ExitProcess(90);}
+U __cdecl audio_backend_cpu_features_00597070(){ExitProcess(90);}
+}
+extern "C" I __stdcall DirectSoundCreate(const void*,U*,void*){ExitProcess(90);}
+#pragma comment(linker,"/alternatename:_GetForegroundWindow@0=_unused_foreground_466@0")
+#pragma comment(linker,"/alternatename:_GetDesktopWindow@0=_unused_desktop_466@0")
+extern "C" void* __stdcall unused_foreground_466(){ExitProcess(90);}
+extern "C" void* __stdcall unused_desktop_466(){ExitProcess(90);}
+
+
+namespace porsche { void __stdcall render_display_draw_quad_006bd9a8(const void*,const void*,const void*,const void*){ExitProcess(90);} }
+
+namespace porsche {
+void __cdecl audio_stream_metric_00597360(U,U){ExitProcess(90);}
+void __cdecl audio_stream_coefficients_00597180(U,I,U,U){ExitProcess(90);}
+I __cdecl audio_resampler_rand_005a17c9(){ExitProcess(90);}
+void __cdecl network_callbacks_stop_00560380(){ExitProcess(90);}
+void __cdecl io_init_00580630(IoList*,U(__cdecl*)(IoNode*,U),U){ExitProcess(90);}
+void __cdecl thread_exit_register_00557380(void(__cdecl*)()){ExitProcess(90);}
+}
+static B pool[22000],out[512],before[512];static U events[16],ne,which,cases;static B* slab;static U allocp,freep;
+static U rd(const void* p){U v;memcpy(&v,p,4);return v;}static void wr(void* p,U v){memcpy(p,&v,4);}
+static const U values[]={0xc7800000,0xc7000100,0xc7000000,0xc6ffffff,0xbf900000,0x3f900000,0x46fffd00,0x46fffe00,0x46ffff00,0x47800000,0x7fc00000,0x7f800000,0xff800000};
+namespace porsche {
+void* __stdcall platform_virtual_alloc(void* p,U n,U flags,U protection){events[ne++]=ptr(p);events[ne++]=n;events[ne++]=flags;events[ne++]=protection;memset(pool,0,sizeof(pool));return pool;}
+U __stdcall platform_virtual_free(void* p,U n,U flags){events[ne++]=ptr(p)-ptr(pool);events[ne++]=n;events[ne++]=flags;return which&1;}
+static I process(U o,U n,U i,U d,U f){events[ne++]=n;events[ne++]=i;events[ne++]=d-ptr(pool);events[ne++]=f;events[ne++]=rd(reinterpret_cast<void*>(o+0x24));for(U j=0;j<n;++j)wr(reinterpret_cast<void*>(d+j*4),values[j%13]);return -21;}
+I __cdecl audio_nibble_process_00597c40(U o,U n,U i,U d,U f){return process(o,n,i,d,f);}
+I __cdecl audio_adpcm_process_00597e30(U o,U n,U i,U d,U f){events[ne++]=0xad;for(U j=0;j<n;++j)wr(reinterpret_cast<void*>(d+j*4),values[j%13]);return -22;}
+#define DEAD(NAME) I __cdecl NAME(U,U,U,U,U){ExitProcess(90);}
+DEAD(audio_adpcm_stream_process_0059c1e0)
+DEAD(audio_nibble_loop_process_0059c890)
+DEAD(audio_nibble_stream_process_0059c3c0)
+DEAD(audio_resampler_stream_process_0059b690)
+#undef DEAD
+void __cdecl audio_nibble_decode_x87_0059a5a0(U){ExitProcess(90);}
+void __cdecl audio_nibble_decode_sse_0059a660(U){ExitProcess(91);}
+void __cdecl audio_nibble_decode_3dnow_0059a730(U){ExitProcess(92);}
+void __cdecl audio_mixer_accumulate_3dnow_0059bc40(U,U,U,U){ExitProcess(90);}
+void __cdecl audio_mixer_decode_s16_3dnow_0059bb90(U,U,U){ExitProcess(90);}
+}
+static U invoke(void* fn,const U* args,U argc,U& result){U saved_sp,saved_frame,fail=0,value;__asm {
+    push ebx
+    push esi
+    push edi
+    mov saved_sp,esp
+    mov saved_frame,ebp
+    mov ecx,argc
+    mov eax,args
+push_args:dec ecx
+    push dword ptr [eax+ecx*4]
+    test ecx,ecx
+    jne push_args
+    mov ebx,13579bdfh
+    mov esi,2468ace0h
+    mov edi,10203040h
+    call fn
+    mov value,eax
+    mov eax,argc
+    lea esp,[esp+eax*4]
+    cmp esp,saved_sp
+    jne bad
+    cmp ebp,saved_frame
+    jne bad
+    cmp ebx,13579bdfh
+    jne bad
+    cmp esi,2468ace0h
+    jne bad
+    cmp edi,10203040h
+    je done
+bad:mov fail,1
+done:mov esp,saved_sp
+    pop edi
+    pop esi
+    pop ebx
+    }result=value;return fail;}
+
+static void absolute(U old,const void* target){U matches=0;for(U j=0;j+4<=399;++j)if(rd(slab+j)==old){wr(slab+j,ptr(target));++matches;}require(matches==1,"absolute identity");}
+static void relative(U offset,U old,const void* target){require(slab[offset]==0xe8&&0x58e310+offset+5+rd(slab+offset+1)==old,"relative identity");wr(slab+offset+1,ptr(target)-ptr(slab+offset+5));}
+int main(){
+require(application_audio_device_state_006b48c0[0xe3]==0,"production state initial");require(audio_copy_min_005c1694==0xc7000000&&audio_resampler_scalar_005c1698==0x46fffe00,"raw scalar values");
+slab=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));const B body[]={@BODY@};memcpy(slab,body,399);
+allocp=ptr(reinterpret_cast<void*>(&platform_virtual_alloc));freep=ptr(reinterpret_cast<void*>(&platform_virtual_free));
+absolute(0x5b2144,&allocp);absolute(0x5b2148,&freep);absolute(0x6b49a3,application_audio_device_state_006b48c0.data()+0xe3);absolute(0x5c1698,&audio_resampler_scalar_005c1698);absolute(0x5c1694,&audio_copy_min_005c1694);
+relative(0x7a,0x597f20,reinterpret_cast<void*>(&audio_mixer_construct_adpcm_00597f20));relative(0xa3,0x597dc0,reinterpret_cast<void*>(&audio_mixer_construct_nibble_00597dc0));relative(0xd5,0x597c10,reinterpret_cast<void*>(&audio_mixer_construct_pcm_00597c10));relative(0x14f,0x5a0f98,reinterpret_cast<void*>(&audio_stream_ftol_005a0f98));
+audio_mixer_decode_s16_006b17d8=ptr(reinterpret_cast<void*>(&audio_mixer_decode_s16_x87_0059b9f0));for(U j=0;j<256;++j)audio_mixer_pcm8_lookup_006b00c0[j]=static_cast<float>((static_cast<I>(j)-128)*256);
+static B source[512];for(U j=0;j<512;++j)source[j]=static_cast<B>(j*37+11);source[0]=0x20;source[1]=0;source[2]=0;
+for(I format:{-1,0,2,3,4,8,9,10,11})for(U count:{1u,2u,4u,13u,21u})for(I crop:{0,1,2,3})for(I bits:{-1,0,8,16})for(U flags:{0u,2u,4u,255u}){
+ U n=count;I start=crop==1?1:0,end=crop==1?static_cast<I>(count)-1:crop==2?static_cast<I>(count):crop==3?-1:0; if(count==1&&crop==1)start=0;
+ U args[]={ptr(source),static_cast<U>(format),static_cast<U>(start),static_cast<U>(end),n,ptr(out),static_cast<U>(bits)},saved[16]={},ns=0;
+ for(which=0;which<2;++which){application_audio_device_state_006b48c0[0xe3]=static_cast<B>(flags);memset(out,0xa5,sizeof(out));memset(events,0,sizeof(events));ne=0;U result;require(invoke(which?reinterpret_cast<void*>(&audio_resource_copy_0058e310):slab,args,7,result)==0&&result==0,"cdecl result/ABI");if(!which){memcpy(before,out,sizeof(out));memcpy(saved,events,sizeof(events));ns=ne;}else{require(ne==ns&&memcmp(saved,events,sizeof(events))==0,"events");require(memcmp(before,out,sizeof(out))==0,"output");}}
+ ++cases;
+}
+printf("audio_resource_copy=PASS cases=%u\n",cases);return 0;
+}

@@ -1,0 +1,110 @@
+{
+  "run": 729,
+  "experiment": "local/experiments/v2-frame-control-state-consumer-729",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/frame_control_state_729.cpp",
+    "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize/ff_effect_initialize_695.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00412030",
+      "bytes": 91,
+      "sha256": "81a61b69caf99905a9e0e7d881f9e24324b8ac7535da90bb1c152815e6344e7d",
+      "raw_hex": "a10c945e0085c07451a110945e000fbf0cc524945e0051e8841812008b1510945e000fbf04d522945e0050e8701812008b0d10945e000fbf14cd20945e0052e85c181200a110945e000fbf0cc526945e0051e84918120083c410c3",
+      "assembly": [
+        "00412030 mov eax, dword ptr [0x5e940c]",
+        "00412035 test eax, eax",
+        "00412037 je 0x41208a",
+        "00412039 mov eax, dword ptr [0x5e9410]",
+        "0041203e movsx ecx, word ptr [eax*8 + 0x5e9424]",
+        "00412046 push ecx",
+        "00412047 call 0x5338d0",
+        "0041204c mov edx, dword ptr [0x5e9410]",
+        "00412052 movsx eax, word ptr [edx*8 + 0x5e9422]",
+        "0041205a push eax",
+        "0041205b call 0x5338d0",
+        "00412060 mov ecx, dword ptr [0x5e9410]",
+        "00412066 movsx edx, word ptr [ecx*8 + 0x5e9420]",
+        "0041206e push edx",
+        "0041206f call 0x5338d0",
+        "00412074 mov eax, dword ptr [0x5e9410]",
+        "00412079 movsx ecx, word ptr [eax*8 + 0x5e9426]",
+        "00412081 push ecx",
+        "00412082 call 0x5338d0",
+        "00412087 add esp, 0x10",
+        "0041208a ret "
+      ],
+      "token": "@BODY_00412030@"
+    }
+  ],
+  "pass_marker": "frame_control_00412030_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "gate",
+      "source": "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/frame_control_state_729.cpp",
+      "old": "if (read_u32(frame_control_ff_state_005e9408 + 0x04u) == 0u) {",
+      "new": "if (read_u32(frame_control_ff_state_005e9408 + 0x04u) != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "index",
+      "source": "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/frame_control_state_729.cpp",
+      "old": "const std::uint32_t index = read_u32(state + 0x08u);",
+      "new": "const std::uint32_t index = 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "row-base",
+      "source": "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/frame_control_state_729.cpp",
+      "old": "const std::size_t row_offset = 0x18u + static_cast<std::size_t>(index) * 8u;",
+      "new": "const std::size_t row_offset = 0x18u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "field-offset",
+      "source": "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/frame_control_state_729.cpp",
+      "old": "release_from_current_row(0x04u);",
+      "new": "release_from_current_row(0x02u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "call-order",
+      "source": "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/frame_control_state_729.cpp",
+      "old": "release_from_current_row(0x04u);\n    release_from_current_row(0x02u);",
+      "new": "release_from_current_row(0x02u);\n    release_from_current_row(0x04u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "signed-word",
+      "source": "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/frame_control_state_729.cpp",
+      "old": "const std::int16_t slot = read_i16(state + row_offset + field_offset);",
+      "new": "const std::int32_t slot = static_cast<std::uint16_t>(read_i16(state + row_offset + field_offset));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "drop-fourth",
+      "source": "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/frame_control_state_729.cpp",
+      "old": "release_from_current_row(0x06u);",
+      "new": "/* omitted fourth release */;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ],
+  "timeout_seconds": 240
+}

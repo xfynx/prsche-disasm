@@ -1,5 +1,24 @@
 # Отложенные проверки восстановления v2
 
+Run730 integrates 728/005 (`0058e310`, 4B readonly `005c1694`), 729/002
+(replaces unregistered `400/00412030.cpp` with canonical Run695 consumer) and
+731/002 (`00455830`, `004558b0` tree constructors) into 425 TUs / 97 names /
+104 refs (`14,610` comparisons, 24 mutations, 1,053 pins, 13 REA sessions;
+registry 1,186). Coded-child `728` process composition, `729` rows outside
+`0..31`, `731` non-alias/fault/live-heap behavior, live DirectSound and full
+startup remain open.
+
+Run727 connects 004552b0 for its sole proved 00468fb0 call path. Constructor
+interiors, opaque bytes for other entry stacks and live device teardown remain
+open. Run729 owns the separate Run400/695 force-feedback state reconciliation.
+
+Run720 accepts the two scene resets for arbitrary controlled incoming ECX.
+Prove their real predecessor 004552b0, including four incoming stack bytes.
+Run715 covers initial counts 1..4. Oversized and uninitialized pointer-table
+entries, invalid allocation results, faults and live audio remain open. The
+audio children 0058f5b0 and 0058e500 joined the build in Run724. Their
+remaining copier is 0058e310. Run723 binds only the scene caller that discards EAX.
+
 Run714 integrates713 (1 body205B,120cases,10mutations,1024pins,414TUs;
 104names111refs,noEXE). 00590a80 closes; 00599610 opens. Excluded packets
 remain: 0043ed00/00448b10/0044f240/00451490/004552b0/00455f60/00463c30/

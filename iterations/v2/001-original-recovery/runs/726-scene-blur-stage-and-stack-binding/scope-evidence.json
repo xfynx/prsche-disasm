@@ -1,0 +1,52 @@
+{
+    "run":  726,
+    "status":  "native/provenance/ownership/COFF PASS004; shared integration pending",
+    "module_sha256":  "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+    "scope":  "actual00468fb0 -\u003e00451490 -\u003e004552b0 -\u003e716; original last-write stack provenance and scoped production4552 binding",
+    "bodies":  [
+                   {
+                       "va":  "00451490",
+                       "bytes":  279,
+                       "sha256":  "f881806e794286ee078fbb542f54d9301253454d8ed58795c14fe67460fc5522"
+                   },
+                   {
+                       "va":  "005379f0",
+                       "bytes":  34,
+                       "sha256":  "67514aeef0e0c62ef6b00a173fd1ec08b2ceed815c25768d9fcc92bda9a6a2af"
+                   },
+                   {
+                       "va":  "00537a50",
+                       "bytes":  10,
+                       "sha256":  "b35caac991eb0d06657c3fbba49c85de5f83e8cf4de0b07b70fa4b90cb5770fd"
+                   }
+               ],
+    "last_write_trace":  {
+                             "same_entry_esp":  "E: original0046906f calls451490;00469074 calls4552b0, with no callerESP change in between.",
+                             "producer":  "451490 SUB ESP8 -\u003eE-8. PUSH BLUR -\u003eE-12;PUSH0 -\u003eE-16;CALL44d320 -\u003eE-20. Lookup SUB ESP10 -\u003eE-36;PUSHESI -\u003eE-40;MOV[ESP+4],EAX at44d32a writes key0=0 atE-36..E-33, exactly4552 four opaque bytes E-0x24..E-0x21.",
+                             "last_child":  "44b830 makes no calls. It reads key_pair at E-36, writes distinct out-pointer targetE-16 and its own deeper stack. No write to the key image. Both lookup exits make no further calls/writes toE-36;451490 only stores query EAX result to61bcb8, adjustsESP8 andRET.",
+                             "lifetime_in4552":  "4552 SUB24 allocates same fourbytes; subsequent pushes/calls lie below its locals. Original allocators do not receive a pointer to this region. Ctors get byte pointers and original455830/4558b0 only read their first byte. Thus both original tags=0 for sole proved production call path.",
+                             "conditions":  "normal valid disjoint call-stack and heap/tree memory; no signals or out-of-bounds hostile child writes. This is not a claim that standalone arbitrary-stack4552 initializes its locals."
+                         },
+    "caller_check":  "v2 disassembly CALL0x004552b0 only00469074; no alternate direct caller or code relocation/function-table pointer found; compiled parent ordering checked against a714 COFF from716review.",
+    "canonical_owners":  [
+                             "00613e04 startup_context_table_owner_00613e04 Run649",
+                             "00606ac4 startup_sequence_word_00606ac4 source/recovered/Porsche.exe/startup_sequence.cpp",
+                             "0044d320/0044b830 Run646",
+                             "4552 explicit-input core Run721",
+                             "43ed00/455f60 Run716"
+                         ],
+    "new_storage_candidates":  [
+                                   "61bc78..61bc97:32B matrix",
+                                   "61bcac:4B pointer to canonical606ac4",
+                                   "61bcb0:4B pointer",
+                                   "61bcb4:4B pointer",
+                                   "61bcb8:4B pointer"
+                               ],
+    "children":  [
+                     "468240 thiscallRET20 ctor fiveDWORD args -\u003epointer used",
+                     "4685e0 thiscallRET24 sixDWORD args, called even when ctor resultnull",
+                     "5379f0 thiscallRET0 ctor24B -\u003eself used",
+                     "537a50 thiscallRET4 storeDWORDatself+8, input1 fromparent"
+                 ],
+    "boundaries":  "Real468240/4685e0 remain downstream frontiers. No broad allocation/null fault acceptance. Root/global lifetime and current source/COFF binding need native proof."
+}

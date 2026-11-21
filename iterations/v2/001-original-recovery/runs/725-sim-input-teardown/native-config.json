@@ -1,0 +1,174 @@
+{
+  "run": 725,
+  "experiment": "local/experiments/v2-sim-input-teardown-725",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves/startup_input_slot_math_676.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/725-sim-input-teardown",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00412cd0",
+      "bytes": 22,
+      "sha256": "c7c72fea69e19cc98a8de365322e9c5996ab912771665359a2a051806161e95b",
+      "raw_hex": "a10c945e0085c0740ca110945e0050e89c07120059c3",
+      "assembly": [
+        "00412cd0 mov eax, dword ptr [0x5e940c]",
+        "00412cd5 test eax, eax",
+        "00412cd7 je 0x412ce5",
+        "00412cd9 mov eax, dword ptr [0x5e9410]",
+        "00412cde push eax",
+        "00412cdf call 0x533480",
+        "00412ce4 pop ecx",
+        "00412ce5 ret "
+      ],
+      "token": "@BODY_00412cd0@"
+    },
+    {
+      "va": "00412e60",
+      "bytes": 5,
+      "sha256": "8eb025d841a7a2a7102a25bfb7b9c938bd24067f3c0c74f6ac60822d6ea1a707",
+      "raw_hex": "e9cbfe1100",
+      "assembly": [
+        "00412e60 jmp 0x532d30"
+      ],
+      "token": "@BODY_00412e60@"
+    },
+    {
+      "va": "00532d30",
+      "bytes": 93,
+      "sha256": "a3e4352be05b7ac671779404f7f2cd726ce0b2d853c50d70d18c10c2cd7a30ff",
+      "raw_hex": "57e81a030000a10ccb690033ff85c07e3156be40e06b008b0685c074148b0850ff51208b06508b10ff5208c70600000000a10ccb69004781c60c0100003bf87cd65ea108cb69005f85c074108b0850ff5108c70508cb690000000000c3",
+      "assembly": [
+        "00532d30 push edi",
+        "00532d31 call 0x533050",
+        "00532d36 mov eax, dword ptr [0x69cb0c]",
+        "00532d3b xor edi, edi",
+        "00532d3d test eax, eax",
+        "00532d3f jle 0x532d72",
+        "00532d41 push esi",
+        "00532d42 mov esi, 0x6be040",
+        "00532d47 mov eax, dword ptr [esi]",
+        "00532d49 test eax, eax",
+        "00532d4b je 0x532d61",
+        "00532d4d mov ecx, dword ptr [eax]",
+        "00532d4f push eax",
+        "00532d50 call dword ptr [ecx + 0x20]",
+        "00532d53 mov eax, dword ptr [esi]",
+        "00532d55 push eax",
+        "00532d56 mov edx, dword ptr [eax]",
+        "00532d58 call dword ptr [edx + 8]",
+        "00532d5b mov dword ptr [esi], 0",
+        "00532d61 mov eax, dword ptr [0x69cb0c]",
+        "00532d66 inc edi",
+        "00532d67 add esi, 0x10c",
+        "00532d6d cmp edi, eax",
+        "00532d6f jl 0x532d47",
+        "00532d71 pop esi",
+        "00532d72 mov eax, dword ptr [0x69cb08]",
+        "00532d77 pop edi",
+        "00532d78 test eax, eax",
+        "00532d7a je 0x532d8c",
+        "00532d7c mov ecx, dword ptr [eax]",
+        "00532d7e push eax",
+        "00532d7f call dword ptr [ecx + 8]",
+        "00532d82 mov dword ptr [0x69cb08], 0",
+        "00532d8c ret "
+      ],
+      "token": "@BODY_00532d30@"
+    }
+  ],
+  "pass_marker": "sim_input_teardown_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "gate",
+      "source": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+      "old": "+4u)!=0u",
+      "new": "+4u)==0u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "index",
+      "source": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+      "old": "read(frame_control_ff_state_005e9408+8u)",
+      "new": "read(frame_control_ff_state_005e9408+0xcu)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "drop-thunk",
+      "source": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+      "old": "application_sim_boundary_00412e60(){input_shutdown_00532d30();}",
+      "new": "application_sim_boundary_00412e60(){}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "drop-cleanup",
+      "source": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+      "old": "    input_effect_cleanup_00533050();",
+      "new": "    /* omitted cleanup */;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "count",
+      "source": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+      "old": "i<input_count_0069cb0c",
+      "new": "i<input_count_0069cb0c-1",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "unacquire",
+      "source": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+      "old": "call(slot.device,0x20u);",
+      "new": "call(slot.device,8u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "device-reload",
+      "source": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+      "old": "call(slot.device,8u);",
+      "new": "call(input_slots_006be040[0].device,8u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "clear-slot",
+      "source": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+      "old": "slot.device=nullptr;",
+      "new": "/* no slot clear */;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "root-guard",
+      "source": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+      "old": "if(void* const root=input_directinput_0069cb08)",
+      "new": "if(void* const root=nullptr)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "clear-root",
+      "source": "iterations/v2/001-original-recovery/runs/725-sim-input-teardown/sim_input_teardown_725.cpp",
+      "old": "input_directinput_0069cb08=nullptr;",
+      "new": "/* no root clear */;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ],
+  "timeout_seconds": 240
+}

@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "run": 716,
+  "status": "native-differential-PASS",
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "bodies": 2,
+  "body_bytes": 278,
+  "definition_source": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.cpp",
+  "definition_header": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scene_stage_reset_716.hpp",
+  "scope_evidence": "iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/scope-evidence.json",
+  "source_sha256": {
+    "scene_stage_reset_716.cpp": "ee5b615d6fae25affcfcaecdfd986372de3489f9176d0b4aaa1b1e73aa96643a",
+    "scene_stage_reset_716.hpp": "26acb2ab51921cd39a4f3a417900e486c8cff36dc9eabef90206ab49625982cd",
+    "native-config.json": "e3b5d279494211467727e1847c138fbe10d9116cfa8f44dfbe5d38cc547cf24a",
+    "native-fixture.cpp.in": "7d86812c15409bba0a54c9fc8521fcc326defaf39a0c448d2cc761df21caf491",
+    "scope-evidence.json": "f3c278fdee11a024139374197e68a5c99e2e9e69e98c3dad9c8177b3f7b87685"
+  },
+  "verify_command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/716-scene-stage-reset-ecx-tag/native-config.json --attempt 011",
+  "receipt": "local/experiments/v2-scene-stage-reset-ecx-tag-716/011/receipt.json",
+  "receipt_sha256": "c8ce9e1afd85e50cfe9bbca48f7eeb77962f2f5eeaf50275d88f950d895b296f",
+  "result": {
+    "status": "PASS",
+    "variants": [
+      "/Od",
+      "/O2"
+    ],
+    "pass_marker": "scene_stage_reset_ecx_tag_original_x86_vs_cpp=PASS cases=10",
+    "cases": 10,
+    "case_breakdown": "0043ed00: alloc failure; ordinary free-list pop with tag 0x5a; empty free list -> new_head refill with tag 0xca; tags 0xff and 0x00-mid-byte (5). 00455f60: first alloc failure; second alloc failure; tags 0x5a/0xca/0xff (5)",
+    "mutations": 12,
+    "mutations_detected": 12,
+    "warnings": "Production TU: zero warnings at /Od and /O2 with /W4. Fixture warnings remain bounded test scaffolding.",
+    "abi_checked": "ESP/EBP/EBX/ESI/EDI and output ECX checked against entry ECX on both leaves at /Od and /O2; EAX captured. All allocation failure paths included.",
+    "byte_semantics": "entry_ECX high byte captured at function entry in C++; raw x86 reads [saved ECX+3]. Tested with 0x00000000/0x5a000000/0xca000000/0xffffffff/0x12345600.",
+    "raw_data_witness": "Both original body byte ranges were read from the SHA-pinned PE by the runner and SHA-matched before injection: 0043ed00/148B sha256 f78eba8b57ba84c1ca666d4e06fce47994c6694ddf5c192e45323d22bb368c12; 00455f60/130B sha256 4a978625782cf688970b66e838d1cd78f4bef97fe29d471b4bca010c05e83918",
+    "intermediate_state": "ordered event log (allocation sizes/index, heap enter/leave lock, new_head kind/slot, member-storage bytes/mode) plus both owned roots, holder bytes, node bytes, member bytes and the two heap-state slots",
+    "material_controls": "wrong-43ed00-alloc-size, wrong-43ed00-tag-shift, wrong-43ed00-global, wrong-43ed00-drop-leave, wrong-43ed00-wrong-newhead, wrong-43ed00-drop-pop, wrong-43ed00-node-self, wrong-55f60-first-alloc, wrong-55f60-global, wrong-55f60-member-size, wrong-55f60-tag-shift, wrong-55f60-drop-member-init",
+    "initial_storage": "Raw PE section extents prove both cells loader-zero; production cells checked null before fixture reset."
+  },
+  "ownership": {
+    "registry_and_body_ranges_checked": "iterations/v2/001-original-recovery/source/recovered/functions.json: both entry VAs unowned; globals 0x006115c0 / 0x00627dfc absent as owned cells across registry and all run sources",
+    "cells_owned": [
+      "0x006115c0",
+      "0x00627dfc"
+    ],
+    "canonical_providers_reused": [
+      "0059ef90",
+      "005e4fe8",
+      "005322b0",
+      "005322c0",
+      "0059eeb0",
+      "004211d0"
+    ],
+    "excluded": []
+  },
+  "boundaries": "The original callsite byte is proved zero, including restoration by original 0043ed00; current compiled parent input ECX is not established because preceding 004552b0 is unresolved. The repaired leaves match arbitrary controlled entry ECX and restore it on every exit. Compiled parent transport must be proved before composed integration acceptance. Real allocator/member-storage producers, live free-list state and production CMake/registry integration remain open. Synthetic callsite setup/RET and controlled endpoints are harness code.",
+  "review_attempts": {
+    "009": "Preserved previous PASS, did not check output ECX.",
+    "010": "Added output ECX equality only; /Od exits 7: divergence abi fail. Preserved failure.",
+    "011": "Explicit restoration on all five exits, production initial-root assertion; PASS10 at /Od and /O2, existing 12 mutations detected."
+  }
+}

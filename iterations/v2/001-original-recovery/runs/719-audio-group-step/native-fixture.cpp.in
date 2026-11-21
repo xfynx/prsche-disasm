@@ -1,0 +1,124 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "audio_group_step_719.hpp"
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;
+using namespace porsche;
+// Unused edges of the actual state-owner TU. Any accidental call fails closed.
+namespace porsche {
+I __cdecl application_audio_backend_initialize_0058a4f0(){ExitProcess(91);return 0;}
+void __cdecl application_audio_backend_apply_0058a690(){ExitProcess(91);}
+void __cdecl application_audio_backend_configure_0058fef0(U,U){ExitProcess(91);}
+void __cdecl application_audio_backend_configure_0058aa90(U,U){ExitProcess(91);}
+U __cdecl application_audio_backend_allocate_0058aae0(U){ExitProcess(91);return 0;}
+void __cdecl application_audio_backend_start_0058e2d0(){ExitProcess(91);}
+I __cdecl application_audio_backend_start_device_0058fdb0(){ExitProcess(91);return 0;}
+void __cdecl application_audio_backend_stop_device_0058fe80(){ExitProcess(91);}
+void __cdecl application_audio_backend_stop_0058e2e0(){ExitProcess(91);}
+void __cdecl application_audio_backend_finalize_0058e0e0(){ExitProcess(91);}
+}
+static B *code;
+static B record[64],saved_record[64],state[0x18c];
+static U cases=0,which=0,current_mask=0,current_sample=0;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U v;std::memcpy(&v,p,4);return v;}
+static void wr(void* p,U v){std::memcpy(p,&v,4);}
+static void check(bool ok,const char* msg){if(!ok){std::printf("divergence %s case=%u which=%u mask=%02x sample=%02x\n",msg,cases,which,current_mask,current_sample);std::fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* p){std::printf("divergence fault %08lx eip=%08lx case=%u which=%u\n",p->ExceptionRecord->ExceptionCode,p->ContextRecord->Eip,cases,which);std::fflush(stdout);ExitProcess(1);return EXCEPTION_CONTINUE_SEARCH;}
+static void absolute(U old,const void* target){U n=0;for(U i=0;i+4<=233;++i)if(rd(code+i)==old){wr(code+i,ptr(target));++n;i+=3;}check(n==1,"absolute relocation");}
+static bool initial_data(const char* path){
+ FILE* f=std::fopen(path,"rb");if(!f)return false;std::fseek(f,0,SEEK_END);long length=std::ftell(f);std::rewind(f);
+ B* pe=new B[length];bool ok=std::fread(pe,1,length,f)==static_cast<size_t>(length);std::fclose(f);
+ U nt=rd(pe+0x3c),base=rd(pe+nt+52),ns=pe[nt+6]|U(pe[nt+7])<<8,opt=pe[nt+20]|U(pe[nt+21])<<8;
+ bool found=false;
+ for(U j=0;j<ns;++j){B* s=pe+nt+24+opt+j*40;U d=0x6b48c0-base-rd(s+12);
+  if(d>=rd(s+8)||0x128u>rd(s+8)-d)continue;found=true;
+  for(U b=0;b<0x128;++b){B raw=d+b<rd(s+16)?pe[rd(s+20)+d+b]:0;ok=ok&&application_audio_device_state_006b48c0[b]==raw;}
+ }
+ delete[] pe;return ok&&found;
+}
+// Synthetic cdecl2 callsite, original plain RET and preserved-register checks.
+static U invoke(void* fn,U* out,const void* rec,U& abi){
+ U before=0,frame=0,result=0,fail=0;
+ __asm {
+  push ebx
+  push esi
+  push edi
+  mov before,esp
+  mov frame,ebp
+  push rec
+  push out
+  mov eax,0a5a5a500h
+  mov ecx,0cafebabeh
+  mov edx,0deadc0deh
+  mov ebx,13579bdfh
+  mov esi,2468ace0h
+  mov edi,10203040h
+  call fn
+  mov result,eax
+  add esp,8
+  cmp esp,before
+  jne bad
+  cmp ebp,frame
+  jne bad
+  cmp ebx,13579bdfh
+  jne bad
+  cmp esi,2468ace0h
+  jne bad
+  cmp edi,10203040h
+  je done
+ bad:
+  mov fail,1
+ done:
+  mov esp,before
+  pop edi
+  pop esi
+  pop ebx
+ }
+ abi=fail;return result;
+}
+static void scenario(U count,U cursor,U mask,U gate,U sample,U mode){
+ current_mask=mask;current_sample=sample;
+ for(U i=0;i<0x18c;++i)state[i]=static_cast<B>(0x45u+i*13u);
+ for(U i=0;i<255;++i){U x=mode==0?sample:(mode==1?(i+1u==count?sample:0u):(i*73u+mask*11u));state[0x10u+0x28u+i]=static_cast<B>(x);}
+ state[0x10u+0x27u]=static_cast<B>(count);
+ for(U i=0;i<sizeof(record);++i)saved_record[i]=static_cast<B>(0xa5u+i*7u);
+ saved_record[3]=static_cast<B>(gate);saved_record[0x18]=static_cast<B>(mask);
+ U expected_result=0,expected_cursor=0;
+ for(which=0;which<2;++which){
+  std::memcpy(application_audio_device_state_006b48c0.preceding_data(),state,sizeof(state));
+  std::memcpy(record,saved_record,sizeof(record));
+  U words[]={0xabcddcbau,cursor,0x12344321u},abi=0;
+  U result=invoke(which?reinterpret_cast<void*>(&audio_group_step_0058a970):code,words+1,record,abi);
+  check(abi==0,"callee ABI");check(words[0]==0xabcddcbau&&words[2]==0x12344321u,"cursor canaries");
+  check(std::memcmp(record,saved_record,sizeof(record))==0,"record bytes");
+  check(std::memcmp(application_audio_device_state_006b48c0.preceding_data(),state,sizeof(state))==0,"canonical owner bytes");
+  if(which==0){expected_result=result;expected_cursor=words[1];}
+  else {check(result==expected_result,"return");check(words[1]==expected_cursor,"cursor progression");}
+ }
+ ++cases;
+}
+int main(int argc,char** argv){
+ AddVectoredExceptionHandler(1,&fault);check(argc>=2&&initial_data(argv[1]),"original initial bytes");
+ code=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));check(code!=nullptr,"code allocation");
+ const B original[]={ @BODY_0058a970@ };static_assert(sizeof(original)==233,"body extent");std::memcpy(code,original,233);
+ absolute(0x6b48e7,application_audio_device_state_006b48c0.data()+0x27);
+ absolute(0x6b48e8,application_audio_device_state_006b48c0.data()+0x28);
+ check(FlushInstructionCache(GetCurrentProcess(),code,233)!=0,"instruction flush");
+ // Every flag byte and every record mask, both forms of the record[3] gate.
+ for(U m=0;m<256;++m)for(U s=0;s<256;++s)for(U gate:{0u,1u})scenario(1,0,m,gate,s,0);
+ for(U count:{0u,1u,2u,3u,8u,127u,128u,255u}){
+  for(U m:{0u,1u,3u,4u,0x10u,0x1cu,0x20u,0x40u,0x80u,0xe0u,0xffu}){
+   for(U gate:{0u,1u,2u,0x81u,0xffu}){
+    for(U cursor:{0u,count,count+1u,0x7fffffffu,0xffffffffu,0xfffffffeu}){
+     scenario(count,cursor,m,gate,0xffu,1);
+     scenario(count,cursor,m,gate,0x15u,2);
+    }
+   }
+  }
+ }
+ std::printf("audio_group_step_original_x86_vs_cpp=PASS cases=%u ABI=ESP_EBP_EBX_ESI_EDI exhaustive=256x256x2\n",cases);
+ return 0;
+}

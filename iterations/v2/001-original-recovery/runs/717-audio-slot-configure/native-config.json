@@ -1,0 +1,163 @@
+{
+  "run": 717,
+  "experiment": "local/experiments/v2-audio-slot-configure-717",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/audio_capabilities_443.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/717-audio-slot-configure"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0058f220",
+      "bytes": 103,
+      "sha256": "2f099cf0e7722f5f2ca32ead45aca5867a0657c0eb1d17339a85aee5afdbcc45",
+      "raw_hex": "a160d76a0085c0750333c0c3e87f03000085c07f0333c0c38a5424048d0c4056508d34cdb8d76a00668b4c24108856168b542414c646170866894e148b4c24188956088b54241c894e0c8b4c2420895610890ee888f2ffff83c40485c07f06c706000000005ec3",
+      "assembly": [
+        "0058f220 mov eax, dword ptr [0x6ad760]",
+        "0058f225 test eax, eax",
+        "0058f227 jne 0x58f22c",
+        "0058f229 xor eax, eax",
+        "0058f22b ret ",
+        "0058f22c call 0x58f5b0",
+        "0058f231 test eax, eax",
+        "0058f233 jg 0x58f238",
+        "0058f235 xor eax, eax",
+        "0058f237 ret ",
+        "0058f238 mov dl, byte ptr [esp + 4]",
+        "0058f23c lea ecx, [eax + eax*2]",
+        "0058f23f push esi",
+        "0058f240 push eax",
+        "0058f241 lea esi, [ecx*8 + 0x6ad7b8]",
+        "0058f248 mov cx, word ptr [esp + 0x10]",
+        "0058f24d mov byte ptr [esi + 0x16], dl",
+        "0058f250 mov edx, dword ptr [esp + 0x14]",
+        "0058f254 mov byte ptr [esi + 0x17], 8",
+        "0058f258 mov word ptr [esi + 0x14], cx",
+        "0058f25c mov ecx, dword ptr [esp + 0x18]",
+        "0058f260 mov dword ptr [esi + 8], edx",
+        "0058f263 mov edx, dword ptr [esp + 0x1c]",
+        "0058f267 mov dword ptr [esi + 0xc], ecx",
+        "0058f26a mov ecx, dword ptr [esp + 0x20]",
+        "0058f26e mov dword ptr [esi + 0x10], edx",
+        "0058f271 mov dword ptr [esi], ecx",
+        "0058f273 call 0x58e500",
+        "0058f278 add esp, 4",
+        "0058f27b test eax, eax",
+        "0058f27d jg 0x58f285",
+        "0058f27f mov dword ptr [esi], 0",
+        "0058f285 pop esi",
+        "0058f286 ret "
+      ],
+      "token": "@BODY_0058f220@"
+    }
+  ],
+  "pass_marker": "audio_slot_configure_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "device-guard",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "audio_ds_device_006ad760==0u",
+      "new": "audio_ds_device_006ad760!=0u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "signed-slot",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "slot<=0",
+      "new": "slot==0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stride",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "*24u",
+      "new": "*20u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "byte",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "row[0x16]",
+      "new": "row[0x15]",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "format",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "row[0x17]=8u",
+      "new": "row[0x17]=16u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "word",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "row+0x14",
+      "new": "row+0x12",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "arg3",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "row+8,&at58",
+      "new": "row+8,&at5c",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "arg4",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "row+0xc,&at5c",
+      "new": "row+0xc,&at58",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "arg5",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "row+0x10,&at60",
+      "new": "row+0x10,&at58",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "pointer",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "row,&pointer0",
+      "new": "row+4,&pointer0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "cleanup-sign",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "result<=0",
+      "new": "result==0",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "return",
+      "source": "iterations/v2/001-original-recovery/runs/717-audio-slot-configure/audio_slot_configure_717.cpp",
+      "old": "static_cast<std::uint32_t>(result);",
+      "new": "0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

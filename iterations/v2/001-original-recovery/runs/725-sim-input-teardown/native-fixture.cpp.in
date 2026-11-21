@@ -1,0 +1,115 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "sim_input_teardown_725.hpp"
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;using namespace porsche;
+namespace porsche {
+std::int32_t input_count_0069cb0c{};
+InputSlot input_slots_006be040[32]{};
+FrameControlSlotFields_494 frame_control_slot_fields_494[32]{};
+void* input_directinput_0069cb08{};
+std::uint8_t frame_control_ff_state_005e9408[0x134]{};
+std::int8_t fe_input_devices_005e8e60[32]{};
+void __cdecl heap_fill_0053c290(void*,U,U){ExitProcess(96);}
+void* __cdecl fe_input_getstate_00532e10(U,U){ExitProcess(97);return nullptr;}
+}
+static B* code;static U cases,side,kind,mode,root_on,pattern,enabled;static I count_value,index_value;
+struct Device{U table,id;};static Device devices[64],root;static U table[26];
+struct Event{U type,self,root,count,slot0,slot1,command;};
+struct Trace{U abi,n;Event events[128];InputSlot slots[32];FrameControlSlotFields_494 fields[32];B ff[0x134];U root,count;};static Trace trace,expected;
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s case=%u side=%u\n",why,cases,side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("divergence native-fault %08lx case=%u side=%u\n",e->ExceptionRecord->ExceptionCode,cases,side);fflush(stdout);ExitProcess(1);return EXCEPTION_CONTINUE_SEARCH;}
+static U ptr(const void* p){return reinterpret_cast<U>(p);}static U rd(const void* p){U x;memcpy(&x,p,4);return x;}static void wr(void* p,U x){memcpy(p,&x,4);}
+static void event(U type,U self,U command=0){require(trace.n<128,"event bound");trace.events[trace.n++]={type,self,ptr(input_directinput_0069cb08),static_cast<U>(input_count_0069cb0c),ptr(input_slots_006be040[0].device),ptr(input_slots_006be040[1].device),command};}
+static U __stdcall unacquire(void* obj){const U id=static_cast<Device*>(obj)->id;event(2,id);
+ if(mode==1&&id<32){input_slots_006be040[id].device=reinterpret_cast<InputDevice*>(&devices[id+32]);if(id==0&&input_count_0069cb0c<32)input_count_0069cb0c=3;}
+ if(mode==2&&id==0)input_count_0069cb0c=1;
+ return 0x80001234;
+}
+static U __stdcall release(void* obj){const U id=static_cast<Device*>(obj)->id;event(3,id);
+ if(mode==1&&id<64)input_slots_006be040[id%32].device=reinterpret_cast<InputDevice*>(&devices[31]);
+ if(mode==2&&id==90)input_directinput_0069cb08=&devices[30];
+ return 0xabcdef01;
+}
+static U __stdcall ff_command(void* obj,U command){event(4,static_cast<Device*>(obj)->id,command);if(mode==1){for(auto& x:frame_control_slot_fields_494)x.active=0x9999;wr(frame_control_ff_state_005e9408+4,0);wr(frame_control_ff_state_005e9408+8,31);}return 0;}
+static U __stdcall acquire(void*){ExitProcess(95);return 0;}
+namespace porsche {
+void __cdecl input_effect_cleanup_00533050(){event(1,0);if(mode==1){input_count_0069cb0c=2;input_slots_006be040[0].device=reinterpret_cast<InputDevice*>(&devices[0]);input_slots_006be040[1].device=reinterpret_cast<InputDevice*>(&devices[1]);}if(mode==2)input_directinput_0069cb08=&root;}
+}
+static U invoke_cdecl0(void* fn,U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return out;
+}
+static bool initial_data(const char* pe_path){
+    // Read original virtual bytes from its file-backed prefix or loader-zero tail.
+    FILE* f=fopen(pe_path,"rb");if(!f)return false;
+    fseek(f,0,SEEK_END);const long bytes=ftell(f);rewind(f);
+    auto* pe=new unsigned char[bytes];if(fread(pe,1,bytes,f)!=static_cast<size_t>(bytes)){fclose(f);return false;}fclose(f);
+    const U nt=rd(pe+0x3c),base=rd(pe+nt+52),sections=pe[nt+6]|U(pe[nt+7])<<8;
+    const U optional=pe[nt+20]|U(pe[nt+21])<<8;
+    const U va[]={0x5e9408,0x69cb0c,0x6be040,0x69cb08};const U sizes[]={0x134,4,32*0x10c,4};
+    const unsigned char* native[]={frame_control_ff_state_005e9408,reinterpret_cast<const B*>(&input_count_0069cb0c),reinterpret_cast<const B*>(input_slots_006be040),reinterpret_cast<const B*>(&input_directinput_0069cb08)};
+    bool ok=true;
+    for(U j=0;j<4;++j){bool found=false;for(U i=0;i<sections;++i){
+        const auto* s=pe+nt+24+optional+i*40;const U rva=rd(s+12),vs=rd(s+8),rawsize=rd(s+16),raw=rd(s+20);
+        const U delta=va[j]-base-rva;if(delta>=vs||sizes[j]>vs-delta)continue;found=true;
+        for(U k=0;k<sizes[j];++k){const unsigned char original_byte=delta+k<rawsize?pe[raw+delta+k]:0;if(native[j][k]!=original_byte)ok=false;}
+    }if(!found)ok=false;}
+    delete[] pe;return ok;
+}
+static void absolute(U at,U size,U old,U replacement,U expected_count){U n=0;for(U i=0;i+4<=size;++i)if(rd(code+at+i)==old){wr(code+at+i,replacement);++n;i+=3;}require(n==expected_count,"raw absolute");}
+static void rel(U at,U offset,U va,U original,U target,B opcode=0xe8){require(code[at+offset]==opcode&&va+offset+5+rd(code+at+offset+1)==original,"raw rel");wr(code+at+offset+1,target-ptr(code+at+offset+5));}
+static void init(const char* pe){require(initial_data(pe),"production owner initial bytes");
+ table[2]=ptr(reinterpret_cast<void*>(&release));table[8]=ptr(reinterpret_cast<void*>(&unacquire));table[7]=ptr(reinterpret_cast<void*>(&acquire));table[22]=ptr(reinterpret_cast<void*>(&ff_command));for(U i=0;i<64;++i)devices[i]={ptr(table),i};root={ptr(table),90};
+ code=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code!=nullptr,"allocate");const B a[]={@BODY_00412cd0@};const B b[]={@BODY_00412e60@};const B c[]={@BODY_00532d30@};memcpy(code,a,sizeof a);memcpy(code+0x40,b,sizeof b);memcpy(code+0x80,c,sizeof c);
+ absolute(0,22,0x5e940c,ptr(frame_control_ff_state_005e9408)+4,1);absolute(0,22,0x5e9410,ptr(frame_control_ff_state_005e9408)+8,1);rel(0,0xf,0x412cd0,0x533480,ptr(reinterpret_cast<void*>(&input_slot_stop_ff_00533480)));
+ rel(0x40,0,0x412e60,0x532d30,ptr(code+0x80),0xe9);rel(0x80,1,0x532d30,0x533050,ptr(reinterpret_cast<void*>(&input_effect_cleanup_00533050)));
+ absolute(0x80,93,0x69cb0c,ptr(&input_count_0069cb0c),2);absolute(0x80,93,0x6be040,ptr(input_slots_006be040),1);absolute(0x80,93,0x69cb08,ptr(&input_directinput_0069cb08),2);require(FlushInstructionCache(GetCurrentProcess(),code,4096)!=0,"flush");
+}
+static void seed(){memset(&trace,0,sizeof trace);for(U i=0;i<32;++i){auto& s=input_slots_006be040[i];memset(&s,static_cast<B>(i+7),sizeof s);s.device=(pattern==0||i%2==0)?reinterpret_cast<InputDevice*>(&devices[i]):nullptr;s.flags_04=pattern==2?0:1;frame_control_slot_fields_494[i]={0x55550000u+i,0x66660000u+i,0x77770000u+i};}
+ memset(frame_control_ff_state_005e9408,0xa5,0x134);wr(frame_control_ff_state_005e9408+4,enabled);wr(frame_control_ff_state_005e9408+8,static_cast<U>(index_value));wr(frame_control_ff_state_005e9408+0xc,0xffffffff);
+ input_count_0069cb0c=count_value;input_directinput_0069cb08=root_on?&root:nullptr;
+}
+static void check(){++cases;for(side=0;side<2;++side){seed();void* fn=kind==0?(side?reinterpret_cast<void*>(&application_sim_boundary_00412cd0):code):(kind==1?(side?reinterpret_cast<void*>(&application_sim_boundary_00412e60):code+0x40):(side?reinterpret_cast<void*>(&input_shutdown_00532d30):code+0x80));(void)invoke_cdecl0(fn,trace.abi);require(trace.abi==0,"ABI");memcpy(trace.slots,input_slots_006be040,sizeof trace.slots);memcpy(trace.fields,frame_control_slot_fields_494,sizeof trace.fields);memcpy(trace.ff,frame_control_ff_state_005e9408,sizeof trace.ff);trace.count=static_cast<U>(input_count_0069cb0c);trace.root=ptr(input_directinput_0069cb08);if(side==0)expected=trace;else require(memcmp(&trace,&expected,sizeof trace)==0,"calls/order/full state");}}
+int main(int argc,char** argv){AddVectoredExceptionHandler(1,fault);require(argc==2,"PE argument");init(argv[1]);
+ for(U k:{0u,1u,2u})for(I count:{-1,0,1,3,32})for(U m:{0u,1u,2u})for(U p:{0u,1u,2u})for(U root_present:{0u,1u})for(U gate:{0u,1u,0x80000000u})for(I index:{-1,0,1,31,32}){kind=k;count_value=count;mode=m;pattern=p;root_on=root_present;enabled=gate;index_value=index;check();}
+ printf("sim_input_teardown_original_x86_vs_cpp=PASS cases=%u ABI=PASS production_initial_state=PASS canonical676=PASS\n",cases);return 0;}

@@ -19,21 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-Latest recovery intake is [Run687](iterations/v2/001-original-recovery/runs/687-render-palette-leaves-integration/README.md).
-Render palette expand and conversion leaves (`00570260`..`00571160`) integrate as unlockers with zero new unresolved names and zero new `.data`/`.rdata`/`.bss`.
-The shared build compiles 394 TUs with 69 unresolved names / 73 references.
-Activation4ae010,
-two texture constructors and earlier metric597360 retain explicit partial domains.
-[PR #26 intake](docs/research/pr26-integration-review-2026-10-29.md)
-adds reusable recorders and prototype ports, with unproved compositions gated off.
-Run566 retains six partial callback/resource providers as archive-only intake.
-Next are `688`/`689` recovery waves on `005333a0`/`005334e0` (unlocking `00411d20` -> `004121b0`) and `00570780`/`00570820`/`00534830`. The real depth-conversion
-dependency005350e0 remains open. Broader
-archive-only continuation and validation domains are deferred under the
-first-executable priority in AGENTS.md;
-Run558 periodic transport and external heap-slot
-export547 remain antivirus-blocked. Live producers/nativeAMD
-hardware remain open.
+[Run730](iterations/v2/001-original-recovery/runs/730-audio-copy-and-frame-control-integration/README.md)
+is the current shared build (`425` TUs, `97` unresolved names / `104`
+references). The next packets (`732`–`734`) address remaining reachable scene,
+audio and render/input frontier dependencies. The active iteration plan tracks
+their proof and integration.
 
 ## Recovery milestones
 

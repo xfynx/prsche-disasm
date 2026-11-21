@@ -1,0 +1,119 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "audio_resource_slot_718.hpp"
+using U=std::uint32_t; using B=unsigned char; using I=std::int32_t;
+using namespace porsche;
+// Unused dependencies of actual canonical Run443 device owner: fail closed.
+namespace porsche {
+I __stdcall audio_direct_sound_create_00597f70(const void*,U*,void*){ExitProcess(92);return 0;}
+void* __stdcall audio_platform_foreground_window(){ExitProcess(93);return nullptr;}
+void* __stdcall audio_platform_desktop_window(){ExitProcess(94);return nullptr;}
+}
+static U map[65535u*2u+8u], expected[65535u*2u+8u];
+static U cases=0, which=0, count_value=0, hit_value=0;
+static B* code;
+static U ptr(const void* p){return reinterpret_cast<U>(p);}
+static U rd(const void* p){U v;std::memcpy(&v,p,4);return v;}
+static void wr(void* p,U v){std::memcpy(p,&v,4);}
+static void check(bool ok,const char* what){if(!ok){std::printf("divergence %s case=%u which=%u count=%08x hit=%u\n",what,cases,which,count_value,hit_value);std::fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* p){std::printf("divergence fault %08lx eip=%08lx case=%u which=%u\n",p->ExceptionRecord->ExceptionCode,p->ContextRecord->Eip,cases,which);std::fflush(stdout);ExitProcess(1);return EXCEPTION_CONTINUE_SEARCH;}
+static void absolute(U old,const void* target,U expected_count){
+ U n=0;for(U i=0;i+4<=60;++i)if(rd(code+i)==old){wr(code+i,ptr(target));++n;i+=3;}
+ check(n==expected_count,"relocation multiplicity");
+}
+static bool initial_data(const char* path){
+ FILE* f=std::fopen(path,"rb");if(!f)return false;
+ std::fseek(f,0,SEEK_END);long length=std::ftell(f);std::rewind(f);
+ B* pe=new B[length];bool ok=std::fread(pe,1,length,f)==static_cast<size_t>(length);std::fclose(f);
+ U nt=rd(pe+0x3c),base=rd(pe+nt+52),ns=pe[nt+6]|U(pe[nt+7])<<8;
+ U opt=pe[nt+20]|U(pe[nt+21])<<8;
+ const U vas[]={0x6b48a0,0x6b48a4};const void* cells[]={&audio_resource_map_count_006b48a0,&audio_resource_map_006b48a4};
+ for(U k=0;k<2;++k){bool found=false;for(U j=0;j<ns;++j){
+  B* s=pe+nt+24+opt+j*40;U d=vas[k]-base-rd(s+12);
+  if(d>=rd(s+8)||4>rd(s+8)-d)continue;found=true;
+  for(U b=0;b<4;++b){B raw=d+b<rd(s+16)?pe[rd(s+20)+d+b]:0;ok=ok && static_cast<const B*>(cells[k])[b]==raw;}
+ }ok=ok&&found;}
+ delete[] pe;return ok;
+}
+// Synthetic cdecl1 callsite; retain original plain-RET callee and ABI witnesses.
+static U invoke(void* fn,U key,U& abi){
+ U before=0,frame=0,out=0,fail=0;
+ __asm {
+  push ebx
+  push esi
+  push edi
+  mov before,esp
+  mov frame,ebp
+  push key
+  mov ebx,13579bdfh
+  mov esi,2468ace0h
+  mov edi,10203040h
+  mov eax,0a5a5a500h
+  mov ecx,0cafebabeh
+  mov edx,0deadc0deh
+  call fn
+  mov out,eax
+  add esp,4
+  cmp esp,before
+  jne bad
+  cmp ebp,frame
+  jne bad
+  cmp ebx,13579bdfh
+  jne bad
+  cmp esi,2468ace0h
+  jne bad
+  cmp edi,10203040h
+  je done
+ bad:
+  mov fail,1
+ done:
+  mov esp,before
+  pop edi
+  pop esi
+  pop ebx
+ }
+ abi=fail;return out;
+}
+static void scenario(U count,U hit,U key,bool null_map){
+ count_value=count;hit_value=hit;U n=count&0xffffu;
+ U result=0;
+ for(which=0;which<2;++which){
+  for(U j=0;j<65535u*2u+8u;++j)map[j]=(j&1u)?(0x8bad0000u+j):(0x23450000u+j+1u);
+  // Two empty slots distinguish first-empty selection. Payload is nonzero.
+  if(hit<n){map[hit*2u]=0;if(hit+1u<n)map[(hit+1u)*2u]=0;}
+  audio_resource_map_count_006b48a0=count;
+  audio_resource_map_006b48a4=null_map?0:ptr(map);
+  U abi=0;U out=invoke(which?reinterpret_cast<void*>(&audio_group_slot_0058f7a0):code,key,abi);
+  check(abi==0,"callee ABI");check(audio_resource_map_count_006b48a0==count,"count modified");
+  check(audio_resource_map_006b48a4==(null_map?0:ptr(map)),"base modified");
+  if(which==0){result=out;std::memcpy(expected,map,sizeof(map));}
+  else {check(out==result,"return");check(std::memcmp(expected,map,sizeof(map))==0,"whole map/payload/canary");}
+  // Explicit original-domain witnesses, in addition to differential comparison.
+  check(out==((hit<n)?ptr(map+hit*2u):0u),"expected first empty result");
+  if(hit<n)check(map[hit*2u]==key,"key write");
+ }
+ ++cases;
+}
+int main(int argc,char** argv){
+ AddVectoredExceptionHandler(1,&fault);
+ check(argc>=2 && initial_data(argv[1]),"raw original initial cells");
+ code=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));check(code!=nullptr,"code allocation");
+ const B original[]={ @BODY_0058f7a0@ };static_assert(sizeof(original)==60,"body extent");std::memcpy(code,original,60);
+ absolute(0x6b48a0,&audio_resource_map_count_006b48a0,1);
+ absolute(0x6b48a4,&audio_resource_map_006b48a4,2);
+ check(FlushInstructionCache(GetCurrentProcess(),code,60)!=0,"instruction flush");
+ for(U n:{0u,1u,2u,3u,8u,31u,256u,32767u,32768u,65535u}){
+  for(U high:{0u,0x12340000u,0xffff0000u}){
+   for(U key:{0u,1u,0x80000000u,0xffffffffu,0x12345678u}){
+    scenario(high|n,n,key,false);
+    if(n){scenario(high|n,0,key,false);scenario(high|n,n/2u,key,false);scenario(high|n,n-1u,key,false);}
+   }
+  }
+ }
+ scenario(0,0,0xabcdef01,true);scenario(0xffff0000,0,0,true);
+ std::printf("audio_resource_slot_original_x86_vs_cpp=PASS cases=%u mutation_fixture=full-map-state ABI=ESP_EBP_EBX_ESI_EDI\n",cases);
+ return 0;
+}

@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "disassembly": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+  "bodies": [
+    {
+      "va": "00599610",
+      "end": "005996c5",
+      "bytes": 182,
+      "sha256": "3bda549f88cb3a64f663162733618edf91e71169e84d075364ce57b3b6e38f53",
+      "abi": "cdecl int(void* record, const void* ctx, void* scratch); EAX return is the constant 8; third argument is never read; EBX/EBP/ESI/EDI and ESP preserved",
+      "callers": [
+        "00590a80 (Run713 accepted audio group decode; CALL rel at body offset 0x4e)"
+      ],
+      "callees": [
+        "0058a970 (unowned typed boundary; two CALL rel32 at body offsets 0x4d and 0xad; cdecl (uint32* out, const void* record) -> EAX)",
+        "0058f7a0 (unowned typed boundary; CALL rel32 at body offset 0x6e; cdecl (uint32 key) -> pointer in EAX)",
+        "0058f220 (unowned typed boundary; CALL rel32 at body offset 0x8f; cdecl six uint32 args)",
+        "0058f7e0 (canonical Run452 full body, audio_resource_erase_0058f7e0; CALL rel32 at body offset 0x9f)"
+      ],
+      "relocations": [
+        {"off": "0x4d", "kind": "rel32", "original_target": "0058a970"},
+        {"off": "0x6e", "kind": "rel32", "original_target": "0058f7a0"},
+        {"off": "0x8f", "kind": "rel32", "original_target": "0058f220"},
+        {"off": "0x9f", "kind": "rel32", "original_target": "0058f7e0"},
+        {"off": "0xad", "kind": "rel32", "original_target": "0058a970"}
+      ],
+      "body_ranges": [["00599610", "005996c5"]]
+    }
+  ],
+  "ownership": {
+    "new_cells": [],
+    "raw_pe": {
+      "00599610:182": "section .text file-backed; SHA-256 3bda549f88cb3a64f663162733618edf91e71169e84d075364ce57b3b6e38f53"
+    },
+    "reused_not_redefined": {
+      "0058f7e0": "Run452 canonical full body audio_resource_erase_0058f7e0; declaration only, mocked in the standalone native fixture",
+      "0058a970/0058f7a0/0058f220": "unowned typed child boundaries; mocked in the native fixture, no production body invented"
+    },
+    "closure_search": "functions.json (1167 entries) has no entry_va 00599610 and no body_ranges overlapping 00599610..005996c5; all 17 original-index supplements were searched for 005996xx spans with no hit. Catalog lists 00599610 as unrecovered with body 00599610..005996c5. 0058f7e0 is owned by Run452; 0058a970 (233B), 0058f7a0 (60B) and 0058f220 (103B) are unowned. No absolute data references occur in this body: every record access is [ESI+offset] and the pointer table is stack-local [ESP+0x10], so no .data/.rdata/.bss cell is owned here.",
+    "registry_overlap": "0 overlapping body_ranges; next owned body 005996d0 (Run452) starts 11 bytes after this body's RET."
+  },
+  "declarations": {
+    "source": "runs/713-audio-group-decode/audio_group_decode_713.hpp",
+    "target": "std::int32_t __cdecl audio_group_process_reload_00599610(void* record, const void* ctx, void* scratch);",
+    "linker_symbol": "?audio_group_process_reload_00599610@porsche@@YAHPAXPBX0@Z"
+  },
+  "scope_boundary": "FULL body at /Od and /O2. Harness mocks stand in for 0058a970, 0058f7a0, 0058f220 and the canonical 0058f7e0; all five relative calls are relocated from immutable PE bytes. The signed record[3] is bounded to 1..4 so the original's unguarded pointer-table writes stay inside the harness record; counts outside that domain, uninitialized pointer-table entries, real child interiors, live callbacks/devices, faults, concurrency, full game integration and CMake/registry acceptance remain open."
+}

@@ -1,17 +1,24 @@
 # Current project status
 
-Updated 2026-11-20. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-21. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run714](iterations/v2/001-original-recovery/runs/714-audio-group-decode-integration/README.md)
-compiles 414 C++ translation units across 8 projects. The link has 104 unresolved
-names / 111 references. **There is no recovered playable C++ game executable yet.**
+[Run730](iterations/v2/001-original-recovery/runs/730-audio-copy-and-frame-control-integration/README.md)
+compiles 425 C++ translation units across eight projects. The shared link
+reports **97 unresolved names / 104 references**. There is no game EXE yet.
 
-Run714 integrates 713: one full original body (205B: audio group decode
-`00590a80`). Native comparisons pass 120 measured cases and 10 material
-mutation controls at `/Od`/`/O2`; shared audit PASS, 1,024 source pins.
-`00590a80` closes; `00599610` (group process/reload) opens.
+The shared audit verifies `728/005`, `729/002` and `731/002` (four registry
+entries: `0058e310`, replaced `00412030` consumer, `00455830`, `004558b0`;
+1,186 total), 14,610 original-x86 comparisons, 24 mutation controls, 1,053
+source pins and 13 REA sessions. Six names close (`audio_resource_copy_0058e310`,
+three Run400 `frame_control_*` globals, two `scene_stage_tree_ctor_*`
+entries) with zero new unresolved names and 4B new readonly data (`005c1694`).
+
+Historical: [Run727](iterations/v2/001-original-recovery/runs/727-input-and-scene-integration/README.md)
+compiled 423 TUs (103 unresolved names / 110 references), verifying seven
+registry entries (`00412cd0`, `00412e60`, `00532d30`, `00451490`, `005379f0`,
+`00537a50`, partial `004552b0`), 8,312 comparisons and 24 mutations.
 
 Historical: Run712 integrated 710/711 (five bodies, 392B; 658 cases / 26
 mutations / 1,021 pins; 413 TUs). Run709 integrated 705-708 (nine bodies,

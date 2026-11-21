@@ -1,0 +1,51 @@
+{
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "functions": [
+    {
+      "va": "00412030",
+      "bytes": 91,
+      "sha256": "81a61b69caf99905a9e0e7d881f9e24324b8ac7535da90bb1c152815e6344e7d",
+      "raw_hex": "a10c945e0085c07451a110945e000fbf0cc524945e0051e8841812008b1510945e000fbf04d522945e0050e8701812008b0d10945e000fbf14cd20945e0052e85c181200a110945e000fbf0cc526945e0051e84918120083c410c3",
+      "assembly": [
+        "00412030 mov eax, dword ptr [0x5e940c]",
+        "00412035 test eax, eax",
+        "00412037 je 0x41208a",
+        "00412039 mov eax, dword ptr [0x5e9410]",
+        "0041203e movsx ecx, word ptr [eax*8 + 0x5e9424]",
+        "00412046 push ecx",
+        "00412047 call 0x5338d0",
+        "0041204c mov edx, dword ptr [0x5e9410]",
+        "00412052 movsx eax, word ptr [edx*8 + 0x5e9422]",
+        "0041205a push eax",
+        "0041205b call 0x5338d0",
+        "00412060 mov ecx, dword ptr [0x5e9410]",
+        "00412066 movsx edx, word ptr [ecx*8 + 0x5e9420]",
+        "0041206e push edx",
+        "0041206f call 0x5338d0",
+        "00412074 mov eax, dword ptr [0x5e9410]",
+        "00412079 movsx ecx, word ptr [eax*8 + 0x5e9426]",
+        "00412081 push ecx",
+        "00412082 call 0x5338d0",
+        "00412087 add esp, 0x10",
+        "0041208a ret "
+      ]
+    }
+  ],
+  "source_candidate": {
+    "old_source": "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters/00412030.cpp",
+    "old_source_compiled_in": "iterations/v2/001-original-recovery/runs/724-audio-slot-and-abi-integration/build-001.json",
+    "old_source_unregistered": true,
+    "new_source": "iterations/v2/001-original-recovery/runs/729-frame-control-state-consumer/frame_control_state_729.cpp",
+    "same_original_entry_va": "00412030",
+    "body_count_delta": 0
+  },
+  "state_owner": "Run695 ff_effect_initialize_695.cpp defines the canonical 308-byte loader-zero frame_control_ff_state_005e9408 block; 00412030 uses byte offsets +4,+8,+0x18 and reads four signed 16-bit fields.",
+  "child_owner": "Run494 render_resource_494.cpp remains the canonical production owner of frame_control_slot_release_005338d0; native differential fixture records controlled calls and mutates the real Run695 owner state.",
+  "new_data_bytes": 0,
+  "boundaries": [
+    "Rows 0..31 only; count/index outside this table domain is not accepted.",
+    "Controlled call endpoint mutates the current index and table after calls; live device behavior, faulting out-of-range indexes and full startup remain open."
+  ],
+  "registry_note": "Do not add duplicate body coverage. 00412030 is an existing compiled but unregistered 91-byte source candidate; root owns the single registry intake."
+}

@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "run": 715,
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "query": "00599610 (typed child newly exposed by integrated Run713/714)",
+  "body": {
+    "va": "00599610",
+    "end": "005996c5",
+    "bytes": 182,
+    "sha256": "3bda549f88cb3a64f663162733618edf91e71169e84d075364ce57b3b6e38f53",
+    "status": "full original body, native differential verified"
+  },
+  "declaration": {
+    "source": "runs/713-audio-group-decode/audio_group_decode_713.hpp",
+    "text": "std::int32_t __cdecl audio_group_process_reload_00599610(void* record, const void* ctx, void* scratch);",
+    "linker_symbol": "?audio_group_process_reload_00599610@porsche@@YAHPAXPBX0@Z"
+  },
+  "summary": "MOVSX of signed record[3] builds a stack table of ctx+offset pointers from DWORDs at record+0x68. The incoming argument slot is zeroed once and passed by address to 0058a970; the worker loop re-calls it until EAX is zero. When the worker's low bit is set and record[3] is exactly one, record+0xa0 selects a slot through 0058f7a0, six zero-extended record fields feed 0058f220, the result is stored at allocator_result+4, and a zero result calls canonical 0058f7e0. EAX is always 8; the third argument is never read.",
+  "abi": "cdecl int(void* record, const void* ctx, void* scratch); ESP/EBP/EBX/ESI/EDI checked against poison values at both /Od and /O2",
+  "callers": ["00590a80 (Run713 accepted audio group decode, CALL rel at body offset 0x4e)"],
+  "callees": [
+    "0058a970 x2 (unowned typed boundary, mocked)",
+    "0058f7a0 (unowned typed boundary, mocked)",
+    "0058f220 (unowned typed boundary, mocked)",
+    "0058f7e0 (canonical Run452 owner audio_resource_erase_0058f7e0; declaration only, mocked in the standalone fixture)"
+  ],
+  "ownership": {
+    "new_cells": [],
+    "registry": "functions.json (1167 entries) has no entry_va 00599610 and no body_ranges overlapping 00599610..005996c5; 17 original-index supplements searched with no hit; next owned body 005996d0 (Run452) starts 11 bytes after RET",
+    "data": "No absolute data references in the body: all record accesses are [ESI+offset], the pointer table is stack-local [ESP+0x10]; no .data/.rdata/.bss cell owned here"
+  },
+  "proof": {
+    "command": "py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/715-audio-group-process-reload/native-config.json --attempt 006",
+    "receipt": "local/experiments/v2-audio-group-process-reload-715/006/receipt.json",
+    "status": "PASS",
+    "variants": ["/Od", "/O2"],
+    "measured_cases_per_variant": 128,
+    "mutation_controls": 13,
+    "input_pins": 186,
+    "output_pins": 185,
+    "compared": "inputs, worker/slot/configure/erase call order and all arguments, out-slot value before every worker call, record[3] reload, zero-extended word/byte operands, result stored at slot+4, post-call record/slot/ctx/scratch fingerprints, return value and ESP/EBP/EBX/ESI/EDI"
+  },
+  "domain": "signed record[3] 1..4, first-call early exit, 2..4 worker calls, worker low bit 0/1, record[3] reload to 1 or 2/3, configure returns zero/nonzero, word56 {0x0003,0x8003}, byte13 high-bit values, two context variants; record bytes outside the written fields stay at controlled distinct patterns.",
+  "boundary": "Real 0058a970/0058f7a0/0058f220 interiors and live 0058f7e0 behaviour are typed/mocked, not recovered here. The original has no guard on the pointer-table count: counts outside 1..4, uninitialized pointer-table entries and malformed records remain explicit open domains. Faults, concurrency, live callbacks/devices, full game integration and registry/CMake/manifest acceptance remain open. No registry, CMake, manifest, plan, doc, shared script or local/game change in this batch."
+}

@@ -1,0 +1,376 @@
+// Native x86-vs-C++ differential fixture for Run716 scene-stage reset leaves.
+// Original body bytes are injected by verify-v2-native-batch.py from the
+// SHA-pinned Porsche.exe. ECX is a controlled oracle input: both the raw x86
+// body and the C++ body store (entry_ECX >> 24) & 0xff at holder+8.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "scene_stage_reset_716.hpp"
+#include "scene_stage_stack_core_721.hpp"
+extern "C" void __cdecl scene_stage_chain_721(unsigned char*);
+#include "porsche/application_alloc.hpp"
+#include "porsche/application_context_base.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/render_startup.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+enum : U {
+    kEvAlloc = 1u, kEvContext = 2u, kEvLockEnter = 3u, kEvLockLeave = 4u,
+    kEvNewHead = 5u, kEvMemberStorage = 6u,
+};
+enum : U { kMaxEvents = 64u, kNodeBytes = 0x20u };
+
+struct Event { U kind, a, b, c, d; };
+struct Snapshot {
+    U event_count;
+    Event events[kMaxEvents];
+    U root_6115c0, root_627dfc, root_627dfc_holder;
+    B allocations[8][0x50u];
+    U tree_root, group_root;
+    U matrix[256][8];
+    B node[kNodeBytes];
+    B member[0x18u];
+    U heap_list, heap_free;
+};
+
+static void require(bool ok, const char* why) {
+    if (!ok) { std::printf("divergence %s\n", why); std::fflush(stdout); ExitProcess(7); }
+}
+static U fnv(const void* p, U count) {
+    U h = 0x811c9dc5u; const B* b = static_cast<const B*>(p);
+    for (U i = 0u; i < count; ++i) h = (h ^ b[i]) * 0x01000193u;
+    return h;
+}
+static U address(const void* p) { return static_cast<U>(reinterpret_cast<std::uintptr_t>(p)); }
+static U load_dword(const void* base, U off) { U v; std::memcpy(&v, static_cast<const B*>(base) + off, 4u); return v; }
+static void store_dword(void* base, U off, U v) { std::memcpy(static_cast<B*>(base) + off, &v, 4u); }
+
+// ---- controlled endpoints -------------------------------------------------
+static Event events[kMaxEvents];
+static U event_count = 0u;
+static U cases = 0u;
+static U which = 0u;
+static U g_alloc_index = 0u;
+static U g_fail_mask = 0u;
+static U g_refill = 0u;
+
+static alignas(8) B heap_state[0x40u];
+static B buf4[4u], holder_buf[0x0cu], node_buf[kNodeBytes], member_buf[0x18u];
+static B allocations[8][0x50u];
+static U opaque_word = 0u;
+static B explicit_bytes[4];
+static B root_cell[8u];
+static void* ctx_cell = heap_state;
+
+static void record(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u) {
+    require(event_count < kMaxEvents, "event overflow");
+    events[event_count++] = Event{kind, a, b, c, d};
+}
+static void reset_case() {
+    event_count = 0u; g_alloc_index = 0u;
+    std::memset(allocations, 0xcc, sizeof allocations);
+    std::memset(scene_stage_matrix_00624de8, 0xa5, sizeof scene_stage_matrix_00624de8);
+    scene_stage_tree_root_00627df0 = root_cell;
+    scene_stage_group_root_006221d8 = root_cell;
+    std::memcpy(explicit_bytes, &opaque_word, 4);
+    std::memset(events, 0, sizeof events);
+    std::memset(heap_state, 0, sizeof heap_state);
+    std::memset(buf4, 0xcc, sizeof buf4);
+    std::memset(holder_buf, 0xcc, sizeof holder_buf);
+    std::memset(node_buf, 0xcc, sizeof node_buf);
+    std::memset(member_buf, 0xcc, sizeof member_buf);
+    std::memset(root_cell, 0xcc, sizeof root_cell);
+    ctx_cell = heap_state;
+    store_dword(heap_state, 0x28u, address(buf4));       // list head / lock
+    store_dword(heap_state, 0x3cu, g_refill ? 0u : address(node_buf));
+    store_dword(node_buf, 4u, 0x11223344u);              // next free node
+    scene_stage_root_006115c0 = reinterpret_cast<void*>(0x5eed0001u);
+    scene_stage_root_00627dfc = root_cell;
+}
+
+namespace porsche {
+
+void* __cdecl render_allocate_0059ef90(std::uint32_t size) {
+    const U idx = g_alloc_index++;
+    record(kEvAlloc, size, idx);
+    if ((g_fail_mask & (1u << idx)) != 0u) return nullptr;
+    require(idx < 8u && size <= 0x50u, "allocation bound");
+    return allocations[idx];
+}
+void* __cdecl application_context_heap_state_005e4fe8() {
+    // The original body reads the 005e4fe8 cell directly (MOV EAX,[...]);
+    // this accessor is only the C++ transport for that same state read and
+    // records no observable event.
+    return heap_state;
+}
+void __cdecl heap_enter_005322b0(void* lock) { record(kEvLockEnter, address(lock)); }
+void __cdecl heap_leave_005322c0(void* lock) { record(kEvLockLeave, address(lock)); }
+void __cdecl application_context_new_head_0059eeb0(std::uint32_t kind, std::uint32_t slot) {
+    record(kEvNewHead, kind, slot);
+    if (g_refill != 0u) store_dword(heap_state, 0x3cu, address(node_buf));
+}
+void* __cdecl application_context_member_storage_004211d0(std::uint32_t bytes, std::uint32_t mode) {
+    record(kEvMemberStorage, bytes, mode);
+    return member_buf;
+}
+
+
+void* __fastcall scene_stage_tree_ctor_00455830(void* self, void*, B* first, B* second) {
+    require(first == second + 1, "ctor830 pointer adjacency");
+    record(7, address(self), *first, *second);
+    std::memset(self, 0x83, 12); static_cast<B*>(self)[8] = *first;
+    return static_cast<B*>(self) + 4; // original caller must ignore this return
+}
+void __fastcall scene_stage_tree_load_00455570(void* slot, void*) {
+    record(8, address(slot), load_dword(slot, 0));
+    store_dword(slot, 0, load_dword(slot, 0) ^ 0x20u);
+}
+void* __fastcall scene_stage_tree_ctor_004558b0(void* self, void*, B* first, B* second) {
+    require(first == second + 1, "ctor8b0 pointer adjacency");
+    record(9, address(self), *first, *second);
+    std::memset(self, 0xb0, 12); static_cast<B*>(self)[8] = *first;
+    return static_cast<B*>(self) + 4;
+}
+void* __fastcall scene_stage_group_ctor_0059f070(void* self, void*) {
+    record(10, address(self)); std::memset(self, 0x70, 0x4c);
+    return static_cast<B*>(self) + 4; // original caller must use this return
+}
+
+} // namespace porsche
+
+// ---- original byte slots and relocation ----------------------------------
+static const B body_004552b0[311] = {@BODY_004552B0@};
+static B* slot_004552b0 = nullptr;
+static B* original_chain = nullptr;
+static const B body_0043ed00[148] = {@BODY_0043ED00@};
+static const B body_00455f60[130] = {@BODY_00455F60@};
+static B* slot_0043ed00 = nullptr;
+static B* slot_00455f60 = nullptr;
+
+static void set_abs(B* body, U size, U old, const void* replacement, U expected) {
+    U found = 0u; const U target = address(replacement);
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (load_dword(body, i) == old) { store_dword(body, i, target); ++found; i += 3u; }
+    }
+    require(found == expected, "absolute relocation count");
+}
+static void set_rel(B* body, U size, U original_va, U target_va,
+                    const void* replacement, U expected, B opcode) {
+    U found = 0u; const U target = address(replacement);
+    for (U i = 0u; i + 5u <= size; ++i) {
+        if (body[i] == opcode &&
+            ((original_va + i + 5u + static_cast<I>(load_dword(body, i + 1u))) &
+              0xffffffffu) == target_va) {
+            store_dword(body, i + 1u, target - address(body + i + 5u));
+            ++found; i += 4u;
+        }
+    }
+    require(found == expected, "relative relocation count");
+}
+static void prepare_code() {
+    B* const code = static_cast<B*>(VirtualAlloc(
+        nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc code");
+    slot_004552b0 = code + 0x200u;
+    original_chain = code + 0x400u;
+    std::memcpy(slot_004552b0, body_004552b0, sizeof body_004552b0);
+    slot_0043ed00 = code + 0x000u;
+    slot_00455f60 = code + 0x100u;
+    std::memcpy(slot_0043ed00, body_0043ed00, sizeof body_0043ed00);
+    std::memcpy(slot_00455f60, body_00455f60, sizeof body_00455f60);
+
+    set_abs(slot_0043ed00, 148u, 0x006115c0u, &scene_stage_root_006115c0, 2u);
+    set_abs(slot_0043ed00, 148u, 0x005e4fe8u, &ctx_cell, 1u);
+    set_rel(slot_0043ed00, 148u, 0x0043ed00u, 0x0059ef90u,
+            reinterpret_cast<const void*>(&render_allocate_0059ef90), 1u, 0xe8u);
+    set_rel(slot_0043ed00, 148u, 0x0043ed00u, 0x005322b0u,
+            reinterpret_cast<const void*>(&heap_enter_005322b0), 1u, 0xe8u);
+    set_rel(slot_0043ed00, 148u, 0x0043ed00u, 0x0059eeb0u,
+            reinterpret_cast<const void*>(&application_context_new_head_0059eeb0), 1u, 0xe8u);
+    set_rel(slot_0043ed00, 148u, 0x0043ed00u, 0x005322c0u,
+            reinterpret_cast<const void*>(&heap_leave_005322c0), 1u, 0xe8u);
+
+    set_abs(slot_00455f60, 130u, 0x00627dfcu, &scene_stage_root_00627dfc, 3u);
+    set_rel(slot_00455f60, 130u, 0x00455f60u, 0x0059ef90u,
+            reinterpret_cast<const void*>(&render_allocate_0059ef90), 2u, 0xe8u);
+    set_rel(slot_00455f60, 130u, 0x00455f60u, 0x004211d0u,
+            reinterpret_cast<const void*>(&application_context_member_storage_004211d0), 1u, 0xe8u);
+
+
+    set_abs(slot_004552b0, 311, 0x00627df0u, &scene_stage_tree_root_00627df0, 3);
+    set_abs(slot_004552b0, 311, 0x006221d8u, &scene_stage_group_root_006221d8, 2);
+    set_abs(slot_004552b0, 311, 0x00624df0u, reinterpret_cast<B*>(scene_stage_matrix_00624de8) + 8, 1);
+    set_abs(slot_004552b0, 311, 0x00626df0u, reinterpret_cast<B*>(scene_stage_matrix_00624de8) + 8200, 1);
+    set_rel(slot_004552b0, 311, 0x004552b0u, 0x0059ef90u, reinterpret_cast<void*>(&render_allocate_0059ef90), 4, 0xe8);
+    set_rel(slot_004552b0, 311, 0x004552b0u, 0x00455830u, reinterpret_cast<void*>(&scene_stage_tree_ctor_00455830), 1, 0xe8);
+    set_rel(slot_004552b0, 311, 0x004552b0u, 0x00455570u, reinterpret_cast<void*>(&scene_stage_tree_load_00455570), 1, 0xe8);
+    set_rel(slot_004552b0, 311, 0x004552b0u, 0x004558b0u, reinterpret_cast<void*>(&scene_stage_tree_ctor_004558b0), 1, 0xe8);
+    set_rel(slot_004552b0, 311, 0x004552b0u, 0x0059f070u, reinterpret_cast<void*>(&scene_stage_group_ctor_0059f070), 1, 0xe8);
+    // Synthetic CALL/CALL/CALL/RET matches the actual no-arg subsequence.
+    B* chain_targets[3] = {slot_004552b0, slot_0043ed00, slot_00455f60};
+    for (U i = 0; i < 3; ++i) {
+        original_chain[i * 5] = 0xe8;
+        store_dword(original_chain, i * 5 + 1, address(chain_targets[i]) - address(original_chain + i * 5 + 5));
+    }
+    original_chain[15] = 0xc3;
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0,
+            "FlushInstructionCache");
+}
+
+// ---- ABI wrapper: ECX is a controlled input -------------------------------
+static U invoke(void* fn, U ecx_value, U& abi_fail) {
+    U before = 0u, frame = 0u, fail = 0u, result = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0a5a5a500h
+        mov ecx, ecx_value
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        mov edx, opaque_word
+        mov dword ptr [esp-30h], edx
+        lea eax, explicit_bytes
+        push eax
+        call fn
+        add esp, 4
+        mov result, eax
+        cmp ecx, 0
+        jne bad
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return result;
+}
+
+static void capture(Snapshot& out) {
+    out.event_count = event_count;
+    std::memcpy(out.events, events, event_count * sizeof(Event));
+    out.root_6115c0 = address(scene_stage_root_006115c0);
+    out.root_627dfc = address(scene_stage_root_00627dfc);
+    out.root_627dfc_holder = scene_stage_root_00627dfc == nullptr
+        ? 0u : load_dword(scene_stage_root_00627dfc, 0u);
+    std::memcpy(out.allocations, allocations, sizeof allocations);
+    out.tree_root = address(scene_stage_tree_root_00627df0);
+    out.group_root = address(scene_stage_group_root_006221d8);
+    std::memcpy(out.matrix, scene_stage_matrix_00624de8, sizeof out.matrix);
+    std::memcpy(out.node, node_buf, sizeof node_buf);
+    std::memcpy(out.member, member_buf, sizeof member_buf);
+    out.heap_list = load_dword(heap_state, 0x28u);
+    out.heap_free = load_dword(heap_state, 0x3cu);
+}
+static void dump_events(const char* tag, const Snapshot& s) {
+    std::printf("%s case=%u count=%u:", tag, cases, s.event_count);
+    for (U i = 0u; i < s.event_count; ++i)
+        std::printf(" [%u,%u,%u,%u,%u]", s.events[i].kind, s.events[i].a,
+                    s.events[i].b, s.events[i].c, s.events[i].d);
+    std::printf("\n");
+    std::fflush(stdout);
+}
+static void dump_bytes(const char* tag, const B* a, const B* b, U n) {
+    std::printf("%s case=%u:", tag, cases);
+    for (U i = 0u; i < n; ++i)
+        if (a[i] != b[i]) std::printf(" [%02x:%02x!=%02x]", i, a[i], b[i]);
+    std::printf("\n");
+    std::fflush(stdout);
+}
+static void assert_same(const Snapshot& exp, const Snapshot& act) {
+    if (act.event_count != exp.event_count) {
+        dump_events("original", exp);
+        dump_events("cpp", act);
+    }
+    require(act.event_count == exp.event_count, "event count");
+    for (U i = 0u; i < exp.event_count; ++i) {
+        require(act.events[i].kind == exp.events[i].kind, "event kind");
+        require(act.events[i].a == exp.events[i].a, "event a");
+        require(act.events[i].b == exp.events[i].b, "event b");
+        require(act.events[i].c == exp.events[i].c, "event c");
+        require(act.events[i].d == exp.events[i].d, "event d");
+    }
+    require(act.root_6115c0 == exp.root_6115c0, "root 006115c0");
+    require(act.root_627dfc == exp.root_627dfc, "root 00627dfc");
+    require(act.root_627dfc_holder == exp.root_627dfc_holder, "root holder");
+    require(std::memcmp(act.allocations, exp.allocations, sizeof allocations) == 0, "allocation bytes");
+    require(act.tree_root == exp.tree_root && act.group_root == exp.group_root, "721 roots");
+    require(std::memcmp(act.matrix, exp.matrix, sizeof act.matrix) == 0, "matrix bytes");
+    if (std::memcmp(act.node, exp.node, sizeof node_buf) != 0)
+        dump_bytes("node-diff", exp.node, act.node, sizeof node_buf);
+    require(std::memcmp(act.node, exp.node, sizeof node_buf) == 0, "node bytes");
+    require(std::memcmp(act.member, exp.member, sizeof member_buf) == 0, "member bytes");
+    require(act.heap_list == exp.heap_list, "heap list");
+    require(act.heap_free == exp.heap_free, "heap free");
+}
+
+static U abi_fail[2];
+static void run_case(void* original, void* cpp, U ecx_value) {
+    Snapshot snap[2];
+    for (which = 0u; which < 2u; ++which) {
+        reset_case();
+        U af = 0u;
+        if (which == 0u) (void)invoke(original, ecx_value, af);
+        else             (void)invoke(cpp, ecx_value, af);
+        abi_fail[which] = af;
+        capture(snap[which]);
+    }
+    require(abi_fail[0] == 0u && abi_fail[1] == 0u, "abi fail");
+    assert_same(snap[0], snap[1]);
+    ++cases;
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* info) {
+    std::printf("native-fault code=%08lx case=%u which=%u eip=%08lx\n",
+        info->ExceptionRecord->ExceptionCode, cases, which, info->ContextRecord->Eip);
+    std::fflush(stdout); ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+int main(int argc, char** argv) {
+    AddVectoredExceptionHandler(1u, fault_handler);
+    require(argc == 2, "argv PE path");
+    require(scene_stage_root_006115c0 == nullptr && scene_stage_root_00627dfc == nullptr, "production initial roots");
+    prepare_code();
+
+    require(scene_stage_tree_root_00627df0 == nullptr && scene_stage_group_root_006221d8 == nullptr, "721 production initial roots");
+    for (const auto& row : scene_stage_matrix_00624de8)
+        for (U word : row) require(word == 0, "721 production initial matrix");
+    const U patterns[] = {0u, 0x5a37ca18u, 0xffffffffu, 0x12345678u};
+    const U masks[] = {0u, 1u, 2u, 4u, 8u, 16u, 32u, 64u};
+    for (U pattern : patterns) for (U mask : masks) {
+        opaque_word = pattern; g_fail_mask = mask; g_refill = 0;
+        run_case(original_chain, reinterpret_cast<void*>(&scene_stage_chain_721), 0xdeadbeefu);
+    }
+    opaque_word = 0x89abcdefu; g_fail_mask = 0; g_refill = 1;
+    run_case(original_chain, reinterpret_cast<void*>(&scene_stage_chain_721), 0x76543210u);
+    std::printf("scene_stage_stack_core_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    std::fflush(stdout);
+    return 0;
+}

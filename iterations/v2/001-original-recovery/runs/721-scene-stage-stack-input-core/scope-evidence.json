@@ -1,0 +1,72 @@
+{
+  "run": 721,
+  "status": "native-comparison PASS001, explicit-input core PARTIAL/off-graph",
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "query": "unresolved actual parent 00468fb0 ->004552b0 ->0043ed00 ->00455f60; original stack inputs, output ECX and writable state",
+  "original_body": {
+    "va": "004552b0",
+    "end": "004553e6",
+    "bytes": 311,
+    "sha256": "df707a82d95d0d6a6281864cc3be1670a0b1e92da0232653810228321971f2b6"
+  },
+  "evidence": [
+    "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm:004552b0..004553e6",
+    "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm:00455830..004558a6 and004558b0..00455926",
+    "research/v2/binaries/Porsche.exe-ddd748fdbe6d/decompiled.c:VA004552b0"
+  ],
+  "opaque_inputs": {
+    "entry_esp": "E",
+    "original_storage": "four bytes [E-0x24,E-0x21] are never written by parent before child calls",
+    "first_ctor": "004552dc/004552e0: arg1=E-0x23, arg2=E-0x24; this=allocated12B. Original00455830 reads *arg1 at00455883 and writes holder+8 at00455885; arg2 is not read.",
+    "second_ctor": "0045530a/0045530e: arg1=E-0x21,arg2=E-0x22; this=allocated12B. Original004558b0 reads *arg1 at00455903 and writes holder+8 at00455905; arg2 not read.",
+    "production_boundary": "No original-semantic initialization exists. Host compiler stack offsets or guessed zeroes cannot supply these bytes. Research core accepts a mutable explicit4B input image, preserving pointer adjacency and later reads. No void4552b0 production definition is emitted."
+  },
+  "children": [
+    {
+      "va": "0059ef90",
+      "status": "accepted canonical render_allocate_0059ef90",
+      "abi": "cdecl uint32 size -> pointer"
+    },
+    {
+      "va": "00455830",
+      "status": "unowned",
+      "abi": "thiscall RET8 -> self; explicit arg pointers to bytes"
+    },
+    {
+      "va": "00455570",
+      "status": "unowned",
+      "abi": "thiscall RET0; this=8Broot+4; loads configuration and mutates first tree"
+    },
+    {
+      "va": "004558b0",
+      "status": "unowned",
+      "abi": "thiscall RET8 -> self; explicit arg pointers to bytes"
+    },
+    {
+      "va": "0059f070",
+      "status": "unowned",
+      "abi": "thiscall RET0 -> constructed pointer used by caller"
+    }
+  ],
+  "ownership": {
+    "search": "registry entry_va/body_ranges plus complete source/include and all run.cpp/.hpp literal address searches",
+    "cells": [
+      "00627df0:4B root",
+      "006221d8:4B constructor-result root",
+      "00624de8..00626de7:8192B,256x32B records"
+    ],
+    "result": "no current owner found",
+    "initial": "all three lie beyond raw .data1c000 extent, within virtualf6538, thus loader-zero; assertions precede fixture reset",
+    "detailed_review": "ownership-review.json: zero original body overlaps including registry body_ranges; zero address hits across all source/run.cpp/.hpp outside721"
+  },
+  "confirmed": [
+    "Each of256 matrix records has bit pattern [00000000,00000000,3f800000,00000000,3f800000,3f800000,00000000,3f800000]. First byte624de8, last626de7.",
+    "Output ECX=0 on every normal path: written00455361 then untouched toRET004553e6. This transport feeds both716 original leaves, which restore ECX.",
+    "Root8B allocation failure skips both12B allocations and load570; first12B failure still calls load570 with root+4 containing null; second12B failure writes root[0]=0;76B allocation always follows.",
+    "59f070 return used,55830/558b0 return ignored (ESI original allocation used)."
+  ],
+  "boundaries": "Controlled downstream calls and explicit original-stack bytes only; parent void ABI unresolved; no live config, allocation or gameplay acceptance.",
+  "indexed_function": "research/v2/binaries/Porsche.exe-ddd748fdbe6d/functions.jsonl:1111, exact311B ranges4552b0..4553e6",
+  "stack_provenance_limit": "Parent00468fb0 issues no argument setup; the four bytes reside below entryESP in reused call-stack space. The producer depends on earlier frames/callees and is not proved. The core never derives their location from a recovered compiler frame."
+}

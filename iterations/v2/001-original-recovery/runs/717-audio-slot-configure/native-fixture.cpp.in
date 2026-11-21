@@ -1,0 +1,137 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstdint>
+#include <cstring>
+#include <initializer_list>
+#include "audio_slot_configure_717.hpp"
+using U=std::uint32_t;using I=std::int32_t;using B=std::uint8_t;
+using namespace porsche;
+static U cases,side,mode,device_on;static I slot_value,create_return;
+static U args[6];static B* code;
+struct Trace{U abi,ret,n,events[8],device;B before[0x1800],after[0x1800];};
+static Trace trace,expected;
+static void require(bool ok,const char* why){if(!ok){printf("divergence %s case=%u side=%u\n",why,cases,side);fflush(stdout);ExitProcess(1);}}
+static LONG WINAPI fault(EXCEPTION_POINTERS* e){printf("divergence native-fault %08lx case=%u side=%u\n",e->ExceptionRecord->ExceptionCode,cases,side);fflush(stdout);ExitProcess(1);return EXCEPTION_CONTINUE_SEARCH;}
+namespace porsche {
+I __stdcall audio_direct_sound_create_00597f70(const void*,U*,void*){ExitProcess(92);return 0;}
+void* __stdcall audio_platform_foreground_window(){ExitProcess(93);return nullptr;}
+void* __stdcall audio_platform_desktop_window(){ExitProcess(94);return nullptr;}
+I __cdecl audio_resource_free_slot_0058f5b0(){
+ trace.events[trace.n++]=1;trace.events[trace.n++]=audio_ds_device_006ad760;
+ if(mode==1)audio_ds_device_006ad760=0;
+ if(mode==2)memset(audio_resource_slots_006ad7b8,0x51,0x1800);
+ return slot_value;
+}
+I __cdecl audio_resource_create_slot_0058e500(U slot){
+ trace.events[trace.n++]=2;trace.events[trace.n++]=slot;trace.events[trace.n++]=audio_ds_device_006ad760;
+ memcpy(trace.before,audio_resource_slots_006ad7b8,0x1800);
+ if(mode==1){audio_ds_device_006ad760=0xfedcba98;memset(audio_resource_slots_006ad7b8+slot*24,0xbc,24);}
+ if(mode==2){memset(audio_resource_slots_006ad7b8+slot*24,0xcd,24);audio_resource_slots_006ad7b8[0]=0xef;}
+ return create_return;
+}
+}
+static U invoke_cdecl6(void* fn, U arg0, U arg1, U arg2, U arg3, U arg4, U arg5, U& abi_fail) {
+    U out = 0u;
+    U fail = 0u;
+    U before = 0u;
+    U frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg5
+        push arg4
+        push arg3
+        push arg2
+        push arg1
+        push arg0
+        mov eax, 0a5a5a500h
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 24
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return out;
+}
+static U rd(const void* p){U v;memcpy(&v,p,4);return v;}
+static bool initial_data(const char* pe_path){
+    // Read original virtual bytes from its file-backed prefix or loader-zero tail.
+    FILE* f=fopen(pe_path,"rb");if(!f)return false;
+    fseek(f,0,SEEK_END);const long bytes=ftell(f);rewind(f);
+    auto* pe=new unsigned char[bytes];if(fread(pe,1,bytes,f)!=static_cast<size_t>(bytes)){fclose(f);return false;}fclose(f);
+    const U nt=rd(pe+0x3c),base=rd(pe+nt+52),sections=pe[nt+6]|U(pe[nt+7])<<8;
+    const U optional=pe[nt+20]|U(pe[nt+21])<<8;
+    const U va[]={0x6ad760,0x6ad7b8};const U sizes[]={4,0x1800};
+    const unsigned char* native[]={reinterpret_cast<const unsigned char*>(&audio_ds_device_006ad760),audio_resource_slots_006ad7b8};
+    bool ok=true;
+    for(U j=0;j<2;++j){bool found=false;for(U i=0;i<sections;++i){
+        const auto* s=pe+nt+24+optional+i*40;const U rva=rd(s+12),vs=rd(s+8),rawsize=rd(s+16),raw=rd(s+20);
+        const U delta=va[j]-base-rva;if(delta>=vs||sizes[j]>vs-delta)continue;found=true;
+        for(U k=0;k<sizes[j];++k){const unsigned char original_byte=delta+k<rawsize?pe[raw+delta+k]:0;if(native[j][k]!=original_byte)ok=false;}
+    }if(!found)ok=false;}
+    delete[] pe;return ok;
+}
+static void wr(void* p,U value){memcpy(p,&value,4);}
+static void init(const char* pe_path){
+ require(initial_data(pe_path),"production initial data vs PE");
+ code=static_cast<B*>(VirtualAlloc(nullptr,4096,0x3000,0x40));require(code!=nullptr,"allocate");
+ const B raw[]={@BODY_0058f220@};require(sizeof(raw)==103,"extent");memcpy(code,raw,103);
+ require(rd(code+1)==0x6ad760,"raw device");wr(code+1,reinterpret_cast<U>(&audio_ds_device_006ad760));
+ require(rd(code+0x24)==0x6ad7b8,"raw table");wr(code+0x24,reinterpret_cast<U>(audio_resource_slots_006ad7b8));
+ for(U off:{0xcu,0x53u}){
+   require(code[off]==0xe8,"call opcode");
+   const U target=0x58f220+off+5+rd(code+off+1);
+   require(target==(off==0xc?0x58f5b0u:0x58e500u),"raw callee");
+   const U callback=off==0xc?reinterpret_cast<U>(&audio_resource_free_slot_0058f5b0):reinterpret_cast<U>(&audio_resource_create_slot_0058e500);
+   wr(code+off+1,callback-reinterpret_cast<U>(code+off+5));
+ }
+ require(FlushInstructionCache(GetCurrentProcess(),code,103)!=0,"flush");
+}
+static void run_case(){
+ ++cases;
+ for(side=0;side<2;++side){
+  memset(&trace,0,sizeof(trace));
+  for(U i=0;i<0x1800;++i)audio_resource_slots_006ad7b8[i]=static_cast<B>(i*17+cases*3);
+  audio_ds_device_006ad760=device_on?0x12345678:0;
+  void* fn=side?reinterpret_cast<void*>(&audio_group_configure_0058f220):code;
+  trace.ret=invoke_cdecl6(fn,args[0],args[1],args[2],args[3],args[4],args[5],trace.abi);
+  trace.device=audio_ds_device_006ad760;memcpy(trace.after,audio_resource_slots_006ad7b8,0x1800);
+  require(trace.abi==0,"callee-saved and ESP");
+  if(side==0)expected=trace;else require(memcmp(&trace,&expected,sizeof(trace))==0,"return calls state");
+ }
+}
+int main(int argc,char** argv){
+ AddVectoredExceptionHandler(1,fault);require(argc==2,"PE argument");init(argv[1]);
+ for(U dev:{0u,1u})for(I slot:{-1,0,1,2,127,255})for(I result:{-2147483647,-1,0,1,255,2147483647})for(U mutation_mode:{0u,1u,2u}){
+  device_on=dev;mode=mutation_mode;slot_value=slot;create_return=result;
+  args[0]=0xf1234580u+cases;args[1]=0xe2348001u+cases;
+  args[2]=0x13579bdfu+cases;args[3]=0x2468ace0u+cases;args[4]=0xa51a51a5u+cases;args[5]=0x80001234u+cases;
+  run_case();
+ }
+ printf("audio_slot_configure_original_x86_vs_cpp=PASS cases=%u ABI=PASS production_initial_state=PASS full_slots=PASS\n",cases);return 0;
+}

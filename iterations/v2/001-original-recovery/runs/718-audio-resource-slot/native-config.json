@@ -1,0 +1,94 @@
+{
+  "run": 718,
+  "experiment": "local/experiments/v2-audio-resource-slot-718",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/audio_resource_slot_718.cpp",
+    "iterations/v2/001-original-recovery/runs/452-audio-record-resources/audio_record_resources_452.cpp",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities/audio_capabilities_443.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/718-audio-resource-slot"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0058f7a0",
+      "bytes": 60,
+      "sha256": "a702a6ea7b7988efb2372269799f05c4aa32f33111085b286b34d161415360e9",
+      "token": "@BODY_0058f7a0@"
+    }
+  ],
+  "pass_marker": "audio_resource_slot_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "low15-count",
+      "source": "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/audio_resource_slot_718.cpp",
+      "old": "& 0xffffu",
+      "new": "& 0x7fffu",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "ignore-upper16-mask",
+      "source": "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/audio_resource_slot_718.cpp",
+      "old": "& 0xffffu",
+      "new": "& 0xffffffffu",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stride4",
+      "source": "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/audio_resource_slot_718.cpp",
+      "old": "base + index * 8u",
+      "new": "base + index * 4u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "skip-first-empty",
+      "source": "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/audio_resource_slot_718.cpp",
+      "old": "if (value == 0u)",
+      "new": "if (value == 0u && index != 0u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-key",
+      "source": "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/audio_resource_slot_718.cpp",
+      "old": "&key, 4u",
+      "new": "&index, 4u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "clear-payload",
+      "source": "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/audio_resource_slot_718.cpp",
+      "old": "return reinterpret_cast<void*>(audio_resource_map_006b48a4 + index * 8u);",
+      "new": "std::uint32_t zero = 0; std::memcpy(reinterpret_cast<void*>(row + 4u), &zero, 4u); return reinterpret_cast<void*>(audio_resource_map_006b48a4 + index * 8u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "return-next-row",
+      "source": "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/audio_resource_slot_718.cpp",
+      "old": "audio_resource_map_006b48a4 + index * 8u",
+      "new": "audio_resource_map_006b48a4 + (index + 1u) * 8u",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "reject-zero-key",
+      "source": "iterations/v2/001-original-recovery/runs/718-audio-resource-slot/audio_resource_slot_718.cpp",
+      "old": "const std::uint32_t count =",
+      "new": "if (key == 0u) return nullptr;\n    const std::uint32_t count =",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

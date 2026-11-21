@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "run": 716,
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "research/v2/binaries/Porsche.exe-ddd748fdbe6d/disassembly.asm",
+    "research/v2/binaries/Porsche.exe-ddd748fdbe6d/decompiled.c",
+    "local/game/Porsche.exe (raw PE, read-only)"
+  ],
+  "query": "Run700 evidence-excluded 0043ed00 / 00455f60: establish opaque byte semantics and global ownership before reconsidering implementation.",
+  "targets": [
+    {
+      "va": "0043ed00",
+      "bytes": 148,
+      "end": "0043ed93",
+      "raw_pe_sha256": "f78eba8b57ba84c1ca666d4e06fce47994c6694ddf5c192e45323d22bb368c12",
+      "raw_prefix": "51566a0ce8870216008bf083c40485f67475c706",
+      "abi": "cdecl void(), RET 0; entry ECX word is the byte source",
+      "writes": [
+        "0x006115c0"
+      ]
+    },
+    {
+      "va": "00455f60",
+      "bytes": 130,
+      "end": "00455fe1",
+      "raw_pe_sha256": "4a978625782cf688970b66e838d1cd78f4bef97fe29d471b4bca010c05e83918",
+      "raw_prefix": "51576a04e8279014008bf883c40485ff7463566a",
+      "abi": "cdecl void(), RET 0; entry ECX word is the byte source",
+      "writes": [
+        "0x00627dfc"
+      ]
+    }
+  ],
+  "opaque_byte_semantics": {
+    "status": "proved",
+    "raw_stack_trace_43ed00": "E=entry ESP. PUSH ECX -> [E-4]; PUSH ESI -> E-8; PUSH 0xc -> E-12; CALL 0059ef90/ADD ESP,4 -> E-8; PUSH EBP/EDI -> E-16; PUSH ECX([ctx+0x28]) -> E-20; CALL 005322b0/ADD ESP,4 -> E-16; PUSH 0/PUSH 2/CALL 0059eeb0/ADD ESP,8 -> E-16; PUSH EAX -> E-20; CALL 005322c0 -> E-20. At 0043ed52 MOV CL,[ESP+0x13]=[E-1]=byte 3 of saved ECX = (entry_ECX>>24)&0xff.",
+    "raw_stack_trace_55f60": "E=entry ESP. PUSH ECX -> [E-4]; PUSH EDI -> E-8; PUSH 4/CALL 0059ef90/ADD ESP,4 -> E-8; PUSH ESI -> E-12; PUSH 0xc/CALL 0059ef90/ADD ESP,4 -> E-12; PUSH 0/PUSH 0x18/CALL 004211d0 -> E-20. At 00455f92 MOV CL,[ESP+0x13]=[E-1]=(entry_ECX>>24)&0xff.",
+    "ghidra_crosscheck": "decompiled.c lines 38806 and 56279: local_1 = (undefined1)((uint)param_1 >> 0x18); both functions declared void __fastcall FUN_...(undefined4 param_1) \u0432\u0402\u201d one ECX word input. Confirms raw stack derivation.",
+    "sole_caller": "Original 00468fb0 at 00469079 / 0046907e issues consecutive CALLs with no ECX setup. The preceding original 004552b0 writes ECX=0 at 00455361 and never changes it before RET. Original 0043ed00 restores entry ECX with POP ECX at both exits (0043ed85/0043ed92), so the second original call also receives zero. This fact does not establish ECX=0 across the recovered C++ parent.",
+    "conclusion": "Not opaque caller garbage of unknown behavior: the machine semantics are exactly (entry_ECX>>24)&0xff, reproducible for arbitrary ECX. Run700's 'fixed byte would invent behavior' reason is resolved by snapshotting entry ECX rather than fixing a constant.",
+    "output_ecx": "Both original leaves restore entry ECX on every exit via POP ECX. Review010 reproduced /Od divergence when output ECX was checked: uncorrected C++ returned the holder pointer in ECX. Repaired source restores entry_ecx explicitly on every exit. Proof011 checks output ECX as well as ESP/EBP/EBX/ESI/EDI."
+  },
+  "ownership": {
+    "registry": "iterations/v2/001-original-recovery/source/recovered/functions.json: entries 0043ed00 and 00455f60 are absent; globals 0x006115c0, 0x00627dfc absent as va/cell from registry and from all run .cpp/.hpp sources. No canonical owner exists.",
+    "owned_cells_created": [
+      "0x006115c0 (4B writable stage root, written by 0043ed00, read by 0043eda0)",
+      "0x00627dfc (4B writable stage root, written by 00455f60, read by 00455ff0)"
+    ],
+    "reused_canonical_providers": [
+      "0059ef90 render_allocate_0059ef90 (porsche/render_startup.hpp)",
+      "005e4fe8 application_context_heap_state_005e4fe8 (porsche/application_context_base.hpp)",
+      "005322b0 heap_enter_005322b0 / 005322c0 heap_leave_005322c0 (porsche/heap.hpp)",
+      "0059eeb0 application_context_new_head_0059eeb0 (porsche/application_context_base.hpp)",
+      "004211d0 application_context_member_storage_004211d0 (porsche/application_context_base.hpp)"
+    ],
+    "run700_abi_conflict_resolved": "The splash/window header aliases splash_progress_*_005322b0 and window_*_005322b0 are namespace-local wrappers; the canonical declaration is void __cdecl heap_enter_005322b0(void*)/heap_leave_005322c0(void*) in source/include/porsche/heap.hpp. Including only that canonical header avoids the alias collision; no ABI guess is needed.",
+    "initial_storage": {
+      "section": ".data",
+      "section_raw_size": "0001c000",
+      "section_virtual_size": "000f6538",
+      "006115c0_delta": "000465c0",
+      "00627dfc_delta": "0005cdfc",
+      "bytes": "00000000 each, loader-zero beyond section raw extent",
+      "fixture": "Both production cells asserted null before first fixture reset."
+    }
+  },
+  "boundaries": "The original callsite byte is proved zero, including restoration by original 0043ed00; current compiled parent input ECX is not established because preceding 004552b0 is unresolved. The repaired leaves match arbitrary controlled entry ECX and restore it on every exit. Compiled parent transport must be proved before composed integration acceptance. Real allocator/member-storage producers, live free-list state and production CMake/registry integration remain open. Synthetic callsite setup/RET and controlled endpoints are harness code.",
+  "compiled_parent_review": {
+    "object": "local/builds/v2/a714/entry-289/porsche_game_entry_bridges.dir/Release/application_view_lifecycle_693.obj",
+    "calls": "Release COFF +0xF3 calls unresolved scene_stage_reset_004552b0, +0xF8 calls 0043ed00, +0xFD calls 00455f60; no ECX setup between them.",
+    "condition": "Before admitting the composed parent, establish the original-derived ECX=0 explicitly at its first leaf boundary, or recover and prove the preceding 004552b0 output ECX. Repaired leaves preserve the full entry word across the second no-arg call. Full compiled parent composition remains unproved.",
+    "evidence": "local/experiments/v2-scene-stage-reset-ecx-tag-716/review-parent-a714-disasm.txt"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "run": 723,
+  "experiment": "local/experiments/v2-canonical-abi-bindings-723-audio",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/audio_period_callback_probe_697.cpp",
+    "iterations/v2/001-original-recovery/runs/723-canonical-abi-bindings/audio-callers.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/723-canonical-abi-bindings/audio-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message",
+    "iterations/v2/001-original-recovery/source/include",
+    "iterations/v2/001-original-recovery/runs/723-canonical-abi-bindings"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/697-audio-period-callback-and-probe-message/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/723-canonical-abi-bindings/bindings.json",
+    "iterations/v2/001-original-recovery/runs/723-canonical-abi-bindings/bindings.cmake"
+  ],
+  "original_bodies": [
+    {
+      "va": "00590250",
+      "bytes": 56,
+      "sha256": "941bc12ee93b6a85c61f21c7cd88e887c9180c36015ff5c6480b1ef64bbbbfda",
+      "token": "@BODY_00590250@"
+    },
+    {
+      "va": "004a6c90",
+      "bytes": 176,
+      "sha256": "c6b4dc0f14b0041bfc02853bb07072e4d60c01851ff56422174d92ed055c4753",
+      "token": "@BODY_004A6C90@"
+    },
+    {
+      "va": "005d1444",
+      "bytes": 40,
+      "sha256": "aaa3ccc5e9695f906f60f3e09e576968018c24587c393c7c4b3b0d6f777e3626",
+      "token": "@STR_005D1444@"
+    },
+    {
+      "va": "005d146c",
+      "bytes": 5,
+      "sha256": "06c1fd6af7b9d480ac9e89c7b6fea8eb8c6e95d2cd96ee20222324bfcd4792fb",
+      "token": "@STR_005D146C@"
+    }
+  ],
+  "pass_marker": "audio_period_probe_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 300,
+  "mutations": [
+    {
+      "name": "audio-legacy-call-control",
+      "source": "iterations/v2/001-original-recovery/runs/723-canonical-abi-bindings/audio-callers.cpp",
+      "old": "porsche::application_sim_boundary_004a6c90(text,kind);",
+      "new": "porsche::application_sim_boundary_004a6c90(text,kind ^ 1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
