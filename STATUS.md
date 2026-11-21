@@ -1,14 +1,19 @@
 # Current project status
 
-Updated 2026-11-21. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-22. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run730](iterations/v2/001-original-recovery/runs/730-audio-copy-and-frame-control-integration/README.md)
-compiles 425 C++ translation units across eight projects. The shared link
+[Run735](iterations/v2/001-original-recovery/runs/735-scene-audio-render-integration/README.md)
+compiles 428 C++ translation units across eight projects. The shared link
 reports **97 unresolved names / 104 references**. There is no game EXE yet.
+The shared audit accepts Runs732/733/734 within their bounded domains: 25 new
+registry entries (1,211 total), 4,836 original-x86 comparisons, 44 mutations,
+and 1,060 source pins. Four names close; four typed children open. Run736 has a
+passing native packet awaiting the next shared integration.
 
-The shared audit verifies `728/005`, `729/002` and `731/002` (four registry
+Historical: [Run730](iterations/v2/001-original-recovery/runs/730-audio-copy-and-frame-control-integration/README.md)
+verifies `728/005`, `729/002` and `731/002` (four registry
 entries: `0058e310`, replaced `00412030` consumer, `00455830`, `004558b0`;
 1,186 total), 14,610 original-x86 comparisons, 24 mutation controls, 1,053
 source pins and 13 REA sessions. Six names close (`audio_resource_copy_0058e310`,

@@ -1,6 +1,16 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-21. [Run730](runs/730-audio-copy-and-frame-control-integration/README.md)
+Current 2026-11-22. [Run735](runs/735-scene-audio-render-integration/README.md)
+passes the shared audit for frozen Runs732/733/734: 428 TUs, 97 unresolved
+names / 104 references, 25 new registry entries (1,211 total), 4,836 native
+cases, 44 mutations, 1,060 source pins, no EXE. Four names close and four
+typed children open (`00567060`, `00566ea0`, `005612a0`, `00571630`).
+[Run736](runs/736-scene-blur-program-lifecycle/README.md) is native PASS006
+(152 comparisons, 10 mutations) and awaits coordinator-owned shared integration
+in a new batch. Next: integrate frozen Run736, then choose a reachable child
+from the measured linker/startup frontier. Passed packets remain unchanged.
+
+[Run730](runs/730-audio-copy-and-frame-control-integration/README.md)
 passes the shared audit (`build-002`) for `728/005`, `729/002` and `731/002` on
 the Run727 baseline: **425 TUs / 8 projects**, **97 unresolved names / 104
 references**, no game EXE. Six names close with zero new unresolved names;

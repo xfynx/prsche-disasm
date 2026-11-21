@@ -19,11 +19,10 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run730](iterations/v2/001-original-recovery/runs/730-audio-copy-and-frame-control-integration/README.md)
-is the current shared build (`425` TUs, `97` unresolved names / `104`
-references). The next packets (`732`–`734`) address remaining reachable scene,
-audio and render/input frontier dependencies. The active iteration plan tracks
-their proof and integration.
+[Run735](iterations/v2/001-original-recovery/runs/735-scene-audio-render-integration/README.md)
+is the current shared build (`428` TUs, `97` unresolved names / `104`
+references). Run736 is native-proved and awaits the next shared integration.
+The active iteration plan tracks its acceptance and the newly opened children.
 
 ## Recovery milestones
 

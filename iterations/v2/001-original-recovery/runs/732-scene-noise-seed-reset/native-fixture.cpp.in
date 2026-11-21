@@ -1,0 +1,483 @@
+// Native x86-vs-C++ differential fixture for Run732:
+//   0044f240..0044f2ed (174B) porsche::scene_stage_reset_0044f240
+//   00538110..00538150 (65B)  porsche::render_seed_prng_seed_00538110
+// Composed with accepted Run638 porsche::render_seed_prng_next_00538040 (193B).
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "application_view_lifecycle_693.hpp"
+#include "render_seed_prng_638.hpp"
+#include "render_surface_init_511.hpp"
+#include "scene_noise_seed_732.hpp"
+
+namespace porsche {
+// Canonical Run511 readonly constant (defined by render_surface_init_511.cpp in the game link;
+// verified against raw PE bytes at 005b23f0 in init() below).
+const float render_surface_half_005b23f0 = 0.5f;
+} // namespace porsche
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static_assert(sizeof(porsche::render_seed_prng_state_005de910) == 24u, "24-byte PRNG state");
+static_assert(sizeof(porsche::scene_noise_gradient_00619804) == 1068u, "267-float gradient table");
+static_assert(sizeof(porsche::scene_noise_perm_00619c30) == 8192u, "4096-word permutation table");
+
+static U cases = 0u;
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", msg, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* p, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + off, 4u);
+    return v;
+}
+
+static void store32(void* p, U off, U v) {
+    std::memcpy(static_cast<B*>(p) + off, &v, 4u);
+}
+
+struct Fpu {
+    unsigned short control;
+    unsigned short status;
+    B tag;
+    B padding[3];
+    B values[80];
+    unsigned short full_tag;
+    U mxcsr;
+};
+
+struct SeedTrace {
+    U abi_fail;
+    std::array<U, 6> prng_state;
+    std::array<U, 4> next_samples;
+    Fpu fpu;
+};
+
+struct ResetTrace {
+    U abi_fail;
+    U flag_5ce938;
+    std::array<U, 6> prng_state;
+    std::array<U, 267> gradient_words;
+    std::array<std::int16_t, 4096> perm_words;
+    Fpu fpu;
+};
+
+alignas(16) static B floating[512];
+static B* code_page = nullptr;
+static B* slot_00538040 = nullptr;
+static B* slot_00538110 = nullptr;
+static B* slot_0044f240 = nullptr;
+
+// Raw PE .rdata slices used by the relocated original x86 oracle (distinct addresses from C++ globals
+// so oracle and candidate cannot agree on an invented constant).
+alignas(4) static const B orig_rdata_5b3ca4[4] = {@RDATA_005B3CA4@};
+alignas(4) static const B orig_rdata_5b23f0[4] = {@RDATA_005B23F0@};
+alignas(4) static const B orig_data_5de910[24] = {@DATA_005DE910@};
+alignas(4) static const B orig_data_5ce938[4] = {@DATA_005CE938@};
+
+static void capture_fpu(Fpu& f) {
+    std::memset(&f, 0, sizeof f);
+    B env[28];
+    __asm {
+        fxsave floating
+        fnstenv env
+        fldenv env
+    }
+    f.control = *reinterpret_cast<unsigned short*>(floating);
+    f.status = *reinterpret_cast<unsigned short*>(floating + 2);
+    f.tag = floating[4];
+    std::memset(f.padding, 0, 3);
+    f.full_tag = *reinterpret_cast<unsigned short*>(env + 8);
+    f.mxcsr = *reinterpret_cast<U*>(floating + 24);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((f.status >> 11) + i) & 7u;
+        if ((f.tag & (1u << physical)) != 0u) {
+            std::memcpy(f.values + i * 10u, floating + 32u + i * 16u, 10u);
+        } else {
+            std::memset(f.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void seed_fpu(unsigned short cw, U pre_depth) {
+    __asm {
+        fninit
+        fldcw cw
+    }
+    if (pre_depth >= 1u) {
+        __asm { fldpi }
+    }
+    if (pre_depth >= 2u) {
+        __asm { fld1 }
+    }
+}
+
+static U invoke_cdecl0(void* fn) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_cdecl1(void* fn, U arg0) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push arg0
+        call fn
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_cdecl0_ret(void* fn) {
+    U out = 0u;
+    __asm {
+        call fn
+        mov out, eax
+    }
+    return out;
+}
+
+static void relocate_abs32(B* slot, U off, U expected_orig, U replacement) {
+    require(load32(slot, off) == expected_orig, "exact absolute relocation offset");
+    store32(slot, off, replacement);
+}
+
+static void relocate_call_rel32(B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void verify_pe_bss_loader_zero(const char* pe_path) {
+    HANDLE h = CreateFileA(pe_path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                           FILE_ATTRIBUTE_NORMAL, nullptr);
+    require(h != INVALID_HANDLE_VALUE, "open original PE");
+    B hdr[1024]{};
+    DWORD got = 0u;
+    require(ReadFile(h, hdr, sizeof hdr, &got, nullptr) != 0 && got == sizeof hdr, "read PE header");
+    CloseHandle(h);
+
+    const U pe_off = load32(hdr, 0x3cu);
+    require(pe_off + 24u < sizeof hdr && std::memcmp(hdr + pe_off, "PE\0\0", 4u) == 0, "PE signature");
+    const U sections = *reinterpret_cast<const unsigned short*>(hdr + pe_off + 6u);
+    const U optional = *reinterpret_cast<const unsigned short*>(hdr + pe_off + 20u);
+    const U base = load32(hdr, pe_off + 52u);
+    bool verified_bss = false;
+    for (U i = 0u; i < sections; ++i) {
+        const U off = pe_off + 24u + optional + i * 40u;
+        const U vsize = load32(hdr, off + 8u);
+        const U rva = load32(hdr, off + 12u);
+        const U rsize = load32(hdr, off + 16u);
+        const U sec_va = base + rva;
+        if (sec_va <= 0x00619804u && 0x0061bc30u <= sec_va + vsize) {
+            require(0x00619804u >= sec_va + rsize, "00619804..0061bc2f is virtual-only loader-zero .bss");
+            verified_bss = true;
+        }
+    }
+    require(verified_bss, "located .data/.bss section containing 00619804..0061bc2f");
+}
+
+static void init(const char* pe_path) {
+    // 1. Assert production initial .data, .rdata, and loader-zero .bss before any fixture reset.
+    require(std::memcmp(porsche::render_seed_prng_state_005de910, orig_data_5de910, 24u) == 0,
+            "initial .data 005de910..005de927");
+    require(std::memcmp(&porsche::scene_noise_flag_005ce938, orig_data_5ce938, 4u) == 0 &&
+                porsche::scene_noise_flag_005ce938 == 1u,
+            "initial .data 005ce938 == 1");
+    require(std::memcmp(&porsche::scene_noise_inv_2pow32_005b3ca4, orig_rdata_5b3ca4, 4u) == 0 &&
+                load32(&porsche::scene_noise_inv_2pow32_005b3ca4) == 0x2f800000u,
+            "initial .rdata 005b3ca4 == 0x2f800000");
+    require(std::memcmp(&porsche::render_surface_half_005b23f0, orig_rdata_5b23f0, 4u) == 0 &&
+                load32(&porsche::render_surface_half_005b23f0) == 0x3f000000u,
+            "initial .rdata 005b23f0 == 0x3f000000");
+    for (U i = 0u; i < 267u; ++i) {
+        require(load32(&porsche::scene_noise_gradient_00619804[i]) == 0u,
+                "initial loader-zero .bss 00619804..00619c2f");
+    }
+    for (U i = 0u; i < 4096u; ++i) {
+        require(porsche::scene_noise_perm_00619c30[i] == 0,
+                "initial loader-zero .bss 00619c30..0061bc2f");
+    }
+    verify_pe_bss_loader_zero(pe_path);
+
+    // Ensure host addresses lie in positive signed 32-bit range for original JL/JGE pointer loops.
+    require(address(&porsche::scene_noise_gradient_00619804[267]) < 0x70000000u, "gradient address range");
+    require(address(&porsche::scene_noise_perm_00619c30[4096]) < 0x70000000u, "perm address range");
+
+    // 2. Allocate executable slots and copy raw SHA-verified PE bodies.
+    static const B body_00538040[] = {@BODY_00538040@};
+    static const B body_00538110[] = {@BODY_00538110@};
+    static const B body_0044f240[] = {@BODY_0044F240@};
+    require(sizeof body_00538040 == 193u, "193B 00538040");
+    require(sizeof body_00538110 == 65u, "65B 00538110");
+    require(sizeof body_0044f240 == 174u, "174B 0044f240");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+    slot_00538040 = code_page;
+    slot_00538110 = code_page + 256u;
+    slot_0044f240 = code_page + 512u;
+    std::memcpy(slot_00538040, body_00538040, sizeof body_00538040);
+    std::memcpy(slot_00538110, body_00538110, sizeof body_00538110);
+    std::memcpy(slot_0044f240, body_0044f240, sizeof body_0044f240);
+
+    // 3. Relocate 00538040 -> porsche::render_seed_prng_state_005de910.
+    const U prng_base = address(porsche::render_seed_prng_state_005de910);
+    struct RelocEntry {
+        U off;
+        U orig_va;
+    };
+    static const RelocEntry kRelocs538040[] = {
+        {0x002u, 0x005de920u}, {0x009u, 0x005de924u}, {0x023u, 0x005de91cu},
+        {0x028u, 0x005de920u}, {0x032u, 0x005de918u}, {0x039u, 0x005de91cu},
+        {0x049u, 0x005de914u}, {0x050u, 0x005de918u}, {0x05du, 0x005de914u},
+        {0x069u, 0x005de910u}, {0x072u, 0x005de924u}, {0x077u, 0x005de910u},
+        {0x080u, 0x005de920u}, {0x087u, 0x005de920u}, {0x08fu, 0x005de91cu},
+        {0x096u, 0x005de91cu}, {0x09eu, 0x005de918u}, {0x0a5u, 0x005de918u},
+        {0x0adu, 0x005de914u}, {0x0b4u, 0x005de914u}, {0x0bcu, 0x005de910u},
+    };
+    for (const RelocEntry& r : kRelocs538040) {
+        relocate_abs32(slot_00538040, r.off, r.orig_va, prng_base + (r.orig_va - 0x005de910u));
+    }
+
+    // 4. Relocate 00538110 -> porsche::render_seed_prng_state_005de910.
+    static const RelocEntry kRelocs538110[] = {
+        {0x00au, 0x005de910u}, {0x014u, 0x005de914u}, {0x01eu, 0x005de918u},
+        {0x028u, 0x005de91cu}, {0x032u, 0x005de920u}, {0x03cu, 0x005de924u},
+    };
+    for (const RelocEntry& r : kRelocs538110) {
+        relocate_abs32(slot_00538110, r.off, r.orig_va, prng_base + (r.orig_va - 0x005de910u));
+    }
+
+    // 5. Relocate 0044f240 data/rdata and CALLs to raw 00538040 / 00538110 slots.
+    relocate_abs32(slot_0044f240, 0x05u, 0x005ce938u, address(&porsche::scene_noise_flag_005ce938));
+    relocate_abs32(slot_0044f240, 0x24u, 0x00619804u, address(&porsche::scene_noise_gradient_00619804[0]));
+    relocate_abs32(slot_0044f240, 0x42u, 0x00619c30u, address(&porsche::scene_noise_gradient_00619804[267]));
+    relocate_abs32(slot_0044f240, 0x48u, 0x005b3ca4u, address(orig_rdata_5b3ca4));
+    relocate_abs32(slot_0044f240, 0x4eu, 0x005b23f0u, address(orig_rdata_5b23f0));
+    relocate_abs32(slot_0044f240, 0x5cu, 0x00619c30u, address(&porsche::scene_noise_perm_00619c30[0]));
+    relocate_abs32(slot_0044f240, 0x68u, 0x0061bc30u, address(&porsche::scene_noise_perm_00619c30[4096]));
+    relocate_abs32(slot_0044f240, 0x6fu, 0x0061bc2eu, address(&porsche::scene_noise_perm_00619c30[4095]));
+    relocate_abs32(slot_0044f240, 0x85u, 0x00619c30u, address(&porsche::scene_noise_perm_00619c30[0]));
+    relocate_abs32(slot_0044f240, 0x8du, 0x00619c30u, address(&porsche::scene_noise_perm_00619c30[0]));
+    relocate_abs32(slot_0044f240, 0x99u, 0x00619c30u, address(&porsche::scene_noise_perm_00619c30[0]));
+
+    relocate_call_rel32(slot_0044f240, 0x0044f240u, 0x0fu, 0x00538040u, slot_00538040);
+    relocate_call_rel32(slot_0044f240, 0x0044f240u, 0x1bu, 0x00538110u, slot_00538110);
+    relocate_call_rel32(slot_0044f240, 0x0044f240u, 0x28u, 0x00538040u, slot_00538040);
+    relocate_call_rel32(slot_0044f240, 0x0044f240u, 0x73u, 0x00538040u, slot_00538040);
+    relocate_call_rel32(slot_0044f240, 0x0044f240u, 0xa0u, 0x00538110u, slot_00538110);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code_page, 4096u) != 0, "FlushInstructionCache");
+}
+
+static void run_seed_case(U seed_arg, const std::array<U, 6>& pre_state) {
+    SeedTrace expected{};
+    SeedTrace actual{};
+
+    // Original x86 00538110 + 4 steps of original 00538040
+    for (U i = 0u; i < 6u; ++i) porsche::render_seed_prng_state_005de910[i] = pre_state[i];
+    seed_fpu(0x027fu, 1u);
+    expected.abi_fail = invoke_cdecl1(slot_00538110, seed_arg);
+    capture_fpu(expected.fpu);
+    for (U i = 0u; i < 6u; ++i) expected.prng_state[i] = porsche::render_seed_prng_state_005de910[i];
+    for (U k = 0u; k < 4u; ++k) expected.next_samples[k] = invoke_cdecl0_ret(slot_00538040);
+
+    // Recovered C++ render_seed_prng_seed_00538110 + 4 steps of recovered render_seed_prng_next_00538040
+    for (U i = 0u; i < 6u; ++i) porsche::render_seed_prng_state_005de910[i] = pre_state[i];
+    seed_fpu(0x027fu, 1u);
+    actual.abi_fail = invoke_cdecl1(reinterpret_cast<void*>(&porsche::render_seed_prng_seed_00538110), seed_arg);
+    capture_fpu(actual.fpu);
+    for (U i = 0u; i < 6u; ++i) actual.prng_state[i] = porsche::render_seed_prng_state_005de910[i];
+    for (U k = 0u; k < 4u; ++k) actual.next_samples[k] = porsche::render_seed_prng_next_00538040();
+
+    require(expected.abi_fail == 0u && actual.abi_fail == 0u, "00538110 abi");
+    require(actual.prng_state == expected.prng_state, "00538110 state words");
+    require(actual.next_samples == expected.next_samples, "00538110->00538040 composed stream");
+    require(std::memcmp(&actual.fpu, &expected.fpu, sizeof(Fpu)) == 0, "00538110 fpu");
+    ++cases;
+}
+
+static void prepare_reset_globals(const std::array<U, 6>& pre_state, U pre_flag, U poison) {
+    for (U i = 0u; i < 6u; ++i) {
+        porsche::render_seed_prng_state_005de910[i] = pre_state[i];
+    }
+    porsche::scene_noise_flag_005ce938 = pre_flag;
+    for (U i = 0u; i < 267u; ++i) {
+        const U v = poison ^ (i * 0x9e3779b9u);
+        std::memcpy(&porsche::scene_noise_gradient_00619804[i], &v, 4u);
+    }
+    for (U i = 0u; i < 4096u; ++i) {
+        porsche::scene_noise_perm_00619c30[i] = static_cast<std::int16_t>((poison + i * 17u) & 0xffffu);
+    }
+}
+
+static void capture_reset_trace(ResetTrace& out) {
+    out.flag_5ce938 = porsche::scene_noise_flag_005ce938;
+    for (U i = 0u; i < 6u; ++i) {
+        out.prng_state[i] = porsche::render_seed_prng_state_005de910[i];
+    }
+    for (U i = 0u; i < 267u; ++i) {
+        out.gradient_words[i] = load32(&porsche::scene_noise_gradient_00619804[i]);
+    }
+    for (U i = 0u; i < 4096u; ++i) {
+        out.perm_words[i] = porsche::scene_noise_perm_00619c30[i];
+    }
+    capture_fpu(out.fpu);
+}
+
+static void run_reset_case(const std::array<U, 6>& pre_state, U pre_flag, U poison,
+                           unsigned short cw, U pre_depth) {
+    static ResetTrace expected{};
+    static ResetTrace actual{};
+
+    prepare_reset_globals(pre_state, pre_flag, poison);
+    seed_fpu(cw, pre_depth);
+    expected.abi_fail = invoke_cdecl0(slot_0044f240);
+    capture_reset_trace(expected);
+
+    prepare_reset_globals(pre_state, pre_flag, poison);
+    seed_fpu(cw, pre_depth);
+    actual.abi_fail = invoke_cdecl0(reinterpret_cast<void*>(&porsche::scene_stage_reset_0044f240));
+    capture_reset_trace(actual);
+
+    require(expected.abi_fail == 0u && actual.abi_fail == 0u, "0044f240 abi");
+    require(actual.flag_5ce938 == expected.flag_5ce938 && actual.flag_5ce938 == 0u, "0044f240 flag 005ce938");
+    require(actual.prng_state == expected.prng_state, "0044f240 restored PRNG state");
+    require(actual.gradient_words == expected.gradient_words, "0044f240 gradient table 00619804..00619c2f");
+    require(actual.perm_words == expected.perm_words, "0044f240 permutation table 00619c30..0061bc2f");
+    require(std::memcmp(&actual.fpu, &expected.fpu, sizeof(Fpu)) == 0, "0044f240 fpu");
+    ++cases;
+}
+
+int main(int argc, char** argv) {
+    require(argc >= 2, "expected original PE path argument");
+    init(argv[1]);
+
+    const std::array<U, 6> default_state = {
+        0xf22d0e56u, 0x883126e9u, 0xc624dd2fu, 0x0702c49cu, 0x9e353f7du, 0x6fdf3b64u,
+    };
+
+    // 1. Direct + composed tests for 00538110 across boundary and wraparound seeds.
+    static const U kSeeds[] = {
+        0x00000000u, 0x00000001u, 0x00003039u, 0x7fffffffu,
+        0x80000000u, 0xffffffffu, 0x0dd2f1aau, 0x0dd2f1abu,
+        0x77ced917u, 0x39db22d1u, 0xf8fd3b64u, 0x61cac083u,
+        0x9020c49cu, 0x12345678u, 0xdeadbeefu, 0xCAFEBABEu,
+    };
+    for (U s : kSeeds) {
+        run_seed_case(s, default_state);
+        run_seed_case(s ^ 0xa5a5a5a5u, {0xffffffffu, 0u, 1u, 2u, 3u, 4u});
+    }
+
+    // 2. Full 0044f240 reset tests across PRNG initial states, flags, poison patterns, and x87 CW modes.
+    static const std::array<U, 6> kResetStates[] = {
+        default_state,
+        {0u, 0u, 0u, 0u, 0u, 0u},
+        {0xffffffffu, 0xffffffffu, 0xffffffffu, 0xffffffffu, 0xffffffffu, 0xffffffffu},
+        {0x11111111u, 0x22222222u, 0x33333333u, 0x44444444u, 0x00000001u, 0xffffffffu},
+        {0xdeadbeefu, 0xffffffffu, 0xffffffffu, 0xffffffffu, 0x55555555u, 0xaaaaaaabu},
+        {0x01234567u, 0x89abcdefu, 0xfedcba98u, 0x76543210u, 0x80000000u, 0x80000000u},
+    };
+    static const unsigned short kControlWords[] = {
+        0x027fu, // PC=53, RC=nearest (Win32 MSVC default)
+        0x037fu, // PC=64, RC=nearest
+        0x007fu, // PC=24, RC=nearest
+        0x067fu, // PC=53, RC=down
+        0x0a7fu, // PC=53, RC=up
+        0x0e7fu, // PC=53, RC=chop
+    };
+
+    U idx = 0u;
+    for (const auto& st : kResetStates) {
+        for (unsigned short cw : kControlWords) {
+            const U flag = (idx & 1u) != 0u ? 1u : (0x5eed0000u + idx);
+            const U poison = 0xc001d00du ^ (idx * 0x01010101u);
+            const U depth = idx % 3u;
+            run_reset_case(st, flag, poison, cw, depth);
+            ++idx;
+        }
+    }
+
+    std::printf("scene_noise_seed_reset_732_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

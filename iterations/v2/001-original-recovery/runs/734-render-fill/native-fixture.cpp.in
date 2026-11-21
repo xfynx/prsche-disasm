@@ -1,0 +1,803 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+
+#include "render_fill_734.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using namespace porsche;
+
+namespace porsche {
+
+std::uint32_t window_shutdown_config_005de620[12] = {};
+std::uint8_t& window_shutdown_mode_005de630 =
+    reinterpret_cast<std::uint8_t*>(window_shutdown_config_005de620)[0x10];
+std::uint32_t& window_shutdown_state_005de64c = window_shutdown_config_005de620[11];
+
+std::uint32_t shared_runtime_word_005deb1c = 0u;
+std::uint32_t& copy_flag_005deb1c = shared_runtime_word_005deb1c;
+std::uint32_t copy_flag_005deb18 = 0u;
+
+} // namespace porsche
+
+enum : U {
+    kMaxEvents = 32u,
+    kSpanBufBytes = 256u,
+};
+
+struct Event {
+    U kind;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+    U a4;
+    U color_global;
+    I backend_global;
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Trace {
+    U abi_fail;
+    U ret_u32;
+    U event_count;
+    Event events[kMaxEvents];
+    U color_after;
+    I backend_after;
+    U config_after[12];
+    B span_buf_after[kSpanBufBytes];
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512] = {};
+alignas(32) static B span_buf[kSpanBufBytes] = {};
+
+static B* code = nullptr;
+static B* slot_537e00 = nullptr;
+static B* slot_562680 = nullptr;
+static B* slot_5627f0 = nullptr;
+static B* slot_562800 = nullptr;
+static B* slot_562500 = nullptr;
+static B* slot_562520 = nullptr;
+static B* slot_562540 = nullptr;
+static B* slot_562570 = nullptr;
+static B* slot_5625a0 = nullptr;
+static B* slot_5625c0 = nullptr;
+static B* slot_5625e0 = nullptr;
+static B* slot_562610 = nullptr;
+static B* slot_562630 = nullptr;
+static B* slot_562650 = nullptr;
+static B* slot_56e2a8 = nullptr;
+static B* slot_573070 = nullptr;
+
+static const void* orig_table_5df880[8] = {};
+static const void* orig_table_5df8a0[8] = {};
+static const void* orig_table_5df8c0[8] = {};
+static const void* const* orig_table_5df8e0[5] = {};
+
+static U iat_6bd984 = 0u;
+static U iat_6bd97c = 0u;
+static U iat_6bd954 = 0u;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U side = 0u;
+static U active_span_slot = 0u;
+static I callback_mutate_backend = -99;
+
+static U ptr(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr(void* p, U o, U v) {
+    std::memcpy(static_cast<B*>(p) + o, &v, 4u);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", msg, cases, side);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("divergence native-fault %08lx eip=%08lx case=%u side=%u\n",
+                p->ExceptionRecord->ExceptionCode,
+                p->ContextRecord->Eip,
+                cases,
+                side);
+    std::fflush(stdout);
+    ExitProcess(1);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void record_event(U kind, U a0, U a1 = 0u, U a2 = 0u, U a3 = 0u, U a4 = 0u) {
+    require(trace.event_count < kMaxEvents, "event capacity");
+    trace.events[trace.event_count++] = {
+        kind, a0, a1, a2, a3, a4,
+        render_fill_color_006a5bb8,
+        render_fill_backend_005decd8
+    };
+}
+
+namespace porsche {
+
+std::uint32_t __stdcall render_display_getstate_006bd984(std::uint32_t key) {
+    const U val = (key == 0x0au) ? 0x11223344u : ((key == 0x01u) ? 0x55667788u : (0x99000000u ^ key));
+    record_event(1u, key, val);
+    return val;
+}
+
+void __stdcall render_display_setstate_006bd97c(std::uint32_t key, std::uint32_t value) {
+    record_event(2u, key, value);
+}
+
+void __stdcall render_display_set_texture_006bd954(std::uint32_t value) {
+    record_event(3u, value);
+}
+
+void __cdecl render_draw_rectangle_bits_0056daf0(
+    std::uint32_t x_bits, std::uint32_t y_bits,
+    std::uint32_t width_bits, std::uint32_t height_bits,
+    std::uint32_t pixel) {
+    record_event(4u, x_bits, y_bits, width_bits, height_bits, pixel);
+}
+
+std::uint32_t __cdecl render_buffer_read_word_0056e2a8(const void* src, std::int32_t bytes) {
+    const auto* const p = static_cast<const std::uint8_t*>(src) + bytes - 4;
+    std::uint32_t val = 0u;
+    std::memcpy(&val, p, sizeof val);
+    const std::uint32_t shift = static_cast<std::uint32_t>((-bytes) * 8 + 32) & 0x1fu;
+    return val >> shift;
+}
+
+void __cdecl render_mmx_empty_00573070() {
+    __asm {
+        emms
+    }
+}
+
+void __cdecl render_shape_transfer_00571630(
+    const void* shape, std::int32_t x, std::int32_t y, const void* const* table) {
+    require(shape != nullptr && table != nullptr, "shape/table non-null");
+    U type_00 = 0u;
+    std::uint16_t w16 = 0u, h16 = 0u;
+    std::memcpy(&type_00, static_cast<const B*>(shape) + 0, 4u);
+    std::memcpy(&w16, static_cast<const B*>(shape) + 4, 2u);
+    std::memcpy(&h16, static_cast<const B*>(shape) + 6, 2u);
+
+    U table_id = 99u;
+    if (side == 0u) {
+        if (table == orig_table_5df880) table_id = 0u;
+        else if (table == orig_table_5df8a0) table_id = 1u;
+        else if (table == orig_table_5df8c0) table_id = 2u;
+    } else {
+        if (table == render_fill_table_scalar_005df880) table_id = 0u;
+        else if (table == render_fill_table_mmx_005df8a0) table_id = 1u;
+        else if (table == render_fill_table_sse_005df8c0) table_id = 2u;
+    }
+    require(table_id <= 2u, "table identity");
+    require(table[5] == nullptr && table[6] == nullptr && table[7] == nullptr, "table null tail");
+
+    const U packed_wh = static_cast<U>(w16) | (static_cast<U>(h16) << 16u);
+    record_event(5u, type_00, packed_wh, static_cast<U>(x), static_cast<U>(y), table_id);
+
+    using SpanFn = void*(__cdecl*)(void*, U, U);
+    const U slot = active_span_slot % 5u;
+    if (table_id == 1u || callback_mutate_backend == 3) {
+        __asm {
+            mov eax, 12345678h
+            movd mm0, eax
+        }
+    }
+    auto* const fn = reinterpret_cast<SpanFn>(const_cast<void*>(table[slot]));
+    require(fn != nullptr, "span callback non-null");
+    void* const ret = fn(span_buf + 32u, 0xdeadbeefu, 5u);
+    record_event(6u, slot, static_cast<U>( static_cast<B*>(ret) - (span_buf + 32u) ));
+
+    if (callback_mutate_backend != -99) {
+        render_fill_backend_005decd8 = callback_mutate_backend;
+    }
+}
+
+} // namespace porsche
+
+static void seed_fpu(U mode) {
+    unsigned short cw = (mode == 1u) ? 0x027fu : 0x037fu;
+    __asm {
+        fninit
+        fldcw cw
+    }
+}
+
+static void capture_fpu(FpuSnapshot& fp) {
+    std::memset(&fp, 0, sizeof fp);
+    std::memset(fp_area, 0, sizeof fp_area);
+    __asm {
+        fxsave fp_area
+    }
+    std::memcpy(&fp.control, fp_area + 0, 2u);
+    std::memcpy(&fp.status, fp_area + 2, 2u);
+    fp.status &= 0xb8ffu;
+    fp.tag = static_cast<unsigned short>(fp_area[4]);
+    std::memcpy(&fp.mxcsr, fp_area + 24, 4u);
+    for (U i = 0u; i < 8u; ++i) {
+        const U physical = ((static_cast<U>(fp.status) >> 11u) + i) & 7u;
+        if ((fp_area[4] & (1u << physical)) != 0u) {
+            std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        }
+    }
+}
+
+static void invoke_cdecl1_void(void* fn, U a0, U fpu_mode, FpuSnapshot& fp_out, U& abi_fail) {
+    U fail = 0u, before = 0u, frame = 0u;
+    seed_fpu(fpu_mode);
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+}
+
+static void invoke_cdecl5_void(void* fn, U a0, U a1, U a2, U a3, U a4, U fpu_mode, FpuSnapshot& fp_out, U& abi_fail) {
+    U fail = 0u, before = 0u, frame = 0u;
+    seed_fpu(fpu_mode);
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a4
+        push a3
+        push a2
+        push a1
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 20
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    capture_fpu(fp_out);
+    abi_fail = fail;
+}
+
+static U invoke_cdecl3_u32(void* fn, U a0, U a1, U a2, U& abi_fail) {
+    U out = 0u, fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a2
+        push a1
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        add esp, 12
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+        emms
+    }
+    abi_fail = fail;
+    return out;
+}
+
+static void patch_abs(B* base, U size, U old_va, U new_va, U expected_hits) {
+    U hits = 0u;
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (rd(base, i) == old_va) {
+            wr(base, i, new_va);
+            ++hits;
+            i += 3u;
+        }
+    }
+    require(hits == expected_hits, "patch_abs count");
+}
+
+static void patch_rel(B* base, U offset, U va_start, U orig_target, U new_target) {
+    require(base[offset] == 0xe8u, "patch_rel opcode");
+    const U decoded = va_start + offset + 5u + rd(base, offset + 1u);
+    require(decoded == orig_target, "patch_rel orig target");
+    wr(base, offset + 1u, new_target - (ptr(base) + offset + 5u));
+}
+
+static void verify_initial_pe_state(const char* pe_path) {
+    require(render_fill_backend_005decd8 == -1, "C++ initial 005decd8");
+    require(render_fill_color_006a5bb8 == 0u, "C++ initial 006a5bb8");
+    require(render_fill_mode_tables_005df8e0[0] == render_fill_table_scalar_005df880 &&
+            render_fill_mode_tables_005df8e0[1] == render_fill_table_scalar_005df880 &&
+            render_fill_mode_tables_005df8e0[2] == render_fill_table_scalar_005df880 &&
+            render_fill_mode_tables_005df8e0[3] == render_fill_table_mmx_005df8a0 &&
+            render_fill_mode_tables_005df8e0[4] == render_fill_table_sse_005df8c0,
+            "C++ initial 005df8e0");
+
+    FILE* f = std::fopen(pe_path, "rb");
+    require(f != nullptr, "open PE");
+    std::fseek(f, 0, SEEK_END);
+    const long len = std::ftell(f);
+    std::rewind(f);
+    auto* pe = new B[static_cast<std::size_t>(len)];
+    require(std::fread(pe, 1, static_cast<std::size_t>(len), f) == static_cast<std::size_t>(len), "read PE");
+    std::fclose(f);
+
+    const U nt = rd(pe, 0x3cu);
+    const U base = rd(pe, nt + 52u);
+    const U sections = pe[nt + 6u] | (static_cast<U>(pe[nt + 7u]) << 8u);
+    const U optional = pe[nt + 20u] | (static_cast<U>(pe[nt + 21u]) << 8u);
+
+    auto read_va_u32 = [&](U va) -> U {
+        for (U i = 0u; i < sections; ++i) {
+            const B* s = pe + nt + 24u + optional + i * 40u;
+            const U vs = rd(s, 8u), rva = rd(s, 12u), rawsize = rd(s, 16u), raw = rd(s, 20u);
+            const U delta = va - base - rva;
+            if (delta < vs && delta + 4u <= vs) {
+                if (delta + 4u <= rawsize) {
+                    return rd(pe, raw + delta);
+                }
+                return 0u;
+            }
+        }
+        require(false, "VA not in PE");
+        return 0u;
+    };
+
+    require(read_va_u32(0x005decd8u) == 0xffffffffu, "PE initial 005decd8");
+    require(read_va_u32(0x006a5bb8u) == 0u, "PE initial 006a5bb8");
+
+    const U expected_5df880[8] = {0x562500u, 0x562520u, 0x562520u, 0x562540u, 0x562570u, 0u, 0u, 0u};
+    const U expected_5df8a0[8] = {0x5625a0u, 0x5625c0u, 0x5625c0u, 0x562540u, 0x5625e0u, 0u, 0u, 0u};
+    const U expected_5df8c0[8] = {0x562610u, 0x562630u, 0x562630u, 0x562540u, 0x562650u, 0u, 0u, 0u};
+    const U expected_5df8e0[5] = {0x5df880u, 0x5df880u, 0x5df880u, 0x5df8a0u, 0x5df8c0u};
+    for (U i = 0u; i < 8u; ++i) {
+        require(read_va_u32(0x005df880u + i * 4u) == expected_5df880[i], "PE 005df880");
+        require(read_va_u32(0x005df8a0u + i * 4u) == expected_5df8a0[i], "PE 005df8a0");
+        require(read_va_u32(0x005df8c0u + i * 4u) == expected_5df8c0[i], "PE 005df8c0");
+    }
+    for (U i = 0u; i < 5u; ++i) {
+        require(read_va_u32(0x005df8e0u + i * 4u) == expected_5df8e0[i], "PE 005df8e0");
+    }
+    delete[] pe;
+}
+
+static void init_fixture(const char* pe_path) {
+    verify_initial_pe_state(pe_path);
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    std::memset(code, 0xcc, 4096u);
+
+    const B b_537e00[] = {@BODY_00537E00@};
+    const B b_562680[] = {@BODY_00562680@};
+    const B b_5627f0[] = {@JTBL_005627F0@};
+    const B b_562800[] = {@LUT_00562800@};
+    const B b_562500[] = {@BODY_00562500@};
+    const B b_562520[] = {@BODY_00562520@};
+    const B b_562540[] = {@BODY_00562540@};
+    const B b_562570[] = {@BODY_00562570@};
+    const B b_5625a0[] = {@BODY_005625A0@};
+    const B b_5625c0[] = {@BODY_005625C0@};
+    const B b_5625e0[] = {@BODY_005625E0@};
+    const B b_562610[] = {@BODY_00562610@};
+    const B b_562630[] = {@BODY_00562630@};
+    const B b_562650[] = {@BODY_00562650@};
+    const B b_56e2a8[] = {@BODY_0056E2A8@};
+    const B b_573070[] = {@BODY_00573070@};
+
+    slot_537e00 = code + 0x000u;
+    slot_562680 = code + 0x100u;
+    slot_5627f0 = code + 0x270u;
+    slot_562800 = code + 0x280u;
+    slot_562500 = code + 0x300u;
+    slot_562520 = code + 0x340u;
+    slot_562540 = code + 0x380u;
+    slot_562570 = code + 0x3c0u;
+    slot_5625a0 = code + 0x400u;
+    slot_5625c0 = code + 0x440u;
+    slot_5625e0 = code + 0x480u;
+    slot_562610 = code + 0x4c0u;
+    slot_562630 = code + 0x500u;
+    slot_562650 = code + 0x540u;
+    slot_56e2a8 = code + 0x580u;
+    slot_573070 = code + 0x5c0u;
+
+    std::memcpy(slot_537e00, b_537e00, sizeof b_537e00);
+    std::memcpy(slot_562680, b_562680, sizeof b_562680);
+    std::memcpy(slot_5627f0, b_5627f0, sizeof b_5627f0);
+    std::memcpy(slot_562800, b_562800, sizeof b_562800);
+    std::memcpy(slot_562500, b_562500, sizeof b_562500);
+    std::memcpy(slot_562520, b_562520, sizeof b_562520);
+    std::memcpy(slot_562540, b_562540, sizeof b_562540);
+    std::memcpy(slot_562570, b_562570, sizeof b_562570);
+    std::memcpy(slot_5625a0, b_5625a0, sizeof b_5625a0);
+    std::memcpy(slot_5625c0, b_5625c0, sizeof b_5625c0);
+    std::memcpy(slot_5625e0, b_5625e0, sizeof b_5625e0);
+    std::memcpy(slot_562610, b_562610, sizeof b_562610);
+    std::memcpy(slot_562630, b_562630, sizeof b_562630);
+    std::memcpy(slot_562650, b_562650, sizeof b_562650);
+    std::memcpy(slot_56e2a8, b_56e2a8, sizeof b_56e2a8);
+    std::memcpy(slot_573070, b_573070, sizeof b_573070);
+
+    iat_6bd984 = ptr(reinterpret_cast<void*>(&render_display_getstate_006bd984));
+    iat_6bd97c = ptr(reinterpret_cast<void*>(&render_display_setstate_006bd97c));
+    iat_6bd954 = ptr(reinterpret_cast<void*>(&render_display_set_texture_006bd954));
+
+    orig_table_5df880[0] = slot_562500;
+    orig_table_5df880[1] = slot_562520;
+    orig_table_5df880[2] = slot_562520;
+    orig_table_5df880[3] = slot_562540;
+    orig_table_5df880[4] = slot_562570;
+    orig_table_5df880[5] = nullptr;
+    orig_table_5df880[6] = nullptr;
+    orig_table_5df880[7] = nullptr;
+
+    orig_table_5df8a0[0] = slot_5625a0;
+    orig_table_5df8a0[1] = slot_5625c0;
+    orig_table_5df8a0[2] = slot_5625c0;
+    orig_table_5df8a0[3] = slot_562540;
+    orig_table_5df8a0[4] = slot_5625e0;
+    orig_table_5df8a0[5] = nullptr;
+    orig_table_5df8a0[6] = nullptr;
+    orig_table_5df8a0[7] = nullptr;
+
+    orig_table_5df8c0[0] = slot_562610;
+    orig_table_5df8c0[1] = slot_562630;
+    orig_table_5df8c0[2] = slot_562630;
+    orig_table_5df8c0[3] = slot_562540;
+    orig_table_5df8c0[4] = slot_562650;
+    orig_table_5df8c0[5] = nullptr;
+    orig_table_5df8c0[6] = nullptr;
+    orig_table_5df8c0[7] = nullptr;
+
+    orig_table_5df8e0[0] = orig_table_5df880;
+    orig_table_5df8e0[1] = orig_table_5df880;
+    orig_table_5df8e0[2] = orig_table_5df880;
+    orig_table_5df8e0[3] = orig_table_5df8a0;
+    orig_table_5df8e0[4] = orig_table_5df8c0;
+
+    // Relocate 00537e00
+    patch_abs(slot_537e00, sizeof b_537e00, 0x005de640u, ptr(&window_shutdown_config_005de620[8]), 1u);
+    patch_abs(slot_537e00, sizeof b_537e00, 0x005de63cu, ptr(&window_shutdown_config_005de620[7]), 1u);
+    patch_abs(slot_537e00, sizeof b_537e00, 0x005de638u, ptr(&window_shutdown_config_005de620[6]), 1u);
+    patch_abs(slot_537e00, sizeof b_537e00, 0x005de634u, ptr(&window_shutdown_config_005de620[5]), 1u);
+    patch_rel(slot_537e00, 0x24u, 0x00537e00u, 0x00562680u, ptr(slot_562680));
+
+    // Relocate 00562680 + jump table
+    for (U i = 0u; i < 4u; ++i) {
+        const U old_target = rd(slot_5627f0, i * 4u);
+        require(old_target >= 0x00562680u && old_target < 0x005627f0u, "jtbl target range");
+        wr(slot_5627f0, i * 4u, ptr(slot_562680) + (old_target - 0x00562680u));
+    }
+    patch_abs(slot_562680, sizeof b_562680, 0x005de630u, ptr(&window_shutdown_mode_005de630), 1u);
+    patch_abs(slot_562680, sizeof b_562680, 0x005de64cu, ptr(&window_shutdown_state_005de64c), 1u);
+    patch_abs(slot_562680, sizeof b_562680, 0x006bd984u, ptr(&iat_6bd984), 2u);
+    patch_abs(slot_562680, sizeof b_562680, 0x006bd97cu, ptr(&iat_6bd97c), 2u);
+    patch_abs(slot_562680, sizeof b_562680, 0x006bd954u, ptr(&iat_6bd954), 2u);
+    patch_rel(slot_562680, 0x4au, 0x00562680u, 0x00574b70u, ptr(reinterpret_cast<void*>(&render_buffer_convert_00574b70)));
+    patch_rel(slot_562680, 0x73u, 0x00562680u, 0x0056daf0u, ptr(reinterpret_cast<void*>(&render_draw_rectangle_bits_0056daf0)));
+    patch_abs(slot_562680, sizeof b_562680, 0x005de62cu, ptr(&window_shutdown_config_005de620[3]), 1u);
+    patch_abs(slot_562680, sizeof b_562680, 0x00562800u, ptr(slot_562800), 1u);
+    patch_abs(slot_562680, sizeof b_562680, 0x005627f0u, ptr(slot_5627f0), 1u);
+    patch_abs(slot_562680, sizeof b_562680, 0x006a5bb8u, ptr(&render_fill_color_006a5bb8), 1u);
+    patch_abs(slot_562680, sizeof b_562680, 0x005decd8u, ptr(&render_fill_backend_005decd8), 3u);
+    patch_abs(slot_562680, sizeof b_562680, 0x005deb1cu, ptr(&shared_runtime_word_005deb1c), 1u);
+    patch_abs(slot_562680, sizeof b_562680, 0x005deb18u, ptr(&copy_flag_005deb18), 1u);
+    patch_abs(slot_562680, sizeof b_562680, 0x005df8e0u, ptr(orig_table_5df8e0), 1u);
+    patch_rel(slot_562680, 0x155u, 0x00562680u, 0x00571630u, ptr(reinterpret_cast<void*>(&render_shape_transfer_00571630)));
+    patch_rel(slot_562680, 0x167u, 0x00562680u, 0x00573070u, ptr(slot_573070));
+
+    // Relocate 10 span callbacks
+    const U fn_scalar = ptr(reinterpret_cast<void*>(&heap_fill_scalar_005b0980_core));
+    const U fn_mmx = ptr(reinterpret_cast<void*>(&heap_fill_mmx_005b0a40_core));
+    const U fn_sse = ptr(reinterpret_cast<void*>(&heap_fill_sse_005b0b00_core));
+
+    patch_abs(slot_562500, sizeof b_562500, 0x006a5bb8u, ptr(&render_fill_color_006a5bb8), 1u);
+    patch_rel(slot_562500, 0x11u, 0x00562500u, 0x005b0980u, fn_scalar);
+
+    patch_abs(slot_562520, sizeof b_562520, 0x006a5bb8u, ptr(&render_fill_color_006a5bb8), 1u);
+    patch_rel(slot_562520, 0x14u, 0x00562520u, 0x005b0980u, fn_scalar);
+
+    patch_rel(slot_562540, 0x0fu, 0x00562540u, 0x0056e2a8u, ptr(slot_56e2a8));
+    patch_rel(slot_562540, 0x19u, 0x00562540u, 0x0056e301u, ptr(reinterpret_cast<void*>(&render_buffer_word_0056e301)));
+
+    patch_abs(slot_562570, sizeof b_562570, 0x006a5bb8u, ptr(&render_fill_color_006a5bb8), 1u);
+    patch_rel(slot_562570, 0x18u, 0x00562570u, 0x005b0980u, fn_scalar);
+
+    patch_abs(slot_5625a0, sizeof b_5625a0, 0x006a5bb8u, ptr(&render_fill_color_006a5bb8), 1u);
+    patch_rel(slot_5625a0, 0x11u, 0x005625a0u, 0x005b0a40u, fn_mmx);
+
+    patch_abs(slot_5625c0, sizeof b_5625c0, 0x006a5bb8u, ptr(&render_fill_color_006a5bb8), 1u);
+    patch_rel(slot_5625c0, 0x14u, 0x005625c0u, 0x005b0a40u, fn_mmx);
+
+    patch_abs(slot_5625e0, sizeof b_5625e0, 0x006a5bb8u, ptr(&render_fill_color_006a5bb8), 1u);
+    patch_rel(slot_5625e0, 0x18u, 0x005625e0u, 0x005b0a40u, fn_mmx);
+
+    patch_abs(slot_562610, sizeof b_562610, 0x006a5bb8u, ptr(&render_fill_color_006a5bb8), 1u);
+    patch_rel(slot_562610, 0x11u, 0x00562610u, 0x005b0b00u, fn_sse);
+
+    patch_abs(slot_562630, sizeof b_562630, 0x006a5bb8u, ptr(&render_fill_color_006a5bb8), 1u);
+    patch_rel(slot_562630, 0x14u, 0x00562630u, 0x005b0b00u, fn_sse);
+
+    patch_abs(slot_562650, sizeof b_562650, 0x006a5bb8u, ptr(&render_fill_color_006a5bb8), 1u);
+    patch_rel(slot_562650, 0x18u, 0x00562650u, 0x005b0b00u, fn_sse);
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "FlushInstructionCache");
+}
+
+static void prepare_state(
+    B mode_byte, U state_4c, B shape_type, B bpp,
+    I backend_init, U sse_flag, U mmx_flag,
+    U clip_l, U clip_t, U clip_r, U clip_b,
+    U color_init) {
+    std::memset(&trace, 0, sizeof trace);
+    for (U i = 0u; i < 12u; ++i) {
+        window_shutdown_config_005de620[i] = 0x10000000u + i;
+    }
+    for (U i = 0u; i < 256u; ++i) {
+        render_pixel_palette_006b4b20[i] = 0xff000000u | (i * 0x010203u);
+    }
+    window_shutdown_config_005de620[3] =
+        static_cast<U>(shape_type) | (static_cast<U>(bpp) << 8u) | 0x00200000u;
+    window_shutdown_config_005de620[5] = clip_l;
+    window_shutdown_config_005de620[6] = clip_t;
+    window_shutdown_config_005de620[7] = clip_r;
+    window_shutdown_config_005de620[8] = clip_b;
+    window_shutdown_mode_005de630 = mode_byte;
+    window_shutdown_state_005de64c = state_4c;
+
+    render_fill_backend_005decd8 = backend_init;
+    shared_runtime_word_005deb1c = sse_flag;
+    copy_flag_005deb18 = mmx_flag;
+    render_fill_color_006a5bb8 = color_init;
+
+    for (U i = 0u; i < kSpanBufBytes; ++i) {
+        span_buf[i] = static_cast<B>((i * 37u + 11u) & 0xffu);
+    }
+}
+
+static void snapshot_state() {
+    require(trace.abi_fail == 0u, "ABI check");
+    trace.color_after = render_fill_color_006a5bb8;
+    trace.backend_after = render_fill_backend_005decd8;
+    std::memcpy(trace.config_after, window_shutdown_config_005de620, sizeof trace.config_after);
+    std::memcpy(trace.span_buf_after, span_buf, sizeof trace.span_buf_after);
+}
+
+static void run_562680_case(
+    B mode_byte, U state_4c, B shape_type, B bpp,
+    I backend_init, U sse_flag, U mmx_flag,
+    I x, I y, U w, U h, U color, U fpu_mode,
+    U span_slot, I mut_backend = -99) {
+    ++cases;
+    active_span_slot = span_slot;
+    callback_mutate_backend = mut_backend;
+    for (side = 0u; side < 2u; ++side) {
+        prepare_state(mode_byte, state_4c, shape_type, bpp,
+                      backend_init, sse_flag, mmx_flag,
+                      10u, 20u, 110u, 220u, 0x77777777u);
+        void* const fn = (side == 0u)
+            ? static_cast<void*>(slot_562680)
+            : reinterpret_cast<void*>(&splash_progress_draw_text_00562680);
+        invoke_cdecl5_void(fn, static_cast<U>(x), static_cast<U>(y), w, h, color,
+                           fpu_mode, trace.fp, trace.abi_fail);
+        snapshot_state();
+        if (side == 0u) {
+            expected = trace;
+        } else {
+            require(std::memcmp(&trace, &expected, sizeof trace) == 0, "00562680 trace match");
+        }
+    }
+}
+
+static void run_537e00_case(
+    B mode_byte, U state_4c, B shape_type, B bpp,
+    I backend_init, U sse_flag, U mmx_flag,
+    U clip_l, U clip_t, U clip_r, U clip_b,
+    U color, U fpu_mode, U span_slot) {
+    ++cases;
+    active_span_slot = span_slot;
+    callback_mutate_backend = -99;
+    for (side = 0u; side < 2u; ++side) {
+        prepare_state(mode_byte, state_4c, shape_type, bpp,
+                      backend_init, sse_flag, mmx_flag,
+                      clip_l, clip_t, clip_r, clip_b, 0x88888888u);
+        void* const fn = (side == 0u)
+            ? static_cast<void*>(slot_537e00)
+            : reinterpret_cast<void*>(&render_display_fill_00537e00);
+        invoke_cdecl1_void(fn, color, fpu_mode, trace.fp, trace.abi_fail);
+        snapshot_state();
+        if (side == 0u) {
+            expected = trace;
+        } else {
+            require(std::memcmp(&trace, &expected, sizeof trace) == 0, "00537e00 trace match");
+        }
+    }
+}
+
+static void run_span_leaf_case(U leaf_index, U align_off, U count, U fill_color) {
+    ++cases;
+    void* const orig_fns[10] = {
+        slot_562500, slot_562520, slot_562540, slot_562570,
+        slot_5625a0, slot_5625c0, slot_5625e0,
+        slot_562610, slot_562630, slot_562650,
+    };
+    void* const cpp_fns[10] = {
+        reinterpret_cast<void*>(&render_fill_span_scalar_8_00562500),
+        reinterpret_cast<void*>(&render_fill_span_scalar_16_00562520),
+        reinterpret_cast<void*>(&render_fill_span_24_00562540),
+        reinterpret_cast<void*>(&render_fill_span_scalar_32_00562570),
+        reinterpret_cast<void*>(&render_fill_span_mmx_8_005625a0),
+        reinterpret_cast<void*>(&render_fill_span_mmx_16_005625c0),
+        reinterpret_cast<void*>(&render_fill_span_mmx_32_005625e0),
+        reinterpret_cast<void*>(&render_fill_span_sse_8_00562610),
+        reinterpret_cast<void*>(&render_fill_span_sse_16_00562630),
+        reinterpret_cast<void*>(&render_fill_span_sse_32_00562650),
+    };
+    for (side = 0u; side < 2u; ++side) {
+        prepare_state(0u, 0u, 0x7bu, 8u, 0, 0u, 0u, 0u, 0u, 64u, 64u, fill_color);
+        void* const dst = span_buf + 32u + align_off;
+        void* const fn = (side == 0u) ? orig_fns[leaf_index] : cpp_fns[leaf_index];
+        const U ret = invoke_cdecl3_u32(fn, ptr(dst), 0x12345678u, count, trace.abi_fail);
+        trace.ret_u32 = ret - ptr(dst);
+        snapshot_state();
+        if (side == 0u) {
+            expected = trace;
+        } else {
+            require(std::memcmp(&trace, &expected, sizeof trace) == 0, "span leaf trace match");
+        }
+    }
+}
+
+int main(int argc, char** argv) {
+    AddVectoredExceptionHandler(1, fault_handler);
+    require(argc == 2, "PE path argument");
+    init_fixture(argv[1]);
+
+    // 1. Hardware 3D path of 00562680 across modes, bpp conversions, signed coordinates, FPU CW
+    for (B mode : {static_cast<B>(1u), static_cast<B>(2u), static_cast<B>(0x7fu), static_cast<B>(0xfeu)}) {
+        for (B bpp : {static_cast<B>(8u), static_cast<B>(15u), static_cast<B>(16u), static_cast<B>(24u), static_cast<B>(32u)}) {
+            const U c0 = (bpp < 15u) ? 0x78u : 0x12345678u;
+            const U c1 = (bpp < 15u) ? 0xefu : 0x00abcdefu;
+            for (U fpu_mode : {0u, 1u}) {
+                run_562680_case(mode, 0u, 0x6du, bpp, -1, 0u, 0u, -15, 25, 320u, 240u, c0, fpu_mode, 0u);
+                run_562680_case(mode, 0u, 0x7bu, bpp, 3, 1u, 1u, 0, -1, 0xffffffffu, 0x80000001u, c1, fpu_mode, 0u);
+            }
+        }
+    }
+
+    // 2. Software path of 00562680: gates (mode=0, mode=0xff, state!=0), all switch bpp cases 0..33,
+    // backend initialization (-1 with SSE/MMX/scalar flags) and pre-initialized backends 0..4,
+    // plus post-00571630 backend reload to 3 vs 0.
+    const B bpps[] = {0u, 3u, 4u, 5u, 7u, 8u, 9u, 14u, 15u, 16u, 17u, 24u, 32u};
+    for (B bpp : bpps) {
+        for (U flags : {0u, 1u, 2u, 3u}) {
+            const U sse = (flags & 2u) ? 1u : 0u;
+            const U mmx = (flags & 1u) ? 0x80000000u : 0u;
+            run_562680_case(0u, 0u, 0x7bu, bpp, -1, sse, mmx, 12, 34, 64u, 48u, 0xa5b6c7d8u, 0u, bpp % 5u);
+            run_562680_case(0xffu, 0u, 0x7du, bpp, -1, sse, mmx, -8, -16, 128u, 96u, 0x1f2e3d4cu, 0u, (bpp + 1u) % 5u);
+            run_562680_case(1u, 0x1000u, 0x7eu, bpp, -1, sse, mmx, 100, 200, 1u, 1u, 0xffffffffu, 0u, (bpp + 2u) % 5u);
+        }
+        for (I preset : {0, 1, 2, 3, 4}) {
+            run_562680_case(0u, 0u, 0x7bu, bpp, preset, 1u, 1u, 4, 8, 32u, 16u, 0x13579bdfu, 0u, static_cast<U>(preset));
+        }
+    }
+    // Reload of 005decd8 after 00571630 returns
+    run_562680_case(0u, 0u, 0x7bu, 16u, 0, 0u, 0u, 10, 20, 30u, 40u, 0x12345678u, 0u, 1u, 3);
+    run_562680_case(0u, 0u, 0x7bu, 16u, 3, 0u, 1u, 10, 20, 30u, 40u, 0x12345678u, 0u, 1u, 0);
+
+    // 3. Direct 00537e00 cases across hardware and software modes and clip rectangles
+    const U rects[][4] = {
+        {0u, 0u, 640u, 480u},
+        {16u, 32u, 336u, 272u},
+        {100u, 50u, 100u, 50u},
+        {0xfffffff0u, 0xffffffe0u, 0x00000010u, 0x00000020u},
+    };
+    for (const auto& r : rects) {
+        run_537e00_case(1u, 0u, 0x6du, 16u, -1, 0u, 0u, r[0], r[1], r[2], r[3], 0xff112233u, 0u, 0u);
+        run_537e00_case(0u, 0u, 0x7bu, 8u, -1, 0u, 1u, r[0], r[1], r[2], r[3], 0x44556677u, 0u, 0u);
+        run_537e00_case(1u, 0x2000u, 0x7fu, 32u, -1, 1u, 0u, r[0], r[1], r[2], r[3], 0x89abcdefu, 0u, 4u);
+    }
+
+    // 4. Direct span-fill callbacks 00562500..00562650 across alignments and counts
+    for (U leaf = 0u; leaf < 10u; ++leaf) {
+        for (U align_off : {0u, 1u, 2u, 3u, 4u, 7u, 15u}) {
+            for (U count : {1u, 2u, 3u, 4u, 7u, 8u, 9u, 16u, 17u, 33u}) {
+                run_span_leaf_case(leaf, align_off, count, 0xa1b2c3d4u ^ (leaf * 0x11111111u));
+            }
+        }
+    }
+
+    std::printf("render_fill_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

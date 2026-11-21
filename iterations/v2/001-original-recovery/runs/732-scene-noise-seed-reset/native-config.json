@@ -1,0 +1,151 @@
+{
+  "run": 732,
+  "experiment": "local/experiments/v2-scene-noise-seed-reset-732",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.cpp",
+    "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset",
+    "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter",
+    "iterations/v2/001-original-recovery/runs/638-render-seed-prng",
+    "iterations/v2/001-original-recovery/runs/511-render-surface-init"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.hpp",
+    "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter/application_view_lifecycle_693.hpp",
+    "iterations/v2/001-original-recovery/runs/638-render-seed-prng/render_seed_prng_638.hpp",
+    "iterations/v2/001-original-recovery/runs/511-render-surface-init/render_surface_init_511.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "0044f240",
+      "bytes": 174,
+      "sha256": "567e16f088870cff7382e0038b3c9c6dd4d8f2f672a006168ea1db49f30f5d92",
+      "token": "@BODY_0044F240@"
+    },
+    {
+      "va": "00538110",
+      "bytes": 65,
+      "sha256": "400655825fa9e64352eb1a689b4d317efd33a5ef69d9f3ad6e59da71d6b5f885",
+      "token": "@BODY_00538110@"
+    },
+    {
+      "va": "00538040",
+      "bytes": 193,
+      "sha256": "a3c4b3764536d7f285c16f5cd5ad470a2bdf7baef3a67215206d1ff359172c13",
+      "token": "@BODY_00538040@"
+    },
+    {
+      "va": "005de910",
+      "bytes": 24,
+      "sha256": "13eb516294955f2da4796105e1ecbea3780d3effefe20f5d2ae69aabcad79bde",
+      "token": "@DATA_005DE910@"
+    },
+    {
+      "va": "005ce938",
+      "bytes": 4,
+      "sha256": "67abdd721024f0ff4e0b3f4c2fc13bc5bad42d0b7851d456d88d203d15aaa450",
+      "token": "@DATA_005CE938@"
+    },
+    {
+      "va": "005b3ca4",
+      "bytes": 4,
+      "sha256": "b7d41d79e52b4090852073f63ecbadf7dbc031e0004382988b247b05c125ac72",
+      "token": "@RDATA_005B3CA4@"
+    },
+    {
+      "va": "005b23f0",
+      "bytes": 4,
+      "sha256": "d99e58435243d9fef9c88273b8d553b4fba4d0baf8009d29eae74fa99e0d9f57",
+      "token": "@RDATA_005B23F0@"
+    }
+  ],
+  "pass_marker": "scene_noise_seed_reset_732_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-seed-s0-const",
+      "source": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp",
+      "old": "std::uint32_t acc = seed + 0xf22d0e56u;",
+      "new": "std::uint32_t acc = seed + 0xf22d0e57u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-seed-s3-add",
+      "source": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp",
+      "old": "acc += 0x40dde76du;",
+      "new": "acc -= 0x40dde76du;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-seed-s5-const",
+      "source": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp",
+      "old": "acc += 0xd1a9fbe7u;",
+      "new": "acc += 0xd1a9fbe6u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-noise-flag-clear",
+      "source": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp",
+      "old": "scene_noise_flag_005ce938 = 0u;",
+      "new": "scene_noise_flag_005ce938 = 1u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-fixed-seed-const",
+      "source": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp",
+      "old": "render_seed_prng_seed_00538110(0x3039u);",
+      "new": "render_seed_prng_seed_00538110(0x3038u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-gradient-count",
+      "source": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp",
+      "old": "for (std::uint32_t i = 0u; i < 267u; ++i)",
+      "new": "for (std::uint32_t i = 0u; i < 266u; ++i)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-gradient-double",
+      "source": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp",
+      "old": "        fadd st(0), st(0)",
+      "new": "        fmul render_surface_half_005b23f0",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-perm-mask",
+      "source": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp",
+      "old": "const std::uint32_t j = render_seed_prng_next_00538040() & 0x0fffu;",
+      "new": "const std::uint32_t j = render_seed_prng_next_00538040() & 0x07ffu;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-perm-lower-bound",
+      "source": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp",
+      "old": "for (std::int32_t i = 4095; i >= 0; --i)",
+      "new": "for (std::int32_t i = 4095; i >= 1; --i)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-seed-restore",
+      "source": "iterations/v2/001-original-recovery/runs/732-scene-noise-seed-reset/scene_noise_seed_732.cpp",
+      "old": "render_seed_prng_seed_00538110(saved_seed);",
+      "new": "render_seed_prng_seed_00538110(0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}
