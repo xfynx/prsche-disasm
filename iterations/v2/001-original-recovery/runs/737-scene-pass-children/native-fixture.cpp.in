@@ -1,0 +1,537 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "scene_pass_children_737.hpp"
+#include "../599-render-misc-cleanup/render_misc_cleanup_599.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using I = std::int32_t;
+
+enum : U { kMaxEvents = 64u, kNodeCount = 4u, kPassCount = 3u };
+enum EventKind : U {
+    kEvAlloc = 1u,
+    kEvFactoryDefault = 2u,
+    kEvFactoryA = 3u,
+    kEvFactoryB = 4u,
+    kEvConfigure = 5u,
+    kEvSetup = 6u,
+    kEvQueryA = 7u,
+    kEvQueryB = 8u,
+    kEvCompile = 9u,
+};
+
+struct Event { U kind, a, b, c; };
+struct Trace { U count; Event events[kMaxEvents]; };
+
+static U cases = 0u;
+static U events_total = 0u;
+static U g_case = 0u;
+static U which = 0u;
+static Trace trace{};
+
+static B* code_page = nullptr;
+static B* slot_53f160 = nullptr;
+static B* slot_53f230 = nullptr;
+static B* slot_53f2a0 = nullptr;
+
+static B owner[0x30];
+static B nodes[kNodeCount][0x30];
+static B passes[kPassCount][0x30];
+static B allocated_node[8];
+static U pass_vtable[7];
+
+static bool fail_alloc = false;
+static void* factory_results[3] = {};
+static B query_a[kPassCount] = {};
+static B query_b[kPassCount] = {};
+static bool compile_cut_next = false;
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* p, U off = 0u) {
+    U value = 0u;
+    std::memcpy(&value, static_cast<const B*>(p) + off, sizeof value);
+    return value;
+}
+
+static void store32(void* p, U off, U value) {
+    std::memcpy(static_cast<B*>(p) + off, &value, sizeof value);
+}
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", why, g_case, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static void event(U kind, U a = 0u, U b = 0u, U c = 0u) {
+    require(trace.count < kMaxEvents, "event overflow");
+    trace.events[trace.count++] = Event{kind, a, b, c};
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip,
+                g_case, which);
+    std::fflush(stdout);
+    ExitProcess(98);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static U pass_index(const void* pass) {
+    for (U i = 0u; i < kPassCount; ++i) {
+        if (pass == passes[i]) return i;
+    }
+    require(false, "unknown pass");
+    return 0u;
+}
+
+namespace porsche {
+
+RenderCleanupNode_599* render_cleanup_head_0069ebb0 = nullptr;
+
+void* __cdecl render_allocate_0059ef90(U size) {
+    event(kEvAlloc, size);
+    require(size == 8u, "allocator size");
+    return fail_alloc ? nullptr : static_cast<void*>(allocated_node);
+}
+
+void* __cdecl scene_pass_factory_default_0053f980(U kind, U subkind) {
+    event(kEvFactoryDefault, kind, subkind);
+    return factory_results[0];
+}
+
+void __fastcall scene_pass_compile_0053f380(void* self) {
+    const U idx = pass_index(self);
+    event(kEvCompile, idx, load32(self, 0x18u), load32(self, 0x1cu));
+    if (compile_cut_next && idx == 0u) {
+        store32(self, 0x08u, 0u);
+    }
+}
+
+} // namespace porsche
+
+static void* __cdecl factory_a(U kind, U subkind) {
+    event(kEvFactoryA, kind, subkind);
+    return factory_results[1];
+}
+
+static void* __cdecl factory_b(U kind, U subkind) {
+    event(kEvFactoryB, kind, subkind);
+    return factory_results[2];
+}
+
+static void __cdecl configure_handler(void* self, U flags) {
+    event(kEvConfigure, pass_index(self), flags);
+    store32(self, 0x24u, flags);
+}
+
+static void __declspec(naked) configure_thunk() {
+    __asm {
+        push ebp
+        mov ebp, esp
+        push dword ptr [ebp + 8]
+        push ecx
+        call configure_handler
+        add esp, 8
+        pop ebp
+        ret 4
+    }
+}
+
+static void __cdecl setup_handler(void* self) {
+    event(kEvSetup, pass_index(self));
+}
+
+static B __cdecl query_a_handler(void* self) {
+    const U idx = pass_index(self);
+    event(kEvQueryA, idx);
+    return query_a[idx];
+}
+
+static B __cdecl query_b_handler(void* self) {
+    const U idx = pass_index(self);
+    event(kEvQueryB, idx);
+    return query_b[idx];
+}
+
+static void __declspec(naked) setup_thunk() {
+    __asm {
+        push ecx
+        call setup_handler
+        add esp, 4
+        ret
+    }
+}
+
+static B __declspec(naked) query_a_thunk() {
+    __asm {
+        push ecx
+        call query_a_handler
+        add esp, 4
+        ret
+    }
+}
+
+static B __declspec(naked) query_b_thunk() {
+    __asm {
+        push ecx
+        call query_b_handler
+        add esp, 4
+        ret
+    }
+}
+
+static const B body_53f160[] = {@BODY_0053F160@};
+static const B body_53f230[] = {@BODY_0053F230@};
+static const B body_53f2a0[] = {@BODY_0053F2A0@};
+
+static void relocate_abs32(B* slot, U size, U old_va, const void* replacement, U expected) {
+    U found = 0u;
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (load32(slot, i) == old_va) {
+            store32(slot, i, address(replacement));
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected, "absolute relocation count");
+}
+
+static void relocate_call(B* slot, U original_va, U off, U expected_target, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL opcode");
+    const I disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual = original_va + off + 5u + static_cast<U>(disp);
+    require(actual == expected_target, "CALL target");
+    store32(slot, off + 1u, address(replacement) - address(slot + off + 5u));
+}
+
+static void init() {
+    require(porsche::render_cleanup_head_0069ebb0 == nullptr, "initial cleanup head zero");
+    code_page = static_cast<B*>(VirtualAlloc(
+        nullptr, 0x1000u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc");
+    slot_53f160 = code_page + 0x000u;
+    slot_53f230 = code_page + 0x100u;
+    slot_53f2a0 = code_page + 0x200u;
+    std::memcpy(slot_53f160, body_53f160, sizeof body_53f160);
+    std::memcpy(slot_53f230, body_53f230, sizeof body_53f230);
+    std::memcpy(slot_53f2a0, body_53f2a0, sizeof body_53f2a0);
+
+    // Verify original identities before controlled relocation.
+    require(load32(slot_53f230, 1u) == 0x0069ebb0u, "raw cleanup head");
+    require(load32(slot_53f230, 0x20u) == 0x0053f980u, "raw default factory");
+
+    relocate_abs32(slot_53f230, sizeof body_53f230, 0x0069ebb0u,
+                   &porsche::render_cleanup_head_0069ebb0, 2u);
+    relocate_abs32(slot_53f230, sizeof body_53f230, 0x0053f980u,
+                   &porsche::scene_pass_factory_default_0053f980, 1u);
+    relocate_call(slot_53f230, 0x0053f230u, 0x0bu, 0x0059ef90u,
+                  &porsche::render_allocate_0059ef90);
+    relocate_call(slot_53f2a0, 0x0053f2a0u, 0x68u, 0x0053f380u,
+                  &porsche::scene_pass_compile_0053f380);
+
+    std::memset(pass_vtable, 0, sizeof pass_vtable);
+    pass_vtable[2] = address(&configure_thunk);
+    pass_vtable[4] = address(&setup_thunk);
+    pass_vtable[5] = address(&query_a_thunk);
+    pass_vtable[6] = address(&query_b_thunk);
+    require(FlushInstructionCache(GetCurrentProcess(), code_page, 0x1000u) != 0,
+            "FlushInstructionCache");
+}
+
+static U invoke_fast3(void* fn, U self, U arg, U& bad) {
+    U before = 0u, frame = 0u, out = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg
+        mov ecx, self
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        cmp esp, before
+        jne failed
+        cmp ebp, frame
+        jne failed
+        cmp ebx, 13579bdfh
+        jne failed
+        cmp esi, 2468ace0h
+        jne failed
+        cmp edi, 10203040h
+        je done
+    failed:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    bad = fail;
+    return out;
+}
+
+static U invoke_fast1(void* fn, U self, U& bad) {
+    U before = 0u, frame = 0u, out = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, self
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov out, eax
+        cmp esp, before
+        jne failed
+        cmp ebp, frame
+        jne failed
+        cmp ebx, 13579bdfh
+        jne failed
+        cmp esi, 2468ace0h
+        jne failed
+        cmp edi, 10203040h
+        je done
+    failed:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    bad = fail;
+    return out;
+}
+
+static U invoke_cdecl3(void* fn, U a, U b, U c, U& bad) {
+    U before = 0u, frame = 0u, out = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push c
+        push b
+        push a
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 12
+        mov out, eax
+        cmp esp, before
+        jne failed
+        cmp ebp, frame
+        jne failed
+        cmp ebx, 13579bdfh
+        jne failed
+        cmp esi, 2468ace0h
+        jne failed
+        cmp edi, 10203040h
+        je done
+    failed:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    bad = fail;
+    return out;
+}
+
+struct Snapshot {
+    U abi;
+    U result;
+    U head;
+    Trace calls;
+    B owner_bytes[sizeof owner];
+    B node_bytes[sizeof nodes];
+    B pass_bytes[sizeof passes];
+    B alloc_bytes[sizeof allocated_node];
+};
+
+static Snapshot capture(U abi, U result) {
+    Snapshot out{};
+    out.abi = abi;
+    out.result = result;
+    out.head = address(porsche::render_cleanup_head_0069ebb0);
+    out.calls = trace;
+    std::memcpy(out.owner_bytes, owner, sizeof owner);
+    std::memcpy(out.node_bytes, nodes, sizeof nodes);
+    std::memcpy(out.pass_bytes, passes, sizeof passes);
+    std::memcpy(out.alloc_bytes, allocated_node, sizeof allocated_node);
+    if (which == 0u) {
+        const U host_default = address(&porsche::scene_pass_factory_default_0053f980);
+        if (load32(out.alloc_bytes, 4u) == host_default) {
+            store32(out.alloc_bytes, 4u, 0x0053f980u);
+        }
+        if (load32(out.node_bytes, 4u) == host_default) {
+            store32(out.node_bytes, 4u, 0x0053f980u);
+        }
+    }
+    return out;
+}
+
+static void compare(const Snapshot& exp, const Snapshot& act, bool compare_result) {
+    require(exp.abi == 0u, "original ABI");
+    require(act.abi == 0u, "C++ ABI");
+    if (compare_result) require(act.result == exp.result, "return EAX");
+    require(act.head == exp.head, "cleanup head");
+    require(std::memcmp(&act.calls, &exp.calls, sizeof exp.calls) == 0, "events");
+    require(std::memcmp(act.owner_bytes, exp.owner_bytes, sizeof exp.owner_bytes) == 0, "owner bytes");
+    require(std::memcmp(act.node_bytes, exp.node_bytes, sizeof exp.node_bytes) == 0, "node bytes");
+    require(std::memcmp(act.pass_bytes, exp.pass_bytes, sizeof exp.pass_bytes) == 0, "pass bytes");
+    require(std::memcmp(act.alloc_bytes, exp.alloc_bytes, sizeof exp.alloc_bytes) == 0, "alloc bytes");
+}
+
+static void seed_common() {
+    std::memset(owner, 0xa5, sizeof owner);
+    std::memset(nodes, 0xb6, sizeof nodes);
+    std::memset(passes, 0xc7, sizeof passes);
+    std::memset(allocated_node, 0xd8, sizeof allocated_node);
+    for (U i = 0u; i < kPassCount; ++i) {
+        store32(passes[i], 0u, address(pass_vtable));
+    }
+    std::memset(&trace, 0, sizeof trace);
+    porsche::render_cleanup_head_0069ebb0 = nullptr;
+    fail_alloc = false;
+    factory_results[0] = factory_results[1] = factory_results[2] = nullptr;
+    compile_cut_next = false;
+}
+
+static void seed_append(U length) {
+    seed_common();
+    store32(owner, 0x04u, length == 0u ? 0u : address(nodes[0]));
+    for (U i = 0u; i < length; ++i) {
+        store32(nodes[i], 0x04u, i == 0u ? 0u : address(nodes[i - 1u]));
+        store32(nodes[i], 0x08u, i + 1u < length ? address(nodes[i + 1u]) : 0u);
+        store32(nodes[i], 0x20u, address(owner));
+    }
+}
+
+static Snapshot run_append(void* fn, U length) {
+    seed_append(length);
+    U abi = 0u;
+    const U result = invoke_fast3(fn, address(owner), address(nodes[length]), abi);
+    return capture(abi, result);
+}
+
+static void test_append() {
+    void* cpp = reinterpret_cast<void*>(&porsche::scene_pass_append_0053f160);
+    for (U length = 0u; length < kNodeCount; ++length) {
+        g_case = cases++;
+        which = 0u; Snapshot exp = run_append(slot_53f160, length);
+        which = 1u; Snapshot act = run_append(cpp, length);
+        compare(exp, act, false);
+        events_total += exp.calls.count;
+    }
+}
+
+static void seed_create(U mode) {
+    seed_common();
+    const U callbacks[2] = {address(&factory_a), address(&factory_b)};
+    if (mode == 0u) {
+        fail_alloc = true;
+    } else if (mode == 1u) {
+        factory_results[0] = nullptr;
+    } else if (mode == 6u) {
+        porsche::render_cleanup_head_0069ebb0 = reinterpret_cast<porsche::RenderCleanupNode_599*>(nodes[0]);
+        store32(nodes[0], 0u, 0u);
+        store32(nodes[0], 4u, which == 0u ? address(&porsche::scene_pass_factory_default_0053f980) : 0x0053f980u);
+        factory_results[0] = passes[2];
+    } else {
+        porsche::render_cleanup_head_0069ebb0 = reinterpret_cast<porsche::RenderCleanupNode_599*>(nodes[0]);
+        store32(nodes[0], 0u, (mode >= 3u) ? address(nodes[1]) : 0u);
+        store32(nodes[0], 4u, callbacks[0]);
+        store32(nodes[1], 0u, 0u);
+        store32(nodes[1], 4u, callbacks[1]);
+        if (mode == 2u || mode == 5u) factory_results[1] = passes[0];
+        if (mode == 3u) factory_results[2] = passes[1];
+    }
+}
+
+static Snapshot run_create(void* fn, U mode) {
+    seed_create(mode);
+    U abi = 0u;
+    const U result = invoke_cdecl3(fn, 0x800eu + mode, mode ^ 3u, 0x20u + mode, abi);
+    return capture(abi, result);
+}
+
+static void test_create() {
+    void* cpp = reinterpret_cast<void*>(&porsche::scene_pass_create_0053f230);
+    for (U mode = 0u; mode < 7u; ++mode) {
+        g_case = cases++;
+        which = 0u; Snapshot exp = run_create(slot_53f230, mode);
+        which = 1u; Snapshot act = run_create(cpp, mode);
+        compare(exp, act, true);
+        events_total += exp.calls.count;
+    }
+}
+
+static void seed_finalize(U length, U pattern) {
+    seed_common();
+    store32(owner, 0x04u, length == 0u ? 0u : address(passes[0]));
+    for (U i = 0u; i < length; ++i) {
+        store32(passes[i], 0x08u, i + 1u < length ? address(passes[i + 1u]) : 0u);
+        store32(passes[i], 0x18u, 0xaaaa0000u + i);
+        store32(passes[i], 0x1cu, 0xbbbb0000u + i);
+        query_a[i] = static_cast<B>((pattern >> (i & 2u)) & 1u);
+        query_b[i] = static_cast<B>((pattern >> ((i + 1u) & 2u)) & 1u);
+    }
+    compile_cut_next = (pattern == 7u && length > 1u);
+}
+
+static Snapshot run_finalize(void* fn, U length, U pattern) {
+    seed_finalize(length, pattern);
+    U abi = 0u;
+    const U result = invoke_fast1(fn, address(owner), abi);
+    return capture(abi, result);
+}
+
+static void test_finalize() {
+    void* cpp = reinterpret_cast<void*>(&porsche::scene_pass_finalize_0053f2a0);
+    for (U length = 0u; length <= kPassCount; ++length) {
+        for (U pattern = 0u; pattern < 8u; ++pattern) {
+            g_case = cases++;
+            which = 0u; Snapshot exp = run_finalize(slot_53f2a0, length, pattern);
+            which = 1u; Snapshot act = run_finalize(cpp, length, pattern);
+            compare(exp, act, false);
+            events_total += exp.calls.count;
+        }
+    }
+}
+
+int main() {
+    AddVectoredExceptionHandler(1, fault_handler);
+    init();
+    test_append();
+    test_create();
+    test_finalize();
+    std::printf("scene_pass_children_737_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

@@ -1,14 +1,25 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-22. [Run735](runs/735-scene-audio-render-integration/README.md)
+Current 2026-11-22. [Run739](runs/739-scene-program-integration/README.md)
+passes the shared audit (`build-001`) for frozen `736/006` (`00468240`,
+`004685e0`), `737/005` (`0053f160`, `0053f230`, `0053f2a0`), and `738/001`
+(`00468440`), plus `scene_blur_stage_abi_bridge_739.cpp` bridging Run736's
+param-4 `std::uint32_t` call to Run738's `void*` definition: **432 TUs / 8
+projects**, **101 unresolved names / 108 references**, no game EXE. Two names
+close (`00468240`, `004685e0`; `00468440` and `0053f160`/`0053f230`/`0053f2a0`
+resolve internally) and six typed children open (`0053f380`, `0053f980`,
+`00537a70`, `00537a40`, `00537a30`, `00536470`). 478 native comparisons, 33
+mutations, 1,068 source pins, 3 REA sessions (`v2-audio-scene-730-rea/001`,
+`v2-scene-pass-children-737-rea/002`, `v2-scene-blur-stage-child-738-rea/002`),
+0 new `.data`/`.rdata`/`.bss` bytes. Registry **1,217** (`+6` entries;
+`00451490` updates `00468240`/`004685e0` to recovered). Next shared wave
+(`Run743`) awaits completed worker packets (`740`–`742`).
+
+Historical: [Run735](runs/735-scene-audio-render-integration/README.md)
 passes the shared audit for frozen Runs732/733/734: 428 TUs, 97 unresolved
 names / 104 references, 25 new registry entries (1,211 total), 4,836 native
 cases, 44 mutations, 1,060 source pins, no EXE. Four names close and four
 typed children open (`00567060`, `00566ea0`, `005612a0`, `00571630`).
-[Run736](runs/736-scene-blur-program-lifecycle/README.md) is native PASS006
-(152 comparisons, 10 mutations) and awaits coordinator-owned shared integration
-in a new batch. Next: integrate frozen Run736, then choose a reachable child
-from the measured linker/startup frontier. Passed packets remain unchanged.
 
 [Run730](runs/730-audio-copy-and-frame-control-integration/README.md)
 passes the shared audit (`build-002`) for `728/005`, `729/002` and `731/002` on

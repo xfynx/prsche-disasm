@@ -1,0 +1,40 @@
+{
+  "run": 738,
+  "status": "native/provenance/REA PASS001; shared integration pending",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "scope": "scene_blur_program_stage_00468440 (00468440..004685d0, 401B), exposed by Run736 scene_blur_program_setup_004685e0 (004685e0)",
+  "rea_session": {
+    "config": "iterations/v2/001-original-recovery/runs/738-scene-blur-stage-child/rea/queries.json",
+    "validation": "iterations/v2/001-original-recovery/runs/738-scene-blur-stage-child/rea/validation.json",
+    "receipt": "local/experiments/v2-scene-blur-stage-child-738-rea/002/receipt.json",
+    "dossiers": [
+      "local/experiments/v2-scene-blur-stage-child-738-rea/002/function-00468440.json"
+    ]
+  },
+  "bodies": [
+    {
+      "va": "00468440",
+      "range": ["00468440", "004685d0"],
+      "bytes": 401,
+      "sha256": "7f6d301f75f9b2b83b9f1d659d3bbdcbf04f3ac5c5c1ed827faab40e1391dd66",
+      "symbol": "porsche::scene_blur_program_stage_00468440",
+      "abi": "__thiscall (fastcall bridge self, unused_edx, index, source, slot_1f_value, slot_1d_value, slot_20_value, enabled), void return, RET 0x18"
+    }
+  ],
+  "canonical_owners_reused": [
+    "0044dfe0 startup_text_quality_mask_ptr_0044dfe0 (Run650)"
+  ],
+  "newly_owned_data": [],
+  "downstream_child_frontiers": [
+    "0053f230 porsche::scene_pass_create_0053f230 (__cdecl void*(uint32_t, uint32_t, uint32_t), closed by Run737)",
+    "0053f160 porsche::scene_pass_append_0053f160 (__thiscall void(void* self, void* pass), closed by Run737)",
+    "00537a70 porsche::scene_blur_state_flag_00537a70 (__thiscall void(void* self, uint32_t), RET 4)",
+    "00537a40 porsche::scene_blur_state_one_00537a40 (__thiscall void(void* self, uint32_t), RET 4)",
+    "00537a30 porsche::scene_blur_state_quality_00537a30 (__thiscall void(void* self, uint32_t), RET 4)",
+    "00536470 porsche::scene_blur_state_commit_00536470 (__thiscall void(void* self, const void* state_28_bytes), RET 4)"
+  ],
+  "integration_notes": [
+    "Run736 caller header scene_blur_program_736.hpp declares parameter 4 of scene_blur_program_stage_00468440 as std::uint32_t b (?scene_blur_program_stage_00468440@porsche@@YIXPAX0IIIIII@Z), whereas Run738 scene_blur_stage_child_738.hpp defines parameter 4 as void* source (?scene_blur_program_stage_00468440@porsche@@YIXPAX0IPAXIIII@Z). Shared integration must reconcile or bridge the C++ mangled parameter type."
+  ],
+  "boundaries": "Valid non-null 40-byte receiver and table buffer; source may be null or non-null (>= 0x54 bytes for +0x38..+0x53 copy). Controlled endpoints prove transport and order for 0053f230, 0053f160, 00537a70, 00537a40, 0044dfe0, 00537a30, and 00536470; downstream semantics, null receiver faults, broad aliasing, and live renderer behavior remain open."
+}

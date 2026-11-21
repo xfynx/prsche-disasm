@@ -1,0 +1,322 @@
+// Run738 original-x86 versus recovered C++ differential fixture.
+#include "scene_blur_stage_child_738.hpp"
+#include "startup_text_fallbacks_650.hpp"
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <windows.h>
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::fprintf(stderr, "divergence %s case=%u\n", why, cases);
+        std::exit(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U value = 0u;
+    std::memcpy(&value, static_cast<const B*>(base) + off, sizeof value);
+    return value;
+}
+
+static void store32(void* base, U off, U value) {
+    std::memcpy(static_cast<B*>(base) + off, &value, sizeof value);
+}
+
+static U hash28(const void* p) {
+    U h = 2166136261u;
+    const auto* b = static_cast<const B*>(p);
+    for (U i = 0u; i < 28u; ++i) {
+        h = (h ^ b[i]) * 16777619u;
+    }
+    return h;
+}
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+    U d;
+    U e;
+};
+
+constexpr U kMaxEvents = 48u;
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+static U g_append_count = 0u;
+static bool g_mutate = false;
+
+static alignas(8) B g_program[0x28u];
+static alignas(8) B g_table[0x200u];
+static alignas(8) B g_source[0x80u];
+static alignas(8) B g_owner0[4];
+static alignas(8) B g_owner1[4];
+static alignas(8) B g_pass3[4];
+static alignas(8) B g_pass4[4];
+static alignas(8) B g_pass8[4];
+static alignas(8) B g_pass6[4];
+static alignas(4) U g_quality_word = 0u;
+
+static void record(U kind, U a = 0u, U b = 0u, U c = 0u,
+                   U d = 0u, U e = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c, d, e};
+}
+
+namespace porsche {
+
+void* __cdecl scene_pass_create_0053f230(U kind, U subkind, U flags) {
+    record(1u, kind, subkind, flags);
+    if (kind == 3u) return g_pass3;
+    if (kind == 4u) return g_pass4;
+    if (kind == 8u) return g_pass8;
+    if (kind == 6u) return g_pass6;
+    return nullptr;
+}
+
+void __fastcall scene_pass_append_0053f160(void* self, void*, void* pass) {
+    record(2u, g_append_count, address(self), address(pass),
+           load32(g_program, 0x00u), load32(g_program, 0x10u));
+    if (g_mutate) {
+        if (g_append_count == 0u) {
+            store32(g_program, 0x00u, address(g_owner1));
+            store32(g_program, 0x10u, 9u);
+            g_program[0x1du] = 5u;
+        } else if (g_append_count == 1u) {
+            g_program[0x1eu] = 6u;
+            g_source[0x38u] ^= 0x5au;
+        } else if (g_append_count == 2u) {
+            g_program[0x1fu] = 7u;
+        } else if (g_append_count == 3u) {
+            g_program[0x20u] = 8u;
+            store32(g_program, 0x10u, 11u);
+        }
+    }
+    ++g_append_count;
+}
+
+void __fastcall scene_blur_state_flag_00537a70(void* self, void*, U value) {
+    record(3u, value, hash28(self));
+    store32(self, 0u, value ^ 0xa0700000u);
+}
+
+void __fastcall scene_blur_state_one_00537a40(void* self, void*, U value) {
+    record(4u, value, hash28(self));
+    store32(self, 4u, value ^ 0xa0400000u);
+}
+
+void __fastcall scene_blur_state_quality_00537a30(void* self, void*, U value) {
+    record(5u, value, hash28(self));
+    store32(self, 8u, value ^ 0xa0300000u);
+}
+
+void __fastcall scene_blur_state_commit_00536470(void* self, void*, const void* state) {
+    record(7u, address(self), hash28(state), load32(state, 0u),
+           load32(state, 4u), load32(state, 8u));
+    std::memcpy(static_cast<B*>(self) + 0x38u, state, 28u);
+}
+
+U* __cdecl startup_text_quality_mask_ptr_0044dfe0(U index) {
+    record(6u, index, g_quality_word & 0xffu);
+    return &g_quality_word;
+}
+
+} // namespace porsche
+
+struct Snapshot {
+    U abi_fail;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    std::array<B, sizeof g_program> program;
+    std::array<B, sizeof g_table> table;
+    std::array<B, sizeof g_source> source;
+};
+
+static B* raw_stage = nullptr;
+
+static void set_rel(B* body, U size, U original_base, U original_target,
+                    const void* replacement, U expected_count) {
+    U count = 0u;
+    for (U i = 0u; i + 5u <= size; ++i) {
+        if (body[i] != 0xe8u) continue;
+        std::int32_t old_disp = 0;
+        std::memcpy(&old_disp, body + i + 1u, sizeof old_disp);
+        const U target = original_base + i + 5u + static_cast<U>(old_disp);
+        if (target != original_target) continue;
+        const U next = address(body + i + 5u);
+        const U disp = address(replacement) - next;
+        store32(body, i + 1u, disp);
+        ++count;
+    }
+    require(count == expected_count, "relocation count");
+}
+
+static void init_raw() {
+    static const B body[] = {@BODY_00468440@};
+    require(sizeof body == 401u, "401B body");
+    raw_stage = static_cast<B*>(VirtualAlloc(nullptr, 4096u,
+        MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(raw_stage != nullptr, "VirtualAlloc");
+    std::memcpy(raw_stage, body, sizeof body);
+    set_rel(raw_stage, sizeof body, 0x00468440u, 0x0053f230u,
+            reinterpret_cast<const void*>(&porsche::scene_pass_create_0053f230), 4u);
+    set_rel(raw_stage, sizeof body, 0x00468440u, 0x0053f160u,
+            reinterpret_cast<const void*>(&porsche::scene_pass_append_0053f160), 4u);
+    set_rel(raw_stage, sizeof body, 0x00468440u, 0x00537a70u,
+            reinterpret_cast<const void*>(&porsche::scene_blur_state_flag_00537a70), 1u);
+    set_rel(raw_stage, sizeof body, 0x00468440u, 0x00537a40u,
+            reinterpret_cast<const void*>(&porsche::scene_blur_state_one_00537a40), 1u);
+    set_rel(raw_stage, sizeof body, 0x00468440u, 0x0044dfe0u,
+            reinterpret_cast<const void*>(&porsche::startup_text_quality_mask_ptr_0044dfe0), 1u);
+    set_rel(raw_stage, sizeof body, 0x00468440u, 0x00537a30u,
+            reinterpret_cast<const void*>(&porsche::scene_blur_state_quality_00537a30), 1u);
+    set_rel(raw_stage, sizeof body, 0x00468440u, 0x00536470u,
+            reinterpret_cast<const void*>(&porsche::scene_blur_state_commit_00536470), 1u);
+    require(FlushInstructionCache(GetCurrentProcess(), raw_stage, 401u) != 0,
+            "FlushInstructionCache");
+}
+
+static U invoke(void* fn, void* self, U index, void* source,
+                U v1f, U v1d, U v20, U enabled) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push enabled
+        push v20
+        push v1d
+        push v1f
+        push source
+        push index
+        mov ecx, self
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static void reset(B poison, B stride, U layout, bool mutate, B quality) {
+    g_event_count = 0u;
+    g_append_count = 0u;
+    g_mutate = mutate;
+    std::memset(g_events, 0, sizeof g_events);
+    std::memset(g_program, poison, sizeof g_program);
+    std::memset(g_table, poison ^ 0x55u, sizeof g_table);
+    std::memset(g_source, poison ^ 0xaau, sizeof g_source);
+    store32(g_program, 0x00u, address(g_owner0));
+    store32(g_program, 0x04u, address(g_table));
+    store32(g_program, 0x10u, 5u + layout);
+    g_program[0x1du] = static_cast<B>(1u + layout);
+    g_program[0x1eu] = static_cast<B>(2u + layout);
+    g_program[0x1fu] = static_cast<B>(3u + layout);
+    g_program[0x20u] = static_cast<B>(4u + layout);
+    g_program[0x24u] = stride;
+    for (U i = 0u; i < 28u; ++i) g_source[0x38u + i] = static_cast<B>(poison + i * 3u);
+    g_quality_word = quality;
+}
+
+static void capture(Snapshot& s) {
+    s.event_count = g_event_count;
+    for (U i = 0u; i < kMaxEvents; ++i) s.events[i] = g_events[i];
+    std::memcpy(s.program.data(), g_program, sizeof g_program);
+    std::memcpy(s.table.data(), g_table, sizeof g_table);
+    std::memcpy(s.source.data(), g_source, sizeof g_source);
+}
+
+static void compare(const Snapshot& a, const Snapshot& b) {
+    require(a.abi_fail == 0u && b.abi_fail == 0u, "ABI");
+    require(a.event_count == b.event_count, "event count");
+    for (U i = 0u; i < a.event_count; ++i) {
+        require(std::memcmp(&a.events[i], &b.events[i], sizeof(Event)) == 0,
+                "ordered event");
+    }
+    require(a.program == b.program, "program bytes");
+    require(a.table == b.table, "table bytes");
+    require(a.source == b.source, "source bytes");
+}
+
+static void run_case(U index, B stride, U layout, bool source_present,
+                     U enabled, bool mutate, B quality, B poison) {
+    static Snapshot expected{};
+    static Snapshot actual{};
+    void* source = source_present ? static_cast<void*>(g_source) : nullptr;
+    const U v1f = 0x11220000u ^ poison;
+    const U v1d = 0x33440000u ^ (poison << 8u);
+    const U v20 = 0x55660000u ^ (poison << 16u);
+
+    reset(poison, stride, layout, mutate, quality);
+    expected.abi_fail = invoke(raw_stage, g_program, index, source,
+                               v1f, v1d, v20, enabled);
+    capture(expected);
+
+    reset(poison, stride, layout, mutate, quality);
+    actual.abi_fail = invoke(
+        reinterpret_cast<void*>(&porsche::scene_blur_program_stage_00468440),
+        g_program, index, source, v1f, v1d, v20, enabled);
+    capture(actual);
+
+    compare(expected, actual);
+    ++cases;
+}
+
+int main() {
+    init_raw();
+    static const U enabled_values[] = {0u, 1u, 0x100u, 0x101u, 0xffffffffu};
+    static const B quality_values[] = {0x10u, 0x0fu};
+    for (U layout = 0u; layout < 3u; ++layout) {
+        const B stride = layout == 0u ? 0xffu : static_cast<B>(layout);
+        const U index = layout == 0u ? 0u : layout + 1u;
+        for (U source = 0u; source < 2u; ++source) {
+            for (U e = 0u; e < 5u; ++e) {
+                for (U q = 0u; q < 2u; ++q) {
+                    for (U mutate = 0u; mutate < 2u; ++mutate) {
+                        run_case(index, stride, layout, source != 0u,
+                                 enabled_values[e], mutate != 0u,
+                                 quality_values[q],
+                                 static_cast<B>(0x31u + layout * 17u + source * 7u +
+                                                e * 11u + q * 3u + mutate));
+                    }
+                }
+            }
+        }
+    }
+    std::printf("scene_blur_stage_child_738_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

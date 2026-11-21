@@ -4,13 +4,21 @@ Updated 2026-11-22. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run735](iterations/v2/001-original-recovery/runs/735-scene-audio-render-integration/README.md)
-compiles 428 C++ translation units across eight projects. The shared link
-reports **97 unresolved names / 104 references**. There is no game EXE yet.
-The shared audit accepts Runs732/733/734 within their bounded domains: 25 new
-registry entries (1,211 total), 4,836 original-x86 comparisons, 44 mutations,
-and 1,060 source pins. Four names close; four typed children open. Run736 has a
-passing native packet awaiting the next shared integration.
+[Run739](iterations/v2/001-original-recovery/runs/739-scene-program-integration/README.md)
+compiles 432 C++ translation units across eight projects. The shared link
+reports **101 unresolved names / 108 references**. There is no game EXE yet.
+The shared audit accepts Runs736/737/738 (plus the Run739 `00468440` param-4
+ABI bridge) within their bounded domains: 6 new registry entries (`1,217`
+total), 478 original-x86 comparisons, 33 mutations, 0 new owned bytes, and
+1,068 source pins. Two names close (`00468240`, `004685e0`) and six typed
+children open (`0053f380`, `0053f980`, `00537a70`, `00537a40`, `00537a30`,
+`00536470`).
+
+Historical: [Run735](iterations/v2/001-original-recovery/runs/735-scene-audio-render-integration/README.md)
+compiles 428 C++ translation units across eight projects (**97 unresolved names /
+104 references**), accepting Runs732/733/734: 25 new registry entries (1,211
+total), 4,836 original-x86 comparisons, 44 mutations, and 1,060 source pins.
+Four names close; four typed children open.
 
 Historical: [Run730](iterations/v2/001-original-recovery/runs/730-audio-copy-and-frame-control-integration/README.md)
 verifies `728/005`, `729/002` and `731/002` (four registry

@@ -1,0 +1,615 @@
+// Native x86-vs-C++ differential fixture for Run736:
+//   00468240..00468307 (200B) porsche::scene_blur_program_ctor_00468240
+//   004685e0..00468628 (73B)  porsche::scene_blur_program_setup_004685e0
+// Also verifies composed execution with accepted Run726 porsche::scene_stage_reset_00451490.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "porsche/application_alloc.hpp"
+#include "porsche/render_startup.hpp"
+#include "scene_blur_program_736.hpp"
+#include "scene_blur_stage_726.hpp"
+#include "scene_stage_stack_core_721.hpp"
+#include "startup_sequence_resource_table_649.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+enum : U {
+    kEvAlloc59ef90 = 1u,
+    kEvAllocArray59eff0 = 2u,
+    kEvPassCreate53f230 = 3u,
+    kEvPassAppend53f160 = 4u,
+    kEvPassFinalize53f2a0 = 5u,
+    kEvProgramStage468440 = 6u,
+    kEvLookup44d320 = 7u,
+};
+
+struct Event {
+    U kind;
+    U a, b, c, d, e, f, g;
+};
+
+enum : U { kMaxEvents = 32u };
+
+struct Snapshot {
+    U abi_fail;
+    U ret_eax;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    std::array<B, 0x28u> program_bytes;
+    std::array<B, 0x0cu> node_bytes;
+    std::array<B, 0x100u> array_bytes;
+    std::array<B, 0x18u> mode_bytes;
+    std::array<U, 8> blur_matrix;
+    U blur_clock;
+    U blur_program;
+    U blur_mode;
+    U blur_resource;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static alignas(8) B g_program_buf[0x28u];
+static alignas(8) B g_node_buf[0x0cu];
+static alignas(8) B g_array_buf[0x100u];
+static alignas(8) B g_mode_buf[0x18u];
+static alignas(8) B g_pass_token_ctor[4];
+static alignas(8) B g_pass_token_setup[4];
+static alignas(8) B g_alt_owner_token[4];
+static alignas(8) B g_lookup_token[4];
+
+static bool g_fail_node_alloc = false;
+static bool g_mutate_slot_on_append = false;
+static B g_mutated_slot_index = 0u;
+static bool g_mutate_owner_on_stage = false;
+static bool g_mutate_owner_on_append = false;
+static bool g_lookup_hit = false;
+static U g_alloc_59ef90_calls = 0u;
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u, U e = 0u, U f = 0u, U g = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c, d, e, f, g};
+}
+
+namespace porsche {
+
+void* startup_context_table_owner_00613e04 = reinterpret_cast<void*>(0x613e0400u);
+U startup_sequence_word_00606ac4 = 0x606ac400u;
+
+void __cdecl scene_stage_stack_core_004552b0(unsigned char*) {}
+
+void* __fastcall startup_context_table_lookup_0044d320(void* self, void*, U a, U b) {
+    record_event(kEvLookup44d320, address(self), a, b);
+    return g_lookup_hit ? g_lookup_token : nullptr;
+}
+
+void* __cdecl render_allocate_0059ef90(std::uint32_t size) {
+    const U idx = g_alloc_59ef90_calls++;
+    // Snapshot intermediate receiver state when 00468240 requests the 12-byte container node.
+    const U self_w0 = load32(g_program_buf, 0x00u);
+    const U self_w14 = load32(g_program_buf, 0x14u);
+    const U self_w18 = load32(g_program_buf, 0x18u);
+    const U self_w20 = load32(g_program_buf, 0x20u);
+    record_event(kEvAlloc59ef90, size, idx, self_w0, self_w14, self_w18, self_w20);
+    if (size == 0x28u) {
+        return g_program_buf;
+    }
+    if (size == 0x0cu) {
+        return g_fail_node_alloc ? nullptr : g_node_buf;
+    }
+    if (size == 0x18u) {
+        return g_mode_buf;
+    }
+    require(false, "unexpected 0059ef90 size");
+    return nullptr;
+}
+
+void* __cdecl application_allocate_array_0059eff0(std::uint32_t bytes) {
+    require(bytes <= sizeof g_array_buf, "0059eff0 array bound");
+    // [self + 0x00] must already hold the allocated node (or 0 on failure) before 0059eff0 is called.
+    record_event(kEvAllocArray59eff0, bytes, load32(g_program_buf, 0x00u),
+                 load32(g_node_buf, 0x00u), load32(g_node_buf, 0x04u), load32(g_node_buf, 0x08u));
+    return g_array_buf;
+}
+
+void* __cdecl scene_pass_create_0053f230(std::uint32_t kind, std::uint32_t subkind, std::uint32_t flags) {
+    // In 00468240, [self + 0x04] must already hold the array pointer before 0053f230 runs.
+    record_event(kEvPassCreate53f230, kind, subkind, flags, load32(g_program_buf, 0x04u));
+    return (kind == 0x800eu) ? static_cast<void*>(g_pass_token_ctor)
+                             : static_cast<void*>(g_pass_token_setup);
+}
+
+void __fastcall scene_pass_append_0053f160(void* self, void*, void* pass) {
+    record_event(kEvPassAppend53f160, address(self), address(pass));
+    if (g_mutate_slot_on_append) {
+        g_program_buf[0x1cu] = g_mutated_slot_index;
+    }
+    if (g_mutate_owner_on_append) {
+        store32(g_program_buf, 0x00u, address(g_alt_owner_token));
+    }
+}
+
+void __fastcall scene_pass_finalize_0053f2a0(void* self, void*) {
+    record_event(kEvPassFinalize53f2a0, address(self));
+}
+
+void __fastcall scene_blur_program_stage_00468440(
+    void* self, void*,
+    std::uint32_t a, std::uint32_t b, std::uint32_t c,
+    std::uint32_t d, std::uint32_t e, std::uint32_t f) {
+    record_event(kEvProgramStage468440, address(self), a, b, c, d, e, f);
+    if (g_mutate_owner_on_stage) {
+        store32(self, 0x00u, address(g_node_buf));
+    }
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_00468240 = nullptr;
+static B* slot_004685e0 = nullptr;
+static B* slot_00451490 = nullptr;
+static B* slot_005379f0 = nullptr;
+static B* slot_00537a50 = nullptr;
+
+static void relocate_abs32(B* slot, U size, U old_va, const void* replacement, U expected_count) {
+    U found = 0u;
+    const U target = address(replacement);
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (load32(slot, i) == old_va) {
+            store32(slot, i, target);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected_count, "relocate_abs32 count");
+}
+
+static void relocate_call_rel32(B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void init() {
+    // Assert production initial loader-zero state of Run726 blur globals before any fixture reset.
+    for (U i = 0u; i < 8u; ++i) {
+        require(porsche::scene_blur_matrix_0061bc78[i] == 0u, "initial blur matrix zero");
+    }
+    require(porsche::scene_blur_clock_0061bcac == nullptr, "initial blur clock null");
+    require(porsche::scene_blur_program_0061bcb0 == nullptr, "initial blur program null");
+    require(porsche::scene_blur_mode_0061bcb4 == nullptr, "initial blur mode null");
+    require(porsche::scene_blur_resource_0061bcb8 == nullptr, "initial blur resource null");
+
+    static const B body_00468240[] = {@BODY_00468240@};
+    static const B body_004685e0[] = {@BODY_004685E0@};
+    static const B body_00451490[] = {@BODY_00451490@};
+    static const B body_005379f0[] = {@BODY_005379F0@};
+    static const B body_00537a50[] = {@BODY_00537A50@};
+    require(sizeof body_00468240 == 200u, "200B 00468240");
+    require(sizeof body_004685e0 == 73u, "73B 004685e0");
+    require(sizeof body_00451490 == 279u, "279B 00451490");
+    require(sizeof body_005379f0 == 34u, "34B 005379f0");
+    require(sizeof body_00537a50 == 10u, "10B 00537a50");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+    slot_00468240 = code_page;
+    slot_004685e0 = code_page + 256u;
+    slot_00451490 = code_page + 512u;
+    slot_005379f0 = code_page + 896u;
+    slot_00537a50 = code_page + 960u;
+
+    std::memcpy(slot_00468240, body_00468240, sizeof body_00468240);
+    std::memcpy(slot_004685e0, body_004685e0, sizeof body_004685e0);
+    std::memcpy(slot_00451490, body_00451490, sizeof body_00451490);
+    std::memcpy(slot_005379f0, body_005379f0, sizeof body_005379f0);
+    std::memcpy(slot_00537a50, body_00537a50, sizeof body_00537a50);
+
+    // Relocate 00468240 calls ( note: +0x59 immediate 0x005b3c94 is left un-relocated! )
+    relocate_call_rel32(slot_00468240, 0x00468240u, 0x45u, 0x0059ef90u,
+                        reinterpret_cast<const void*>(&porsche::render_allocate_0059ef90));
+    relocate_call_rel32(slot_00468240, 0x00468240u, 0x78u, 0x0059eff0u,
+                        reinterpret_cast<const void*>(&porsche::application_allocate_array_0059eff0));
+    relocate_call_rel32(slot_00468240, 0x00468240u, 0x88u, 0x0053f230u,
+                        reinterpret_cast<const void*>(&porsche::scene_pass_create_0053f230));
+    relocate_call_rel32(slot_00468240, 0x00468240u, 0x93u, 0x0053f160u,
+                        reinterpret_cast<const void*>(&porsche::scene_pass_append_0053f160));
+
+    // Relocate 004685e0 calls
+    relocate_call_rel32(slot_004685e0, 0x004685e0u, 0x23u, 0x00468440u,
+                        reinterpret_cast<const void*>(&porsche::scene_blur_program_stage_00468440));
+    relocate_call_rel32(slot_004685e0, 0x004685e0u, 0x2eu, 0x0053f230u,
+                        reinterpret_cast<const void*>(&porsche::scene_pass_create_0053f230));
+    relocate_call_rel32(slot_004685e0, 0x004685e0u, 0x39u, 0x0053f160u,
+                        reinterpret_cast<const void*>(&porsche::scene_pass_append_0053f160));
+    relocate_call_rel32(slot_004685e0, 0x004685e0u, 0x40u, 0x0053f2a0u,
+                        reinterpret_cast<const void*>(&porsche::scene_pass_finalize_0053f2a0));
+
+    // Relocate 00451490 to compose with raw 00468240, 004685e0, 005379f0, 00537a50
+    for (U i = 0u; i < 8u; ++i) {
+        relocate_abs32(slot_00451490, sizeof body_00451490, 0x0061bc78u + i * 4u,
+                       &porsche::scene_blur_matrix_0061bc78[i], 1u);
+    }
+    relocate_abs32(slot_00451490, sizeof body_00451490, 0x0061bcacu, &porsche::scene_blur_clock_0061bcac, 1u);
+    relocate_abs32(slot_00451490, sizeof body_00451490, 0x0061bcb0u, &porsche::scene_blur_program_0061bcb0, 1u);
+    relocate_abs32(slot_00451490, sizeof body_00451490, 0x0061bcb4u, &porsche::scene_blur_mode_0061bcb4, 1u);
+    relocate_abs32(slot_00451490, sizeof body_00451490, 0x0061bcb8u, &porsche::scene_blur_resource_0061bcb8, 1u);
+    relocate_abs32(slot_00451490, sizeof body_00451490, 0x00606ac4u, &porsche::startup_sequence_word_00606ac4, 1u);
+    relocate_abs32(slot_00451490, sizeof body_00451490, 0x00613e04u, &porsche::startup_context_table_owner_00613e04, 1u);
+
+    relocate_call_rel32(slot_00451490, 0x00451490u, 0x05u, 0x0059ef90u,
+                        reinterpret_cast<const void*>(&porsche::render_allocate_0059ef90));
+    relocate_call_rel32(slot_00451490, 0x00451490u, 0x1du, 0x00468240u, slot_00468240);
+    relocate_call_rel32(slot_00451490, 0x00451490u, 0x39u, 0x004685e0u, slot_004685e0);
+    relocate_call_rel32(slot_00451490, 0x00451490u, 0x40u, 0x0059ef90u,
+                        reinterpret_cast<const void*>(&porsche::render_allocate_0059ef90));
+    relocate_call_rel32(slot_00451490, 0x00451490u, 0x4eu, 0x005379f0u, slot_005379f0);
+    relocate_call_rel32(slot_00451490, 0x00451490u, 0x60u, 0x00537a50u, slot_00537a50);
+    relocate_call_rel32(slot_00451490, 0x00451490u, 0x109u, 0x0044d320u,
+                        reinterpret_cast<const void*>(&porsche::startup_context_table_lookup_0044d320));
+
+    require(FlushInstructionCache(GetCurrentProcess(), code_page, 4096u) != 0, "FlushInstructionCache");
+}
+
+static U invoke_thiscall5(void* fn, void* self_ptr, U a, U b, U c, U d, U e, U& ret_eax) {
+    U before = 0u, frame = 0u, fail = 0u, out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push e
+        push d
+        push c
+        push b
+        push a
+        mov ecx, self_ptr
+        call fn
+        mov out_eax, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return fail;
+}
+
+static U invoke_thiscall6_void(void* fn, void* self_ptr, U a, U b, U c, U d, U e, U f) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        push f
+        push e
+        push d
+        push c
+        push b
+        push a
+        mov ecx, self_ptr
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static U invoke_cdecl0_void(void* fn) {
+    U before = 0u, frame = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov eax, 0cafe1234h
+        mov ecx, 01234567h
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static void reset_buffers(B poison) {
+    g_event_count = 0u;
+    g_alloc_59ef90_calls = 0u;
+    std::memset(g_events, 0, sizeof g_events);
+    std::memset(g_program_buf, poison, sizeof g_program_buf);
+    std::memset(g_node_buf, poison ^ 0x33u, sizeof g_node_buf);
+    std::memset(g_array_buf, poison ^ 0x55u, sizeof g_array_buf);
+    std::memset(g_mode_buf, poison ^ 0x77u, sizeof g_mode_buf);
+    std::memset(porsche::scene_blur_matrix_0061bc78, poison, sizeof porsche::scene_blur_matrix_0061bc78);
+    porsche::scene_blur_clock_0061bcac = nullptr;
+    porsche::scene_blur_program_0061bcb0 = nullptr;
+    porsche::scene_blur_mode_0061bcb4 = nullptr;
+    porsche::scene_blur_resource_0061bcb8 = nullptr;
+}
+
+static void capture_snapshot(Snapshot& s) {
+    s.event_count = g_event_count;
+    for (U i = 0u; i < kMaxEvents; ++i) {
+        s.events[i] = g_events[i];
+    }
+    std::memcpy(s.program_bytes.data(), g_program_buf, sizeof g_program_buf);
+    std::memcpy(s.node_bytes.data(), g_node_buf, sizeof g_node_buf);
+    std::memcpy(s.array_bytes.data(), g_array_buf, sizeof g_array_buf);
+    std::memcpy(s.mode_bytes.data(), g_mode_buf, sizeof g_mode_buf);
+    for (U i = 0u; i < 8u; ++i) {
+        s.blur_matrix[i] = porsche::scene_blur_matrix_0061bc78[i];
+    }
+    s.blur_clock = address(porsche::scene_blur_clock_0061bcac);
+    s.blur_program = address(porsche::scene_blur_program_0061bcb0);
+    s.blur_mode = address(porsche::scene_blur_mode_0061bcb4);
+    s.blur_resource = address(porsche::scene_blur_resource_0061bcb8);
+}
+
+static void compare_snapshots(const Snapshot& expected, const Snapshot& actual, bool check_ret) {
+    require(expected.abi_fail == 0u && actual.abi_fail == 0u, "abi preservation");
+    if (check_ret) {
+        require(actual.ret_eax == expected.ret_eax, "return EAX");
+    }
+    require(actual.event_count == expected.event_count, "event count");
+    for (U i = 0u; i < expected.event_count; ++i) {
+        const Event& e = expected.events[i];
+        const Event& a = actual.events[i];
+        require(a.kind == e.kind && a.a == e.a && a.b == e.b && a.c == e.c &&
+                    a.d == e.d && a.e == e.e && a.f == e.f && a.g == e.g,
+                "ordered event trace");
+    }
+    require(actual.program_bytes == expected.program_bytes, "program 40B receiver (including untouched padding)");
+    require(actual.node_bytes == expected.node_bytes, "12B pass container node");
+    require(actual.array_bytes == expected.array_bytes, "array buffer bytes");
+    require(actual.mode_bytes == expected.mode_bytes, "24B mode buffer bytes");
+    require(actual.blur_matrix == expected.blur_matrix, "blur matrix");
+    require(actual.blur_clock == expected.blur_clock &&
+                actual.blur_program == expected.blur_program &&
+                actual.blur_mode == expected.blur_mode &&
+                actual.blur_resource == expected.blur_resource,
+            "blur globals");
+}
+
+static void run_ctor_case(U a, U b, U c, U d, U e, B poison, bool fail_node,
+                          bool mutate_slot, B slot_idx) {
+    static Snapshot expected{};
+    static Snapshot actual{};
+
+    g_fail_node_alloc = fail_node;
+    g_mutate_slot_on_append = mutate_slot;
+    g_mutated_slot_index = slot_idx;
+    g_mutate_owner_on_stage = false;
+    g_mutate_owner_on_append = false;
+
+    reset_buffers(poison);
+    expected.abi_fail = invoke_thiscall5(slot_00468240, g_program_buf, a, b, c, d, e, expected.ret_eax);
+    capture_snapshot(expected);
+
+    reset_buffers(poison);
+    actual.abi_fail = invoke_thiscall5(
+        reinterpret_cast<void*>(&porsche::scene_blur_program_ctor_00468240),
+        g_program_buf, a, b, c, d, e, actual.ret_eax);
+    capture_snapshot(actual);
+
+    // Verify untouched receiver padding bytes +0x0d..+0x0f and +0x26..+0x27 retained poison.
+    require(actual.program_bytes[0x0du] == poison &&
+                actual.program_bytes[0x0eu] == poison &&
+                actual.program_bytes[0x0fu] == poison &&
+                actual.program_bytes[0x26u] == poison &&
+                actual.program_bytes[0x27u] == poison,
+            "untouched padding bytes preserved");
+
+    compare_snapshots(expected, actual, true);
+    ++cases;
+}
+
+static void run_setup_case(U a, U b, U c, U d, U e, U f, B poison,
+                           U initial_owner, bool mutate_on_stage, bool mutate_on_append) {
+    static Snapshot expected{};
+    static Snapshot actual{};
+
+    g_fail_node_alloc = false;
+    g_mutate_slot_on_append = false;
+    g_mutate_owner_on_stage = mutate_on_stage;
+    g_mutate_owner_on_append = mutate_on_append;
+
+    reset_buffers(poison);
+    store32(g_program_buf, 0x00u, initial_owner);
+    expected.abi_fail = invoke_thiscall6_void(slot_004685e0, g_program_buf, a, b, c, d, e, f);
+    capture_snapshot(expected);
+
+    reset_buffers(poison);
+    store32(g_program_buf, 0x00u, initial_owner);
+    actual.abi_fail = invoke_thiscall6_void(
+        reinterpret_cast<void*>(&porsche::scene_blur_program_setup_004685e0),
+        g_program_buf, a, b, c, d, e, f);
+    capture_snapshot(actual);
+
+    compare_snapshots(expected, actual, false);
+    ++cases;
+}
+
+static void run_composed_451490_case(B poison, bool fail_node, bool lookup_hit) {
+    static Snapshot expected{};
+    static Snapshot actual{};
+
+    g_fail_node_alloc = fail_node;
+    g_mutate_slot_on_append = false;
+    g_mutate_owner_on_stage = false;
+    g_mutate_owner_on_append = false;
+    g_lookup_hit = lookup_hit;
+
+    reset_buffers(poison);
+    expected.abi_fail = invoke_cdecl0_void(slot_00451490);
+    capture_snapshot(expected);
+
+    reset_buffers(poison);
+    actual.abi_fail = invoke_cdecl0_void(reinterpret_cast<void*>(&porsche::scene_stage_reset_00451490));
+    capture_snapshot(actual);
+
+    compare_snapshots(expected, actual, false);
+    ++cases;
+}
+
+int main() {
+    init();
+
+    // 1. Isolated 00468240 constructor cases (36 cases)
+    struct CtorArgs {
+        U a, b, c, d, e;
+    };
+    static const CtorArgs kCtorInputs[] = {
+        {14u, 4u, 1u, 0u, 4u},
+        {0u, 0u, 0u, 0u, 0u},
+        {1u, 2u, 3u, 0x11223344u, 0x05556667u},
+        {0xffffffffu, 0x80000000u, 2u, 0xdeadbeefu, 0x0fffffffu},
+        {7u, 9u, 4u, 0xcafebabeu, 0x12345678u},
+        {0x1234u, 0x5678u, 5u, 0x01020304u, 0xfedcba98u},
+        {42u, 99u, 6u, 0xffffffffu, 0x00000001u},
+        {0xabcdef01u, 0x23456789u, 3u, 0x55aa55aau, 0xaa55aa55u},
+        {0x10203040u, 0x50607080u, 0x40000000u, 0x11223344u, 0x55667788u},
+    };
+    for (U i = 0u; i < 9u; ++i) {
+        const CtorArgs& in = kCtorInputs[i];
+        const B poison = static_cast<B>(0xa0u + i * 7u);
+        run_ctor_case(in.a, in.b, in.c, in.d, in.e, poison, false, false, 0u);
+        run_ctor_case(in.a, in.b, in.c, in.d, in.e, static_cast<B>(poison ^ 0x5au), true, false, 0u);
+        if (in.c >= 1u) {
+            run_ctor_case(in.a, in.b, in.c, in.d, in.e, static_cast<B>(poison ^ 0x33u), false, true, 1u);
+            run_ctor_case(in.a, in.b, in.c, in.d, in.e, static_cast<B>(poison ^ 0x66u), true, true, 2u);
+        } else {
+            run_ctor_case(in.a, in.b, 2u, in.d, in.e, static_cast<B>(poison ^ 0x33u), false, true, 1u);
+            run_ctor_case(in.a, in.b, 2u, in.d, in.e, static_cast<B>(poison ^ 0x66u), true, true, 3u);
+        }
+    }
+
+    // 2. Isolated 004685e0 setup cases (24 cases)
+    struct SetupArgs {
+        U a, b, c, d, e, f;
+    };
+    static const SetupArgs kSetupInputs[] = {
+        {0u, 0u, 0u, 0u, 0u, 0u},
+        {1u, 2u, 3u, 4u, 5u, 6u},
+        {0x10u, 0x20u, 0x30u, 0x40u, 0x50u, 0x60u},
+        {0xffffffffu, 0xeeeeeeeeu, 0xddddddddu, 0xccccccccu, 0xbbbbbbbbu, 0xaaaaaaaau},
+        {0x12345678u, 0x9abcdef0u, 0x0fedcba9u, 0x87654321u, 0x00000001u, 0x80000000u},
+        {0xdeadbeefu, 0xcafebabeu, 0xfeedfaceu, 0xbadc0de0u, 0x13579bdfu, 0x2468ace0u},
+    };
+    for (U i = 0u; i < 6u; ++i) {
+        const SetupArgs& in = kSetupInputs[i];
+        const B poison = static_cast<B>(0x41u + i * 11u);
+        run_setup_case(in.a, in.b, in.c, in.d, in.e, in.f, poison, address(g_node_buf), false, false);
+        run_setup_case(in.a, in.b, in.c, in.d, in.e, in.f, static_cast<B>(poison ^ 0x1fu), 0u, true, false);
+        run_setup_case(in.a, in.b, in.c, in.d, in.e, in.f, static_cast<B>(poison ^ 0x2fu), address(g_node_buf), false, true);
+        run_setup_case(in.a, in.b, in.c, in.d, in.e, in.f, static_cast<B>(poison ^ 0x3fu), 0u, true, true);
+    }
+
+    // 3. Composed 00451490 -> 00468240 -> 004685e0 cases (16 cases)
+    for (U i = 0u; i < 4u; ++i) {
+        const B poison = static_cast<B>(0xc0u + i * 13u);
+        run_composed_451490_case(poison, false, false);
+        run_composed_451490_case(static_cast<B>(poison ^ 0x11u), false, true);
+        run_composed_451490_case(static_cast<B>(poison ^ 0x22u), true, false);
+        run_composed_451490_case(static_cast<B>(poison ^ 0x33u), true, true);
+    }
+
+    std::printf("scene_blur_program_lifecycle_736_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

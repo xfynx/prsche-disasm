@@ -1,5 +1,21 @@
 # Отложенные проверки восстановления v2
 
+Run739 integrates `736/006`, `737/005`, and `738/001` (plus `Run739`'s
+param-4 `uint32_t` -> `void*` ABI bridge for `00468440`): 6 bodies, 478 native
+comparisons, 33 mutations, 0 new owned data, 432 TUs, 101 names / 108 refs, no
+EXE (registry 1,217). Six typed children remain open (`0053f380`, `0053f980`,
+`00537a70`, `00537a40`, `00537a30`, `00536470`), alongside `00468240` array
+allocation failure, pass vtable slots `+0x08/+0x10/+0x14/+0x18`, faults,
+live renderer, startup and gameplay.
+
+Run735 integrates 732/003, 733/006 and 734/003: 25 bodies, 4,836 native
+comparisons, 44 mutations, 428 TUs, 97 names / 104 refs, no EXE. Typed
+children `00567060`, `00566ea0`, `005612a0` and `00571630` remain open.
+Run734's original fill pointer tables are initialized `.data`, while the
+accepted C++ COFF places its `const` tables in `.rdata`; check the complete
+writer/address-taking closure before claiming mutable-table fidelity. Live
+audio/render devices, faults, concurrency, startup and gameplay remain open.
+
 Run730 integrates 728/005 (`0058e310`, 4B readonly `005c1694`), 729/002
 (replaces unregistered `400/00412030.cpp` with canonical Run695 consumer) and
 731/002 (`00455830`, `004558b0` tree constructors) into 425 TUs / 97 names /

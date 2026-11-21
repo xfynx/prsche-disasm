@@ -1,0 +1,116 @@
+{
+  "run": 737,
+  "experiment": "local/experiments/v2-scene-pass-children-737",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/737-scene-pass-children",
+    "iterations/v2/001-original-recovery/runs/599-render-misc-cleanup",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.hpp",
+    "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scope-evidence.json"
+  ],
+  "original_bodies": [
+    { "va": "0053f160", "bytes": 76, "sha256": "2ea3c7e041d8794cc2017b15b2074d33abb78d762d15bf88856000ccf4521f77", "token": "@BODY_0053F160@" },
+    { "va": "0053f230", "bytes": 109, "sha256": "060443d42213095b9afdd7b97296eafc229b38775fd0185ca5d0fc2710f2f089", "token": "@BODY_0053F230@" },
+    { "va": "0053f2a0", "bytes": 121, "sha256": "255ec16ad5d4e59451bf33b30a12c5316f409c64cd89e7f4a8d47c927370e0fd", "token": "@BODY_0053F2A0@" }
+  ],
+  "pass_marker": "scene_pass_children_737_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-append-next-offset",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "    store32(tail, 0x08u, address(pass));",
+      "new": "    store32(tail, 0x0cu, address(pass));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-append-prev",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "    store32(pass, 0x04u, address(tail));",
+      "new": "    store32(pass, 0x04u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-append-owner-offset",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "    store32(pass, 0x04u, address(tail));\n    store32(pass, 0x08u, 0u);\n    store32(pass, 0x20u, address(self));",
+      "new": "    store32(pass, 0x04u, address(tail));\n    store32(pass, 0x08u, 0u);\n    store32(pass, 0x1cu, address(self));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-create-alloc-size",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "render_allocate_0059ef90(8u)",
+      "new": "render_allocate_0059ef90(12u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-create-callback-args",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "factory_callback(node->callback_va)(kind, subkind)",
+      "new": "factory_callback(node->callback_va)(subkind, kind)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-create-skip-next",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "        node = node->next;",
+      "new": "        node = nullptr;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-create-flags",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "virtual_slot<Configure>(pass, 0x08u)(pass, flags);",
+      "new": "virtual_slot<Configure>(pass, 0x08u)(pass, flags + 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-reset-offset",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "        store32(pass, 0x18u, 0u);",
+      "new": "        store32(pass, 0x14u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-index-step",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "            store32(pass, 0x18u, index++);",
+      "new": "            store32(pass, 0x18u, index);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-copy-condition",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "            virtual_slot<Query>(pass, 0x18u)(pass) == 0u)",
+      "new": "            virtual_slot<Query>(pass, 0x18u)(pass) != 0u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-skip-compile",
+      "source": "iterations/v2/001-original-recovery/runs/737-scene-pass-children/scene_pass_children_737.cpp",
+      "old": "        scene_pass_compile_0053f380(pass);",
+      "new": "        (void)pass;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
