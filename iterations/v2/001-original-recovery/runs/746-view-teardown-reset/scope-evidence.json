@@ -1,0 +1,70 @@
+{
+  "run": 746,
+  "status": "native/provenance/REA PASS002; shared integration pending",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "scope": "view_teardown_reset_00466500 (340B) and its four RB-tree clear/node-release helpers (00466c30 109B, 00466ca0 109B, 00466d10 79B, 00466d60 79B), closing ?view_teardown_reset_00466500@porsche@@YIXPAX0@Z from Run735 build-003.json",
+  "rea_session": {
+    "config": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/rea/queries.json",
+    "validation": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/rea/validation.json",
+    "receipt": "local/experiments/v2-view-teardown-reset-746-rea/001/receipt.json",
+    "dossiers": [
+      "local/experiments/v2-view-teardown-reset-746-rea/001/function-00466500.json",
+      "local/experiments/v2-view-teardown-reset-746-rea/001/function-00466c30.json",
+      "local/experiments/v2-view-teardown-reset-746-rea/001/function-00466ca0.json",
+      "local/experiments/v2-view-teardown-reset-746-rea/001/function-00466d10.json",
+      "local/experiments/v2-view-teardown-reset-746-rea/001/function-00466d60.json"
+    ]
+  },
+  "bodies": [
+    {
+      "va": "00466500",
+      "range": ["00466500", "00466653"],
+      "bytes": 340,
+      "sha256": "d741274df9717d66263bf5e62dac4f35f8e75427b54567f594f990fb9cb10c32",
+      "symbol": "porsche::view_teardown_reset_00466500",
+      "abi": "__thiscall (fastcall bridge self, unused_edx), void return, RET 0"
+    },
+    {
+      "va": "00466c30",
+      "range": ["00466c30", "00466c9c"],
+      "bytes": 109,
+      "sha256": "b0202ff52fad853e950cad5adbce36a9f3bfe711b9252c8167f893e69a0865af",
+      "symbol": "porsche::scene_tree_clear_a_00466c30",
+      "abi": "__thiscall (fastcall bridge self, unused_edx), void return, RET 0"
+    },
+    {
+      "va": "00466ca0",
+      "range": ["00466ca0", "00466d0c"],
+      "bytes": 109,
+      "sha256": "fc1b280437a27132db536b9891e3078c8140e10d0942ca480af0bce4a70ac6ed",
+      "symbol": "porsche::scene_tree_clear_b_00466ca0",
+      "abi": "__thiscall (fastcall bridge self, unused_edx), void return, RET 0"
+    },
+    {
+      "va": "00466d10",
+      "range": ["00466d10", "00466d5e"],
+      "bytes": 79,
+      "sha256": "bc809a508142aa33528efd6acd22cdebd6340527f77acac82c48d50703f10e20",
+      "symbol": "porsche::scene_tree_nodes_release_a_00466d10",
+      "abi": "__thiscall (fastcall bridge self, unused_edx, node), void return, RET 4"
+    },
+    {
+      "va": "00466d60",
+      "range": ["00466d60", "00466dae"],
+      "bytes": 79,
+      "sha256": "1c6a52ded4fd30330fdc482412b21b81400c08307db3282fe5e8d3470ece4eee",
+      "symbol": "porsche::scene_tree_nodes_release_b_00466d60",
+      "abi": "__thiscall (fastcall bridge self, unused_edx, node), void return, RET 4"
+    }
+  ],
+  "canonical_owners_reused": [
+    "005e4fe8 application_context_heap_state_005e4fe8 (application_heap_state.cpp)",
+    "004237d0 application_context_clear_004237d0 (context_effects.cpp)",
+    "0059f050 application_release_0059f050 (application_alloc.cpp)",
+    "005322b0 heap_enter_005322b0 (heap_locks.cpp)",
+    "005322c0 heap_leave_005322c0 (heap_locks.cpp)"
+  ],
+  "newly_owned_data": [],
+  "downstream_child_frontiers": [],
+  "boundaries": "Valid non-null 32-byte view struct whose non-null slot pointers hold valid 8-byte tree headers with 32-byte head sentinels and acyclic node left/right (+0x08/+0x0c) links, plus non-null application context state with lock at +0x28 and free-list head at +0x40. Controlled native fixture proves exact ABI, lock/release/pool-free order, sentinel reset, and free-list chaining across all five bodies; null tree head dereferences, cyclic trees, and live renderer integration remain outside this bounded scope."
+}

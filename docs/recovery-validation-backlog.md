@@ -16,6 +16,13 @@ EXE (registry 1,217). Six typed children remain open (`0053f380`, `0053f980`,
 allocation failure, pass vtable slots `+0x08/+0x10/+0x14/+0x18`, faults,
 live renderer, startup and gameplay.
 
+Run747 integrates Run746/002: five view teardown/tree bodies, 70 native
+comparisons, 11 mutations, 436 TUs, 99 names / 106 refs, no EXE. Valid
+acyclic tree teardown is proved; null/cyclic/fault/live renderer paths remain
+open. Run744/002 proves four audio header functions but stays out of the game
+graph until parent `00566ea0` is recovered. Run745 is tracing reachable
+render conversion parents `00534b90`/`00534d40` before child `00571330`.
+
 Run735 integrates 732/003, 733/006 and 734/003: 25 bodies, 4,836 native
 comparisons, 44 mutations, 428 TUs, 97 names / 104 refs, no EXE. Typed
 children `00567060`, `00566ea0`, `005612a0` and `00571630` remain open.

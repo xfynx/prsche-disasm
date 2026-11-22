@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run743](iterations/v2/001-original-recovery/runs/743-audio-render-scene-integration/README.md)
-is the current shared build (`435` TUs, `100` unresolved names / `107`
-references). Active workers are preparing the next audio/render/scene packets
-(`Run744`–`Run746`). The active iteration plan tracks acceptance and the newly
-opened children.
+[Run747](iterations/v2/001-original-recovery/runs/747-view-teardown-integration/README.md)
+is the current shared build (`436` TUs, `99` unresolved names / `106`
+references). Run744's native proof awaits its unresolved audio parent; Run745
+is tracing the render conversion parent. The active iteration plan owns their
+next acceptance steps.
 
 ## Recovery milestones
 

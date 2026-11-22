@@ -4,7 +4,15 @@ Updated 2026-11-22. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run743](iterations/v2/001-original-recovery/runs/743-audio-render-scene-integration/README.md)
+[Run747](iterations/v2/001-original-recovery/runs/747-view-teardown-integration/README.md)
+compiles 436 C++ translation units across eight projects. The shared link
+reports **99 unresolved names / 106 references**. There is no game EXE yet.
+Run746's five view teardown bodies pass the shared audit: 70 original-x86
+comparisons, 11 mutations, 1,077 source pins, and 1,232 registry entries.
+One name closes with zero new linker names. Run744 is native-proved but awaits
+its unresolved audio parent; Run745 is tracing the render conversion parent.
+
+Historical: [Run743](iterations/v2/001-original-recovery/runs/743-audio-render-scene-integration/README.md)
 compiles 435 C++ translation units across eight projects. The shared link
 reports **100 unresolved names / 107 references**. There is no game EXE yet.
 The shared audit accepts Runs740/741/742 within their bounded domains: 10 new

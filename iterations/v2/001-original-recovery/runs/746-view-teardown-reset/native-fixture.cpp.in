@@ -1,0 +1,548 @@
+// Native x86-vs-C++ differential fixture for Run746:
+//   00466500..00466653 (340B) porsche::view_teardown_reset_00466500
+//   00466c30..00466c9c (109B) porsche::scene_tree_clear_a_00466c30
+//   00466ca0..00466d0c (109B) porsche::scene_tree_clear_b_00466ca0
+//   00466d10..00466d5e ( 79B) porsche::scene_tree_nodes_release_a_00466d10
+//   00466d60..00466dae ( 79B) porsche::scene_tree_nodes_release_b_00466d60
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "porsche/application_alloc.hpp"
+#include "porsche/application_context_base.hpp"
+#include "porsche/heap.hpp"
+#include "scene_view_teardown_746.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+enum : U {
+    kEvEnter = 1u,
+    kEvLeave = 2u,
+    kEvPoolFree = 3u,
+    kEvRelease = 4u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+};
+
+enum : U {
+    kMaxEvents = 256u,
+    kTreeCount = 8u,
+    kNodeCount = 48u,
+};
+
+struct Snapshot {
+    U abi_fail;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    std::array<B, 0x80u> ctx_bytes;
+    std::array<B, 0x20u> view_bytes;
+    std::array<std::array<B, 0x08u>, kTreeCount> trees;
+    std::array<std::array<B, 0x20u>, kTreeCount> heads;
+    std::array<std::array<B, 0x20u>, kNodeCount> nodes;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static alignas(8) B g_ctx_buf[0x80u];
+static void* g_heap_ctx_ptr = g_ctx_buf;
+static alignas(8) B g_lock_buf[0x20u];
+static alignas(8) B g_view_buf[0x20u];
+static alignas(8) B g_trees[kTreeCount][0x08u];
+static alignas(8) B g_heads[kTreeCount][0x20u];
+static alignas(8) B g_nodes[kNodeCount][0x20u];
+static alignas(8) B g_sentinel_free[0x10u];
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c};
+}
+
+namespace porsche {
+
+void* __cdecl application_context_heap_state_005e4fe8() {
+    return g_heap_ctx_ptr;
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    record_event(kEvEnter, address(lock));
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    record_event(kEvLeave, address(lock));
+}
+
+void __cdecl application_context_clear_004237d0(
+    void* block, std::uint32_t bytes, std::uint32_t mode) {
+    record_event(kEvPoolFree, address(block), bytes, mode);
+}
+
+std::uint32_t __cdecl application_release_0059f050(void* block) {
+    record_event(kEvRelease, address(block));
+    return 1u;
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_00466500 = nullptr;
+static B* slot_00466c30 = nullptr;
+static B* slot_00466ca0 = nullptr;
+static B* slot_00466d10 = nullptr;
+static B* slot_00466d60 = nullptr;
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void relocate_disp32(
+    B* slot, U insn_off, U disp_off, U expected_addr, const void* replacement) {
+    const U actual = load32(slot, insn_off + disp_off);
+    require(actual == expected_addr, "disp32 target");
+    store32(slot, insn_off + disp_off, address(replacement));
+}
+
+static void init() {
+    static const B body_00466500[] = {@BODY_00466500@};
+    static const B body_00466c30[] = {@BODY_00466C30@};
+    static const B body_00466ca0[] = {@BODY_00466CA0@};
+    static const B body_00466d10[] = {@BODY_00466D10@};
+    static const B body_00466d60[] = {@BODY_00466D60@};
+    require(sizeof body_00466500 == 340u, "340B 00466500");
+    require(sizeof body_00466c30 == 109u, "109B 00466c30");
+    require(sizeof body_00466ca0 == 109u, "109B 00466ca0");
+    require(sizeof body_00466d10 == 79u, "79B 00466d10");
+    require(sizeof body_00466d60 == 79u, "79B 00466d60");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+
+    slot_00466500 = code_page + 0x000u;
+    slot_00466c30 = code_page + 0x200u;
+    slot_00466ca0 = code_page + 0x300u;
+    slot_00466d10 = code_page + 0x400u;
+    slot_00466d60 = code_page + 0x500u;
+
+    std::memcpy(slot_00466500, body_00466500, sizeof body_00466500);
+    std::memcpy(slot_00466c30, body_00466c30, sizeof body_00466c30);
+    std::memcpy(slot_00466ca0, body_00466ca0, sizeof body_00466ca0);
+    std::memcpy(slot_00466d10, body_00466d10, sizeof body_00466d10);
+    std::memcpy(slot_00466d60, body_00466d60, sizeof body_00466d60);
+
+    const void* fn_4237d0 = reinterpret_cast<const void*>(&porsche::application_context_clear_004237d0);
+    const void* fn_59f050 = reinterpret_cast<const void*>(&porsche::application_release_0059f050);
+    const void* fn_5322b0 = reinterpret_cast<const void*>(&porsche::heap_enter_005322b0);
+    const void* fn_5322c0 = reinterpret_cast<const void*>(&porsche::heap_leave_005322c0);
+
+    // 00466500 relocations
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x00fu, 0x00466c30u, slot_00466c30);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x01au, 0x004237d0u, fn_4237d0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x020u, 0x0059f050u, fn_59f050);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x031u, 0x00466c30u, slot_00466c30);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x03cu, 0x004237d0u, fn_4237d0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x042u, 0x0059f050u, fn_59f050);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x053u, 0x00466ca0u, slot_00466ca0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x05eu, 0x004237d0u, fn_4237d0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x064u, 0x0059f050u, fn_59f050);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x075u, 0x00466ca0u, slot_00466ca0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x080u, 0x004237d0u, fn_4237d0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x086u, 0x0059f050u, fn_59f050);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x097u, 0x00466ca0u, slot_00466ca0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x0a2u, 0x004237d0u, fn_4237d0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x0a8u, 0x0059f050u, fn_59f050);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x0c4u, 0x00466d10u, slot_00466d10);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x0e1u, 0x004237d0u, fn_4237d0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x0e7u, 0x0059f050u, fn_59f050);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x0f8u, 0x00466ca0u, slot_00466ca0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x103u, 0x004237d0u, fn_4237d0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x109u, 0x0059f050u, fn_59f050);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x125u, 0x00466d60u, slot_00466d60);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x142u, 0x004237d0u, fn_4237d0);
+    relocate_call_rel32(slot_00466500, 0x00466500u, 0x148u, 0x0059f050u, fn_59f050);
+
+    // 00466c30 relocations
+    relocate_call_rel32(slot_00466c30, 0x00466c30u, 0x01du, 0x00466d10u, slot_00466d10);
+    relocate_disp32(slot_00466c30, 0x022u, 2u, 0x005e4fe8u, &g_heap_ctx_ptr);
+    relocate_call_rel32(slot_00466c30, 0x00466c30u, 0x032u, 0x005322b0u, fn_5322b0);
+    relocate_call_rel32(slot_00466c30, 0x00466c30u, 0x043u, 0x005322c0u, fn_5322c0);
+
+    // 00466ca0 relocations
+    relocate_call_rel32(slot_00466ca0, 0x00466ca0u, 0x01du, 0x00466d60u, slot_00466d60);
+    relocate_disp32(slot_00466ca0, 0x022u, 2u, 0x005e4fe8u, &g_heap_ctx_ptr);
+    relocate_call_rel32(slot_00466ca0, 0x00466ca0u, 0x032u, 0x005322b0u, fn_5322b0);
+    relocate_call_rel32(slot_00466ca0, 0x00466ca0u, 0x043u, 0x005322c0u, fn_5322c0);
+
+    // 00466d10 relocations
+    relocate_call_rel32(slot_00466d10, 0x00466d10u, 0x014u, 0x00466d10u, slot_00466d10);
+    relocate_disp32(slot_00466d10, 0x019u, 2u, 0x005e4fe8u, &g_heap_ctx_ptr);
+    relocate_call_rel32(slot_00466d10, 0x00466d10u, 0x029u, 0x005322b0u, fn_5322b0);
+    relocate_call_rel32(slot_00466d10, 0x00466d10u, 0x03au, 0x005322c0u, fn_5322c0);
+
+    // 00466d60 relocations
+    relocate_call_rel32(slot_00466d60, 0x00466d60u, 0x014u, 0x00466d60u, slot_00466d60);
+    relocate_disp32(slot_00466d60, 0x019u, 2u, 0x005e4fe8u, &g_heap_ctx_ptr);
+    relocate_call_rel32(slot_00466d60, 0x00466d60u, 0x029u, 0x005322b0u, fn_5322b0);
+    relocate_call_rel32(slot_00466d60, 0x00466d60u, 0x03au, 0x005322c0u, fn_5322c0);
+}
+
+static U invoke_thiscall_0(const void* fn, void* self) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_esp0
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_esp0:
+        cmp ebx, 0x13572468
+        je ok_ebx0
+        or abi_fail, 2
+    ok_ebx0:
+        cmp esi, 0x24681357
+        je ok_esi0
+        or abi_fail, 4
+    ok_esi0:
+        cmp edi, 0x55aa33cc
+        je ok_edi0
+        or abi_fail, 8
+    ok_edi0:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static U invoke_thiscall_1(const void* fn, void* self, void* arg0) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push arg0
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_esp1
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_esp1:
+        cmp ebx, 0x13572468
+        je ok_ebx1
+        or abi_fail, 2
+    ok_ebx1:
+        cmp esi, 0x24681357
+        je ok_esi1
+        or abi_fail, 4
+    ok_esi1:
+        cmp edi, 0x55aa33cc
+        je ok_edi1
+        or abi_fail, 8
+    ok_edi1:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static void reset_fixtures(U seed) {
+    g_event_count = 0u;
+    std::memset(g_events, 0, sizeof g_events);
+    for (U i = 0u; i < sizeof g_ctx_buf; ++i) {
+        g_ctx_buf[i] = static_cast<B>((0x91u + i + seed) & 0xffu);
+    }
+    store32(g_ctx_buf, 0x28u, address(g_lock_buf));
+    store32(g_ctx_buf, 0x40u, address(g_sentinel_free));
+    std::memset(g_view_buf, 0, sizeof g_view_buf);
+    for (U t = 0u; t < kTreeCount; ++t) {
+        for (U j = 0u; j < 0x08u; ++j) {
+            g_trees[t][j] = 0u;
+        }
+        for (U j = 0u; j < 0x20u; ++j) {
+            g_heads[t][j] = static_cast<B>((0x20u + t * 7u + j + seed) & 0xffu);
+        }
+        store32(g_trees[t], 0x00u, address(g_heads[t]));
+        store32(g_trees[t], 0x04u, 0u);
+        store32(g_heads[t], 0x04u, 0u);
+        store32(g_heads[t], 0x08u, address(g_heads[t]));
+        store32(g_heads[t], 0x0cu, address(g_heads[t]));
+    }
+    for (U n = 0u; n < kNodeCount; ++n) {
+        for (U j = 0u; j < 0x20u; ++j) {
+            g_nodes[n][j] = static_cast<B>((0x40u + n * 11u + j + seed) & 0xffu);
+        }
+        store32(g_nodes[n], 0x04u, 0x77770000u + n);
+        store32(g_nodes[n], 0x08u, 0u);
+        store32(g_nodes[n], 0x0cu, 0u);
+    }
+}
+
+static void build_tree_shape(U tree_idx, U base_node, U shape, U count_override) {
+    // Leaves +0x08 (left) and +0x0c (right) as nullptr by default.
+    void* head = g_heads[tree_idx];
+    void* n0 = g_nodes[base_node + 0u];
+    void* n1 = g_nodes[base_node + 1u];
+    void* n2 = g_nodes[base_node + 2u];
+    void* n3 = g_nodes[base_node + 3u];
+    void* n4 = g_nodes[base_node + 4u];
+    void* n5 = g_nodes[base_node + 5u];
+    U cnt = 0u;
+    if (shape == 0u) {
+        cnt = count_override;
+    } else if (shape == 1u) {
+        // Single root node.
+        store32(head, 0x04u, address(n0));
+        cnt = 1u;
+    } else if (shape == 2u) {
+        // Right chain + left branch: n0 -> (L: n1 -> R: n2, R: n3 -> (L: n4, R: n5))
+        store32(head, 0x04u, address(n0));
+        store32(n0, 0x08u, address(n1));
+        store32(n0, 0x0cu, address(n3));
+        store32(n1, 0x0cu, address(n2));
+        store32(n3, 0x08u, address(n4));
+        store32(n3, 0x0cu, address(n5));
+        cnt = 6u;
+    } else if (shape == 3u) {
+        // Left-only chain: n0 -> L: n1 -> L: n2
+        store32(head, 0x04u, address(n0));
+        store32(n0, 0x08u, address(n1));
+        store32(n1, 0x08u, address(n2));
+        cnt = 3u;
+    } else if (shape == 4u) {
+        // Right-only chain: n0 -> R: n1 -> R: n2
+        store32(head, 0x04u, address(n0));
+        store32(n0, 0x0cu, address(n1));
+        store32(n1, 0x0cu, address(n2));
+        cnt = 3u;
+    }
+    store32(g_trees[tree_idx], 0x04u, count_override == 0xffffffffu ? cnt : count_override);
+}
+
+static void capture(Snapshot& out, U abi_fail) {
+    out.abi_fail = abi_fail;
+    out.event_count = g_event_count;
+    std::memcpy(out.events.data(), g_events, sizeof g_events);
+    std::memcpy(out.ctx_bytes.data(), g_ctx_buf, sizeof g_ctx_buf);
+    std::memcpy(out.view_bytes.data(), g_view_buf, sizeof g_view_buf);
+    for (U t = 0u; t < kTreeCount; ++t) {
+        std::memcpy(out.trees[t].data(), g_trees[t], sizeof g_trees[t]);
+        std::memcpy(out.heads[t].data(), g_heads[t], sizeof g_heads[t]);
+    }
+    for (U n = 0u; n < kNodeCount; ++n) {
+        std::memcpy(out.nodes[n].data(), g_nodes[n], sizeof g_nodes[n]);
+    }
+}
+
+static void check_equal(const Snapshot& orig, const Snapshot& cpp, const char* tag) {
+    require(orig.abi_fail == 0u, tag);
+    require(cpp.abi_fail == 0u, tag);
+    require(orig.event_count == cpp.event_count, tag);
+    for (U i = 0u; i < orig.event_count; ++i) {
+        require(orig.events[i].kind == cpp.events[i].kind &&
+                    orig.events[i].a == cpp.events[i].a &&
+                    orig.events[i].b == cpp.events[i].b &&
+                    orig.events[i].c == cpp.events[i].c,
+                tag);
+    }
+    require(orig.ctx_bytes == cpp.ctx_bytes, tag);
+    require(orig.view_bytes == cpp.view_bytes, tag);
+    for (U t = 0u; t < kTreeCount; ++t) {
+        require(orig.trees[t] == cpp.trees[t], tag);
+        require(orig.heads[t] == cpp.heads[t], tag);
+    }
+    for (U n = 0u; n < kNodeCount; ++n) {
+        require(orig.nodes[n] == cpp.nodes[n], tag);
+    }
+    ++cases;
+}
+
+template <class Setup>
+static void run_release_case(bool is_b, bool pass_null_node, Setup&& setup, const char* tag) {
+    Snapshot orig{};
+    Snapshot cpp{};
+    reset_fixtures(1u);
+    setup();
+    void* node = pass_null_node ? nullptr : g_nodes[0];
+    const void* orig_fn = is_b ? slot_00466d60 : slot_00466d10;
+    const void* cpp_fn = is_b
+        ? reinterpret_cast<const void*>(&porsche::scene_tree_nodes_release_b_00466d60)
+        : reinterpret_cast<const void*>(&porsche::scene_tree_nodes_release_a_00466d10);
+    capture(orig, invoke_thiscall_1(orig_fn, g_trees[0], node));
+    reset_fixtures(1u);
+    setup();
+    capture(cpp, invoke_thiscall_1(cpp_fn, g_trees[0], node));
+    check_equal(orig, cpp, tag);
+}
+
+template <class Setup>
+static void run_clear_case(bool is_b, Setup&& setup, const char* tag) {
+    Snapshot orig{};
+    Snapshot cpp{};
+    reset_fixtures(2u);
+    setup();
+    const void* orig_fn = is_b ? slot_00466ca0 : slot_00466c30;
+    const void* cpp_fn = is_b
+        ? reinterpret_cast<const void*>(&porsche::scene_tree_clear_b_00466ca0)
+        : reinterpret_cast<const void*>(&porsche::scene_tree_clear_a_00466c30);
+    capture(orig, invoke_thiscall_0(orig_fn, g_trees[0]));
+    reset_fixtures(2u);
+    setup();
+    capture(cpp, invoke_thiscall_0(cpp_fn, g_trees[0]));
+    check_equal(orig, cpp, tag);
+}
+
+template <class Setup>
+static void run_view_case(Setup&& setup, const char* tag) {
+    Snapshot orig{};
+    Snapshot cpp{};
+    reset_fixtures(3u);
+    setup();
+    capture(orig, invoke_thiscall_0(slot_00466500, g_view_buf));
+    reset_fixtures(3u);
+    setup();
+    capture(cpp, invoke_thiscall_0(
+        reinterpret_cast<const void*>(&porsche::view_teardown_reset_00466500), g_view_buf));
+    check_equal(orig, cpp, tag);
+}
+
+int main() {
+    init();
+
+    // Direct 00466d10 / 00466d60 tests
+    for (int kind = 0; kind < 2; ++kind) {
+        const bool is_b = (kind != 0);
+        run_release_case(is_b, true, []() {}, "release null");
+        run_release_case(is_b, false, []() { build_tree_shape(0u, 0u, 1u, 1u); }, "release single");
+        run_release_case(is_b, false, []() { build_tree_shape(0u, 0u, 2u, 6u); }, "release complex");
+        run_release_case(is_b, false, []() { build_tree_shape(0u, 0u, 3u, 3u); }, "release left chain");
+        run_release_case(is_b, false, []() { build_tree_shape(0u, 0u, 4u, 3u); }, "release right chain");
+    }
+
+    // Direct 00466c30 / 00466ca0 tests
+    for (int kind = 0; kind < 2; ++kind) {
+        const bool is_b = (kind != 0);
+        run_clear_case(is_b, []() {
+            // count == 0 even when head+4 is non-null: original returns immediately.
+            store32(g_heads[0], 0x04u, address(g_nodes[0]));
+            store32(g_trees[0], 0x04u, 0u);
+        }, "clear count zero skips");
+        run_clear_case(is_b, []() {
+            // count != 0 with head+4 == nullptr: resets sentinel and clears count.
+            store32(g_heads[0], 0x04u, 0u);
+            store32(g_heads[0], 0x08u, address(g_nodes[0]));
+            store32(g_heads[0], 0x0cu, address(g_nodes[1]));
+            store32(g_trees[0], 0x04u, 5u);
+        }, "clear nonzero count empty root");
+        run_clear_case(is_b, []() { build_tree_shape(0u, 0u, 2u, 6u); }, "clear complex");
+    }
+
+    // 00466500 tests: all null
+    run_view_case([]() {}, "view all null");
+
+    // 00466500 single-slot sweep (offsets 0x00, 0x04, 0x08, 0x0c, 0x10, 0x14, 0x18, 0x1c)
+    for (U slot = 0u; slot < 8u; ++slot) {
+        run_view_case([slot]() {
+            build_tree_shape(slot, slot * 6u, 2u, 6u);
+            store32(g_view_buf, slot * 4u, address(g_trees[slot]));
+        }, "view single slot populated");
+
+        run_view_case([slot]() {
+            build_tree_shape(slot, slot * 6u, 0u, 0u);
+            store32(g_view_buf, slot * 4u, address(g_trees[slot]));
+        }, "view single slot zero count");
+    }
+
+    // 00466500 all 8 slots simultaneously populated with distinct shapes
+    run_view_case([]() {
+        const U shapes[8] = {2u, 2u, 3u, 4u, 1u, 2u, 3u, 2u};
+        for (U slot = 0u; slot < 8u; ++slot) {
+            build_tree_shape(slot, slot * 6u, shapes[slot], 0xffffffffu);
+            store32(g_view_buf, slot * 4u, address(g_trees[slot]));
+        }
+    }, "view all 8 slots populated");
+
+    // 00466500 mixed zero-count, null-root-with-nonzero-count, and populated slots
+    run_view_case([]() {
+        build_tree_shape(0u, 0u, 2u, 6u);
+        build_tree_shape(1u, 6u, 0u, 0u);
+        build_tree_shape(2u, 12u, 0u, 4u);
+        build_tree_shape(3u, 18u, 3u, 3u);
+        // slot 4 stays null
+        build_tree_shape(5u, 30u, 4u, 3u);
+        build_tree_shape(6u, 36u, 1u, 1u);
+        build_tree_shape(7u, 42u, 2u, 6u);
+        for (U slot = 0u; slot < 8u; ++slot) {
+            if (slot != 4u) {
+                store32(g_view_buf, slot * 4u, address(g_trees[slot]));
+            }
+        }
+    }, "view mixed slots");
+
+    std::printf("view_teardown_reset_746_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

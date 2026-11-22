@@ -1,0 +1,141 @@
+{
+  "run": 746,
+  "experiment": "local/experiments/v2-view-teardown-reset-746",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/746-view-teardown-reset",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "00466500",
+      "bytes": 340,
+      "sha256": "d741274df9717d66263bf5e62dac4f35f8e75427b54567f594f990fb9cb10c32",
+      "token": "@BODY_00466500@"
+    },
+    {
+      "va": "00466c30",
+      "bytes": 109,
+      "sha256": "b0202ff52fad853e950cad5adbce36a9f3bfe711b9252c8167f893e69a0865af",
+      "token": "@BODY_00466C30@"
+    },
+    {
+      "va": "00466ca0",
+      "bytes": 109,
+      "sha256": "fc1b280437a27132db536b9891e3078c8140e10d0942ca480af0bce4a70ac6ed",
+      "token": "@BODY_00466CA0@"
+    },
+    {
+      "va": "00466d10",
+      "bytes": 79,
+      "sha256": "bc809a508142aa33528efd6acd22cdebd6340527f77acac82c48d50703f10e20",
+      "token": "@BODY_00466D10@"
+    },
+    {
+      "va": "00466d60",
+      "bytes": 79,
+      "sha256": "1c6a52ded4fd30330fdc482412b21b81400c08307db3282fe5e8d3470ece4eee",
+      "token": "@BODY_00466D60@"
+    }
+  ],
+  "pass_marker": "view_teardown_reset_746_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-lock-offset",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "auto* pool = ctx + 0x28u;",
+      "new": "auto* pool = ctx + 0x2cu;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-freelist-offset",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "store_ptr(node, 0x04u, load_ptr(pool, 0x18u));",
+      "new": "store_ptr(node, 0x04u, load_ptr(pool, 0x1cu));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-right-child-offset",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "recurse(self, nullptr, load_ptr(node, 0x0cu));",
+      "new": "recurse(self, nullptr, load_ptr(node, 0x08u));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-head-left-reset",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "store_ptr(head, 0x08u, head);",
+      "new": "store_ptr(head, 0x08u, nullptr);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-head-right-reset",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "store_ptr(head, 0x0cu, head);",
+      "new": "store_ptr(head, 0x0cu, nullptr);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-tree-count-clear",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "store32(tree, 0x04u, 0u);",
+      "new": "store32(tree, 0x04u, 1u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-pool-clear-size",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "application_context_clear_004237d0(load_ptr(tree, 0x00u), 0x20u, 0u);",
+      "new": "application_context_clear_004237d0(load_ptr(tree, 0x00u), 0x24u, 0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-pool-clear-mode",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "application_context_clear_004237d0(load_ptr(tree, 0x00u), 0x20u, 0u);",
+      "new": "application_context_clear_004237d0(load_ptr(tree, 0x00u), 0x20u, 1u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "swap-slot-0c-08-order",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "{0x0cu, &scene_tree_clear_b_00466ca0},\n        {0x08u, &scene_tree_clear_b_00466ca0},",
+      "new": "{0x08u, &scene_tree_clear_b_00466ca0},\n        {0x0cu, &scene_tree_clear_b_00466ca0},",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "swap-slot-04-18-order",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "{0x04u, &clear_tree_inlined_a},\n        {0x18u, &scene_tree_clear_b_00466ca0},",
+      "new": "{0x18u, &scene_tree_clear_b_00466ca0},\n        {0x04u, &clear_tree_inlined_a},",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-count-zero-guard",
+      "source": "iterations/v2/001-original-recovery/runs/746-view-teardown-reset/scene_view_teardown_746.cpp",
+      "old": "if (load32(self, 0x04u) == 0u) {",
+      "new": "if (load32(self, 0x04u) == 0xffffffffu) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

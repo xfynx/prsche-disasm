@@ -1,6 +1,16 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-22. [Run743](runs/743-audio-render-scene-integration/README.md)
+Current 2026-11-22. [Run747](runs/747-view-teardown-integration/README.md)
+passes the shared audit for frozen Run746/002: **436 TUs / 8 projects**,
+**99 unresolved names / 106 references**, no game EXE. It closes
+`00466500` with zero new names; 70 native comparisons, 11 mutations, 1,077
+source pins, 1 REA session, and 1,232 registry entries. Run744/002 is native
+PASS (four audio header functions) but waits for unresolved parent `00566ea0`
+before game integration. Run745 traces the reachable `00534d40`/`00534b90`
+render conversion parents; `00571330` is their child, not a current linker
+name. Next: complete parent proof, then integrate its ready closure.
+
+Historical: [Run743](runs/743-audio-render-scene-integration/README.md)
 passes the shared audit (`build-002`) for frozen `740/002` (`005615c0`,
 `00566b40`, `00567060`), `741/002` (`00571630`, `005719c0`, partial), and
 `742/001` (`0059f070`, `0053f320`, `0053f600`, `00537a20`, `00537a60`): **435

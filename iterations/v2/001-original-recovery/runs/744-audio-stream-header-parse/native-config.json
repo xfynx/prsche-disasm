@@ -1,0 +1,197 @@
+{
+  "run": 744,
+  "experiment": "local/experiments/v2-audio-stream-header-parse-744",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse",
+    "iterations/v2/001-original-recovery/runs/733-audio-stream-service-tick",
+    "iterations/v2/001-original-recovery/runs/653-audio-stream-codec-release",
+    "iterations/v2/001-original-recovery/runs/641-audio-stream-codec-leaves",
+    "iterations/v2/001-original-recovery/runs/629-audio-stream-codec-create",
+    "iterations/v2/001-original-recovery/runs/565-audio-stream-codec-lifecycle",
+    "iterations/v2/001-original-recovery/runs/568-audio-greedy-transition",
+    "iterations/v2/001-original-recovery/runs/561-audio-stream-creation",
+    "iterations/v2/001-original-recovery/runs/559-audio-stream-service",
+    "iterations/v2/001-original-recovery/runs/556-application-audio-lifecycle",
+    "iterations/v2/001-original-recovery/runs/519-audio-stream-capture-fill",
+    "iterations/v2/001-original-recovery/runs/513-audio-stream-worker-stop",
+    "iterations/v2/001-original-recovery/runs/508-audio-stream-producer-lifecycle",
+    "iterations/v2/001-original-recovery/runs/505-audio-stream-buffer-delivery",
+    "iterations/v2/001-original-recovery/runs/501-audio-pcm-stream-lookup",
+    "iterations/v2/001-original-recovery/runs/493-audio-pcm-constructors",
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls",
+    "iterations/v2/001-original-recovery/runs/451-audio-record-decoder",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.hpp",
+    "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00561900",
+      "bytes": 81,
+      "sha256": "a0dd4bc847d8f676477cad8a482f7dbd4d1486c8d73a15c2e2294f64405fa775",
+      "token": "@BODY_00561900@"
+    },
+    {
+      "va": "00590ef0",
+      "bytes": 116,
+      "sha256": "55f41f84cd6acbf0d8566b3907a7bd6598c3d31284b04c899848ebf44cb13adc",
+      "token": "@BODY_00590EF0@"
+    },
+    {
+      "va": "00590f70",
+      "bytes": 871,
+      "sha256": "218d61a3188611e419dc12bc56b359fd23b3decd345949ee87b13bf867f5c5cb",
+      "token": "@BODY_00590F70@"
+    },
+    {
+      "va": "00599720",
+      "bytes": 55,
+      "sha256": "696f4431bf114c2ad5bbe778e5b96ad4082718fb40dbc902e7e970042d72c4bd",
+      "token": "@BODY_00599720@"
+    }
+  ],
+  "pass_marker": "audio_stream_header_parse_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-info-init-default-vol",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    write_u8(info_va + 0x03u, 0x7fu);",
+      "new": "    write_u8(info_va + 0x03u, 0x7eu);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-info-init-default-pan",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    write_u8(info_va + 0x04u, 0x40u);",
+      "new": "    write_u8(info_va + 0x04u, 0x00u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-byte-rate-mode3-factor",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    if (codec_mode == 3u || codec_mode == 10u) {\n        factor = 0x88u;",
+      "new": "    if (codec_mode == 3u || codec_mode == 10u) {\n        factor = 0x80u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-byte-rate-mode4-factor",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    } else if (codec_mode == 4u) {\n        factor = 0x33u;",
+      "new": "    } else if (codec_mode == 4u) {\n        factor = 0x34u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-byte-rate-mode9-branch",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    } else if (codec_mode == 2u || codec_mode == 9u) {",
+      "new": "    } else if (codec_mode == 2u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-byte-rate-shift-unsigned",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    return sar_8(product * factor);",
+      "new": "    return static_cast<I>((product * factor) >> 8u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-codec-from-fmt0-8bit",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "        if (bits_per_sample == 8u) {\n            return 2u;",
+      "new": "        if (bits_per_sample == 8u) {\n            return 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-codec-from-fmt7",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    if (format_tag == 7u) {\n        return 3u;",
+      "new": "    if (format_tag == 7u) {\n        return 4u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-codec-from-fmt9",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    if (format_tag == 9u) {\n        return 4u;",
+      "new": "    if (format_tag == 9u) {\n        return 3u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-parse-data-offset-bit2",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    token_state[0] = data_va + ((read_u8(data_va + 3u) & 2u) != 0u ? 8u : 4u);",
+      "new": "    token_state[0] = data_va + ((read_u8(data_va + 3u) & 2u) != 0u ? 4u : 8u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-parse-default-rate",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    write_u16(header_va + 0x00u, 0x5622u);",
+      "new": "    write_u16(header_va + 0x00u, 0xac44u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-parse-slot-copy-len",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "                write_u32(info_va + 0x24u + slot * 4u, len);",
+      "new": "                write_u32(info_va + 0x24u + slot * 4u, alloc);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-parse-raw-flags-bit80",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "        if ((raw_flags & 0x80u) != 0u) {\n            explicit_flags |= 0x20u;",
+      "new": "        if ((raw_flags & 0x80u) != 0u) {\n            explicit_flags |= 0x10u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-parse-channel-adj-bypass",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "        if (channels != 2 || application_audio_device_state_006b48c0[0x1cu] != 2u) {",
+      "new": "        if (channels != 2) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-parse-channel-table-off",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "            const U adj_off = 0x154u + table_idx * 2u;",
+      "new": "            const U adj_off = 0x150u + table_idx * 2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-parse-codec-fallback-guard",
+      "source": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "old": "    if (read_u8(info_va + 0x07u) == 0u) {",
+      "new": "    if (read_u8(info_va + 0x07u) != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}
