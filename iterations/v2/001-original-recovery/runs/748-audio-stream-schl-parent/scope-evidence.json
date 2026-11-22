@@ -1,0 +1,96 @@
+{
+  "run": 748,
+  "functions": [
+    "audio_stream_service_chunk_schl_00566ea0"
+  ],
+  "originals": [
+    {
+      "function": "audio_stream_service_chunk_schl_00566ea0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (2 args: slot_index, chunk; RET int32_t 0; preserves EBX/ESI/EDI/EBP)",
+      "entry": "00566ea0",
+      "body_ranges_inclusive": [["00566ea0", "00567011"]],
+      "body_bytes": 370,
+      "body_sha256": "dd84e42c82e79485f8c9a0c364c6a00c979a958e7194842ac7ba1204bedf98e8",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "raw_pe_offset": "00166ea0",
+      "rea_dossier": "local/experiments/v2-audio-748-rea/002/function-00566ea0.json",
+      "caller": {
+        "from_va": "005671a7",
+        "from_function": "00567170",
+        "owner": "iterations/v2/001-original-recovery/runs/733-audio-stream-service-tick/audio_stream_service_tick_733.cpp"
+      }
+    }
+  ],
+  "registry_overlap_audit": {
+    "candidate_range": ["00566ea0", "00567011"],
+    "registry": "iterations/v2/001-original-recovery/source/recovered/functions.json",
+    "supplement_glob": "iterations/v2/001-original-recovery/runs/**/*supplement*.json",
+    "overlaps": 0,
+    "notes": "Checked registry body_ranges plus all run-owned original-index supplement body ranges before implementation."
+  },
+  "reused_canonical_symbols": [
+    {
+      "name": "audio_stream_service_storage_006b7740",
+      "va": "006b7740",
+      "owner": "iterations/v2/001-original-recovery/runs/561-audio-stream-creation/audio_stream_creation_561.cpp"
+    },
+    {
+      "name": "application_audio_device_state_006b48c0",
+      "va": "006b48c0",
+      "owner": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp",
+      "notes": "Reads signed callback count at +0xe2 (006b49a2) and callback pointer table at +0x120 (006b49e0)."
+    },
+    {
+      "name": "audio_stream_codec_release_chunk_0056c620",
+      "va": "0056c620",
+      "owner": "iterations/v2/001-original-recovery/runs/653-audio-stream-codec-release/audio_stream_codec_release_653.cpp"
+    },
+    {
+      "name": "audio_backend_channel_apply_00590e70",
+      "va": "00590e70",
+      "owner": "iterations/v2/001-original-recovery/runs/733-audio-stream-service-tick/audio_stream_service_tick_733.cpp"
+    },
+    {
+      "name": "audio_stream_header_parse_00590f70",
+      "va": "00590f70",
+      "owner": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "proof": "local/experiments/v2-audio-stream-header-parse-744/002/receipt.json"
+    },
+    {
+      "name": "audio_stream_header_byte_rate_00590ef0",
+      "va": "00590ef0",
+      "owner": "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp",
+      "proof": "local/experiments/v2-audio-stream-header-parse-744/002/receipt.json"
+    }
+  ],
+  "controlled_unrecovered_boundaries": [
+    {
+      "name": "audio_stream_voice_start_005612a0",
+      "va": "005612a0",
+      "body_bytes": 791,
+      "notes": "Controlled typed endpoint only; its backend subtree and live voice semantics remain unrecovered."
+    },
+    {
+      "name": "audio_notification_callbacks_006b49e0",
+      "va": "006b49e0",
+      "notes": "Controlled cdecl callbacks prove payload, ordering, signed count and count reload; real callback bodies remain outside this packet."
+    }
+  ],
+  "rea_session": {
+    "config": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/rea-queries.json",
+    "failed_attempt": "local/experiments/v2-audio-748-rea/001/receipt.json",
+    "receipt": "local/experiments/v2-audio-748-rea/002/receipt.json",
+    "audit": {"passed": true, "dossiers": 1, "repeated_equal": 0}
+  },
+  "explicit_bounds": [
+    "Valid slot_index into the canonical 16-slot table and mapped stream/chunk/entry storage.",
+    "Signed stream entry index is preserved; native cases use index 1.",
+    "Run744 channel/token bounds remain unchanged and are reused rather than broadened.",
+    "Notification list is bounded, mapped and zero-terminated; callbacks are controlled and may reduce the reloaded signed count. The callback payload has proved fields at dword offsets 0, 4, 8 and 16; its stack dword at offset 12 is original-unwritten and remains opaque.",
+    "005612a0 and 00590e70 effects are controlled endpoints in the parent comparison; live device/playback behavior is not claimed."
+  ]
+}

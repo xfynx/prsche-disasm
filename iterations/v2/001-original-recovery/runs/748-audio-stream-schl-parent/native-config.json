@@ -1,0 +1,157 @@
+{
+  "run": 748,
+  "experiment": "local/experiments/v2-audio-stream-schl-parent-748",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+    "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse/audio_stream_header_parse_744.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent",
+    "iterations/v2/001-original-recovery/runs/744-audio-stream-header-parse",
+    "iterations/v2/001-original-recovery/runs/733-audio-stream-service-tick",
+    "iterations/v2/001-original-recovery/runs/653-audio-stream-codec-release",
+    "iterations/v2/001-original-recovery/runs/641-audio-stream-codec-leaves",
+    "iterations/v2/001-original-recovery/runs/629-audio-stream-codec-create",
+    "iterations/v2/001-original-recovery/runs/565-audio-stream-codec-lifecycle",
+    "iterations/v2/001-original-recovery/runs/568-audio-greedy-transition",
+    "iterations/v2/001-original-recovery/runs/561-audio-stream-creation",
+    "iterations/v2/001-original-recovery/runs/559-audio-stream-service",
+    "iterations/v2/001-original-recovery/runs/556-application-audio-lifecycle",
+    "iterations/v2/001-original-recovery/runs/519-audio-stream-capture-fill",
+    "iterations/v2/001-original-recovery/runs/513-audio-stream-worker-stop",
+    "iterations/v2/001-original-recovery/runs/508-audio-stream-producer-lifecycle",
+    "iterations/v2/001-original-recovery/runs/505-audio-stream-buffer-delivery",
+    "iterations/v2/001-original-recovery/runs/501-audio-pcm-stream-lookup",
+    "iterations/v2/001-original-recovery/runs/493-audio-pcm-constructors",
+    "iterations/v2/001-original-recovery/runs/478-audio-resource-controls",
+    "iterations/v2/001-original-recovery/runs/451-audio-record-decoder",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/438-audio-pool-allocator",
+    "iterations/v2/001-original-recovery/runs/443-audio-device-capabilities",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.hpp",
+    "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00566ea0",
+      "bytes": 370,
+      "sha256": "dd84e42c82e79485f8c9a0c364c6a00c979a958e7194842ac7ba1204bedf98e8",
+      "token": "@BODY_00566EA0@"
+    }
+  ],
+  "pass_marker": "audio_stream_schl_parent_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-entry-stride",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "static_cast<U>(entry_index * 0x2c);",
+      "new": "static_cast<U>(entry_index * 0x28);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-parser-data-offset",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "ptr_from_va(chunk_va + 0x08u),",
+      "new": "ptr_from_va(chunk_va + 0x04u),",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-parsed-flags-store",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "write_u32(entry_va + 0x18u, parsed_flags);",
+      "new": "write_u32(entry_va + 0x14u, parsed_flags);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-notification-kind",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "        notification[0] = 3u;",
+      "new": "        notification[0] = 2u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-notification-list-stride",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "        list_va += 4u;",
+      "new": "        list_va += 8u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-byte-rate-entry-offset",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "        entry_va + 0x10u,",
+      "new": "        entry_va + 0x14u,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-header-word-mismatch-test",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "        if (read_u16(stream_va + 0x2cu) != 0u) {",
+      "new": "        if (read_u16(stream_va + 0x2cu) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-restart-state",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "            write_u8(stream_va + 0x14u, 2u);",
+      "new": "            write_u8(stream_va + 0x14u, 1u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-param-copy-count",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "        for (U i = 0u; i < 0x15u; ++i) {\n            write_u32(stream_va + 0x34u + i * 4u, read_u32(stream_va + 0x88u + i * 4u));",
+      "new": "        for (U i = 0u; i < 0x14u; ++i) {\n            write_u32(stream_va + 0x34u + i * 4u, read_u32(stream_va + 0x88u + i * 4u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-voice-slot",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "            read_u32(stream_va + 0x0cu),",
+      "new": "            read_u32(stream_va + 0x08u),",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-apply-guard",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "        if (read_u8(stream_va + 0x19u) != 0u) {",
+      "new": "        if (read_u8(stream_va + 0x19u) == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-final-state",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "        write_u8(stream_va + 0x14u, 1u);",
+      "new": "        write_u8(stream_va + 0x14u, 2u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-return-value",
+      "source": "iterations/v2/001-original-recovery/runs/748-audio-stream-schl-parent/audio_stream_schl_parent_748.cpp",
+      "old": "    return 0;\n}\n\n} // namespace porsche",
+      "new": "    return 1;\n}\n\n} // namespace porsche",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

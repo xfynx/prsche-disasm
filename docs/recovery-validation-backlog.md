@@ -16,6 +16,12 @@ EXE (registry 1,217). Six typed children remain open (`0053f380`, `0053f980`,
 allocation failure, pass vtable slots `+0x08/+0x10/+0x14/+0x18`, faults,
 live renderer, startup and gameplay.
 
+Run749 integrates Run744/002 + Run748/003: 62 native comparisons, 29
+mutations, 438 TUs, 98 names / 106 refs, no EXE. Valid SCHl chunks and
+controlled notification transport are proved; `005612a0`, real callbacks,
+live playback, faults and concurrency remain open. Run750 has REA evidence
+only for the render child chain and is not a game source.
+
 Run745/002 proves `00534b90` only in bounded native comparison (1,536
 comparisons, six mutations). It remains out of the game graph: 18 callback
 table target VAs are unbound, and `00534d40` still needs `00571470` then

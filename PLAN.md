@@ -19,11 +19,10 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run747](iterations/v2/001-original-recovery/runs/747-view-teardown-integration/README.md)
-is the current shared build (`436` TUs, `99` unresolved names / `106`
-references). Run744's native proof awaits its unresolved audio parent; Run745
-is tracing the render conversion parent. The active iteration plan owns their
-next acceptance steps.
+[Run749](iterations/v2/001-original-recovery/runs/749-audio-schl-integration/README.md)
+is the current shared build (`438` TUs, `98` unresolved names / `106`
+references). The audio SCHl parent now consumes Run744's parser. Run745 remains
+a proof-only render boundary; the active iteration plan owns its next steps.
 
 ## Recovery milestones
 

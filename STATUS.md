@@ -4,7 +4,15 @@ Updated 2026-11-22. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run747](iterations/v2/001-original-recovery/runs/747-view-teardown-integration/README.md)
+[Run749](iterations/v2/001-original-recovery/runs/749-audio-schl-integration/README.md)
+compiles 438 C++ translation units across eight projects. The shared link
+reports **98 unresolved names / 106 references**. There is no game EXE yet.
+Run744's parser and Run748's audio SCHl parent pass the shared audit: 62
+original-x86 comparisons, 29 mutations, 1,082 source pins, and 1,237
+registry entries. One name closes with zero new linker names. Run745 remains
+proof-only/PARTIAL outside the game graph; Run750 has REA evidence only.
+
+Historical: [Run747](iterations/v2/001-original-recovery/runs/747-view-teardown-integration/README.md)
 compiles 436 C++ translation units across eight projects. The shared link
 reports **99 unresolved names / 106 references**. There is no game EXE yet.
 Run746's five view teardown bodies pass the shared audit: 70 original-x86

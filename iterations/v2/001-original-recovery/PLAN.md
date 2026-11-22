@@ -1,6 +1,16 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-22. [Run747](runs/747-view-teardown-integration/README.md)
+Current 2026-11-22. [Run749](runs/749-audio-schl-integration/README.md)
+passes the shared audit for frozen Run744/002 and Run748/003: **438 TUs / 8
+projects**, **98 unresolved names / 106 references**, no game EXE. It closes
+`00566ea0` with zero new linker names; 62 native comparisons, 29 mutations,
+1,082 source pins, two REA sessions and 1,237 registry entries. `005612a0`
+and real notification callbacks remain open. Run745 is proof-only/PARTIAL
+outside CMake/registry; Run750 has audited REA evidence for the render child
+chain but no native source/proof. Next: recover a reachable parent/child set
+on the current linker frontier and keep bounded domains explicit.
+
+Historical: [Run747](runs/747-view-teardown-integration/README.md)
 passes the shared audit for frozen Run746/002: **436 TUs / 8 projects**,
 **99 unresolved names / 106 references**, no game EXE. It closes
 `00466500` with zero new names; 70 native comparisons, 11 mutations, 1,077
