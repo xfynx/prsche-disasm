@@ -1,0 +1,95 @@
+{
+  "run": 745,
+  "experiment": "local/experiments/v2-render-depthconv-745",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/745-render-depthconv/render_depthconv_745.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/745-render-depthconv/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/745-render-depthconv",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/745-render-depthconv/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00534b90",
+      "bytes": 422,
+      "sha256": "1245cc9a093496069fd32c2e1f150fad46b1b49a0f53ddeb90ed7b71af5550ef",
+      "token": "@BODY_00534B90@"
+    },
+    {
+      "va": "005de2fc",
+      "bytes": 256,
+      "sha256": "93bbe4fbd0c0dc87ec4892bae73158a7c5eb37c9226e1e9a11b7c43d38842128",
+      "token": "@TABLE_005DE2FC@"
+    },
+    {
+      "va": "005de3fc",
+      "bytes": 256,
+      "sha256": "d5db84cd3bc91a586ef3642d77d17c417bf3b8d00db941f842247da5399ef4a7",
+      "token": "@TABLE_005DE3FC@"
+    },
+    {
+      "va": "005de4fc",
+      "bytes": 64,
+      "sha256": "77e7cc217906605833f5828a0957705c3632daa65093e975fca3d222da6a1575",
+      "token": "@MAP_005DE4FC@"
+    }
+  ],
+  "pass_marker": "render_depthconv_00534b90_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-534b90-mapped-accept",
+      "source": "iterations/v2/001-original-recovery/runs/745-render-depthconv/render_depthconv_745.cpp",
+      "old": "    if (mapped_type != target_type) {\n        return nullptr;\n    }",
+      "new": "    if (mapped_type == target_type) {\n        return nullptr;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-534b90-table-select",
+      "source": "iterations/v2/001-original-recovery/runs/745-render-depthconv/render_depthconv_745.cpp",
+      "old": "    const std::uint32_t callback_va = (direct_mode != 0)\n        ? kDirectCallbacks[callback_index] : kAlternateCallbacks[callback_index];",
+      "new": "    const std::uint32_t callback_va = (direct_mode == 0)\n        ? kDirectCallbacks[callback_index] : kAlternateCallbacks[callback_index];",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-534b90-palette-count",
+      "source": "iterations/v2/001-original-recovery/runs/745-render-depthconv/render_depthconv_745.cpp",
+      "old": "        const std::uint32_t count = 1u << (source_bits & 31u);",
+      "new": "        const std::uint32_t count = 1u << ((source_bits + 1u) & 31u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-534b90-4444-target",
+      "source": "iterations/v2/001-original-recovery/runs/745-render-depthconv/render_depthconv_745.cpp",
+      "old": "        if (target_type == 0x6du) {",
+      "new": "        if (target_type == 0x7du) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-534b90-alpha1555",
+      "source": "iterations/v2/001-original-recovery/runs/745-render-depthconv/render_depthconv_745.cpp",
+      "old": "                render_palette_8888_to_1555_alpha_00570330(",
+      "new": "                render_palette_888_to_1555_00570370(",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-534b90-callback-reindex",
+      "source": "iterations/v2/001-original-recovery/runs/745-render-depthconv/render_depthconv_745.cpp",
+      "old": "    const auto callback_source_index =\n        render_shape_type_to_depth_index_005345e0(shape_type);\n    const auto callback_target_index =\n        render_shape_type_to_depth_index_005345e0(target_type);",
+      "new": "    const auto callback_source_index = source_index;\n    const auto callback_target_index = target_index;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

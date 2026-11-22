@@ -8,7 +8,23 @@ source pins, 1 REA session, and 1,232 registry entries. Run744/002 is native
 PASS (four audio header functions) but waits for unresolved parent `00566ea0`
 before game integration. Run745 traces the reachable `00534d40`/`00534b90`
 render conversion parents; `00571330` is their child, not a current linker
-name. Next: complete parent proof, then integrate its ready closure.
+name. Run745 REA003 pins `00534b90` (422B), `00534d40` (857B) and child
+`00571330` (107B). Run745 native002 now passes 1,536 comparisons and six
+mutations for `00534b90`, but remains proof-only/PARTIAL: 18 callback-table
+target VAs are unbound, so no game CMake/registry ownership is claimed.
+`00534d40` still needs the `00571470` -> `00571330` child chain.
+A second worker owns Run748 for reachable audio parent `00566ea0` (370B),
+reusing committed Run744's parser; original body/ABI and canonical owners are
+pinned, native proof is pending. The coordinator owns the next shared intake.
+Next: integrate only the ready reachable audio closure, then revisit render
+conversion with its exact callback and child dependencies.
+For the separate reachable `00533050` cleanup, original `0069cb10` is a
+32-by-`0x90` record array owned by Run688. Run494's packed
+`frame_control_slot_fields_494[32]` separately models original
+`0069cb90+0x90*i+{0,8,12}`; Runs676/680 consume that packed view. Reconcile
+all compiled readers/writers with Run688's canonical storage and reprove the
+changed consumers before binding cleanup. The 75B original body alone is
+insufficient evidence for that shared-state change.
 
 Historical: [Run743](runs/743-audio-render-scene-integration/README.md)
 passes the shared audit (`build-002`) for frozen `740/002` (`005615c0`,

@@ -16,6 +16,11 @@ EXE (registry 1,217). Six typed children remain open (`0053f380`, `0053f980`,
 allocation failure, pass vtable slots `+0x08/+0x10/+0x14/+0x18`, faults,
 live renderer, startup and gameplay.
 
+Run745/002 proves `00534b90` only in bounded native comparison (1,536
+comparisons, six mutations). It remains out of the game graph: 18 callback
+table target VAs are unbound, and `00534d40` still needs `00571470` then
+`00571330` composition. Raw VA tokens are not host-callable pointers.
+
 Run747 integrates Run746/002: five view teardown/tree bodies, 70 native
 comparisons, 11 mutations, 436 TUs, 99 names / 106 refs, no EXE. Valid
 acyclic tree teardown is proved; null/cyclic/fault/live renderer paths remain

@@ -1,0 +1,308 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "render_depthconv_745.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+struct Event { U kind, a0, a1; };
+struct Trace {
+    U abi_fail;
+    U result;
+    U palette_ptr_is_source;
+    U scratch_hash;
+    U event_count;
+    Event events[16];
+};
+
+static B* code = nullptr;
+static B* slot_534b90 = nullptr;
+static B* table_5de2fc = nullptr;
+static B* table_5de3fc = nullptr;
+static B* map_5de4fc = nullptr;
+static U palette_source[256] = {};
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U side = 0u;
+
+static U ptr(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U rd(const void* p, U offset = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + offset, sizeof v);
+    return v;
+}
+
+static void wr(void* p, U offset, U value) {
+    std::memcpy(static_cast<B*>(p) + offset, &value, sizeof value);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", msg, cases, side);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("divergence native-fault %08lx eip=%08lx case=%u side=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip, cases, side);
+    std::fflush(stdout);
+    ExitProcess(1);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void event(U kind, U a0, U a1 = 0u) {
+    require(trace.event_count < 16u, "event capacity");
+    trace.events[trace.event_count++] = {kind, a0, a1};
+}
+
+static U hash_bytes(const void* p, U size) {
+    const auto* b = static_cast<const B*>(p);
+    U h = 2166136261u;
+    for (U i = 0u; i < size; ++i) h = (h ^ b[i]) * 16777619u;
+    return h;
+}
+
+} // namespace
+
+namespace porsche {
+
+std::uint32_t* render_depthconv_palette_ptr_005de2f8 = nullptr;
+std::uint32_t render_depthconv_palette_scratch_006bda20[256] = {};
+
+std::int32_t __cdecl render_shape_type_to_depth_index_005345e0(std::uint32_t t) {
+    I result = -1;
+    switch (t) {
+    case 0x01u: case 0x40u: case 0x7au: result = 0; break;
+    case 0x02u: case 0x41u: case 0x7bu: result = 1; break;
+    case 0x03u: case 0x7eu: result = 2; break;
+    case 0x04u: case 0x78u: result = 3; break;
+    case 0x05u: case 0x43u: case 0x7fu: result = 4; break;
+    case 0x7du: result = 5; break;
+    case 0x6du: result = 6; break;
+    case 0x42u: result = 7; break;
+    }
+    event(1u, t, static_cast<U>(result));
+    return result;
+}
+
+std::uint32_t __cdecl render_descriptor_bits_00537f90(const void* descriptor) {
+    static const B bits[128] = {
+        0,4,8,15,24,32,16,0,0,0,0,0,0,0,0,0,
+        15,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        15,32,24,0,24,0,0,0,0,16,32,0,32,15,32,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        4,8,15,24,1,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,16,0,0,
+        0,0,0,0,0,0,0,0,16,1,4,8,0,32,15,24,
+    };
+    const U type = rd(descriptor) & 0x7fu;
+    event(2u, type, bits[type]);
+    return bits[type];
+}
+
+std::uint32_t* __cdecl render_getclutptr_from_resource_005346d0(
+    const void* descriptor, std::uint32_t* palette) {
+    event(3u, rd(descriptor) & 0xffu, palette == render_depthconv_palette_scratch_006bda20);
+    for (U i = 0u; i < 256u; ++i) palette[i] = 0xa5000000u ^ (i * 0x010203u);
+    return palette_source;
+}
+
+static void palette_call(U kind, std::uint16_t* dst, const std::uint32_t* src, I count) {
+    event(kind, static_cast<U>(count), src == palette_source);
+    for (I i = 0; i < count; ++i) {
+        dst[i] = static_cast<std::uint16_t>((src[i] ^ (kind * 0x1111u)) & 0xffffu);
+    }
+}
+
+void __cdecl render_palette_8888_to_1555_alpha_00570330(
+    std::uint16_t* d, const std::uint32_t* s, I n) { palette_call(10u, d, s, n); }
+void __cdecl render_palette_888_to_1555_00570370(
+    std::uint16_t* d, const std::uint32_t* s, I n) { palette_call(11u, d, s, n); }
+void __cdecl render_palette_8888_to_565_alpha_005704c0(
+    std::uint16_t* d, const std::uint32_t* s, I n) { palette_call(12u, d, s, n); }
+void __cdecl render_palette_888_to_565_00570510(
+    std::uint16_t* d, const std::uint32_t* s, I n) { palette_call(13u, d, s, n); }
+void __cdecl render_palette_8888_to_4444_00570540(
+    std::uint16_t* d, const std::uint32_t* s, I n) { palette_call(14u, d, s, n); }
+
+} // namespace porsche
+
+namespace {
+
+static U invoke_cdecl3(void* fn, U a0, U a1, U a2, U& abi_fail) {
+    U result = 0u, fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a2
+        push a1
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        add esp, 12
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return result;
+}
+
+static void patch_abs(B* base, U size, U old_va, U new_va, U expected_hits) {
+    U hits = 0u;
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (rd(base, i) == old_va) {
+            wr(base, i, new_va);
+            ++hits;
+            i += 3u;
+        }
+    }
+    require(hits == expected_hits, "patch_abs count");
+}
+
+static void patch_rel(B* base, U offset, U original_target, U replacement) {
+    require(base[offset] == 0xe8u, "patch_rel opcode");
+    const U decoded = 0x00534b90u + offset + 5u + rd(base, offset + 1u);
+    require(decoded == original_target, "patch_rel target");
+    wr(base, offset + 1u, replacement - (ptr(base) + offset + 5u));
+}
+
+static void init_fixture() {
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    std::memset(code, 0xcc, 4096u);
+    const B body[] = {@BODY_00534B90@};
+    const B table0[] = {@TABLE_005DE2FC@};
+    const B table1[] = {@TABLE_005DE3FC@};
+    const B map[] = {@MAP_005DE4FC@};
+    slot_534b90 = code;
+    table_5de2fc = code + 0x200u;
+    table_5de3fc = code + 0x300u;
+    map_5de4fc = code + 0x400u;
+    std::memcpy(slot_534b90, body, sizeof body);
+    std::memcpy(table_5de2fc, table0, sizeof table0);
+    std::memcpy(table_5de3fc, table1, sizeof table1);
+    std::memcpy(map_5de4fc, map, sizeof map);
+
+    patch_abs(slot_534b90, sizeof body, 0x005de2fcu, ptr(table_5de2fc), 1u);
+    patch_abs(slot_534b90, sizeof body, 0x005de3fcu, ptr(table_5de3fc), 1u);
+    patch_abs(slot_534b90, sizeof body, 0x005de4fcu, ptr(map_5de4fc), 1u);
+    patch_abs(slot_534b90, sizeof body, 0x005de2f8u,
+              ptr(&porsche::render_depthconv_palette_ptr_005de2f8), 1u);
+    patch_abs(slot_534b90, sizeof body, 0x006bda20u,
+              ptr(porsche::render_depthconv_palette_scratch_006bda20), 7u);
+
+    const U shape_index = ptr(reinterpret_cast<void*>(&porsche::render_shape_type_to_depth_index_005345e0));
+    patch_rel(slot_534b90, 0x1du, 0x005345e0u, shape_index);
+    patch_rel(slot_534b90, 0x29u, 0x005345e0u, shape_index);
+    patch_rel(slot_534b90, 0x51u, 0x005345e0u, shape_index);
+    patch_rel(slot_534b90, 0x59u, 0x005345e0u, shape_index);
+    patch_rel(slot_534b90, 0x71u, 0x005345e0u, shape_index);
+    patch_rel(slot_534b90, 0x79u, 0x005345e0u, shape_index);
+    const U bits = ptr(reinterpret_cast<void*>(&porsche::render_descriptor_bits_00537f90));
+    patch_rel(slot_534b90, 0x90u, 0x00537f90u, bits);
+    patch_rel(slot_534b90, 0x9cu, 0x00537f90u, bits);
+    patch_rel(slot_534b90, 0xc9u, 0x005346d0u,
+              ptr(reinterpret_cast<void*>(&porsche::render_getclutptr_from_resource_005346d0)));
+    patch_rel(slot_534b90, 0xeau, 0x00570540u,
+              ptr(reinterpret_cast<void*>(&porsche::render_palette_8888_to_4444_00570540)));
+    patch_rel(slot_534b90, 0x10eu, 0x00570330u,
+              ptr(reinterpret_cast<void*>(&porsche::render_palette_8888_to_1555_alpha_00570330)));
+    patch_rel(slot_534b90, 0x12eu, 0x005704c0u,
+              ptr(reinterpret_cast<void*>(&porsche::render_palette_8888_to_565_alpha_005704c0)));
+    patch_rel(slot_534b90, 0x14eu, 0x00570540u,
+              ptr(reinterpret_cast<void*>(&porsche::render_palette_8888_to_4444_00570540)));
+    patch_rel(slot_534b90, 0x172u, 0x00570370u,
+              ptr(reinterpret_cast<void*>(&porsche::render_palette_888_to_1555_00570370)));
+    patch_rel(slot_534b90, 0x192u, 0x00570510u,
+              ptr(reinterpret_cast<void*>(&porsche::render_palette_888_to_565_00570510)));
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0,
+            "FlushInstructionCache");
+}
+
+static void prepare(U salt) {
+    std::memset(&trace, 0, sizeof trace);
+    porsche::render_depthconv_palette_ptr_005de2f8 =
+        reinterpret_cast<U*>(static_cast<std::uintptr_t>(0x11223344u));
+    for (U i = 0u; i < 256u; ++i) {
+        palette_source[i] = 0x81000000u ^ (i * 0x10203u) ^ salt;
+        porsche::render_depthconv_palette_scratch_006bda20[i] = 0x5a5a0000u ^ i ^ salt;
+    }
+}
+
+static void snapshot(U result) {
+    trace.result = result;
+    trace.palette_ptr_is_source =
+        porsche::render_depthconv_palette_ptr_005de2f8 == palette_source ? 1u : 0u;
+    trace.scratch_hash = hash_bytes(porsche::render_depthconv_palette_scratch_006bda20, 1024u);
+    require(trace.abi_fail == 0u, "ABI");
+}
+
+static void run_case(U source_type, U target_type, I direct_mode) {
+    ++cases;
+    alignas(4) U shape[8] = {};
+    shape[0] = 0xa55a0000u | source_type;
+    for (side = 0u; side < 2u; ++side) {
+        prepare(cases * 17u);
+        void* fn = side == 0u ? static_cast<void*>(slot_534b90)
+                              : reinterpret_cast<void*>(&porsche::render_shape_row_converter_00534b90);
+        const U result = invoke_cdecl3(fn, ptr(shape), target_type,
+                                      static_cast<U>(direct_mode), trace.abi_fail);
+        snapshot(result);
+        if (side == 0u) expected = trace;
+        else require(std::memcmp(&trace, &expected, sizeof trace) == 0,
+                     "00534b90 trace");
+    }
+}
+
+} // namespace
+
+int main() {
+    AddVectoredExceptionHandler(1, fault_handler);
+    init_fixture();
+    const U types[] = {
+        0x01u,0x40u,0x7au,0x02u,0x41u,0x7bu,0x03u,0x7eu,
+        0x04u,0x78u,0x05u,0x43u,0x7fu,0x7du,0x6du,0x42u,
+    };
+    const I modes[] = {0, 1, -7};
+    for (U s : types) for (U t : types) for (I m : modes) run_case(s, t, m);
+    std::printf("render_depthconv_00534b90_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}
