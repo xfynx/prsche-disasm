@@ -1,0 +1,150 @@
+{
+  "run": 773,
+  "experiment": "local/experiments/v2-audio-voice-allocator-773",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator",
+    "iterations/v2/001-original-recovery/runs/751-audio-voice-start",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.hpp",
+    "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005898b0",
+      "bytes": 49,
+      "sha256": "66173fda19494edcca424054de25ca4a4f66de80a29bc8c024b97be685da3556",
+      "token": "@BODY_005898B0@"
+    },
+    {
+      "va": "005898f0",
+      "bytes": 771,
+      "sha256": "339fbcaa839f7fa4cf676eb1305faea97b9bb646ded691960f0d9cbe790670fc",
+      "token": "@BODY_005898F0@"
+    }
+  ],
+  "pass_marker": "audio_voice_allocator_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-contains-skip-first",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "    for (I i = 0; i < count; ++i) {",
+      "new": "    for (I i = 1; i < count; ++i) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-contains-match-ret",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "        if (static_cast<I>(audio_voice_selection_006b48a8[i]) == candidate) {\n            return 1;\n        }",
+      "new": "        if (static_cast<I>(audio_voice_selection_006b48a8[i]) == candidate) {\n            return 2;\n        }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-gen-wrap",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "    audio_voice_generation_006ad74c = (static_cast<I>(next_gen) < 0) ? 0u : next_gen;",
+      "new": "    audio_voice_generation_006ad74c = next_gen;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-gen-step",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "    const U next_gen = audio_voice_generation_006ad74c + 0x100u;",
+      "new": "    const U next_gen = audio_voice_generation_006ad74c + 0x200u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-pass1-signed-weight",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "                    if (weight < best_weight) {",
+      "new": "                    if (static_cast<I>(weight) < static_cast<I>(best_weight)) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-pass2-prio-cap",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "                    if (rec_prio < 0x65u) {",
+      "new": "                    if (rec_prio <= 0x65u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-pass2-tiebreak",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "                        if (rec_prio < best_prio ||\n                            (rec_prio == best_prio && weight < best_weight)) {",
+      "new": "                        if (rec_prio < best_prio ||\n                            (rec_prio == best_prio && weight <= best_weight)) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-partial-fail-ret",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "    if (selected_count != channel_count) {\n        return -9;\n    }",
+      "new": "    if (selected_count != channel_count) {\n        return -10;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-handle-or-gen",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "    *handle = static_cast<U>(head_slot) | audio_voice_generation_006ad74c;",
+      "new": "    *handle = static_cast<U>(head_slot);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-stop-parent-lookup",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "                if (stop_handle < 0) {",
+      "new": "                if (stop_handle <= 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-rec-stride",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "            const I slot = static_cast<I>(audio_voice_selection_006b48a8[i]);\n            const U rec_va = table_va + static_cast<U>(slot) * 0x70u;",
+      "new": "            const I slot = static_cast<I>(audio_voice_selection_006b48a8[i]);\n            const U rec_va = table_va + static_cast<U>(slot) * 0x68u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-head-parent-tag",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "    write_i16(head_va + 0x1cu, -1);",
+      "new": "    write_i16(head_va + 0x1cu, 0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-child-handle",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "            write_u32(child_va + 0x00u, 0xffffffffu);",
+      "new": "            write_u32(child_va + 0x00u, *handle);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-alloc-child-parent-link",
+      "source": "iterations/v2/001-original-recovery/runs/773-audio-voice-allocator/audio_allocator_773.cpp",
+      "old": "            write_i16(child_va + 0x1cu, static_cast<std::int16_t>(head_slot));",
+      "new": "            write_i16(child_va + 0x1cu, -1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

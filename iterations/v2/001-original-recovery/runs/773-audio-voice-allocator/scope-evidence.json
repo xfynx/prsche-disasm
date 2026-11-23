@@ -1,0 +1,119 @@
+{
+  "run": 773,
+  "functions": [
+    "audio_voice_selection_contains_005898b0",
+    "audio_backend_allocate_voice_005898f0"
+  ],
+  "originals": [
+    {
+      "function": "audio_voice_selection_contains_005898b0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (2 args: candidate, count; RET int32_t)",
+      "entry": "005898b0",
+      "body_ranges_inclusive": [
+        [
+          "005898b0",
+          "005898e0"
+        ]
+      ],
+      "body_bytes": 49,
+      "body_sha256": "66173fda19494edcca424054de25ca4a4f66de80a29bc8c024b97be685da3556",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "rea_dossier": "local/experiments/v2-audio-allocator-dependency-research-759/002/function-005898b0.json",
+      "references_in_index": [
+        {
+          "from_va": "00589979",
+          "from_function": "005898f0",
+          "type": "UNCONDITIONAL_CALL"
+        },
+        {
+          "from_va": "00589a20",
+          "from_function": "005898f0",
+          "type": "UNCONDITIONAL_CALL"
+        }
+      ]
+    },
+    {
+      "function": "audio_backend_allocate_voice_005898f0",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (5 args: channel_count, priority, handle, first, last; RET int32_t)",
+      "entry": "005898f0",
+      "body_ranges_inclusive": [
+        [
+          "005898f0",
+          "00589bf2"
+        ]
+      ],
+      "body_bytes": 771,
+      "body_sha256": "339fbcaa839f7fa4cf676eb1305faea97b9bb646ded691960f0d9cbe790670fc",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "rea_dossier": "local/experiments/v2-audio-allocator-dependency-research-759/002/function-005898f0.json",
+      "references_in_index": [
+        {
+          "from_va": "005613b5",
+          "from_function": "005612a0",
+          "type": "UNCONDITIONAL_CALL"
+        },
+        {
+          "from_va": "005904d8",
+          "from_function": "00590420",
+          "type": "UNCONDITIONAL_CALL"
+        }
+      ]
+    }
+  ],
+  "owned_rodata_strings": [],
+  "owned_writable_data": [
+    {
+      "name": "audio_voice_selection_006b48a8",
+      "va": "006b48a8",
+      "bytes": 8,
+      "section": ".bss",
+      "notes": "4 x int16_t allocator-private voice slot selection buffer immediately preceding 006b48b0."
+    },
+    {
+      "name": "audio_voice_generation_006ad74c",
+      "va": "006ad74c",
+      "bytes": 4,
+      "section": ".bss",
+      "notes": "uint32_t allocator-private handle generation counter (+0x100 per call, wraps to 0 on signed overflow)."
+    }
+  ],
+  "reused_canonical_symbols": [
+    {
+      "name": "application_audio_device_state_006b48c0",
+      "va": "006b48c0",
+      "owner": "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_audio_device.cpp",
+      "notes": "Reads +0xe8 (006b49a8 device allocation stamp)."
+    },
+    {
+      "name": "audio_backend_channels_006b4a00",
+      "va": "006b4a00",
+      "owner": "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+      "notes": "Pointer to 0x70-byte voice record table."
+    },
+    {
+      "name": "audio_channel_stop_00565d60",
+      "va": "00565d60",
+      "owner": "iterations/v2/001-original-recovery/runs/435-audio-stop-voice/audio_stop_435.cpp",
+      "notes": "Called during finalize when stealing an active voice record (+0x0f == 1)."
+    }
+  ],
+  "rea_session": {
+    "config": "iterations/v2/001-original-recovery/runs/759-audio-allocator-dependency-research/rea-queries.json",
+    "receipt": "local/experiments/v2-audio-allocator-dependency-research-759/002/receipt.json",
+    "validation": "iterations/v2/001-original-recovery/runs/759-audio-allocator-dependency-research/validation.json"
+  },
+  "bounded_and_unrecovered_notes": {
+    "caller_frontier": "005898f0 closes ?audio_backend_allocate_voice_005898f0@porsche@@YAHHIPAIII@Z on Run751/Run761 linker frontier. Second caller 00590420 remains unrecovered.",
+    "verified_bounds": [
+      "audio_backend_allocate_voice_005898f0: channel_count <= 4 (matching 8B selection list 006b48a8..006b48af before 006b48b0 and 4-word slot array in voice record +0x04..+0x0b); slots 0..127 (matching int8_t sign-extension at 005899aa/00589a7e); controlled audio_channel_stop_00565d60 endpoint verified by Run435."
+    ]
+  }
+}

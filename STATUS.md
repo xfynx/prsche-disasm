@@ -4,7 +4,16 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run776](iterations/v2/001-original-recovery/runs/776-scene-blur-and-input-render-integration/README.md)
+[Run780](iterations/v2/001-original-recovery/runs/780-audio-scene-render-integration/README.md)
+build compiles 447 C++ translation units across eight projects. The shared
+link reports **91 unresolved names / 99 references**. There is no game EXE.
+The shared audit accepts Runs773/778/779 within their bounded domains: 8 new
+registry entries (`1,255` total), 268 original-x86 comparisons, 36 mutations,
+16B `.bss` (`773` + `779`) + 6B `.rdata` (`779`), and 1,104 source pins. Five
+names close (`005898f0`, `0053f380`, `0053f980`, `00573030`, `004121b0`) and
+two typed children open (`005a38c7`, `004123e0`).
+
+Historical: [Run776](iterations/v2/001-original-recovery/runs/776-scene-blur-and-input-render-integration/README.md)
 build compiles 444 C++ translation units across eight projects. The shared
 link reports **94 unresolved names / 101 references**. There is no game EXE.
 The shared audit accepts Runs774/775 within their bounded domains: 6 new

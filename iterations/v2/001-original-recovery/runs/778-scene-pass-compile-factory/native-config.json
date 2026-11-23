@@ -1,0 +1,145 @@
+{
+  "run": 778,
+  "experiment": "local/experiments/v2-scene-pass-compile-factory-778",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory",
+    "iterations/v2/001-original-recovery/runs/742-scene-stage-group-ctor",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.hpp",
+    "iterations/v2/001-original-recovery/runs/742-scene-stage-group-ctor/scene_stage_group_742.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "0053f380",
+      "bytes": 166,
+      "sha256": "94d8193a58f4ced978032b5bfa5678018b749cc69e7161b253d24d045e26c828",
+      "token": "@BODY_0053F380@"
+    },
+    {
+      "va": "0053f980",
+      "bytes": 866,
+      "sha256": "9e1ec95c06e14b4cb6837ff65a6f51773f49b160dcc43cdf423e3eb61a63af74",
+      "token": "@BODY_0053F980@"
+    },
+    {
+      "va": "0053fd60",
+      "bytes": 33,
+      "sha256": "b0ea0398d91c669e1f50d2605aa79498ab08cb8fe39e662c44fa6b5247aff6ff",
+      "token": "@BODY_0053FD60@"
+    },
+    {
+      "va": "00574ab0",
+      "bytes": 27,
+      "sha256": "1afc910c7c26843879a05db8cd306402ab20d5fe4c5750e42cb805ca50b2dd88",
+      "token": "@BODY_00574AB0@"
+    }
+  ],
+  "pass_marker": "scene_pass_compile_factory_778_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-fd60-kind",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "store32(self, 0x0cu, 1u);",
+      "new": "store32(self, 0x0cu, 2u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-fd60-vtable",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "constexpr U kPassVtable_005b6a34 = 0x005b6a34u;",
+      "new": "constexpr U kPassVtable_005b6a34 = 0x005b6a38u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-4ab0-kind",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "scene_pass_init_0053f320(self, nullptr, 2u, subkind);",
+      "new": "scene_pass_init_0053f320(self, nullptr, 3u, subkind);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-4ab0-vtable",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "constexpr U kPassVtable_005c0898 = 0x005c0898u;",
+      "new": "constexpr U kPassVtable_005c0898 = 0x005c089cu;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-compile-alloc-indices",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "render_allocate_0059ef90(load32(self, 0x2cu) * 2u)",
+      "new": "render_allocate_0059ef90(load32(self, 0x2cu) * 4u)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-compile-alloc-passes",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "store_ptr(self, 0x28u, passes);",
+      "new": "store_ptr(self, 0x24u, passes);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-compile-self-list-next",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "cur = load_ptr(cur, 0x04u);",
+      "new": "cur = load_ptr(cur, 0x08u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-compile-parent-list-next",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "cur = load_ptr(cur, 0x08u);",
+      "new": "cur = load_ptr(cur, 0x04u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-compile-wildcard-zero",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "(want_subkind == 0u || want_subkind == load32(cur, 0x10u))",
+      "new": "(want_subkind == 1u || want_subkind == load32(cur, 0x10u))",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-factory-case9-size",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "{FactoryInitKind::Std320,   0x810u, 0x08u, 0x005bbc84u},",
+      "new": "{FactoryInitKind::Std320,   0x030u, 0x08u, 0x005bbc84u},",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-factory-case17-nonnull",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "{FactoryInitKind::Null,     0x000u, 0x00u, 0x00000000u},",
+      "new": "{FactoryInitKind::Std320,   0x030u, 0x11u, 0x005bbcccu},",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-factory-upper-bound",
+      "source": "iterations/v2/001-original-recovery/runs/778-scene-pass-compile-factory/scene_pass_compile_factory_778.cpp",
+      "old": "if (kind > 0x13u) {",
+      "new": "if (kind > 0x14u) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

@@ -1,6 +1,19 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-24. [Run776](runs/776-scene-blur-and-input-render-integration/README.md)
+Current 2026-11-24. [Run780](runs/780-audio-scene-render-integration/README.md)
+PASS (`build-001`): folds frozen `773/004` (`005898b0`, `005898f0`), `778/001`
+(`0053f380`, `0053f980`, `0053fd60`, `00574ab0`), and `779/001` (`00573030`,
+`004121b0`, partial) onto `Run776`: **447 TUs / 8 projects**, **91 unresolved
+names / 99 references**, `1,104` source pins, `268` native comparisons, `36`
+mutations, `3` REA sessions (`v2-audio-allocator-dependency-research-759/002`,
+`v2-scene-778-rea/001`, `v2-render-input-779-rea/001`), `16B` new `.bss` + `6B`
+new `.rdata`; no EXE. Five names close (`005898f0`, `0053f380`, `0053f980`,
+`00573030`, `004121b0`) and two typed boundaries open (`005a38c7`,
+`004123e0`). Registry **1,255** (`+8` entries; `004b67b0`, `00556bb0`,
+`0053f230`, `0053f2a0`, `005612a0` updated to recovered). Next shared wave
+(`Run784`) awaits `Run777` (ready, `00589e80`/`00589f40`) plus `781`–`783`.
+
+Historical: [Run776](runs/776-scene-blur-and-input-render-integration/README.md)
 PASS (`build-001`): folds frozen `774/002` (`00537a30`, `00537a40`,
 `00537a70`, `00536470`) and `775/001` (`005331a0`, `00465df0`) onto `Run761`:
 **444 TUs / 8 projects**, **94 unresolved names / 101 references**, `1,097`

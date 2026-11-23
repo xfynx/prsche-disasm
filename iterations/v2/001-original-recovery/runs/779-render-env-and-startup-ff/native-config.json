@@ -1,0 +1,130 @@
+{
+  "run": 779,
+  "experiment": "local/experiments/v2-render-env-and-startup-ff-779",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff",
+    "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize",
+    "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain",
+    "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves",
+    "iterations/v2/001-original-recovery/runs/673-render-loader-directx-and-startup-alloc",
+    "iterations/v2/001-original-recovery/runs/521-render-initialize",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00573030",
+      "bytes": 50,
+      "sha256": "ece7a18deb1439806cd476ba049e57d6f3d401ce539486c7170ac5b19136e0f0",
+      "token": "@BODY_00573030@"
+    },
+    {
+      "va": "005c0838",
+      "bytes": 6,
+      "sha256": "e314e7a77a705c9b8f0bd2964f8a80c58552243502340071968cde61ee950694",
+      "token": "@STR_005C0838@"
+    },
+    {
+      "va": "004121b0",
+      "bytes": 124,
+      "sha256": "c0d36c963c64210155854701d8c80dc91e16758f195b1f7f226242ce211fb110",
+      "token": "@BODY_004121B0@"
+    }
+  ],
+  "pass_marker": "render_env_startup_ff_779_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-573030-fmt-order",
+      "source": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp",
+      "old": "    formatter_entry_005a0fbf(entry, render_environment_fmt_005c0838, name, value);",
+      "new": "    formatter_entry_005a0fbf(entry, render_environment_fmt_005c0838, value, name);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-573030-skip-putenv",
+      "source": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp",
+      "old": "    (void)crt_putenv_005a38c7(entry);",
+      "new": "",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-573030-return-nonzero",
+      "source": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp",
+      "old": "    (void)crt_putenv_005a38c7(entry);\n    return 0u;",
+      "new": "    return static_cast<std::uint32_t>(crt_putenv_005a38c7(entry));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-4121b0-enabled-gate",
+      "source": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp",
+      "old": "    if (load_state_u32(0x04u) == 0u) {\n        return;\n    }",
+      "new": "    if (load_state_u32(0x04u) != 0u) {\n        return;\n    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-4121b0-signed-mode-cmp",
+      "source": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp",
+      "old": "    if (static_cast<std::int32_t>(global_00657424) >= 2) {",
+      "new": "    if (global_00657424 >= 2u) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-4121b0-mode-limit",
+      "source": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp",
+      "old": "    if (static_cast<std::int32_t>(global_00657424) >= 2) {",
+      "new": "    if (static_cast<std::int32_t>(global_00657424) > 2) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-4121b0-preinsert-state",
+      "source": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp",
+      "old": "    store_state_u32(0x12cu, 1u);",
+      "new": "    store_state_u32(0x12cu, 0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-4121b0-insert-key",
+      "source": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp",
+      "old": "        player,\n        10);",
+      "new": "        player,\n        9);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-4121b0-postinsert-stop",
+      "source": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp",
+      "old": "    if (load_state_u32(0x04u) == 0u) {\n        input_slot_stop_ff_00533480(static_cast<std::int32_t>(load_state_u32(0x08u)));",
+      "new": "    if (load_state_u32(0x04u) != 0u) {\n        input_slot_stop_ff_00533480(static_cast<std::int32_t>(load_state_u32(0x08u)));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-4121b0-clear-fields",
+      "source": "iterations/v2/001-original-recovery/runs/779-render-env-and-startup-ff/render_env_startup_ff_779.cpp",
+      "old": "        store_state_u32(0x128u, 0u);\n        store_state_u32(0x130u, 0u);\n        store_state_u32(0x124u, 0u);",
+      "new": "        store_state_u32(0x128u, 0u);\n        store_state_u32(0x124u, 0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

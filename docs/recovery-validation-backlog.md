@@ -1,6 +1,13 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run776 PASS (`774/002` + `775/001`: 6 bodies, 242 native comparisons,
+Текущее: Run780 PASS (`773/004` + `778/001` + `779/001`: 8 bodies, 268 native
+comparisons, 36 mutations, 16B `.bss` + 6B `.rdata`, 447 TUs, 91 names / 99
+refs, 1,104 pins; no EXE; registry 1,255). `773` bounds `channel_count <= 4` /
+slots `0..127` (`00590420` open); `778` preserves raw `.rdata` vtables without
+live virtual dispatch; `779` leaves `005a38c7` and `004123e0` as `PARTIAL`
+boundaries. Live audio/FF/renderer hardware, startup and gameplay remain open.
+
+Historical: Run776 PASS (`774/002` + `775/001`: 6 bodies, 242 native comparisons,
 20 mutations, 0 new owned data, 444 TUs, 94 names / 101 refs, 1,097 pins; no
 EXE; registry 1,247). Controlled `0069ed0c` + `005de72c[0..6]` D3D flush
 callbacks (`774`) and live DirectInput hardware, startup and gameplay (`775`)
