@@ -1,0 +1,112 @@
+{
+  "run": 777,
+  "functions": [
+    "audio_voice_pitch_scale_00589e80",
+    "audio_voice_recompute_pitch_00589f40"
+  ],
+  "originals": [
+    {
+      "function": "audio_voice_pitch_scale_00589e80",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (1 arg: cents; RET int32_t)",
+      "entry": "00589e80",
+      "body_ranges_inclusive": [
+        [
+          "00589e80",
+          "00589f31"
+        ]
+      ],
+      "body_bytes": 178,
+      "body_sha256": "7313cfa93428141920de670f8bcb67e3592467fdc9be164bbe5bace00af31578",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "rea_dossier": "local/experiments/v2-audio-777-rea/001/function-00589e80.json",
+      "references_in_index": [
+        {
+          "from_va": "00589fb2",
+          "from_function": "00589f40",
+          "type": "UNCONDITIONAL_CALL"
+        }
+      ]
+    },
+    {
+      "function": "audio_voice_recompute_pitch_00589f40",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (1 arg: voice_slot; RET void)",
+      "entry": "00589f40",
+      "body_ranges_inclusive": [
+        [
+          "00589f40",
+          "00589fd5"
+        ]
+      ],
+      "body_bytes": 150,
+      "body_sha256": "5e19d342e400ba717d25caf9282beda2c015719a7a057eceaa6a3cecb23143c5",
+      "binary_index_functions": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+      "binary_index_references": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/references.jsonl",
+      "rea_dossier": "local/experiments/v2-audio-777-rea/001/function-00589f40.json",
+      "references_in_index": [
+        {
+          "from_va": "005614d4",
+          "from_function": "005612a0",
+          "type": "UNCONDITIONAL_CALL"
+        },
+        {
+          "from_va": "00565ff4",
+          "from_function": "00565f80",
+          "type": "UNCONDITIONAL_CALL"
+        },
+        {
+          "from_va": "00566088",
+          "from_function": "00566020",
+          "type": "UNCONDITIONAL_CALL"
+        },
+        {
+          "from_va": "005895b1",
+          "from_function": null,
+          "type": "UNCONDITIONAL_CALL"
+        },
+        {
+          "from_va": "005906c1",
+          "from_function": "00590420",
+          "type": "UNCONDITIONAL_CALL"
+        }
+      ]
+    }
+  ],
+  "owned_rodata_strings": [],
+  "owned_writable_data": [
+    {
+      "name": "audio_pitch_scale_table_005e1d3c",
+      "va": "005e1d3c",
+      "bytes": 256,
+      "section": ".data",
+      "sha256": "24e944a9313649312e7251afb205894bcf816f2e8005ae004e5a30a5806baa15",
+      "notes": "Read-only exponential pitch lookup table (005e1d3c..005e1e3b; negative indices -255..-1 reference 005e1e3c + idx = 005e1d3c + 256 + idx)."
+    }
+  ],
+  "reused_canonical_symbols": [
+    {
+      "name": "audio_backend_channels_006b4a00",
+      "va": "006b4a00",
+      "owner": "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings/audio_backend_434.cpp",
+      "notes": "Base pointer to 0x70-byte voice row array; preserves Run434 layout untouched."
+    }
+  ],
+  "rea_session": {
+    "config": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/rea-queries.json",
+    "receipt": "local/experiments/v2-audio-777-rea/001/receipt.json",
+    "validation": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/validation.json",
+    "prior_trace": "iterations/v2/001-original-recovery/runs/756-audio-backend-voice-children/rea-evidence.json"
+  },
+  "bounded_and_unrecovered_notes": {
+    "caller_frontier": "00589f40 closes ?audio_voice_recompute_pitch_00589f40@porsche@@YAXI@Z on Run751/Run761 linker frontier. Callers 00565f80, 00566020, 005895b1, and 00590420 remain outside Run777.",
+    "verified_bounds": [
+      "audio_voice_recompute_pitch_00589f40: valid voice_slot index and valid modulation table pointers (+0x58/+0x60) when non-null; +0x3f signed int8 index, +0x4b unsigned uint8 index."
+    ]
+  }
+}

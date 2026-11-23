@@ -1,0 +1,140 @@
+{
+  "run": 777,
+  "experiment": "local/experiments/v2-audio-voice-pitch-777",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch",
+    "iterations/v2/001-original-recovery/runs/751-audio-voice-start",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.hpp",
+    "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00589e80",
+      "bytes": 178,
+      "sha256": "7313cfa93428141920de670f8bcb67e3592467fdc9be164bbe5bace00af31578",
+      "token": "@BODY_00589E80@"
+    },
+    {
+      "va": "00589f40",
+      "bytes": 150,
+      "sha256": "5e19d342e400ba717d25caf9282beda2c015719a7a057eceaa6a3cecb23143c5",
+      "token": "@BODY_00589F40@"
+    },
+    {
+      "va": "005e1d3c",
+      "bytes": 256,
+      "sha256": "24e944a9313649312e7251afb205894bcf816f2e8005ae004e5a30a5806baa15",
+      "token": "@DATA_005E1D3C@"
+    }
+  ],
+  "pass_marker": "audio_voice_pitch_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-scale-pos-octave-mul",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "        cents = static_cast<I>(static_cast<U>(cents) - q * 1200u);",
+      "new": "        cents = static_cast<I>(static_cast<U>(cents) - q * 1100u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scale-neg-octave-mul",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "        cents = static_cast<I>(static_cast<U>(cents) + q * 1200u);",
+      "new": "        cents = static_cast<I>(static_cast<U>(cents) + q * 1100u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scale-cents-factor",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "    const I prod = static_cast<I>(static_cast<U>(cents) * 13981u);",
+      "new": "    const I prod = static_cast<I>(static_cast<U>(cents) * 13900u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scale-neg-clamp",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "    if (idx < -255) {\n        idx = -255;\n    }",
+      "new": "    if (idx < -254) {\n        idx = -254;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scale-neg-shift",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "        return sar_n(static_cast<I>(static_cast<U>(entry) * static_cast<U>(scale)), 9u);",
+      "new": "        return sar_n(static_cast<I>(static_cast<U>(entry) * static_cast<U>(scale)), 8u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-scale-pos-shift",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "    return sar_n(static_cast<I>(static_cast<U>(entry) * static_cast<U>(scale)), 8u);",
+      "new": "    return sar_n(static_cast<I>(static_cast<U>(entry) * static_cast<U>(scale)), 9u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-pitch-cache-guard",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "    if (read_i16(rec_va + 0x6au) == 0) {",
+      "new": "    if (read_i16(rec_va + 0x6au) >= 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-pitch-mod0-null-idx",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "            const I sample0 = (ptr0 != 0u) ? static_cast<I>(read_i8(ptr0 + static_cast<U>(idx0))) : idx0;",
+      "new": "            const I sample0 = (ptr0 != 0u) ? static_cast<I>(read_i8(ptr0 + static_cast<U>(idx0))) : 0;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-pitch-mod0-shift",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "            cents += sar_n((sample0 - 0x40) * mod0_scale, 6u);",
+      "new": "            cents += sar_n((sample0 - 0x40) * mod0_scale, 5u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-pitch-mod1-unsigned-idx",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "            const U idx1 = static_cast<U>(read_u8(rec_va + 0x4bu));",
+      "new": "            const U idx1 = static_cast<U>(static_cast<I>(read_i8(rec_va + 0x4bu)));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-pitch-mod1-shift",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "            cents += sar_n((sample1 - 0x40) * mod1_scale, 6u);",
+      "new": "            cents += sar_n((sample1 - 0x40) * mod1_scale, 7u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-pitch-out-rate-shift",
+      "source": "iterations/v2/001-original-recovery/runs/777-audio-voice-pitch/audio_voice_pitch_777.cpp",
+      "old": "    const I out_rate = sar_n(static_cast<I>(base_rate * pitch_mul), 12u);",
+      "new": "    const I out_rate = sar_n(static_cast<I>(base_rate * pitch_mul), 11u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

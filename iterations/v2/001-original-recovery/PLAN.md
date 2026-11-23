@@ -1,6 +1,18 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-24. [Run780](runs/780-audio-scene-render-integration/README.md)
+Current 2026-11-24. [Run784](runs/784-audio-voice-and-sim-teardown-integration/README.md)
+PASS (`build-001`): folds frozen `777/003` (`00589e80`, `00589f40`) and
+`783/001` (`004a4760`, `004ae470`, `004b04d0`, `004ad4d0`, `005610e0`) onto
+`Run780`: **449 TUs / 8 projects**, **86 unresolved names / 94 references**,
+`1,109` source pins, `84` native comparisons, `24` mutations, `2` REA sessions
+(`v2-audio-777-rea/001`, `v2-sim-audio-783-rea/001`), 256B pitch table
+(`005e1d3c..005e1e3b`) + 1B `.bss` (`00656ab0`); no EXE. Five names close
+(`00589f40`, `004a4760`, `004ae470`, `004b04d0`, `004ad4d0`) with zero new
+unresolved names; registry **1,262** (`+7` entries; `005612a0` updates
+`00589f40` to recovered). Next shared wave (`Run788`) awaits ready `781` /
+`782` plus `785`–`787`.
+
+Historical: [Run780](runs/780-audio-scene-render-integration/README.md)
 PASS (`build-001`): folds frozen `773/004` (`005898b0`, `005898f0`), `778/001`
 (`0053f380`, `0053f980`, `0053fd60`, `00574ab0`), and `779/001` (`00573030`,
 `004121b0`, partial) onto `Run776`: **447 TUs / 8 projects**, **91 unresolved

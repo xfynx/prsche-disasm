@@ -1,6 +1,13 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run780 PASS (`773/004` + `778/001` + `779/001`: 8 bodies, 268 native
+Текущее: Run784 PASS (`777/003` + `783/001`: 7 bodies, 84 native comparisons,
+24 mutations, 256B `005e1d3c` table + 1B `.bss` `00656ab0`, 449 TUs, 86 names
+/ 94 refs, 1,109 pins; no EXE; registry 1,262). `777` bounds modulation tables
+(`005897c0` -> `00589fe0` skipped); `783` forwards literal callback VAs
+(`0x004a45d0`, `0x004ac290`) with 8-slot `+0xf0` table bound. Live DirectSound,
+sim callers, startup and gameplay remain open.
+
+Historical: Run780 PASS (`773/004` + `778/001` + `779/001`: 8 bodies, 268 native
 comparisons, 36 mutations, 16B `.bss` + 6B `.rdata`, 447 TUs, 91 names / 99
 refs, 1,104 pins; no EXE; registry 1,255). `773` bounds `channel_count <= 4` /
 slots `0..127` (`00590420` open); `778` preserves raw `.rdata` vtables without

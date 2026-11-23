@@ -19,11 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run780](iterations/v2/001-original-recovery/runs/780-audio-scene-render-integration/README.md)
-is the current shared build (`447` TUs, `91` unresolved names / `99`
-references). It integrates Run773 (audio voice allocator), Run778 (scene pass
-compile/factory), and Run779 (render env + startup FF init). Active workers
-are preparing the next audio/scene/render packets (`Run777`, `Run781`–`Run783`).
+[Run784](iterations/v2/001-original-recovery/runs/784-audio-voice-and-sim-teardown-integration/README.md)
+is the current shared build (`449` TUs, `86` unresolved names / `94`
+references). It integrates Run777 (audio voice pitch scale) and Run783 (sim &
+audio teardown leaves). Active workers are finishing the next wave (`Run781`,
+`Run782`, `Run785`–`Run787`).
 
 ## Recovery milestones
 
