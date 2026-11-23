@@ -1,6 +1,14 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run784 PASS (`777/003` + `783/001`: 7 bodies, 84 native comparisons,
+Текущее: Run788 PASS (`781/003` + `782/001` + `785/001` + `787/001`: 12 bodies,
+228 native comparisons, 38 mutations, 25B `.bss` + 4B `.rdata` `005bb708` +
+7,093B `FNTF` payload `005dfd8c`, 453 TUs, 87 names / 96 refs, 1,118 pins; no
+EXE; registry 1,274). `781` bounds `<=200` flare slots (`00452120` open until
+`786`); `782`/`787` keep `005dfb60`/`005dec08`/`0053c6c0`/`00594980` as
+`PARTIAL` boundaries; `785` proves controlled `vtable[0]` view teardown. Live
+renderer/DirectInput hardware, startup and gameplay remain open.
+
+Historical: Run784 PASS (`777/003` + `783/001`: 7 bodies, 84 native comparisons,
 24 mutations, 256B `005e1d3c` table + 1B `.bss` `00656ab0`, 449 TUs, 86 names
 / 94 refs, 1,109 pins; no EXE; registry 1,262). `777` bounds modulation tables
 (`005897c0` -> `00589fe0` skipped); `783` forwards literal callback VAs

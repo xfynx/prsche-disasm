@@ -1,0 +1,283 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "sim_view_slot_cleanup_785.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+enum : U {
+    kMaxEvents = 16u,
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Event {
+    U obj_id;
+    I flag;
+};
+
+struct MockViewObj {
+    void* const* vtable;
+    U id;
+};
+
+struct Trace {
+    U abi_fail;
+    U count;
+    Event events[kMaxEvents];
+    B final_slot_table[0x218u];
+    U final_mode_word;
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512];
+static B fp_env[28];
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events_total = 0u;
+static U which = 0u;
+
+static B* code = nullptr;
+static B* orig_4642f0 = nullptr;
+
+static U address(const void* p) { return static_cast<U>(reinterpret_cast<std::uintptr_t>(p)); }
+
+static U rd(const void* p, U o = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + o, 4u);
+    return v;
+}
+
+static void wr_va(U va, U v) {
+    std::memcpy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(va)), &v, 4u);
+}
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n", why, cases, which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("divergence native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip, cases, which);
+    std::fflush(stdout);
+    ExitProcess(1);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void capture_fp(FpuSnapshot& fp) {
+    __asm fxsave fp_area
+    __asm fnstenv fp_env
+    __asm fldenv fp_env
+    fp.control = static_cast<unsigned short>(rd(fp_area, 0u));
+    fp.status = static_cast<unsigned short>(rd(fp_area, 2u));
+    fp.tag = static_cast<unsigned short>(rd(fp_env, 8u));
+    fp.pad = 0u;
+    fp.mxcsr = rd(fp_area, 24u);
+    for (U i = 0u; i < 8u; ++i) {
+        std::memcpy(fp.values + i * 10u, fp_area + 32u + i * 16u, 10u);
+        if ((fp_area[4u] & (1u << (((fp.status >> 11u) + i) & 7u))) == 0u) {
+            std::memset(fp.values + i * 10u, 0, 10u);
+        }
+    }
+}
+
+static void __fastcall mock_dtor_thunk(MockViewObj* self, void*, I flag) {
+    require(trace.count < kMaxEvents, "event overflow");
+    Event& e = trace.events[trace.count++];
+    e.obj_id = (self != nullptr) ? self->id : 0xdeadbeefu;
+    e.flag = flag;
+}
+
+static void* const mock_vtable[1] = {
+    reinterpret_cast<void*>(&mock_dtor_thunk),
+};
+
+static MockViewObj obj0{mock_vtable, 101u};
+static MockViewObj obj1{mock_vtable, 202u};
+
+namespace porsche {
+
+ApplicationStateArena application_state_006573e8{};
+std::uint8_t view_slot_table_00627e80[0x218u]{};
+
+std::uint32_t& ApplicationStateArena::word(std::uint32_t va) {
+    return words_[(va - application_state_base_va) / sizeof(std::uint32_t)];
+}
+
+} // namespace porsche
+
+static U invoke_0(void* fn) {
+    U saved_sp = 0u;
+    U saved_bp = 0u;
+    U fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp, esp
+        mov saved_bp, ebp
+        mov ebx, 0x13579bdf
+        mov esi, 0x2468ace0
+        mov edi, 0x10203040
+        call fn
+        cmp esp, saved_sp
+        jne bad_abi
+        cmp ebp, saved_bp
+        jne bad_abi
+        cmp ebx, 0x13579bdf
+        jne bad_abi
+        cmp esi, 0x2468ace0
+        jne bad_abi
+        cmp edi, 0x10203040
+        je ok_abi
+    bad_abi:
+        mov fail, 1
+    ok_abi:
+        mov esp, saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static void verify_initial_state() {
+    for (U w : porsche::application_state_006573e8.words_) {
+        require(w == 0u, "initial application_state bss non-zero");
+    }
+    for (B b : porsche::view_slot_table_00627e80) {
+        require(b == 0u, "initial view_slot_table bss non-zero");
+    }
+}
+
+static void init_originals() {
+    static const B body_4642f0[] = {@BODY_004642F0@};
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "code alloc");
+    std::memset(code, 0xCC, 4096u);
+
+    orig_4642f0 = code;
+    std::memcpy(orig_4642f0, body_4642f0, sizeof body_4642f0);
+
+    wr_va(address(orig_4642f0 + 0x002u), address(&porsche::application_state_006573e8.word(0x00657404u)));
+    wr_va(address(orig_4642f0 + 0x015u), address(porsche::view_slot_table_00627e80 + 0x20u));
+
+    FlushInstructionCache(GetCurrentProcess(), code, 4096u);
+}
+
+static void reset_trace_state() {
+    porsche::application_state_006573e8.words_.fill(0u);
+    std::memset(porsche::view_slot_table_00627e80, 0x5Au, sizeof porsche::view_slot_table_00627e80);
+    std::memset(&trace, 0, sizeof trace);
+}
+
+static void finish_trace(U abi_fail) {
+    trace.abi_fail = abi_fail;
+    std::memcpy(trace.final_slot_table, porsche::view_slot_table_00627e80, sizeof trace.final_slot_table);
+    trace.final_mode_word = porsche::application_state_006573e8.word(0x00657404u);
+    capture_fp(trace.fp);
+}
+
+static void compare_traces() {
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "abi_fail");
+    require(trace.count == expected.count, "event count mismatch");
+    for (U i = 0u; i < trace.count; ++i) {
+        require(std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) == 0, "event mismatch");
+    }
+    require(std::memcmp(trace.final_slot_table, expected.final_slot_table, sizeof trace.final_slot_table) == 0,
+            "slot table mismatch");
+    require(trace.final_mode_word == expected.final_mode_word, "mode word mismatch");
+    require(std::memcmp(&trace.fp, &expected.fp, sizeof(FpuSnapshot)) == 0, "fpu snapshot mismatch");
+    ++cases;
+    events_total += trace.count;
+}
+
+template <typename Setup>
+static void run_case(Setup setup) {
+    void* const cpp_fn = reinterpret_cast<void*>(porsche::application_sim_boundary_004642f0);
+
+    which = 0u;
+    reset_trace_state();
+    setup();
+    const U orig_fail = invoke_0(orig_4642f0);
+    finish_trace(orig_fail);
+    expected = trace;
+
+    which = 1u;
+    reset_trace_state();
+    setup();
+    const U cpp_fail = invoke_0(cpp_fn);
+    finish_trace(cpp_fail);
+    compare_traces();
+}
+
+static void set_slot_obj(U idx, MockViewObj* obj) {
+    const U ptr = address(obj);
+    std::memcpy(porsche::view_slot_table_00627e80 + 0x20u + idx * 0x10cu, &ptr, sizeof ptr);
+}
+
+int main() {
+    SetUnhandledExceptionFilter(fault_handler);
+    verify_initial_state();
+    init_originals();
+
+    // 1. mode=0 -> 1 slot destroyed even when slot 1 non-null
+    run_case([&]() {
+        porsche::application_state_006573e8.word(0x00657404u) = 0u;
+        set_slot_obj(0u, &obj0);
+        set_slot_obj(1u, &obj1);
+    });
+
+    // 2. mode=2 -> 1 slot destroyed (kills mode==2 mutation)
+    run_case([&]() {
+        porsche::application_state_006573e8.word(0x00657404u) = 2u;
+        set_slot_obj(0u, &obj0);
+        set_slot_obj(1u, &obj1);
+    });
+
+    // 3. mode=1, both slots non-null -> 2 slots destroyed and zeroed
+    run_case([&]() {
+        porsche::application_state_006573e8.word(0x00657404u) = 1u;
+        set_slot_obj(0u, &obj0);
+        set_slot_obj(1u, &obj1);
+    });
+
+    // 4. mode=1, slot 0 null, slot 1 non-null -> only slot 1 destroyed
+    run_case([&]() {
+        porsche::application_state_006573e8.word(0x00657404u) = 1u;
+        set_slot_obj(0u, nullptr);
+        set_slot_obj(1u, &obj1);
+    });
+
+    // 5. mode=1, both slots null -> 0 dtor calls, pattern preserved
+    run_case([&]() {
+        porsche::application_state_006573e8.word(0x00657404u) = 1u;
+        set_slot_obj(0u, nullptr);
+        set_slot_obj(1u, nullptr);
+    });
+
+    std::printf(
+        "sim_view_slot_cleanup_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+        cases,
+        events_total);
+    return 0;
+}

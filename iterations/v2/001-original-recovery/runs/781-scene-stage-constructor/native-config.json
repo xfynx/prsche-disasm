@@ -1,0 +1,127 @@
+{
+  "run": 781,
+  "experiment": "local/experiments/v2-scene-stage-constructor-781",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor",
+    "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table",
+    "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers",
+    "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves",
+    "iterations/v2/001-original-recovery/runs/334-resource-open",
+    "iterations/v2/001-original-recovery/runs/290-frame-service-cluster",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.hpp",
+    "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "004522b0",
+      "bytes": 487,
+      "sha256": "96ce236313cc9768fe18af8d803ef81cb159be1fc407f8af2db93b24d9dc5d18",
+      "token": "@BODY_004522B0@"
+    },
+    {
+      "va": "004524a0",
+      "bytes": 104,
+      "sha256": "e2f2f7f1a40811922ca9cc24078e3d7546fa3680c38a7924f6a9585234a27e34",
+      "token": "@BODY_004524A0@"
+    },
+    {
+      "va": "0059ece0",
+      "bytes": 18,
+      "sha256": "4aa5e485306be3b69b50d3619636b8ca761e1c1567465e37faa0a066229ef631",
+      "token": "@BODY_0059ECE0@"
+    }
+  ],
+  "pass_marker": "scene_stage_constructor_781_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-ctx-size-offset",
+      "source": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp",
+      "old": "load_ptr(state, 0x18u)",
+      "new": "load_ptr(state, 0x1cu)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-ctor-field-4c",
+      "source": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp",
+      "old": "store32(self, 0x4cu, 4u);",
+      "new": "store32(self, 0x4cu, 3u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-ctor-float100",
+      "source": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp",
+      "old": "constexpr U kFlareFloat100 = 0x42c80000u;",
+      "new": "constexpr U kFlareFloat100 = 0x42c40000u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-ctor-neg-one",
+      "source": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp",
+      "old": "store32(self, 0x1cu + i * 4u, 0xffffffffu);",
+      "new": "store32(self, 0x1cu + i * 4u, 0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-flare-format",
+      "source": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp",
+      "old": "\"%sflare.dat\"",
+      "new": "\"%sflare2.dat\"",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-entry-stride",
+      "source": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp",
+      "old": "constexpr U kFlareEntryBytes = 0x8cu;",
+      "new": "constexpr U kFlareEntryBytes = 0x88u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-holder-size",
+      "source": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp",
+      "old": "            do {\n                void* holder = startup_network_allocate_0059ef90(0x0cu);",
+      "new": "            do {\n                void* holder = startup_network_allocate_0059ef90(0x10u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-array-element-stride",
+      "source": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp",
+      "old": "application_allocate_array_0059eff0(final_count * 4u);",
+      "new": "application_allocate_array_0059eff0(final_count * 8u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-self-zero-span",
+      "source": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp",
+      "old": "std::memset(static_cast<B*>(self) + 0x08u, 0, 0x320u);",
+      "new": "std::memset(static_cast<B*>(self) + 0x08u, 0, 0x31cu);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-ctx-release",
+      "source": "iterations/v2/001-original-recovery/runs/781-scene-stage-constructor/scene_stage_constructor_781.cpp",
+      "old": "context_table_release_0059ecd0(data);",
+      "new": "",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

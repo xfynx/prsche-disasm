@@ -4,7 +4,17 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run784](iterations/v2/001-original-recovery/runs/784-audio-voice-and-sim-teardown-integration/README.md)
+[Run788](iterations/v2/001-original-recovery/runs/788-scene-render-sim-integration/README.md)
+build compiles 453 C++ translation units across eight projects. The shared
+link reports **87 unresolved names / 96 references**. There is no game EXE.
+The shared audit accepts Runs781/782/785/787 within their bounded domains:
+12 new registry entries (`1,274` total), 228 original-x86 comparisons, 38
+mutations, 25B `.bss` (`782`) + 4B `.rdata` `005bb708` + 7,093B `FNTF` font
+payload `005dfd8c` (`787`), and 1,118 source pins. Four names close (`004522b0`,
+`00536870`, `0053c8e0`, `004642f0`) and five typed boundaries open (`00452120`,
+`0053c6c0`, `00594980`, `005dfb60`, `005dec08`).
+
+Historical: [Run784](iterations/v2/001-original-recovery/runs/784-audio-voice-and-sim-teardown-integration/README.md)
 build compiles 449 C++ translation units across eight projects. The shared
 link reports **86 unresolved names / 94 references**. There is no game EXE.
 The shared audit accepts Runs777/783 within their bounded domains: 7 new

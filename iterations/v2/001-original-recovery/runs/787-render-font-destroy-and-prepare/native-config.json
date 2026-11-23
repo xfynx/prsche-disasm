@@ -1,0 +1,141 @@
+{
+  "run": 787,
+  "experiment": "local/experiments/v2-render-font-destroy-and-prepare-787",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare",
+    "iterations/v2/001-original-recovery/runs/782-render-calibrate-service",
+    "iterations/v2/001-original-recovery/runs/671-font-state-and-vec3-dist",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/runs/525-render-driver-destruction",
+    "iterations/v2/001-original-recovery/runs/521-render-initialize",
+    "iterations/v2/001-original-recovery/runs/518-render-driver-start",
+    "iterations/v2/001-original-recovery/runs/515-render-driver-constructors",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00571a10",
+      "bytes": 125,
+      "sha256": "594f43a48b17abc6269d9eceac8dca47d8e7d1ea414902f0c3f4950c5642188d",
+      "token": "@BODY_00571A10@"
+    },
+    {
+      "va": "00536840",
+      "bytes": 44,
+      "sha256": "50e3f3d9caaac79bd2112800bc69b207e5f736da0140e62116d2bed8329915b4",
+      "token": "@BODY_00536840@"
+    },
+    {
+      "va": "0053c8b0",
+      "bytes": 25,
+      "sha256": "92a606942ede44b888c12e420351530697b96d24430b5e64783cef1cccb4a1af",
+      "token": "@BODY_0053C8B0@"
+    },
+    {
+      "va": "00571a90",
+      "bytes": 41,
+      "sha256": "8d8d060224bf1d650657fd68f95c3808c7dc6c54e2079ec1bf403d464f215086",
+      "token": "@BODY_00571A90@"
+    },
+    {
+      "va": "005dfd8c",
+      "bytes": 7093,
+      "sha256": "316e53fdf7bc89e4784c4f17dceaf08ab3e2506f5cde3d49b511ad1c3e4e0eea",
+      "token": "@DATA_005DFD8C@"
+    }
+  ],
+  "pass_marker": "render_font_destroy_787_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-571a10-ops-alloc-zero",
+      "source": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp",
+      "old": "        if (handle == nullptr) {\n            store_u8(font_bytes + 0xacu, 1u);\n            return;\n        }",
+      "new": "        if (handle == nullptr) {\n            store_u8(font_bytes + 0xacu, 0u);\n            return;\n        }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-571a10-skip-convert",
+      "source": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp",
+      "old": "    render_font_convert_glyphs_00594980(font);",
+      "new": "",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-571a10-upload-pixels-off",
+      "source": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp",
+      "old": "        shape_bytes + 0x10u,",
+      "new": "        shape_bytes + 0x0cu,",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-571a10-ready-flag-invert",
+      "source": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp",
+      "old": "    store_u8(font_bytes + 0xacu, (status == 0u) ? 1u : 0u);",
+      "new": "    store_u8(font_bytes + 0xacu, (status != 0u) ? 1u : 0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-536840-vtable-write",
+      "source": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp",
+      "old": "    store_ptr(obj_bytes, &render_calibration_vtable_005bb708[0]);",
+      "new": "",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-536840-skip-release",
+      "source": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp",
+      "old": "    if ((flags & 1u) != 0u) {\n        (void)application_release_0059f050(self);\n    }",
+      "new": "",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53c8b0-ops-slot",
+      "source": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp",
+      "old": "    const auto free_font_fn = reinterpret_cast<FreeFontFn>(ops[6]);",
+      "new": "    const auto free_font_fn = reinterpret_cast<FreeFontFn>(ops[5]);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-571a90-clear-handle",
+      "source": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp",
+      "old": "    store_ptr(font_bytes + 0x44u, nullptr);",
+      "new": "",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-571a90-ops-slot",
+      "source": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp",
+      "old": "    const auto release_fn = reinterpret_cast<ReleaseFn>(ops[2]);",
+      "new": "    const auto release_fn = reinterpret_cast<ReleaseFn>(ops[1]);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-571a90-null-gate",
+      "source": "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare/render_font_destroy_787.cpp",
+      "old": "    if (handle == nullptr) {\n        return;\n    }",
+      "new": "    if (handle != nullptr) {\n        return;\n    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

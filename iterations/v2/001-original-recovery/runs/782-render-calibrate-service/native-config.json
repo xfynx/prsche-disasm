@@ -1,0 +1,150 @@
+{
+  "run": 782,
+  "experiment": "local/experiments/v2-render-calibrate-service-782",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/782-render-calibrate-service",
+    "iterations/v2/001-original-recovery/runs/671-font-state-and-vec3-dist",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/runs/525-render-driver-destruction",
+    "iterations/v2/001-original-recovery/runs/521-render-initialize",
+    "iterations/v2/001-original-recovery/runs/518-render-driver-start",
+    "iterations/v2/001-original-recovery/runs/515-render-driver-constructors",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00536870",
+      "bytes": 216,
+      "sha256": "8d81e38d572f1bd834fe6e2de4236bbbd3a2c6dd6bacd3f4ed3c2f9037822a5e",
+      "token": "@BODY_00536870@"
+    },
+    {
+      "va": "0053c8d0",
+      "bytes": 10,
+      "sha256": "860add851908ca56106874dff425e9501f93e553b40fb0b9774bebda15430cb1",
+      "token": "@BODY_0053C8D0@"
+    },
+    {
+      "va": "0053c8e0",
+      "bytes": 45,
+      "sha256": "5da4f6813b8b91e6eb3abfd7648a7b494776d00777cf12152936f4de77451913",
+      "token": "@BODY_0053C8E0@"
+    },
+    {
+      "va": "0053d840",
+      "bytes": 86,
+      "sha256": "cbb6dbd0813480c61c74b36ff5c1c33287f4c1979b1f5ece45ec16ad34d42aa1",
+      "token": "@BODY_0053D840@"
+    }
+  ],
+  "pass_marker": "render_calibrate_service_782_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-536870-init-gate",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "    if (render_calibration_initialized_0069de40 != 0u) {\n        return;\n    }",
+      "new": "    if (render_calibration_initialized_0069de40 == 0u) {\n        return;\n    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-536870-flag-set",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "    if (probe_fn(inner, nullptr) != 0u) {",
+      "new": "    if (probe_fn(inner, nullptr) == 0u) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-536870-alloc-size",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "    void* const raw = startup_network_allocate_0059ef90(0x2cu);",
+      "new": "    void* const raw = startup_network_allocate_0059ef90(0x28u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-536870-state-ctor-offset",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "        render_resource_node_state_ctor_005379d0(obj_bytes + 8u, nullptr);",
+      "new": "        render_resource_node_state_ctor_005379d0(obj_bytes + 4u, nullptr);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-536870-setstatef-val",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "            font_setstatef_0053e890(stored_font, 0x14, -0.5f);",
+      "new": "            font_setstatef_0053e890(stored_font, 0x14, 0.5f);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-536870-setstatef-ids",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "            font_setstatef_0053e890(stored_font, 0x15, -0.5f);",
+      "new": "            font_setstatef_0053e890(stored_font, 0x16, -0.5f);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-536870-null-store",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "    } else {\n        render_calibration_object_0069de44 = nullptr;\n        render_font_prepare_00571a10(render_service_font_0069eb90);\n    }",
+      "new": "    } else {\n        render_font_prepare_00571a10(render_service_font_0069eb90);\n    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53c8d0-store",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "void __cdecl render_service_set_ops_0053c8d0(void* ops_table) {\n    render_service_ops_005dec08 = ops_table;\n}",
+      "new": "void __cdecl render_service_set_ops_0053c8d0(void* ops_table) {\n    (void)ops_table;\n}",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53c8e0-init-gate",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "    if (render_service_initialized_0069eb94 != 0u) {\n        return;\n    }",
+      "new": "    if (render_service_initialized_0069eb94 == 0u) {\n        return;\n    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53d840-default-count",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "        count = 0x190;\n        render_service_capacity_0069eba0 = 0x190;",
+      "new": "        count = 0x180;\n        render_service_capacity_0069eba0 = 0x180;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53d840-ops-slot",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "    const auto alloc_fn = reinterpret_cast<AllocFn>(ops[5]);",
+      "new": "    const auto alloc_fn = reinterpret_cast<AllocFn>(ops[4]);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53d840-fill-loop",
+      "source": "iterations/v2/001-original-recovery/runs/782-render-calibrate-service/render_calibrate_service_782.cpp",
+      "old": "        render_service_indices_0069eba4[i] = i;",
+      "new": "        render_service_indices_0069eba4[i] = i + 1;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

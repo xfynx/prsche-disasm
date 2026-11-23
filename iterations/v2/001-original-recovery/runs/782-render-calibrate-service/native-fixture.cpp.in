@@ -1,0 +1,527 @@
+// Native x86-vs-C++ differential fixture for Run782 00536870, 0053c8d0, 0053c8e0, 0053d840.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+
+#include "render_calibrate_service_782.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kEvProbe = 1u,
+    kEvAlloc44 = 2u,
+    kEvStateCtor = 3u,
+    kEvSetStateF = 4u,
+    kEvPrepare = 5u,
+    kEvCreateFont = 6u,
+    kEvOpsAlloc = 7u,
+    kEvWrongSlot = 8u,
+    kMaxEvents = 32u,
+};
+
+struct Event {
+    U type;
+    U a;
+    U b;
+    U c;
+};
+
+struct Snapshot {
+    U abi_fail;
+    U event_count;
+    Event events[kMaxEvents];
+    U cal_init;
+    U cal_obj_tok;
+    U cal_cookie;
+    B cal_flag;
+    U svc_font_tok;
+    U svc_init;
+    I svc_cap;
+    U svc_idx_tok;
+    U svc_ops_tok;
+    B cal_buf[0x2c];
+    I idx_buf[512];
+};
+
+static U cases = 0u;
+static U side = 0u;
+static U probe_mode = 0u;
+static U alloc_mode = 0u;
+static U font_sentinel = 0x11112222u;
+static U alt_ops_table[8]{};
+static void* inner_vtable[2]{};
+static B inner_obj[8]{};
+static B outer_obj[0x20]{};
+static B movie_service_obj[0x10]{};
+static B cal_buf[0x2c]{};
+static I idx_buf[512]{};
+static Event events[kMaxEvents]{};
+static U event_count = 0u;
+static Snapshot trace{};
+static Snapshot expected{};
+static B* code = nullptr;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", why, cases, side);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static LONG WINAPI fault(EXCEPTION_POINTERS* info) {
+    std::printf("divergence native-fault %08lx case=%u side=%u\n",
+                info->ExceptionRecord->ExceptionCode, cases, side);
+    std::fflush(stdout);
+    ExitProcess(7);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static U ptr_u(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* p) {
+    U v = 0u;
+    std::memcpy(&v, p, sizeof v);
+    return v;
+}
+
+static void store32(void* p, U v) {
+    std::memcpy(p, &v, sizeof v);
+}
+
+static void record_event(U type, U a, U b, U c) {
+    if (event_count < kMaxEvents) {
+        events[event_count++] = Event{type, a, b, c};
+    }
+}
+
+static std::uint8_t __fastcall mock_inner_probe(void* self, void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvProbe, (self == &inner_obj[0]) ? 1u : 0u, probe_mode, 0u);
+    return static_cast<std::uint8_t>(probe_mode & 0xffu);
+}
+
+static I* __cdecl mock_ops_alloc_wrong(I bytes) {
+    record_event(kEvWrongSlot, static_cast<U>(bytes), 0u, 0u);
+    return &idx_buf[0];
+}
+
+static I* __cdecl mock_ops_alloc_slot5(I bytes) {
+    record_event(kEvOpsAlloc, static_cast<U>(bytes), 0u, 0u);
+    std::memset(idx_buf, 0x77, sizeof idx_buf);
+    return &idx_buf[0];
+}
+
+static void reset_state(
+    U cal_init_val,
+    U cal_flag_val,
+    U svc_init_val,
+    U svc_font_present,
+    U svc_idx_present,
+    U p_mode,
+    U a_mode,
+    U cookie_val) {
+    probe_mode = p_mode;
+    alloc_mode = a_mode;
+    event_count = 0u;
+    std::memset(events, 0, sizeof events);
+    std::memset(cal_buf, 0xaa, sizeof cal_buf);
+    for (U i = 0u; i < 512u; ++i) {
+        idx_buf[i] = static_cast<I>(0x55550000u + i);
+    }
+
+    store32(&inner_vtable[0], ptr_u(reinterpret_cast<void*>(&mock_inner_probe)));
+    store32(&inner_obj[0], ptr_u(&inner_vtable[0]));
+    store32(&outer_obj[0x18], ptr_u(&inner_obj[0]));
+    store32(&movie_service_obj[0], ptr_u(&outer_obj[0]));
+    store32(&movie_service_obj[4], cookie_val);
+
+    for (U i = 0u; i < 8u; ++i) {
+        porsche::render_mouse_ops_table_005dfb60[i] =
+            (i == 5u) ? ptr_u(reinterpret_cast<void*>(&mock_ops_alloc_slot5))
+                      : ptr_u(reinterpret_cast<void*>(&mock_ops_alloc_wrong));
+        alt_ops_table[i] =
+            (i == 5u) ? ptr_u(reinterpret_cast<void*>(&mock_ops_alloc_slot5))
+                      : ptr_u(reinterpret_cast<void*>(&mock_ops_alloc_wrong));
+    }
+
+    porsche::game_setup_movie_service_0069ed0c = &movie_service_obj[0];
+    porsche::render_calibration_initialized_0069de40 = cal_init_val;
+    porsche::render_calibration_object_0069de44 = reinterpret_cast<void*>(0xdeadbeefu);
+    porsche::render_calibration_cookie_0069de48 = 0x11223344u;
+    porsche::render_calibration_flag_0069de4c = static_cast<B>(cal_flag_val);
+    porsche::render_service_font_0069eb90 = svc_font_present ? &font_sentinel : nullptr;
+    porsche::render_service_initialized_0069eb94 = svc_init_val;
+    porsche::render_service_capacity_0069eba0 = -1;
+    porsche::render_service_indices_0069eba4 = svc_idx_present ? &idx_buf[0] : nullptr;
+    porsche::render_service_ops_005dec08 = &alt_ops_table[0];
+}
+
+static void capture(Snapshot& out, U abi_fail) {
+    std::memset(&out, 0, sizeof out);
+    out.abi_fail = abi_fail;
+    out.event_count = event_count;
+    std::memcpy(out.events, events, sizeof events);
+    out.cal_init = porsche::render_calibration_initialized_0069de40;
+    if (porsche::render_calibration_object_0069de44 == &cal_buf[0]) {
+        out.cal_obj_tok = 1u;
+    } else if (porsche::render_calibration_object_0069de44 == nullptr) {
+        out.cal_obj_tok = 0u;
+    } else {
+        out.cal_obj_tok = ptr_u(porsche::render_calibration_object_0069de44);
+    }
+    out.cal_cookie = porsche::render_calibration_cookie_0069de48;
+    out.cal_flag = porsche::render_calibration_flag_0069de4c;
+    out.svc_font_tok = (porsche::render_service_font_0069eb90 == &font_sentinel) ? 1u : 0u;
+    out.svc_init = porsche::render_service_initialized_0069eb94;
+    out.svc_cap = porsche::render_service_capacity_0069eba0;
+    out.svc_idx_tok = (porsche::render_service_indices_0069eba4 == &idx_buf[0]) ? 1u : 0u;
+    if (porsche::render_service_ops_005dec08 == &porsche::render_mouse_ops_table_005dfb60[0]) {
+        out.svc_ops_tok = 1u;
+    } else if (porsche::render_service_ops_005dec08 == &alt_ops_table[0]) {
+        out.svc_ops_tok = 2u;
+    } else {
+        out.svc_ops_tok = ptr_u(porsche::render_service_ops_005dec08);
+    }
+    std::memcpy(out.cal_buf, cal_buf, sizeof cal_buf);
+    std::memcpy(out.idx_buf, idx_buf, sizeof idx_buf);
+}
+
+static void compare_snapshots(const char* label) {
+    require(expected.abi_fail == 0u && trace.abi_fail == 0u, label);
+    require(std::memcmp(&expected, &trace, sizeof(Snapshot)) == 0, label);
+}
+
+} // namespace
+
+namespace porsche {
+
+void* game_setup_movie_service_0069ed0c = nullptr;
+void* render_calibration_object_0069de44 = nullptr;
+std::uint32_t render_mouse_ops_table_005dfb60[8]{};
+const std::uint8_t render_debug_font_005dfd8c[32]{};
+const std::uint32_t render_calibration_vtable_005bb708[1]{0x536840u};
+void* render_service_ops_005dec08 = nullptr;
+
+void* __cdecl startup_network_allocate_0059ef90(std::uint32_t bytes) {
+    record_event(kEvAlloc44, bytes, alloc_mode, 0u);
+    if (alloc_mode == 0u) {
+        return nullptr;
+    }
+    std::memset(cal_buf, 0x22, bytes < sizeof cal_buf ? bytes : sizeof cal_buf);
+    return &cal_buf[0];
+}
+
+void* __fastcall render_resource_node_state_ctor_005379d0(void* self, void* unused_edx) {
+    (void)unused_edx;
+    const U off = static_cast<U>(static_cast<const B*>(self) - &cal_buf[0]);
+    record_event(kEvStateCtor, off, 0u, 0u);
+    auto* p = static_cast<B*>(self);
+    p[0] = 0x91u;
+    p[4] = 0x92u;
+    return self;
+}
+
+void __cdecl font_setstatef_0053e890(void* font, std::int32_t state, float value) {
+    U bits = 0u;
+    std::memcpy(&bits, &value, sizeof bits);
+    record_event(kEvSetStateF, (font == &font_sentinel) ? 1u : 0u, static_cast<U>(state), bits);
+}
+
+void* __cdecl render_debug_font_create_0053c6c0(const void* font_data) {
+    record_event(kEvCreateFont, (font_data == &render_debug_font_005dfd8c[0]) ? 1u : 0u, 0u, 0u);
+    return &font_sentinel;
+}
+
+void __cdecl render_font_prepare_00571a10(void* font) {
+    record_event(kEvPrepare, (font == &font_sentinel) ? 1u : 0u, 0u, 0u);
+}
+
+} // namespace porsche
+
+namespace {
+
+static void invoke_cdecl0_void(void* fn, U& abi_fail) {
+    U fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je ok
+    bad:
+        mov fail, 1
+    ok:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+}
+
+static void invoke_cdecl1_void(void* fn, U arg0, U& abi_fail) {
+    U fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je ok
+    bad:
+        mov fail, 1
+    ok:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+}
+
+static void patch_rel(B* base, U off, U src_va, U target_va, U dst) {
+    const U insn_next_va = src_va + off + 4u;
+    require(static_cast<U>(static_cast<I>(insn_next_va) + static_cast<I>(load32(base + off))) == target_va,
+            "patch_rel-mismatch");
+    const I new_rel = static_cast<I>(dst - (ptr_u(base + off) + 4u));
+    std::memcpy(base + off, &new_rel, sizeof new_rel);
+}
+
+static void patch_abs(B* base, U off, U expected_va, U actual_addr) {
+    require(load32(base + off) == expected_va, "patch_abs-mismatch");
+    std::memcpy(base + off, &actual_addr, sizeof actual_addr);
+}
+
+static B* setup_original_code() {
+    static const B body_536870[] = { @BODY_00536870@ };
+    static const B body_53c8d0[] = { @BODY_0053C8D0@ };
+    static const B body_53c8e0[] = { @BODY_0053C8E0@ };
+    static const B body_53d840[] = { @BODY_0053D840@ };
+    static_assert(sizeof body_536870 == 216u, "00536870 size");
+    static_assert(sizeof body_53c8d0 == 10u, "0053c8d0 size");
+    static_assert(sizeof body_53c8e0 == 45u, "0053c8e0 size");
+    static_assert(sizeof body_53d840 == 86u, "0053d840 size");
+
+    B* const mem = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(mem != nullptr, "virtualalloc");
+    std::memset(mem, 0xcc, 4096u);
+
+    B* const s_536870 = mem + 0x000u;
+    B* const s_53c8d0 = mem + 0x200u;
+    B* const s_53c8e0 = mem + 0x300u;
+    B* const s_53d840 = mem + 0x400u;
+    std::memcpy(s_536870, body_536870, sizeof body_536870);
+    std::memcpy(s_53c8d0, body_53c8d0, sizeof body_53c8d0);
+    std::memcpy(s_53c8e0, body_53c8e0, sizeof body_53c8e0);
+    std::memcpy(s_53d840, body_53d840, sizeof body_53d840);
+
+    // 0053c8d0 patches
+    patch_abs(s_53c8d0, 0x05u, 0x005dec08u, ptr_u(&porsche::render_service_ops_005dec08));
+
+    // 0053d840 patches
+    patch_abs(s_53d840, 0x01u, 0x0069eba4u, ptr_u(&porsche::render_service_indices_0069eba4));
+    patch_abs(s_53d840, 0x10u, 0x0069eba0u, ptr_u(&porsche::render_service_capacity_0069eba0));
+    patch_abs(s_53d840, 0x1cu, 0x0069eba0u, ptr_u(&porsche::render_service_capacity_0069eba0));
+    patch_abs(s_53d840, 0x22u, 0x005dec08u, ptr_u(&porsche::render_service_ops_005dec08));
+    patch_abs(s_53d840, 0x2fu, 0x0069eba0u, ptr_u(&porsche::render_service_capacity_0069eba0));
+    patch_abs(s_53d840, 0x34u, 0x0069eba4u, ptr_u(&porsche::render_service_indices_0069eba4));
+    patch_abs(s_53d840, 0x43u, 0x0069eba4u, ptr_u(&porsche::render_service_indices_0069eba4));
+    patch_abs(s_53d840, 0x4cu, 0x0069eba0u, ptr_u(&porsche::render_service_capacity_0069eba0));
+
+    // 0053c8e0 patches
+    patch_abs(s_53c8e0, 0x01u, 0x0069eb94u, ptr_u(&porsche::render_service_initialized_0069eb94));
+    patch_rel(s_53c8e0, 0x0cu, 0x0053c8e0u, 0x0053d840u, ptr_u(s_53d840));
+    patch_abs(s_53c8e0, 0x11u, 0x005dfd8cu, ptr_u(&porsche::render_debug_font_005dfd8c[0]));
+    patch_rel(s_53c8e0, 0x16u, 0x0053c8e0u, 0x0053c6c0u,
+              ptr_u(reinterpret_cast<void*>(&porsche::render_debug_font_create_0053c6c0)));
+    patch_abs(s_53c8e0, 0x1eu, 0x0069eb90u, ptr_u(&porsche::render_service_font_0069eb90));
+    patch_abs(s_53c8e0, 0x24u, 0x0069eb94u, ptr_u(&porsche::render_service_initialized_0069eb94));
+
+    // 00536870 patches
+    patch_abs(s_536870, 0x01u, 0x0069de40u, ptr_u(&porsche::render_calibration_initialized_0069de40));
+    patch_abs(s_536870, 0x0eu, 0x005dfb60u, ptr_u(&porsche::render_mouse_ops_table_005dfb60[0]));
+    patch_rel(s_536870, 0x13u, 0x00536870u, 0x0053c8d0u, ptr_u(s_53c8d0));
+    patch_rel(s_536870, 0x1bu, 0x00536870u, 0x0053c8e0u, ptr_u(s_53c8e0));
+    patch_abs(s_536870, 0x20u, 0x0069ed0cu, ptr_u(&porsche::game_setup_movie_service_0069ed0c));
+    patch_abs(s_536870, 0x26u, 0x0069de40u, ptr_u(&porsche::render_calibration_initialized_0069de40));
+    patch_abs(s_536870, 0x3du, 0x0069de4cu, ptr_u(&porsche::render_calibration_flag_0069de4c));
+    patch_rel(s_536870, 0x46u, 0x00536870u, 0x0059ef90u,
+              ptr_u(reinterpret_cast<void*>(&porsche::startup_network_allocate_0059ef90)));
+    patch_abs(s_536870, 0x56u, 0x0069eb90u, ptr_u(&porsche::render_service_font_0069eb90));
+    patch_rel(s_536870, 0x5eu, 0x00536870u, 0x005379d0u,
+              ptr_u(reinterpret_cast<void*>(&porsche::render_resource_node_state_ctor_005379d0)));
+    patch_abs(s_536870, 0x64u, 0x005bb708u, ptr_u(&porsche::render_calibration_vtable_005bb708[0]));
+    patch_abs(s_536870, 0x6cu, 0x0069ed0cu, ptr_u(&porsche::game_setup_movie_service_0069ed0c));
+    patch_abs(s_536870, 0x75u, 0x0069de4cu, ptr_u(&porsche::render_calibration_flag_0069de4c));
+    patch_abs(s_536870, 0x7du, 0x0069de48u, ptr_u(&porsche::render_calibration_cookie_0069de48));
+    patch_rel(s_536870, 0x8fu, 0x00536870u, 0x0053e890u,
+              ptr_u(reinterpret_cast<void*>(&porsche::font_setstatef_0053e890)));
+    patch_rel(s_536870, 0x9fu, 0x00536870u, 0x0053e890u,
+              ptr_u(reinterpret_cast<void*>(&porsche::font_setstatef_0053e890)));
+    patch_abs(s_536870, 0xa8u, 0x0069eb90u, ptr_u(&porsche::render_service_font_0069eb90));
+    patch_abs(s_536870, 0xaeu, 0x0069de44u, ptr_u(&porsche::render_calibration_object_0069de44));
+    patch_rel(s_536870, 0xb4u, 0x00536870u, 0x00571a10u,
+              ptr_u(reinterpret_cast<void*>(&porsche::render_font_prepare_00571a10)));
+    patch_abs(s_536870, 0xbfu, 0x0069eb90u, ptr_u(&porsche::render_service_font_0069eb90));
+    patch_abs(s_536870, 0xc5u, 0x0069de44u, ptr_u(&porsche::render_calibration_object_0069de44));
+    patch_rel(s_536870, 0xcfu, 0x00536870u, 0x00571a10u,
+              ptr_u(reinterpret_cast<void*>(&porsche::render_font_prepare_00571a10)));
+
+    FlushInstructionCache(GetCurrentProcess(), mem, 4096u);
+    return mem;
+}
+
+static void run_calibrate_case(
+    U cal_init, U cal_flag, U svc_init, U svc_font, U svc_idx, U p_mode, U a_mode, U cookie) {
+    B* const fn_orig = code + 0x000u;
+    void* const fn_cpp = reinterpret_cast<void*>(&porsche::render_driver_calibrate_00536870);
+    U abi_orig = 0u, abi_cpp = 0u;
+
+    side = 0u;
+    reset_state(cal_init, cal_flag, svc_init, svc_font, svc_idx, p_mode, a_mode, cookie);
+    invoke_cdecl0_void(fn_orig, abi_orig);
+    capture(expected, abi_orig);
+
+    side = 1u;
+    reset_state(cal_init, cal_flag, svc_init, svc_font, svc_idx, p_mode, a_mode, cookie);
+    invoke_cdecl0_void(fn_cpp, abi_cpp);
+    capture(trace, abi_cpp);
+
+    compare_snapshots("00536870");
+    ++cases;
+}
+
+static void run_init_indices_case(U svc_idx, I count) {
+    B* const fn_orig = code + 0x400u;
+    void* const fn_cpp = reinterpret_cast<void*>(&porsche::render_service_init_indices_0053d840);
+    U abi_orig = 0u, abi_cpp = 0u;
+
+    side = 0u;
+    reset_state(0u, 0u, 0u, 0u, svc_idx, 0u, 0u, 0u);
+    invoke_cdecl1_void(fn_orig, static_cast<U>(count), abi_orig);
+    capture(expected, abi_orig);
+
+    side = 1u;
+    reset_state(0u, 0u, 0u, 0u, svc_idx, 0u, 0u, 0u);
+    invoke_cdecl1_void(fn_cpp, static_cast<U>(count), abi_cpp);
+    capture(trace, abi_cpp);
+
+    compare_snapshots("0053d840");
+    ++cases;
+}
+
+static void run_init_service_case(U svc_init, U svc_idx) {
+    B* const fn_orig = code + 0x300u;
+    void* const fn_cpp = reinterpret_cast<void*>(&porsche::render_initialize_service_0053c8e0);
+    U abi_orig = 0u, abi_cpp = 0u;
+
+    side = 0u;
+    reset_state(0u, 0u, svc_init, 0u, svc_idx, 0u, 0u, 0u);
+    invoke_cdecl0_void(fn_orig, abi_orig);
+    capture(expected, abi_orig);
+
+    side = 1u;
+    reset_state(0u, 0u, svc_init, 0u, svc_idx, 0u, 0u, 0u);
+    invoke_cdecl0_void(fn_cpp, abi_cpp);
+    capture(trace, abi_cpp);
+
+    compare_snapshots("0053c8e0");
+    ++cases;
+}
+
+static void run_set_ops_case() {
+    B* const fn_orig = code + 0x200u;
+    void* const fn_cpp = reinterpret_cast<void*>(&porsche::render_service_set_ops_0053c8d0);
+    U abi_orig = 0u, abi_cpp = 0u;
+    const U tbl = ptr_u(&porsche::render_mouse_ops_table_005dfb60[0]);
+
+    side = 0u;
+    reset_state(0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u);
+    invoke_cdecl1_void(fn_orig, tbl, abi_orig);
+    capture(expected, abi_orig);
+
+    side = 1u;
+    reset_state(0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u);
+    invoke_cdecl1_void(fn_cpp, tbl, abi_cpp);
+    capture(trace, abi_cpp);
+
+    compare_snapshots("0053c8d0");
+    ++cases;
+}
+
+} // namespace
+
+int main() {
+    AddVectoredExceptionHandler(1, fault);
+    code = setup_original_code();
+
+    run_set_ops_case();
+    for (U svc_idx : {0u, 1u}) {
+        for (I count : {-3, 0, 1, 17, 400}) {
+            run_init_indices_case(svc_idx, count);
+        }
+    }
+    for (U svc_init : {0u, 1u}) {
+        for (U svc_idx : {0u, 1u}) {
+            run_init_service_case(svc_init, svc_idx);
+        }
+    }
+    for (U cal_init : {0u, 1u}) {
+        for (U cal_flag : {0u, 1u}) {
+            for (U svc_init : {0u, 1u}) {
+                for (U p_mode : {0u, 1u, 0x100u}) {
+                    for (U a_mode : {0u, 1u}) {
+                        run_calibrate_case(
+                            cal_init, cal_flag, svc_init, svc_init, svc_init, p_mode, a_mode, 0x76543210u);
+                    }
+                }
+            }
+        }
+    }
+
+    std::printf("render_calibrate_service_782_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

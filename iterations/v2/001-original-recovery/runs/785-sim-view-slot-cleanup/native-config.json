@@ -1,0 +1,83 @@
+{
+  "run": 785,
+  "experiment": "local/experiments/v2-sim-view-slot-cleanup-785",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup/sim_view_slot_cleanup_785.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup",
+    "iterations/v2/001-original-recovery/runs/693-view-setup-teardown-scene-enter",
+    "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload",
+    "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control",
+    "iterations/v2/001-original-recovery/runs/464-audio-probe-startup",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup/sim_view_slot_cleanup_785.hpp",
+    "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004642f0",
+      "bytes": 58,
+      "sha256": "c78a0d86e00b9e37b27f7c0184b661753b8dcd24398ae86b0cfdb3203efc4165",
+      "token": "@BODY_004642F0@"
+    }
+  ],
+  "pass_marker": "sim_view_slot_cleanup_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-mode-cmp",
+      "source": "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup/sim_view_slot_cleanup_785.cpp",
+      "old": "    const std::uint32_t count = (application_state_006573e8.word(0x00657404u) == 1u) ? 2u : 1u;",
+      "new": "    const std::uint32_t count = (application_state_006573e8.word(0x00657404u) == 2u) ? 2u : 1u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-count-alt",
+      "source": "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup/sim_view_slot_cleanup_785.cpp",
+      "old": "(application_state_006573e8.word(0x00657404u) == 1u) ? 2u : 1u;",
+      "new": "(application_state_006573e8.word(0x00657404u) == 1u) ? 2u : 0u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-base-offset",
+      "source": "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup/sim_view_slot_cleanup_785.cpp",
+      "old": "    std::uint8_t* slot = view_slot_table_00627e80 + 0x20u;",
+      "new": "    std::uint8_t* slot = view_slot_table_00627e80 + 0x24u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-stride",
+      "source": "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup/sim_view_slot_cleanup_785.cpp",
+      "old": "        slot += 0x10cu;",
+      "new": "        slot += 0x108u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-dtor-flag",
+      "source": "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup/sim_view_slot_cleanup_785.cpp",
+      "old": "            dtor(obj, 1);",
+      "new": "            dtor(obj, 0);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-zero-skip",
+      "source": "iterations/v2/001-original-recovery/runs/785-sim-view-slot-cleanup/sim_view_slot_cleanup_785.cpp",
+      "old": "            std::memset(slot, 0, sizeof obj);",
+      "new": "            (void)slot;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

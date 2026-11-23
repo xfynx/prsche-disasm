@@ -1,6 +1,22 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-24. [Run784](runs/784-audio-voice-and-sim-teardown-integration/README.md)
+Current 2026-11-24. [Run788](runs/788-scene-render-sim-integration/README.md)
+PASS (`build-001`): folds frozen `781/003` (`004522b0`, `004524a0`, `0059ece0`,
+partial), `782/001` (`00536870`, `0053c8d0`, `0053c8e0`, `0053d840`, partial),
+`785/001` (`004642f0`), and `787/001` (`00571a10`, `00536840`, `0053c8b0`,
+`00571a90`, partial) onto `Run784`: **453 TUs / 8 projects**, **87 unresolved
+names / 96 references**, `1,118` source pins, `228` native comparisons, `38`
+mutations, `4` REA sessions (`v2-scene-781-rea/001`,
+`v2-render-input-782-rea/001`, `v2-sim-view-slot-cleanup-785-rea/001`,
+`v2-render-input-787-rea/001`), `25B` `.bss` (`782`) + `4B` `.rdata` `005bb708`
++ `7,093B` `FNTF` payload `005dfd8c` (`787`); no EXE. Four names close
+(`004522b0`, `00536870`, `0053c8e0`, `004642f0`) and five typed boundaries open
+(`00452120`, `0053c6c0`, `00594980`, `005dfb60`, `005dec08`). Registry
+**1,274** (`+12` entries; `00556b10`, `00557180`, `00556bb0` updated to
+recovered). Next shared wave (`Run792`) awaits `Run786` (ready, closes
+`00452120`!) plus `789`–`791`.
+
+Historical: [Run784](runs/784-audio-voice-and-sim-teardown-integration/README.md)
 PASS (`build-001`): folds frozen `777/003` (`00589e80`, `00589f40`) and
 `783/001` (`004a4760`, `004ae470`, `004b04d0`, `004ad4d0`, `005610e0`) onto
 `Run780`: **449 TUs / 8 projects**, **86 unresolved names / 94 references**,
