@@ -1,15 +1,13 @@
 # v2 / 001 - original source recovery plan
 
 Current 2026-11-23. [Run761](runs/761-audio-backend-range-canonical-state/README.md)
-extends Run757 with the range helper reading Run434's canonical device-state
-bytes directly. Shared audit PASS: **442 TUs / 8 projects**, **100 unresolved
-names / 107 references**, no EXE; native comparison adds 327,680 cases per
-optimization and three mutations; 1,092 source pins. It closes both device
-limit symbols with no new names. Registry: **1,241 entries**. Remaining nearby
-frontier: `005898f0` allocator, `00589f40` pitch, `005897c0` backend start,
-and cleanup child `005331a0`. Run756 documents pitch/start blockers; Run755
-records allocator follow-up evidence needs. Next: trace the allocator's
-eligibility/release children and prove a safe consumer boundary.
+PASS: 442 TUs, 100 names / 107 refs, 1,092 pins; no EXE. It closes both device
+limits using Run434's canonical state (327,680 cases per optimization, 3
+mutations). Run759 REA002 audit PASS proves `005898b0` is an allocator-private
+membership scan, reuses accepted `00565d60`/`00565720`, and confirms `00590420`
+is a separate unowned caller. Run773 owns the scan's native proof. Next: isolate
+the larger `005898f0` allocator; `00589f40`/`005897c0` remain blocked by Run756
+state/callback evidence, and `005331a0` remains open.
 
 Historical: [Run747](runs/747-view-teardown-integration/README.md)
 passes the shared audit for frozen Run746/002: **436 TUs / 8 projects**,

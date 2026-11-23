@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "run": 759,
+  "packet": "audio-allocator-dependency-research (proof-only)",
+  "experiment": "local/experiments/v2-audio-allocator-dependency-research-759",
+  "original_binary": {
+    "path": "local/game/Porsche.exe",
+    "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39"
+  },
+  "rea_session": {
+    "config": "iterations/v2/001-original-recovery/runs/759-audio-allocator-dependency-research/rea-queries.json",
+    "failed_attempt": "local/experiments/v2-audio-allocator-dependency-research-759/001/receipt.json",
+    "failed_attempt_error": "Error: spawn EPERM (MCP stdio transport); transient, same failure documented in Run751 attempt001",
+    "receipt": "local/experiments/v2-audio-allocator-dependency-research-759/002/receipt.json",
+    "audit": {"passed": true, "dossiers": 4, "repeated_equal": 0}
+  },
+  "procedures": [
+    {
+      "entry": "005898b0",
+      "body_ranges_inclusive": [["005898b0", "005898e0"]],
+      "body_bytes": 49,
+      "convention_observed": "__stdcall(2); EAX undefined4 result; preserves ESI/EDI",
+      "rea_dossier": "local/experiments/v2-audio-allocator-dependency-research-759/002/function-005898b0.json",
+      "incoming_callsites": [
+        {"source": "0x589979", "source_procedure": "005898f0"},
+        {"source": "0x589a20", "source_procedure": "005898f0"}
+      ],
+      "callees": [],
+      "data_refs": [
+        {"va": "0x5898c0", "target": "006b48a8", "kind": "DATA"},
+        {"va": "0x5898c5", "target": "006b48a8", "kind": "READ"},
+        {"va": "0x5898c5", "target": "006b48aa", "kind": "READ"}
+      ],
+      "semantics_observed": "Pure membership scan: linear search of the [006b48a8] 16-bit selection list (word stride 2) for EDX=count, ESI=candidate; EAX=1 if candidate already listed, else 0. No writes, no other state reads, no callees.",
+      "registry_status": "unowned (not in source/recovered/functions.json)"
+    },
+    {
+      "entry": "00565d60",
+      "body_ranges_inclusive": [["00565d60", "00565dc9"]],
+      "body_bytes": 106,
+      "symbol": "audio_channel_stop_00565d60 (Run435 audio_stop_435.cpp)",
+      "registry_status": "native-differential-verified, Run435",
+      "rea_dossier": "local/experiments/v2-audio-allocator-dependency-research-759/002/function-00565d60.json",
+      "incoming_callsites_from_allocator": [
+        {"source": "0x589b26", "source_procedure": "005898f0", "context": "finalize loop, voice record +0xf == 1 (active), releases the record's channel field"}
+      ],
+      "total_callers": 19,
+      "callees_and_owners": [
+        {"va": "005896d0", "owner": "Run434 audio_backend_434.cpp", "status": "native-differential-verified"},
+        {"va": "005896f0", "owner": "Run434 audio_backend_434.cpp", "status": "native-differential-verified"},
+        {"va": "00589d20", "owner": "Run434 audio_voice_434.cpp", "status": "native-differential-verified"},
+        {"va": "0058a8b0", "owner": "Run435 audio_stop_435.cpp", "status": "native-differential-verified"},
+        {"va": "00590340", "owner": "Run434 audio_voice_434.cpp", "status": "native-differential-verified"}
+      ],
+      "gate_state": "reads [006b499c] device-active gate; returns -10 when zero, else channel index after lock/iterate/stop/unlock"
+    },
+    {
+      "entry": "00565720",
+      "body_ranges_inclusive": [["00565720", "0056588a"]],
+      "body_bytes": 363,
+      "registry_status": "native-differential-verified (application_audio_device.cpp)",
+      "rea_dossier": "local/experiments/v2-audio-allocator-dependency-research-759/002/function-00565720.json",
+      "caller": "004a66b0",
+      "role_in_packet": "canonical device-state initializer; writes the state bytes the allocator consumes: [006b4a00]/[006b4a04] record table root, [006b49a8], [006b49ac], [006b499c]/[006b499d], [006b49a0..a2], [006b4a24..3a]",
+      "data_owners": {
+        "006b4a00": "audio_backend_channels_006b4a00, Run434, 0x70-byte voice records",
+        "006b499c": "device-active gate, application_audio_device.cpp",
+        "006b49a8": "application_audio_device.cpp (written by 00565720; read by 005898f0, 00589c00/Run439, 00589531/38)"
+      }
+    },
+    {
+      "entry": "005898f0",
+      "body_ranges_inclusive": [["005898f0", "00589bf2"]],
+      "body_bytes": 771,
+      "convention_observed": "__stdcall(5: count u32, priority u8, out u32*, first i32, last i32); EAX uint",
+      "rea_dossier": "local/experiments/v2-audio-allocator-dependency-research-759/002/function-005898f0.json",
+      "consistency": "body range/size matches Run751 dossier function-005898f0.json (771B, 0x5898f0..0x589bf2)",
+      "incoming_callsites": [
+        {"source": "0x5613b5", "source_procedure": "005612a0", "owner": "Run751 (partial-native-differential-verified)"},
+        {"source": "0x5904d8", "source_procedure": "00590420", "owner": "unowned"}
+      ],
+      "outgoing_callsites": [
+        {"target": "005898b0", "at": "0x589979", "context": "pass 1 eligibility: skip records already selected"},
+        {"target": "005898b0", "at": "0x589a20", "context": "pass 2 eligibility: skip records already selected"},
+        {"target": "00565d60", "at": "0x589b26", "context": "release active voice record during finalize"}
+      ],
+      "registry_status": "unowned"
+    }
+  ],
+  "allocator_private_state": [
+    {"symbol": "DAT_006b48a8..ae", "consumers": ["005898b0 (read)", "005898f0 (clear/write/read)"], "external_consumers": [], "owner": "none outside 005898b0/005898f0"},
+    {"symbol": "DAT_006ad74c", "consumers": ["005898f0 only (+0x100 generation, wrapped at negative)"], "external_consumers": [], "owner": "none outside 005898f0"}
+  ],
+  "isolation_verdicts": {
+    "005898b0_eligibility": {
+      "natively_isolable": true,
+      "reason": "pure list-membership over the allocator-private [006b48a8] word list; only fixture-owned list bytes and the count/candidate arguments are needed; no shared state and no state invention",
+      "oracle": "fixture-owned byte-equivalent global for 006b48a8 (Run755 absolute-operand patch pattern); ABI EDX=count, ESI=candidate, EAX result, ESI/EDI preserved"
+    },
+    "00565d60_release": {
+      "natively_isolable": true,
+      "reason": "release effect is already covered by the accepted Run435 native-differential proof; all five callees are accepted Run434/Run435 providers; no re-isolation and no state invention required",
+      "allocator_claim": "allocator proof claims only the 0x589b26 call order/arguments via a controlled typed endpoint (Run751 precedent); live stop semantics remain Run435's accepted proof",
+      "deferred": "binding the accepted Run435 implementation into an allocator fixture would require the [006b499c] gate, backend lock and voice-table transport; that belongs to integration, not this research packet"
+    }
+  },
+  "next_native_packet": {
+    "scope": "allocator-only 005898b0+005898f0 differential on the shared verify-v2-native-batch runner",
+    "fixture_state": "fixture-owned 006b48a8 list, 006ad74c generation, 0x70-stride record table root 006b4a00, 006b49a8 timestamp; 00565d60/005898b0 children as recorded or proved endpoints",
+    "mutations": "generation wrap at negative, list pre-clear semantics, +0xf gates, +0x1a priority and +0x20 weight tie-break, 0x70 stride, partial-selection 0xfffffff7 return, release callsite",
+    "blockers": ["00590420 (second caller) unowned; full start-path acceptance still blocked until its chain is recovered"]
+  },
+  "explicit_bounds": [
+    "Proof-only packet: no production code, registry, CMake, plan or doc changes.",
+    "Decompiler pseudocode/types are research material, not accepted C++.",
+    "Live playback, device faults, concurrency and the unowned 00590420 caller remain open."
+  ]
+}

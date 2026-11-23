@@ -1,8 +1,8 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run761 PASS, 442 TU, 100 names / 107 refs, 1,092 pins; закрыты оба
-limit-symbol без EXE. Следующее по плану — доказать владельцев allocator/release
-state из Run755; детали и границы — в `iterations/v2/001-original-recovery/PLAN.md`.
+Текущее: Run761 PASS (442 TU, 100 / 107 names / refs, 1,092 pins; no EXE).
+Run759 REA PASS: `005898b0` private-list scan; `00565d60`/`00565720` reuse
+Run435/434; `00590420` remains unowned. Run773 is proving the scan natively.
 
 Run743 integrates `740/002`, `741/002`, and `742/001`: 10 bodies, 410 native
 comparisons, 37 mutations, 55B `.rdata` + 8B `.bss` (`741`), 435 TUs, 100 names
