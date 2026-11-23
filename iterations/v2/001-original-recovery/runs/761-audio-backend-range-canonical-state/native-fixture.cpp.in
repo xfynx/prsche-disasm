@@ -1,0 +1,93 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "audio_backend_range_761.hpp"
+#include "porsche/application_audio_device.hpp"
+
+namespace porsche {
+ApplicationAudioDeviceStateStorage application_audio_device_state_006b48c0{};
+}
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+static B* original = nullptr;
+static U cases = 0;
+static void fail(const char* why, U candidate, U a, U b, U x, U y) {
+    std::printf("divergence %s case=%u candidate=%08x original=%08x,%08x recovered=%08x,%08x\n", why, cases, candidate, a, b, x, y);
+    std::fflush(stdout);
+    ExitProcess(1);
+}
+using Fn = void (__cdecl *)(U, U*, U*);
+static bool invoke(Fn fn, U candidate, U* first, U* last) {
+    U saved_sp = 0, saved_bp = 0, bad = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp, esp
+        mov saved_bp, ebp
+        push last
+        push first
+        push candidate
+        mov ebx, 013579bdfh
+        mov esi, 02468ace0h
+        mov edi, 010203040h
+        call fn
+        add esp, 12
+        cmp esp, saved_sp
+        jne bad_abi
+        cmp ebp, saved_bp
+        jne bad_abi
+        cmp ebx, 013579bdfh
+        jne bad_abi
+        cmp esi, 02468ace0h
+        jne bad_abi
+        cmp edi, 010203040h
+        je good_abi
+    bad_abi:
+        mov bad, 1
+    good_abi:
+        mov esp, saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return bad == 0;
+}
+
+int main() {
+    static const B body[] = {@BODY_0058A4B0@};
+    original = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!original) return 2;
+    std::memcpy(original, body, sizeof body);
+    // Replace only the two absolute data operands with this fixture's equivalent bytes.
+    const U voice_limit = static_cast<U>(reinterpret_cast<std::uintptr_t>((porsche::application_audio_device_state_006b48c0.data() + 0x1du)));
+    const U priority_limit = static_cast<U>(reinterpret_cast<std::uintptr_t>((porsche::application_audio_device_state_006b48c0.data() + 0xe4u)));
+    std::memcpy(original + 0x14u, &voice_limit, 4u);
+    std::memcpy(original + 0x2cu, &voice_limit, 4u);
+    std::memcpy(original + 0x33u, &priority_limit, 4u);
+    Fn native = reinterpret_cast<Fn>(original);
+    for (U mode = 0; mode < 5; ++mode) {
+        const std::int16_t word = mode == 0 ? static_cast<std::int16_t>(0x8000u) :
+                                  mode == 1 ? static_cast<std::int16_t>(-1) :
+                                  mode == 2 ? 0 : mode == 3 ? 1 : 0x7fff;
+        porsche::application_audio_device_state_006b48c0[0xe4u] = static_cast<B>(word);
+        porsche::application_audio_device_state_006b48c0[0xe5u] = static_cast<B>(static_cast<std::uint16_t>(word) >> 8u);
+        for (U voice = 0; voice < 256; ++voice) {
+            porsche::application_audio_device_state_006b48c0[0x1du] = static_cast<B>(voice);
+            for (U low = 0; low < 256; ++low) {
+                const U candidate = (low | ((voice & 0xffu) << 8u) | ((mode & 0xffu) << 24u));
+                U a = 0x13579bdfu ^ cases, b = 0x2468ace0u + cases;
+                U x = a, y = b;
+                if (!invoke(native, candidate, &a, &b)) fail("original-abi", candidate, a, b, x, y);
+                if (!invoke(porsche::audio_backend_candidate_range_0058a4b0, candidate, &x, &y)) fail("recovered-abi", candidate, a, b, x, y);
+                if (a != x || b != y) fail("outputs", candidate, a, b, x, y);
+                ++cases;
+            }
+        }
+    }
+    std::printf("audio_backend_candidate_range_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

@@ -1,0 +1,53 @@
+{
+  "run": 761,
+  "experiment": "local/experiments/v2-audio-backend-range-canonical-761",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/761-audio-backend-range-canonical-state/audio_backend_range_761.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/761-audio-backend-range-canonical-state/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/761-audio-backend-range-canonical-state",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/761-audio-backend-range-canonical-state/audio_backend_range_761.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "0058a4b0",
+      "bytes": 64,
+      "sha256": "3136561158365ce3858f75d92a1f009b30e690d12cedfbe28aa359942f74025d",
+      "token": "@BODY_0058A4B0@"
+    }
+  ],
+  "pass_marker": "audio_backend_candidate_range_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "mask-four-no-longer-priority",
+      "source": "iterations/v2/001-original-recovery/runs/761-audio-backend-range-canonical-state/audio_backend_range_761.cpp",
+      "old": "if ((candidate & 4u) != 0u)",
+      "new": "if ((candidate & 4u) != 0u && (candidate & 0x10u) == 0u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "priority-word-zero-extended",
+      "source": "iterations/v2/001-original-recovery/runs/761-audio-backend-range-canonical-state/audio_backend_range_761.cpp",
+      "old": "static_cast<std::int32_t>(word)",
+      "new": "static_cast<std::uint32_t>(static_cast<std::uint16_t>(word))",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "unsupported-mask-writes-output",
+      "source": "iterations/v2/001-original-recovery/runs/761-audio-backend-range-canonical-state/audio_backend_range_761.cpp",
+      "old": "    }\n}\n}",
+      "new": "    } else { *first = 0u; *last = 0u; }\n}\n}",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

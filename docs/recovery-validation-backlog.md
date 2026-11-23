@@ -1,5 +1,9 @@
 # Отложенные проверки восстановления v2
 
+Текущее: Run761 PASS, 442 TU, 100 names / 107 refs, 1,092 pins; закрыты оба
+limit-symbol без EXE. Следующее по плану — доказать владельцев allocator/release
+state из Run755; детали и границы — в `iterations/v2/001-original-recovery/PLAN.md`.
+
 Run743 integrates `740/002`, `741/002`, and `742/001`: 10 bodies, 410 native
 comparisons, 37 mutations, 55B `.rdata` + 8B `.bss` (`741`), 435 TUs, 100 names
 / 107 refs, no EXE (registry 1,227). `741` keeps `00534b90`, `00534d40` and

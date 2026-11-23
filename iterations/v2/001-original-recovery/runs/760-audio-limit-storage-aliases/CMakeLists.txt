@@ -1,0 +1,5 @@
+﻿cmake_minimum_required(VERSION 3.20)
+project(porsche_integration_760 LANGUAGES CXX)
+include("${CMAKE_CURRENT_SOURCE_DIR}/../757-audio-backend-range-integration/CMakeLists.txt")
+target_sources(porsche_game_entry_bridges PRIVATE "${CMAKE_CURRENT_LIST_DIR}/audio_limit_storage_760.cpp")
+target_include_directories(porsche_game_entry_bridges PRIVATE "${CMAKE_CURRENT_LIST_DIR}")

@@ -1,16 +1,16 @@
 # Current project status
 
-Updated 2026-11-22. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-23. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run749](iterations/v2/001-original-recovery/runs/749-audio-schl-integration/README.md)
-compiles 438 C++ translation units across eight projects. The shared link
-reports **98 unresolved names / 106 references**. There is no game EXE yet.
-Run744's parser and Run748's audio SCHl parent pass the shared audit: 62
-original-x86 comparisons, 29 mutations, 1,082 source pins, and 1,237
-registry entries. One name closes with zero new linker names. Run745 remains
-proof-only/PARTIAL outside the game graph; Run750 has REA evidence only.
+[Run761](iterations/v2/001-original-recovery/runs/761-audio-backend-range-canonical-state/README.md)
+build compiles 442 C++ translation units across eight projects. The shared
+link reports **100 unresolved names / 107 references**. There is no game EXE.
+The shared audit passes with 1,092 source pins. Its native range proof covers
+327,680 cases per optimization and detects three mutations. It closes both
+device-limit symbols by reading canonical Run434 state directly. Four backend
+functions and the input cleanup child remain unresolved; registry: 1,241.
 
 Historical: [Run747](iterations/v2/001-original-recovery/runs/747-view-teardown-integration/README.md)
 compiles 436 C++ translation units across eight projects. The shared link

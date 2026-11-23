@@ -1,14 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-22. [Run749](runs/749-audio-schl-integration/README.md)
-passes the shared audit for frozen Run744/002 and Run748/003: **438 TUs / 8
-projects**, **98 unresolved names / 106 references**, no game EXE. It closes
-`00566ea0` with zero new linker names; 62 native comparisons, 29 mutations,
-1,082 source pins, two REA sessions and 1,237 registry entries. `005612a0`
-and real notification callbacks remain open. Run745 is proof-only/PARTIAL
-outside CMake/registry; Run750 has audited REA evidence for the render child
-chain but no native source/proof. Next: recover a reachable parent/child set
-on the current linker frontier and keep bounded domains explicit.
+Current 2026-11-23. [Run761](runs/761-audio-backend-range-canonical-state/README.md)
+extends Run757 with the range helper reading Run434's canonical device-state
+bytes directly. Shared audit PASS: **442 TUs / 8 projects**, **100 unresolved
+names / 107 references**, no EXE; native comparison adds 327,680 cases per
+optimization and three mutations; 1,092 source pins. It closes both device
+limit symbols with no new names. Registry: **1,241 entries**. Remaining nearby
+frontier: `005898f0` allocator, `00589f40` pitch, `005897c0` backend start,
+and cleanup child `005331a0`. Run756 documents pitch/start blockers; Run755
+records allocator follow-up evidence needs. Next: trace the allocator's
+eligibility/release children and prove a safe consumer boundary.
 
 Historical: [Run747](runs/747-view-teardown-integration/README.md)
 passes the shared audit for frozen Run746/002: **436 TUs / 8 projects**,

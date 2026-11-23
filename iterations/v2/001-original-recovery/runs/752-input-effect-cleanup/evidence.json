@@ -1,0 +1,47 @@
+{
+  "run": 752,
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "index_query": "py -3 scripts/research/query-binary-index.py --binary Porsche.exe --address 0x533050 --disassemble --limit 120",
+  "target": {
+    "va": "00533050",
+    "end_inclusive": "0053309a",
+    "bytes": 75,
+    "body_sha256": "a8ab87266fcbe0ec203d3249cc2a6dc509859c9f7f4b97c8e17d7372809a686f",
+    "raw_hex": "a110dd690085c0744156be98cb6900837e04ff74088b06508b08ff510881c69000000081fe98dd69007ce433f656e8cdfaffff83c40485c0740956e81001000083c4044683fe207ce45ec3",
+    "abi": "cdecl0 void RET0; preserves ESI/EBX/EDI/EBP and ESP",
+    "caller": "00532d30 at 00532d31; reachable through accepted 00412e60 thunk",
+    "summary": "If 0069dd10 is zero, return. Otherwise scan 32 records at 0069cb10 stride 0x90: when signed dword +0x8c is not -1, call the object at +0x88 through vtable +0x08 (stdcall one-argument Release transport). Then for indices 0..31 call 00532b50(i), and call 005331a0(i) only for nonzero results."
+  },
+  "canonical_storage": {
+    "owner": "Run688 frame_control_effects_0069cb10[32]",
+    "record_bytes": 144,
+    "effect_object_offset": 136,
+    "input_slot_offset": 140,
+    "scan_start_va": "0069cb98",
+    "scan_end_exclusive_va": "0069dd98"
+  },
+  "scalar": {
+    "va": "0069dd10",
+    "bytes": 4,
+    "initial_bytes": "00000000",
+    "writer": "00533020 at 00533040 writes 1 after initializing all record +0x8c cells to -1",
+    "readers": ["00533020", "00533050"]
+  },
+  "reused_or_controlled": [
+    "Run688 canonical full-record layout and storage declaration",
+    "Run676 accepted input_slot_has_device_00532b50 contract, controlled fixture endpoint",
+    "005331a0 controlled child boundary",
+    "effect-object vtable +0x08 controlled stdcall endpoint"
+  ],
+  "integration_blocker": {
+    "exact_mismatch": "Run494 defines FrameControlSlotFields_494[32] as one contiguous 12-byte-per-entry host array, while original +0x80/+0x88/+0x8c cells are embedded in Run688 FeEffectEntry[32] with 0x90-byte stride. Thus packed host entry 1 begins at byte 12, but original record 1 cells begin at byte 0x90; both compiled arrays are independent storages.",
+    "replacement_scope": [
+      "replace Run494 005338d0 source ownership/access with Run688 FeEffectEntry fields",
+      "replace and reprove Run676 00533480 active-cell sweep against FeEffectEntry::field_80",
+      "replace and reprove Run680 005337e0, 00533730, 00533760, and 00533120 against FeEffectEntry::effect_object_88/input_slot_8c",
+      "compare interleaved create, release, find, unload, download, stop, reset, and cleanup mutations before game binding"
+    ]
+  },
+  "boundary": "Proof-only. No CMake, registry, PLAN, STATUS, or game integration changes; no live DirectInput identity/hardware acceptance."
+}

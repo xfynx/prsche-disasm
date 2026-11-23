@@ -1,0 +1,147 @@
+{
+  "run": 751,
+  "experiment": "local/experiments/v2-audio-voice-start-751",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/751-audio-voice-start",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "005612a0",
+      "bytes": 791,
+      "sha256": "435636867e37abd80dd7d9b12a31f2554792b7691869be6bacbf4f849a11a7b5",
+      "token": "@BODY_005612A0@"
+    },
+    {
+      "va": "00561180",
+      "bytes": 68,
+      "sha256": "94a3e5e43cf5983e8f31aebd1183ea0fc5368b3497ed58c4a3ce432c30971251",
+      "token": "@BODY_00561180@"
+    }
+  ],
+  "pass_marker": "audio_voice_start_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-inactive-result",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "    if (application_audio_device_state_006b48c0[0xdcu] == 0u) return -10;",
+      "new": "    if (application_audio_device_state_006b48c0[0xdcu] == 0u) return -9;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-slot-header-offset",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "    write<U>(slot, 0x34u, read<U>(header, 0u));",
+      "new": "    write<U>(slot, 0x30u, read<U>(header, 0u));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-subchannel-sentinel",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "        write<std::uint16_t>(slot, 0x08u + i * 2u, 0xffffu);",
+      "new": "        write<std::uint16_t>(slot, 0x08u + i * 2u, 0u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-allocation-priority",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "            channel_count, 0x65u, &handle, first, last);",
+      "new": "            channel_count, 0x64u, &handle, first, last);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-allocation-failure-test",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "        if (voice_slot < 0) {",
+      "new": "        if (voice_slot <= 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-loudest-tie-test",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "        if (best_value < value) {",
+      "new": "        if (best_value <= value) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-explicit-pitch-offset",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "                ? read<std::uint16_t>(descriptor, 0x18u)",
+      "new": "                ? read<std::uint16_t>(descriptor, 0x16u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-signed-shift-source",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "                static_cast<U>(static_cast<I>(static_cast<std::int8_t>(descriptor[8u]))) << 16u);",
+      "new": "                static_cast<U>(static_cast<I>(static_cast<std::int8_t>(descriptor[9u]))) << 16u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-pitch-scale",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "                static_cast<std::int16_t>(static_cast<I>(static_cast<std::int8_t>(params[6u])) * 100));",
+      "new": "                static_cast<std::int16_t>(static_cast<I>(static_cast<std::int8_t>(params[6u])) * 99));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-backend-call-order",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "            audio_voice_recompute_pitch_00589f40(static_cast<U>(voice_slot));\n            audio_voice_recompute_gain_00589df0(static_cast<U>(voice_slot));",
+      "new": "            audio_voice_recompute_gain_00589df0(static_cast<U>(voice_slot));\n            audio_voice_recompute_pitch_00589f40(static_cast<U>(voice_slot));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-start-success-test",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "            if (started >= 0) {",
+      "new": "            if (started > 0) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-finalize-channel-offset",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "                    static_cast<I>(read<std::int16_t>(voice, 4u + static_cast<U>(i) * 2u))));",
+      "new": "                    static_cast<I>(read<std::int16_t>(voice, 6u + static_cast<U>(i) * 2u))));",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-backend-params-pointer",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "                params + 0x14u);",
+      "new": "                params + 0x10u);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-allocation-error",
+      "source": "iterations/v2/001-original-recovery/runs/751-audio-voice-start/audio_voice_start_751.cpp",
+      "old": "            write<I>(slot, 0u, -9);",
+      "new": "            write<I>(slot, 0u, -8);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

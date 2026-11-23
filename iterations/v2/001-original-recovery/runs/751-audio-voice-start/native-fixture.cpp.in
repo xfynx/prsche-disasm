@@ -1,0 +1,264 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "audio_voice_start_751.hpp"
+
+using B = std::uint8_t;
+using I = std::int32_t;
+using U = std::uint32_t;
+
+enum : U { kArenaBytes = 32768u, kMaxEvents = 96u, kMaxScript = 8u };
+enum EventTag : U {
+    kLock=1u, kUnlock, kStep, kRange, kAllocate, kPitch, kGain, kSend, kStart, kFinalize
+};
+struct Event { U value[12]; };
+struct FpuSnapshot { unsigned short control,status,tag,pad; B values[80]; U mxcsr; };
+struct Trace {
+    U ret, abi_fail, count;
+    Event events[kMaxEvents];
+    B device[0x18c];
+    U slots[16];
+    B memory[kArenaBytes];
+    FpuSnapshot fp;
+};
+
+alignas(256) static B arena[kArenaBytes];
+alignas(16) static B fp_area[512];
+static B fp_env[28];
+static Trace trace{}, expected{};
+static U candidates[kMaxScript]{}, candidate_count=0u, candidate_cursor=0u;
+static I voices[kMaxScript]{};
+static U handles[kMaxScript]{}, allocation_count=0u, allocation_cursor=0u;
+static I starts[kMaxScript]{};
+static U start_count=0u, start_cursor=0u;
+static U cases=0u, events_total=0u, which=0u, captured_return=0u;
+static B* code=nullptr;
+static B* orig_5612a0=nullptr;
+static B* orig_561180=nullptr;
+static U backend_base=0u;
+
+static U address(const void* p) { return static_cast<U>(reinterpret_cast<std::uintptr_t>(p)); }
+static U rd(const void* p,U o=0u) { U v=0u; std::memcpy(&v,static_cast<const B*>(p)+o,4u); return v; }
+static void wr(void* p,U o,U v) { std::memcpy(static_cast<B*>(p)+o,&v,4u); }
+static void wr16(void* p,U o,std::uint16_t v) { std::memcpy(static_cast<B*>(p)+o,&v,2u); }
+static void wr8(void* p,U o,B v) { std::memcpy(static_cast<B*>(p)+o,&v,1u); }
+static void require(bool ok,const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u which=%u\n",why,cases,which);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("divergence native-fault %08lx eip=%08lx case=%u which=%u\n",
+                p->ExceptionRecord->ExceptionCode,p->ContextRecord->Eip,cases,which);
+    std::fflush(stdout);
+    ExitProcess(1);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+static Event& event(U tag) {
+    require(trace.count<kMaxEvents,"event overflow");
+    Event& e=trace.events[trace.count++];
+    std::memset(&e,0,sizeof e);
+    e.value[0]=tag;
+    return e;
+}
+static void capture_fp(FpuSnapshot& fp) {
+    __asm fxsave fp_area
+    __asm fnstenv fp_env
+    __asm fldenv fp_env
+    fp.control=static_cast<unsigned short>(rd(fp_area,0u));
+    fp.status=static_cast<unsigned short>(rd(fp_area,2u));
+    fp.tag=static_cast<unsigned short>(rd(fp_env,8u));
+    fp.pad=0u;
+    fp.mxcsr=rd(fp_area,24u);
+    for (U i=0u;i<8u;++i) {
+        std::memcpy(fp.values+i*10u,fp_area+32u+i*16u,10u);
+        if ((fp_area[4u]&(1u<<(((fp.status>>11u)+i)&7u)))==0u) std::memset(fp.values+i*10u,0,10u);
+    }
+}
+
+namespace porsche {
+ApplicationAudioDeviceStateStorage application_audio_device_state_006b48c0{};
+U audio_stream_slots_006b7cc0[16]{};
+U& audio_backend_channels_006b4a00=backend_base;
+
+void __cdecl audio_backend_lock_005896d0() { event(kLock); }
+void __cdecl audio_backend_unlock_005896f0() { event(kUnlock); }
+U __cdecl audio_group_step_0058a970(U* out,const void*) {
+    const U result=candidate_cursor<candidate_count?candidates[candidate_cursor++]:0u;
+    Event& e=event(kStep); e.value[1]=*out; e.value[2]=result;
+    ++*out;
+    return result;
+}
+void __cdecl audio_backend_candidate_range_0058a4b0(U candidate,U* first,U* last) {
+    if ((candidate&4u)!=0u) { *first=0u; *last=application_audio_device_state_006b48c0[0x1du]; }
+    else if ((candidate&0x10u)!=0u) { *first=application_audio_device_state_006b48c0[0x1du]; *last=static_cast<U>(static_cast<std::uint16_t>(application_audio_device_state_006b48c0[0xe4u] | (application_audio_device_state_006b48c0[0xe5u]<<8u))); }
+    Event& e=event(kRange); e.value[1]=candidate; e.value[2]=*first; e.value[3]=*last;
+}
+I __cdecl audio_backend_allocate_voice_005898f0(I channel_count,U priority,U* handle,U first,U last) {
+    require(allocation_cursor<allocation_count,"allocation script");
+    const U n=allocation_cursor++;
+    *handle=handles[n];
+    Event& e=event(kAllocate); e.value[1]=static_cast<U>(channel_count); e.value[2]=priority;
+    e.value[3]=first; e.value[4]=last; e.value[5]=*handle; e.value[6]=static_cast<U>(voices[n]);
+    return voices[n];
+}
+void __cdecl audio_voice_recompute_pitch_00589f40(U slot) { Event& e=event(kPitch); e.value[1]=slot; }
+void __cdecl audio_voice_recompute_gain_00589df0(U slot) { Event& e=event(kGain); e.value[1]=slot; }
+void __cdecl audio_voice_recompute_send_00589d70(U bus,U slot) { Event& e=event(kSend); e.value[1]=bus; e.value[2]=slot; }
+I __cdecl audio_voice_backend_start_005897c0(U stream,U voice,U candidate,U d0e,U d12,U d14,const void* header,const void* p0c,const void* p14) {
+    require(start_cursor<start_count,"start script");
+    const I result=starts[start_cursor++];
+    Event& e=event(kStart); e.value[1]=stream; e.value[2]=voice; e.value[3]=candidate;
+    e.value[4]=d0e; e.value[5]=d12; e.value[6]=d14; e.value[7]=address(header);
+    e.value[8]=address(p0c); e.value[9]=address(p14); e.value[10]=static_cast<U>(result);
+    return result;
+}
+void __cdecl audio_backend_voice_finalize_00589c00(U slot) { Event& e=event(kFinalize); e.value[1]=slot; }
+} // namespace porsche
+
+static U invoke_4(void* fn,U a0,U a1,U a2,U a3) {
+    U saved_sp=0u,saved_bp=0u,fail=0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov saved_sp,esp
+        mov saved_bp,ebp
+        push a3
+        push a2
+        push a1
+        push a0
+        mov ebx,0x13579bdf
+        mov esi,0x2468ace0
+        mov edi,0x10203040
+        call fn
+        mov captured_return,eax
+        add esp,16
+        cmp esp,saved_sp
+        jne bad_abi
+        cmp ebp,saved_bp
+        jne bad_abi
+        cmp ebx,0x13579bdf
+        jne bad_abi
+        cmp esi,0x2468ace0
+        jne bad_abi
+        cmp edi,0x10203040
+        je ok_abi
+    bad_abi:
+        mov fail,1
+    ok_abi:
+        mov esp,saved_sp
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return fail;
+}
+
+static void init_original() {
+    static const B parent[] = {@BODY_005612A0@};
+    static const B helper[] = {@BODY_00561180@};
+    code=static_cast<B*>(VirtualAlloc(nullptr,4096u,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
+    require(code!=nullptr,"code alloc");
+    orig_5612a0=code;
+    orig_561180=code+1024u;
+    std::memcpy(orig_5612a0,parent,sizeof parent);
+    std::memcpy(orig_561180,helper,sizeof helper);
+    auto rel=[](B* fn,U off,const void* target){ wr(fn,off,address(target)-address(fn+off+4u)); };
+    wr(orig_5612a0,0x07u,address(&porsche::application_audio_device_state_006b48c0[0xdcu]));
+    wr(orig_5612a0,0x43u,address(porsche::audio_stream_slots_006b7cc0));
+    wr(orig_5612a0,0x158u,address(&backend_base));
+    wr(orig_5612a0,0x2a6u,address(&backend_base));
+    rel(orig_5612a0,0x04cu,reinterpret_cast<const void*>(porsche::audio_backend_lock_005896d0));
+    rel(orig_5612a0,0x0cfu,reinterpret_cast<const void*>(porsche::audio_group_step_0058a970));
+    rel(orig_5612a0,0x0fbu,reinterpret_cast<const void*>(porsche::audio_backend_candidate_range_0058a4b0));
+    rel(orig_5612a0,0x116u,reinterpret_cast<const void*>(porsche::audio_backend_allocate_voice_005898f0));
+    rel(orig_5612a0,0x145u,orig_561180);
+    rel(orig_5612a0,0x235u,reinterpret_cast<const void*>(porsche::audio_voice_recompute_pitch_00589f40));
+    rel(orig_5612a0,0x23fu,reinterpret_cast<const void*>(porsche::audio_voice_recompute_gain_00589df0));
+    rel(orig_5612a0,0x24au,reinterpret_cast<const void*>(porsche::audio_voice_recompute_send_00589d70));
+    rel(orig_5612a0,0x286u,reinterpret_cast<const void*>(porsche::audio_voice_backend_start_005897c0));
+    rel(orig_5612a0,0x2b0u,reinterpret_cast<const void*>(porsche::audio_backend_voice_finalize_00589c00));
+    rel(orig_5612a0,0x2dcu,reinterpret_cast<const void*>(porsche::audio_group_step_0058a970));
+    rel(orig_5612a0,0x2f0u,reinterpret_cast<const void*>(porsche::audio_backend_unlock_005896f0));
+    rel(orig_5612a0,0x306u,reinterpret_cast<const void*>(porsche::audio_backend_unlock_005896f0));
+    wr(orig_561180,0x22u,address(&backend_base));
+    FlushInstructionCache(GetCurrentProcess(),code,4096u);
+}
+static void reset() {
+    std::memset(arena,0xa5,sizeof arena);
+    std::memset(&porsche::application_audio_device_state_006b48c0,0,sizeof porsche::application_audio_device_state_006b48c0);
+    std::memset(porsche::audio_stream_slots_006b7cc0,0,sizeof porsche::audio_stream_slots_006b7cc0);
+    std::memset(&trace,0,sizeof trace);
+    std::memset(candidates,0,sizeof candidates);
+    std::memset(voices,0,sizeof voices);
+    std::memset(handles,0,sizeof handles);
+    std::memset(starts,0,sizeof starts);
+    candidate_count=candidate_cursor=allocation_count=allocation_cursor=start_count=start_cursor=0u;
+    backend_base=address(arena+0x2000u);
+}
+static void finish(U abi_fail) {
+    trace.ret=captured_return;
+    trace.abi_fail=abi_fail;
+    std::memcpy(trace.device,porsche::application_audio_device_state_006b48c0.backing.data(),sizeof trace.device);
+    std::memcpy(trace.slots,porsche::audio_stream_slots_006b7cc0,sizeof trace.slots);
+    std::memcpy(trace.memory,arena,sizeof trace.memory);
+    capture_fp(trace.fp);
+}
+static void compare() {
+    require(trace.abi_fail==0u&&expected.abi_fail==0u,"abi");
+    require(trace.ret==expected.ret,"return");
+    require(trace.count==expected.count,"event count");
+    require(std::memcmp(trace.events,expected.events,trace.count*sizeof(Event))==0,"events");
+    require(std::memcmp(trace.device,expected.device,sizeof trace.device)==0,"device");
+    require(std::memcmp(trace.slots,expected.slots,sizeof trace.slots)==0,"slots");
+    require(std::memcmp(trace.memory,expected.memory,sizeof trace.memory)==0,"memory");
+    require(std::memcmp(&trace.fp,&expected.fp,sizeof trace.fp)==0,"fpu");
+    ++cases; events_total+=trace.count;
+}
+template <typename Setup> static void run_case(Setup setup) {
+    B* const header=arena+0x0400u;
+    B* const params=arena+0x0500u;
+    B* const descriptor=arena+0x0600u;
+    which=0u; reset(); setup(); U fail=invoke_4(orig_5612a0,3u,address(header),address(params),address(descriptor)); finish(fail); expected=trace;
+    which=1u; reset(); setup(); fail=invoke_4(reinterpret_cast<void*>(porsche::audio_stream_voice_start_005612a0),3u,address(header),address(params),address(descriptor)); finish(fail); compare();
+}
+static void common(B*& header,B*& params,B*& descriptor,B*& slot) {
+    header=arena+0x0400u; params=arena+0x0500u; descriptor=arena+0x0600u; slot=arena+0x1000u;
+    porsche::application_audio_device_state_006b48c0[0xdcu]=1u;
+    porsche::application_audio_device_state_006b48c0[0x1du]=5u;
+    porsche::application_audio_device_state_006b48c0[0xe4u]=12u;
+    porsche::application_audio_device_state_006b48c0[0xe5u]=0u;
+    porsche::audio_stream_slots_006b7cc0[3]=address(slot);
+    wr(header,0u,0x11220234u); wr8(header,2u,2u);
+    wr16(params,0u,0x2345u); wr8(params,3u,0x31u); wr8(params,4u,0x32u); wr8(params,5u,0x33u); wr8(params,6u,0xfeu);
+    wr(params,0x14u,0xa1a2a3a4u); wr(params,0x18u,0xb1b2b3b4u);
+    wr8(descriptor,7u,0x3eu); wr8(descriptor,8u,0xfeu); wr8(descriptor,9u,0x41u); wr8(descriptor,0x0au,0x42u);
+    wr16(descriptor,0x0cu,0x3456u); wr16(descriptor,0x0eu,0x4567u); wr16(descriptor,0x12u,0x5678u); wr16(descriptor,0x14u,0x6789u); wr16(descriptor,0x18u,0x789au);
+    wr(slot,0u,0x0badbeefu); wr8(slot,0x36u,2u);
+    wr16(arena+0x2000u+0x70u,4u,10u); wr16(arena+0x2000u+0x70u,6u,30u);
+    wr16(arena+0x2000u+0x70u*2u,4u,0xfffbu); wr16(arena+0x2000u+0x70u*2u,6u,7u);
+}
+static void add_candidate(U value) { require(candidate_count<kMaxScript,"candidate script"); candidates[candidate_count++]=value; }
+static void add_allocation(I voice,U handle) { require(allocation_count<kMaxScript,"allocation script"); voices[allocation_count]=voice; handles[allocation_count++]=handle; }
+static void add_start(I result) { require(start_count<kMaxScript,"start result script"); starts[start_count++]=result; }
+
+int main() {
+    AddVectoredExceptionHandler(1,fault_handler);
+    init_original();
+    run_case([]{});
+    run_case([]{ B *h,*p,*d,*s; common(h,p,d,s); });
+    run_case([]{ B *h,*p,*d,*s; common(h,p,d,s); add_candidate(4u); add_allocation(-9,0x99887766u); });
+    run_case([]{ B *h,*p,*d,*s; common(h,p,d,s); wr16(arena+0x2000u+0x70u,4u,30u); add_candidate(4u); add_allocation(1,0x12340101u); add_start(0); });
+    run_case([]{ B *h,*p,*d,*s; common(h,p,d,s); add_candidate(4u); add_allocation(0,0x12340000u); add_start(0); });
+    run_case([]{ B *h,*p,*d,*s; common(h,p,d,s); add_candidate(0x10u); add_candidate(4u); add_allocation(2,0x12340202u); add_allocation(-9,0x12340303u); add_start(-7); });
+    run_case([]{ B *h,*p,*d,*s; common(h,p,d,s); add_candidate(0x10u); add_candidate(4u); add_allocation(2,0x12340404u); add_allocation(1,0x12340505u); add_start(-6); add_start(3); });
+    run_case([]{ B *h,*p,*d,*s; common(h,p,d,s); wr8(h,2u,0u); wr8(s,0x36u,0u); wr8(d,0x0bu,1u); add_candidate(4u); add_allocation(1,0x12340606u); add_start(0); });
+    std::printf("audio_voice_start_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events_total);
+    return 0;
+}

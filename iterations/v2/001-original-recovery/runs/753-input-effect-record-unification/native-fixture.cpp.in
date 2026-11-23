@@ -1,0 +1,694 @@
+// Run753 native x86-vs-C++ fixture for the six consumers migrated from the
+// packed Run494 host view to Run688 FeEffectEntry[32].
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+
+#include "../494-render-resource-leaves/render_resource_494.hpp"
+#include "../676-startup-input-slot-and-math-leaves/startup_input_slot_math_676.hpp"
+#include "../680-input-ff-slot-and-render-leaves/input_ff_slot_render_680.hpp"
+#include "../688-frame-control-create-and-gain/input_ff_frame_control_688.hpp"
+#include "../752-input-effect-cleanup/input_effect_cleanup_752.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kEvRelease08 = 1u,
+    kEvRelease20 = 2u,
+    kEvDownload28 = 3u,
+    kEvUnload2c = 4u,
+    kEvAcquire = 5u,
+    kEvFfCommand = 6u,
+    kEvCreate48 = 7u,
+    kEvCleanup331a0 = 8u,
+    kMaxEvents = 256u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+};
+
+struct MockEffect {
+    void** vtable;
+    U id;
+};
+
+struct MockDevice {
+    porsche::InputVtable* vtable;
+    U id;
+};
+
+struct Snapshot {
+    U abi_fail;
+    U result;
+    U event_count;
+    Event events[kMaxEvents];
+    porsche::FeEffectEntry records[32];
+    porsche::InputSlot slots[32];
+    MockEffect effects[64];
+    U initialized;
+};
+
+static B* code = nullptr;
+static B* slot_5338d0 = nullptr;
+static B* slot_533480 = nullptr;
+static B* slot_5337e0 = nullptr;
+static B* slot_533730 = nullptr;
+static B* slot_533760 = nullptr;
+static B* slot_533120 = nullptr;
+
+static U cases = 0u;
+static U side = 0u;
+static U kind = 0u;
+static I argument = 0;
+static U pattern = 0u;
+static U callback_mode = 0u;
+static U lifecycle_variant = 0u;
+static U download_calls = 0u;
+static Event events[kMaxEvents]{};
+static U event_count = 0u;
+static Snapshot trace{};
+static Snapshot expected{};
+static MockEffect effects[64]{};
+static void* effect_vtable[20]{};
+static porsche::InputVtable device_vtable{};
+static MockDevice devices[32]{};
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u kind=%u\n", why, cases, side, kind);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static LONG WINAPI fault(EXCEPTION_POINTERS* info) {
+    std::printf("divergence native-fault %08lx case=%u side=%u kind=%u\n",
+                info->ExceptionRecord->ExceptionCode, cases, side, kind);
+    std::fflush(stdout);
+    ExitProcess(7);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* p, U offset = 0u) {
+    U value = 0u;
+    std::memcpy(&value, static_cast<const B*>(p) + offset, sizeof value);
+    return value;
+}
+
+static void store32(void* p, U offset, U value) {
+    std::memcpy(static_cast<B*>(p) + offset, &value, sizeof value);
+}
+
+static void push_event(U event_kind, U a, U b = 0u, U c = 0u) {
+    require(event_count < kMaxEvents, "event bound");
+    events[event_count++] = Event{event_kind, a, b, c};
+}
+
+static U count_state(I state) {
+    U count = 0u;
+    for (const auto& entry : porsche::frame_control_effects_0069cb10) {
+        if (entry.input_slot_8c == state) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+static U __stdcall effect_release_08(void* raw) {
+    auto* const effect = static_cast<MockEffect*>(raw);
+    const auto& entry = porsche::frame_control_effects_0069cb10[effect->id & 31u];
+    push_event(kEvRelease08, effect->id, entry.field_80,
+               static_cast<U>(entry.input_slot_8c));
+    return 0x08000000u | effect->id;
+}
+
+static U __stdcall effect_release_20(void* raw) {
+    auto* const effect = static_cast<MockEffect*>(raw);
+    auto& entry = porsche::frame_control_effects_0069cb10[effect->id & 31u];
+    push_event(kEvRelease20, effect->id, entry.field_80,
+               static_cast<U>(entry.input_slot_8c));
+    if (callback_mode == 1u) {
+        entry.field_80 = 0xf00d0000u | effect->id;
+        entry.input_slot_8c = static_cast<I>((effect->id + 3u) & 31u);
+    }
+    return 0x20000000u | effect->id;
+}
+
+static U __stdcall effect_download_28(void* raw) {
+    auto* const effect = static_cast<MockEffect*>(raw);
+    const U call = download_calls++;
+    push_event(kEvDownload28, effect->id, call);
+    if (callback_mode == 2u && call == 0u) {
+        return 0x8007000cu;
+    }
+    return 0x28000000u | effect->id;
+}
+
+static U __stdcall effect_unload_2c(void* raw) {
+    auto* const effect = static_cast<MockEffect*>(raw);
+    push_event(kEvUnload2c, effect->id);
+    return 0x2c000000u | effect->id;
+}
+
+static U __stdcall device_acquire(void* raw) {
+    auto* const device = static_cast<MockDevice*>(raw);
+    push_event(kEvAcquire, device->id);
+    return callback_mode == 2u ? 1u : 0u;
+}
+
+static U __stdcall device_ff_command(void* raw, U command) {
+    auto* const device = static_cast<MockDevice*>(raw);
+    push_event(kEvFfCommand, device->id, command, count_state(static_cast<I>(device->id)));
+    if (command == 2u && callback_mode == 1u) {
+        porsche::frame_control_effects_0069cb10[31].field_80 = 0xfeed0031u;
+    }
+    if (command == 1u && callback_mode == 1u) {
+        porsche::frame_control_effects_0069cb10[31].input_slot_8c =
+            static_cast<I>(device->id);
+        porsche::frame_control_effects_0069cb10[31].effect_object_88 = &effects[31];
+    }
+    return 0x60000000u | (command << 8u) | device->id;
+}
+
+static U __stdcall device_create_effect(void* raw, const void*, void* descriptor,
+                                        void** out_effect, void*) {
+    auto* const device = static_cast<MockDevice*>(raw);
+    const U delta = address(descriptor) - address(porsche::frame_control_effects_0069cb10);
+    require(delta % 0x90u == 0u && delta / 0x90u < 32u, "create descriptor record");
+    const U record = delta / 0x90u;
+    push_event(kEvCreate48, device->id, record);
+    *out_effect = &effects[record];
+    return 0u;
+}
+
+} // namespace
+
+namespace porsche {
+
+std::int32_t input_count_0069cb0c = 0;
+InputSlot input_slots_006be040[32]{};
+std::uint32_t window_shutdown_config_005de620[12]{};
+std::int8_t fe_input_devices_005e8e60[32]{};
+
+void __stdcall render_resource_global_memory_status_005b2140(void* status) {
+    static_cast<U*>(status)[2] = 0x12345678u;
+}
+std::uint32_t __cdecl window_shutdown_prepare_00534550() { return 0u; }
+std::uint32_t __cdecl free_00531f90(void*) { return 1u; }
+void __cdecl heap_fill_0053c290(void* dst, U value, U bytes) {
+    std::memset(dst, static_cast<int>(value & 0xffu), bytes);
+}
+void __cdecl heap_copy_dispatch_005323e0(void* dst, const void* src, U bytes) {
+    std::memcpy(dst, src, bytes);
+}
+void* __cdecl fe_input_getstate_00532e10(U, U) {
+    static B caps[8]{};
+    return caps;
+}
+void __cdecl input_slot_effect_cleanup_005331a0(I slot_index) {
+    push_event(kEvCleanup331a0, static_cast<U>(slot_index));
+}
+
+} // namespace porsche
+
+namespace {
+
+static bool production_initial_records(const char* pe_path) {
+    FILE* file = std::fopen(pe_path, "rb");
+    if (file == nullptr) {
+        return false;
+    }
+    std::fseek(file, 0, SEEK_END);
+    const long bytes = std::ftell(file);
+    std::rewind(file);
+    auto* const pe = new B[static_cast<std::size_t>(bytes)];
+    const bool read_ok = std::fread(pe, 1u, static_cast<std::size_t>(bytes), file) ==
+                         static_cast<std::size_t>(bytes);
+    std::fclose(file);
+    if (!read_ok) {
+        delete[] pe;
+        return false;
+    }
+    const U nt = load32(pe, 0x3cu);
+    const U image_base = load32(pe, nt + 52u);
+    const U section_count = pe[nt + 6u] | (static_cast<U>(pe[nt + 7u]) << 8u);
+    const U optional_bytes = pe[nt + 20u] | (static_cast<U>(pe[nt + 21u]) << 8u);
+    bool ok = false;
+    for (U i = 0u; i < section_count; ++i) {
+        const B* const section = pe + nt + 24u + optional_bytes + i * 40u;
+        const U rva = load32(section, 12u);
+        const U virtual_size = load32(section, 8u);
+        const U raw_size = load32(section, 16u);
+        const U raw_offset = load32(section, 20u);
+        const U delta = 0x0069cb10u - image_base - rva;
+        if (delta >= virtual_size || 0x1200u > virtual_size - delta) {
+            continue;
+        }
+        ok = true;
+        const B* const native = reinterpret_cast<const B*>(
+            porsche::frame_control_effects_0069cb10);
+        for (U k = 0u; k < 0x1200u; ++k) {
+            const B original = delta + k < raw_size ? pe[raw_offset + delta + k] : 0u;
+            if (native[k] != original) {
+                ok = false;
+            }
+        }
+    }
+    delete[] pe;
+    return ok;
+}
+
+static void relocate_abs(B* body, U bytes, U old_va, U replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 4u <= bytes; ++i) {
+        if (load32(body, i) == old_va) {
+            store32(body, i, replacement);
+            ++found;
+            i += 3u;
+        }
+    }
+    require(found == expected_count, "absolute relocation count");
+}
+
+static void relocate_rel(B* body, U bytes, U va, U target_va,
+                         const void* replacement, U expected_count) {
+    U found = 0u;
+    for (U i = 0u; i + 5u <= bytes; ++i) {
+        if (body[i] == 0xe8u && va + i + 5u + load32(body, i + 1u) == target_va) {
+            store32(body, i + 1u, address(replacement) - address(body + i + 5u));
+            ++found;
+            i += 4u;
+        }
+    }
+    require(found == expected_count, "relative relocation count");
+}
+
+static void init(const char* pe_path) {
+    require(production_initial_records(pe_path), "production record initial bytes");
+    require(address(&porsche::frame_control_effects_0069cb10[1].field_80) -
+                address(&porsche::frame_control_effects_0069cb10[0].field_80) == 0x90u,
+            "canonical 0x90 field stride");
+
+    effect_vtable[2] = reinterpret_cast<void*>(&effect_release_08);
+    effect_vtable[8] = reinterpret_cast<void*>(&effect_release_20);
+    effect_vtable[10] = reinterpret_cast<void*>(&effect_download_28);
+    effect_vtable[11] = reinterpret_cast<void*>(&effect_unload_2c);
+    device_vtable.acquire_1c = &device_acquire;
+    device_vtable.other_28[8] = reinterpret_cast<void*>(&device_create_effect);
+    device_vtable.other_28[12] = reinterpret_cast<void*>(&device_ff_command);
+
+    static const B body_5338d0[] = {@BODY_005338D0@};
+    static const B body_533480[] = {@BODY_00533480@};
+    static const B body_5337e0[] = {@BODY_005337E0@};
+    static const B body_533730[] = {@BODY_00533730@};
+    static const B body_533760[] = {@BODY_00533760@};
+    static const B body_533120[] = {@BODY_00533120@};
+    require(sizeof body_5338d0 == 53u && sizeof body_533480 == 82u &&
+            sizeof body_5337e0 == 41u && sizeof body_533730 == 40u &&
+            sizeof body_533760 == 64u && sizeof body_533120 == 60u,
+            "original body sizes");
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc RWX");
+    slot_5338d0 = code + 0x000u;
+    slot_533480 = code + 0x100u;
+    slot_5337e0 = code + 0x200u;
+    slot_533730 = code + 0x300u;
+    slot_533760 = code + 0x400u;
+    slot_533120 = code + 0x500u;
+    std::memcpy(slot_5338d0, body_5338d0, sizeof body_5338d0);
+    std::memcpy(slot_533480, body_533480, sizeof body_533480);
+    std::memcpy(slot_5337e0, body_5337e0, sizeof body_5337e0);
+    std::memcpy(slot_533730, body_533730, sizeof body_533730);
+    std::memcpy(slot_533760, body_533760, sizeof body_533760);
+    std::memcpy(slot_533120, body_533120, sizeof body_533120);
+
+    const U records = address(porsche::frame_control_effects_0069cb10);
+    const U slots = address(porsche::input_slots_006be040);
+    relocate_abs(slot_5338d0, 53u, 0x0069cb90u, records + 0x80u, 1u);
+    relocate_abs(slot_5338d0, 53u, 0x0069cb98u, records + 0x88u, 1u);
+    relocate_abs(slot_5338d0, 53u, 0x0069cb9cu, records + 0x8cu, 1u);
+
+    relocate_abs(slot_533480, 82u, 0x006be040u, slots, 1u);
+    relocate_abs(slot_533480, 82u, 0x006be044u, slots + 4u, 1u);
+    relocate_abs(slot_533480, 82u, 0x0069cb90u, records + 0x80u, 1u);
+    relocate_abs(slot_533480, 82u, 0x0069dd90u, records + 32u * 0x90u + 0x80u, 1u);
+    relocate_rel(slot_533480, 82u, 0x00533480u, 0x00532b50u,
+                 reinterpret_cast<const void*>(&porsche::input_slot_has_device_00532b50), 1u);
+    relocate_rel(slot_533480, 82u, 0x00533480u, 0x00533160u,
+                 reinterpret_cast<const void*>(&porsche::input_device_ff_command_00533160), 1u);
+
+    relocate_abs(slot_5337e0, 41u, 0x0069cb98u, records + 0x88u, 1u);
+    relocate_abs(slot_5337e0, 41u, 0x0069cb9cu, records + 0x8cu, 1u);
+    relocate_abs(slot_533730, 40u, 0x0069cb9cu, records + 0x8cu, 1u);
+    relocate_abs(slot_533730, 40u, 0x0069dd9cu, records + 32u * 0x90u + 0x8cu, 1u);
+    relocate_abs(slot_533760, 64u, 0x0069cb98u, records + 0x88u, 1u);
+    relocate_abs(slot_533760, 64u, 0x0069cb9cu, records + 0x8cu, 1u);
+    relocate_abs(slot_533760, 64u, 0x006be040u, slots, 1u);
+    relocate_rel(slot_533760, 64u, 0x00533760u, 0x005337a0u,
+                 reinterpret_cast<const void*>(&porsche::input_effect_download_005337a0), 1u);
+    relocate_abs(slot_533120, 60u, 0x0069cb9cu, records + 0x8cu, 1u);
+    relocate_abs(slot_533120, 60u, 0x0069dd9cu, records + 32u * 0x90u + 0x8cu, 1u);
+    relocate_abs(slot_533120, 60u, 0x006be040u, slots, 1u);
+    relocate_rel(slot_533120, 60u, 0x00533120u, 0x00533160u,
+                 reinterpret_cast<const void*>(&porsche::input_device_ff_command_00533160), 1u);
+    require(FlushInstructionCache(GetCurrentProcess(), code, 0x600u) != 0,
+            "FlushInstructionCache");
+}
+
+static U invoke_cdecl0(const void* fn, U& abi_fail) {
+    U out = 0u, fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        mov eax, fn
+        call eax
+        mov out, eax
+        cmp esp, before
+        jne bad0
+        cmp ebp, frame
+        jne bad0
+        cmp ebx, 13579bdfh
+        jne bad0
+        cmp esi, 2468ace0h
+        jne bad0
+        cmp edi, 10203040h
+        je done0
+    bad0:
+        mov fail, 1
+    done0:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail |= fail;
+    return out;
+}
+
+static U invoke_cdecl1(const void* fn, U arg0, U& abi_fail) {
+    U out = 0u, fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        mov eax, fn
+        call eax
+        mov out, eax
+        add esp, 4
+        cmp esp, before
+        jne bad1
+        cmp ebp, frame
+        jne bad1
+        cmp ebx, 13579bdfh
+        jne bad1
+        cmp esi, 2468ace0h
+        jne bad1
+        cmp edi, 10203040h
+        je done1
+    bad1:
+        mov fail, 1
+    done1:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail |= fail;
+    return out;
+}
+
+static void seed() {
+    std::memset(events, 0, sizeof events);
+    event_count = 0u;
+    download_calls = 0u;
+    for (U i = 0u; i < 64u; ++i) {
+        effects[i].vtable = effect_vtable;
+        effects[i].id = i;
+    }
+    for (U i = 0u; i < 32u; ++i) {
+        auto& entry = porsche::frame_control_effects_0069cb10[i];
+        std::memset(&entry, static_cast<int>(0x40u + i), sizeof entry);
+        entry.field_80 = 0xa0000000u | i;
+        entry.effect_object_88 = &effects[i];
+        entry.input_slot_8c = static_cast<I>(i & 7u);
+
+        std::memset(&porsche::input_slots_006be040[i], static_cast<int>(0x20u + i),
+                    sizeof porsche::input_slots_006be040[i]);
+        devices[i].vtable = &device_vtable;
+        devices[i].id = i;
+        porsche::input_slots_006be040[i].device =
+            reinterpret_cast<porsche::InputDevice*>(&devices[i]);
+        porsche::input_slots_006be040[i].flags_04 = 1u;
+    }
+    porsche::input_count_0069cb0c = 32;
+    porsche::input_effects_initialized_0069dd10 = 1u;
+
+    if (kind == 0u || kind == 2u || kind == 4u) {
+        if (argument >= 0 && argument < 32) {
+            auto& entry = porsche::frame_control_effects_0069cb10[argument];
+            entry.input_slot_8c = pattern == 0u ? -1 : static_cast<I>((argument + 5) & 31);
+        }
+    } else if (kind == 1u) {
+        if (argument >= 0 && argument < 32) {
+            if (pattern == 0u) {
+                porsche::input_slots_006be040[argument].device = nullptr;
+            } else if (pattern == 1u) {
+                porsche::input_slots_006be040[argument].flags_04 = 0u;
+            }
+        }
+    } else if (kind == 3u) {
+        for (auto& entry : porsche::frame_control_effects_0069cb10) {
+            entry.input_slot_8c = 3;
+        }
+        if (pattern == 1u) porsche::frame_control_effects_0069cb10[0].input_slot_8c = -1;
+        if (pattern == 2u) porsche::frame_control_effects_0069cb10[1].input_slot_8c = -1;
+        if (pattern == 3u) porsche::frame_control_effects_0069cb10[31].input_slot_8c = -1;
+    } else if (kind == 5u) {
+        for (U i = 0u; i < 32u; ++i) {
+            porsche::frame_control_effects_0069cb10[i].input_slot_8c =
+                (pattern == 0u || (i % (pattern + 1u)) == 0u) ? argument
+                                                               : static_cast<I>((argument + 1) & 31);
+        }
+    } else if (kind == 6u) {
+        std::memset(porsche::frame_control_effects_0069cb10, 0,
+                    sizeof porsche::frame_control_effects_0069cb10);
+        for (auto& entry : porsche::frame_control_effects_0069cb10) {
+            entry.input_slot_8c = -1;
+        }
+        porsche::input_count_0069cb0c = 1;
+        porsche::input_slots_006be040[0].flags_04 = 1u;
+    }
+}
+
+static void normalize_and_capture() {
+    trace.event_count = event_count;
+    std::memcpy(trace.events, events, sizeof events);
+    std::memcpy(trace.records, porsche::frame_control_effects_0069cb10,
+                sizeof trace.records);
+    for (auto& entry : trace.records) {
+        entry.axes_20 = nullptr; // accepted Run688 per-call stack pointer
+    }
+    std::memcpy(trace.slots, porsche::input_slots_006be040, sizeof trace.slots);
+    std::memcpy(trace.effects, effects, sizeof trace.effects);
+    trace.initialized = porsche::input_effects_initialized_0069dd10;
+}
+
+static void run_lifecycle() {
+    porsche::FeEffectParams params{};
+    params.type_00 = 0u;
+    params.duration_34 = 0x1111u;
+    params.gain_38 = 7u;
+    params.axes_3c = 1u;
+    params.button_40 = 0xffffffffu;
+    params.repeat_44 = 0x2222u;
+    params.direction_48 = 3u;
+    const I record = porsche::frame_control_slot_create_005334e0(0, &params);
+    require(record == 0, "lifecycle create record");
+
+    const void* release_fn = side == 0u ? static_cast<const void*>(slot_5338d0)
+                                        : reinterpret_cast<const void*>(&porsche::frame_control_slot_release_005338d0);
+    const void* reset_fn = side == 0u ? static_cast<const void*>(slot_533120)
+                                      : reinterpret_cast<const void*>(&porsche::input_slot_reset_ff_00533120);
+    const void* unload_fn = side == 0u ? static_cast<const void*>(slot_5337e0)
+                                       : reinterpret_cast<const void*>(&porsche::frame_control_slot_unload_005337e0);
+    const void* download_fn = side == 0u ? static_cast<const void*>(slot_533760)
+                                         : reinterpret_cast<const void*>(&porsche::frame_control_slot_download_00533760);
+    const void* stop_fn = side == 0u ? static_cast<const void*>(slot_533480)
+                                     : reinterpret_cast<const void*>(&porsche::input_slot_stop_ff_00533480);
+
+    if (lifecycle_variant == 0u) {
+        (void)invoke_cdecl1(release_fn, 0u, trace.abi_fail);
+        (void)invoke_cdecl0(reinterpret_cast<const void*>(&porsche::input_effect_cleanup_00533050),
+                            trace.abi_fail);
+        trace.result = invoke_cdecl1(reset_fn, 0u, trace.abi_fail);
+    } else if (lifecycle_variant == 1u) {
+        trace.result = invoke_cdecl1(reset_fn, 0u, trace.abi_fail);
+        (void)invoke_cdecl0(reinterpret_cast<const void*>(&porsche::input_effect_cleanup_00533050),
+                            trace.abi_fail);
+        (void)invoke_cdecl1(release_fn, 0u, trace.abi_fail);
+    } else {
+        (void)invoke_cdecl1(unload_fn, 0u, trace.abi_fail);
+        (void)invoke_cdecl1(download_fn, 0u, trace.abi_fail);
+        (void)invoke_cdecl1(stop_fn, 0u, trace.abi_fail);
+        (void)invoke_cdecl0(reinterpret_cast<const void*>(&porsche::input_effect_cleanup_00533050),
+                            trace.abi_fail);
+        trace.result = static_cast<U>(porsche::frame_control_effects_0069cb10[0].input_slot_8c);
+    }
+}
+
+static void run_one_side() {
+    std::memset(&trace, 0, sizeof trace);
+    seed();
+    if (kind == 6u) {
+        run_lifecycle();
+    } else {
+        const void* original = nullptr;
+        const void* recovered = nullptr;
+        bool returns_value = false;
+        switch (kind) {
+        case 0u:
+            original = slot_5338d0;
+            recovered = reinterpret_cast<const void*>(&porsche::frame_control_slot_release_005338d0);
+            break;
+        case 1u:
+            original = slot_533480;
+            recovered = reinterpret_cast<const void*>(&porsche::input_slot_stop_ff_00533480);
+            break;
+        case 2u:
+            original = slot_5337e0;
+            recovered = reinterpret_cast<const void*>(&porsche::frame_control_slot_unload_005337e0);
+            break;
+        case 3u:
+            original = slot_533730;
+            recovered = reinterpret_cast<const void*>(&porsche::frame_control_slot_find_free_00533730);
+            returns_value = true;
+            break;
+        case 4u:
+            original = slot_533760;
+            recovered = reinterpret_cast<const void*>(&porsche::frame_control_slot_download_00533760);
+            break;
+        default:
+            original = slot_533120;
+            recovered = reinterpret_cast<const void*>(&porsche::input_slot_reset_ff_00533120);
+            returns_value = true;
+            break;
+        }
+        const void* const fn = side == 0u ? original : recovered;
+        const U result = kind == 3u ? invoke_cdecl0(fn, trace.abi_fail)
+                                    : invoke_cdecl1(fn, static_cast<U>(argument), trace.abi_fail);
+        trace.result = returns_value ? result : 0u;
+    }
+    normalize_and_capture();
+}
+
+static void check_case() {
+    ++cases;
+    for (side = 0u; side < 2u; ++side) {
+        run_one_side();
+        require(trace.abi_fail == 0u, "ABI");
+        if (side == 0u) {
+            expected = trace;
+        } else {
+            require(std::memcmp(&trace, &expected, sizeof trace) == 0,
+                    "calls/order/full canonical state");
+        }
+    }
+}
+
+} // namespace
+
+int main(int argc, char** argv) {
+    AddVectoredExceptionHandler(1u, fault);
+    require(argc == 2, "PE argument");
+    init(argv[1]);
+
+    for (I slot : {-1, 0, 1, 31, 32}) {
+        for (U occupied = 0u; occupied < 2u; ++occupied) {
+            for (U mode = 0u; mode < 3u; ++mode) {
+                argument = slot;
+                pattern = occupied;
+                callback_mode = mode;
+                kind = 0u;
+                check_case();
+                kind = 2u;
+                check_case();
+                kind = 4u;
+                check_case();
+            }
+        }
+    }
+    for (I slot : {0, 1, 31}) {
+        for (U gate = 0u; gate < 3u; ++gate) {
+            for (U mode = 0u; mode < 2u; ++mode) {
+                kind = 1u;
+                argument = slot;
+                pattern = gate;
+                callback_mode = mode;
+                check_case();
+            }
+        }
+    }
+    kind = 3u;
+    argument = 0;
+    callback_mode = 0u;
+    for (pattern = 0u; pattern < 4u; ++pattern) {
+        check_case();
+    }
+    kind = 5u;
+    for (I slot : {0, 1, 31}) {
+        for (U states = 0u; states < 3u; ++states) {
+            for (U mode = 0u; mode < 2u; ++mode) {
+                argument = slot;
+                pattern = states;
+                callback_mode = mode;
+                check_case();
+            }
+        }
+    }
+    kind = 6u;
+    argument = 0;
+    pattern = 0u;
+    for (U lifecycle = 0u; lifecycle < 3u; ++lifecycle) {
+        for (U mode = 0u; mode < 3u; ++mode) {
+            lifecycle_variant = lifecycle;
+            callback_mode = mode;
+            check_case();
+        }
+    }
+
+    std::printf("input_effect_record_unification_753_original_x86_vs_cpp=PASS "
+                "cases=%u ABI=PASS production_initial_state=PASS lifecycle=PASS "
+                "canonical_stride=0x90 no_packed_storage=PASS mutations=10\n",
+                cases);
+    return 0;
+}

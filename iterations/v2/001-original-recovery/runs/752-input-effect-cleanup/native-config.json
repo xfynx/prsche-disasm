@@ -1,0 +1,81 @@
+{
+  "run": 752,
+  "experiment": "local/experiments/v2-input-effect-cleanup-752",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup/input_effect_cleanup_752.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup",
+    "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain",
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup/evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00533050",
+      "bytes": 75,
+      "sha256": "a8ab87266fcbe0ec203d3249cc2a6dc509859c9f7f4b97c8e17d7372809a686f",
+      "token": "@BODY_00533050@"
+    }
+  ],
+  "pass_marker": "input_effect_cleanup_752_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-initialized-gate",
+      "source": "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup/input_effect_cleanup_752.cpp",
+      "old": "input_effects_initialized_0069dd10 == 0u",
+      "new": "input_effects_initialized_0069dd10 != 0u",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-record-limit",
+      "source": "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup/input_effect_cleanup_752.cpp",
+      "old": "for (std::int32_t i = 0; i < 32; ++i) {\n        FeEffectEntry& entry",
+      "new": "for (std::int32_t i = 0; i < 31; ++i) {\n        FeEffectEntry& entry",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-occupied-cell",
+      "source": "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup/input_effect_cleanup_752.cpp",
+      "old": "entry.input_slot_8c != -1",
+      "new": "entry.direction_7c != -1",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-release-vtable-slot",
+      "source": "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup/input_effect_cleanup_752.cpp",
+      "old": "effect->vtable[2]",
+      "new": "effect->vtable[3]",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-device-gate",
+      "source": "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup/input_effect_cleanup_752.cpp",
+      "old": "input_slot_has_device_00532b50(i) != 0u",
+      "new": "input_slot_has_device_00532b50(i) == 0u",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-cleanup-index",
+      "source": "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup/input_effect_cleanup_752.cpp",
+      "old": "input_slot_effect_cleanup_005331a0(i);",
+      "new": "input_slot_effect_cleanup_005331a0(i + 1);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

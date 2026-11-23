@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.20)
+project(porsche_integration_761 LANGUAGES CXX)
+include("${CMAKE_CURRENT_SOURCE_DIR}/../757-audio-backend-range-integration/CMakeLists.txt")
+get_target_property(_entry_sources porsche_game_entry_bridges SOURCES)
+list(FILTER _entry_sources EXCLUDE REGEX "755-audio-backend-range-allocation/audio_backend_range_755\.cpp$")
+set_property(TARGET porsche_game_entry_bridges PROPERTY SOURCES "${_entry_sources}")
+target_sources(porsche_game_entry_bridges PRIVATE "${CMAKE_CURRENT_LIST_DIR}/audio_backend_range_761.cpp")
+target_include_directories(porsche_game_entry_bridges PRIVATE "${CMAKE_CURRENT_LIST_DIR}")

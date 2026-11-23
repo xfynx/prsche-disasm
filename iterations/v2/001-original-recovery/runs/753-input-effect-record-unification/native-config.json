@@ -1,0 +1,118 @@
+{
+  "run": 753,
+  "experiment": "local/experiments/v2-input-effect-record-unification-753",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/render_resource_494_record_unified_753.cpp",
+    "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/startup_input_slot_math_676_record_unified_753.cpp",
+    "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/input_ff_slot_render_680_record_unified_753.cpp",
+    "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain/input_ff_frame_control_688.cpp",
+    "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup/input_effect_cleanup_752.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification",
+    "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup",
+    "iterations/v2/001-original-recovery/runs/688-frame-control-create-and-gain",
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/evidence.json"
+  ],
+  "original_bodies": [
+    {"va": "005338d0", "bytes": 53, "sha256": "b4d761e0a23c3a72f55784fee4221bff648cad215c3b78d834132c91a51c4dc2", "token": "@BODY_005338D0@"},
+    {"va": "00533480", "bytes": 82, "sha256": "c9907ad1a21d18ffa66aa087479c0eeeaa83ba4939c32912881d409dc02e45c7", "token": "@BODY_00533480@"},
+    {"va": "005337e0", "bytes": 41, "sha256": "729e54831f5b08e458efe17a371a89948d7e24810e5ffb33554be36dcd2ecfbc", "token": "@BODY_005337E0@"},
+    {"va": "00533730", "bytes": 40, "sha256": "69fb99b3f22fb589c6536b7d5413982e8f6f51a7f354d7c2d198c09430fac004", "token": "@BODY_00533730@"},
+    {"va": "00533760", "bytes": 64, "sha256": "f1246a45e78d67fe871c523e64374004887a7dc6f4f4a8c0770fac08952ceb67", "token": "@BODY_00533760@"},
+    {"va": "00533120", "bytes": 60, "sha256": "e6ef39a088246bf5a9cf19083ab22b119035194f24aeccef74855a4d4b55ee04", "token": "@BODY_00533120@"}
+  ],
+  "pass_marker": "input_effect_record_unification_753_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 300,
+  "mutations": [
+    {
+      "name": "wrong-5338d0-state-cell",
+      "source": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/render_resource_494_record_unified_753.cpp",
+      "old": "entry.input_slot_8c == -1",
+      "new": "entry.direction_7c == -1",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-5338d0-active-cell",
+      "source": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/render_resource_494_record_unified_753.cpp",
+      "old": "entry.field_80 = 0;",
+      "new": "entry.direction_7c = 0;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-533480-scan-only-31",
+      "source": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/startup_input_slot_math_676_record_unified_753.cpp",
+      "old": "for (std::size_t i = 0u; i < 32u; ++i) {\n        frame_control_effects_0069cb10[i].field_80 = 0u;",
+      "new": "for (std::size_t i = 0u; i < 31u; ++i) {\n        frame_control_effects_0069cb10[i].field_80 = 0u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-533480-active-cell",
+      "source": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/startup_input_slot_math_676_record_unified_753.cpp",
+      "old": "frame_control_effects_0069cb10[i].field_80 = 0u;",
+      "new": "frame_control_effects_0069cb10[i].direction_7c = 0;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-5337e0-effect-cell",
+      "source": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/input_ff_slot_render_680_record_unified_753.cpp",
+      "old": "static_cast<EffectObject*>(entry.effect_object_88)",
+      "new": "reinterpret_cast<EffectObject*>(&frame_control_effects_0069cb10[(slot + 1) & 31])",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-533730-scan-only-31",
+      "source": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/input_ff_slot_render_680_record_unified_753.cpp",
+      "old": "std::int32_t __cdecl frame_control_slot_find_free_00533730() {\n    for (std::int32_t i = 0; i < 32; ++i) {",
+      "new": "std::int32_t __cdecl frame_control_slot_find_free_00533730() {\n    for (std::int32_t i = 0; i < 31; ++i) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-533730-state-cell",
+      "source": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/input_ff_slot_render_680_record_unified_753.cpp",
+      "old": "frame_control_effects_0069cb10[i].input_slot_8c == -1",
+      "new": "frame_control_effects_0069cb10[i].direction_7c == -1",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-533760-use-index-not-state",
+      "source": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/input_ff_slot_render_680_record_unified_753.cpp",
+      "old": "input_slots_006be040[entry.input_slot_8c].device,",
+      "new": "input_slots_006be040[slot].device,",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-533120-scan-only-31",
+      "source": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/input_ff_slot_render_680_record_unified_753.cpp",
+      "old": "std::uint32_t __cdecl input_slot_reset_ff_00533120(std::int32_t slot_index) {\n    for (std::size_t i = 0u; i < 32u; ++i) {",
+      "new": "std::uint32_t __cdecl input_slot_reset_ff_00533120(std::int32_t slot_index) {\n    for (std::size_t i = 0u; i < 31u; ++i) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-533120-clear-active-not-state",
+      "source": "iterations/v2/001-original-recovery/runs/753-input-effect-record-unification/input_ff_slot_render_680_record_unified_753.cpp",
+      "old": "frame_control_effects_0069cb10[i].input_slot_8c = -1;",
+      "new": "frame_control_effects_0069cb10[i].field_80 = 0xffffffffu;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}
