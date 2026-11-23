@@ -1,0 +1,370 @@
+// Native x86-vs-C++ differential fixture for Run774:
+//   00537a30..00537a38 (  9B) porsche::scene_blur_state_quality_00537a30
+//   00537a40..00537a49 ( 10B) porsche::scene_blur_state_one_00537a40
+//   00537a70..00537a7c ( 13B) porsche::scene_blur_state_flag_00537a70
+//   00536470..00536505 (150B) porsche::scene_blur_state_commit_00536470
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "porsche/game_setup.hpp"
+#include "render_state_flush_527.hpp"
+#include "scene_blur_state_774.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+struct Event {
+    U slot;
+    U key;
+    U value;
+};
+
+enum : U { kMaxEvents = 32u };
+
+struct Snapshot {
+    U abi_fail;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    std::array<B, 0x60u> state_bytes;
+    std::array<U, 28u> flush_records;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static alignas(8) B g_movie_service[0x20u];
+static alignas(8) B g_movie_sub[0x20u];
+static alignas(8) B g_state_buf[0x60u];
+static alignas(8) B g_other_buf[0x60u];
+static alignas(4) U g_input_28[7];
+
+static void record_cb(U slot, U key, U value) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{slot, key, value};
+}
+
+template <U Slot>
+static U __cdecl cb_slot(U key, U value) {
+    record_cb(Slot, key, value);
+    return 100u + Slot;
+}
+
+namespace porsche {
+
+void* game_setup_movie_service_0069ed0c = nullptr;
+U render_state_flush_records_005de6bc[28] = {};
+U render_state_flush_callbacks_005de72c[7] = {};
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_00537a30 = nullptr;
+static B* slot_00537a40 = nullptr;
+static B* slot_00537a70 = nullptr;
+static B* slot_00536470 = nullptr;
+
+static void relocate_imm32(
+    B* slot, U insn_off, U imm_off, U expected_addr, U replacement_addr) {
+    const U actual = load32(slot, insn_off + imm_off);
+    require(actual == expected_addr, "imm32/disp32 target");
+    store32(slot, insn_off + imm_off, replacement_addr);
+}
+
+static void init() {
+    static const B body_00537a30[] = {@BODY_00537A30@};
+    static const B body_00537a40[] = {@BODY_00537A40@};
+    static const B body_00537a70[] = {@BODY_00537A70@};
+    static const B body_00536470[] = {@BODY_00536470@};
+    require(sizeof body_00537a30 == 9u, "9B 00537a30");
+    require(sizeof body_00537a40 == 10u, "10B 00537a40");
+    require(sizeof body_00537a70 == 13u, "13B 00537a70");
+    require(sizeof body_00536470 == 150u, "150B 00536470");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+
+    slot_00537a30 = code_page + 0x000u;
+    slot_00537a40 = code_page + 0x040u;
+    slot_00537a70 = code_page + 0x080u;
+    slot_00536470 = code_page + 0x100u;
+
+    std::memcpy(slot_00537a30, body_00537a30, sizeof body_00537a30);
+    std::memcpy(slot_00537a40, body_00537a40, sizeof body_00537a40);
+    std::memcpy(slot_00537a70, body_00537a70, sizeof body_00537a70);
+    std::memcpy(slot_00536470, body_00536470, sizeof body_00536470);
+
+    const U records_1 = address(&porsche::render_state_flush_records_005de6bc[1]);
+    const U records_15 = address(&porsche::render_state_flush_records_005de6bc[15]);
+    const U records_29 = records_15 + 7u * 8u;
+    const U callbacks_0 = address(&porsche::render_state_flush_callbacks_005de72c[0]);
+
+    relocate_imm32(slot_00536470, 0x015u, 2u, 0x0069ed0cu,
+                   address(&porsche::game_setup_movie_service_0069ed0c));
+    relocate_imm32(slot_00536470, 0x023u, 1u, 0x005de72cu, callbacks_0);
+    relocate_imm32(slot_00536470, 0x028u, 1u, 0x005de6c0u, records_1);
+    relocate_imm32(slot_00536470, 0x04cu, 2u, 0x005de6f8u, records_15);
+    relocate_imm32(slot_00536470, 0x05fu, 1u, 0x005de72cu, callbacks_0);
+    relocate_imm32(slot_00536470, 0x064u, 1u, 0x005de6f8u, records_15);
+    relocate_imm32(slot_00536470, 0x088u, 2u, 0x005de730u, records_29);
+}
+
+static U invoke_thiscall_1_u32(const void* fn, void* self, U arg0) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push arg0
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_esp
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_esp:
+        cmp ebx, 0x13572468
+        je ok_ebx
+        or abi_fail, 2
+    ok_ebx:
+        cmp esi, 0x24681357
+        je ok_esi
+        or abi_fail, 4
+    ok_esi:
+        cmp edi, 0x55aa33cc
+        je ok_edi
+        or abi_fail, 8
+    ok_edi:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static void reset_fixtures(U seed) {
+    g_event_count = 0u;
+    std::memset(g_events, 0, sizeof g_events);
+    std::memset(g_movie_service, 0, sizeof g_movie_service);
+    std::memset(g_movie_sub, 0, sizeof g_movie_sub);
+    porsche::game_setup_movie_service_0069ed0c = g_movie_service;
+    store32(g_movie_service, 0x04u, address(g_movie_sub));
+
+    for (U i = 0u; i < sizeof g_state_buf; ++i) {
+        g_state_buf[i] = static_cast<B>((0xa0u + i + seed) & 0xffu);
+    }
+    for (U i = 0u; i < 14u; ++i) {
+        porsche::render_state_flush_records_005de6bc[2u * i] = 0x100u + i;
+        porsche::render_state_flush_records_005de6bc[2u * i + 1u] = 0x2000u + i * 3u + seed;
+    }
+    porsche::render_state_flush_callbacks_005de72c[0] = address(reinterpret_cast<const void*>(&cb_slot<0u>));
+    porsche::render_state_flush_callbacks_005de72c[1] = address(reinterpret_cast<const void*>(&cb_slot<1u>));
+    porsche::render_state_flush_callbacks_005de72c[2] = address(reinterpret_cast<const void*>(&cb_slot<2u>));
+    porsche::render_state_flush_callbacks_005de72c[3] = address(reinterpret_cast<const void*>(&cb_slot<3u>));
+    porsche::render_state_flush_callbacks_005de72c[4] = address(reinterpret_cast<const void*>(&cb_slot<4u>));
+    porsche::render_state_flush_callbacks_005de72c[5] = address(reinterpret_cast<const void*>(&cb_slot<5u>));
+    porsche::render_state_flush_callbacks_005de72c[6] = address(reinterpret_cast<const void*>(&cb_slot<6u>));
+}
+
+static void capture(Snapshot& out, U abi_fail) {
+    out.abi_fail = abi_fail;
+    out.event_count = g_event_count;
+    std::memcpy(out.events.data(), g_events, sizeof g_events);
+    std::memcpy(out.state_bytes.data(), g_state_buf, sizeof g_state_buf);
+    std::memcpy(out.flush_records.data(), porsche::render_state_flush_records_005de6bc,
+                sizeof porsche::render_state_flush_records_005de6bc);
+}
+
+static void check_equal(const Snapshot& orig, const Snapshot& cpp, const char* tag) {
+    require(orig.abi_fail == 0u, tag);
+    require(cpp.abi_fail == 0u, tag);
+    require(orig.event_count == cpp.event_count, tag);
+    for (U i = 0u; i < orig.event_count; ++i) {
+        require(orig.events[i].slot == cpp.events[i].slot &&
+                    orig.events[i].key == cpp.events[i].key &&
+                    orig.events[i].value == cpp.events[i].value,
+                tag);
+    }
+    require(orig.state_bytes == cpp.state_bytes, tag);
+    require(orig.flush_records == cpp.flush_records, tag);
+    ++cases;
+}
+
+static void run_setter_case(const void* orig_fn, const void* cpp_fn, U value, const char* tag) {
+    Snapshot orig{};
+    Snapshot cpp{};
+    reset_fixtures(1u);
+    capture(orig, invoke_thiscall_1_u32(orig_fn, g_state_buf, value));
+    reset_fixtures(1u);
+    capture(cpp, invoke_thiscall_1_u32(cpp_fn, g_state_buf, value));
+    check_equal(orig, cpp, tag);
+}
+
+template <class Setup>
+static void run_commit_case(Setup&& setup, const char* tag) {
+    Snapshot orig{};
+    Snapshot cpp{};
+    reset_fixtures(2u);
+    setup();
+    capture(orig, invoke_thiscall_1_u32(slot_00536470, g_state_buf, address(g_input_28)));
+    reset_fixtures(2u);
+    setup();
+    capture(cpp, invoke_thiscall_1_u32(
+        reinterpret_cast<const void*>(&porsche::scene_blur_state_commit_00536470),
+        g_state_buf, address(g_input_28)));
+    check_equal(orig, cpp, tag);
+}
+
+int main() {
+    init();
+
+    const U setter_values[] = {0u, 1u, 0x10u, 0x12345678u, 0xffffffffu};
+    for (U v : setter_values) {
+        run_setter_case(slot_00537a30,
+                        reinterpret_cast<const void*>(&porsche::scene_blur_state_quality_00537a30),
+                        v, "quality 00537a30");
+        run_setter_case(slot_00537a40,
+                        reinterpret_cast<const void*>(&porsche::scene_blur_state_one_00537a40),
+                        v, "one 00537a40");
+        run_setter_case(slot_00537a70,
+                        reinterpret_cast<const void*>(&porsche::scene_blur_state_flag_00537a70),
+                        v, "flag 00537a70");
+    }
+
+    // 1. Neither slot matches self
+    run_commit_case([]() {
+        store32(g_movie_sub, 0x08u, address(g_other_buf));
+        store32(g_movie_sub, 0x0cu, address(g_other_buf));
+        for (U i = 0u; i < 7u; ++i) {
+            g_input_28[i] = 0x5000u + i;
+        }
+    }, "commit neither slot");
+
+    // 2. Slot +0x08 matches self, all 7 differ
+    run_commit_case([]() {
+        store32(g_movie_sub, 0x08u, address(g_state_buf));
+        store32(g_movie_sub, 0x0cu, address(g_other_buf));
+        for (U i = 0u; i < 7u; ++i) {
+            g_input_28[i] = 0x9000u + i;
+        }
+    }, "commit slot8 all differ");
+
+    // 3. Slot +0x08 matches self, partial match (even indices match cached, odd differ)
+    run_commit_case([]() {
+        store32(g_movie_sub, 0x08u, address(g_state_buf));
+        store32(g_movie_sub, 0x0cu, address(g_other_buf));
+        for (U i = 0u; i < 7u; ++i) {
+            g_input_28[i] = (i % 2u == 0u)
+                ? porsche::render_state_flush_records_005de6bc[2u * i + 1u]
+                : (0x3300u + i);
+        }
+    }, "commit slot8 partial");
+
+    // 4. Slot +0x08 matches self, all 7 match cached (zero callbacks)
+    run_commit_case([]() {
+        store32(g_movie_sub, 0x08u, address(g_state_buf));
+        for (U i = 0u; i < 7u; ++i) {
+            g_input_28[i] = porsche::render_state_flush_records_005de6bc[2u * i + 1u];
+        }
+    }, "commit slot8 all match");
+
+    // 5. Slot +0x0c matches self, all 7 differ (bank 1: records[14..27])
+    run_commit_case([]() {
+        store32(g_movie_sub, 0x08u, address(g_other_buf));
+        store32(g_movie_sub, 0x0cu, address(g_state_buf));
+        for (U i = 0u; i < 7u; ++i) {
+            g_input_28[i] = 0x7700u + i;
+        }
+    }, "commit slotc all differ");
+
+    // 6. Slot +0x0c matches self, partial match (odd indices match cached, even differ)
+    run_commit_case([]() {
+        store32(g_movie_sub, 0x08u, address(g_other_buf));
+        store32(g_movie_sub, 0x0cu, address(g_state_buf));
+        for (U i = 0u; i < 7u; ++i) {
+            g_input_28[i] = (i % 2u != 0u)
+                ? porsche::render_state_flush_records_005de6bc[14u + 2u * i + 1u]
+                : (0x4400u + i);
+        }
+    }, "commit slotc partial");
+
+    // 7. Slot +0x0c matches self, all 7 match cached
+    run_commit_case([]() {
+        store32(g_movie_sub, 0x0cu, address(g_state_buf));
+        for (U i = 0u; i < 7u; ++i) {
+            g_input_28[i] = porsche::render_state_flush_records_005de6bc[14u + 2u * i + 1u];
+        }
+    }, "commit slotc all match");
+
+    // 8. Both +0x08 and +0x0c equal self: original takes +0x08 branch and returns
+    run_commit_case([]() {
+        store32(g_movie_sub, 0x08u, address(g_state_buf));
+        store32(g_movie_sub, 0x0cu, address(g_state_buf));
+        for (U i = 0u; i < 7u; ++i) {
+            g_input_28[i] = 0x8800u + i;
+        }
+    }, "commit both slots prefer slot8");
+
+    // 9. Multi-step commit sequence (commit then re-commit with partial delta) on both banks
+    for (U bank_off : {0x08u, 0x0cu}) {
+        Snapshot orig{};
+        Snapshot cpp{};
+        auto run_seq = [&](const void* fn, Snapshot& out) {
+            reset_fixtures(5u);
+            store32(g_movie_sub, bank_off, address(g_state_buf));
+            for (U i = 0u; i < 7u; ++i) {
+                g_input_28[i] = 0x10u + i;
+            }
+            U fail = invoke_thiscall_1_u32(fn, g_state_buf, address(g_input_28));
+            g_input_28[0] = 0x99u;
+            g_input_28[3] = 0x77u;
+            g_input_28[6] = 0u;
+            fail |= invoke_thiscall_1_u32(fn, g_state_buf, address(g_input_28));
+            capture(out, fail);
+        };
+        run_seq(slot_00536470, orig);
+        run_seq(reinterpret_cast<const void*>(&porsche::scene_blur_state_commit_00536470), cpp);
+        check_equal(orig, cpp, "commit multi-step sequence");
+    }
+
+    std::printf("scene_blur_state_774_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

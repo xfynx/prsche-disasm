@@ -1,6 +1,17 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-23. [Run761](runs/761-audio-backend-range-canonical-state/README.md)
+Current 2026-11-24. [Run776](runs/776-scene-blur-and-input-render-integration/README.md)
+PASS (`build-001`): folds frozen `774/002` (`00537a30`, `00537a40`,
+`00537a70`, `00536470`) and `775/001` (`005331a0`, `00465df0`) onto `Run761`:
+**444 TUs / 8 projects**, **94 unresolved names / 101 references**, `1,097`
+source pins, `242` native comparisons, `20` mutations, `2` REA sessions
+(`v2-scene-774-rea/001`, `v2-render-input-775-rea/001`), `0` new owned bytes;
+no EXE. All 6 names close with zero new unresolved names; registry **1,247**
+(`+6` entries; `00468440` and `00533050` update those children to recovered).
+Next shared wave (`Run780`) awaits `Run773` (ready, `005898b0`/`005898f0`)
+plus Wave 2 packets (`777`–`779`).
+
+Historical: [Run761](runs/761-audio-backend-range-canonical-state/README.md)
 PASS: 442 TUs, 100 names / 107 refs, 1,092 pins; no EXE. It closes both device
 limits using Run434's canonical state (327,680 cases per optimization, 3
 mutations). Run759 REA002 audit PASS proves `005898b0` is an allocator-private

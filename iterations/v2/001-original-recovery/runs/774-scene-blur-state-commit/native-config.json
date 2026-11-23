@@ -1,0 +1,137 @@
+{
+  "run": 774,
+  "experiment": "local/experiments/v2-scene-blur-state-commit-774",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit",
+    "iterations/v2/001-original-recovery/runs/527-render-state-flush",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.hpp",
+    "iterations/v2/001-original-recovery/runs/527-render-state-flush/render_state_flush_527.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "00537a30",
+      "bytes": 9,
+      "sha256": "aa1d0523d277f6a14d7950c488982e29fa08fe5d88274b15a712c4427302720a",
+      "token": "@BODY_00537A30@"
+    },
+    {
+      "va": "00537a40",
+      "bytes": 10,
+      "sha256": "01caaa228fe4f4c7fe4269994a79702b290762107c5e6b67c17e8d8525fc7585",
+      "token": "@BODY_00537A40@"
+    },
+    {
+      "va": "00537a70",
+      "bytes": 13,
+      "sha256": "cef962854bdb7e3321a10f6baeffd7c5f935c62ac57fd03076a9d9f9b8040abd",
+      "token": "@BODY_00537A70@"
+    },
+    {
+      "va": "00536470",
+      "bytes": 150,
+      "sha256": "e7fe7dd1c178e26c14d536be8f8b2d19907967b2dcbf065f9b6a1e98ee78744d",
+      "token": "@BODY_00536470@"
+    }
+  ],
+  "pass_marker": "scene_blur_state_774_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-quality-offset",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "store32(self, 0x00u, value);",
+      "new": "store32(self, 0x04u, value);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-one-offset",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "store32(self, 0x04u, value);",
+      "new": "store32(self, 0x08u, value);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-flag-first-offset",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "store32(self, 0x14u, value);",
+      "new": "store32(self, 0x10u, value);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-flag-second-offset",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "store32(self, 0x18u, value);",
+      "new": "store32(self, 0x1cu, value);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-commit-dst-offset",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "auto* committed = static_cast<B*>(self) + 0x38u;",
+      "new": "auto* committed = static_cast<B*>(self) + 0x3cu;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-commit-copy-bytes",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "std::memcpy(committed, state_28_bytes, 28u);",
+      "new": "std::memcpy(committed, state_28_bytes, 24u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-slot8-cmp-offset",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "if (load_ptr(service_sub, 0x08u) == self) {",
+      "new": "if (load_ptr(service_sub, 0x10u) == self) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-bank-zero-base",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "flush_state_bank(committed, 0u);",
+      "new": "flush_state_bank(committed, 2u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-bank-one-base",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "flush_state_bank(committed, 14u);",
+      "new": "flush_state_bank(committed, 12u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "remove-else-prefer-both",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "} else if (load_ptr(service_sub, 0x0cu) == self) {",
+      "new": "}\n    if (load_ptr(service_sub, 0x0cu) == self) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-cached-compare-flip",
+      "source": "iterations/v2/001-original-recovery/runs/774-scene-blur-state-commit/scene_blur_state_774.cpp",
+      "old": "if (value != render_state_flush_records_005de6bc[record_index + 1u]) {",
+      "new": "if (value == render_state_flush_records_005de6bc[record_index + 1u]) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

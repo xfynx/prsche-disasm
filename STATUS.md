@@ -1,10 +1,19 @@
 # Current project status
 
-Updated 2026-11-23. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run761](iterations/v2/001-original-recovery/runs/761-audio-backend-range-canonical-state/README.md)
+[Run776](iterations/v2/001-original-recovery/runs/776-scene-blur-and-input-render-integration/README.md)
+build compiles 444 C++ translation units across eight projects. The shared
+link reports **94 unresolved names / 101 references**. There is no game EXE.
+The shared audit accepts Runs774/775 within their bounded domains: 6 new
+registry entries (`1,247` total), 242 original-x86 comparisons, 20 mutations,
+0 new owned data bytes, and 1,097 source pins. Six names close (`00537a30`,
+`00537a40`, `00537a70`, `00536470`, `005331a0`, `00465df0`) with zero new
+unresolved names.
+
+Historical: [Run761](iterations/v2/001-original-recovery/runs/761-audio-backend-range-canonical-state/README.md)
 build compiles 442 C++ translation units across eight projects. The shared
 link reports **100 unresolved names / 107 references**. There is no game EXE.
 The shared audit passes with 1,092 source pins. Its native range proof covers

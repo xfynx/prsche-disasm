@@ -1,0 +1,398 @@
+// Native x86-vs-C++ differential fixture for Run775 005331a0 and 00465df0.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+
+#include "input_effect_slot_render_misc_775.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kEvHasDevice = 1u,
+    kEvResetFf = 2u,
+    kEvAlloc = 3u,
+    kEvStageCtor = 4u,
+    kMaxEvents = 32u,
+};
+
+struct Event {
+    U type;
+    U a;
+    U b;
+};
+
+struct Snapshot {
+    U abi_fail;
+    U event_count;
+    Event events[kMaxEvents];
+    U directinput_ptr;
+    U secondary_obj_offset;
+    U flags_04[32];
+    B stage_buf[0x60];
+};
+
+static U cases = 0u;
+static U side = 0u;
+static U has_device_mode = 0u;
+static U reset_ff_mode = 0u;
+static U alloc_mode = 0u;
+static U root_sentinel = 0x12345678u;
+static B stage_buf[0x60]{};
+static Event events[kMaxEvents]{};
+static U event_count = 0u;
+static Snapshot trace{};
+static Snapshot expected{};
+static B* code = nullptr;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", why, cases, side);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static LONG WINAPI fault(EXCEPTION_POINTERS* info) {
+    std::printf("divergence native-fault %08lx case=%u side=%u\n",
+                info->ExceptionRecord->ExceptionCode, cases, side);
+    std::fflush(stdout);
+    ExitProcess(7);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static U ptr_u(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static void record_event(U type, U a, U b) {
+    if (event_count < kMaxEvents) {
+        events[event_count++] = Event{type, a, b};
+    }
+}
+
+static void reset_state(
+    bool root_present,
+    U initial_secondary_marker,
+    const U initial_flags[32],
+    U dev_mode,
+    U ff_mode,
+    U alc_mode) {
+    has_device_mode = dev_mode;
+    reset_ff_mode = ff_mode;
+    alloc_mode = alc_mode;
+    event_count = 0u;
+    std::memset(events, 0, sizeof events);
+    std::memset(stage_buf, 0xa7, sizeof stage_buf);
+    porsche::input_directinput_0069cb08 = root_present ? &root_sentinel : nullptr;
+    if (initial_secondary_marker == 0u) {
+        porsche::render_secondary_object_0062810c = nullptr;
+    } else if (initial_secondary_marker == 1u) {
+        porsche::render_secondary_object_0062810c = &stage_buf[0x20];
+    } else {
+        porsche::render_secondary_object_0062810c = reinterpret_cast<void*>(0xdeadbeefu);
+    }
+    std::memset(porsche::input_slots_006be040, 0, sizeof porsche::input_slots_006be040);
+    for (U i = 0u; i < 32u; ++i) {
+        porsche::input_slots_006be040[i].flags_04 = initial_flags[i];
+    }
+}
+
+static void capture(Snapshot& out, U abi_fail) {
+    std::memset(&out, 0, sizeof out);
+    out.abi_fail = abi_fail;
+    out.event_count = event_count;
+    std::memcpy(out.events, events, sizeof events);
+    out.directinput_ptr = (porsche::input_directinput_0069cb08 == &root_sentinel) ? 1u : 0u;
+    const void* const sec = porsche::render_secondary_object_0062810c;
+    if (sec == nullptr) {
+        out.secondary_obj_offset = 0u;
+    } else if (sec >= &stage_buf[0] && sec < &stage_buf[sizeof stage_buf]) {
+        out.secondary_obj_offset = 0x100u + static_cast<U>(static_cast<const B*>(sec) - &stage_buf[0]);
+    } else {
+        out.secondary_obj_offset = ptr_u(sec);
+    }
+    for (U i = 0u; i < 32u; ++i) {
+        out.flags_04[i] = porsche::input_slots_006be040[i].flags_04;
+    }
+    std::memcpy(out.stage_buf, stage_buf, sizeof stage_buf);
+}
+
+static void compare_snapshots(const char* label) {
+    require(expected.abi_fail == 0u && trace.abi_fail == 0u, label);
+    require(std::memcmp(&expected, &trace, sizeof(Snapshot)) == 0, label);
+}
+
+} // namespace
+
+namespace porsche {
+
+void* input_directinput_0069cb08 = nullptr;
+InputSlot input_slots_006be040[32]{};
+void* render_secondary_object_0062810c = nullptr;
+
+std::uint32_t __cdecl input_slot_has_device_00532b50(std::int32_t index) {
+    record_event(kEvHasDevice, static_cast<U>(index), has_device_mode);
+    if (index < 0 || index >= 32) {
+        return 0u;
+    }
+    if (has_device_mode == 0u) {
+        return 0u;
+    }
+    if (has_device_mode == 1u) {
+        return 1u;
+    }
+    return ((static_cast<U>(index) & 1u) == 0u) ? 1u : 0u;
+}
+
+std::uint32_t __cdecl input_slot_reset_ff_00533120(std::int32_t slot_index) {
+    record_event(kEvResetFf, static_cast<U>(slot_index), reset_ff_mode);
+    if (reset_ff_mode == 1u && slot_index >= 0 && slot_index < 32) {
+        input_slots_006be040[slot_index].flags_04 |= 0x80000002u;
+        return 0x80004005u;
+    }
+    return 0u;
+}
+
+void* __cdecl startup_network_allocate_0059ef90(std::uint32_t bytes) {
+    record_event(kEvAlloc, bytes, alloc_mode);
+    if (alloc_mode == 0u) {
+        return nullptr;
+    }
+    std::memset(stage_buf, 0x33, bytes < sizeof stage_buf ? bytes : sizeof stage_buf);
+    return &stage_buf[0];
+}
+
+void* __fastcall scene_stage_group_ctor_0059f070(void* self, void* unused_edx) {
+    (void)unused_edx;
+    const U off = (self == &stage_buf[0]) ? 0u : ptr_u(self);
+    record_event(kEvStageCtor, off, alloc_mode);
+    auto* bytes = static_cast<B*>(self);
+    bytes[0] = 0x5au;
+    bytes[4] = 0x12u;
+    if (alloc_mode == 2u) {
+        return bytes + 4;
+    }
+    return self;
+}
+
+} // namespace porsche
+
+namespace {
+
+static void invoke_cdecl1_void(void* fn, U arg0, U& abi_fail) {
+    U fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je ok
+    bad:
+        mov fail, 1
+    ok:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+}
+
+static void invoke_cdecl0_void(void* fn, U& abi_fail) {
+    U fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je ok
+    bad:
+        mov fail, 1
+    ok:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+}
+
+static U load32_unaligned(const B* p) {
+    U v = 0u;
+    std::memcpy(&v, p, sizeof v);
+    return v;
+}
+
+static void patch_rel(B* base, U off, U src_va, U target_va, U dst) {
+    const U insn_next_va = src_va + off + 4u;
+    require(static_cast<U>(static_cast<I>(insn_next_va) + load32_unaligned(base + off)) == target_va,
+            "patch_rel-mismatch");
+    const I new_rel = static_cast<I>(dst - (ptr_u(base + off) + 4u));
+    std::memcpy(base + off, &new_rel, sizeof new_rel);
+}
+
+static void patch_abs(B* base, U off, U expected_va, U actual_addr) {
+    require(load32_unaligned(base + off) == expected_va, "patch_abs-mismatch");
+    std::memcpy(base + off, &actual_addr, sizeof actual_addr);
+}
+
+static B* setup_original_code() {
+    static const B body_5331a0[] = { @BODY_005331A0@ };
+    static const B body_465df0[] = { @BODY_00465DF0@ };
+    static_assert(sizeof body_5331a0 == 76u, "005331a0 size");
+    static_assert(sizeof body_465df0 == 38u, "00465df0 size");
+
+    B* const mem = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(mem != nullptr, "virtualalloc");
+    std::memset(mem, 0xcc, 4096u);
+
+    B* const s_5331a0 = mem + 0x000u;
+    B* const s_465df0 = mem + 0x100u;
+    std::memcpy(s_5331a0, body_5331a0, sizeof body_5331a0);
+    std::memcpy(s_465df0, body_465df0, sizeof body_465df0);
+
+    // 005331a0 patches
+    patch_abs(s_5331a0, 0x01u, 0x0069cb08u, ptr_u(&porsche::input_directinput_0069cb08));
+    patch_rel(s_5331a0, 0x11u, 0x005331a0u, 0x00532b50u,
+              ptr_u(reinterpret_cast<void*>(&porsche::input_slot_has_device_00532b50)));
+    const U flags0_addr = ptr_u(&porsche::input_slots_006be040[0].flags_04);
+    patch_abs(s_5331a0, 0x29u, 0x006be044u, flags0_addr);
+    patch_rel(s_5331a0, 0x32u, 0x005331a0u, 0x00533120u,
+              ptr_u(reinterpret_cast<void*>(&porsche::input_slot_reset_ff_00533120)));
+    patch_abs(s_5331a0, 0x39u, 0x006be044u, flags0_addr);
+    patch_abs(s_5331a0, 0x45u, 0x006be044u, flags0_addr);
+
+    // 00465df0 patches
+    patch_rel(s_465df0, 0x03u, 0x00465df0u, 0x0059ef90u,
+              ptr_u(reinterpret_cast<void*>(&porsche::startup_network_allocate_0059ef90)));
+    patch_rel(s_465df0, 0x11u, 0x00465df0u, 0x0059f070u,
+              ptr_u(reinterpret_cast<void*>(&porsche::scene_stage_group_ctor_0059f070)));
+    patch_abs(s_465df0, 0x16u, 0x0062810cu, ptr_u(&porsche::render_secondary_object_0062810c));
+    patch_abs(s_465df0, 0x1du, 0x0062810cu, ptr_u(&porsche::render_secondary_object_0062810c));
+
+    FlushInstructionCache(GetCurrentProcess(), mem, 4096u);
+    return mem;
+}
+
+static void run_cleanup_case(
+    bool root_present,
+    const U initial_flags[32],
+    U dev_mode,
+    U ff_mode,
+    I slot_index) {
+    B* const fn_orig = code + 0x000u;
+    void* const fn_cpp = reinterpret_cast<void*>(&porsche::input_slot_effect_cleanup_005331a0);
+    U abi_orig = 0u, abi_cpp = 0u;
+
+    side = 0u;
+    reset_state(root_present, 0u, initial_flags, dev_mode, ff_mode, 0u);
+    invoke_cdecl1_void(fn_orig, static_cast<U>(slot_index), abi_orig);
+    capture(expected, abi_orig);
+
+    side = 1u;
+    reset_state(root_present, 0u, initial_flags, dev_mode, ff_mode, 0u);
+    invoke_cdecl1_void(fn_cpp, static_cast<U>(slot_index), abi_cpp);
+    capture(trace, abi_cpp);
+
+    compare_snapshots("005331a0");
+    ++cases;
+}
+
+static void run_render_misc_case(U initial_secondary_marker, U alc_mode) {
+    static const U zero_flags[32]{};
+    B* const fn_orig = code + 0x100u;
+    void* const fn_cpp = reinterpret_cast<void*>(&porsche::render_misc_00465df0);
+    U abi_orig = 0u, abi_cpp = 0u;
+
+    side = 0u;
+    reset_state(false, initial_secondary_marker, zero_flags, 0u, 0u, alc_mode);
+    invoke_cdecl0_void(fn_orig, abi_orig);
+    capture(expected, abi_orig);
+
+    side = 1u;
+    reset_state(false, initial_secondary_marker, zero_flags, 0u, 0u, alc_mode);
+    invoke_cdecl0_void(fn_cpp, abi_cpp);
+    capture(trace, abi_cpp);
+
+    compare_snapshots("00465df0");
+    ++cases;
+}
+
+} // namespace
+
+int main() {
+    AddVectoredExceptionHandler(1, fault);
+    code = setup_original_code();
+
+    U flags_pattern_a[32]{};
+    U flags_pattern_b[32]{};
+    for (U i = 0u; i < 32u; ++i) {
+        flags_pattern_a[i] = (i == 0u) ? 0x00000002u : ((i & 1u) ? 0xa5a5a5a5u : 0x00000003u);
+        flags_pattern_b[i] = 0xffffffffu ^ ((i == 17u) ? 0u : 1u);
+    }
+
+    // 005331a0 matrix
+    for (bool root : {false, true}) {
+        for (U dev_mode : {0u, 1u, 2u}) {
+            for (U ff_mode : {0u, 1u}) {
+                for (I slot : {-1, 0, 1, 7, 17, 31, 32}) {
+                    run_cleanup_case(root, flags_pattern_a, dev_mode, ff_mode, slot);
+                }
+            }
+        }
+    }
+    run_cleanup_case(true, flags_pattern_b, 1u, 0u, 17);
+    run_cleanup_case(true, flags_pattern_b, 1u, 1u, 17);
+    run_cleanup_case(true, flags_pattern_b, 1u, 0u, 0);
+
+    // 00465df0 matrix
+    for (U init_sec : {0u, 1u, 2u}) {
+        for (U alc_mode : {0u, 1u, 2u}) {
+            run_render_misc_case(init_sec, alc_mode);
+        }
+    }
+
+    std::printf("input_effect_slot_render_misc_775_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

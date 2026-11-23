@@ -19,10 +19,11 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run749](iterations/v2/001-original-recovery/runs/749-audio-schl-integration/README.md)
-is the current shared build (`438` TUs, `98` unresolved names / `106`
-references). The audio SCHl parent now consumes Run744's parser. Run745 remains
-a proof-only render boundary; the active iteration plan owns its next steps.
+[Run776](iterations/v2/001-original-recovery/runs/776-scene-blur-and-input-render-integration/README.md)
+is the current shared build (`444` TUs, `94` unresolved names / `101`
+references). It integrates Run774 (scene blur state setters/commit) and Run775
+(input slot effect cleanup and render secondary alloc). Active workers are
+preparing the next audio/scene/render packets (`Run773`, `Run777`–`Run779`).
 
 ## Recovery milestones
 

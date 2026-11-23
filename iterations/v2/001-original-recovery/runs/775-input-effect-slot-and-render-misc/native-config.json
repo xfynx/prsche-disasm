@@ -1,0 +1,114 @@
+{
+  "run": 775,
+  "experiment": "local/experiments/v2-input-effect-slot-and-render-misc-775",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/input_effect_slot_render_misc_775.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc",
+    "iterations/v2/001-original-recovery/runs/752-input-effect-cleanup",
+    "iterations/v2/001-original-recovery/runs/742-scene-stage-group-ctor",
+    "iterations/v2/001-original-recovery/runs/701-view-teardown-route-family",
+    "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/680-input-ff-slot-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/676-startup-input-slot-and-math-leaves",
+    "iterations/v2/001-original-recovery/runs/494-render-resource-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005331a0",
+      "bytes": 76,
+      "sha256": "8620ae7652c994d1c3b86c17b408c40f5970fd056972c36c8d6b0d6fe1be5cf9",
+      "token": "@BODY_005331A0@"
+    },
+    {
+      "va": "00465df0",
+      "bytes": 38,
+      "sha256": "de15fe8feb9be8912f2b5fa4bacee322c1534a220b952fcc0699451b70cd49a6",
+      "token": "@BODY_00465DF0@"
+    }
+  ],
+  "pass_marker": "input_effect_slot_render_misc_775_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-5331a0-root-gate",
+      "source": "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/input_effect_slot_render_misc_775.cpp",
+      "old": "    if (input_directinput_0069cb08 == nullptr) {",
+      "new": "    if (input_directinput_0069cb08 != nullptr) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-5331a0-has-device-gate",
+      "source": "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/input_effect_slot_render_misc_775.cpp",
+      "old": "    if (input_slot_has_device_00532b50(slot_index) == 0u) {",
+      "new": "    if (input_slot_has_device_00532b50(slot_index) != 0u) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-5331a0-flag-bit",
+      "source": "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/input_effect_slot_render_misc_775.cpp",
+      "old": "    if ((input_slots_006be040[slot_index].flags_04 & 1u) == 0u) {",
+      "new": "    if ((input_slots_006be040[slot_index].flags_04 & 2u) == 0u) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-5331a0-skip-reset",
+      "source": "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/input_effect_slot_render_misc_775.cpp",
+      "old": "    input_slot_reset_ff_00533120(slot_index);\n    input_slots_006be040[slot_index].flags_04 &= ~1u;",
+      "new": "    input_slots_006be040[slot_index].flags_04 &= ~1u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-5331a0-clear-bit",
+      "source": "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/input_effect_slot_render_misc_775.cpp",
+      "old": "    input_slots_006be040[slot_index].flags_04 &= ~1u;",
+      "new": "    input_slots_006be040[slot_index].flags_04 &= ~2u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-5331a0-slot-index",
+      "source": "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/input_effect_slot_render_misc_775.cpp",
+      "old": "    input_slot_reset_ff_00533120(slot_index);\n    input_slots_006be040[slot_index].flags_04 &= ~1u;",
+      "new": "    input_slot_reset_ff_00533120(slot_index);\n    input_slots_006be040[0].flags_04 &= ~1u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-465df0-alloc-size",
+      "source": "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/input_effect_slot_render_misc_775.cpp",
+      "old": "    void* const object = startup_network_allocate_0059ef90(0x4cu);",
+      "new": "    void* const object = startup_network_allocate_0059ef90(0x48u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-465df0-null-store",
+      "source": "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/input_effect_slot_render_misc_775.cpp",
+      "old": "    } else {\n        render_secondary_object_0062810c = nullptr;\n    }",
+      "new": "    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-465df0-ctor-result",
+      "source": "iterations/v2/001-original-recovery/runs/775-input-effect-slot-and-render-misc/input_effect_slot_render_misc_775.cpp",
+      "old": "        render_secondary_object_0062810c = scene_stage_group_ctor_0059f070(object, nullptr);",
+      "new": "        (void)scene_stage_group_ctor_0059f070(object, nullptr);\n        render_secondary_object_0062810c = object;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

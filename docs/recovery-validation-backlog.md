@@ -1,6 +1,12 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run761 PASS (442 TU, 100 / 107 names / refs, 1,092 pins; no EXE).
+Текущее: Run776 PASS (`774/002` + `775/001`: 6 bodies, 242 native comparisons,
+20 mutations, 0 new owned data, 444 TUs, 94 names / 101 refs, 1,097 pins; no
+EXE; registry 1,247). Controlled `0069ed0c` + `005de72c[0..6]` D3D flush
+callbacks (`774`) and live DirectInput hardware, startup and gameplay (`775`)
+remain open.
+
+Historical: Run761 PASS (442 TU, 100 / 107 names / refs, 1,092 pins; no EXE).
 Run759 REA PASS: `005898b0` private-list scan; `00565d60`/`00565720` reuse
 Run435/434; `00590420` remains unowned. Run773 is proving the scan natively.
 
