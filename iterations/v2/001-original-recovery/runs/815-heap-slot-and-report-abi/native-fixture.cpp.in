@@ -1,0 +1,328 @@
+// Native x86-vs-C++ differential fixture for Run815 00569a70 and 005a177b ABI bindings.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "heap_slot_815.hpp"
+#include "porsche/exit_registry.hpp"
+#include "porsche/formatter_cleanup.hpp"
+#include "porsche/formatter_entry.hpp"
+#include "porsche/formatter_lowio.hpp"
+#include "porsche/formatter_runtime_storage.hpp"
+#include "porsche/formatter_stdio.hpp"
+#include "porsche/heap.hpp"
+
+extern "C" void __cdecl call_render_report_815(const char* format, std::uint32_t value);
+extern "C" void __cdecl call_scene_report_815(const char* format, std::uint32_t value);
+extern "C" void* __cdecl render_report_addr_815();
+extern "C" void* __cdecl scene_report_addr_815();
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kMaxEvents = 16u,
+};
+
+struct EventRec {
+    U kind;
+    U a0;
+    U a1;
+    U a2;
+};
+
+struct Snapshot {
+    U abi_fail;
+    U ret;
+    U ev_count;
+    EventRec ev[kMaxEvents];
+    porsche::FormatterOriginalDescriptor32 stream1;
+    U alloc_count;
+};
+
+static U cases = 0u;
+static Snapshot expected{};
+static Snapshot actual{};
+static Snapshot* cur = nullptr;
+
+static porsche::OriginalHeap dummy_heaps[16]{};
+static B malloc_buf[0x1000]{};
+static U fake_char_dev = 1u;
+static U fake_malloc_ok = 1u;
+
+static B* code_569a70 = nullptr;
+static B* code_5a177b = nullptr;
+
+static U addr_u32(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static void write_u32(B* dst, U v) {
+    std::memcpy(dst, &v, sizeof(v));
+}
+
+static void write_rel32(B* imm_slot, const void* target) {
+    const std::intptr_t delta =
+        reinterpret_cast<const B*>(target) - (imm_slot + 4);
+    const std::int32_t rel = static_cast<std::int32_t>(delta);
+    std::memcpy(imm_slot, &rel, sizeof(rel));
+}
+
+static void record_event(U kind, U a0, U a1, U a2) {
+    if (cur == nullptr || cur->ev_count >= kMaxEvents) {
+        return;
+    }
+    auto& e = cur->ev[cur->ev_count++];
+    e.kind = kind;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+}
+
+static void reset_stdio_env(U is_char, U allow_malloc, U init_flags) {
+    std::memset(porsche::formatter_iob_entries_005e54e8, 0,
+                sizeof(porsche::formatter_iob_entries_005e54e8));
+    porsche::formatter_stdio_buffers_006afd60[0] = nullptr;
+    porsche::formatter_stdio_buffers_006afd60[1] = nullptr;
+    porsche::formatter_output_allocations_006afcf8 = 0u;
+    std::memset(malloc_buf, 0, sizeof(malloc_buf));
+    fake_char_dev = is_char;
+    fake_malloc_ok = allow_malloc;
+
+    auto* raw = reinterpret_cast<B*>(&porsche::formatter_iob_entries_005e54e8[1]);
+    write_u32(raw + 12u, init_flags);
+    write_u32(raw + 16u, 1u);
+}
+
+static void init_original_code() {
+    static const B kRaw569a70[28] = {
+        @BODY_00569A70@
+    };
+    static const B kRaw5a177b[65] = {
+        @BODY_005A177B@
+    };
+
+    auto* const mem = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    code_569a70 = mem;
+    code_5a177b = mem + 256u;
+
+    std::memcpy(code_569a70, kRaw569a70, sizeof(kRaw569a70));
+    std::memcpy(code_5a177b, kRaw5a177b, sizeof(kRaw5a177b));
+
+    // 00569a70: 0x6b4f2c (&heaps[3]) at +0x06, 0x6b4f60 (&heaps[16]) at +0x15.
+    write_u32(code_569a70 + 0x06u, addr_u32(&porsche::heaps_006b4f20[3]));
+    write_u32(code_569a70 + 0x15u, addr_u32(&porsche::heaps_006b4f20[16]));
+
+    // 005a177b: 0x5e5508 (&iob[1]) at +0x03, calls at +0x0c/+0x12/+0x23/+0x2c/+0x34.
+    write_u32(code_5a177b + 0x03u, addr_u32(&porsche::formatter_iob_entries_005e54e8[1]));
+    write_rel32(code_5a177b + 0x0cu, reinterpret_cast<const void*>(&porsche::formatter_stdio_lock_index_005a3719));
+    write_rel32(code_5a177b + 0x12u, reinterpret_cast<const void*>(&porsche::formatter_stdio_temporary_buffer_005a533e));
+    write_rel32(code_5a177b + 0x23u, reinterpret_cast<const void*>(&porsche::formatter_core_005a4371));
+    write_rel32(code_5a177b + 0x2cu, reinterpret_cast<const void*>(&porsche::formatter_stdio_finish_buffer_005a53cb));
+    write_rel32(code_5a177b + 0x34u, reinterpret_cast<const void*>(&porsche::formatter_stdio_unlock_index_005a376b));
+
+    FlushInstructionCache(GetCurrentProcess(), mem, 512u);
+}
+
+static void fail_case(const char* name) {
+    std::printf("divergence %s\n", name);
+    std::printf("  expected: abi=%u ret=0x%08x ev=%u alloc=%u\n",
+                expected.abi_fail, expected.ret, expected.ev_count, expected.alloc_count);
+    std::printf("  actual:   abi=%u ret=0x%08x ev=%u alloc=%u\n",
+                actual.abi_fail, actual.ret, actual.ev_count, actual.alloc_count);
+    std::fflush(nullptr);
+    ExitProcess(10u);
+}
+
+static void run_heap_slot(const char* name) {
+    ++cases;
+    U esp_before = 0u, esp_after = 0u;
+    U ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+    U ret_raw = 0u;
+    B* raw_fn = code_569a70;
+
+    std::memset(&expected, 0, sizeof(expected));
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_before, esp
+        mov eax, raw_fn
+        call eax
+        mov esp_after, esp
+        mov ret_raw, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.ret = ret_raw;
+    expected.abi_fail = (esp_before != esp_after || ebx_b != ebx_a ||
+                         esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    actual.ret = porsche::application_heap_slot_00569a70();
+    actual.abi_fail = 0u;
+
+    if (std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+        fail_case(name);
+    }
+}
+
+static void run_report_case(
+    const char* name, bool is_scene, U is_char, U allow_malloc, U init_flags,
+    const char* fmt, U arg_val) {
+    ++cases;
+    U esp_before = 0u, esp_after = 0u;
+    U ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+    B* raw_fn = code_5a177b;
+
+    reset_stdio_env(is_char, allow_malloc, init_flags);
+    std::memset(&expected, 0, sizeof(expected));
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_before, esp
+        push arg_val
+        push fmt
+        mov eax, raw_fn
+        call eax
+        add esp, 8
+        mov esp_after, esp
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.ret = 0u;
+    expected.abi_fail = (esp_before != esp_after || ebx_b != ebx_a ||
+                         esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+    expected.stream1 = porsche::formatter_iob_entries_005e54e8[1];
+    expected.alloc_count = porsche::formatter_output_allocations_006afcf8;
+
+    reset_stdio_env(is_char, allow_malloc, init_flags);
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    if (is_scene) {
+        call_scene_report_815(fmt, arg_val);
+    } else {
+        call_render_report_815(fmt, arg_val);
+    }
+    actual.ret = 0u;
+    actual.abi_fail = 0u;
+    actual.stream1 = porsche::formatter_iob_entries_005e54e8[1];
+    actual.alloc_count = porsche::formatter_output_allocations_006afcf8;
+
+    if (std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+        fail_case(name);
+    }
+}
+
+} // namespace
+
+namespace porsche {
+
+OriginalHeap* heaps_006b4f20[16]{};
+FormatterOriginalDescriptor32 formatter_iob_entries_005e54e8[20]{};
+std::uint32_t formatter_output_allocations_006afcf8 = 0u;
+
+void __cdecl exit_registry_lock_api_005a4ba4(std::uint32_t lock_id) {
+    record_event(1u, lock_id, 0u, 0u);
+}
+
+void __cdecl exit_registry_unlock_api_005a4c05(std::uint32_t lock_id) {
+    record_event(2u, lock_id, 0u, 0u);
+}
+
+void* __cdecl exit_registry_malloc_005a3be5(std::uint32_t bytes) {
+    record_event(3u, bytes, fake_malloc_ok, 0u);
+    return fake_malloc_ok ? static_cast<void*>(malloc_buf) : nullptr;
+}
+
+void __stdcall formatter_lowio_critical_enter(void* crit) {
+    record_event(4u, addr_u32(crit), 0u, 0u);
+}
+
+void __stdcall formatter_lowio_critical_leave(void* crit) {
+    record_event(5u, addr_u32(crit), 0u, 0u);
+}
+
+std::uint32_t __cdecl cleanup_is_character_device_005abf35(std::uint32_t file_id) {
+    record_event(6u, file_id, fake_char_dev, 0u);
+    return fake_char_dev;
+}
+
+std::int32_t __cdecl formatter_cleanup_file_write_005a9e49(
+    std::uint32_t file_id, const void* bytes, std::int32_t length) {
+    record_event(7u, file_id, addr_u32(bytes), static_cast<U>(length));
+    return length;
+}
+
+std::int32_t __cdecl formatter_core_005a4371(
+    FormatterDescriptor005a0fbf* descriptor, const char* format,
+    const std::uint32_t* raw_arguments) {
+    const U arg0 = (raw_arguments != nullptr) ? raw_arguments[0] : 0u;
+    record_event(8u, addr_u32(descriptor), addr_u32(format), arg0);
+    return 42;
+}
+
+} // namespace porsche
+
+int main() {
+    init_original_code();
+
+    // Verify canonical ABI aliases resolve to exact address of formatter_stdio_printf_005a177b.
+    const auto printf_addr = reinterpret_cast<const void*>(&porsche::formatter_stdio_printf_005a177b);
+    if (render_report_addr_815() != printf_addr || scene_report_addr_815() != printf_addr) {
+        std::printf("divergence alias-address-mismatch\n");
+        std::fflush(nullptr);
+        return 10;
+    }
+
+    // 1. 00569a70 heap slot scan tests (ignores slots 0..2, scans 3..15, returns 16 when full).
+    std::memset(porsche::heaps_006b4f20, 0, sizeof(porsche::heaps_006b4f20));
+    run_heap_slot("slot-all-empty");
+
+    porsche::heaps_006b4f20[0] = &dummy_heaps[0];
+    porsche::heaps_006b4f20[1] = &dummy_heaps[1];
+    porsche::heaps_006b4f20[2] = &dummy_heaps[2];
+    run_heap_slot("slot-012-full-3-empty");
+
+    for (U i = 3u; i < 8u; ++i) {
+        porsche::heaps_006b4f20[i] = &dummy_heaps[i];
+    }
+    run_heap_slot("slot-3-to-7-full");
+
+    for (U i = 8u; i < 15u; ++i) {
+        porsche::heaps_006b4f20[i] = &dummy_heaps[i];
+    }
+    run_heap_slot("slot-only-15-empty");
+
+    porsche::heaps_006b4f20[15] = &dummy_heaps[15];
+    run_heap_slot("slot-all-full-returns-16");
+
+    // 2. 005a177b canonical ABI alias tests (render & scene texture report calls).
+    run_report_case("render-report-char-malloc", false, 1u, 1u, 0u, "alloc ok [%d]", 0x01800000u);
+    run_report_case("scene-report-char-malloc", true, 1u, 1u, 0u, "scene alloc [%d]", 0x01800000u);
+    run_report_case("render-report-char-nomalloc", false, 1u, 0u, 0u, "fail %s", 0x12345678u);
+    run_report_case("scene-report-nonchar", true, 0u, 1u, 0u, "old version %u", 7u);
+    run_report_case("render-report-preflagged", false, 1u, 1u, 0x08u, "already buffered %u", 99u);
+
+    std::printf("heap_slot_and_report_abi_815_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

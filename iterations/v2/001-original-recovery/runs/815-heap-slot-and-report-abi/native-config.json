@@ -1,0 +1,77 @@
+{
+  "run": 815,
+  "experiment": "local/experiments/v2-heap-slot-and-report-abi-815",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/heap_slot_815.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/formatter_stdio.cpp",
+    "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/report_callers_815.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/heap_slot_815.hpp",
+    "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/bindings.hpp",
+    "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/bindings.json",
+    "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/bindings.cmake",
+    "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00569a70",
+      "bytes": 28,
+      "sha256": "c3d728ca7abf36ab523ba7daa2aba5ef2bf6571f9de5ddb9cd97ab1288e9d857",
+      "token": "@BODY_00569A70@"
+    },
+    {
+      "va": "005a177b",
+      "bytes": 65,
+      "sha256": "95493bc97fbb8874909f5cbe58acf62165a5a6d7e7869698711ade9d8936051c",
+      "token": "@BODY_005A177B@"
+    }
+  ],
+  "pass_marker": "heap_slot_and_report_abi_815_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-569a70-start-index",
+      "source": "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/heap_slot_815.cpp",
+      "old": "    for (std::uint32_t index = 3u; index < 16u; ++index) {",
+      "new": "    for (std::uint32_t index = 0u; index < 16u; ++index) {"
+    },
+    {
+      "name": "wrong-569a70-end-bound",
+      "source": "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/heap_slot_815.cpp",
+      "old": "    for (std::uint32_t index = 3u; index < 16u; ++index) {",
+      "new": "    for (std::uint32_t index = 3u; index < 15u; ++index) {"
+    },
+    {
+      "name": "wrong-569a70-null-check",
+      "source": "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/heap_slot_815.cpp",
+      "old": "        if (heaps_006b4f20[index] == nullptr) {",
+      "new": "        if (heaps_006b4f20[index] != nullptr) {"
+    },
+    {
+      "name": "wrong-569a70-exhausted-return",
+      "source": "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/heap_slot_815.cpp",
+      "old": "    return 16u;",
+      "new": "    return 15u;"
+    },
+    {
+      "name": "wrong-815-render-report-arg",
+      "source": "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/report_callers_815.cpp",
+      "old": "    porsche::render_display_texture_report_005a177b(format, value);",
+      "new": "    porsche::render_display_texture_report_005a177b(format, value ^ 1u);"
+    },
+    {
+      "name": "wrong-815-scene-report-arg",
+      "source": "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/report_callers_815.cpp",
+      "old": "    porsche::scene_texture_alloc_report_005a177b(format, value);",
+      "new": "    porsche::scene_texture_alloc_report_005a177b(format, value ^ 1u);"
+    }
+  ]
+}

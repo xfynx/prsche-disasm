@@ -19,10 +19,10 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run812](iterations/v2/001-original-recovery/runs/812-scene-table-load-integration/README.md)
-is the current shared build (`468` TUs, `78` unresolved names / `88`
-references), integrating Run `810` (`1,338` registry entries).
-Verified proof-only / deferred intake: [Run807](iterations/v2/001-original-recovery/runs/807-render-color-pack/README.md) (awaiting caller `00563160`/`005dec08`). Active WIP: `Run772`, `Run803`.
+[Run816](iterations/v2/001-original-recovery/runs/816-scene-register-heap-abi-integration/README.md)
+is the current shared build (`470` TUs, `74` unresolved names / `81`
+references), integrating Runs `814` and `815` (`1,346` registry entries).
+Deferred proof-only: [Run807](iterations/v2/001-original-recovery/runs/807-render-color-pack/README.md) (awaiting caller `00563160`/`005dec08`). Active WIP: `Run813`, `Run817`, `Run818`.
 
 ## Recovery milestones
 

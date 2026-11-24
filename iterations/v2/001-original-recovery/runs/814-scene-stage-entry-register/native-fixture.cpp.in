@@ -1,0 +1,870 @@
+// Native x86-vs-C++ differential fixture for Run814:
+//   005af040..005af080 ( 65B) porsche::application_page_protect_005af040
+//   0044d380..0044d515 (406B) porsche::scene_stage_entry_register_0044d380
+//   0044d520..0044d543 ( 36B) porsche::scene_stage_entry_record_init_0044d520
+//   0044d550..0044d5a1 ( 82B) porsche::scene_stage_entry_apply_state_0044d550
+//   00536120..00536173 ( 84B) porsche::scene_resource_node_clone_00536120
+//   005365a0..005365d4 ( 53B) porsche::scene_resource_node_set_name_005365a0
+//   00423840..00423882 ( 67B) porsche::scene_tree_node_advance_00423840
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "porsche/application_alloc.hpp"
+#include "render_resource_node_536.hpp"
+#include "scene_blur_state_774.hpp"
+#include "scene_sky_texture_791.hpp"
+#include "scene_stage_entry_register_814.hpp"
+#include "scene_stage_group_742.hpp"
+#include "startup_context_table_helpers_646.hpp"
+#include "startup_text_fallbacks_650.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+static void store_ptr(void* base, U off, const void* ptr) {
+    std::memcpy(static_cast<B*>(base) + off, &ptr, 4u);
+}
+
+static U fnv1a_n(const void* p, U n) {
+    const B* b = static_cast<const B*>(p);
+    U h = 2166136261u;
+    for (U i = 0u; i < n; ++i) {
+        h = (h ^ b[i]) * 16777619u;
+    }
+    return h;
+}
+
+enum : U {
+    kEvMaskPtr = 1u,
+    kEvModeSetC = 2u,
+    kEvBlurCommit = 3u,
+    kEvFind = 4u,
+    kEvCreateSky = 5u,
+    kEvPrepare = 6u,
+    kEvInsert = 7u,
+    kEvAlloc = 8u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+    U d;
+};
+
+enum : U { kMaxEvents = 32u };
+
+struct Snapshot {
+    U abi_fail;
+    U ret_eax;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    std::array<B, 0x54u> dst_node;
+    std::array<B, 0x10u> rec_buf;
+    U shared_ref;
+    U iter_ptr_addr;
+    U page0_protect;
+    U page1_protect;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static alignas(8) B g_self_obj[0x20u];
+static alignas(8) B g_tree_hdr[0x10u];
+static alignas(8) B g_sentinel[0x20u];
+static alignas(8) B g_tree_nodes[4][0x20u];
+static alignas(8) B g_src_node_a[0x54u];
+static alignas(8) B g_src_node_b[0x54u];
+static alignas(8) B g_dst_node[0x54u];
+static alignas(8) B g_rec_buf[0x10u];
+static alignas(8) B g_entry_buf[0x20u];
+static alignas(8) B g_state_28[28u];
+static alignas(4) U g_shared_ref = 0u;
+static alignas(4) U g_quality_mask = 0u;
+static void* g_iter_ptr = nullptr;
+static U g_find_mode = 0u;
+
+static void* g_iat_get_system_info = nullptr;
+static void* g_iat_virtual_protect = nullptr;
+static B* g_vm_pages = nullptr;
+
+static const char kStrClone[] = ":CLONE";
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c, d};
+}
+
+namespace porsche {
+
+const U render_resource_node_table_005bb6d4[1] = {0x535d30u};
+
+U* __cdecl startup_text_quality_mask_ptr_0044dfe0(U index) {
+    record_event(kEvMaskPtr, index, g_quality_mask);
+    return &g_quality_mask;
+}
+
+void __fastcall scene_mode_set_c_00537a20(void* self, void*, U value) {
+    store32(self, 0x0cu, value);
+    record_event(kEvModeSetC, value);
+}
+
+void __fastcall scene_blur_state_commit_00536470(
+    void* self, void*, const void* state_28_bytes) {
+    record_event(kEvBlurCommit, address(self), fnv1a_n(state_28_bytes, 28u));
+}
+
+void** __fastcall startup_context_tree_find_0044b830(
+    void* tree, void*, void** out_node, const U* key_pair) {
+    record_event(kEvFind, address(tree), key_pair[0], key_pair[1]);
+    *out_node = (g_find_mode == 0u) ? static_cast<void*>(g_sentinel)
+                                    : static_cast<void*>(g_tree_nodes[0]);
+    return out_node;
+}
+
+void* __cdecl scene_sky_texture_create_0044da10(
+    const void* chunk, U tag, U mode, void* driver, U flags) {
+    record_event(kEvCreateSky, address(chunk), tag, mode,
+                 address(driver) ^ (flags << 16u));
+    return g_dst_node;
+}
+
+void __fastcall render_resource_node_prepare_00536460(void* self, void*) {
+    record_event(kEvPrepare, address(self));
+}
+
+void* __fastcall scene_stage_entry_insert_0044db70(
+    void* tree, void*, void* out_pair, const void* entry_record) {
+    record_event(kEvInsert, address(tree), load32(entry_record, 0x00u),
+                 load32(entry_record, 0x04u),
+                 load32(entry_record, 0x08u) ^ (static_cast<const B*>(entry_record)[0x0du] << 24u));
+    store_ptr(out_pair, 0u, g_tree_nodes[0]);
+    store32(out_pair, 4u, 1u);
+    return out_pair;
+}
+
+void* __cdecl startup_network_allocate_0059ef90(U bytes) {
+    record_event(kEvAlloc, bytes);
+    require(bytes == 0x54u, "0059ef90 0x54 bound");
+    return g_dst_node;
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_005af040 = nullptr;
+static B* slot_0044d380 = nullptr;
+static B* slot_0044d520 = nullptr;
+static B* slot_0044d550 = nullptr;
+static B* slot_00536120 = nullptr;
+static B* slot_005365a0 = nullptr;
+static B* slot_00423840 = nullptr;
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void relocate_imm32(
+    B* slot, U imm_off, U expected_addr, const void* replacement) {
+    const U actual = load32(slot, imm_off);
+    require(actual == expected_addr, "imm32/disp32 target");
+    store32(slot, imm_off, address(replacement));
+}
+
+static void init() {
+    static const B body_005af040[] = {@BODY_005AF040@};
+    static const B body_0044d380[] = {@BODY_0044D380@};
+    static const B body_0044d520[] = {@BODY_0044D520@};
+    static const B body_0044d550[] = {@BODY_0044D550@};
+    static const B body_00536120[] = {@BODY_00536120@};
+    static const B body_005365a0[] = {@BODY_005365A0@};
+    static const B body_00423840[] = {@BODY_00423840@};
+    require(sizeof body_005af040 == 65u, "65B 005af040");
+    require(sizeof body_0044d380 == 406u, "406B 0044d380");
+    require(sizeof body_0044d520 == 36u, "36B 0044d520");
+    require(sizeof body_0044d550 == 82u, "82B 0044d550");
+    require(sizeof body_00536120 == 84u, "84B 00536120");
+    require(sizeof body_005365a0 == 53u, "53B 005365a0");
+    require(sizeof body_00423840 == 67u, "67B 00423840");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+
+    g_vm_pages = static_cast<B*>(VirtualAlloc(nullptr, 8192u, MEM_COMMIT | MEM_RESERVE,
+                                              PAGE_READWRITE));
+    require(g_vm_pages != nullptr, "VirtualAlloc 2 pages");
+
+    g_iat_get_system_info = reinterpret_cast<void*>(&GetSystemInfo);
+    g_iat_virtual_protect = reinterpret_cast<void*>(&VirtualProtect);
+
+    slot_005af040 = code_page + 0x000u;
+    slot_0044d380 = code_page + 0x080u;
+    slot_0044d520 = code_page + 0x240u;
+    slot_0044d550 = code_page + 0x280u;
+    slot_00536120 = code_page + 0x300u;
+    slot_005365a0 = code_page + 0x380u;
+    slot_00423840 = code_page + 0x3c0u;
+
+    std::memcpy(slot_005af040, body_005af040, sizeof body_005af040);
+    std::memcpy(slot_0044d380, body_0044d380, sizeof body_0044d380);
+    std::memcpy(slot_0044d520, body_0044d520, sizeof body_0044d520);
+    std::memcpy(slot_0044d550, body_0044d550, sizeof body_0044d550);
+    std::memcpy(slot_00536120, body_00536120, sizeof body_00536120);
+    std::memcpy(slot_005365a0, body_005365a0, sizeof body_005365a0);
+    std::memcpy(slot_00423840, body_00423840, sizeof body_00423840);
+
+    // 005af040
+    relocate_imm32(slot_005af040, 0x00au, 0x005b21b0u, &g_iat_get_system_info);
+    relocate_imm32(slot_005af040, 0x039u, 0x005b20acu, &g_iat_virtual_protect);
+
+    // 00536120
+    relocate_imm32(slot_00536120, 0x049u, 0x005bb6d4u,
+                   porsche::render_resource_node_table_005bb6d4);
+
+    // 0044d550
+    relocate_call_rel32(slot_0044d550, 0x0044d550u, 0x011u, 0x0044dfe0u,
+                        reinterpret_cast<const void*>(&porsche::startup_text_quality_mask_ptr_0044dfe0));
+    relocate_call_rel32(slot_0044d550, 0x0044d550u, 0x037u, 0x00537a20u,
+                        reinterpret_cast<const void*>(&porsche::scene_mode_set_c_00537a20));
+    relocate_call_rel32(slot_0044d550, 0x0044d550u, 0x045u, 0x00536470u,
+                        reinterpret_cast<const void*>(&porsche::scene_blur_state_commit_00536470));
+
+    // 0044d380
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x038u, 0x0044b830u,
+                        reinterpret_cast<const void*>(&porsche::startup_context_tree_find_0044b830));
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x05fu, 0x0044da10u,
+                        reinterpret_cast<const void*>(&porsche::scene_sky_texture_create_0044da10));
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x071u, 0x0044d550u, slot_0044d550);
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x080u, 0x00536460u,
+                        reinterpret_cast<const void*>(&porsche::render_resource_node_prepare_00536460));
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x08eu, 0x0044d520u, slot_0044d520);
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x09cu, 0x0044db70u,
+                        reinterpret_cast<const void*>(&porsche::scene_stage_entry_insert_0044db70));
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x0e4u, 0x00423840u, slot_00423840);
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x0f8u, 0x0059ef90u,
+                        reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x107u, 0x00536120u, slot_00536120);
+    relocate_imm32(slot_0044d380, 0x117u, 0x005ce56cu, kStrClone);
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x154u, 0x005365a0u, slot_005365a0);
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x161u, 0x0044d550u, slot_0044d550);
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x177u, 0x0044d520u, slot_0044d520);
+    relocate_call_rel32(slot_0044d380, 0x0044d380u, 0x185u, 0x0044db70u,
+                        reinterpret_cast<const void*>(&porsche::scene_stage_entry_insert_0044db70));
+}
+
+static U invoke_cdecl_3_void(const void* fn, U a0, U a1, U a2) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a2
+        push a1
+        push a0
+        mov eax, fn
+        call eax
+        add esp, 12
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espc3
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espc3:
+        cmp ebx, 0x13572468
+        je ok_ebxc3
+        or abi_fail, 2
+    ok_ebxc3:
+        cmp esi, 0x24681357
+        je ok_esic3
+        or abi_fail, 4
+    ok_esic3:
+        cmp edi, 0x55aa33cc
+        je ok_edic3
+        or abi_fail, 8
+    ok_edic3:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static U invoke_thiscall_0_void(const void* fn, void* self) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt0
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt0:
+        cmp ebx, 0x13572468
+        je ok_ebxt0
+        or abi_fail, 2
+    ok_ebxt0:
+        cmp esi, 0x24681357
+        je ok_esit0
+        or abi_fail, 4
+    ok_esit0:
+        cmp edi, 0x55aa33cc
+        je ok_edit0
+        or abi_fail, 8
+    ok_edit0:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static U invoke_thiscall_1(const void* fn, void* self, U a0, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a0
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt1
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt1:
+        cmp ebx, 0x13572468
+        je ok_ebxt1
+        or abi_fail, 2
+    ok_ebxt1:
+        cmp esi, 0x24681357
+        je ok_esit1
+        or abi_fail, 4
+    ok_esit1:
+        cmp edi, 0x55aa33cc
+        je ok_edit1
+        or abi_fail, 8
+    ok_edit1:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static U invoke_thiscall_2_void(const void* fn, void* self, U a0, U a1) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a1
+        push a0
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt2
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt2:
+        cmp ebx, 0x13572468
+        je ok_ebxt2
+        or abi_fail, 2
+    ok_ebxt2:
+        cmp esi, 0x24681357
+        je ok_esit2
+        or abi_fail, 4
+    ok_esit2:
+        cmp edi, 0x55aa33cc
+        je ok_edit2
+        or abi_fail, 8
+    ok_edit2:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static U invoke_thiscall_4(const void* fn, void* self, U a0, U a1, U a2, U a3, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a3
+        push a2
+        push a1
+        push a0
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt4
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt4:
+        cmp ebx, 0x13572468
+        je ok_ebxt4
+        or abi_fail, 2
+    ok_ebxt4:
+        cmp esi, 0x24681357
+        je ok_esit4
+        or abi_fail, 4
+    ok_esit4:
+        cmp edi, 0x55aa33cc
+        je ok_edit4
+        or abi_fail, 8
+    ok_edit4:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static U invoke_thiscall_7(
+    const void* fn, void* self,
+    U a0, U a1, U a2, U a3, U a4, U a5, U a6, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a6
+        push a5
+        push a4
+        push a3
+        push a2
+        push a1
+        push a0
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt7
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt7:
+        cmp ebx, 0x13572468
+        je ok_ebxt7
+        or abi_fail, 2
+    ok_ebxt7:
+        cmp esi, 0x24681357
+        je ok_esit7
+        or abi_fail, 4
+    ok_esit7:
+        cmp edi, 0x55aa33cc
+        je ok_edit7
+        or abi_fail, 8
+    ok_edit7:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static void reset_fixtures(U seed) {
+    g_event_count = 0u;
+    g_quality_mask = 0u;
+    g_find_mode = 0u;
+    g_shared_ref = 7u + seed;
+    g_iter_ptr = nullptr;
+    std::memset(g_events, 0, sizeof g_events);
+    std::memset(g_self_obj, 0, sizeof g_self_obj);
+    std::memset(g_tree_hdr, 0, sizeof g_tree_hdr);
+    std::memset(g_sentinel, 0, sizeof g_sentinel);
+    std::memset(g_tree_nodes, 0, sizeof g_tree_nodes);
+    std::memset(g_rec_buf, static_cast<int>(0x20u + seed), sizeof g_rec_buf);
+    std::memset(g_entry_buf, 0x11u, sizeof g_entry_buf);
+    for (U i = 0u; i < 0x54u; ++i) {
+        g_src_node_a[i] = static_cast<B>((0x30u + seed + i) & 0xffu);
+        g_src_node_b[i] = static_cast<B>((0x80u + seed + i) & 0xffu);
+        g_dst_node[i] = static_cast<B>((0x60u + seed + i) & 0xffu);
+    }
+    store_ptr(g_src_node_a, 0x20u, &g_shared_ref);
+    store_ptr(g_src_node_b, 0x20u, &g_shared_ref);
+    for (U i = 0u; i < 28u; ++i) {
+        g_state_28[i] = static_cast<B>((0x10u + i * 3u) & 0xffu);
+    }
+
+    store_ptr(g_self_obj, 0x00u, g_entry_buf); // driver
+    store32(g_self_obj, 0x04u, 2u);           // mode
+    store_ptr(g_self_obj, 0x08u, g_tree_hdr);
+    store_ptr(g_tree_hdr, 0x00u, g_sentinel);
+
+    // Sentinel links: parent=node0, left=node0, right=node1
+    store_ptr(g_sentinel, 0x04u, g_tree_nodes[0]);
+    store_ptr(g_sentinel, 0x08u, g_tree_nodes[0]);
+    store_ptr(g_sentinel, 0x0cu, g_tree_nodes[1]);
+
+    DWORD oldp = 0u;
+    (void)VirtualProtect(g_vm_pages, 8192u, PAGE_READWRITE, &oldp);
+}
+
+static U query_protect(const void* addr) {
+    MEMORY_BASIC_INFORMATION mbi{};
+    (void)VirtualQuery(addr, &mbi, sizeof mbi);
+    return mbi.Protect;
+}
+
+static void capture(Snapshot& out, U abi_fail, U ret_eax) {
+    out.abi_fail = abi_fail;
+    out.ret_eax = ret_eax;
+    out.event_count = g_event_count;
+    std::memcpy(out.events.data(), g_events, sizeof g_events);
+    std::memcpy(out.dst_node.data(), g_dst_node, sizeof g_dst_node);
+    std::memcpy(out.rec_buf.data(), g_rec_buf, sizeof g_rec_buf);
+    out.shared_ref = g_shared_ref;
+    out.iter_ptr_addr = address(g_iter_ptr);
+    out.page0_protect = query_protect(g_vm_pages);
+    out.page1_protect = query_protect(g_vm_pages + 4096u);
+}
+
+static void check_equal(const Snapshot& orig, const Snapshot& cpp, const char* tag) {
+    require(orig.abi_fail == 0u, tag);
+    require(cpp.abi_fail == 0u, tag);
+    require(orig.ret_eax == cpp.ret_eax, tag);
+    require(orig.event_count == cpp.event_count, tag);
+    for (U i = 0u; i < orig.event_count; ++i) {
+        require(orig.events[i].kind == cpp.events[i].kind &&
+                    orig.events[i].a == cpp.events[i].a &&
+                    orig.events[i].b == cpp.events[i].b &&
+                    orig.events[i].c == cpp.events[i].c &&
+                    orig.events[i].d == cpp.events[i].d,
+                tag);
+    }
+    require(orig.dst_node == cpp.dst_node, tag);
+    require(orig.rec_buf == cpp.rec_buf, tag);
+    require(orig.shared_ref == cpp.shared_ref, tag);
+    require(orig.iter_ptr_addr == cpp.iter_ptr_addr, tag);
+    require(orig.page0_protect == cpp.page0_protect, tag);
+    require(orig.page1_protect == cpp.page1_protect, tag);
+    ++cases;
+}
+
+static void wire_tree_for_register(U mode) {
+    // node0 -> parent=sentinel, left=null, right=node1
+    // node1 -> parent=node0, left=null, right=null
+    store_ptr(g_tree_nodes[0], 0x04u, g_sentinel);
+    store_ptr(g_tree_nodes[0], 0x08u, nullptr);
+    store_ptr(g_tree_nodes[0], 0x0cu, g_tree_nodes[1]);
+    store32(g_tree_nodes[0], 0x10u, 0u);
+    store32(g_tree_nodes[0], 0x14u, 0x534b5920u);
+    store_ptr(g_tree_nodes[0], 0x18u, g_src_node_a);
+
+    store_ptr(g_tree_nodes[1], 0x04u, g_tree_nodes[0]);
+    store_ptr(g_tree_nodes[1], 0x08u, nullptr);
+    store_ptr(g_tree_nodes[1], 0x0cu, nullptr);
+    store32(g_tree_nodes[1], 0x10u, 0u);
+    store32(g_tree_nodes[1], 0x14u, (mode == 3u) ? 0x534b5921u : 0x534b5920u);
+    store_ptr(g_tree_nodes[1], 0x18u, g_src_node_b);
+
+    // node0 state does NOT match g_state_28 when mode != 1;
+    // in mode 3 it matches first 24 bytes and differs only in bytes 24..27 (proves 0x1cu compare)
+    if (mode == 1u) {
+        std::memcpy(g_src_node_a + 0x38u, g_state_28, 28u);
+    } else if (mode == 3u) {
+        std::memcpy(g_src_node_a + 0x38u, g_state_28, 24u);
+    }
+    if (mode == 2u) {
+        std::memcpy(g_src_node_b + 0x38u, g_state_28, 28u);
+    }
+}
+
+int main() {
+    init();
+
+    // 1. 005af040 page protect tests (0 pages, 1 page RO->RW, 2 pages RO->RW)
+    for (U bytes : {100u, 4096u, 5000u, 8192u}) {
+        for (U ro : {1u, 0u}) {
+            Snapshot orig{}, cpp{};
+            reset_fixtures(1u);
+            if (ro == 0u) {
+                DWORD oldp = 0u;
+                (void)VirtualProtect(g_vm_pages, 8192u, PAGE_READONLY, &oldp);
+            }
+            U f0 = invoke_cdecl_3_void(slot_005af040, address(g_vm_pages), bytes, ro);
+            capture(orig, f0, 0u);
+            reset_fixtures(1u);
+            if (ro == 0u) {
+                DWORD oldp = 0u;
+                (void)VirtualProtect(g_vm_pages, 8192u, PAGE_READONLY, &oldp);
+            }
+            U f1 = invoke_cdecl_3_void(
+                reinterpret_cast<const void*>(&porsche::application_page_protect_005af040),
+                address(g_vm_pages), bytes, ro);
+            capture(cpp, f1, 0u);
+            check_equal(orig, cpp, "005af040");
+        }
+    }
+
+    // 2. 0044d520 direct record init tests
+    for (U owned : {0u, 1u}) {
+        Snapshot orig{}, cpp{};
+        U r0 = 0u, r1 = 0u;
+        reset_fixtures(2u);
+        U f0 = invoke_thiscall_4(slot_0044d520, g_rec_buf, 0x12u, 0x534b5920u,
+                                 address(g_dst_node), owned, r0);
+        capture(orig, f0, r0);
+        reset_fixtures(2u);
+        U f1 = invoke_thiscall_4(
+            reinterpret_cast<const void*>(&porsche::scene_stage_entry_record_init_0044d520),
+            g_rec_buf, 0x12u, 0x534b5920u, address(g_dst_node), owned, r1);
+        capture(cpp, f1, r1);
+        check_equal(orig, cpp, "0044d520");
+    }
+
+    // 3. 0044d550 direct state apply tests (null, non-null with bit 0x040000 clear/set)
+    for (U state_arg : {0u, address(g_state_28)}) {
+        for (U mask : {0u, 0x00040000u}) {
+            Snapshot orig{}, cpp{};
+            reset_fixtures(3u);
+            g_quality_mask = mask;
+            U f0 = invoke_thiscall_2_void(slot_0044d550, g_self_obj, address(g_dst_node), state_arg);
+            capture(orig, f0, 0u);
+            reset_fixtures(3u);
+            g_quality_mask = mask;
+            U f1 = invoke_thiscall_2_void(
+                reinterpret_cast<const void*>(&porsche::scene_stage_entry_apply_state_0044d550),
+                g_self_obj, address(g_dst_node), state_arg);
+            capture(cpp, f1, 0u);
+            check_equal(orig, cpp, "0044d550");
+        }
+    }
+
+    // 4. 00536120 direct clone tests
+    {
+        Snapshot orig{}, cpp{};
+        U r0 = 0u, r1 = 0u;
+        reset_fixtures(4u);
+        U f0 = invoke_thiscall_1(slot_00536120, g_dst_node, address(g_src_node_a), r0);
+        capture(orig, f0, r0);
+        reset_fixtures(4u);
+        U f1 = invoke_thiscall_1(
+            reinterpret_cast<const void*>(&porsche::scene_resource_node_clone_00536120),
+            g_dst_node, address(g_src_node_a), r1);
+        capture(cpp, f1, r1);
+        check_equal(orig, cpp, "00536120");
+    }
+
+    // 5. 005365a0 direct set_name tests (empty, short, 18, 19, >19)
+    for (const char* nm : {"", "AB", "SKY :CLONE", "123456789012345678", "1234567890123456789", "12345678901234567890XYZ"}) {
+        Snapshot orig{}, cpp{};
+        U r0 = 0u, r1 = 0u;
+        reset_fixtures(5u);
+        U f0 = invoke_thiscall_1(slot_005365a0, g_dst_node, address(nm), r0);
+        capture(orig, f0, 0u);
+        reset_fixtures(5u);
+        U f1 = invoke_thiscall_1(
+            reinterpret_cast<const void*>(&porsche::scene_resource_node_set_name_005365a0),
+            g_dst_node, address(nm), r1);
+        capture(cpp, f1, 0u);
+        check_equal(orig, cpp, "005365a0");
+    }
+
+    // 6. 00423840 direct tree advance tests (right child w/ left subtree, climb parent chain, rightmost->sentinel)
+    for (U start_idx : {0u, 1u, 2u, 3u}) {
+        auto setup_tree = [=]() {
+            // node0=root(k0), node1=left(node0), node2=right(node0)->left=node3
+            store_ptr(g_tree_nodes[0], 0x04u, g_sentinel);
+            store_ptr(g_tree_nodes[0], 0x08u, g_tree_nodes[1]);
+            store_ptr(g_tree_nodes[0], 0x0cu, g_tree_nodes[2]);
+            store_ptr(g_tree_nodes[1], 0x04u, g_tree_nodes[0]);
+            store_ptr(g_tree_nodes[1], 0x08u, nullptr);
+            store_ptr(g_tree_nodes[1], 0x0cu, nullptr);
+            store_ptr(g_tree_nodes[2], 0x04u, g_tree_nodes[0]);
+            store_ptr(g_tree_nodes[2], 0x08u, g_tree_nodes[3]);
+            store_ptr(g_tree_nodes[2], 0x0cu, nullptr);
+            store_ptr(g_tree_nodes[3], 0x04u, g_tree_nodes[2]);
+            store_ptr(g_tree_nodes[3], 0x08u, nullptr);
+            store_ptr(g_tree_nodes[3], 0x0cu, nullptr);
+            store_ptr(g_sentinel, 0x04u, g_tree_nodes[0]);
+            store_ptr(g_sentinel, 0x08u, g_tree_nodes[1]);
+            store_ptr(g_sentinel, 0x0cu, g_tree_nodes[2]);
+            g_iter_ptr = g_tree_nodes[start_idx];
+        };
+        Snapshot orig{}, cpp{};
+        reset_fixtures(6u);
+        setup_tree();
+        U f0 = invoke_thiscall_0_void(slot_00423840, &g_iter_ptr);
+        capture(orig, f0, 0u);
+        reset_fixtures(6u);
+        setup_tree();
+        U f1 = invoke_thiscall_0_void(
+            reinterpret_cast<const void*>(&porsche::scene_tree_node_advance_00423840),
+            &g_iter_ptr);
+        capture(cpp, f1, 0u);
+        check_equal(orig, cpp, "00423840");
+    }
+    // 2-node tree (root node0, left node1): advancing from rightmost node0 hits sentinel->right == node0
+    {
+        auto setup_2node = []() {
+            store_ptr(g_tree_nodes[0], 0x04u, g_sentinel);
+            store_ptr(g_tree_nodes[0], 0x08u, g_tree_nodes[1]);
+            store_ptr(g_tree_nodes[0], 0x0cu, nullptr);
+            store_ptr(g_tree_nodes[1], 0x04u, g_tree_nodes[0]);
+            store_ptr(g_tree_nodes[1], 0x08u, nullptr);
+            store_ptr(g_tree_nodes[1], 0x0cu, nullptr);
+            store_ptr(g_sentinel, 0x04u, g_tree_nodes[0]);
+            store_ptr(g_sentinel, 0x08u, g_tree_nodes[1]);
+            store_ptr(g_sentinel, 0x0cu, g_tree_nodes[0]);
+            g_iter_ptr = g_tree_nodes[0];
+        };
+        Snapshot orig{}, cpp{};
+        reset_fixtures(6u);
+        setup_2node();
+        U f0 = invoke_thiscall_0_void(slot_00423840, &g_iter_ptr);
+        capture(orig, f0, 0u);
+        reset_fixtures(6u);
+        setup_2node();
+        U f1 = invoke_thiscall_0_void(
+            reinterpret_cast<const void*>(&porsche::scene_tree_node_advance_00423840),
+            &g_iter_ptr);
+        capture(cpp, f1, 0u);
+        check_equal(orig, cpp, "00423840-end");
+    }
+
+    // 7. 0044d380 full register tests:
+    //    miss + one_b=0 (prepare called), miss + one_b=1 (prepare skipped),
+    //    hit node0, hit node1 after advance, miss after advance -> clone
+    for (U mode : {0u, 1u, 2u, 3u}) {
+        for (U one_b : {0u, 1u}) {
+            if (mode != 0u && one_b == 0u) {
+                continue;
+            }
+            for (U state_arg : {0u, address(g_state_28)}) {
+                if (mode != 0u && state_arg == 0u) {
+                    continue;
+                }
+                Snapshot orig{}, cpp{};
+                U r0 = 0u, r1 = 0u;
+                auto setup_reg = [=]() {
+                    g_find_mode = mode;
+                    g_quality_mask = 0x00040000u;
+                    if (mode != 0u) {
+                        wire_tree_for_register(mode);
+                    }
+                };
+                reset_fixtures(7u);
+                setup_reg();
+                U f0 = invoke_thiscall_7(
+                    slot_0044d380, g_self_obj, address(g_entry_buf), 0u,
+                    0x534b5920u, state_arg, 1u, one_b, 0x22u, r0);
+                capture(orig, f0, r0);
+                reset_fixtures(7u);
+                setup_reg();
+                U f1 = invoke_thiscall_7(
+                    reinterpret_cast<const void*>(&porsche::scene_stage_entry_register_0044d380),
+                    g_self_obj, address(g_entry_buf), 0u,
+                    0x534b5920u, state_arg, 1u, one_b, 0x22u, r1);
+                capture(cpp, f1, r1);
+                check_equal(orig, cpp, "0044d380");
+            }
+        }
+    }
+
+    std::printf("scene_stage_entry_register_814_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

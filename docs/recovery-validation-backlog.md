@@ -1,12 +1,13 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run812 PASS (`810/003`: 6 bodies, 78 cases, 10 mutations, 0B data/bss,
-468 TUs, 78/88 names/refs, 1,155 pins, registry 1,338, no EXE). `810` closes
-`0044d270` (`0059f8f0`/`0044d380`/`005af040` open). Deferred proof-only:
-Run807 (`004/receipt.json` PASS, 4 bodies, 262 cases, 10 mutations, 256B `.data`
-+ 4B `.bss`, awaiting caller `00563160`/`005dec08`).
+Текущее: Run816 PASS (`814/003` + `815/001`: 9 targets, 86 cases, 16 mutations,
+0B data/bss, 470 TUs, 74/81 names/refs, 1,161 pins, registry 1,346, no EXE).
+Closes `00569a70`/`005af040`/`0044d380`/`2x 005a177b` (`0044db70` open).
+Deferred proof-only: Run807 (`004/receipt.json` PASS, awaiting caller
+`00563160`/`005dec08`).
 
-Historical: Run809 PASS (`805/003` + `806/002`: 3 bodies, 64 cases, 19
+Historical: Run812 PASS (`810/003`: 6 bodies, 78 cases, 10 mutations, 0B
+data/bss, 468 TUs, 78/88 names/refs, 1,155 pins, registry 1,338, no EXE). Run809 PASS (`805/003` + `806/002`: 3 bodies, 64 cases, 19
 mutations, 8B `.data` + 4B `.bss` + 32B `.rdata`, 467 TUs, 76/86 names/refs,
 1,152 pins, registry 1,332, no EXE). Run808 PASS (`801/004` + `802/002`: 4
 bodies, 418 cases, 20 mutations, 13B `.rdata`, 465 TUs, 77/87 names/refs,

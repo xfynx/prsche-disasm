@@ -2547,7 +2547,7 @@
       "binary_matched": false,
       "verification": "scripts/research/verify-v2-application-heap-init.py",
       "verification_report": "iterations/v2/001-original-recovery/runs/078-shared-runtime-integration/application-heap-init/verification.json",
-      "verification_boundary": "Primary heap commit and optional object heap start; page allocation is exercised through the Run025 consumer; 005679f0 pool initialization remains a separate dependency.",
+      "verification_boundary": "Primary heap commit and optional object heap start; page allocation is exercised through the Run025 consumer; 005679f0 pool initialization remains a separate dependency. Canonical ?application_heap_slot_00569a70@porsche@@YAIXZ symbol provided by Run815 heap_slot_815.cpp (10 /Od and 10 /O2 comparisons, 6 mutations).",
       "dependency_scope": "Indexed direct call targets only; remaining indirect/platform calls documented separately."
     },
     {
@@ -26768,17 +26768,17 @@
         "00537f60",
         "0059f880",
         "0059f8a0",
-        "0059fb90"
+        "0059fb90",
+        "0044d380",
+        "005af040"
       ],
       "unrecovered_dependencies": [
-        "0044d380",
-        "0059f8f0",
-        "005af040"
+        "0059f8f0"
       ],
       "binary_matched": false,
       "verification": "scripts/research/verify-v2-native-batch.py",
       "verification_report": "local/experiments/v2-scene-stage-table-load-810/003/receipt.json",
-      "verification_boundary": "Run810 native003 (39 /Od and 39 /O2 comparisons, 10 mutations): closes Run805 child 0044d270; frontiers 0059f8f0, 0044d380, 005af040 remain open.",
+      "verification_boundary": "Run810 native003 (39 /Od and 39 /O2 comparisons, 10 mutations): closes Run805 child 0044d270; 0044d380 and 005af040 recovered in Run814, 0059f8f0 remains open.",
       "body_bytes": 165,
       "body_ranges": [
         [
@@ -26891,6 +26891,189 @@
         [
           "0059fb90",
           "0059fbbd"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "005af040",
+      "source": "iterations/v2/001-original-recovery/runs/814-scene-stage-entry-register/scene_stage_entry_register_814.cpp",
+      "status": "native-differential-verified",
+      "calling_convention": "cdecl void(void*,uint32,uint32); RET 0",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/verify-v2-native-batch.py",
+      "verification_report": "local/experiments/v2-scene-stage-entry-register-814/003/receipt.json",
+      "verification_boundary": "Run814 native003 (33 /Od and 33 /O2 comparisons, 10 mutations): Win32 VirtualProtect page rounding & RW/RO transitions.",
+      "body_bytes": 65,
+      "body_ranges": [
+        [
+          "005af040",
+          "005af080"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0044d380",
+      "source": "iterations/v2/001-original-recovery/runs/814-scene-stage-entry-register/scene_stage_entry_register_814.cpp",
+      "status": "native-differential-verified",
+      "calling_convention": "thiscall void*(void*,void*,const void*,uint32,uint32,uint32,uint32,uint32,uint32); RET 0x1c",
+      "recovered_dependencies": [
+        "0044b830",
+        "0044d520",
+        "0044d550",
+        "0044da10",
+        "0044dfe0",
+        "00536120",
+        "00536460",
+        "00536470",
+        "005365a0",
+        "00537a20",
+        "0059ef90",
+        "00423840"
+      ],
+      "unrecovered_dependencies": [
+        "0044db70"
+      ],
+      "binary_matched": false,
+      "verification": "scripts/research/verify-v2-native-batch.py",
+      "verification_report": "local/experiments/v2-scene-stage-entry-register-814/003/receipt.json",
+      "verification_boundary": "Run814 native003 (66 total comparisons, 10 mutations): closes Run810 child 0044d380; child 0044db70 remains typed frontier.",
+      "body_bytes": 406,
+      "body_ranges": [
+        [
+          "0044d380",
+          "0044d515"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0044d520",
+      "source": "iterations/v2/001-original-recovery/runs/814-scene-stage-entry-register/scene_stage_entry_register_814.cpp",
+      "status": "native-differential-verified",
+      "calling_convention": "thiscall void*(void*,void*,uint32,uint32,void*,uint8); RET 0x10",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/verify-v2-native-batch.py",
+      "verification_report": "local/experiments/v2-scene-stage-entry-register-814/003/receipt.json",
+      "verification_boundary": "Run814 native003 (66 total comparisons, 10 mutations): scene stage entry record init.",
+      "body_bytes": 36,
+      "body_ranges": [
+        [
+          "0044d520",
+          "0044d543"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "0044d550",
+      "source": "iterations/v2/001-original-recovery/runs/814-scene-stage-entry-register/scene_stage_entry_register_814.cpp",
+      "status": "native-differential-verified",
+      "calling_convention": "thiscall void(void*,void*,void*,const void*); RET 8",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/verify-v2-native-batch.py",
+      "verification_report": "local/experiments/v2-scene-stage-entry-register-814/003/receipt.json",
+      "verification_boundary": "Run814 native003 (66 total comparisons, 10 mutations): scene stage entry apply state.",
+      "body_bytes": 82,
+      "body_ranges": [
+        [
+          "0044d550",
+          "0044d5a1"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00536120",
+      "source": "iterations/v2/001-original-recovery/runs/814-scene-stage-entry-register/scene_stage_entry_register_814.cpp",
+      "status": "native-differential-verified",
+      "calling_convention": "thiscall void*(void*,void*,const void*); RET 4",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/verify-v2-native-batch.py",
+      "verification_report": "local/experiments/v2-scene-stage-entry-register-814/003/receipt.json",
+      "verification_boundary": "Run814 native003 (66 total comparisons, 10 mutations): scene resource node clone.",
+      "body_bytes": 84,
+      "body_ranges": [
+        [
+          "00536120",
+          "00536173"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "005365a0",
+      "source": "iterations/v2/001-original-recovery/runs/814-scene-stage-entry-register/scene_stage_entry_register_814.cpp",
+      "status": "native-differential-verified",
+      "calling_convention": "thiscall void(void*,void*,const char*); RET 4",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/verify-v2-native-batch.py",
+      "verification_report": "local/experiments/v2-scene-stage-entry-register-814/003/receipt.json",
+      "verification_boundary": "Run814 native003 (66 total comparisons, 10 mutations): scene resource node 19-char name setter.",
+      "body_bytes": 53,
+      "body_ranges": [
+        [
+          "005365a0",
+          "005365d4"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "00423840",
+      "source": "iterations/v2/001-original-recovery/runs/814-scene-stage-entry-register/scene_stage_entry_register_814.cpp",
+      "status": "native-differential-verified",
+      "calling_convention": "thiscall void(void*,void*); RET 0",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/verify-v2-native-batch.py",
+      "verification_report": "local/experiments/v2-scene-stage-entry-register-814/003/receipt.json",
+      "verification_boundary": "Run814 native003 (66 total comparisons, 10 mutations): scene RB-tree node advance.",
+      "body_bytes": 67,
+      "body_ranges": [
+        [
+          "00423840",
+          "00423882"
+        ]
+      ]
+    },
+    {
+      "module": "Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "entry_va": "005a177b",
+      "source": "iterations/v2/001-original-recovery/runs/815-heap-slot-and-report-abi/bindings.cmake",
+      "status": "native-differential-verified",
+      "calling_convention": "cdecl int(const char*,...); RET 0",
+      "recovered_dependencies": [],
+      "unrecovered_dependencies": [],
+      "binary_matched": false,
+      "verification": "scripts/research/verify-v2-native-batch.py",
+      "verification_report": "local/experiments/v2-heap-slot-and-report-abi-815/001/receipt.json",
+      "verification_boundary": "Run815 native001 (10 /Od and 10 /O2 comparisons, 6 mutations): linker /alternatename ABI aliases for render_display_texture_report_005a177b & scene_texture_alloc_report_005a177b -> formatter_stdio_printf_005a177b.",
+      "body_bytes": 65,
+      "body_ranges": [
+        [
+          "005a177b",
+          "005a17bb"
         ]
       ]
     }
