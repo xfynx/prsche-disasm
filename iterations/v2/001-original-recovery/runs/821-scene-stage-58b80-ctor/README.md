@@ -1,0 +1,4 @@
+# Run 821: Scene Stage-58b80 Constructor (`00458c90` Cluster)
+Closes `700`/`706`/`816` frontier `scene_stage_58b80_ctor_00458c90` (906B) + 15 callees (`00456ed0`, `004577a0`, `00457920`, `00456790`, `004580e0`, `00458150`, `005327d0`, `005327e0`, `00532880`, `005328a0`, `005328d0`, `0053c490`, `0053c5d0`, `005561d0`, `0056e8f5`); 3,677B code, 33B `.data` (`005ceeb8`), 0 new unresolved symbols.
+- REA: `local/experiments/v2-scene-stage-58b80-ctor-821-rea/001/receipt.json` + `rea/validation.json` (16 dossiers, 0 repeated_equal).
+- Native: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/821-scene-stage-58b80-ctor/native-config.json --attempt 003` -> `local/experiments/v2-scene-stage-58b80-ctor-821/003/receipt.json` PASS (`50` cases/variant `/Od` & `/O2`, `12/12` mutations killed).

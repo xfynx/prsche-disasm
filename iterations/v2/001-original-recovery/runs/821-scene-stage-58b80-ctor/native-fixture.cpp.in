@@ -1,0 +1,703 @@
+// Native x86-vs-C++ differential fixture for Run821 (00458c90 closure, 16 functions, 3,677B).
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "font_state_vec3_671.hpp"
+#include "porsche/application_alloc.hpp"
+#include "porsche/render_mode.hpp"
+#include "render_seed_prng_638.hpp"
+#include "scene_blur_program_736.hpp"
+#include "scene_blur_stage_726.hpp"
+#include "scene_stage_58b80_ctor_821.hpp"
+#include "scene_stage_reset_805.hpp"
+#include "startup_context_table_helpers_646.hpp"
+#include "startup_sequence_resource_table_649.hpp"
+
+using U = std::uint32_t;
+using U64 = std::uint64_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+static U f32_bits(float v) {
+    U b = 0u;
+    std::memcpy(&b, &v, 4u);
+    return b;
+}
+
+static U64 f64_bits(double v) {
+    U64 b = 0u;
+    std::memcpy(&b, &v, 8u);
+    return b;
+}
+
+static float bits_f32(U b) {
+    float v = 0.0f;
+    std::memcpy(&v, &b, 4u);
+    return v;
+}
+
+enum : U {
+    kEvLookup = 1u,
+    kEvAlloc = 2u,
+    kEvModeCtor = 3u,
+    kEvModeSet = 4u,
+    kEvBlurCtor = 5u,
+    kEvBlurSetup = 6u,
+    kEvPrngNext = 7u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+    U d;
+    U e;
+    U f;
+    U g;
+};
+
+enum : U { kMaxEvents = 64u, kArenaBytes = 0x30000u };
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+static alignas(16) B g_arena[kArenaBytes];
+static U g_arena_cursor = 0u;
+static alignas(16) B g_self_buf[0x9000u];
+static U g_alloc_index = 0u;
+static U g_alloc_fail_mask = 0u;
+static U g_lookup_index = 0u;
+static U g_lookup_fail_mask = 0u;
+static U g_prng_step = 0u;
+
+static U rel_ptr(const void* p) {
+    if (p == nullptr) {
+        return 0u;
+    }
+    const auto addr = reinterpret_cast<std::uintptr_t>(p);
+    const auto arena_base = reinterpret_cast<std::uintptr_t>(g_arena);
+    if (addr >= arena_base && addr < arena_base + kArenaBytes) {
+        return 0x10000000u + static_cast<U>(addr - arena_base);
+    }
+    const auto self_base = reinterpret_cast<std::uintptr_t>(g_self_buf);
+    if (addr >= self_base && addr < self_base + sizeof(g_self_buf)) {
+        return 0x20000000u + static_cast<U>(addr - self_base);
+    }
+    return static_cast<U>(addr);
+}
+
+static void record_event(
+    U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u, U e = 0u, U f = 0u, U g = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c, d, e, f, g};
+}
+
+static const char g_orig_particle_tags[33] = "0ons1ons2ons3ons0nar1nar2nar3nar";
+static B g_orig_render_mode_state[0x71]{};
+static void* g_orig_particle_owner = nullptr;
+static void* g_orig_context_owner = nullptr;
+
+static const float kConst_005b273c = 0.0078125f;
+static const float kConst_005b2428 = 1000.0f;
+static const float kConst_005b3e44 = bits_f32(0x3da3d70au);
+static const float kConst_005b3e40 = bits_f32(0x3f44ec4fu);
+static const float kConst_005b24a8 = 1.0f;
+static const float kConst_005b23f0 = 0.5f;
+static const float kConst_005b2468 = 0.25f;
+static const float kConst_005b23f8 = 0.0f;
+static const float kConst_005b253c = 1.52587890625e-05f;
+static const U64 kConst_005bb2c0_bits = 0x401921fb20000000ull;
+
+namespace porsche {
+
+std::uint8_t render_mode_state_00619790[0x71]{};
+void* scene_stage_particle_table_owner_00613e08 = nullptr;
+void* startup_context_table_owner_00613e04 = nullptr;
+
+std::uint32_t __cdecl render_seed_prng_next_00538040() {
+    ++g_prng_step;
+    const U val = (g_prng_step * 0x9e3779b9u) ^ 0x13572468u;
+    record_event(kEvPrngNext, g_prng_step, val);
+    return val;
+}
+
+float __cdecl vec3_length_00532b20(const float* vec) {
+    float result = 0.0f;
+    __asm {
+        mov eax, vec
+        fld dword ptr [eax]
+        fmul dword ptr [eax]
+        fld dword ptr [eax + 4]
+        fmul dword ptr [eax + 4]
+        faddp st(1), st(0)
+        fld dword ptr [eax + 8]
+        fmul dword ptr [eax + 8]
+        faddp st(1), st(0)
+        fsqrt
+        fstp dword ptr [result]
+    }
+    return result;
+}
+
+void* __fastcall startup_context_table_lookup_0044d320(
+    void* self, void* unused_edx, U key0, U key1) {
+    (void)unused_edx;
+    const U idx = g_lookup_index++;
+    const bool fail = ((g_lookup_fail_mask >> idx) & 1u) != 0u;
+    record_event(kEvLookup, rel_ptr(self), key0, key1, fail ? 1u : 0u);
+    if (fail) {
+        return nullptr;
+    }
+    return reinterpret_cast<void*>(static_cast<std::uintptr_t>((key1 ^ 0x11223344u) | 1u));
+}
+
+void* __cdecl startup_network_allocate_0059ef90(U bytes) {
+    const U idx = g_alloc_index++;
+    const bool fail = ((g_alloc_fail_mask >> idx) & 1u) != 0u;
+    record_event(kEvAlloc, bytes, fail ? 1u : 0u);
+    if (fail) {
+        return nullptr;
+    }
+    const U aligned = (bytes + 15u) & ~15u;
+    require(g_arena_cursor + aligned <= kArenaBytes, "arena overflow");
+    void* const p = g_arena + g_arena_cursor;
+    g_arena_cursor += aligned;
+    return p;
+}
+
+void* __fastcall scene_mode_ctor_005379f0(void* self, void* unused_edx) {
+    (void)unused_edx;
+    record_event(kEvModeCtor, rel_ptr(self));
+    store32(self, 0u, 0x5379f001u);
+    return self;
+}
+
+void __fastcall scene_mode_set_00537a50(void* self, void* unused_edx, U value) {
+    (void)unused_edx;
+    record_event(kEvModeSet, rel_ptr(self), value);
+}
+
+void* __fastcall scene_blur_program_ctor_00468240(
+    void* self, void* unused_edx, U a, U b, U c, U d, U e) {
+    (void)unused_edx;
+    record_event(kEvBlurCtor, rel_ptr(self), a, b, c, d, e);
+    store32(self, 0u, 0x46824001u);
+    return self;
+}
+
+void __fastcall scene_blur_program_setup_004685e0(
+    void* self, void* unused_edx, U a, U b, U c, U d, U e, U f) {
+    (void)unused_edx;
+    record_event(
+        kEvBlurSetup,
+        rel_ptr(self),
+        a,
+        b,
+        rel_ptr(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(c))),
+        rel_ptr(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(d))),
+        rel_ptr(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(e))),
+        f);
+}
+
+} // namespace porsche
+
+static std::int64_t __cdecl orig_ftol_005a0f98() {
+    std::uint16_t saved = 0u;
+    std::uint16_t chop = 0u;
+    std::int64_t result = 0;
+    __asm fstcw saved
+    __asm fwait
+    chop = static_cast<std::uint16_t>(saved | 0x0c00u);
+    __asm fldcw chop
+    __asm fistp qword ptr result
+    __asm fldcw saved
+    return result;
+}
+
+static B* code_page = nullptr;
+static B* slot_00458c90 = nullptr;
+static B* slot_00456ed0 = nullptr;
+static B* slot_004577a0 = nullptr;
+static B* slot_00457920 = nullptr;
+static B* slot_00456790 = nullptr;
+static B* slot_004580e0 = nullptr;
+static B* slot_00458150 = nullptr;
+static B* slot_005327d0 = nullptr;
+static B* slot_005327e0 = nullptr;
+static B* slot_00532880 = nullptr;
+static B* slot_005328a0 = nullptr;
+static B* slot_005328d0 = nullptr;
+static B* slot_0053c490 = nullptr;
+static B* slot_0053c5d0 = nullptr;
+static B* slot_005561d0 = nullptr;
+static B* slot_0056e8f5 = nullptr;
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void relocate_highlow(
+    B* slot, U orig_base_va, U off, U expected_va, const void* replacement) {
+    (void)orig_base_va;
+    const U actual_va = load32(slot, off);
+    require(actual_va == expected_va, "HIGHLOW VA");
+    store32(slot, off, address(replacement));
+}
+
+static void init() {
+    static const B body_00458c90[] = {@BODY_00458C90@};
+    static const B body_00456ed0[] = {@BODY_00456ED0@};
+    static const B body_004577a0[] = {@BODY_004577A0@};
+    static const B body_00457920[] = {@BODY_00457920@};
+    static const B body_00456790[] = {@BODY_00456790@};
+    static const B body_004580e0[] = {@BODY_004580E0@};
+    static const B body_00458150[] = {@BODY_00458150@};
+    static const B body_005327d0[] = {@BODY_005327D0@};
+    static const B body_005327e0[] = {@BODY_005327E0@};
+    static const B body_00532880[] = {@BODY_00532880@};
+    static const B body_005328a0[] = {@BODY_005328A0@};
+    static const B body_005328d0[] = {@BODY_005328D0@};
+    static const B body_0053c490[] = {@BODY_0053C490@};
+    static const B body_0053c5d0[] = {@BODY_0053C5D0@};
+    static const B body_005561d0[] = {@BODY_005561D0@};
+    static const B body_0056e8f5[] = {@BODY_0056E8F5@};
+
+    code_page = static_cast<B*>(
+        VirtualAlloc(nullptr, 8192u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc");
+
+    U cursor = 0u;
+    auto place = [&](const B* body, U len) -> B* {
+        B* p = code_page + cursor;
+        std::memcpy(p, body, len);
+        cursor = (cursor + len + 15u) & ~15u;
+        return p;
+    };
+
+    slot_00458c90 = place(body_00458c90, sizeof(body_00458c90));
+    slot_00456ed0 = place(body_00456ed0, sizeof(body_00456ed0));
+    slot_004577a0 = place(body_004577a0, sizeof(body_004577a0));
+    slot_00457920 = place(body_00457920, sizeof(body_00457920));
+    slot_00456790 = place(body_00456790, sizeof(body_00456790));
+    slot_004580e0 = place(body_004580e0, sizeof(body_004580e0));
+    slot_00458150 = place(body_00458150, sizeof(body_00458150));
+    slot_005327d0 = place(body_005327d0, sizeof(body_005327d0));
+    slot_005327e0 = place(body_005327e0, sizeof(body_005327e0));
+    slot_00532880 = place(body_00532880, sizeof(body_00532880));
+    slot_005328a0 = place(body_005328a0, sizeof(body_005328a0));
+    slot_005328d0 = place(body_005328d0, sizeof(body_005328d0));
+    slot_0053c490 = place(body_0053c490, sizeof(body_0053c490));
+    slot_0053c5d0 = place(body_0053c5d0, sizeof(body_0053c5d0));
+    slot_005561d0 = place(body_005561d0, sizeof(body_005561d0));
+    slot_0056e8f5 = place(body_0056e8f5, sizeof(body_0056e8f5));
+
+    // Relocations for 00456ed0 (354B)
+    relocate_highlow(slot_00456ed0, 0x00456ed0u, 0x04cu, 0x005b273cu, &kConst_005b273c);
+    relocate_highlow(slot_00456ed0, 0x00456ed0u, 0x096u, 0x005b2428u, &kConst_005b2428);
+    relocate_call_rel32(slot_00456ed0, 0x00456ed0u, 0x053u, 0x005327e0u, slot_005327e0);
+    relocate_call_rel32(slot_00456ed0, 0x00456ed0u, 0x08fu, 0x005561d0u, slot_005561d0);
+    relocate_call_rel32(slot_00456ed0, 0x00456ed0u, 0x09au, 0x005a0f98u, reinterpret_cast<const void*>(&orig_ftol_005a0f98));
+    relocate_call_rel32(slot_00456ed0, 0x00456ed0u, 0x0bcu, 0x00456790u, slot_00456790);
+    relocate_call_rel32(slot_00456ed0, 0x00456ed0u, 0x0eau, 0x0059ef90u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_call_rel32(slot_00456ed0, 0x00456ed0u, 0x0f8u, 0x005379f0u, reinterpret_cast<const void*>(&porsche::scene_mode_ctor_005379f0));
+    relocate_call_rel32(slot_00456ed0, 0x00456ed0u, 0x10bu, 0x00537a50u, reinterpret_cast<const void*>(&porsche::scene_mode_set_00537a50));
+    relocate_call_rel32(slot_00456ed0, 0x00456ed0u, 0x112u, 0x0059ef90u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_call_rel32(slot_00456ed0, 0x00456ed0u, 0x12au, 0x00468240u, reinterpret_cast<const void*>(&porsche::scene_blur_program_ctor_00468240));
+    relocate_call_rel32(slot_00456ed0, 0x00456ed0u, 0x155u, 0x004685e0u, reinterpret_cast<const void*>(&porsche::scene_blur_program_setup_004685e0));
+
+    // Relocations for 004577a0 (377B)
+    relocate_call_rel32(slot_004577a0, 0x004577a0u, 0x0a4u, 0x00457920u, slot_00457920);
+    relocate_call_rel32(slot_004577a0, 0x004577a0u, 0x0bdu, 0x004580e0u, slot_004580e0);
+    relocate_call_rel32(slot_004577a0, 0x004577a0u, 0x0c4u, 0x00458150u, slot_00458150);
+    relocate_call_rel32(slot_004577a0, 0x004577a0u, 0x0fdu, 0x0059ef90u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_call_rel32(slot_004577a0, 0x004577a0u, 0x10bu, 0x005379f0u, reinterpret_cast<const void*>(&porsche::scene_mode_ctor_005379f0));
+    relocate_call_rel32(slot_004577a0, 0x004577a0u, 0x11eu, 0x00537a50u, reinterpret_cast<const void*>(&porsche::scene_mode_set_00537a50));
+    relocate_call_rel32(slot_004577a0, 0x004577a0u, 0x125u, 0x0059ef90u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_call_rel32(slot_004577a0, 0x004577a0u, 0x13bu, 0x00468240u, reinterpret_cast<const void*>(&porsche::scene_blur_program_ctor_00468240));
+    relocate_call_rel32(slot_004577a0, 0x004577a0u, 0x168u, 0x004685e0u, reinterpret_cast<const void*>(&porsche::scene_blur_program_setup_004685e0));
+
+    // Relocations for 00457920 (1339B)
+    relocate_highlow(slot_00457920, 0x00457920u, 0x0bau, 0x005b3e44u, &kConst_005b3e44);
+    relocate_highlow(slot_00457920, 0x00457920u, 0x19cu, 0x005b3e44u, &kConst_005b3e44);
+    relocate_highlow(slot_00457920, 0x00457920u, 0x407u, 0x005b3e40u, &kConst_005b3e40);
+    relocate_highlow(slot_00457920, 0x00457920u, 0x413u, 0x005b24a8u, &kConst_005b24a8);
+    relocate_highlow(slot_00457920, 0x00457920u, 0x463u, 0x005b23f0u, &kConst_005b23f0);
+    relocate_highlow(slot_00457920, 0x00457920u, 0x48cu, 0x005b23f0u, &kConst_005b23f0);
+    relocate_highlow(slot_00457920, 0x00457920u, 0x4bcu, 0x005b23f0u, &kConst_005b23f0);
+    relocate_highlow(slot_00457920, 0x00457920u, 0x4e4u, 0x005b23f0u, &kConst_005b23f0);
+    relocate_highlow(slot_00457920, 0x00457920u, 0x4fau, 0x005b2468u, &kConst_005b2468);
+    relocate_highlow(slot_00457920, 0x00457920u, 0x50cu, 0x005b2468u, &kConst_005b2468);
+    relocate_highlow(slot_00457920, 0x00457920u, 0x522u, 0x005b2468u, &kConst_005b2468);
+    relocate_call_rel32(slot_00457920, 0x00457920u, 0x2d9u, 0x0053c490u, slot_0053c490);
+    relocate_call_rel32(slot_00457920, 0x00457920u, 0x2ebu, 0x0053c490u, slot_0053c490);
+    relocate_call_rel32(slot_00457920, 0x00457920u, 0x303u, 0x0053c490u, slot_0053c490);
+    relocate_call_rel32(slot_00457920, 0x00457920u, 0x315u, 0x0053c490u, slot_0053c490);
+    relocate_call_rel32(slot_00457920, 0x00457920u, 0x32eu, 0x0053c5d0u, slot_0053c5d0);
+    relocate_call_rel32(slot_00457920, 0x00457920u, 0x3b6u, 0x005328a0u, slot_005328a0);
+    relocate_call_rel32(slot_00457920, 0x00457920u, 0x3f1u, 0x005327d0u, slot_005327d0);
+    relocate_call_rel32(slot_00457920, 0x00457920u, 0x44bu, 0x005328a0u, slot_005328a0);
+
+    // Relocations for 00458c90 (906B)
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x012u, 0x006197f4u, g_orig_render_mode_state + 0x64u);
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x022u, 0x005ceeb8u, g_orig_particle_tags);
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x07eu, 0x006197f0u, g_orig_render_mode_state + 0x60u);
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x095u, 0x00613e08u, &g_orig_particle_owner);
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x0ddu, 0x00613e08u, &g_orig_particle_owner);
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x163u, 0x006197f4u, g_orig_render_mode_state + 0x64u);
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x173u, 0x005ceec8u, g_orig_particle_tags + 0x10);
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x1d2u, 0x006197f0u, g_orig_render_mode_state + 0x60u);
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x1e9u, 0x00613e08u, &g_orig_particle_owner);
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x231u, 0x00613e08u, &g_orig_particle_owner);
+    relocate_highlow(slot_00458c90, 0x00458c90u, 0x2bau, 0x00613e04u, &g_orig_context_owner);
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x0cbu, 0x0044d320u, reinterpret_cast<const void*>(&porsche::startup_context_table_lookup_0044d320));
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x0e7u, 0x0044d320u, reinterpret_cast<const void*>(&porsche::startup_context_table_lookup_0044d320));
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x142u, 0x0059ef90u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x155u, 0x00456ed0u, slot_00456ed0);
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x21fu, 0x0044d320u, reinterpret_cast<const void*>(&porsche::startup_context_table_lookup_0044d320));
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x23bu, 0x0044d320u, reinterpret_cast<const void*>(&porsche::startup_context_table_lookup_0044d320));
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x296u, 0x0059ef90u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x2acu, 0x00456ed0u, slot_00456ed0);
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x345u, 0x0044d320u, reinterpret_cast<const void*>(&porsche::startup_context_table_lookup_0044d320));
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x351u, 0x0059ef90u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_call_rel32(slot_00458c90, 0x00458c90u, 0x365u, 0x004577a0u, slot_004577a0);
+
+    // Relocations for 005327e0, 00532880, 005328a0, 005328d0, 0053c490, 005561d0
+    relocate_highlow(slot_005327e0, 0x005327e0u, 0x006u, 0x005bb2c0u, &kConst_005bb2c0_bits);
+    relocate_call_rel32(slot_00532880, 0x00532880u, 0x00fu, 0x0056e8f5u, slot_0056e8f5);
+    relocate_call_rel32(slot_005328a0, 0x005328a0u, 0x012u, 0x00532880u, slot_00532880);
+    relocate_call_rel32(slot_005328a0, 0x005328a0u, 0x021u, 0x005328d0u, slot_005328d0);
+    relocate_call_rel32(slot_005328d0, 0x005328d0u, 0x006u, 0x00532b20u, reinterpret_cast<const void*>(&porsche::vec3_length_00532b20));
+    relocate_highlow(slot_005328d0, 0x005328d0u, 0x00du, 0x005b24a8u, &kConst_005b24a8);
+    relocate_highlow(slot_0053c490, 0x0053c490u, 0x007u, 0x005b23f8u, &kConst_005b23f8);
+    relocate_highlow(slot_0053c490, 0x0053c490u, 0x014u, 0x005b24a8u, &kConst_005b24a8);
+    relocate_highlow(slot_005561d0, 0x005561d0u, 0x01fu, 0x005b253cu, &kConst_005b253c);
+    relocate_call_rel32(slot_005561d0, 0x005561d0u, 0x003u, 0x00538040u, reinterpret_cast<const void*>(&porsche::render_seed_prng_next_00538040));
+
+    FlushInstructionCache(GetCurrentProcess(), code_page, 8192u);
+}
+
+static void reset_env(U alloc_fail_mask, U lookup_fail_mask, U prng_seed) {
+    g_event_count = 0u;
+    g_arena_cursor = 0u;
+    g_alloc_index = 0u;
+    g_alloc_fail_mask = alloc_fail_mask;
+    g_lookup_index = 0u;
+    g_lookup_fail_mask = lookup_fail_mask;
+    g_prng_step = prng_seed;
+    std::memset(g_arena, 0xaa, sizeof(g_arena));
+    std::memset(g_self_buf, 0xaa, sizeof(g_self_buf));
+}
+
+static void check_math_leaves() {
+    const float sqrt_inputs[] = {0.0f, 1.0f, 2.0f, 0.25f, 13.375f, 1024.5f};
+    for (float x : sqrt_inputs) {
+        ++cases;
+        const double orig_v = reinterpret_cast<double(__cdecl*)(float)>(slot_005327d0)(x);
+        const double cpp_v = porsche::math_fsqrt_005327d0(x);
+        require(f64_bits(orig_v) == f64_bits(cpp_v), "005327d0 fsqrt");
+    }
+
+    const float sin_inputs[] = {0.0f, 0.0078125f, 0.25f, 0.5f, 0.75f, 127.0f * 0.0078125f};
+    for (float x : sin_inputs) {
+        ++cases;
+        const double orig_v = reinterpret_cast<double(__cdecl*)(float)>(slot_005327e0)(x);
+        const double cpp_v = porsche::math_fsin_tau_005327e0(x);
+        require(f64_bits(orig_v) == f64_bits(cpp_v), "005327e0 fsin");
+    }
+
+    // 0056e8f5 & 00532880 & 005328a0 & 005328d0 (including aliased out==a)
+    struct VecPair { float a[3]; float b[3]; };
+    const VecPair vp[] = {
+        {{1.0f, 2.0f, 3.0f}, {4.0f, -5.0f, 6.0f}},
+        {{0.3f, -1.7f, 2.9f}, {-0.5f, 0.8f, -1.2f}},
+    };
+    for (const auto& p : vp) {
+        ++cases;
+        float oa[3]{p.a[0], p.a[1], p.a[2]};
+        float ob[3]{p.b[0], p.b[1], p.b[2]};
+        float o_out[3]{};
+        float ca[3]{p.a[0], p.a[1], p.a[2]};
+        float cb[3]{p.b[0], p.b[1], p.b[2]};
+        float c_out[3]{};
+        float* or1 = reinterpret_cast<float*(__cdecl*)(const float*, const float*, float*)>(slot_0056e8f5)(oa, ob, o_out);
+        float* cr1 = porsche::vec3_cross_raw_0056e8f5(ca, cb, c_out);
+        require((or1 - oa) == (cr1 - ca), "0056e8f5 ret ptr");
+        require(std::memcmp(o_out, c_out, sizeof(o_out)) == 0, "0056e8f5 out");
+
+        ++cases;
+        reinterpret_cast<void(__cdecl*)(const float*, const float*, float*)>(slot_00532880)(oa, ob, oa);
+        porsche::vec3_cross_00532880(ca, cb, ca);
+        require(std::memcmp(oa, ca, sizeof(oa)) == 0, "00532880 aliased out");
+
+        ++cases;
+        reinterpret_cast<void(__cdecl*)(const float*, const float*, float*)>(slot_005328a0)(p.a, p.b, o_out);
+        porsche::vec3_cross_normalize_005328a0(p.a, p.b, c_out);
+        require(std::memcmp(o_out, c_out, sizeof(o_out)) == 0, "005328a0 out");
+
+        ++cases;
+        reinterpret_cast<void(__cdecl*)(const float*, float*)>(slot_005328d0)(p.a, o_out);
+        porsche::vec3_normalize_005328d0(p.a, c_out);
+        require(std::memcmp(o_out, c_out, sizeof(o_out)) == 0, "005328d0 out");
+    }
+
+    // 0053c490 and 0053c5d0
+    for (I cnt : {0, 1, 3}) {
+        ++cases;
+        float oa[12] = {1.f, 2.f, 3.f, 2.f,  -4.f, 5.f, 6.f, 2.f,  7.f, -8.f, 9.f, 4.f};
+        float ca[12];
+        std::memcpy(ca, oa, sizeof(oa));
+        const float b[4] = {0.5f, -1.5f, 2.25f, 4.f};
+        float o_out[12]{};
+        float c_out[12]{};
+        reinterpret_cast<void(__cdecl*)(I, const float*, const float*, float*)>(slot_0053c490)(cnt, oa, b, o_out);
+        porsche::vec4_weighted_add_0053c490(cnt, ca, b, c_out);
+        require(std::memcmp(o_out, c_out, sizeof(o_out)) == 0, "0053c490 out");
+
+        ++cases;
+        reinterpret_cast<void(__cdecl*)(I, const float*, float, float*)>(slot_0053c5d0)(cnt, oa, 0.25f, oa);
+        porsche::vec4_scale_0053c5d0(cnt, ca, 0.25f, ca);
+        require(std::memcmp(oa, ca, sizeof(oa)) == 0, "0053c5d0 aliased");
+    }
+
+    // 005561d0
+    for (U seed : {0u, 7u, 99u}) {
+        ++cases;
+        reset_env(0u, 0u, seed);
+        const float o_r = reinterpret_cast<float(__cdecl*)()>(slot_005561d0)();
+        const U o_ev = g_event_count;
+        Event o_evs[kMaxEvents];
+        std::memcpy(o_evs, g_events, o_ev * sizeof(Event));
+
+        reset_env(0u, 0u, seed);
+        const float c_r = porsche::rand_unit_005561d0();
+        require(f32_bits(o_r) == f32_bits(c_r), "005561d0 ret");
+        require(g_event_count == o_ev && std::memcmp(g_events, o_evs, o_ev * sizeof(Event)) == 0, "005561d0 ev");
+    }
+}
+
+static void check_thiscall_leaves() {
+    // 00456790
+    {
+        ++cases;
+        reset_env(0u, 0u, 0u);
+        reinterpret_cast<void(__fastcall*)(void*, void*)>(slot_00456790)(g_self_buf, nullptr);
+        std::array<B, 0x9000u> o_self;
+        std::memcpy(o_self.data(), g_self_buf, sizeof(g_self_buf));
+
+        reset_env(0u, 0u, 0u);
+        porsche::scene_particle_slot_init_00456790(g_self_buf, nullptr);
+        require(std::memcmp(o_self.data(), g_self_buf, sizeof(g_self_buf)) == 0, "00456790 mem");
+    }
+
+    // 004580e0 & 00458150
+    {
+        ++cases;
+        reset_env(0u, 0u, 0u);
+        reinterpret_cast<void(__fastcall*)(void*, void*)>(slot_004580e0)(g_self_buf, nullptr);
+        std::array<B, 0x9000u> o_self;
+        std::memcpy(o_self.data(), g_self_buf, sizeof(g_self_buf));
+
+        reset_env(0u, 0u, 0u);
+        porsche::scene_splt_zero_tables_004580e0(g_self_buf, nullptr);
+        require(std::memcmp(o_self.data(), g_self_buf, sizeof(g_self_buf)) == 0, "004580e0 mem");
+
+        ++cases;
+        reset_env(0u, 0u, 0u);
+        reinterpret_cast<void(__fastcall*)(void*, void*)>(slot_00458150)(g_self_buf, nullptr);
+        std::memcpy(o_self.data(), g_self_buf, sizeof(g_self_buf));
+
+        reset_env(0u, 0u, 0u);
+        porsche::scene_splt_init_uvs_00458150(g_self_buf, nullptr);
+        require(std::memcmp(o_self.data(), g_self_buf, sizeof(g_self_buf)) == 0, "00458150 mem");
+    }
+
+    // 00457920 across multiple quad orientations (exercising every sort swap + clamp)
+    const float quads[][16] = {
+        {1.0f, 1.4f, -0.55f, 1.0f,  -1.0f, 1.4f, -0.55f, 1.0f,  -1.0f, 0.8f, -0.95f, 1.0f,  1.0f, 0.8f, -0.95f, 1.0f},
+        {-2.0f, 0.1f, 0.2f, 1.0f,   0.5f, 0.0f, 0.4f, 1.0f,    1.2f, 0.5f, -0.6f, 1.0f,   -0.8f, 0.9f, -0.3f, 2.0f},
+        {0.0f, 0.2f, 0.1f, 1.0f,    0.3f, 0.1f, 0.2f, 1.0f,    0.1f, 0.15f, -0.5f, 1.0f,  0.4f, 0.4f, -0.8f, 1.0f},
+    };
+    for (const auto& q : quads) {
+        ++cases;
+        reset_env(0u, 0u, 0u);
+        reinterpret_cast<void(__fastcall*)(void*, void*, const float*)>(slot_00457920)(g_self_buf, nullptr, q);
+        std::array<B, 0x9000u> o_self;
+        std::memcpy(o_self.data(), g_self_buf, sizeof(g_self_buf));
+
+        reset_env(0u, 0u, 0u);
+        porsche::scene_splt_quad_init_00457920(g_self_buf, nullptr, q);
+        require(std::memcmp(o_self.data(), g_self_buf, sizeof(g_self_buf)) == 0, "00457920 mem");
+    }
+}
+
+static void compare_particle_buffer(const B* orig, const B* cpp, bool skip_spec_pad, const char* tag) {
+    if (!skip_spec_pad) {
+        require(std::memcmp(orig, cpp, 0x8858u) == 0, tag);
+        return;
+    }
+    require(std::memcmp(orig, cpp, 0x8655u) == 0, tag);
+    require(std::memcmp(orig + 0x8658u, cpp + 0x8658u, 0x8858u - 0x8658u) == 0, tag);
+}
+
+static void check_ctors() {
+    // 00456ed0 directly (normal + alloc fail masks)
+    for (U mask : {0u, 1u, 2u, 3u}) {
+        ++cases;
+        U spec[21]{};
+        for (U i = 0u; i < 21u; ++i) {
+            spec[i] = 0x3f800000u + i;
+        }
+        reset_env(mask, 0u, 11u);
+        void* o_ret = reinterpret_cast<void*(__fastcall*)(void*, void*, const void*)>(slot_00456ed0)(
+            g_self_buf, nullptr, spec);
+        const U o_ev = g_event_count;
+        const U o_used = g_arena_cursor;
+        Event o_evs[kMaxEvents];
+        std::memcpy(o_evs, g_events, o_ev * sizeof(Event));
+        std::array<B, 0x9000u> o_self;
+        std::memcpy(o_self.data(), g_self_buf, sizeof(g_self_buf));
+        std::array<B, kArenaBytes> o_arena;
+        std::memcpy(o_arena.data(), g_arena, o_used);
+
+        reset_env(mask, 0u, 11u);
+        void* c_ret = porsche::scene_particle_emitter_ctor_00456ed0(g_self_buf, nullptr, spec);
+        require(rel_ptr(o_ret) == rel_ptr(c_ret), "00456ed0 ret");
+        require(g_arena_cursor == o_used, "00456ed0 arena used");
+        require(g_event_count == o_ev && std::memcmp(g_events, o_evs, o_ev * sizeof(Event)) == 0, "00456ed0 ev");
+        require(std::memcmp(o_arena.data(), g_arena, o_used) == 0, "00456ed0 arena");
+        compare_particle_buffer(o_self.data(), g_self_buf, false, "00456ed0 self");
+    }
+
+    // 004577a0 directly (normal + alloc fail masks)
+    const float quad[16] = {
+        1.0f, 1.4f, -0.55f, 1.0f,  -1.0f, 1.4f, -0.55f, 1.0f,
+        -1.0f, 0.8f, -0.95f, 1.0f,  1.0f, 0.8f, -0.95f, 1.0f,
+    };
+    for (U mask : {0u, 1u, 2u, 3u}) {
+        ++cases;
+        reset_env(mask, 0u, 0u);
+        void* o_ret = reinterpret_cast<void*(__fastcall*)(void*, void*, const float*, U)>(slot_004577a0)(
+            g_self_buf, nullptr, quad, 0x55aa1234u);
+        const U o_ev = g_event_count;
+        const U o_used = g_arena_cursor;
+        Event o_evs[kMaxEvents];
+        std::memcpy(o_evs, g_events, o_ev * sizeof(Event));
+        std::array<B, 0x9000u> o_self;
+        std::memcpy(o_self.data(), g_self_buf, sizeof(g_self_buf));
+        std::array<B, kArenaBytes> o_arena;
+        std::memcpy(o_arena.data(), g_arena, o_used);
+
+        reset_env(mask, 0u, 0u);
+        void* c_ret = porsche::scene_splt_emitter_ctor_004577a0(
+            g_self_buf, nullptr, quad, 0x55aa1234u);
+        require(rel_ptr(o_ret) == rel_ptr(c_ret), "004577a0 ret");
+        require(g_arena_cursor == o_used, "004577a0 arena used");
+        require(g_event_count == o_ev && std::memcmp(g_events, o_evs, o_ev * sizeof(Event)) == 0, "004577a0 ev");
+        require(std::memcmp(o_arena.data(), g_arena, o_used) == 0, "004577a0 arena");
+        require(std::memcmp(o_self.data(), g_self_buf, 0x67e4u) == 0, "004577a0 self");
+    }
+
+    // 00458c90 full cluster across quality tiers (0..3), lookup fallbacks, and alloc failures
+    struct Cfg { U quality; I mode; U alloc_mask; U lookup_mask; };
+    const Cfg cfgs[] = {
+        {0u, 300, 0u, 0u},
+        {1u, 60,  0u, 1u},     // snow tag miss -> fallback "snow"
+        {2u, 140, 0u, 2u},     // rain tag miss -> fallback "rain"
+        {3u, 220, 0u, 5u},     // both primary tags miss -> fallbacks "snow" and "rain"
+        {0u, 300, 1u, 0u},     // snow alloc fail
+        {0u, 300, 8u, 0u},     // rain alloc fail
+        {0u, 300, 0x40u, 0u},  // splt alloc fail
+    };
+    for (const auto& cfg : cfgs) {
+        ++cases;
+        g_orig_particle_owner = reinterpret_cast<void*>(0x12340008u);
+        g_orig_context_owner = reinterpret_cast<void*>(0x12340004u);
+        porsche::scene_stage_particle_table_owner_00613e08 = g_orig_particle_owner;
+        porsche::startup_context_table_owner_00613e04 = g_orig_context_owner;
+        store32(g_orig_render_mode_state, 0x60u, static_cast<U>(cfg.mode));
+        store32(g_orig_render_mode_state, 0x64u, cfg.quality);
+        store32(porsche::render_mode_state_00619790, 0x60u, static_cast<U>(cfg.mode));
+        store32(porsche::render_mode_state_00619790, 0x64u, cfg.quality);
+
+        reset_env(cfg.alloc_mask, cfg.lookup_mask, 42u);
+        void* o_ret = reinterpret_cast<void*(__fastcall*)(void*, void*)>(slot_00458c90)(g_self_buf, nullptr);
+        const U o_ev = g_event_count;
+        const U o_used = g_arena_cursor;
+        Event o_evs[kMaxEvents];
+        std::memcpy(o_evs, g_events, o_ev * sizeof(Event));
+        std::array<B, 0x10u> o_self;
+        std::memcpy(o_self.data(), g_self_buf, 0x10u);
+        std::array<B, kArenaBytes> o_arena;
+        std::memcpy(o_arena.data(), g_arena, o_used);
+
+        reset_env(cfg.alloc_mask, cfg.lookup_mask, 42u);
+        void* c_ret = porsche::scene_stage_58b80_ctor_00458c90(g_self_buf, nullptr);
+        require(rel_ptr(o_ret) == rel_ptr(c_ret), "00458c90 ret");
+        require(g_arena_cursor == o_used, "00458c90 arena used");
+        require(g_event_count == o_ev && std::memcmp(g_events, o_evs, o_ev * sizeof(Event)) == 0, "00458c90 ev");
+        require(std::memcmp(o_self.data(), g_self_buf, 0x10u) == 0, "00458c90 self");
+
+        // Compare allocated buffers: if snow/rain succeeded, skip their 3 uninitialized stack-padding bytes at +0x8655..+0x8657.
+        const U snow_ptr = load32(g_self_buf, 0x04u);
+        const U rain_ptr = load32(g_self_buf, 0x08u);
+        auto check_range = [&](U start, U end) {
+            if (end > start) {
+                require(std::memcmp(o_arena.data() + start, g_arena + start, end - start) == 0, "00458c90 arena");
+            }
+        };
+        U pos = 0u;
+        for (U p_addr : {snow_ptr, rain_ptr}) {
+            if (p_addr != 0u) {
+                const U off = p_addr - address(g_arena);
+                check_range(pos, off + 0x8655u);
+                pos = off + 0x8658u;
+            }
+        }
+        check_range(pos, o_used);
+    }
+}
+
+int main() {
+    init();
+    check_math_leaves();
+    check_thiscall_leaves();
+    check_ctors();
+    std::printf("scene_stage_58b80_ctor_821_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

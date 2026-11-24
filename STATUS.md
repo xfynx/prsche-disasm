@@ -4,14 +4,15 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run824](iterations/v2/001-original-recovery/runs/824-sprite-draw-and-color-closure-integration/README.md)
-compiles 475 TUs across eight projects (**69 unresolved names / 77
-references**, no EXE), accepting `807/004` + `817/003` + `822/006`: `1,370`
-registry entries (`+14`), `534` comparisons, `29` mutations, `256B` `.rdata` &
-`8,208B` `.data`/`.bss`, `1,174` source pins; closes `00563160` + `005712f0`
-alias, opens `0058ccbf`.
+[Run826](iterations/v2/001-original-recovery/runs/826-ff-scene-ctor-and-sprite-sample-integration/README.md)
+compiles 478 TUs across eight projects (**65 unresolved names / 72
+references**, no EXE), accepting `819/008` + `821/003` + `823/001`: `1,398`
+registry entries (`+28`), `632` comparisons, `30` mutations, `351B` `.rdata` &
+`4B` `.bss`, `1,181` source pins; closes `4` (`004123e0`, `0058ccbf`,
+`00458c90`, `startup_sequence_report_005a177b`), `0` new.
 
-Historical: [Run820](iterations/v2/001-original-recovery/runs/820-sim-audio-and-scene-insert-integration/README.md),
+Historical: [Run824](iterations/v2/001-original-recovery/runs/824-sprite-draw-and-color-closure-integration/README.md),
+[Run820](iterations/v2/001-original-recovery/runs/820-sim-audio-and-scene-insert-integration/README.md),
 [Run816](iterations/v2/001-original-recovery/runs/816-scene-register-heap-abi-integration/README.md),
 [Run812](iterations/v2/001-original-recovery/runs/812-scene-table-load-integration/README.md),
 [Run809](iterations/v2/001-original-recovery/runs/809-scene-reset-and-input-caps-integration/README.md),

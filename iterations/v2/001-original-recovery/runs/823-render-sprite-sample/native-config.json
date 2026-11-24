@@ -1,0 +1,81 @@
+{
+  "run": 823,
+  "experiment": "local/experiments/v2-render-sprite-sample-823",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/sprite_sample_823.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/823-render-sprite-sample",
+    "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite",
+    "iterations/v2/001-original-recovery/runs/807-render-color-pack",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/sprite_sample_823.hpp",
+    "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/original-index-supplement.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0058c1f0",
+      "bytes": 2767,
+      "sha256": "9dcd22e6ea458058fc79cea0c20c696bbb940efdec339138b8cb65d22cb1e4dc",
+      "token": "@BODY_0058C1F0@"
+    },
+    {
+      "va": "0058ccbf",
+      "bytes": 49,
+      "sha256": "e9e79aab4ce5d051c88c1c519ea67365222ef6ae92161881a0c4a4bf3d1bc4ac",
+      "token": "@BODY_0058CCBF@"
+    },
+    {
+      "va": "005e1e60",
+      "bytes": 256,
+      "sha256": "22ed5b645dee8e7b71c212b18c7b7f91fc18a04a311cd131a501cfa0c9132123",
+      "token": "@TBL_005E1E60@"
+    }
+  ],
+  "pass_marker": "render_sprite_sample_823_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-58ccbf-u-shift",
+      "source": "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/sprite_sample_823.cpp",
+      "old": "    const std::uint32_t u_sub = (static_cast<std::uint32_t>(u_fixed) >> 13u) & 7u;",
+      "new": "    const std::uint32_t u_sub = (static_cast<std::uint32_t>(u_fixed) >> 12u) & 7u;"
+    },
+    {
+      "name": "wrong-58ccbf-v-shift",
+      "source": "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/sprite_sample_823.cpp",
+      "old": "    const std::uint32_t v_sub = (static_cast<std::uint32_t>(v_fixed) >> 13u) & 7u;",
+      "new": "    const std::uint32_t v_sub = (static_cast<std::uint32_t>(v_fixed) >> 14u) & 7u;"
+    },
+    {
+      "name": "wrong-58ccbf-table-swap",
+      "source": "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/sprite_sample_823.cpp",
+      "old": "    const SampleWeights& sw = kBilinearWeights_005e1e60[(v_sub << 3u) | u_sub];",
+      "new": "    const SampleWeights& sw = kBilinearWeights_005e1e60[(u_sub << 3u) | v_sub];"
+    },
+    {
+      "name": "wrong-58c1f0-row4-col1",
+      "source": "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/sprite_sample_823.cpp",
+      "old": "    {4, 0, 4, 0}, {4, 0, 4, 0}, {3, 1, 3, 1}, {2, 2, 2, 2},",
+      "new": "    {4, 0, 4, 0}, {3, 1, 4, 0}, {3, 1, 3, 1}, {2, 2, 2, 2},"
+    },
+    {
+      "name": "wrong-58c1f0-seven-eighths",
+      "source": "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/sprite_sample_823.cpp",
+      "old": "        case 7u: return p - e;",
+      "new": "        case 7u: return h + q + e;"
+    },
+    {
+      "name": "wrong-58c1f0-eighth-mask",
+      "source": "iterations/v2/001-original-recovery/runs/823-render-sprite-sample/sprite_sample_823.cpp",
+      "old": "    const std::uint32_t e = (p >> 3u) & 0x1f1f1f1fu;",
+      "new": "    const std::uint32_t e = (p >> 3u) & 0x3f3f3f3fu;"
+    }
+  ]
+}

@@ -1,0 +1,136 @@
+// Native x86-vs-C++ differential fixture for Run823 0058ccbf and 0058c1f0..0058ccbe.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "sprite_sample_823.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+static U cases = 0u;
+static B tex_buf[256]{};
+static U relocated_tbl[64]{};
+static B* code_mem = nullptr;
+static B* code_58ccbf = nullptr;
+
+static U addr_u32(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static void write_u32(B* dst, U v) {
+    std::memcpy(dst, &v, sizeof(v));
+}
+
+static void init_original_code() {
+    static const B kRaw58c1f0[2767] = { @BODY_0058C1F0@ };
+    static const B kRaw58ccbf[49] = { @BODY_0058CCBF@ };
+    static const B kRawTbl5e1e60[256] = { @TBL_005E1E60@ };
+
+    code_mem = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    std::memcpy(code_mem, kRaw58c1f0, sizeof(kRaw58c1f0));
+    code_58ccbf = code_mem + sizeof(kRaw58c1f0);
+    std::memcpy(code_58ccbf, kRaw58ccbf, sizeof(kRaw58ccbf));
+
+    const U base_delta = addr_u32(code_mem) - 0x0058c1f0u;
+    for (U i = 0u; i < 64u; ++i) {
+        U entry_va = 0u;
+        std::memcpy(&entry_va, &kRawTbl5e1e60[i * 4u], sizeof(entry_va));
+        relocated_tbl[i] = entry_va + base_delta;
+    }
+
+    // 0058ccbf+0x26: ff 14 95 <disp32=0x5e1e60> -> disp32 at +0x29.
+    write_u32(code_58ccbf + 0x29u, addr_u32(relocated_tbl));
+    FlushInstructionCache(GetCurrentProcess(), code_mem, 4096u);
+}
+
+static void run_sample_case(const char* name, U off, I u_fixed, I v_fixed, I row_bytes) {
+    ++cases;
+    U esp_b = 0u, esp_a = 0u;
+    U ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+    U expected = 0u;
+    B* raw_fn = code_58ccbf;
+    const void* src = &tex_buf[off];
+
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push row_bytes
+        push v_fixed
+        push u_fixed
+        push src
+        mov eax, raw_fn
+        call eax
+        add esp, 16
+        mov esp_a, esp
+        mov expected, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    if (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) {
+        std::printf("divergence %s abi-clobber\n", name);
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+
+    const U actual = porsche::render_sprite_sample_0058ccbf(src, u_fixed, v_fixed, row_bytes);
+    if (expected != actual) {
+        std::printf("divergence %s u=0x%08x v=0x%08x exp=0x%08x act=0x%08x\n",
+                    name, static_cast<U>(u_fixed), static_cast<U>(v_fixed), expected, actual);
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+}
+
+} // namespace
+
+int main() {
+    init_original_code();
+
+    // Populate a rich 2x2 neighborhood with bit-edge patterns (0x01, 0x07, 0xff, mixed).
+    const U pat[16] = {
+        0x12345678u, 0x9abcdef0u, 0xffffffffu, 0x01010101u,
+        0xdeadbeefu, 0xcafebabeu, 0x07070707u, 0xf8f8f8f8u,
+        0x80402010u, 0x7f3f1f0fu, 0x55aa33ccu, 0x00ff00ffu,
+        0xf0e1d2c3u, 0x11223344u, 0x89abcdefu, 0x00000000u,
+    };
+    for (U i = 0u; i < 16u; ++i) {
+        write_u32(&tex_buf[i * 4u], pat[i]);
+    }
+    for (U i = 64u; i < 256u; i += 4u) {
+        write_u32(&tex_buf[i], pat[(i / 4u + 3u) & 15u] ^ 0x13579bdfu);
+    }
+
+    // Exhaustively test all 64 (v_sub, u_sub) subpixel slots across 4 pixel sets + low-bit fuzz.
+    for (U set = 0u; set < 4u; ++set) {
+        const U off = set * 8u;
+        const I stride = 16 + static_cast<I>(set * 4u);
+        for (U v_sub = 0u; v_sub < 8u; ++v_sub) {
+            for (U u_sub = 0u; u_sub < 8u; ++u_sub) {
+                const I u_fixed = static_cast<I>((3u << 16u) | (u_sub << 13u) | ((set * 0x555u) & 0x1fffu));
+                const I v_fixed = static_cast<I>((2u << 16u) | (v_sub << 13u) | ((set * 0x777u) & 0x1fffu));
+                run_sample_case("grid", off, u_fixed, v_fixed, stride);
+            }
+        }
+    }
+
+    // Negative / wrapped fixed-point coordinates.
+    run_sample_case("neg-uv", 0u, -0x2000, -0x4000, 16);
+    run_sample_case("high-bits", 4u, static_cast<I>(0x8000e000u), static_cast<I>(0xffff4000u), 20);
+
+    std::printf("render_sprite_sample_823_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

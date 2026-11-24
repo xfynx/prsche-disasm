@@ -1,11 +1,13 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run824 PASS (`807/004` + `817/003` + `822/006`: 14 bodies + alias, 534
-cases, 29 mutations, 256B `.rdata` + 8,208B `.data`/`.bss`, 475 TUs, 69/77
-names/refs, 1,174 pins, registry 1,370, no EXE). Closes `00563160`/`005712f0`
-(`0058ccbf` open); live renderer, startup and gameplay open.
+Текущее: Run826 PASS (`819/008` + `821/003` + `823/001`: 28 bodies + wrapper,
+632 cases, 30 mutations, 351B `.rdata` + 4B `.bss`, 478 TUs, 65/72 names/refs,
+1,181 pins, registry 1,398, no EXE). Closes `004123e0`/`0058ccbf`/`00458c90`/
+`startup_sequence_report_005a177b`, `0` new; live renderer & startup open.
 
-Historical: Run820 PASS (`813/008` + `818/001`: 10 bodies, 78 cases, 22
+Historical: Run824 PASS (`807/004` + `817/003` + `822/006`: 14 bodies + alias,
+534 cases, 29 mutations, 256B `.rdata` + 8,208B `.data`/`.bss`, 475 TUs, 69/77
+names/refs, 1,174 pins, registry 1,370, no EXE). Run820 PASS (`813/008` + `818/001`: 10 bodies, 78 cases, 22
 mutations, 180B `.rdata` + 176B `.bss`, 472 TUs, 69/76 names/refs, 1,166 pins,
 registry 1,356, no EXE). Run816 PASS (`814/003` + `815/001`: 9 targets, 86 cases, 16
 mutations, 0B data/bss, 470 TUs, 74/81 names/refs, 1,161 pins, registry 1,346,

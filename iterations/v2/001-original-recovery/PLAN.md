@@ -1,14 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-24. [Run824](runs/824-sprite-draw-and-color-closure-integration/README.md)
-PASS (`build-001`): folds `807/004` (`256B` `.rdata` + `4B` `.bss`), `817/003`
-(`8,200B` `.bss`), and `822/006` (`4B` `.data` + `bindings.cmake` `005712f0`):
-**475 TUs / 8 projects**, **69 unresolved / 77 refs**, `1,174` pins, `534`
-comparisons, `29` mutations, `3` REA sessions, no EXE; registry **1,370** (`+14`;
-`005712f0` updated). Closes `00563160`, opens `0058ccbf`. Next (`Run828`):
-`819`/`821`/`823`.
+Current 2026-11-24. [Run826](runs/826-ff-scene-ctor-and-sprite-sample-integration/README.md)
+PASS (`build-001`): folds `819/008` (`3,546B`, `62B` `.rdata` + `4B` `.bss`),
+`821/003` (`3,677B`, `33B` `.rdata`), and `823/001` (`2,816B`, `256B`
+`005e1e60`): **478 TUs / 8 projects**, **65 unresolved / 72 refs**, `1,181`
+pins, `632` comparisons, `30` mutations, `3` REA sessions, no EXE; registry
+**1,398** (`+28`; `00563160`/`005a177b` updated). Closes `4`, `0` new. Next
+(`Run829`): `825`/`827`/`828`.
 
-Historical: [Run820](runs/820-sim-audio-and-scene-insert-integration/README.md),
+Historical: [Run824](runs/824-sprite-draw-and-color-closure-integration/README.md),
+[Run820](runs/820-sim-audio-and-scene-insert-integration/README.md),
 [Run816](runs/816-scene-register-heap-abi-integration/README.md),
 [Run812](runs/812-scene-table-load-integration/README.md),
 [Run809](runs/809-scene-reset-and-input-caps-integration/README.md),

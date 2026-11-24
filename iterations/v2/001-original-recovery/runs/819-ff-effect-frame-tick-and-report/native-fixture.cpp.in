@@ -1,0 +1,1077 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "ff_effect_frame_tick_819.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace porsche {
+ApplicationStateArena application_state_006573e8{};
+std::uint32_t& ApplicationStateArena::word(std::uint32_t va) {
+    return words_[(va - application_state_base_va) >> 2u];
+}
+
+std::uint8_t frame_control_ff_state_005e9408[0x134] = {};
+std::uint32_t ff_init_gain_00657bc8 = 0u;
+std::uint32_t ff_init_config_00657be8 = 0u;
+std::uint32_t ff_init_config_00657c08 = 0u;
+std::uint32_t ff_init_config_00657c28 = 0u;
+std::uint32_t ff_init_config_00657c48 = 0u;
+
+FeEffectEntry frame_control_effects_0069cb10[32] = {};
+InputSlot input_slots_006be040[32] = {};
+std::uint32_t startup_clock_word_006559e0 = 0u;
+
+int __cdecl formatter_stdio_printf_005a177b(const char* fmt, ...);
+void __cdecl frame_control_slot_release_005338d0(std::int32_t slot);
+void __cdecl frame_control_slot_download_00533760(std::int32_t slot);
+void* __cdecl fe_input_getstate_00532e10(std::uint32_t index, std::uint32_t mode);
+} // namespace porsche
+
+enum : U {
+    kOff4123E0 = 0x0000u,
+    kOff412730 = 0x0360u,
+    kOff4127A0 = 0x03e0u,
+    kOff4128B0 = 0x0500u,
+    kOff412CF0 = 0x0900u,
+    kOff4938A0 = 0x0a20u,
+    kOff493980 = 0x0ae0u,
+    kOff533810 = 0x0b80u,
+    kOff533880 = 0x0c00u,
+    kOff533910 = 0x0c60u,
+    kOff533B40 = 0x0ea0u,
+    kCodeBytes = 0x1000u,
+    kMaxEvents = 128u,
+};
+
+enum EventTag : U {
+    kEvSlotRelease = 1u,
+    kEvSlotDownload = 2u,
+    kEvGetState = 3u,
+    kEvEffectSetParams = 4u,
+    kEvEffectStart = 5u,
+    kEvDevAcquire = 6u,
+    kEvPrintf = 7u,
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+    U arg3;
+};
+
+struct Trace {
+    U ret;
+    U abi_fail;
+    U count;
+    Event events[kMaxEvents];
+    U ff_state_words[0x134 / 4];
+    I cooldown;
+    U eff_dur[4];
+    U eff_gain[4];
+    U eff_btn[4];
+    I eff_dir[4];
+    U eff_field80[4];
+    U eff_type_bytes[4];
+    U eff_type_hash[4];
+    U eff_env_hash[4];
+    I out_abs;
+    I out_signed;
+    double out_fp;
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512];
+static B fp_env[28];
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events_total = 0u;
+static U which = 0u;
+static B* code = nullptr;
+static U kJumpTable412C98[11]{};
+
+static const B kBody4123E0[837] = { @BODY_004123E0@ };
+static const B kBody412730[112] = { @BODY_00412730@ };
+static const B kBody4127A0[265] = { @BODY_004127A0@ };
+static const B kBody4128B0[998] = { @BODY_004128B0@ };
+static const B kBody412CF0[261] = { @BODY_00412CF0@ };
+static const B kBody4938A0[177] = { @BODY_004938A0@ };
+static const B kBody493980[140] = { @BODY_00493980@ };
+static const B kBody533810[101] = { @BODY_00533810@ };
+static const B kBody533880[70]  = { @BODY_00533880@ };
+static const B kBody533910[549] = { @BODY_00533910@ };
+static const B kBody533B40[36]  = { @BODY_00533B40@ };
+
+// Pinned .rdata constants (verified byte-for-byte against Porsche.exe).
+static const U kRdata005b23f8 = 0x00000000u; // 0.0f
+static const U kRdata005b2400 = 0x40a00000u; // 5.0f
+static const U kRdata005b2408 = 0x41f00000u; // 30.0f
+static const U kRdata005b2410 = 0x42200000u; // 40.0f
+static const U kRdata005b241c = 0x41200000u; // 10.0f
+static const U kRdata005b242c = 0x42c80000u; // 100.0f
+static const U kRdata005b243c = 0x41700000u; // 15.0f
+static const U kRdata005b246c = 0x3fc00000u; // 1.5f
+static const U kRdata005b2470 = 0x41a00000u; // 20.0f
+static const U kRdata005b2484 = 0x43480000u; // 200.0f
+static const U kRdata005b2580 = 0x40000000u; // 2.0f
+static const U kRdata005b26d4 = 0x42a00000u; // 80.0f
+static const U kRdata005b26d8 = 0x430c0000u; // 140.0f
+static const U kRdata005b26f0 = 0x42700000u; // 60.0f
+static const U kRdata005b2758 = 0x400f5c29u; // 2.24f
+static const U kRdata005b2760 = 0xc61c4000u; // -10000.0f
+static const U kRdata005b2764 = 0x461c4000u; // 10000.0f
+static const U kRdata005b2768 = 0x46fde800u; // 32500.0f
+static const std::uint64_t kRdata005b2770 = 0x3fc0000000000000ULL; // 0.125
+static const std::uint64_t kRdata005b2778 = 0x3fe0000000000000ULL; // 0.5
+static const std::uint64_t kRdata005b2780 = 0x412e848000000000ULL; // 1000000.0
+static const U kRdata005b2788 = 0x459c4000u; // 5000.0f
+static const U kRdata005b278c = 0x3b2ec33eu; // 0.0026666666f
+static const U kRdata005b2790 = 0x42340000u; // 45.0f
+static const U kRdata005b2794 = 0x432a0000u; // 170.0f
+static const U kRdata005b3284 = 0x3ba3d70au; // 0.005f
+
+static void fail(const char* why) {
+    std::printf("ff_effect_frame_tick_original_x86_vs_cpp=FAIL case=%u side=%u reason=%s\n",
+                cases, which, why);
+    std::exit(1);
+}
+
+static void push_event(U tag, U a0 = 0u, U a1 = 0u, U a2 = 0u, U a3 = 0u) {
+    if (trace.count >= kMaxEvents) fail("event_overflow");
+    trace.events[trace.count++] = Event{tag, a0, a1, a2, a3};
+    ++events_total;
+}
+
+static U fnv1a(const void* data, std::size_t n) {
+    const B* p = static_cast<const B*>(data);
+    U h = 2166136261u;
+    for (std::size_t i = 0; i < n; ++i) {
+        h ^= p[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void capture_fpu(FpuSnapshot* out) {
+    std::memset(fp_area, 0, sizeof(fp_area));
+    std::memset(fp_env, 0, sizeof(fp_env));
+    __asm {
+        fnstenv fp_env
+        fxsave fp_area
+    }
+    std::memcpy(&out->control, fp_env + 0, 2);
+    std::memcpy(&out->status, fp_env + 4, 2);
+    std::memcpy(&out->tag, fp_env + 8, 2);
+    out->pad = 0u;
+    std::memcpy(out->values, fp_area + 32, 80);
+    std::memcpy(&out->mxcsr, fp_area + 24, 4);
+}
+
+static void verify_fpu(const FpuSnapshot& a, const FpuSnapshot& b) {
+    if (a.control != b.control || a.status != b.status || a.tag != b.tag || a.mxcsr != b.mxcsr) {
+        fail("fpu_ctrl");
+    }
+    if (std::memcmp(a.values, b.values, sizeof(a.values)) != 0) {
+        fail("fpu_regs");
+    }
+}
+
+// Mock COM objects: IDirectInputEffect (slot 6 = SetParameters, slot 7 = Start) + InputDevice (acquire_1c)
+struct MockEffectObj {
+    void* const* vtable;
+    U id;
+};
+static U mock_start_seq = 0u;
+static U mock_start_hrs[4] = {0u, 0u, 0u, 0u};
+static U mock_acquire_hr = 0u;
+static U mock_dev_caps[4] = {0u, 0u, 0u, 0u};
+
+static std::uint32_t __stdcall mock_eff_set_params(void* self, void* entry_ptr, std::uint32_t flags) {
+    auto* eff = static_cast<MockEffectObj*>(self);
+    auto* e = static_cast<const porsche::FeEffectEntry*>(entry_ptr);
+    push_event(kEvEffectSetParams, eff->id, flags, e->gain_10, static_cast<U>(e->direction_78));
+    return 0u;
+}
+
+static std::uint32_t __stdcall mock_eff_start(void* self, std::uint32_t iters, std::uint32_t flags) {
+    auto* eff = static_cast<MockEffectObj*>(self);
+    const U hr = mock_start_hrs[mock_start_seq < 4u ? mock_start_seq++ : 3u];
+    push_event(kEvEffectStart, eff->id, iters, flags, hr);
+    return hr;
+}
+
+static std::uint32_t __stdcall mock_dev_acquire(void* self) {
+    (void)self;
+    push_event(kEvDevAcquire, mock_acquire_hr);
+    return mock_acquire_hr;
+}
+
+static void* const kEffectVtable[8] = {
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    reinterpret_cast<void*>(&mock_eff_set_params),
+    reinterpret_cast<void*>(&mock_eff_start),
+};
+static porsche::InputVtable kInputVtable = {};
+static porsche::InputDevice kInputDev = {&kInputVtable};
+static MockEffectObj kMockEffects[4] = {
+    {kEffectVtable, 100u},
+    {kEffectVtable, 101u},
+    {kEffectVtable, 102u},
+    {kEffectVtable, 103u},
+};
+
+// Mock car + wheel memory
+alignas(16) static B mock_car[0x1200];
+alignas(16) static B mock_wheels[20][0x180];
+
+namespace porsche {
+
+int __cdecl formatter_stdio_printf_005a177b(const char* fmt, ...) {
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    const int n = std::vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    push_event(kEvPrintf, fnv1a(fmt, std::strlen(fmt)), fnv1a(buf, std::strlen(buf)));
+    return n;
+}
+
+void __cdecl frame_control_slot_release_005338d0(std::int32_t slot) {
+    push_event(kEvSlotRelease, static_cast<U>(slot));
+}
+
+void __cdecl frame_control_slot_download_00533760(std::int32_t slot) {
+    push_event(kEvSlotDownload, static_cast<U>(slot));
+}
+
+void* __cdecl fe_input_getstate_00532e10(std::uint32_t index, std::uint32_t mode) {
+    push_event(kEvGetState, index, mode);
+    return mock_dev_caps;
+}
+
+} // namespace porsche
+
+static I __stdcall x87_trunc_helper(double d) {
+    return static_cast<I>(d);
+}
+
+__declspec(naked) static void __cdecl mock_ftol_005a0f98() {
+    __asm {
+        sub esp, 8
+        fstp qword ptr [esp]
+        call x87_trunc_helper
+        ret
+    }
+}
+
+static void write_u32(B* p, U v) { std::memcpy(p, &v, 4u); }
+static void write_f32(B* p, float v) { std::memcpy(p, &v, 4u); }
+static void write_u16(B* p, std::uint16_t v) { std::memcpy(p, &v, 2u); }
+static void write_rel32(B* site, const void* tgt) {
+    const I rel = static_cast<I>(
+        reinterpret_cast<std::uintptr_t>(tgt) -
+        (reinterpret_cast<std::uintptr_t>(site) + 4u));
+    std::memcpy(site, &rel, 4u);
+}
+
+static const void* resolve_global(U va) {
+    using namespace porsche;
+    if (va >= 0x005e9408u && va < 0x005e953cu) {
+        return frame_control_ff_state_005e9408 + (va - 0x005e9408u);
+    }
+    if (va >= 0x0069cb10u && va < 0x0069dd10u) {
+        return reinterpret_cast<const B*>(frame_control_effects_0069cb10) + (va - 0x0069cb10u);
+    }
+    switch (va) {
+    case 0x00412c98u: return kJumpTable412C98;
+    case 0x005e9540u: return &ff_effect_cooldown_005e9540;
+    case 0x006559e0u: return &startup_clock_word_006559e0;
+    case 0x00657424u: return &application_state_006573e8.word(0x00657424u);
+    case 0x00657bc8u: return &ff_init_gain_00657bc8;
+    case 0x00657be8u: return &ff_init_config_00657be8;
+    case 0x00657c08u: return &ff_init_config_00657c08;
+    case 0x00657c28u: return &ff_init_config_00657c28;
+    case 0x00657c48u: return &ff_init_config_00657c48;
+    case 0x006be040u: return input_slots_006be040;
+    case 0x005b23f8u: return &kRdata005b23f8;
+    case 0x005b2400u: return &kRdata005b2400;
+    case 0x005b2408u: return &kRdata005b2408;
+    case 0x005b2410u: return &kRdata005b2410;
+    case 0x005b241cu: return &kRdata005b241c;
+    case 0x005b242cu: return &kRdata005b242c;
+    case 0x005b243cu: return &kRdata005b243c;
+    case 0x005b246cu: return &kRdata005b246c;
+    case 0x005b2470u: return &kRdata005b2470;
+    case 0x005b2484u: return &kRdata005b2484;
+    case 0x005b2580u: return &kRdata005b2580;
+    case 0x005b26d4u: return &kRdata005b26d4;
+    case 0x005b26d8u: return &kRdata005b26d8;
+    case 0x005b26f0u: return &kRdata005b26f0;
+    case 0x005b2758u: return &kRdata005b2758;
+    case 0x005b2760u: return &kRdata005b2760;
+    case 0x005b2764u: return &kRdata005b2764;
+    case 0x005b2768u: return &kRdata005b2768;
+    case 0x005b2770u: return &kRdata005b2770;
+    case 0x005b2778u: return &kRdata005b2778;
+    case 0x005b2780u: return &kRdata005b2780;
+    case 0x005b2788u: return &kRdata005b2788;
+    case 0x005b278cu: return &kRdata005b278c;
+    case 0x005b2790u: return &kRdata005b2790;
+    case 0x005b2794u: return &kRdata005b2794;
+    case 0x005b3284u: return &kRdata005b3284;
+    default: fail("unknown_reloc_va"); return nullptr;
+    }
+}
+
+static const void* resolve_callee(U va) {
+    using namespace porsche;
+    switch (va) {
+    case 0x00412730u: return code + kOff412730;
+    case 0x004127a0u: return code + kOff4127A0;
+    case 0x004128b0u: return code + kOff4128B0;
+    case 0x00412cf0u: return code + kOff412CF0;
+    case 0x004938a0u: return code + kOff4938A0;
+    case 0x00493980u: return code + kOff493980;
+    case 0x00533810u: return code + kOff533810;
+    case 0x00533880u: return code + kOff533880;
+    case 0x00533910u: return code + kOff533910;
+    case 0x00533b40u: return code + kOff533B40;
+    case 0x00532e10u: return reinterpret_cast<const void*>(&fe_input_getstate_00532e10);
+    case 0x00533760u: return reinterpret_cast<const void*>(&frame_control_slot_download_00533760);
+    case 0x005338d0u: return reinterpret_cast<const void*>(&frame_control_slot_release_005338d0);
+    case 0x005a0f98u: return reinterpret_cast<const void*>(&mock_ftol_005a0f98);
+    default: fail("unknown_call_va"); return nullptr;
+    }
+}
+
+struct RelocSite { U base; U off; U va; };
+static const RelocSite kRelocs[] = {
+    {kOff4123E0, 6u, 0x005e9414u},
+    {kOff4123E0, 24u, 0x005e940cu},
+    {kOff4123E0, 35u, 0x00657424u},
+    {kOff4123E0, 54u, 0x00657bc8u},
+    {kOff4123E0, 72u, 0x005b23f8u},
+    {kOff4123E0, 85u, 0x005e941cu},
+    {kOff4123E0, 97u, 0x005e9520u},
+    {kOff4123E0, 104u, 0x005e9410u},
+    {kOff4123E0, 112u, 0x005e9422u},
+    {kOff4123E0, 126u, 0x005e9530u},
+    {kOff4123E0, 132u, 0x005e9520u},
+    {kOff4123E0, 140u, 0x005e9524u},
+    {kOff4123E0, 146u, 0x005e9528u},
+    {kOff4123E0, 154u, 0x005e9410u},
+    {kOff4123E0, 162u, 0x005e9426u},
+    {kOff4123E0, 177u, 0x005e9530u},
+    {kOff4123E0, 185u, 0x005e941cu},
+    {kOff4123E0, 200u, 0x005e941cu},
+    {kOff4123E0, 215u, 0x005e9520u},
+    {kOff4123E0, 223u, 0x005e9410u},
+    {kOff4123E0, 231u, 0x005e9422u},
+    {kOff4123E0, 245u, 0x005e9530u},
+    {kOff4123E0, 251u, 0x005e9520u},
+    {kOff4123E0, 259u, 0x005e9524u},
+    {kOff4123E0, 265u, 0x005e9528u},
+    {kOff4123E0, 272u, 0x005e9410u},
+    {kOff4123E0, 280u, 0x005e9426u},
+    {kOff4123E0, 295u, 0x005e9530u},
+    {kOff4123E0, 303u, 0x005e9418u},
+    {kOff4123E0, 318u, 0x005e9418u},
+    {kOff4123E0, 332u, 0x005b23f8u},
+    {kOff4123E0, 361u, 0x006559e0u},
+    {kOff4123E0, 413u, 0x005e9540u},
+    {kOff4123E0, 419u, 0x005e9418u},
+    {kOff4123E0, 424u, 0x005e952cu},
+    {kOff4123E0, 434u, 0x005e952cu},
+    {kOff4123E0, 442u, 0x005e9520u},
+    {kOff4123E0, 449u, 0x005e9410u},
+    {kOff4123E0, 457u, 0x005e9422u},
+    {kOff4123E0, 472u, 0x005e9520u},
+    {kOff4123E0, 478u, 0x005e9524u},
+    {kOff4123E0, 484u, 0x005e9528u},
+    {kOff4123E0, 490u, 0x005e9418u},
+    {kOff4123E0, 498u, 0x005e941cu},
+    {kOff4123E0, 506u, 0x00657be8u},
+    {kOff4123E0, 523u, 0x005e9540u},
+    {kOff4123E0, 535u, 0x00657c48u},
+    {kOff4123E0, 594u, 0x005b23f8u},
+    {kOff4123E0, 631u, 0x005b23f8u},
+    {kOff4123E0, 667u, 0x005b23f8u},
+    {kOff4123E0, 716u, 0x005e9410u},
+    {kOff4123E0, 730u, 0x005e9426u},
+    {kOff4123E0, 736u, 0x00657c48u},
+    {kOff4123E0, 790u, 0x005e9530u},
+    {kOff4123E0, 801u, 0x005e9540u},
+    {kOff4123E0, 809u, 0x005e9540u},
+    {kOff4123E0, 815u, 0x00657c08u},
+    {kOff412730, 30u, 0x005b2770u},
+    {kOff412730, 38u, 0x005b2768u},
+    {kOff412730, 44u, 0x005b2764u},
+    {kOff412730, 59u, 0x005b2764u},
+    {kOff412730, 67u, 0x005b2760u},
+    {kOff412730, 82u, 0x005b2760u},
+    {kOff4127A0, 17u, 0x005b278cu},
+    {kOff4127A0, 23u, 0x005b241cu},
+    {kOff4127A0, 40u, 0x005b2788u},
+    {kOff4127A0, 127u, 0x005b242cu},
+    {kOff4127A0, 202u, 0x005b2780u},
+    {kOff4127A0, 208u, 0x005b2778u},
+    {kOff4127A0, 219u, 0x005e9410u},
+    {kOff4127A0, 235u, 0x005e9424u},
+    {kOff4127A0, 242u, 0x00657c08u},
+    {kOff4128B0, 17u, 0x005b23f8u},
+    {kOff4128B0, 32u, 0x005b2758u},
+    {kOff4128B0, 42u, 0x005b2580u},
+    {kOff4128B0, 54u, 0x005e9520u},
+    {kOff4128B0, 65u, 0x005e9410u},
+    {kOff4128B0, 73u, 0x005e9422u},
+    {kOff4128B0, 88u, 0x005e9520u},
+    {kOff4128B0, 94u, 0x005e9524u},
+    {kOff4128B0, 100u, 0x005e9528u},
+    {kOff4128B0, 116u, 0x005b2400u},
+    {kOff4128B0, 150u, 0x005b241cu},
+    {kOff4128B0, 177u, 0x005b243cu},
+    {kOff4128B0, 209u, 0x005b2470u},
+    {kOff4128B0, 241u, 0x005b2408u},
+    {kOff4128B0, 273u, 0x005b2410u},
+    {kOff4128B0, 305u, 0x005b26f0u},
+    {kOff4128B0, 337u, 0x005b26d4u},
+    {kOff4128B0, 366u, 0x005b242cu},
+    {kOff4128B0, 395u, 0x005b26d8u},
+    {kOff4128B0, 424u, 0x005b2794u},
+    {kOff4128B0, 453u, 0x005b2484u},
+    {kOff4128B0, 495u, 0x005e9534u},
+    {kOff4128B0, 506u, 0x005b2408u},
+    {kOff4128B0, 512u, 0x005e9534u},
+    {kOff4128B0, 538u, 0x005e9534u},
+    {kOff4128B0, 544u, 0x005b2790u},
+    {kOff4128B0, 567u, 0x005e9534u},
+    {kOff4128B0, 573u, 0x005b26f0u},
+    {kOff4128B0, 601u, 0x005e9534u},
+    {kOff4128B0, 620u, 0x00412c98u},
+    {kOff4128B0, 626u, 0x005e9520u},
+    {kOff4128B0, 637u, 0x005e9410u},
+    {kOff4128B0, 645u, 0x005e9422u},
+    {kOff4128B0, 660u, 0x005e9528u},
+    {kOff4128B0, 666u, 0x005e9524u},
+    {kOff4128B0, 672u, 0x005e9520u},
+    {kOff4128B0, 715u, 0x005e9520u},
+    {kOff4128B0, 723u, 0x005e9524u},
+    {kOff4128B0, 731u, 0x005e9528u},
+    {kOff4128B0, 763u, 0x005b2780u},
+    {kOff4128B0, 769u, 0x005b2778u},
+    {kOff4128B0, 780u, 0x005e9410u},
+    {kOff4128B0, 794u, 0x005e9422u},
+    {kOff4128B0, 800u, 0x00657be8u},
+    {kOff4128B0, 823u, 0x005e9520u},
+    {kOff4128B0, 833u, 0x005e9528u},
+    {kOff4128B0, 839u, 0x005e9524u},
+    {kOff4128B0, 886u, 0x005e9520u},
+    {kOff4128B0, 894u, 0x005e9410u},
+    {kOff4128B0, 902u, 0x005e9422u},
+    {kOff4128B0, 917u, 0x005e9528u},
+    {kOff4128B0, 923u, 0x005e9524u},
+    {kOff4128B0, 929u, 0x005e9520u},
+    {kOff4128B0, 943u, 0x005e9520u},
+    {kOff4128B0, 951u, 0x005e9410u},
+    {kOff4128B0, 959u, 0x005e9422u},
+    {kOff4128B0, 974u, 0x005e9528u},
+    {kOff4128B0, 980u, 0x005e9524u},
+    {kOff4128B0, 988u, 0x005e9520u},
+    {kOff412CF0, 1u, 0x00657c28u},
+    {kOff412CF0, 17u, 0x006559e0u},
+    {kOff412CF0, 23u, 0x005e9538u},
+    {kOff412CF0, 66u, 0x006559e0u},
+    {kOff412CF0, 76u, 0x005e9538u},
+    {kOff412CF0, 82u, 0x005e9410u},
+    {kOff412CF0, 162u, 0x006559e0u},
+    {kOff412CF0, 216u, 0x005e9410u},
+    {kOff412CF0, 223u, 0x00657c28u},
+    {kOff412CF0, 233u, 0x005e9420u},
+    {kOff4938A0, 62u, 0x005b3284u},
+    {kOff4938A0, 78u, 0x005b246cu},
+    {kOff4938A0, 84u, 0x005b23f8u},
+    {kOff493980, 3u, 0x005b23f8u},
+    {kOff493980, 44u, 0x005b3284u},
+    {kOff493980, 65u, 0x005b246cu},
+    {kOff493980, 71u, 0x005b23f8u},
+    {kOff533810, 22u, 0x0069cb9cu},
+    {kOff533810, 33u, 0x0069cb98u},
+    {kOff533810, 55u, 0x006be040u},
+    {kOff533810, 79u, 0x0069cb90u},
+    {kOff533810, 91u, 0x0069cb90u},
+    {kOff533910, 38u, 0x0069cb9cu},
+    {kOff533910, 61u, 0x0069cb88u},
+    {kOff533910, 85u, 0x0069cb88u},
+    {kOff533910, 130u, 0x0069cb18u},
+    {kOff533910, 143u, 0x0069cb18u},
+    {kOff533910, 163u, 0x0069cb20u},
+    {kOff533910, 185u, 0x0069cb20u},
+    {kOff533910, 205u, 0x0069cb3cu},
+    {kOff533910, 211u, 0x0069cb44u},
+    {kOff533910, 293u, 0x0069cb24u},
+    {kOff533910, 312u, 0x0069cb78u},
+    {kOff533910, 322u, 0x0069cb7cu},
+    {kOff533910, 335u, 0x0069cb80u},
+    {kOff533910, 348u, 0x0069cb84u},
+    {kOff533910, 361u, 0x0069cb78u},
+    {kOff533910, 370u, 0x0069cb7cu},
+    {kOff533910, 382u, 0x0069cb80u},
+    {kOff533910, 388u, 0x0069cb84u},
+    {kOff533910, 463u, 0x0069cb98u},
+    {kOff533910, 469u, 0x0069cb10u},
+    {kOff533B40, 19u, 0x0069cb18u},
+    {kOff533B40, 31u, 0x0069cb90u},
+};
+static const RelocSite kCalls[] = {
+    {kOff4123E0, 118u, 0x005338d0u},
+    {kOff4123E0, 168u, 0x005338d0u},
+    {kOff4123E0, 237u, 0x005338d0u},
+    {kOff4123E0, 286u, 0x005338d0u},
+    {kOff4123E0, 404u, 0x00412cf0u},
+    {kOff4123E0, 463u, 0x005338d0u},
+    {kOff4123E0, 514u, 0x004128b0u},
+    {kOff4123E0, 568u, 0x00412730u},
+    {kOff4123E0, 582u, 0x005a0f98u},
+    {kOff4123E0, 653u, 0x005a0f98u},
+    {kOff4123E0, 685u, 0x005a0f98u},
+    {kOff4123E0, 781u, 0x00533910u},
+    {kOff4123E0, 823u, 0x004127a0u},
+    {kOff412730, 87u, 0x005a0f98u},
+    {kOff4127A0, 28u, 0x005a0f98u},
+    {kOff4127A0, 49u, 0x005a0f98u},
+    {kOff4127A0, 121u, 0x004938a0u},
+    {kOff4127A0, 155u, 0x005a0f98u},
+    {kOff4127A0, 213u, 0x005a0f98u},
+    {kOff4127A0, 257u, 0x00533910u},
+    {kOff4128B0, 79u, 0x005338d0u},
+    {kOff4128B0, 500u, 0x00493980u},
+    {kOff4128B0, 651u, 0x005338d0u},
+    {kOff4128B0, 774u, 0x005a0f98u},
+    {kOff4128B0, 814u, 0x00533910u},
+    {kOff4128B0, 908u, 0x005338d0u},
+    {kOff4128B0, 965u, 0x005338d0u},
+    {kOff412CF0, 88u, 0x00532e10u},
+    {kOff412CF0, 247u, 0x00533910u},
+    {kOff533810, 61u, 0x00533880u},
+    {kOff533910, 415u, 0x00533b40u},
+    {kOff533910, 428u, 0x00533810u},
+    {kOff533910, 448u, 0x00533760u},
+    {kOff533910, 492u, 0x00533760u},
+    {kOff533910, 520u, 0x00533b40u},
+    {kOff533910, 533u, 0x00533810u},
+};
+
+static void verify_pe_data_bytes(const char* pe_path) {
+    FILE* f = std::fopen(pe_path, "rb");
+    if (f == nullptr) fail("open_pe");
+    struct Span { U file_off; const void* ptr; U len; };
+    const Span spans[] = {
+        {0x1d1400u, porsche::startup_audio_heap_fmt_005d1400, 26u},
+        {0x1d6e3cu, porsche::startup_mem_left_fmt_005d6e3c, 36u},
+        {0x1b23f8u, &kRdata005b23f8, 4u},
+        {0x1b2758u, &kRdata005b2758, 4u},
+        {0x1b2768u, &kRdata005b2768, 4u},
+        {0x1b2770u, &kRdata005b2770, 8u},
+        {0x1b2778u, &kRdata005b2778, 8u},
+        {0x1b2780u, &kRdata005b2780, 8u},
+        {0x1b3284u, &kRdata005b3284, 4u},
+    };
+    B buf[64];
+    for (const auto& sp : spans) {
+        std::fseek(f, static_cast<long>(sp.file_off), SEEK_SET);
+        if (std::fread(buf, 1, sp.len, f) != sp.len || std::memcmp(buf, sp.ptr, sp.len) != 0) {
+            std::fclose(f);
+            fail("pe_data_mismatch");
+        }
+    }
+    std::fclose(f);
+}
+
+static void init_original_code() {
+    kInputVtable.acquire_1c = &mock_dev_acquire;
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, kCodeBytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (code == nullptr) fail("virtualalloc");
+    std::memset(code, 0xcc, kCodeBytes);
+    std::memcpy(code + kOff4123E0, kBody4123E0, sizeof(kBody4123E0));
+    std::memcpy(code + kOff412730, kBody412730, sizeof(kBody412730));
+    std::memcpy(code + kOff4127A0, kBody4127A0, sizeof(kBody4127A0));
+    std::memcpy(code + kOff4128B0, kBody4128B0, sizeof(kBody4128B0));
+    std::memcpy(code + kOff412CF0, kBody412CF0, sizeof(kBody412CF0));
+    std::memcpy(code + kOff4938A0, kBody4938A0, sizeof(kBody4938A0));
+    std::memcpy(code + kOff493980, kBody493980, sizeof(kBody493980));
+    std::memcpy(code + kOff533810, kBody533810, sizeof(kBody533810));
+    std::memcpy(code + kOff533880, kBody533880, sizeof(kBody533880));
+    std::memcpy(code + kOff533910, kBody533910, sizeof(kBody533910));
+    std::memcpy(code + kOff533B40, kBody533B40, sizeof(kBody533B40));
+
+    static const U kJtTargets[11] = {
+        0x00412b20u, 0x00412b72u, 0x00412b5cu, 0x00412c03u, 0x00412b67u, 0x00412befu,
+        0x00412c0eu, 0x00412c24u, 0x00412c1cu, 0x00412b72u, 0x00412c0eu,
+    };
+    const U base4128b0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(code + kOff4128B0));
+    for (U i = 0u; i < 11u; ++i) {
+        kJumpTable412C98[i] = base4128b0 + (kJtTargets[i] - 0x004128b0u);
+    }
+
+    for (const auto& r : kRelocs) {
+        write_u32(code + r.base + r.off,
+                  static_cast<U>(reinterpret_cast<std::uintptr_t>(resolve_global(r.va))));
+    }
+    for (const auto& c : kCalls) {
+        write_rel32(code + c.base + c.off, resolve_callee(c.va));
+    }
+}
+
+static void call_x86_0(void* fn) {
+    U s0 = 0u, s1 = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        call fn
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+}
+
+static U call_x86_1(void* fn, U a0) {
+    U s0 = 0u, s1 = 0u, r = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        push a0
+        call fn
+        add esp, 4
+        mov r, eax
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+    return r;
+}
+
+static U call_x86_3(void* fn, U a0, U a1, U a2) {
+    U s0 = 0u, s1 = 0u, r = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        push a2
+        push a1
+        push a0
+        call fn
+        add esp, 12
+        mov r, eax
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+    return r;
+}
+
+static U call_x86_4(void* fn, U a0, U a1, U a2, U a3) {
+    U s0 = 0u, s1 = 0u, r = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        push a3
+        push a2
+        push a1
+        push a0
+        call fn
+        add esp, 16
+        mov r, eax
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+    return r;
+}
+
+static U call_x86_8(void* fn, U a0, U a1, U a2, U a3, U a4, U a5, U a6, U a7) {
+    U s0 = 0u, s1 = 0u, r = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        push a7
+        push a6
+        push a5
+        push a4
+        push a3
+        push a2
+        push a1
+        push a0
+        call fn
+        add esp, 32
+        mov r, eax
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+    return r;
+}
+
+static void reset_ff_state(U mode, U clock_tick, U dev_caps0, float spd_mph, float rpm, U gear, U off_road, float steer_z, U air_flag) {
+    using namespace porsche;
+    std::memset(frame_control_ff_state_005e9408, 0, sizeof(frame_control_ff_state_005e9408));
+    std::memset(frame_control_effects_0069cb10, 0, sizeof(frame_control_effects_0069cb10));
+    std::memset(input_slots_006be040, 0, sizeof(input_slots_006be040));
+    std::memset(mock_car, 0, sizeof(mock_car));
+    std::memset(mock_wheels, 0, sizeof(mock_wheels));
+
+    ff_effect_cooldown_005e9540 = 0;
+    startup_clock_word_006559e0 = clock_tick;
+    application_state_006573e8.word(0x00657424u) = mode;
+
+    ff_init_gain_00657bc8 = 100u;
+    ff_init_config_00657be8 = 80u;
+    ff_init_config_00657c08 = 75u;
+    ff_init_config_00657c28 = 90u;
+    ff_init_config_00657c48 = 60u;
+
+    mock_dev_caps[0] = dev_caps0;
+    mock_start_seq = 0u;
+    mock_start_hrs[0] = 0u; mock_start_hrs[1] = 0u; mock_start_hrs[2] = 0u; mock_start_hrs[3] = 0u;
+    mock_acquire_hr = 0u;
+
+    input_slots_006be040[0].device = &kInputDev;
+    for (U i = 0u; i < 4u; ++i) {
+        frame_control_effects_0069cb10[i].duration_08 = 0xffffffffu;
+        frame_control_effects_0069cb10[i].type_bytes_2c = (i == 0u) ? 4u : ((i == 3u) ? 24u : 16u);
+        frame_control_effects_0069cb10[i].effect_object_88 = &kMockEffects[i];
+        frame_control_effects_0069cb10[i].input_slot_8c = 0;
+        const I slot_i = static_cast<I>(i);
+        std::memcpy(frame_control_ff_state_005e9408 + 0x18u + i * 2u, &slot_i, 2u);
+    }
+
+    const U car_u = static_cast<U>(reinterpret_cast<std::uintptr_t>(mock_car));
+    std::memcpy(frame_control_ff_state_005e9408 + 0x04u, &car_u, 0u);
+    const U one = 1u;
+    std::memcpy(frame_control_ff_state_005e9408 + 0x04u, &one, 4u);
+    std::memcpy(frame_control_ff_state_005e9408 + 0x0cu, &car_u, 4u);
+
+    write_f32(mock_car + 0x35cu, spd_mph);
+    write_u16(mock_car + 0x418u, static_cast<std::uint16_t>(air_flag));
+    write_f32(mock_car + 0x424u, steer_z);
+    write_u32(mock_car + 0x464u, gear);
+    write_f32(mock_car + 0x4e8u, 2.5f);
+    write_f32(mock_car + 0x4e4u, 3.0f);
+    write_f32(mock_car + 0x4e8u + 4u, 4.0f);
+    write_f32(mock_car + 0x55cu, 1200.0f);
+    write_f32(mock_car + 0x560u, -250.0f);
+    write_f32(mock_car + 0x564u, 75.0f);
+    write_f32(mock_car + 0xd64u, -1.6f);
+    write_u32(mock_car + 0xdb0u, off_road);
+    write_f32(mock_car + 0xdb4u, rpm);
+    write_f32(mock_car + 0x11c0u, 0.25f);
+
+    for (U i = 0u; i < 20u; ++i) {
+        const U w_u = static_cast<U>(reinterpret_cast<std::uintptr_t>(mock_wheels[i]));
+        write_u32(mock_car + 0x768u + i * 4u, w_u);
+        if (i == 0u || i == 2u) {
+            write_u16(mock_wheels[i] + 0x26u, 1u);
+            write_f32(mock_wheels[i] + 0x60u, 20.0f);
+            write_f32(mock_wheels[i] + 0x164u, 5.0f);
+            mock_wheels[i][0x48u] = 1u;
+            mock_wheels[i][0x4au] = 1u;
+        } else if (i == 1u) {
+            write_u16(mock_wheels[i] + 0x26u, 9u);
+            write_f32(mock_wheels[i] + 0x60u, 10.0f);
+            write_f32(mock_wheels[i] + 0x164u, 32.0f);
+            mock_wheels[i][0x48u] = 1u;
+        }
+    }
+}
+
+static void snapshot_ff_state() {
+    using namespace porsche;
+    std::memcpy(trace.ff_state_words, frame_control_ff_state_005e9408, sizeof(frame_control_ff_state_005e9408));
+    trace.cooldown = ff_effect_cooldown_005e9540;
+    for (U i = 0u; i < 4u; ++i) {
+        const auto& e = frame_control_effects_0069cb10[i];
+        trace.eff_dur[i] = e.duration_08;
+        trace.eff_gain[i] = e.gain_10;
+        trace.eff_btn[i] = e.trigger_button_14;
+        trace.eff_dir[i] = e.direction_78;
+        trace.eff_field80[i] = e.field_80;
+        trace.eff_type_bytes[i] = e.type_bytes_2c;
+        trace.eff_type_hash[i] = fnv1a(e.type_specific_34, e.type_bytes_2c);
+        trace.eff_env_hash[i] = fnv1a(e.spare_64 + 4u, 16u);
+    }
+}
+
+static void compare_traces() {
+    if (trace.abi_fail != 0u) fail("abi");
+    if (expected.abi_fail != 0u) fail("abi_exp");
+    if (trace.ret != expected.ret) fail("ret");
+    if (trace.out_abs != expected.out_abs || trace.out_signed != expected.out_signed) fail("steer_out");
+    if (std::memcmp(&trace.out_fp, &expected.out_fp, sizeof(double)) != 0) fail("fp_ret");
+    if (trace.count != expected.count) fail("event_count");
+    for (U i = 0u; i < trace.count; ++i) {
+        if (std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) != 0) {
+            fail("event_mismatch");
+        }
+    }
+    if (std::memcmp(trace.ff_state_words, expected.ff_state_words, sizeof(trace.ff_state_words)) != 0) fail("ff_state");
+    if (trace.cooldown != expected.cooldown) fail("cooldown");
+    if (std::memcmp(trace.eff_dur, expected.eff_dur, sizeof(trace.eff_dur)) != 0) fail("eff_dur");
+    if (std::memcmp(trace.eff_gain, expected.eff_gain, sizeof(trace.eff_gain)) != 0) fail("eff_gain");
+    if (std::memcmp(trace.eff_btn, expected.eff_btn, sizeof(trace.eff_btn)) != 0) fail("eff_btn");
+    if (std::memcmp(trace.eff_dir, expected.eff_dir, sizeof(trace.eff_dir)) != 0) fail("eff_dir");
+    if (std::memcmp(trace.eff_field80, expected.eff_field80, sizeof(trace.eff_field80)) != 0) fail("eff_field80");
+    if (std::memcmp(trace.eff_type_hash, expected.eff_type_hash, sizeof(trace.eff_type_hash)) != 0) fail("eff_type_hash");
+    if (std::memcmp(trace.eff_env_hash, expected.eff_env_hash, sizeof(trace.eff_env_hash)) != 0) fail("eff_env_hash");
+    verify_fpu(trace.fp, expected.fp);
+}
+
+template <class Setup, class RunOrig, class RunCpp>
+static void run_case(Setup setup, RunOrig run_orig, RunCpp run_cpp) {
+    ++cases;
+    which = 0u;
+    std::memset(&trace, 0, sizeof(trace));
+    setup();
+    run_orig();
+    capture_fpu(&trace.fp);
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof(trace));
+    setup();
+    run_cpp();
+    capture_fpu(&trace.fp);
+    compare_traces();
+}
+
+int main(int argc, char** argv) {
+    verify_pe_data_bytes(argc > 1 ? argv[1] : "local/game/Porsche.exe");
+    init_original_code();
+
+    // Case 1: 004123e0 gate checks (car == null, enabled == 0, mode >= 2, gain == 0)
+    run_case(
+        []() { reset_ff_state(2u, 100u, 0u, 10.0f, 3000.0f, 3u, 1u, 1.0f, 0u); },
+        []() { call_x86_0(code + kOff4123E0); snapshot_ff_state(); },
+        []() { porsche::ff_effect_frame_tick_004123e0(); snapshot_ff_state(); });
+
+    // Case 2: 004123e0 car[0x424] < 0 -> release rumble & spring + set zeroSpdFlag
+    run_case(
+        []() {
+            reset_ff_state(0u, 100u, 0u, 10.0f, 3000.0f, 3u, 1u, -0.5f, 0u);
+            U one = 1u;
+            std::memcpy(porsche::frame_control_ff_state_005e9408 + 0x118u, &one, 4u);
+            std::memcpy(porsche::frame_control_ff_state_005e9408 + 0x128u, &one, 4u);
+        },
+        []() { call_x86_0(code + kOff4123E0); snapshot_ff_state(); },
+        []() { porsche::ff_effect_frame_tick_004123e0(); snapshot_ff_state(); });
+
+    // Case 3: 004123e0 car[0x418] != 0 -> airborne release & resetFlag=1, then landing triggers collision + cooldown=2
+    run_case(
+        []() {
+            reset_ff_state(0u, 200u, 0x600u, 45.0f, 6500.0f, 3u, 1u, 1.0f, 1u);
+            U one = 1u;
+            std::memcpy(porsche::frame_control_ff_state_005e9408 + 0x118u, &one, 4u);
+            std::memcpy(porsche::frame_control_ff_state_005e9408 + 0x128u, &one, 4u);
+        },
+        []() {
+            call_x86_0(code + kOff4123E0);
+            write_u16(mock_car + 0x418u, 0u);
+            call_x86_0(code + kOff4123E0);
+            snapshot_ff_state();
+        },
+        []() {
+            porsche::ff_effect_frame_tick_004123e0();
+            write_u16(mock_car + 0x418u, 0u);
+            porsche::ff_effect_frame_tick_004123e0();
+            snapshot_ff_state();
+        });
+
+    // Case 4: 004123e0 normal driving frame (gear 3, speed 45mph, rpm 6500, off_road=1, timer=1 -> expires, clamp steer high)
+    run_case(
+        []() {
+            reset_ff_state(0u, 300u, 0u, 45.0f, 6500.0f, 3u, 1u, 1.0f, 0u);
+            U one = 1u;
+            std::memcpy(porsche::frame_control_ff_state_005e9408 + 0x124u, &one, 4u);
+            write_f32(mock_car + 0x11c0u, -0.5f); // (-(-0.5))*32500 = +16250 -> clamped to 10000
+            write_f32(mock_car + 0x560u, 150.0f); // positive branch
+        },
+        []() { call_x86_0(code + kOff4123E0); snapshot_ff_state(); },
+        []() { porsche::ff_effect_frame_tick_004123e0(); snapshot_ff_state(); });
+
+    // Case 5: 004128b0 gear switch coverage (gears 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, speed < 2mph)
+    run_case(
+        []() { reset_ff_state(0u, 400u, 0u, 12.0f, 2000.0f, 6u, 1u, 1.0f, 0u); },
+        []() {
+            const U gears[] = {6u, 1u, 2u, 4u, 5u, 7u, 8u, 9u, 10u, 11u};
+            for (U g : gears) {
+                write_u32(mock_car + 0x464u, g);
+                write_f32(mock_car + 0x35cu, 12.0f + static_cast<float>(g) * 5.0f);
+                call_x86_1(code + kOff4128B0, static_cast<U>(reinterpret_cast<std::uintptr_t>(mock_car)));
+            }
+            snapshot_ff_state();
+        },
+        []() {
+            const U gears[] = {6u, 1u, 2u, 4u, 5u, 7u, 8u, 9u, 10u, 11u};
+            for (U g : gears) {
+                write_u32(mock_car + 0x464u, g);
+                write_f32(mock_car + 0x35cu, 12.0f + static_cast<float>(g) * 5.0f);
+                porsche::ff_effect_update_speed_gear_004128b0(mock_car);
+            }
+            snapshot_ff_state();
+        });
+
+    // Case 6: 00533880 retry on 0x80040205 (DIERR_UNPLUGGED) + 0x8007000c + 00533b40 active check
+    run_case(
+        []() {
+            reset_ff_state(0u, 500u, 0u, 20.0f, 3000.0f, 2u, 1u, 1.0f, 0u);
+            mock_start_hrs[0] = 0x80040205u;
+            mock_start_hrs[1] = 1u;
+            mock_acquire_hr = 0u;
+            porsche::frame_control_effects_0069cb10[1].duration_08 = 500u;
+            porsche::frame_control_effects_0069cb10[1].field_80 = 1u;
+        },
+        []() {
+            const U r1 = call_x86_4(code + kOff533880,
+                static_cast<U>(reinterpret_cast<std::uintptr_t>(&kInputDev)),
+                static_cast<U>(reinterpret_cast<std::uintptr_t>(&kMockEffects[0])), 1u, 0u);
+            const U a0 = call_x86_1(code + kOff533B40, 0u);
+            const U a1 = call_x86_1(code + kOff533B40, 1u);
+            trace.ret = r1 ^ (a0 << 8u) ^ (a1 << 16u);
+            snapshot_ff_state();
+        },
+        []() {
+            const U r1 = porsche::ff_effect_start_retry_00533880(&kInputDev, &kMockEffects[0], 1u, 0u);
+            const U a0 = porsche::ff_effect_slot_active_00533b40(0);
+            const U a1 = porsche::ff_effect_slot_active_00533b40(1);
+            trace.ret = r1 ^ (a0 << 8u) ^ (a1 << 16u);
+            snapshot_ff_state();
+        });
+
+    // Case 7: 00533810 + 00533910 start_mode=3 + button/duration clamp + 00412730 steer scale + 005a177b VA report
+    run_case(
+        []() { reset_ff_state(0u, 600u, 0u, 20.0f, 7000.0f, 2u, 1u, 1.0f, 0u); },
+        []() {
+            U dur = 0x200000u; U gain = 50u; I btn = 3; U dir = 90u;
+            U env[4] = {1u, 2u, 3u, 4u}; U ts[4] = {9u, 8u, 7u, 6u};
+            porsche::formatter_stdio_printf_005a177b(porsche::startup_audio_heap_fmt_005d1400, 1234u);
+            porsche::formatter_stdio_printf_005a177b(porsche::startup_mem_left_fmt_005d6e3c, 5678u);
+            call_x86_1(code + kOff533810, 0u);
+            call_x86_8(code + kOff533910, 1u, 2u,
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(ts)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&dur)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&gain)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&btn)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&dir)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(env)));
+            // Also exercise start_mode=3 on slot 1 via 00533910
+            call_x86_8(code + kOff533910, 1u, 3u, 0u, 0u, 0u, 0u, 0u, 0u);
+            call_x86_3(code + kOff412730,
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(mock_car)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&trace.out_abs)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&trace.out_signed)));
+            snapshot_ff_state();
+        },
+        []() {
+            U dur = 0x200000u; U gain = 50u; I btn = 3; U dir = 90u;
+            U env[4] = {1u, 2u, 3u, 4u}; U ts[4] = {9u, 8u, 7u, 6u};
+            porsche::startup_sequence_report_005a177b(0x005d1400u, 1234u);
+            porsche::startup_sequence_report_005a177b(0x005d6e3cu, 5678u);
+            porsche::ff_effect_slot_start_00533810(0);
+            porsche::ff_effect_update_params_00533910(1, 2u, ts, &dur, &gain, &btn, &dir, env);
+            porsche::ff_effect_update_params_00533910(1, 3u, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+            porsche::ff_effect_scale_steer_00412730(mock_car, &trace.out_abs, &trace.out_signed);
+            snapshot_ff_state();
+        });
+
+    // Case 8: 00412730 clamp high (-0.5f -> 10000) + 00412cf0 long-duration cooldown ((20000<<7)/900000 = 2)
+    run_case(
+        []() {
+            reset_ff_state(0u, 700u, 0x600u, 20.0f, 7000.0f, 2u, 1u, 1.0f, 0u);
+            write_f32(mock_car + 0x11c0u, -0.5f);
+        },
+        []() {
+            I dir = 0;
+            U dur = 20000u;
+            U str = 8000u;
+            call_x86_3(code + kOff412CF0,
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&dir)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&dur)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&str)));
+            call_x86_3(code + kOff412730,
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(mock_car)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&trace.out_abs)),
+                       static_cast<U>(reinterpret_cast<std::uintptr_t>(&trace.out_signed)));
+            snapshot_ff_state();
+        },
+        []() {
+            I dir = 0;
+            U dur = 20000u;
+            U str = 8000u;
+            porsche::ff_effect_trigger_collision_00412cf0(&dir, &dur, &str);
+            porsche::ff_effect_scale_steer_00412730(mock_car, &trace.out_abs, &trace.out_signed);
+            snapshot_ff_state();
+        });
+
+    std::printf("ff_effect_frame_tick_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}
