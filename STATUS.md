@@ -4,13 +4,15 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run808](iterations/v2/001-original-recovery/runs/808-scene-texture-and-render-query-integration/README.md)
-compiles 465 TUs across eight projects (**77 unresolved names / 87
-references**, no EXE), accepting Runs801/802: `1,329` registry entries (`+4`),
-`418` comparisons, `20` mutations, `13B .rdata` (`802`), `1,147` source pins.
-Two names close (`005557d0`, `00556d20`) with zero new unresolved names.
+[Run809](iterations/v2/001-original-recovery/runs/809-scene-reset-and-input-caps-integration/README.md)
+compiles 467 TUs across eight projects (**76 unresolved names / 86
+references**, no EXE), accepting Runs805/806: `1,332` registry entries (`+3`),
+`64` comparisons, `19` mutations, `8B .data`/`4B .bss` (`805`) & `32B .rdata`
+(`806`), `1,152` source pins. Closes `2` (`0056fdf9`, `00448b10`), opens `1`
+(`0044d270`).
 
-Historical: [Run804](iterations/v2/001-original-recovery/runs/804-render-mode-and-sim-startup-integration/README.md)
+Historical: [Run808](iterations/v2/001-original-recovery/runs/808-scene-texture-and-render-query-integration/README.md)
+& [Run804](iterations/v2/001-original-recovery/runs/804-render-mode-and-sim-startup-integration/README.md)
 compiles 463 TUs across eight projects (**79 unresolved names / 89
 references**, no EXE), accepting Runs797/798: `1,325` registry entries (`+14`),
 `264` comparisons, `21` mutations, `8B .data` (`797`) + `175B` literals (`202B`

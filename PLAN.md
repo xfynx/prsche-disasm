@@ -19,10 +19,10 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run808](iterations/v2/001-original-recovery/runs/808-scene-texture-and-render-query-integration/README.md)
-is the current shared build (`465` TUs, `77` unresolved names / `87`
-references), integrating Runs `801` and `802` (`1,329` registry entries).
-Active workers are preparing `Run803`, `Run805`, `Run806`.
+[Run809](iterations/v2/001-original-recovery/runs/809-scene-reset-and-input-caps-integration/README.md)
+is the current shared build (`467` TUs, `76` unresolved names / `86`
+references), integrating Runs `805` and `806` (`1,332` registry entries).
+Active workers are preparing `Run803`, `Run807`, `Run810`.
 
 ## Recovery milestones
 

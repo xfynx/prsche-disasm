@@ -1,0 +1,4 @@
+# Run 805: Scene Stage Reset (`00448b10`, `0044d0b0`)
+Closes `693`/`804` frontier `scene_stage_reset_00448b10` (`00448b10..00448bb6`, 167B) + `scene_stage_table_ctor_0044d0b0` (`0044d0b0..0044d153`, 164B); 331B code + 8B `.data` (`005cdeac`) + 4B `.bss` (`00613e08`), reuses `00628130`, `0065b30c`, `00613e04`, `0059ef90`, `005e4fe8`, `0059eeb0`, `005322b0`/`005322c0`, `005a0fbf`, 1 typed frontier (`0044d270` 165B).
+- REA: `local/experiments/v2-scene-805-rea/001/receipt.json` + `rea/validation.json` (2 dossiers).
+- Native: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/805-scene-stage-reset/native-config.json --attempt 003` -> `local/experiments/v2-scene-stage-reset-805/003/receipt.json` PASS (22 cases/variant `/Od` & `/O2`, 10/10 mutations killed).

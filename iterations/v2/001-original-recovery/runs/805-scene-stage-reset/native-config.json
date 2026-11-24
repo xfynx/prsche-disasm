@@ -1,0 +1,129 @@
+{
+  "run": 805,
+  "experiment": "local/experiments/v2-scene-stage-reset-805",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/805-scene-stage-reset",
+    "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table",
+    "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves",
+    "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers",
+    "iterations/v2/001-original-recovery/runs/290-frame-service-cluster",
+    "iterations/v2/001-original-recovery/runs/334-resource-open",
+    "iterations/v2/001-original-recovery/runs/313-pr9-resource-open",
+    "iterations/v2/001-original-recovery/runs/499-rooted-file-exists",
+    "iterations/v2/001-original-recovery/runs/596-startup-quality-tier",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.hpp",
+    "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/application_alloc.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/application_context_base.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/formatter_entry.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/heap.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/render_startup.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "00448b10",
+      "bytes": 167,
+      "sha256": "4c6fbb915db40c1fce009b1dc0e0e7b9b6eebe00cc876799320db0e7bd188357",
+      "token": "@BODY_00448B10@"
+    },
+    {
+      "va": "0044d0b0",
+      "bytes": 164,
+      "sha256": "10ae8e62552131675a648395d80b13458eb8ad0ce4da7b6bd966ab20dfebccd3",
+      "token": "@BODY_0044D0B0@"
+    }
+  ],
+  "pass_marker": "scene_stage_reset_805_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-loop-count",
+      "source": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp",
+      "old": "for (U idx = 0u; idx < 2u; ++idx) {",
+      "new": "for (U idx = 0u; idx < 1u; ++idx) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-outer-alloc-size",
+      "source": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp",
+      "old": "void* const mem = startup_network_allocate_0059ef90(0x0cu);",
+      "new": "void* const mem = startup_network_allocate_0059ef90(0x10u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-driver-offset",
+      "source": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp",
+      "old": "void* const driver = load_ptr(render_display_00628130, 0x74u);",
+      "new": "void* const driver = load_ptr(render_display_00628130, 0x70u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-capacity-arg",
+      "source": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp",
+      "old": "obj = scene_stage_table_ctor_0044d0b0(mem, nullptr, driver, 4u);",
+      "new": "obj = scene_stage_table_ctor_0044d0b0(mem, nullptr, driver, 8u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-fsh-name-order",
+      "source": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp",
+      "old": "std::strcat(path, scene_stage_reset_fsh_names_005cdeac[idx]);",
+      "new": "std::strcat(path, scene_stage_reset_fsh_names_005cdeac[idx ^ 1u]);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-new-head-kind",
+      "source": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp",
+      "old": "application_context_new_head_0059eeb0(3u, 0u);",
+      "new": "application_context_new_head_0059eeb0(2u, 0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-freelist-offset",
+      "source": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp",
+      "old": "B* const sentinel = static_cast<B*>(load_ptr(ctx, 0x40u));",
+      "new": "B* const sentinel = static_cast<B*>(load_ptr(ctx, 0x3cu));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-holder-owner-byte",
+      "source": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp",
+      "old": "static_cast<B>(reinterpret_cast<std::uintptr_t>(owner));",
+      "new": "static_cast<B>(reinterpret_cast<std::uintptr_t>(owner) >> 8u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-heap-leave",
+      "source": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp",
+      "old": "heap_leave_005322c0(load_ptr(lock_slot, 0u));",
+      "new": "",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-sentinel-left-ptr",
+      "source": "iterations/v2/001-original-recovery/runs/805-scene-stage-reset/scene_stage_reset_805.cpp",
+      "old": "store_ptr(sentinel, 0x08u, sentinel);",
+      "new": "store_ptr(sentinel, 0x08u, nullptr);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

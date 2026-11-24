@@ -1,0 +1,333 @@
+// Native x86-vs-C++ differential fixture for Run806 0056fdf9..0056ff8c inside 0056fdb0..0056ff8c.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "input_caps_query_806.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kOutBytes = 0x21cu,
+    kMaxCalls = 64u,
+};
+
+struct CallRec {
+    U kind;
+    U arg0;
+    U arg1;
+};
+
+struct Snapshot {
+    U abi_fail;
+    U ret;
+    U call_count;
+    CallRec calls[kMaxCalls];
+    B out_buf[kOutBytes];
+};
+
+static U cases = 0u;
+static U side = 0u;
+static Snapshot expected{};
+static Snapshot actual{};
+static Snapshot* cur = nullptr;
+
+static B out_mem[kOutBytes]{};
+static void* fake_vtable[16]{};
+static porsche::InputBufferDevice fake_dev{};
+
+static U cfg_caps3c_hr = 0u;
+static U cfg_dev_type = 4u;
+static const char* cfg_inst_name = "Inst";
+static const char* cfg_prod_name = "Prod";
+static U cfg_dev_caps_hr = 0u;
+static U cfg_dev_flags = 0u;
+static U cfg_axes = 0u;
+static U cfg_buttons = 0u;
+static U cfg_povs = 0u;
+static U cfg_present_btn_mask = 0xffffffffu;
+static U cfg_present_axis_mask = 0xffu;
+static U cfg_present_pov_mask = 0xfu;
+
+static B* code_56fdb0 = nullptr;
+
+static U ptr_u(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static void store32(void* p, U v) {
+    std::memcpy(p, &v, sizeof v);
+}
+
+static U load32(const void* p) {
+    U v = 0u;
+    std::memcpy(&v, p, sizeof v);
+    return v;
+}
+
+static void write_rel32(B* site, U dst) {
+    store32(site, dst - (ptr_u(site) + 4u));
+}
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", why, cases, side);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* info) {
+    std::printf("divergence native-fault %08lx case=%u side=%u\n",
+                info->ExceptionRecord->ExceptionCode, cases, side);
+    std::fflush(stdout);
+    ExitProcess(7);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void* __cdecl stub_memset(void* dst, int val, std::size_t n) {
+    return std::memset(dst, val, n);
+}
+
+static char* __cdecl stub_strncpy(char* dst, const char* src, std::size_t n) {
+    return std::strncpy(dst, src, n);
+}
+
+static U __stdcall stub_get_dev_caps_0c(void* dev, void* caps_2c) {
+    require(dev == &fake_dev, "dev_caps_dev");
+    const U sz = load32(caps_2c);
+    if (cur != nullptr && cur->call_count < kMaxCalls) {
+        cur->calls[cur->call_count++] = {1u, sz, 0u};
+    }
+    if (cfg_dev_caps_hr != 0u) {
+        return cfg_dev_caps_hr;
+    }
+    store32(static_cast<B*>(caps_2c) + 0x04u, cfg_dev_flags);
+    store32(static_cast<B*>(caps_2c) + 0x08u, cfg_dev_type);
+    store32(static_cast<B*>(caps_2c) + 0x0cu, cfg_axes);
+    store32(static_cast<B*>(caps_2c) + 0x10u, cfg_buttons);
+    store32(static_cast<B*>(caps_2c) + 0x14u, cfg_povs);
+    return 0u;
+}
+
+static U __stdcall stub_get_prop_14(
+    void*, U, porsche::InputBufferProperty*) {
+    return 0u;
+}
+
+static U __stdcall stub_get_obj_info_38(void* dev, void* info, U offset, U how) {
+    require(dev == &fake_dev, "obj_info_dev");
+    require(load32(info) == 0x13cu, "obj_info_size");
+    if (cur != nullptr && cur->call_count < kMaxCalls) {
+        cur->calls[cur->call_count++] = {2u, offset, how};
+    }
+    const U kind = cfg_dev_type & 0xffu;
+    if (kind == 2u && offset >= 0x0cu && offset < 0x2cu) {
+        const U bit = offset - 0x0cu;
+        return ((cfg_present_btn_mask >> bit) & 1u) ? 0u : 0x80070002u;
+    }
+    if (kind == 4u && offset >= 0x30u && offset < 0x50u) {
+        const U bit = offset - 0x30u;
+        return ((cfg_present_btn_mask >> bit) & 1u) ? 0u : 0x80070002u;
+    }
+    if (offset < 0x20u && (offset % 4u) == 0u) {
+        const U idx = offset / 4u;
+        return ((cfg_present_axis_mask >> idx) & 1u) ? 0u : 0x80070002u;
+    }
+    if (offset >= 0x20u && offset < 0x30u && (offset % 4u) == 0u) {
+        const U idx = (offset - 0x20u) / 4u;
+        return ((cfg_present_pov_mask >> idx) & 1u) ? 0u : 0x80070002u;
+    }
+    return 0x80070002u;
+}
+
+static U __stdcall stub_get_caps_3c(void* dev, void* caps_244) {
+    require(dev == &fake_dev, "caps_3c_dev");
+    const U sz = load32(caps_244);
+    if (cur != nullptr && cur->call_count < kMaxCalls) {
+        cur->calls[cur->call_count++] = {3u, sz, 0u};
+    }
+    if (cfg_caps3c_hr != 0u) {
+        return cfg_caps3c_hr;
+    }
+    auto* const p = static_cast<B*>(caps_244);
+    store32(p + 0x24u, cfg_dev_type);
+    std::strncpy(reinterpret_cast<char*>(p + 0x28u), cfg_inst_name, 0x103u);
+    std::strncpy(reinterpret_cast<char*>(p + 0x12cu), cfg_prod_name, 0x103u);
+    return 0u;
+}
+
+static U invoke_cdecl2(void* fn, U a0, U a1, U& abi_fail) {
+    U fail = 0u, before = 0u, rv = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x369cf147
+        push a1
+        push a0
+        mov eax, fn
+        call eax
+        mov rv, eax
+        add esp, 8
+        cmp esp, before
+        je ok_esp
+        mov fail, 1
+    ok_esp:
+        cmp ebx, 0x13572468
+        jne bad_nv
+        cmp esi, 0x2468ace0
+        jne bad_nv
+        cmp edi, 0x369cf147
+        je done_nv
+    bad_nv:
+        mov fail, 1
+    done_nv:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return rv;
+}
+
+static void init_originals() {
+    static const B b_56fdb0[] = {@BODY_0056FDB0@};
+    B* page = static_cast<B*>(VirtualAlloc(
+        nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(page != nullptr, "virtualalloc");
+    code_56fdb0 = page;
+    std::memcpy(code_56fdb0, b_56fdb0, sizeof b_56fdb0);
+
+    store32(code_56fdb0 + 0x130u, ptr_u(&porsche::input_axis_offsets_005dfa20[0]));
+    store32(code_56fdb0 + 0x136u, ptr_u(&porsche::input_axis_offsets_005dfa20[8]));
+    write_rel32(code_56fdb0 + 0x01au, ptr_u(&stub_memset));
+    write_rel32(code_56fdb0 + 0x064u, ptr_u(&stub_strncpy));
+    write_rel32(code_56fdb0 + 0x07du, ptr_u(&stub_strncpy));
+
+    std::memset(fake_vtable, 0, sizeof fake_vtable);
+    fake_vtable[3] = reinterpret_cast<void*>(&stub_get_dev_caps_0c);
+    fake_vtable[5] = reinterpret_cast<void*>(&stub_get_prop_14);
+    fake_vtable[14] = reinterpret_cast<void*>(&stub_get_obj_info_38);
+    fake_vtable[15] = reinterpret_cast<void*>(&stub_get_caps_3c);
+    fake_dev.vtable = reinterpret_cast<porsche::InputBufferVtable*>(&fake_vtable[0]);
+}
+
+static void check_snapshots(const char* label) {
+    require(expected.abi_fail == 0u && actual.abi_fail == 0u, label);
+    require(std::memcmp(&expected, &actual, sizeof(Snapshot)) == 0, label);
+    ++cases;
+}
+
+static void run_cases() {
+    struct Case {
+        U caps3c_hr;
+        U dev_caps_hr;
+        U dev_type;
+        U dev_flags;
+        U axes;
+        U buttons;
+        U povs;
+        U btn_mask;
+        U axis_mask;
+        U pov_mask;
+        const char* inst_name;
+        const char* prod_name;
+    };
+    const Case list[] = {
+        {0x80004005u, 0u, 0x00000104u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, "A", "B"},
+        {0u, 0x80070057u, 0x00000104u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, "FailCaps", "ProdCaps"},
+        {0u, 0u, 0x00010104u, 0x00000101u, 3u, 4u, 1u, 0xffffffffu, 0xffu, 0xfu, "Joy1", "Wheel"},
+        {0u, 0u, 0x00020104u, 0x00000100u, 2u, 3u, 2u, 0xaaaaaaaau, 0x55u, 0xau, "JoySparse", "WheelSparse"},
+        {0u, 0u, 0x00020104u, 0x00000001u, 10u, 40u, 6u, 0xffffffffu, 0xffu, 0xfu, "JoyMax", "WheelMax"},
+        {0u, 0u, 0x00000202u, 0x00000000u, 2u, 5u, 0u, 0x00000015u, 0x03u, 0x0u, "Mouse1", "PS2Mouse"},
+        {0u, 0u, 0x00000202u, 0x00000101u, 0u, 35u, 0u, 0xffffffffu, 0x00u, 0x0u, "MouseBig", "USBMouse"},
+        {0u, 0u, 0x00000403u, 0x00000001u, 0u, 8u, 0u, 0x00000000u, 0x00u, 0x0u, "Keyboard", "101Key"},
+        {0u, 0u, 0x00000104u, 0xffffffffu, 1u, 1u, 1u, 0x00000002u, 0x04u, 0x8u, "FlagsAll", "Test"},
+    };
+    for (const Case& c : list) {
+        cfg_caps3c_hr = c.caps3c_hr;
+        cfg_dev_caps_hr = c.dev_caps_hr;
+        cfg_dev_type = c.dev_type;
+        cfg_dev_flags = c.dev_flags;
+        cfg_axes = c.axes;
+        cfg_buttons = c.buttons;
+        cfg_povs = c.povs;
+        cfg_present_btn_mask = c.btn_mask;
+        cfg_present_axis_mask = c.axis_mask;
+        cfg_present_pov_mask = c.pov_mask;
+        cfg_inst_name = c.inst_name;
+        cfg_prod_name = c.prod_name;
+
+        for (U s = 0u; s < 2u; ++s) {
+            side = s;
+            Snapshot& dst = (s == 0u) ? expected : actual;
+            std::memset(&dst, 0, sizeof dst);
+            cur = &dst;
+            std::memset(out_mem, 0xee, sizeof out_mem);
+            U abi = 0u;
+            dst.ret = invoke_cdecl2(
+                s == 0u ? static_cast<void*>(code_56fdb0)
+                        : reinterpret_cast<void*>(&porsche::input_caps_0056fdb0),
+                ptr_u(&fake_dev), ptr_u(&out_mem[0]), abi);
+            dst.abi_fail = abi;
+            std::memcpy(dst.out_buf, out_mem, kOutBytes);
+        }
+        check_snapshots("caps_56fdb0");
+    }
+
+    // Long string truncation check (0x103 = 259 bytes)
+    static char long_inst[300]{};
+    static char long_prod[300]{};
+    std::memset(long_inst, 'X', 280u);
+    long_inst[280] = '\0';
+    std::memset(long_prod, 'Y', 280u);
+    long_prod[280] = '\0';
+    cfg_caps3c_hr = 0u;
+    cfg_dev_caps_hr = 0u;
+    cfg_dev_type = 0x00000104u;
+    cfg_dev_flags = 1u;
+    cfg_axes = 1u;
+    cfg_buttons = 1u;
+    cfg_povs = 1u;
+    cfg_present_btn_mask = 1u;
+    cfg_present_axis_mask = 1u;
+    cfg_present_pov_mask = 1u;
+    cfg_inst_name = long_inst;
+    cfg_prod_name = long_prod;
+    for (U s = 0u; s < 2u; ++s) {
+        side = s;
+        Snapshot& dst = (s == 0u) ? expected : actual;
+        std::memset(&dst, 0, sizeof dst);
+        cur = &dst;
+        std::memset(out_mem, 0xee, sizeof out_mem);
+        U abi = 0u;
+        dst.ret = invoke_cdecl2(
+            s == 0u ? static_cast<void*>(code_56fdb0)
+                    : reinterpret_cast<void*>(&porsche::input_caps_0056fdb0),
+            ptr_u(&fake_dev), ptr_u(&out_mem[0]), abi);
+        dst.abi_fail = abi;
+        std::memcpy(dst.out_buf, out_mem, kOutBytes);
+    }
+    check_snapshots("caps_56fdb0_long");
+}
+
+} // namespace
+
+int main() {
+    SetUnhandledExceptionFilter(fault_handler);
+    init_originals();
+    run_cases();
+    std::printf("input_caps_query_806_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}
