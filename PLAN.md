@@ -19,10 +19,10 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run826](iterations/v2/001-original-recovery/runs/826-ff-scene-ctor-and-sprite-sample-integration/README.md)
-is the current shared build (`478` TUs, `65` unresolved names / `72`
-references), integrating Runs `819`, `821`, and `823` (`1,398` registry
-entries). Active WIP: `Run825`, `Run827`, `Run828`.
+[Run829](iterations/v2/001-original-recovery/runs/829-rtti-crt-exit-and-diag-integration/README.md)
+is the current shared build (`480` TUs, `59` unresolved names / `66`
+references), integrating Runs `827` and `828` (`1,402` registry entries).
+Active WIP: `Run825`, `Run830`, `Run831`.
 
 ## Recovery milestones
 

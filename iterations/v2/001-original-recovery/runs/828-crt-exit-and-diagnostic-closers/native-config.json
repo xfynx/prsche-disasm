@@ -1,0 +1,96 @@
+{
+  "run": 828,
+  "experiment": "local/experiments/v2-crt-exit-diag-828",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/crt_exit_diag_828.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/crt_exit_diag_828.hpp",
+    "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005ac147",
+      "bytes": 13,
+      "sha256": "6489f1361817b7a1d64e4a973aebf49d2fcccc894c76d1c469cec99683c52c86",
+      "token": "@BODY_005AC147@"
+    },
+    {
+      "va": "0059eaa2",
+      "bytes": 15,
+      "sha256": "34b2db607017b028ec9347ce60214bb0821e9631b4acea92afcb4215c5028c60",
+      "token": "@BODY_0059EAA2@"
+    },
+    {
+      "va": "0053ad05",
+      "bytes": 15,
+      "sha256": "c9110e330f04377f161c5ac270e32738f49c9d9a048c1218f2ed964165e9895f",
+      "token": "@BODY_0053AD05@"
+    },
+    {
+      "va": "00565068",
+      "bytes": 36,
+      "sha256": "b4ab18491e090a289b099e477b4da5aa2ab7ec20c55e14ebad7e9b9b1a130206",
+      "token": "@BODY_00565068@"
+    }
+  ],
+  "pass_marker": "crt_exit_diag_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-signal-table-entry-0",
+      "source": "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/crt_exit_diag_828.cpp",
+      "old": "0x05u, 0x00u, 0x00u, 0xc0u, 0x0bu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,",
+      "new": "0x06u, 0x00u, 0x00u, 0xc0u, 0x0bu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-signal-table-entry-last",
+      "source": "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/crt_exit_diag_828.cpp",
+      "old": "0x93u, 0x00u, 0x00u, 0xc0u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,",
+      "new": "0x94u, 0x00u, 0x00u, 0xc0u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-unhandled-filter-arg",
+      "source": "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/crt_exit_diag_828.cpp",
+      "old": "    (void)SetUnhandledExceptionFilter(\n        reinterpret_cast<LPTOP_LEVEL_EXCEPTION_FILTER>(exit_shutdown_prev_filter_006afed0));",
+      "new": "    (void)SetUnhandledExceptionFilter(nullptr);",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-mem-diag-fmt",
+      "source": "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/crt_exit_diag_828.cpp",
+      "old": "\"Insufficient memory to launch application (%d MBytes).\\n\";",
+      "new": "\"Insufficient memory (%d MBytes).\\n\";",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-window-diag-arg",
+      "source": "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/crt_exit_diag_828.cpp",
+      "old": "void __cdecl window_register_diagnostic(const char* format, std::uint32_t error) {\n    reinterpret_cast<void(__cdecl*)(const char*, std::uint32_t)>(\n        diagnostic_handler_005debf0)(format, error);\n}",
+      "new": "void __cdecl window_register_diagnostic(const char* format, std::uint32_t error) {\n    reinterpret_cast<void(__cdecl*)(const char*, std::uint32_t)>(\n        diagnostic_handler_005debf0)(format, error + 1u);\n}",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-timer-diag-msg",
+      "source": "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/crt_exit_diag_828.cpp",
+      "old": "    reinterpret_cast<void(__cdecl*)(const char*, const char*)>(\n        diagnostic_handler_005debf0)(\"%s\", buf);",
+      "new": "    reinterpret_cast<void(__cdecl*)(const char*, const char*)>(\n        diagnostic_handler_005debf0)(\"%s\", \"\");",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    }
+  ]
+}

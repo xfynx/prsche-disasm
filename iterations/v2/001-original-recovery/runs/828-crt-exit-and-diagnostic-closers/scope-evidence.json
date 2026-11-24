@@ -1,0 +1,113 @@
+{
+  "run": 828,
+  "functions": [
+    "exit_shutdown_static_callback_005ac147",
+    "formatter_crt_signal_table_005e5ec8",
+    "application_memory_diagnostic",
+    "window_register_diagnostic",
+    "timer_diagnostic_boundary"
+  ],
+  "rea_sessions": [
+    {
+      "config": "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/rea-queries.json",
+      "receipt": "local/experiments/v2-crt-exit-diag-828-rea/001/receipt.json",
+      "validation": "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/validation.json",
+      "dossiers": [
+        "local/experiments/v2-crt-exit-diag-828-rea/001/function-005a2490.json",
+        "local/experiments/v2-crt-exit-diag-828-rea/001/function-005a5449.json",
+        "local/experiments/v2-crt-exit-diag-828-rea/001/function-0059e9d0.json",
+        "local/experiments/v2-crt-exit-diag-828-rea/001/function-0053ac20.json",
+        "local/experiments/v2-crt-exit-diag-828-rea/001/function-00565030.json"
+      ]
+    }
+  ],
+  "index": "research/binary-index/ghidra/Porsche.exe-ddd748fdbe6d/functions.jsonl",
+  "supplement": "iterations/v2/001-original-recovery/runs/828-crt-exit-and-diagnostic-closers/original-index-supplement.json",
+  "originals": [
+    {
+      "function": "exit_shutdown_static_callback_005ac147",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (0 args; RET void)",
+      "entry": "005ac147",
+      "body_ranges_inclusive": [
+        [
+          "005ac147",
+          "005ac153"
+        ]
+      ],
+      "body_bytes": 13,
+      "body_sha256": "6489f1361817b7a1d64e4a973aebf49d2fcccc894c76d1c469cec99683c52c86",
+      "notes": "Restores SetUnhandledExceptionFilter ([005b20c0]) from 4B loader-zero .bss cell 006afed0; absent from ghidra functions.jsonl and supplemented in original-index-supplement.json."
+    },
+    {
+      "function": "formatter_crt_signal_table_005e5ec8",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "readonly .data (120B)",
+      "entry": "005e5ec8",
+      "body_ranges_inclusive": [
+        [
+          "005e5ec8",
+          "005e5f3f"
+        ]
+      ],
+      "body_bytes": 120,
+      "body_sha256": "85ccca35dd132c0b159dcb25fe6c5e8a41158e6bdfc8a718ca9c44f55e8344a6",
+      "notes": "10 x 12-byte CRT XcptActTab entries at 005e5ec8..005e5f3f read by formatter_crt_initialize_thread_005a5449 (005a5449)."
+    },
+    {
+      "function": "application_memory_diagnostic",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (1 arg: uint32 mbytes; RET void)",
+      "entry": "0059eaa2",
+      "body_ranges_inclusive": [
+        [
+          "0059eaa2",
+          "0059eab0"
+        ]
+      ],
+      "body_bytes": 15,
+      "body_sha256": "34b2db607017b028ec9347ce60214bb0821e9631b4acea92afcb4215c5028c60",
+      "notes": "Call-site adapter inside startup_heap_0059e9d0 calling diagnostic_handler_005debf0 with 56B .data literal 005e4ffc..005e5033."
+    },
+    {
+      "function": "window_register_diagnostic",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl (2 args: const char*, uint32; RET void)",
+      "entry": "0053ad05",
+      "body_ranges_inclusive": [
+        [
+          "0053ad05",
+          "0053ad13"
+        ]
+      ],
+      "body_bytes": 15,
+      "body_sha256": "c9110e330f04377f161c5ac270e32738f49c9d9a048c1218f2ed964165e9895f",
+      "notes": "Call-site adapter inside window_register_prefix_0053ac20 forwarding format and error to diagnostic_handler_005debf0."
+    },
+    {
+      "function": "timer_diagnostic_boundary",
+      "path": "local/game/Porsche.exe",
+      "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+      "architecture": "x86",
+      "calling_convention": "__cdecl variadic (const char*, ...; RET void)",
+      "entry": "00565068",
+      "body_ranges_inclusive": [
+        [
+          "00565068",
+          "0056508b"
+        ]
+      ],
+      "body_bytes": 36,
+      "body_sha256": "b4ab18491e090a289b099e477b4da5aa2ab7ec20c55e14ebad7e9b9b1a130206",
+      "notes": "Call-site adapter inside timer_setup_00565030 formatting variadic message and forwarding through diagnostic_handler_005debf0."
+    }
+  ]
+}

@@ -1,0 +1,347 @@
+// Native x86-vs-C++ differential fixture for Run827:
+//   005cf908 ( 25B .data)  porsche::rtti_scene_elem_desc_005cf908
+//   005cf928 ( 26B .data)  porsche::rtti_camera_elem_desc_005cf928
+//   005c4a10 / 005c4940 (148B .rdata) RTTI COL/CHD/BCD graphs
+// Tested against original Porsche.exe RTTI consumers 005a4c20, 005a14cd, and caller 0046d890.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "scene_rtti_descriptors_827.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+namespace porsche {
+
+const RttiTypeInfoTable rtti_type_info_table_005c18f8{nullptr, nullptr};
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_005a4c20 = nullptr;
+static B* slot_005a14cd = nullptr;
+static B* slot_0046d890 = nullptr;
+
+// Raw relocated Porsche.exe copies for 005cf908/005cf928/COL/CHD/BCD.
+static alignas(8) B g_raw_scene_td[25]{};
+static alignas(8) B g_raw_camera_td[26]{};
+static porsche::RttiBaseDescriptor g_raw_scene_base{};
+static porsche::RttiBaseDescriptor g_raw_camera_base{};
+static const porsche::RttiBaseDescriptor* g_raw_scene_bases[1]{};
+static const porsche::RttiBaseDescriptor* g_raw_camera_bases[2]{};
+static porsche::RttiHierarchy g_raw_scene_hier{};
+static porsche::RttiHierarchy g_raw_camera_hier{};
+static porsche::RttiCompleteObjectLocator g_raw_scene_loc{};
+static porsche::RttiCompleteObjectLocator g_raw_camera_loc{};
+
+static U g_vec_hdr[2]{};
+static U* g_vec_ptr = g_vec_hdr;
+static U g_arena_flag = 0u;
+
+struct FakeElem {
+    const porsche::RttiCompleteObjectLocator* loc;
+    U kind;
+};
+
+static const porsche::RttiTypePrefix* as_prefix(const void* p) {
+    return static_cast<const porsche::RttiTypePrefix*>(p);
+}
+
+static U __cdecl mock_rtti_dynamic_cast_005a134b(
+    U elem_ptr, U arg1, const void* scene_rtti, const void* camera_rtti, U arg4) {
+    (void)arg1;
+    (void)arg4;
+    if (elem_ptr == 0u) {
+        return 0u;
+    }
+    const auto* elem = reinterpret_cast<const FakeElem*>(static_cast<std::uintptr_t>(elem_ptr));
+    const auto* sr = as_prefix(scene_rtti);
+    const auto* cr = as_prefix(camera_rtti);
+    require(sr->vptr == &porsche::rtti_type_info_table_005c18f8.destructor, "mock cast scene vptr");
+    require(cr->vptr == &porsche::rtti_type_info_table_005c18f8.destructor, "mock cast camera vptr");
+    require(sr->cached_name == nullptr, "mock cast scene cached_name");
+    require(cr->cached_name == nullptr, "mock cast camera cached_name");
+
+    using FindFn = const porsche::RttiBaseDescriptor* (__cdecl*)(
+        void*, const porsche::RttiCompleteObjectLocator*,
+        const porsche::RttiTypePrefix*, U, const porsche::RttiTypePrefix*);
+    auto orig_find = reinterpret_cast<FindFn>(slot_005a14cd);
+    if (orig_find(nullptr, elem->loc, sr, 0u, cr) != nullptr) {
+        return elem_ptr;
+    }
+    return 0u;
+}
+
+static U __fastcall mock_scene_elem_kind_00469b50(void* obj, void* unused_edx) {
+    (void)unused_edx;
+    return static_cast<const FakeElem*>(obj)->kind;
+}
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void relocate_highlow(
+    B* slot, U off, U expected_va, const void* replacement) {
+    require(load32(slot, off) == expected_va, "HIGHLOW VA");
+    store32(slot, off, address(replacement));
+}
+
+static void init() {
+    static const B body_005cf908[] = {@BODY_005CF908@};
+    static const B body_005cf928[] = {@BODY_005CF928@};
+    static const B body_005c48f0[] = {@BODY_005C48F0@};
+    static const B body_005c4908[] = {@BODY_005C4908@};
+    static const B body_005c4930[] = {@BODY_005C4930@};
+    static const B body_005c4940[] = {@BODY_005C4940@};
+    static const B body_005c4a00[] = {@BODY_005C4A00@};
+    static const B body_005c4a10[] = {@BODY_005C4A10@};
+    static const B body_005a4c20[] = {@BODY_005A4C20@};
+    static const B body_005a14cd[] = {@BODY_005A14CD@};
+    static const B body_0046d890[] = {@BODY_0046D890@};
+
+    static_assert(sizeof(body_005cf908) == 25u);
+    static_assert(sizeof(body_005cf928) == 26u);
+
+    std::memcpy(g_raw_scene_td, body_005cf908, sizeof(body_005cf908));
+    std::memcpy(g_raw_camera_td, body_005cf928, sizeof(body_005cf928));
+    require(load32(g_raw_scene_td, 0u) == 0x005c18f8u, "raw scene vptr");
+    require(load32(g_raw_camera_td, 0u) == 0x005c18f8u, "raw camera vptr");
+    store32(g_raw_scene_td, 0u, address(&porsche::rtti_type_info_table_005c18f8.destructor));
+    store32(g_raw_camera_td, 0u, address(&porsche::rtti_type_info_table_005c18f8.destructor));
+
+    g_raw_scene_base = {
+        as_prefix(g_raw_scene_td),
+        load32(body_005c48f0, 4u),
+        {static_cast<I>(load32(body_005c48f0, 8u)),
+         static_cast<I>(load32(body_005c48f0, 12u)),
+         static_cast<I>(load32(body_005c48f0, 16u))},
+        load32(body_005c48f0, 20u)};
+    g_raw_camera_base = {
+        as_prefix(g_raw_camera_td),
+        load32(body_005c4908, 4u),
+        {static_cast<I>(load32(body_005c4908, 8u)),
+         static_cast<I>(load32(body_005c4908, 12u)),
+         static_cast<I>(load32(body_005c4908, 16u))},
+        load32(body_005c4908, 20u)};
+
+    g_raw_scene_bases[0] = &g_raw_scene_base;
+    g_raw_camera_bases[0] = &g_raw_camera_base;
+    g_raw_camera_bases[1] = &g_raw_scene_base;
+
+    g_raw_scene_hier = {
+        load32(body_005c4a00, 0u), load32(body_005c4a00, 4u),
+        load32(body_005c4a00, 8u), g_raw_scene_bases};
+    g_raw_camera_hier = {
+        load32(body_005c4930, 0u), load32(body_005c4930, 4u),
+        load32(body_005c4930, 8u), g_raw_camera_bases};
+
+    g_raw_scene_loc = {
+        load32(body_005c4a10, 0u), load32(body_005c4a10, 4u),
+        load32(body_005c4a10, 8u), as_prefix(g_raw_scene_td), &g_raw_scene_hier};
+    g_raw_camera_loc = {
+        load32(body_005c4940, 0u), load32(body_005c4940, 4u),
+        load32(body_005c4940, 8u), as_prefix(g_raw_camera_td), &g_raw_camera_hier};
+
+    code_page = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc");
+
+    slot_005a4c20 = code_page;
+    std::memcpy(slot_005a4c20, body_005a4c20, sizeof(body_005a4c20));
+
+    slot_005a14cd = code_page + 256u;
+    std::memcpy(slot_005a14cd, body_005a14cd, sizeof(body_005a14cd));
+    relocate_call_rel32(slot_005a14cd, 0x005a14cdu, 0x02du, 0x005a4c20u, slot_005a4c20);
+
+    slot_0046d890 = code_page + 512u;
+    std::memcpy(slot_0046d890, body_0046d890, sizeof(body_0046d890));
+    relocate_highlow(slot_0046d890, 0x004u, 0x00628168u, &g_vec_ptr);
+    relocate_highlow(slot_0046d890, 0x044u, 0x00657430u, &g_arena_flag);
+    relocate_highlow(slot_0046d890, 0x059u, 0x00657430u, &g_arena_flag);
+    relocate_call_rel32(slot_0046d890, 0x0046d890u, 0x029u, 0x005a134bu, reinterpret_cast<const void*>(&mock_rtti_dynamic_cast_005a134b));
+    relocate_call_rel32(slot_0046d890, 0x0046d890u, 0x039u, 0x00469b50u, reinterpret_cast<const void*>(&mock_scene_elem_kind_00469b50));
+    relocate_call_rel32(slot_0046d890, 0x0046d890u, 0x04eu, 0x00469b50u, reinterpret_cast<const void*>(&mock_scene_elem_kind_00469b50));
+    relocate_call_rel32(slot_0046d890, 0x0046d890u, 0x090u, 0x005a134bu, reinterpret_cast<const void*>(&mock_rtti_dynamic_cast_005a134b));
+
+    FlushInstructionCache(GetCurrentProcess(), code_page, 4096u);
+}
+
+static void check_descriptor_layout() {
+    ++cases;
+    require(porsche::rtti_scene_elem_desc_005cf908.prefix.vptr ==
+            &porsche::rtti_type_info_table_005c18f8.destructor, "scene vptr");
+    require(porsche::rtti_scene_elem_desc_005cf908.prefix.cached_name == nullptr, "scene cached");
+    require(std::memcmp(&porsche::rtti_scene_elem_desc_005cf908, g_raw_scene_td, 25u) == 0, "scene td bytes");
+
+    ++cases;
+    require(porsche::rtti_camera_elem_desc_005cf928.prefix.vptr ==
+            &porsche::rtti_type_info_table_005c18f8.destructor, "camera vptr");
+    require(porsche::rtti_camera_elem_desc_005cf928.prefix.cached_name == nullptr, "camera cached");
+    require(std::memcmp(&porsche::rtti_camera_elem_desc_005cf928, g_raw_camera_td, 26u) == 0, "camera td bytes");
+
+    ++cases;
+    const auto* sl = &porsche::rtti_scene_elem_locator_005c4a10;
+    require(sl->signature == g_raw_scene_loc.signature &&
+            sl->offset == g_raw_scene_loc.offset &&
+            sl->constructor_displacement == g_raw_scene_loc.constructor_displacement &&
+            sl->type == &porsche::rtti_scene_elem_desc_005cf908.prefix &&
+            sl->hierarchy->count == g_raw_scene_hier.count &&
+            sl->hierarchy->bases[0]->contained_bases == g_raw_scene_base.contained_bases &&
+            sl->hierarchy->bases[0]->attributes == g_raw_scene_base.attributes,
+            "scene locator");
+
+    ++cases;
+    const auto* cl = &porsche::rtti_camera_elem_locator_005c4940;
+    require(cl->signature == g_raw_camera_loc.signature &&
+            cl->offset == g_raw_camera_loc.offset &&
+            cl->constructor_displacement == g_raw_camera_loc.constructor_displacement &&
+            cl->type == &porsche::rtti_camera_elem_desc_005cf928.prefix &&
+            cl->hierarchy->count == g_raw_camera_hier.count &&
+            cl->hierarchy->bases[0]->contained_bases == g_raw_camera_base.contained_bases &&
+            cl->hierarchy->bases[1]->type == &porsche::rtti_scene_elem_desc_005cf908.prefix,
+            "camera locator");
+}
+
+static void check_original_rtti_consumers() {
+    using CmpFn = I (__cdecl*)(const char*, const char*);
+    using FindFn = const porsche::RttiBaseDescriptor* (__cdecl*)(
+        void*, const porsche::RttiCompleteObjectLocator*,
+        const porsche::RttiTypePrefix*, U, const porsche::RttiTypePrefix*);
+    auto cmp_x86 = reinterpret_cast<CmpFn>(slot_005a4c20);
+    auto find_x86 = reinterpret_cast<FindFn>(slot_005a14cd);
+
+    ++cases;
+    require(cmp_x86(porsche::rtti_scene_elem_desc_005cf908.decorated_name,
+                    reinterpret_cast<const char*>(g_raw_scene_td) + 8) == 0, "cmp scene");
+    ++cases;
+    require(cmp_x86(porsche::rtti_camera_elem_desc_005cf928.decorated_name,
+                    reinterpret_cast<const char*>(g_raw_camera_td) + 8) == 0, "cmp camera");
+    ++cases;
+    require(cmp_x86(porsche::rtti_scene_elem_desc_005cf908.decorated_name,
+                    porsche::rtti_camera_elem_desc_005cf928.decorated_name) != 0, "cmp distinct");
+
+    // Test 005a14cd parity across raw relocated vs C++ RTTI graphs.
+    const porsche::RttiCompleteObjectLocator* raw_locs[] = {&g_raw_scene_loc, &g_raw_camera_loc};
+    const porsche::RttiCompleteObjectLocator* cpp_locs[] = {
+        &porsche::rtti_scene_elem_locator_005c4a10,
+        &porsche::rtti_camera_elem_locator_005c4940,
+    };
+    const porsche::RttiTypePrefix* raw_tds[] = {as_prefix(g_raw_scene_td), as_prefix(g_raw_camera_td)};
+    const porsche::RttiTypePrefix* cpp_tds[] = {
+        &porsche::rtti_scene_elem_desc_005cf908.prefix,
+        &porsche::rtti_camera_elem_desc_005cf928.prefix,
+    };
+
+    for (U li = 0u; li < 2u; ++li) {
+        for (U ti = 0u; ti < 2u; ++ti) {
+            ++cases;
+            const auto* rb = find_x86(nullptr, raw_locs[li], raw_tds[0], 0u, raw_tds[ti]);
+            const auto* cb = find_x86(nullptr, cpp_locs[li], cpp_tds[0], 0u, cpp_tds[ti]);
+            require((rb == nullptr) == (cb == nullptr), "find_single match parity");
+            if (rb != nullptr) {
+                require(rb->contained_bases == cb->contained_bases &&
+                        rb->attributes == cb->attributes &&
+                        cmp_x86(reinterpret_cast<const char*>(rb->type) + 8,
+                                reinterpret_cast<const char*>(cb->type) + 8) == 0,
+                        "find_single desc parity");
+            }
+        }
+    }
+}
+
+static void patch_caller_rtti(const void* scene_td, const void* camera_td) {
+    store32(slot_0046d890, 0x01du, address(camera_td));
+    store32(slot_0046d890, 0x022u, address(scene_td));
+    store32(slot_0046d890, 0x084u, address(camera_td));
+    store32(slot_0046d890, 0x089u, address(scene_td));
+    FlushInstructionCache(GetCurrentProcess(), slot_0046d890, 195u);
+}
+
+static void check_caller_0046d890() {
+    porsche::RttiTypeDescriptor<17> other_td{
+        {&porsche::rtti_type_info_table_005c18f8.destructor, nullptr}, ".?AVCOtherElem@@"};
+    const porsche::RttiBaseDescriptor other_base{&other_td.prefix, 0u, {0, -1, 0}, 0u};
+    const porsche::RttiBaseDescriptor* const other_bases[1] = {&other_base};
+    const porsche::RttiHierarchy other_hier{0u, 0u, 1u, other_bases};
+    const porsche::RttiCompleteObjectLocator other_loc{0u, 0u, 0u, &other_td.prefix, &other_hier};
+
+    FakeElem raw_elems[4] = {
+        {&other_loc, 0u},
+        {&g_raw_scene_loc, 2u},
+        {&g_raw_camera_loc, 1u},
+        {&g_raw_camera_loc, 2u},
+    };
+    FakeElem cpp_elems[4] = {
+        {&other_loc, 0u},
+        {&porsche::rtti_scene_elem_locator_005c4a10, 2u},
+        {&porsche::rtti_camera_elem_locator_005c4940, 1u},
+        {&porsche::rtti_camera_elem_locator_005c4940, 2u},
+    };
+
+    U raw_ptrs[4] = {address(&raw_elems[0]), address(&raw_elems[1]), address(&raw_elems[2]), address(&raw_elems[3])};
+    U cpp_ptrs[4] = {address(&cpp_elems[0]), address(&cpp_elems[1]), address(&cpp_elems[2]), address(&cpp_elems[3])};
+
+    using EntryFeFn = U (__cdecl*)();
+    auto call_0046d890 = reinterpret_cast<EntryFeFn>(slot_0046d890);
+
+    const U flags[2] = {0u, 1u};
+    for (U flag : flags) {
+        ++cases;
+        g_arena_flag = flag;
+        g_vec_hdr[0] = address(raw_ptrs);
+        g_vec_hdr[1] = address(raw_ptrs + 4);
+        patch_caller_rtti(g_raw_scene_td, g_raw_camera_td);
+        const U raw_idx = call_0046d890();
+
+        g_vec_hdr[0] = address(cpp_ptrs);
+        g_vec_hdr[1] = address(cpp_ptrs + 4);
+        patch_caller_rtti(&porsche::rtti_scene_elem_desc_005cf908, &porsche::rtti_camera_elem_desc_005cf928);
+        const U cpp_idx = call_0046d890();
+        require(raw_idx == cpp_idx, "0046d890 index parity");
+    }
+}
+
+int main() {
+    init();
+    check_descriptor_layout();
+    check_original_rtti_consumers();
+    check_caller_0046d890();
+    std::printf("scene_rtti_descriptors_827_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

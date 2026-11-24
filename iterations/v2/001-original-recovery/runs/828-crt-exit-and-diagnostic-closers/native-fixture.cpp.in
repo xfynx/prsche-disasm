@@ -1,0 +1,356 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "crt_exit_diag_828.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+namespace porsche {
+void(__cdecl* diagnostic_handler_005debf0)(const char*) = nullptr;
+} // namespace porsche
+
+enum : U {
+    kOff5AC147 = 0x0000u,
+    kOff59EAA2 = 0x0040u,
+    kOff53AD05 = 0x0080u,
+    kOff565068 = 0x00c0u,
+    kCodeBytes = 0x0400u,
+    kMaxEvents = 32u,
+};
+
+struct Trace {
+    U abi_fail;
+    U count;
+    U msg_hashes[kMaxEvents];
+    U restored_filter;
+    U diag_file;
+    U diag_line;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U events_total = 0u;
+static U which = 0u;
+static B* code = nullptr;
+
+static void* iat_set_unhandled_slot = nullptr;
+static U mock_diag_file = 0u;
+static U mock_diag_line = 0u;
+
+static const char kStrWinRegFmt[52] = "GRAPH_init - FAILED WINDOWS CALL REGISTERCLASS (%d)";
+static const char kStrTimerFmt[47] = "TIMER_init - BAD TIMER FREQUENCY SPECIFIED %d\n";
+static const char kStrTimerSrc[19] = "\\real\\pc\\inittmr.c";
+
+static const B kBody5AC147[13] = { @BODY_005AC147@ };
+static const B kBody59EAA2[15] = { @BODY_0059EAA2@ };
+static const B kBody53AD05[15] = { @BODY_0053AD05@ };
+static const B kBody565068[36] = { @BODY_00565068@ };
+
+static void fail(const char* why) {
+    std::printf("crt_exit_diag_original_x86_vs_cpp=FAIL case=%u side=%u reason=%s\n",
+                cases, which, why);
+    std::exit(1);
+}
+
+static U fnv1a(const void* data, std::size_t n) {
+    const B* p = static_cast<const B*>(data);
+    U h = 2166136261u;
+    for (std::size_t i = 0; i < n; ++i) {
+        h ^= p[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void __cdecl mock_diag_sink(const char* fmt, ...) {
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    const int n = std::vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    if (n < 0 || trace.count >= kMaxEvents) fail("diag_overflow");
+    trace.msg_hashes[trace.count++] = fnv1a(buf, std::strlen(buf));
+    ++events_total;
+}
+
+static LONG WINAPI dummy_exception_filter(EXCEPTION_POINTERS*) {
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void write_u32(B* p, U v) { std::memcpy(p, &v, 4u); }
+
+static const void* resolve_global(U va) {
+    switch (va) {
+    case 0x006afed0u: return &porsche::exit_shutdown_prev_filter_006afed0;
+    case 0x005b20c0u: return &iat_set_unhandled_slot;
+    case 0x005e4ffcu: return porsche::application_memory_insufficient_fmt_005e4ffc;
+    case 0x005bb8a0u: return kStrWinRegFmt;
+    case 0x005bd480u: return kStrTimerFmt;
+    case 0x005bd4b0u: return kStrTimerSrc;
+    case 0x005deb74u: return &mock_diag_file;
+    case 0x005deb78u: return &mock_diag_line;
+    case 0x005debf0u: return &porsche::diagnostic_handler_005debf0;
+    default: fail("unknown_reloc_va"); return nullptr;
+    }
+}
+
+struct RelocSite { U base; U off; U va; };
+static const RelocSite kRelocs[] = {
+    {kOff5AC147, 2u, 0x006afed0u},
+    {kOff5AC147, 8u, 0x005b20c0u},
+    {kOff59EAA2, 2u, 0x005e4ffcu},
+    {kOff59EAA2, 8u, 0x005debf0u},
+    {kOff53AD05, 2u, 0x005bb8a0u},
+    {kOff53AD05, 8u, 0x005debf0u},
+    {kOff565068, 1u, 0x005bd4b0u},
+    {kOff565068, 7u, 0x005bd480u},
+    {kOff565068, 13u, 0x005deb74u},
+    {kOff565068, 19u, 0x005deb78u},
+    {kOff565068, 29u, 0x005debf0u},
+};
+
+static void verify_pe_data_bytes(const char* pe_path) {
+    FILE* f = std::fopen(pe_path, "rb");
+    if (f == nullptr) fail("open_pe");
+    struct Span { U file_off; const void* ptr; U len; };
+    const Span spans[] = {
+        {0x1e5ec8u, porsche::formatter_crt_signal_table_005e5ec8, 120u},
+        {0x1e4ffcu, porsche::application_memory_insufficient_fmt_005e4ffc, 56u},
+        {0x1bb8a0u, kStrWinRegFmt, 52u},
+        {0x1bd480u, kStrTimerFmt, 47u},
+        {0x1bd4b0u, kStrTimerSrc, 19u},
+    };
+    B buf[128];
+    for (const auto& sp : spans) {
+        std::fseek(f, static_cast<long>(sp.file_off), SEEK_SET);
+        if (std::fread(buf, 1, sp.len, f) != sp.len || std::memcmp(buf, sp.ptr, sp.len) != 0) {
+            std::fclose(f);
+            fail("pe_data_mismatch");
+        }
+    }
+    std::fclose(f);
+}
+
+static void init_original_code() {
+    HMODULE k32 = GetModuleHandleA("kernel32.dll");
+    iat_set_unhandled_slot = reinterpret_cast<void*>(GetProcAddress(k32, "SetUnhandledExceptionFilter"));
+    if (iat_set_unhandled_slot == nullptr) fail("getproc_suef");
+
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, kCodeBytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (code == nullptr) fail("virtualalloc");
+    std::memset(code, 0xcc, kCodeBytes);
+
+    std::memcpy(code + kOff5AC147, kBody5AC147, sizeof(kBody5AC147));
+
+    std::memcpy(code + kOff59EAA2, kBody59EAA2, sizeof(kBody59EAA2));
+    code[kOff59EAA2 + sizeof(kBody59EAA2)] = 0xc3u;
+
+    std::memcpy(code + kOff53AD05, kBody53AD05, sizeof(kBody53AD05));
+    code[kOff53AD05 + sizeof(kBody53AD05)] = 0xc3u;
+
+    std::memcpy(code + kOff565068, kBody565068, sizeof(kBody565068));
+    code[kOff565068 + sizeof(kBody565068)] = 0xc3u;
+
+    for (const auto& r : kRelocs) {
+        write_u32(code + r.base + r.off,
+                  static_cast<U>(reinterpret_cast<std::uintptr_t>(resolve_global(r.va))));
+    }
+}
+
+static void call_x86_0(void* fn) {
+    U s0 = 0u, s1 = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        call fn
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+}
+
+static void call_x86_edx(void* fn, U v_edx) {
+    U s0 = 0u, s1 = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        mov edx, v_edx
+        call fn
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+}
+
+static void call_x86_eax(void* fn, U v_eax) {
+    U s0 = 0u, s1 = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        mov eax, v_eax
+        call fn
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+}
+
+static void call_x86_esi(void* fn, U v_esi) {
+    U s0 = 0u, s1 = 0u;
+    __asm {
+        push esi
+        push edi
+        mov s0, esp
+        mov esi, v_esi
+        call fn
+        mov s1, esp
+        pop edi
+        pop esi
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+}
+
+static void compare_traces() {
+    if (trace.abi_fail != 0u || expected.abi_fail != 0u) fail("abi");
+    if (trace.restored_filter != expected.restored_filter) fail("filter");
+    if (trace.count != expected.count) fail("count");
+    for (U i = 0u; i < trace.count; ++i) {
+        if (trace.msg_hashes[i] != expected.msg_hashes[i]) fail("msg_hash");
+    }
+}
+
+template <class Setup, class RunOrig, class RunCpp>
+static void run_case(Setup setup, RunOrig run_orig, RunCpp run_cpp) {
+    ++cases;
+    which = 0u;
+    std::memset(&trace, 0, sizeof(trace));
+    setup();
+    run_orig();
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof(trace));
+    setup();
+    run_cpp();
+    compare_traces();
+}
+
+int main(int argc, char** argv) {
+    verify_pe_data_bytes(argc > 1 ? argv[1] : "local/game/Porsche.exe");
+    init_original_code();
+    porsche::diagnostic_handler_005debf0 = reinterpret_cast<void(__cdecl*)(const char*)>(&mock_diag_sink);
+
+    // Case 1: 005ac147 restores SetUnhandledExceptionFilter from 006afed0 (dummy handler & null)
+    run_case(
+        []() {
+            porsche::exit_shutdown_prev_filter_006afed0 = reinterpret_cast<void*>(&dummy_exception_filter);
+        },
+        []() {
+            LPTOP_LEVEL_EXCEPTION_FILTER saved = SetUnhandledExceptionFilter(nullptr);
+            call_x86_0(code + kOff5AC147);
+            LPTOP_LEVEL_EXCEPTION_FILTER active = SetUnhandledExceptionFilter(saved);
+            trace.restored_filter = (active == &dummy_exception_filter) ? 1u : 0u;
+        },
+        []() {
+            LPTOP_LEVEL_EXCEPTION_FILTER saved = SetUnhandledExceptionFilter(nullptr);
+            porsche::exit_shutdown_static_callback_005ac147();
+            LPTOP_LEVEL_EXCEPTION_FILTER active = SetUnhandledExceptionFilter(saved);
+            trace.restored_filter = (active == &dummy_exception_filter) ? 1u : 0u;
+        });
+
+    run_case(
+        []() {
+            porsche::exit_shutdown_prev_filter_006afed0 = nullptr;
+        },
+        []() {
+            LPTOP_LEVEL_EXCEPTION_FILTER saved = SetUnhandledExceptionFilter(&dummy_exception_filter);
+            call_x86_0(code + kOff5AC147);
+            LPTOP_LEVEL_EXCEPTION_FILTER active = SetUnhandledExceptionFilter(saved);
+            trace.restored_filter = (active == nullptr) ? 2u : 0u;
+        },
+        []() {
+            LPTOP_LEVEL_EXCEPTION_FILTER saved = SetUnhandledExceptionFilter(&dummy_exception_filter);
+            porsche::exit_shutdown_static_callback_005ac147();
+            LPTOP_LEVEL_EXCEPTION_FILTER active = SetUnhandledExceptionFilter(saved);
+            trace.restored_filter = (active == nullptr) ? 2u : 0u;
+        });
+
+    // Case 3: application_memory_diagnostic (0059eaa2 slice + 005e4ffc literal)
+    run_case(
+        []() {},
+        []() {
+            call_x86_edx(code + kOff59EAA2, 0u);
+            call_x86_edx(code + kOff59EAA2, 64u);
+            call_x86_edx(code + kOff59EAA2, 0x80000000u);
+        },
+        []() {
+            porsche::application_memory_diagnostic(0u);
+            porsche::application_memory_diagnostic(64u);
+            porsche::application_memory_diagnostic(0x80000000u);
+        });
+
+    // Case 4: window_register_diagnostic (0053ad05 slice)
+    run_case(
+        []() {},
+        []() {
+            call_x86_eax(code + kOff53AD05, 0u);
+            call_x86_eax(code + kOff53AD05, 5u);
+            call_x86_eax(code + kOff53AD05, 1410u);
+        },
+        []() {
+            porsche::window_register_diagnostic(kStrWinRegFmt, 0u);
+            porsche::window_register_diagnostic(kStrWinRegFmt, 5u);
+            porsche::window_register_diagnostic(kStrWinRegFmt, 1410u);
+        });
+
+    // Case 5: timer_diagnostic_boundary (00565068 slice + plain message check)
+    run_case(
+        []() { mock_diag_file = 0u; mock_diag_line = 0u; },
+        []() {
+            call_x86_esi(code + kOff565068, 20000u);
+            call_x86_esi(code + kOff565068, 0xffffffffu);
+            mock_diag_sink("TIMER_init - NO FORMAT\n");
+        },
+        []() {
+            porsche::timer_diagnostic_boundary(kStrTimerFmt, 20000u);
+            porsche::timer_diagnostic_boundary(kStrTimerFmt, 0xffffffffu);
+            porsche::timer_diagnostic_boundary("TIMER_init - NO FORMAT\n");
+        });
+
+    std::printf("crt_exit_diag_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

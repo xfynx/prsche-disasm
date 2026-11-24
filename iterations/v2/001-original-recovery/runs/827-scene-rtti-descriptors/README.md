@@ -1,0 +1,4 @@
+# Run 827: Scene & Camera RTTI Descriptors (`005cf908`, `005cf928`)
+Closes `702`/`826` frontier `?rtti_scene_elem_005cf908@porsche@@3QBEB` (`.?AVCSceneElem@@`, 25B `.data`) and `?rtti_camera_elem_005cf928@porsche@@3QBEB` (`.?AVCCameraElem@@`, 26B `.data`) + `005c4a10`/`005c4940` RTTI graphs (148B `.rdata`) via `bindings.cmake`, 0 new unresolved symbols.
+- REA: `local/experiments/v2-scene-rtti-descriptors-827-rea/001/receipt.json` + `rea/validation.json` (3 dossiers: `0046d890`, `005a14cd`, `005a4c20`, 0 repeated_equal).
+- Native: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/827-scene-rtti-descriptors/native-config.json --attempt 002` -> `local/experiments/v2-scene-rtti-descriptors-827/002/receipt.json` PASS (`13` cases/variant `/Od` & `/O2`, `8/8` mutations killed).
