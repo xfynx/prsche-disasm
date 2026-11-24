@@ -1,0 +1,4 @@
+# Run 795: Scene Route Track Spec Load (`00475c80`, `00475a60`)
+Closes `788` frontier `scene_route_dispatch_00475c80` (`00475c80..00475d61`, 226B) + leaf `scene_route_track_spec_default_00475a60` (`00475a60..00475c7b`, 540B); 766B code + 276B `.bss` (`00628a18`, `00628a20`, `00628b28`, `00628b2c`), reuses `005a0fbf`, `0059d9b0`, `005a177b`, `00531f90`, `0065b2b8`, `00657a24`/`00657a30`, `00628a28` (0 new unresolved symbols).
+- REA: `local/experiments/v2-scene-795-rea/001/receipt.json` + `rea/validation.json` (2 dossiers).
+- Native: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/native-config.json --attempt 002` -> `local/experiments/v2-scene-route-spec-load-795/002/receipt.json` PASS (17 cases/variant `/Od` & `/O2`, 10/10 mutations killed).

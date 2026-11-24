@@ -1,0 +1,128 @@
+{
+  "run": 799,
+  "experiment": "local/experiments/v2-scene-texture-descriptor-parse-799",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse",
+    "iterations/v2/001-original-recovery/runs/791-scene-sky-texture-create",
+    "iterations/v2/001-original-recovery/runs/650-startup-text-fallbacks",
+    "iterations/v2/001-original-recovery/runs/374-render-descriptor",
+    "iterations/v2/001-original-recovery/runs/596-startup-quality-tier",
+    "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves",
+    "iterations/v2/001-original-recovery/runs/647-startup-sequence-text",
+    "iterations/v2/001-original-recovery/runs/313-pr9-resource-open",
+    "iterations/v2/001-original-recovery/runs/499-rooted-file-exists",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.hpp",
+    "iterations/v2/001-original-recovery/runs/791-scene-sky-texture-create/scene_sky_texture_791.hpp",
+    "iterations/v2/001-original-recovery/runs/650-startup-text-fallbacks/startup_text_fallbacks_650.hpp",
+    "iterations/v2/001-original-recovery/runs/374-render-descriptor/render_descriptor.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/fe_stream.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/heap.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "0044d7e0",
+      "bytes": 434,
+      "sha256": "ff8d3a2f149cb0f62a639064fe884ee6dd1bc9f3fa5cc14c9b07b2ef3249874c",
+      "token": "@BODY_0044D7E0@"
+    },
+    {
+      "va": "0044d710",
+      "bytes": 194,
+      "sha256": "7706b30e2fbcb000998b438a0313c60e1d01ab71b0c478f7267837bbf7dc994e",
+      "token": "@BODY_0044D710@"
+    }
+  ],
+  "pass_marker": "scene_texture_descriptor_799_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-mask-mode-10",
+      "source": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp",
+      "old": "if (mask_b[0] == 0x10u) {",
+      "new": "if (mask_b[0] == 0x11u) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-alt-chunk-flag",
+      "source": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp",
+      "old": "allow_alt = (load16s(chunk, 0x08u) != 0);",
+      "new": "allow_alt = (load16s(chunk, 0x08u) == 0);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-width-512",
+      "source": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp",
+      "old": "((shrink_mask & 0x01u) != 0u && width == 0x200)",
+      "new": "((shrink_mask & 0x01u) != 0u && width == 0x400)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-width-32",
+      "source": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp",
+      "old": "((shrink_mask & 0x10u) != 0u && width == 0x20)",
+      "new": "((shrink_mask & 0x10u) != 0u && width == 0x10)",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-conv-bpp15",
+      "source": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp",
+      "old": "if (bpp == 15) {\n            bpp = 16;\n        }",
+      "new": "if (bpp == 15) {\n            bpp = 24;\n        }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-conv-header-pad",
+      "source": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp",
+      "old": "const I copy_bytes = h * w * (bpp / 8) + 0x14;",
+      "new": "const I copy_bytes = h * w * (bpp / 8) + 0x10;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-flag-08-output",
+      "source": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp",
+      "old": "store32(out, 0x08u, ((mask_a[2] & 0x04u) != 0u) ? 1u : 0u);",
+      "new": "store32(out, 0x08u, ((mask_a[2] & 0x08u) != 0u) ? 1u : 0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-shift-div",
+      "source": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp",
+      "old": "I shift_val = static_cast<I>(load16s(cur, 0x04u)) >> 2;",
+      "new": "I shift_val = static_cast<I>(load16s(cur, 0x04u)) >> 1;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-shrink-mip-bpp15",
+      "source": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp",
+      "old": "if (bpp == 15) {\n        bpp = 16;\n    }",
+      "new": "if (bpp == 15) {\n        bpp = 8;\n    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-shrink-mip-nibble",
+      "source": "iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/scene_texture_descriptor_799.cpp",
+      "old": "((header_word & 0xf0000000u) - 1u) ^ ((~header_word) & 0x0fffffffu);",
+      "new": "header_word;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

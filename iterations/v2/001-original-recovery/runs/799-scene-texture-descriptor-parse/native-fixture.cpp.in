@@ -1,0 +1,470 @@
+// Native x86-vs-C++ differential fixture for Run799:
+//   0044d7e0..0044d991 (434B) porsche::scene_texture_descriptor_parse_0044d7e0
+//   0044d710..0044d7cf (194B) porsche::scene_texture_descriptor_shrink_mip_0044d710
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "porsche/fe_stream.hpp"
+#include "porsche/heap.hpp"
+#include "render_descriptor.hpp"
+#include "scene_sky_texture_791.hpp"
+#include "scene_texture_descriptor_799.hpp"
+#include "startup_text_fallbacks_650.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using W = std::uint16_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store16(void* base, U off, W v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 2u);
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+static U fnv1a(const char* s) {
+    U h = 2166136261u;
+    while (*s != '\0') {
+        h = (h ^ static_cast<B>(*s++)) * 16777619u;
+    }
+    return h;
+}
+
+enum : U {
+    kEvMaskPtr = 1u,
+    kEvPrefSet = 2u,
+    kEvShrink = 3u,
+    kEvBits = 4u,
+    kEvAlloc = 5u,
+    kEvCopy = 6u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+};
+
+enum : U { kMaxEvents = 32u, kPoolBytes = 8192u, kChunkBytes = 2048u };
+
+struct Snapshot {
+    U abi_fail;
+    U ret_eax;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    std::array<B, 0x1cu> out_desc;
+    std::array<U*, 10u> pref_table;
+    std::array<B, kPoolBytes> alloc_pool;
+    U alloc_used;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static alignas(16) B g_out_desc[0x1cu];
+static alignas(16) B g_chunk[kChunkBytes];
+static alignas(16) B g_alloc_pool[kPoolBytes];
+static U g_alloc_cursor = 0u;
+static alignas(4) U g_quality_mask = 0u;
+static U g_bits_return = 16u;
+static U* g_pref_table[10u] = {};
+
+static const char kStrShrinkMip[] = "ShrinkMIP";
+static const char kStrShpConv[] = "RTex:SHPconv";
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c};
+}
+
+static void* pool_alloc(U bytes) {
+    const U aligned = (bytes + 15u) & ~15u;
+    require(g_alloc_cursor + aligned <= kPoolBytes, "pool overflow");
+    void* const p = g_alloc_pool + g_alloc_cursor;
+    g_alloc_cursor += aligned;
+    return p;
+}
+
+namespace porsche {
+
+U* __cdecl startup_text_quality_mask_ptr_0044dfe0(U index) {
+    record_event(kEvMaskPtr, index, g_quality_mask);
+    return &g_quality_mask;
+}
+
+void __cdecl render_texture_format_table_set_00554950(U slot, U* table) {
+    require(slot < 10u, "pref slot");
+    g_pref_table[slot] = table;
+    record_event(kEvPrefSet, slot, address(table));
+}
+
+void* __cdecl scene_texture_descriptor_shrink_005557d0(const void* descriptor) {
+    record_event(kEvShrink, address(descriptor));
+    B* const dst = static_cast<B*>(pool_alloc(0x20u));
+    std::memcpy(dst, descriptor, 0x10u);
+    store16(dst, 0x04u, static_cast<W>(load32(descriptor, 0x04u) & 0xffffu) / 2u);
+    store16(dst, 0x06u, static_cast<W>(load32(descriptor, 0x06u) & 0xffffu) / 2u);
+    return dst;
+}
+
+U __cdecl render_descriptor_bits_00537f90(const void* descriptor_format) {
+    record_event(kEvBits, address(descriptor_format), g_bits_return);
+    return g_bits_return;
+}
+
+void* __cdecl allocate_00531ca0(const char* name, I bytes, U align) {
+    record_event(kEvAlloc, fnv1a(name), static_cast<U>(bytes), align);
+    return pool_alloc(static_cast<U>(bytes));
+}
+
+void __cdecl heap_copy_dispatch_005323e0(void* dst, const void* src, U bytes) {
+    record_event(kEvCopy, address(dst), address(src), bytes);
+    std::memcpy(dst, src, bytes);
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_0044d7e0 = nullptr;
+static B* slot_0044d710 = nullptr;
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void relocate_imm32(
+    B* slot, U imm_off, U expected_addr, const void* replacement) {
+    const U actual = load32(slot, imm_off);
+    require(actual == expected_addr, "imm32/disp32 target");
+    store32(slot, imm_off, address(replacement));
+}
+
+static void init() {
+    static const B body_0044d7e0[] = {@BODY_0044D7E0@};
+    static const B body_0044d710[] = {@BODY_0044D710@};
+    require(sizeof body_0044d7e0 == 434u, "434B 0044d7e0");
+    require(sizeof body_0044d710 == 194u, "194B 0044d710");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+
+    slot_0044d7e0 = code_page + 0x000u;
+    slot_0044d710 = code_page + 0x200u;
+
+    std::memcpy(slot_0044d7e0, body_0044d7e0, sizeof body_0044d7e0);
+    std::memcpy(slot_0044d710, body_0044d710, sizeof body_0044d710);
+
+    // 0044d710
+    relocate_call_rel32(slot_0044d710, 0x0044d710u, 0x009u, 0x00537f90u,
+                        reinterpret_cast<const void*>(&porsche::render_descriptor_bits_00537f90));
+    relocate_imm32(slot_0044d710, 0x05eu, 0x005ce57cu, kStrShrinkMip);
+    relocate_call_rel32(slot_0044d710, 0x0044d710u, 0x062u, 0x00531ca0u,
+                        reinterpret_cast<const void*>(&porsche::allocate_00531ca0));
+    relocate_call_rel32(slot_0044d710, 0x0044d710u, 0x06du, 0x005323e0u,
+                        reinterpret_cast<const void*>(&porsche::heap_copy_dispatch_005323e0));
+    relocate_call_rel32(slot_0044d710, 0x0044d710u, 0x07fu, 0x005323e0u,
+                        reinterpret_cast<const void*>(&porsche::heap_copy_dispatch_005323e0));
+
+    // 0044d7e0
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x020u, 0x0044dfe0u,
+                        reinterpret_cast<const void*>(&porsche::startup_text_quality_mask_ptr_0044dfe0));
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x03fu, 0x0044dfe0u,
+                        reinterpret_cast<const void*>(&porsche::startup_text_quality_mask_ptr_0044dfe0));
+    relocate_imm32(slot_0044d7e0, 0x04fu, 0x005ce48cu,
+                   porsche::scene_texture_format_prefs_0_005ce48c);
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x055u, 0x00554950u,
+                        reinterpret_cast<const void*>(&porsche::render_texture_format_table_set_00554950));
+    relocate_imm32(slot_0044d7e0, 0x062u, 0x005ce4acu,
+                   porsche::scene_texture_format_prefs_1_005ce4ac);
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x068u, 0x00554950u,
+                        reinterpret_cast<const void*>(&porsche::render_texture_format_table_set_00554950));
+    relocate_imm32(slot_0044d7e0, 0x073u, 0x005ce4ccu,
+                   porsche::scene_texture_format_prefs_2_005ce4cc);
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x079u, 0x00554950u,
+                        reinterpret_cast<const void*>(&porsche::render_texture_format_table_set_00554950));
+    relocate_imm32(slot_0044d7e0, 0x084u, 0x005ce4ecu,
+                   porsche::scene_texture_format_prefs_3_005ce4ec);
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x08au, 0x00554950u,
+                        reinterpret_cast<const void*>(&porsche::render_texture_format_table_set_00554950));
+    relocate_imm32(slot_0044d7e0, 0x090u, 0x005ce50cu,
+                   porsche::scene_texture_format_prefs_4_005ce50c);
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x096u, 0x00554950u,
+                        reinterpret_cast<const void*>(&porsche::render_texture_format_table_set_00554950));
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x0ebu, 0x0044d710u, slot_0044d710);
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x0f6u, 0x005557d0u,
+                        reinterpret_cast<const void*>(&porsche::scene_texture_descriptor_shrink_005557d0));
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x113u, 0x00537f90u,
+                        reinterpret_cast<const void*>(&porsche::render_descriptor_bits_00537f90));
+    relocate_imm32(slot_0044d7e0, 0x149u, 0x005ce588u, kStrShpConv);
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x14du, 0x00531ca0u,
+                        reinterpret_cast<const void*>(&porsche::allocate_00531ca0));
+    relocate_call_rel32(slot_0044d7e0, 0x0044d7e0u, 0x15bu, 0x005323e0u,
+                        reinterpret_cast<const void*>(&porsche::heap_copy_dispatch_005323e0));
+}
+
+static U invoke_stdcall_1(const void* fn, U a0, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a0
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_esps1
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_esps1:
+        cmp ebx, 0x13572468
+        je ok_ebxs1
+        or abi_fail, 2
+    ok_ebxs1:
+        cmp esi, 0x24681357
+        je ok_esis1
+        or abi_fail, 4
+    ok_esis1:
+        cmp edi, 0x55aa33cc
+        je ok_edis1
+        or abi_fail, 8
+    ok_edis1:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static U invoke_thiscall_3(const void* fn, void* self, U a0, U a1, U a2, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a2
+        push a1
+        push a0
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt3
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt3:
+        cmp ebx, 0x13572468
+        je ok_ebxt3
+        or abi_fail, 2
+    ok_ebxt3:
+        cmp esi, 0x24681357
+        je ok_esit3
+        or abi_fail, 4
+    ok_esit3:
+        cmp edi, 0x55aa33cc
+        je ok_edit3
+        or abi_fail, 8
+    ok_edit3:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static void reset_fixtures(U seed) {
+    g_event_count = 0u;
+    g_alloc_cursor = 0u;
+    g_quality_mask = 0u;
+    g_bits_return = 16u;
+    std::memset(g_events, 0, sizeof g_events);
+    std::memset(g_out_desc, static_cast<int>(0x40u + seed), sizeof g_out_desc);
+    std::memset(g_alloc_pool, 0x5au, sizeof g_alloc_pool);
+    for (U i = 0u; i < 10u; ++i) {
+        g_pref_table[i] = nullptr;
+    }
+    for (U i = 0u; i < kChunkBytes; ++i) {
+        g_chunk[i] = static_cast<B>((seed + i * 17u) & 0xffu);
+    }
+}
+
+static void capture(Snapshot& out, U abi_fail, U ret_eax) {
+    out.abi_fail = abi_fail;
+    out.ret_eax = ret_eax;
+    out.event_count = g_event_count;
+    std::memcpy(out.events.data(), g_events, sizeof g_events);
+    std::memcpy(out.out_desc.data(), g_out_desc, sizeof g_out_desc);
+    for (U i = 0u; i < 10u; ++i) {
+        out.pref_table[i] = g_pref_table[i];
+    }
+    std::memcpy(out.alloc_pool.data(), g_alloc_pool, kPoolBytes);
+    out.alloc_used = g_alloc_cursor;
+}
+
+static void check_equal(const Snapshot& orig, const Snapshot& cpp, const char* tag) {
+    require(orig.abi_fail == 0u, tag);
+    require(cpp.abi_fail == 0u, tag);
+    require(orig.ret_eax == cpp.ret_eax, tag);
+    require(orig.event_count == cpp.event_count, tag);
+    for (U i = 0u; i < orig.event_count; ++i) {
+        require(orig.events[i].kind == cpp.events[i].kind &&
+                    orig.events[i].a == cpp.events[i].a &&
+                    orig.events[i].b == cpp.events[i].b &&
+                    orig.events[i].c == cpp.events[i].c,
+                tag);
+    }
+    require(orig.out_desc == cpp.out_desc, tag);
+    require(orig.pref_table == cpp.pref_table, tag);
+    require(orig.alloc_used == cpp.alloc_used, tag);
+    require(orig.alloc_pool == cpp.alloc_pool, tag);
+    ++cases;
+}
+
+template <class Setup>
+static void run_shrink_case(Setup&& setup, const char* tag) {
+    Snapshot orig{}, cpp{};
+    U r0 = 0u, r1 = 0u;
+    reset_fixtures(1u);
+    setup();
+    U f0 = invoke_stdcall_1(slot_0044d710, address(g_chunk), r0);
+    capture(orig, f0, r0);
+    reset_fixtures(1u);
+    setup();
+    U f1 = invoke_stdcall_1(
+        reinterpret_cast<const void*>(&porsche::scene_texture_descriptor_shrink_mip_0044d710),
+        address(g_chunk), r1);
+    capture(cpp, f1, r1);
+    check_equal(orig, cpp, tag);
+}
+
+template <class Setup>
+static void run_parse_case(U mode, U fourcc, Setup&& setup, const char* tag) {
+    Snapshot orig{}, cpp{};
+    U r0 = 0u, r1 = 0u;
+    reset_fixtures(2u);
+    setup();
+    U f0 = invoke_thiscall_3(slot_0044d7e0, g_out_desc, address(g_chunk), mode, fourcc, r0);
+    capture(orig, f0, r0);
+    reset_fixtures(2u);
+    setup();
+    U f1 = invoke_thiscall_3(
+        reinterpret_cast<const void*>(&porsche::scene_texture_descriptor_parse_0044d7e0),
+        g_out_desc, address(g_chunk), mode, fourcc, r1);
+    capture(cpp, f1, r1);
+    check_equal(orig, cpp, tag);
+}
+
+int main() {
+    init();
+
+    // 1. Direct 0044d710 shrink_mip tests: bpp 15->16, bpp 8/24, mip_count 0..3
+    for (U bpp : {8u, 15u, 16u}) {
+        for (U mips : {0u, 1u, 3u}) {
+            run_shrink_case([=]() {
+                g_bits_return = bpp;
+                store16(g_chunk, 0x04u, 16u);
+                store16(g_chunk, 0x06u, 8u);
+                store32(g_chunk, 0x0cu, (mips << 28u) | 0x00abcde1u);
+            }, "shrink_mip");
+        }
+    }
+
+    // 2. 0044d7e0 byte[0]==0x10 vs !=0x10, byte[2]&0x20 + chunk[0x08] alt table branch
+    for (U b0 : {0x00u, 0x10u}) {
+        for (U b2 : {0x00u, 0x20u}) {
+            for (W alt : {0u, 1u}) {
+                run_parse_case(1u, 0x534b5920u, [=]() {
+                    g_quality_mask = b0 | (b2 << 16u);
+                    store16(g_chunk, 0x04u, 0x10u);
+                    store16(g_chunk, 0x06u, 0x10u);
+                    store16(g_chunk, 0x08u, alt);
+                }, "pref_table_branch");
+            }
+        }
+    }
+
+    // 3. 0044d7e0 all 5 width thresholds (0x200..0x20) + non-matching width,
+    //    mip vs non-mip shrink (byte[2] & 0x04), and SHPconv (byte[2] & 0x10) + shift count (byte[2] & 0x02)
+    for (W w : {0x200u, 0x100u, 0x80u, 0x40u, 0x20u, 0x10u}) {
+        for (U b2 : {0x00u, 0x02u, 0x04u, 0x06u, 0x12u, 0x16u}) {
+            run_parse_case(2u, 0x31524143u, [=]() {
+                g_bits_return = (w == 0x80u) ? 15u : 8u;
+                g_quality_mask = 0x10u | (0x1fu << 8u) | (b2 << 16u);
+                store16(g_chunk, 0x04u, w);
+                store16(g_chunk, 0x06u, 4u);
+                store16(g_chunk, 0x08u, 1u);
+                store32(g_chunk, 0x0cu, 0x10123456u);
+            }, "shrink_conv_matrix");
+        }
+    }
+
+    // 4. Individual shrink bit masks (bits 0..4 isolated)
+    for (U idx = 0u; idx < 5u; ++idx) {
+        const W widths[5] = {0x200u, 0x100u, 0x80u, 0x40u, 0x20u};
+        run_parse_case(3u, 0x534b5920u, [=]() {
+            g_quality_mask = ((1u << idx) << 8u) | (0x04u << 16u);
+            store16(g_chunk, 0x04u, widths[idx]);
+            store16(g_chunk, 0x06u, 4u);
+            store32(g_chunk, 0x0cu, 0x10000001u);
+        }, "shrink_bit_isolated");
+    }
+
+    std::printf("scene_texture_descriptor_799_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

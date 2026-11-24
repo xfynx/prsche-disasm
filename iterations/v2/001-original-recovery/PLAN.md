@@ -1,6 +1,14 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-24. [Run796](runs/796-render-font-and-sim-queue-teardown-integration/README.md)
+Current 2026-11-24. [Run800](runs/800-scene-route-and-texture-integration/README.md)
+PASS (`build-001`): folds `795/002` (`00475c80`, `00475a60`, `276B .bss`) and
+`799/002` (`0044d7e0`, `0044d710`, `160B .data`, partial): **461 TUs / 8
+projects**, **81 unresolved / 91 refs**, `1,137` pins, `150` comparisons, `20`
+mutations, `2` REA sessions, no EXE; registry **1,311** (`+4`; `0044da10`
+updated). Closes `2` (`00475c80`, `0044d7e0`), opens `1` (`005557d0`). Next
+(`Run804`): `797` (ready, `00538b30` + 11) + `798`/`801`/`802`.
+
+Historical: [Run796](runs/796-render-font-and-sim-queue-teardown-integration/README.md)
 PASS (`build-001`): folds `793/004` (`0053c6c0` + 7 leaves, `226B` read-only)
 and `794/002` (`004afd30`, `004afe50`, `004af970`, `004a8490`, `38B` literals +
 `41B .bss`): **459 TUs / 8 projects**, **82 unresolved / 92 refs**, `1,132`

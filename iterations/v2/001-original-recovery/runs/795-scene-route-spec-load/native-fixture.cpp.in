@@ -1,0 +1,444 @@
+// Native x86-vs-C++ differential fixture for Run795:
+//   00475c80..00475d61 (226B) porsche::scene_route_dispatch_00475c80
+//   00475a60..00475c7b (540B) porsche::scene_route_track_spec_default_00475a60
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "porsche/application_state.hpp"
+#include "porsche/fe_stream.hpp"
+#include "porsche/formatter_entry.hpp"
+#include "porsche/formatter_stdio.hpp"
+#include "porsche/install_paths.hpp"
+#include "scene_route_spec_795.hpp"
+#include "startup_sequence_resource_table_649.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using W = std::uint16_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static W load16(const void* base, U off = 0u) {
+    W v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 2u);
+    return v;
+}
+
+static void store16(void* base, U off, W v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 2u);
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+static U fnv1a(const char* s) {
+    U h = 2166136261u;
+    while (*s != '\0') {
+        h = (h ^ static_cast<B>(*s++)) * 16777619u;
+    }
+    return h;
+}
+
+enum : U {
+    kEvFormat = 1u,
+    kEvOpen = 2u,
+    kEvPrintf = 3u,
+    kEvFree = 4u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+};
+
+enum : U { kMaxEvents = 32u };
+
+struct Snapshot {
+    U abi_fail;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    I spec_index;
+    I spec_last_index;
+    I spec_count;
+    std::array<B, 0x108u> track_spec;
+    std::array<B, 0x108u> custom_spec;
+    U app_7a24;
+    U app_7a30;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static const char g_install_prefix[] = "Data\\Tracks\\";
+static alignas(8) B g_spec_file_buf[8u + 4u * 0x108u];
+static alignas(8) B g_custom_spec_buf[0x108u];
+static bool g_open_null = false;
+
+static const char kFmtTrBin[] = "%sTr%02d.bin";
+static const char kFmtDashes[] = "-----------------------------------------------\n";
+static const char kFmtRequestErr[] = "REQUEST FOR SPEC FILE %d WHEN ONLY %d EXIST\n";
+static const char kFmtFoundSpecs[] = "FOUND TRACK SPEC FILE WITH %d SPECS!\n";
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c};
+}
+
+namespace porsche {
+
+const char* install_paths_table_0065b2a0[60] = {};
+ApplicationStateArena application_state_006573e8;
+std::uint16_t startup_night_shape_enabled_00628a28 = 0u;
+
+std::uint32_t& ApplicationStateArena::word(std::uint32_t va) {
+    return words_[(va - application_state_base_va) / 4u];
+}
+
+std::int32_t __cdecl formatter_entry_005a0fbf(char* output, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    const int n = std::vsnprintf(output, 64u, format, args);
+    va_end(args);
+    record_event(kEvFormat, fnv1a(format), fnv1a(output));
+    return n;
+}
+
+void* __cdecl resource_open_quiet_0059d9b0(const char* name, std::uint32_t flags) {
+    record_event(kEvOpen, fnv1a(name), flags);
+    return g_open_null ? nullptr : g_spec_file_buf;
+}
+
+int __cdecl formatter_stdio_printf_005a177b(const char* format, ...) {
+    U pct_count = 0u;
+    for (const char* p = format; *p != '\0'; ++p) {
+        if (*p == '%') {
+            ++pct_count;
+        }
+    }
+    va_list args;
+    va_start(args, format);
+    const U a1 = (pct_count >= 1u) ? va_arg(args, U) : 0u;
+    const U a2 = (pct_count >= 2u) ? va_arg(args, U) : 0u;
+    va_end(args);
+    record_event(kEvPrintf, fnv1a(format), a1, a2);
+    return 1;
+}
+
+std::uint32_t __cdecl free_00531f90(void* block) {
+    record_event(kEvFree, address(block));
+    return 1u;
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_00475c80 = nullptr;
+static B* slot_00475a60 = nullptr;
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void relocate_imm32(
+    B* slot, U imm_off, U expected_addr, const void* replacement) {
+    const U actual = load32(slot, imm_off);
+    require(actual == expected_addr, "imm32/disp32 target");
+    store32(slot, imm_off, address(replacement));
+}
+
+static void init() {
+    static const B body_00475c80[] = {@BODY_00475C80@};
+    static const B body_00475a60[] = {@BODY_00475A60@};
+    require(sizeof body_00475c80 == 226u, "226B 00475c80");
+    require(sizeof body_00475a60 == 540u, "540B 00475a60");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+
+    slot_00475c80 = code_page + 0x000u;
+    slot_00475a60 = code_page + 0x200u;
+
+    std::memcpy(slot_00475c80, body_00475c80, sizeof body_00475c80);
+    std::memcpy(slot_00475a60, body_00475a60, sizeof body_00475a60);
+
+    // 00475a60
+    relocate_imm32(slot_00475a60, 0x00du, 0x00657a24u,
+                   &porsche::application_state_006573e8.word(0x00657a24u));
+    relocate_imm32(slot_00475a60, 0x025u, 0x00657a30u,
+                   &porsche::application_state_006573e8.word(0x00657a30u));
+
+    // 00475c80
+    relocate_imm32(slot_00475c80, 0x001u, 0x0065b2b8u,
+                   &porsche::install_paths_table_0065b2a0[6u]);
+    relocate_imm32(slot_00475c80, 0x013u, 0x005cffd0u, kFmtTrBin);
+    relocate_call_rel32(slot_00475c80, 0x00475c80u, 0x018u, 0x005a0fbfu,
+                        reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_call_rel32(slot_00475c80, 0x00475c80u, 0x024u, 0x0059d9b0u,
+                        reinterpret_cast<const void*>(&porsche::resource_open_quiet_0059d9b0));
+    relocate_imm32(slot_00475c80, 0x02au, 0x005cff9cu, kFmtDashes);
+    relocate_call_rel32(slot_00475c80, 0x00475c80u, 0x030u, 0x005a177bu,
+                        reinterpret_cast<const void*>(&porsche::formatter_stdio_printf_005a177b));
+    relocate_imm32(slot_00475c80, 0x048u, 0x00628a18u,
+                   &porsche::scene_route_spec_index_00628a18);
+    relocate_imm32(slot_00475c80, 0x04eu, 0x00628b28u,
+                   &porsche::scene_route_spec_last_index_00628b28);
+    relocate_imm32(slot_00475c80, 0x062u, 0x005cff6cu, kFmtRequestErr);
+    relocate_call_rel32(slot_00475c80, 0x00475c80u, 0x066u, 0x005a177bu,
+                        reinterpret_cast<const void*>(&porsche::formatter_stdio_printf_005a177b));
+    relocate_imm32(slot_00475c80, 0x06cu, 0x00628a20u,
+                   porsche::scene_route_track_spec_00628a20);
+    relocate_call_rel32(slot_00475c80, 0x00475c80u, 0x070u, 0x00475a60u, slot_00475a60);
+    relocate_call_rel32(slot_00475c80, 0x00475c80u, 0x076u, 0x00531f90u,
+                        reinterpret_cast<const void*>(&porsche::free_00531f90));
+    relocate_imm32(slot_00475c80, 0x086u, 0x005cff44u, kFmtFoundSpecs);
+    relocate_call_rel32(slot_00475c80, 0x00475c80u, 0x08au, 0x005a177bu,
+                        reinterpret_cast<const void*>(&porsche::formatter_stdio_printf_005a177b));
+    relocate_imm32(slot_00475c80, 0x09bu, 0x00628a20u,
+                   porsche::scene_route_track_spec_00628a20);
+    relocate_imm32(slot_00475c80, 0x0a1u, 0x00628b2cu,
+                   &porsche::scene_route_spec_count_00628b2c);
+    relocate_imm32(slot_00475c80, 0x0bcu, 0x00628a28u,
+                   &porsche::scene_route_track_spec_00628a20[0x08u]);
+    relocate_imm32(slot_00475c80, 0x0c3u, 0x00628a22u,
+                   &porsche::scene_route_track_spec_00628a20[0x02u]);
+    relocate_imm32(slot_00475c80, 0x0c9u, 0x00657a30u,
+                   &porsche::application_state_006573e8.word(0x00657a30u));
+    relocate_imm32(slot_00475c80, 0x0cfu, 0x00657a24u,
+                   &porsche::application_state_006573e8.word(0x00657a24u));
+    relocate_call_rel32(slot_00475c80, 0x00475c80u, 0x0d3u, 0x00531f90u,
+                        reinterpret_cast<const void*>(&porsche::free_00531f90));
+}
+
+static U invoke_cdecl_1_void(const void* fn, U a0) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a0
+        mov eax, fn
+        call eax
+        add esp, 4
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_esp1
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_esp1:
+        cmp ebx, 0x13572468
+        je ok_ebx1
+        or abi_fail, 2
+    ok_ebx1:
+        cmp esi, 0x24681357
+        je ok_esi1
+        or abi_fail, 4
+    ok_esi1:
+        cmp edi, 0x55aa33cc
+        je ok_edi1
+        or abi_fail, 8
+    ok_edi1:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static void reset_fixtures(U seed) {
+    g_event_count = 0u;
+    g_open_null = false;
+    std::memset(g_events, 0, sizeof g_events);
+    porsche::install_paths_table_0065b2a0[6u] = g_install_prefix;
+    std::memset(&porsche::application_state_006573e8, 0,
+                sizeof porsche::application_state_006573e8);
+    porsche::scene_route_spec_index_00628a18 = static_cast<I>(0x11110000u + seed);
+    porsche::scene_route_spec_last_index_00628b28 = static_cast<I>(0x22220000u + seed);
+    porsche::scene_route_spec_count_00628b2c = static_cast<I>(0x33330000u + seed);
+    porsche::startup_night_shape_enabled_00628a28 = 0x5a5au;
+    for (U i = 0u; i < 0x108u; ++i) {
+        const B pattern = static_cast<B>((0xa0u + seed + i * 7u) & 0xffu);
+        porsche::scene_route_track_spec_00628a20[i] = pattern;
+        g_custom_spec_buf[i] = static_cast<B>(pattern ^ 0x33u);
+    }
+    std::memset(g_spec_file_buf, 0, sizeof g_spec_file_buf);
+}
+
+static void populate_spec_file(I count) {
+    store32(g_spec_file_buf, 0x00u, 0x53504543u);
+    store32(g_spec_file_buf, 0x04u, static_cast<U>(count));
+    for (U entry_idx = 0u; entry_idx < 4u; ++entry_idx) {
+        B* const dst = g_spec_file_buf + 8u + entry_idx * 0x108u;
+        for (U b = 0u; b < 0x108u; ++b) {
+            dst[b] = static_cast<B>((0x10u + entry_idx * 37u + b * 13u) & 0xffu);
+        }
+    }
+    // Entry 0: positive small fields at +0x02 and +0x08
+    store16(g_spec_file_buf + 8u, 0x02u, 0x0015u);
+    store16(g_spec_file_buf + 8u, 0x08u, 0x0001u);
+    // Entry 1: negative int16 fields to verify MOVSX sign extension
+    store16(g_spec_file_buf + 8u + 0x108u, 0x02u, 0xfffdu);
+    store16(g_spec_file_buf + 8u + 0x108u, 0x08u, 0x8001u);
+    // Entry 2: zero night flag and boundary int16 max
+    store16(g_spec_file_buf + 8u + 2u * 0x108u, 0x02u, 0x7fffu);
+    store16(g_spec_file_buf + 8u + 2u * 0x108u, 0x08u, 0x0000u);
+}
+
+static void capture(Snapshot& out, U abi_fail) {
+    out.abi_fail = abi_fail;
+    out.event_count = g_event_count;
+    std::memcpy(out.events.data(), g_events, sizeof g_events);
+    out.spec_index = porsche::scene_route_spec_index_00628a18;
+    out.spec_last_index = porsche::scene_route_spec_last_index_00628b28;
+    out.spec_count = porsche::scene_route_spec_count_00628b2c;
+    std::memcpy(out.track_spec.data(), porsche::scene_route_track_spec_00628a20, 0x108u);
+    std::memcpy(out.custom_spec.data(), g_custom_spec_buf, 0x108u);
+    out.app_7a24 = porsche::application_state_006573e8.word(0x00657a24u);
+    out.app_7a30 = porsche::application_state_006573e8.word(0x00657a30u);
+}
+
+static void check_equal(const Snapshot& orig, const Snapshot& cpp, const char* tag) {
+    require(orig.abi_fail == 0u, tag);
+    require(cpp.abi_fail == 0u, tag);
+    require(orig.event_count == cpp.event_count, tag);
+    for (U i = 0u; i < orig.event_count; ++i) {
+        require(orig.events[i].kind == cpp.events[i].kind &&
+                    orig.events[i].a == cpp.events[i].a &&
+                    orig.events[i].b == cpp.events[i].b &&
+                    orig.events[i].c == cpp.events[i].c,
+                tag);
+    }
+    require(orig.spec_index == cpp.spec_index, tag);
+    require(orig.spec_last_index == cpp.spec_last_index, tag);
+    require(orig.spec_count == cpp.spec_count, tag);
+    require(orig.track_spec == cpp.track_spec, tag);
+    require(orig.custom_spec == cpp.custom_spec, tag);
+    require(orig.app_7a24 == cpp.app_7a24, tag);
+    require(orig.app_7a30 == cpp.app_7a30, tag);
+    ++cases;
+}
+
+template <class Setup>
+static void run_default_case(void* target, Setup&& setup, const char* tag) {
+    Snapshot orig{}, cpp{};
+    reset_fixtures(3u);
+    setup();
+    U f0 = invoke_cdecl_1_void(slot_00475a60, address(target));
+    capture(orig, f0);
+    reset_fixtures(3u);
+    setup();
+    U f1 = invoke_cdecl_1_void(
+        reinterpret_cast<const void*>(&porsche::scene_route_track_spec_default_00475a60),
+        address(target));
+    capture(cpp, f1);
+    if (target == porsche::scene_route_track_spec_00628a20) {
+        require(porsche::startup_night_shape_enabled_00628a28 ==
+                    load16(porsche::scene_route_track_spec_00628a20, 0x08u),
+                "night sync default");
+    }
+    check_equal(orig, cpp, tag);
+}
+
+template <class Setup>
+static void run_spec_load_case(U value, Setup&& setup, bool expect_sync, const char* tag) {
+    Snapshot orig{}, cpp{};
+    reset_fixtures(5u);
+    setup();
+    U f0 = invoke_cdecl_1_void(slot_00475c80, value);
+    capture(orig, f0);
+    reset_fixtures(5u);
+    setup();
+    U f1 = invoke_cdecl_1_void(
+        reinterpret_cast<const void*>(&porsche::scene_route_dispatch_00475c80),
+        value);
+    capture(cpp, f1);
+    if (expect_sync) {
+        require(porsche::startup_night_shape_enabled_00628a28 ==
+                    load16(porsche::scene_route_track_spec_00628a20, 0x08u),
+                "night sync load");
+    }
+    check_equal(orig, cpp, tag);
+}
+
+int main() {
+    init();
+
+    // 1. Direct 00475a60 default track spec builder (multiple 00657a24/00657a30 inputs and targets)
+    for (U a24 : {0u, 3u, 0xffffu}) {
+        for (U a30 : {0u, 1u, 0x1234u}) {
+            run_default_case(g_custom_spec_buf, [=]() {
+                porsche::application_state_006573e8.word(0x00657a24u) = a24;
+                porsche::application_state_006573e8.word(0x00657a30u) = a30;
+            }, "default custom");
+        }
+    }
+    run_default_case(porsche::scene_route_track_spec_00628a20, []() {
+        porsche::application_state_006573e8.word(0x00657a24u) = 7u;
+        porsche::application_state_006573e8.word(0x00657a30u) = 1u;
+    }, "default global");
+
+    // 2. 00475c80 open failure
+    run_spec_load_case(0u, []() {
+        g_open_null = true;
+    }, false, "open null");
+
+    // 3. 00475c80 out-of-range fallback (index >= count)
+    for (U idx : {0u, 3u, 5u}) {
+        run_spec_load_case(idx, [=]() {
+            populate_spec_file(idx == 0u ? 0 : 3);
+            porsche::application_state_006573e8.word(0x00657a24u) = 9u;
+            porsche::application_state_006573e8.word(0x00657a30u) = 1u;
+        }, true, "out of range");
+    }
+
+    // 4. 00475c80 valid spec indices (including negative int16 sign extension)
+    for (U idx : {0u, 1u, 2u}) {
+        run_spec_load_case(idx, []() {
+            populate_spec_file(3);
+        }, true, "valid spec");
+    }
+
+    std::printf("scene_route_spec_795_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

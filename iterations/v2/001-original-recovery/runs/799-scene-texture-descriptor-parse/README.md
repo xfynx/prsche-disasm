@@ -1,0 +1,4 @@
+# Run 799: Scene Texture Descriptor Parse (`0044d7e0`, `0044d710`)
+Closes `791`/`792` frontier `scene_texture_descriptor_parse_0044d7e0` (`0044d7e0..0044d991`, 434B) + leaf `scene_texture_descriptor_shrink_mip_0044d710` (`0044d710..0044d7cf`, 194B); 628B code + 160B `.data` (`005ce48c..005ce50c`), reuses `0044dfe0`, `00554950`, `00537f90`, `00531ca0`, `005323e0`, 1 typed frontier (`005557d0` 415B).
+- REA: `local/experiments/v2-scene-799-rea/001/receipt.json` + `rea/validation.json` (2 dossiers).
+- Native: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/799-scene-texture-descriptor-parse/native-config.json --attempt 002` -> `local/experiments/v2-scene-texture-descriptor-parse-799/002/receipt.json` PASS (58 cases/variant `/Od` & `/O2`, 10/10 mutations killed).

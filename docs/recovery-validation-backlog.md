@@ -1,6 +1,11 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run796 PASS (`793/004` + `794/002`: 12 bodies, 272 cases, 24
+Текущее: Run800 PASS (`795/002` + `799/002`: 4 bodies, 150 cases, 20 mutations,
+276B `.bss` + 160B `.data`, 461 TUs, 81/91 names/refs, 1,137 pins, registry
+1,311, no EXE). `795` bounds `spec_index < 4`; `799` leaves `005557d0` (`415B`)
+open; live renderer/startup/gameplay remain open.
+
+Historical: Run796 PASS (`793/004` + `794/002`: 12 bodies, 272 cases, 24
 mutations, 264B read-only + 41B `.bss`, 459 TUs, 82/92 names/refs, 1,132 pins,
 registry 1,307, no EXE). `793` leaves `005dec08` ops[5] open; `794` uses
 bounded mock file/bank/heap/callback stubs and CRT `std::puts`; live

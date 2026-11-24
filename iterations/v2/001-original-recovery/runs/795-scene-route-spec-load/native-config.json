@@ -1,0 +1,126 @@
+{
+  "run": 795,
+  "experiment": "local/experiments/v2-scene-route-spec-load-795",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load",
+    "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table",
+    "iterations/v2/001-original-recovery/runs/644-render-startup-text-leaves",
+    "iterations/v2/001-original-recovery/runs/646-startup-context-table-helpers",
+    "iterations/v2/001-original-recovery/runs/290-frame-service-cluster",
+    "iterations/v2/001-original-recovery/runs/334-resource-open",
+    "iterations/v2/001-original-recovery/runs/313-pr9-resource-open",
+    "iterations/v2/001-original-recovery/runs/499-rooted-file-exists",
+    "iterations/v2/001-original-recovery/runs/596-startup-quality-tier",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.hpp",
+    "iterations/v2/001-original-recovery/runs/649-startup-sequence-resource-table/startup_sequence_resource_table_649.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/application_state.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/formatter_stdio.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "00475c80",
+      "bytes": 226,
+      "sha256": "3698da04e3d3280646d8fe37d5978a3f8116bb91f72aed292bd168c4ecc4bf7c",
+      "token": "@BODY_00475C80@"
+    },
+    {
+      "va": "00475a60",
+      "bytes": 540,
+      "sha256": "969c9622c2d919b89e7628d5825f974abe04780b8c1168be0d16534bd4180aba",
+      "token": "@BODY_00475A60@"
+    }
+  ],
+  "pass_marker": "scene_route_spec_795_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-spec-count-increment",
+      "source": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp",
+      "old": "scene_route_spec_count_00628b2c = spec_count + 1;",
+      "new": "scene_route_spec_count_00628b2c = spec_count;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-spec-stride",
+      "source": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp",
+      "old": "static_cast<std::ptrdiff_t>(spec_index) * 0x108;",
+      "new": "static_cast<std::ptrdiff_t>(spec_index) * 0x104;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-bounds-check",
+      "source": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp",
+      "old": "if (spec_index >= spec_count) {",
+      "new": "if (spec_index > spec_count) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-sign-extend-a24",
+      "source": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp",
+      "old": "static_cast<I>(load16s(scene_route_track_spec_00628a20, 0x02u)));",
+      "new": "static_cast<I>(load16u(scene_route_track_spec_00628a20, 0x02u)));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-sign-extend-a30",
+      "source": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp",
+      "old": "static_cast<I>(load16s(scene_route_track_spec_00628a20, 0x08u)));",
+      "new": "static_cast<I>(load16u(scene_route_track_spec_00628a20, 0x08u)));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-free-spec-file",
+      "source": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp",
+      "old": "(void)free_00531f90(file_data);\n        return;",
+      "new": "return;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-default-ramp-cutoff",
+      "source": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp",
+      "old": "(rev > 15) ? static_cast<I>(idx) : rev",
+      "new": "(rev > 14) ? static_cast<I>(idx) : rev",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-default-table-step",
+      "source": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp",
+      "old": "store32(out, 0xd8u + base, static_cast<U>(slot * 0x1000));",
+      "new": "store32(out, 0xd8u + base, static_cast<U>(slot * 0x1004));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-default-magic-f4",
+      "source": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp",
+      "old": "store32(out, 0xf4u, 0x44u);",
+      "new": "store32(out, 0xf4u, 0x45u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-default-magic-b4",
+      "source": "iterations/v2/001-original-recovery/runs/795-scene-route-spec-load/scene_route_spec_795.cpp",
+      "old": "store32(out, 0xb4u, 12345u);",
+      "new": "store32(out, 0xb4u, 12346u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}
