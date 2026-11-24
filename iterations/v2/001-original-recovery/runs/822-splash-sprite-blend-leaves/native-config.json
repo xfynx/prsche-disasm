@@ -1,0 +1,140 @@
+{
+  "run": 822,
+  "experiment": "local/experiments/v2-splash-sprite-blend-leaves-822",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/sprite_blend_leaves_822.cpp",
+    "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/stride_callers_822.cpp",
+    "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+    "iterations/v2/001-original-recovery/runs/807-render-color-pack/render_color_pack_807.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves",
+    "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite",
+    "iterations/v2/001-original-recovery/runs/807-render-color-pack",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/sprite_blend_leaves_822.hpp",
+    "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/bindings.hpp",
+    "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/bindings.json",
+    "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/bindings.cmake",
+    "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005350a0",
+      "bytes": 32,
+      "sha256": "8f5e25dbd8332677703b41b066a8a20298f2815ab0a5eeecac06542820af192f",
+      "token": "@BODY_005350A0@"
+    },
+    {
+      "va": "00563ab0",
+      "bytes": 28,
+      "sha256": "53a38efa84165b15877114b3416eaebe7f81ae9dc582a0026d77147cc954af7f",
+      "token": "@BODY_00563AB0@"
+    },
+    {
+      "va": "00570d50",
+      "bytes": 290,
+      "sha256": "414ecdbac65c06bc49b3fd7db7b3d45fe79a2e4b342a73430b9b95885e8ad089",
+      "token": "@BODY_00570D50@"
+    },
+    {
+      "va": "00573b20",
+      "bytes": 622,
+      "sha256": "f3e1cca21e4ed45269160ff07303d3ed58bdf35bf9797b2720c89e759f00426e",
+      "token": "@BODY_00573B20@"
+    },
+    {
+      "va": "005712f0",
+      "bytes": 49,
+      "sha256": "4f8f9547765a6535b98a0d3292121df2a8b5113e237b22ea120ce78653d39fa2",
+      "token": "@BODY_005712F0@"
+    },
+    {
+      "va": "0058dfb0",
+      "bytes": 59,
+      "sha256": "9c6c743d77aa2df772ab681e3de01134efb54abc7e32f568e354333b1077cb61",
+      "token": "@BODY_0058DFB0@"
+    },
+    {
+      "va": "0058ddb0",
+      "bytes": 68,
+      "sha256": "bb31040594fdcf1ff7b1387877baad7f5287bb4d3721889fef64191884e3f0d6",
+      "token": "@BODY_0058DDB0@"
+    },
+    {
+      "va": "0058dd80",
+      "bytes": 48,
+      "sha256": "3126b8aefba75d0ce69e086636d63e1f55194d18fe3b2e570152594c9944177f",
+      "token": "@BODY_0058DD80@"
+    },
+    {
+      "va": "0058df90",
+      "bytes": 17,
+      "sha256": "e3232ea3dc8c66c2b3b32f6a26bebd5897294ffa257cf5030786e96a70f3a70b",
+      "token": "@BODY_0058DF90@"
+    }
+  ],
+  "pass_marker": "splash_sprite_blend_leaves_822_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-5350a0-direct-mode",
+      "source": "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/sprite_blend_leaves_822.cpp",
+      "old": "    return render_shape_convert_type_00534d40(shape, target_type, 0, 1);",
+      "new": "    return render_shape_convert_type_00534d40(shape, target_type, 0, 0);"
+    },
+    {
+      "name": "wrong-563ab0-numerator",
+      "source": "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/sprite_blend_leaves_822.cpp",
+      "old": "        static_cast<std::int64_t>(0x100000000LL) / static_cast<std::int64_t>(abs_scale));",
+      "new": "        static_cast<std::int64_t>(0x100000000LL) / static_cast<std::int64_t>(abs_scale + 1));"
+    },
+    {
+      "name": "wrong-570d50-4bpp-shift",
+      "source": "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/sprite_blend_leaves_822.cpp",
+      "old": "        return ((x & 1) != 0) ? (static_cast<std::uint32_t>(byte_val) >> 4u)",
+      "new": "        return ((x & 1) == 0) ? (static_cast<std::uint32_t>(byte_val) >> 4u)"
+    },
+    {
+      "name": "wrong-570d50-thrash-mode-guard",
+      "source": "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/sprite_blend_leaves_822.cpp",
+      "old": "        window_shutdown_mode_005de630 != 0xffu &&",
+      "new": "        window_shutdown_mode_005de630 != 0xfeu &&"
+    },
+    {
+      "name": "wrong-573b20-565-fastpath",
+      "source": "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/sprite_blend_leaves_822.cpp",
+      "old": "    if (cfg[0x0cu] == 0x78u && window_shutdown_state_005de64c != 0u) {",
+      "new": "    if (cfg[0x0cu] == 0x78u && window_shutdown_state_005de64c == 0u) {"
+    },
+    {
+      "name": "wrong-573b20-flag1-branch",
+      "source": "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/sprite_blend_leaves_822.cpp",
+      "old": "    if ((render_blend_mode_flags_005deba0 & 1u) != 0u) {",
+      "new": "    if ((render_blend_mode_flags_005deba0 & 1u) == 0u) {"
+    },
+    {
+      "name": "wrong-573b20-round-blend",
+      "source": "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/sprite_blend_leaves_822.cpp",
+      "old": "        static_cast<std::uint32_t>((prod >> 16) + ((prod >> 15) & 1));",
+      "new": "        static_cast<std::uint32_t>(prod >> 16);"
+    },
+    {
+      "name": "wrong-573b20-dst-alpha-zero",
+      "source": "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/sprite_blend_leaves_822.cpp",
+      "old": "    if (dst_a == 0u) {",
+      "new": "    if (false && dst_a == 0u) {"
+    },
+    {
+      "name": "wrong-822-stride-caller",
+      "source": "iterations/v2/001-original-recovery/runs/822-splash-sprite-blend-leaves/stride_callers_822.cpp",
+      "old": "    return porsche::render_shape_row_stride_005712f0(shape);",
+      "new": "    return porsche::render_shape_row_stride_005712f0(shape) + 1;"
+    }
+  ]
+}

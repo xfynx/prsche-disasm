@@ -1,0 +1,556 @@
+// Native x86-vs-C++ differential fixture for Run817 sprite draw cluster.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "sprite_draw_817.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kMaxEvents = 64u,
+    kFbBytes = 1024u,
+};
+
+struct EventRec {
+    U kind;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+};
+
+struct Snapshot {
+    U abi_fail;
+    U ret;
+    U ev_count;
+    EventRec ev[kMaxEvents];
+    B fb[kFbBytes];
+    I cache_stride;
+    I cache_count;
+    U row_offsets[32];
+};
+
+static U cases = 0u;
+static Snapshot expected{};
+static Snapshot actual{};
+static Snapshot* cur = nullptr;
+
+static B fb_mem[kFbBytes]{};
+static B shape_main[256]{};
+static B shape_conv[256]{};
+static B lut_storage[32768]{};
+
+static I orig_stride_006ad754 = 0;
+static I orig_count_006ad758 = 0;
+static U orig_row_offsets_006b1c20[2048]{};
+
+static I fake_mip_return = 0x10000;
+static U fake_sample_override_enabled = 0u;
+static U fake_sample_override_argb = 0u;
+
+static B* code_563160 = nullptr;
+static B* code_562cf0 = nullptr;
+static B* code_562eb0 = nullptr;
+static B* code_573f2a = nullptr;
+static B* code_573faf = nullptr;
+static B* code_58ccf0 = nullptr;
+
+static U addr_u32(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static void write_u32(B* dst, U v) {
+    std::memcpy(dst, &v, sizeof(v));
+}
+
+static void write_i16(B* dst, I v) {
+    const std::int16_t s = static_cast<std::int16_t>(v);
+    std::memcpy(dst, &s, sizeof(s));
+}
+
+static void write_rel32(B* insn_start, const void* target) {
+    B* const next_ip = insn_start + 5;
+    const std::int32_t rel =
+        static_cast<std::int32_t>(reinterpret_cast<const B*>(target) - next_ip);
+    std::memcpy(insn_start + 1, &rel, sizeof(rel));
+}
+
+static void record_event(U kind, U a0, U a1, U a2, U a3) {
+    if (cur == nullptr || cur->ev_count >= kMaxEvents) {
+        return;
+    }
+    auto& e = cur->ev[cur->ev_count++];
+    e.kind = kind;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+    e.a3 = a3;
+}
+
+static void init_original_code() {
+    static const B kRaw563160[433] = { @BODY_00563160@ };
+    static const B kRaw562cf0[445] = { @BODY_00562CF0@ };
+    static const B kRaw562eb0[284] = { @BODY_00562EB0@ };
+    static const B kRaw573f2a[133] = { @BODY_00573F2A@ };
+    static const B kRaw573faf[146] = { @BODY_00573FAF@ };
+    static const B kRaw58ccf0[112] = { @BODY_0058CCF0@ };
+
+    auto* const mem = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    code_563160 = mem;
+    code_562cf0 = mem + 512u;
+    code_562eb0 = mem + 1024u;
+    code_573f2a = mem + 1536u;
+    code_573faf = mem + 2048u;
+    code_58ccf0 = mem + 2560u;
+
+    std::memcpy(code_563160, kRaw563160, sizeof(kRaw563160));
+    std::memcpy(code_562cf0, kRaw562cf0, sizeof(kRaw562cf0));
+    std::memcpy(code_562eb0, kRaw562eb0, sizeof(kRaw562eb0));
+    std::memcpy(code_573f2a, kRaw573f2a, sizeof(kRaw573f2a));
+    std::memcpy(code_573faf, kRaw573faf, sizeof(kRaw573faf));
+    std::memcpy(code_58ccf0, kRaw58ccf0, sizeof(kRaw58ccf0));
+
+    // 0058ccf0 relocs: call 5712f0 at +0x07, 6ad754 at +0x0e/+0x37, 6ad758 at +0x1f/+0x3f, 6b1c20 at +0x46.
+    write_rel32(code_58ccf0 + 0x07u, reinterpret_cast<const void*>(&porsche::render_shape_row_stride_005712f0));
+    write_u32(code_58ccf0 + 0x0eu, addr_u32(&orig_stride_006ad754));
+    write_u32(code_58ccf0 + 0x1fu, addr_u32(&orig_count_006ad758));
+    write_u32(code_58ccf0 + 0x37u, addr_u32(&orig_stride_006ad754));
+    write_u32(code_58ccf0 + 0x3fu, addr_u32(&orig_count_006ad758));
+    write_u32(code_58ccf0 + 0x46u, addr_u32(orig_row_offsets_006b1c20));
+
+    // 00562eb0 relocs: 6b4b20 at +0x50, call 572f90 at +0x10d.
+    write_u32(code_562eb0 + 0x50u, addr_u32(porsche::render_pixel_palette_006b4b20));
+    write_rel32(code_562eb0 + 0x10du, reinterpret_cast<const void*>(&porsche::render_color_888_to_pal8_00572f90));
+
+    // 00562cf0 relocs: 5de62c at +0x11, call 574050 at +0x28, 6b1c20 at +0x57/+0xb6/+0x115/+0x173,
+    // calls 58ccbf (+0x6b/+0xca/+0x129/+0x180), 573f2a (+0x72), 573faf (+0xd1), 562eb0 (+0x130), 573b20 (+0x190).
+    write_u32(code_562cf0 + 0x11u, addr_u32(&porsche::window_shutdown_config_005de620[3]));
+    write_rel32(code_562cf0 + 0x28u, reinterpret_cast<const void*>(&porsche::render_buffer_address_00574050));
+    write_u32(code_562cf0 + 0x57u, addr_u32(orig_row_offsets_006b1c20));
+    write_rel32(code_562cf0 + 0x6bu, reinterpret_cast<const void*>(&porsche::render_sprite_sample_0058ccbf));
+    write_rel32(code_562cf0 + 0x72u, code_573f2a);
+    write_u32(code_562cf0 + 0xb6u, addr_u32(orig_row_offsets_006b1c20));
+    write_rel32(code_562cf0 + 0xcau, reinterpret_cast<const void*>(&porsche::render_sprite_sample_0058ccbf));
+    write_rel32(code_562cf0 + 0xd1u, code_573faf);
+    write_u32(code_562cf0 + 0x115u, addr_u32(orig_row_offsets_006b1c20));
+    write_rel32(code_562cf0 + 0x129u, reinterpret_cast<const void*>(&porsche::render_sprite_sample_0058ccbf));
+    write_rel32(code_562cf0 + 0x130u, code_562eb0);
+    write_u32(code_562cf0 + 0x173u, addr_u32(orig_row_offsets_006b1c20));
+    write_rel32(code_562cf0 + 0x180u, reinterpret_cast<const void*>(&porsche::render_sprite_sample_0058ccbf));
+    write_rel32(code_562cf0 + 0x190u, reinterpret_cast<const void*>(&porsche::render_sprite_blend_direct_00573b20));
+
+    // 00563160 relocs: 537f90 (+0x14), 5350a0 (+0x24), 58ccf0 (+0x80), 563ab0 (+0x8a),
+    // clip 5de634..5de640 (+0xf8/+0x11f/+0x132/+0x159), 562cf0 (+0x186), 531f90 (+0x1a5).
+    write_rel32(code_563160 + 0x14u, reinterpret_cast<const void*>(&porsche::render_descriptor_bits_00537f90));
+    write_rel32(code_563160 + 0x24u, reinterpret_cast<const void*>(&porsche::render_sprite_convert_depth_005350a0));
+    write_rel32(code_563160 + 0x80u, code_58ccf0);
+    write_rel32(code_563160 + 0x8au, reinterpret_cast<const void*>(&porsche::render_sprite_filter_select_00563ab0));
+    write_u32(code_563160 + 0xf8u, addr_u32(&porsche::window_shutdown_config_005de620[5]));
+    write_u32(code_563160 + 0x11fu, addr_u32(&porsche::window_shutdown_config_005de620[7]));
+    write_u32(code_563160 + 0x132u, addr_u32(&porsche::window_shutdown_config_005de620[6]));
+    write_u32(code_563160 + 0x159u, addr_u32(&porsche::window_shutdown_config_005de620[8]));
+    write_rel32(code_563160 + 0x186u, code_562cf0);
+    write_rel32(code_563160 + 0x1a5u, reinterpret_cast<const void*>(&porsche::splash_progress_free_00531f90));
+
+    FlushInstructionCache(GetCurrentProcess(), mem, 3072u);
+}
+
+static void reset_env(B mode_tag, I clip_l, I clip_t, I clip_r, I clip_b) {
+    std::memset(porsche::window_shutdown_config_005de620, 0, sizeof(porsche::window_shutdown_config_005de620));
+    porsche::window_shutdown_config_005de620[3] = static_cast<U>(mode_tag);
+    porsche::window_shutdown_config_005de620[5] = static_cast<U>(clip_l);
+    porsche::window_shutdown_config_005de620[6] = static_cast<U>(clip_t);
+    porsche::window_shutdown_config_005de620[7] = static_cast<U>(clip_r);
+    porsche::window_shutdown_config_005de620[8] = static_cast<U>(clip_b);
+
+    for (U i = 0u; i < 256u; ++i) {
+        porsche::render_pixel_palette_006b4b20[i] =
+            ((i * 17u + 3u) & 0xffu) |
+            (((i * 31u + 5u) & 0xffu) << 8u) |
+            (((i * 53u + 7u) & 0xffu) << 16u);
+    }
+    for (U i = 0u; i < sizeof(lut_storage); ++i) {
+        lut_storage[i] = static_cast<B>((i * 29u + 11u) & 0xffu);
+    }
+    porsche::render_color_lut_0069e0ac = lut_storage;
+
+    for (U i = 0u; i < kFbBytes; ++i) {
+        fb_mem[i] = static_cast<B>((i * 43u + 19u) & 0xffu);
+    }
+
+    std::memset(shape_main, 0, sizeof(shape_main));
+    std::memset(shape_conv, 0, sizeof(shape_conv));
+    shape_main[0] = 0x20u;
+    write_i16(shape_main + 4u, 8);
+    write_i16(shape_main + 6u, 6);
+    shape_conv[0] = 0x20u;
+    write_i16(shape_conv + 4u, 8);
+    write_i16(shape_conv + 6u, 6);
+    for (U i = 0x10u; i < 256u; ++i) {
+        shape_main[i] = static_cast<B>((i * 13u + 5u) & 0xffu);
+        shape_conv[i] = static_cast<B>((i * 19u + 9u) & 0xffu);
+    }
+
+    porsche::render_sprite_row_stride_006ad754 = 0;
+    porsche::render_sprite_row_count_006ad758 = 0;
+    std::memset(porsche::render_sprite_row_offsets_006b1c20, 0xaa, sizeof(porsche::render_sprite_row_offsets_006b1c20));
+
+    orig_stride_006ad754 = 0;
+    orig_count_006ad758 = 0;
+    std::memset(orig_row_offsets_006b1c20, 0xaa, sizeof(orig_row_offsets_006b1c20));
+}
+
+static void snap_state(Snapshot* s, bool is_actual) {
+    std::memcpy(s->fb, fb_mem, sizeof(fb_mem));
+    s->cache_stride = is_actual ? porsche::render_sprite_row_stride_006ad754 : orig_stride_006ad754;
+    s->cache_count = is_actual ? porsche::render_sprite_row_count_006ad758 : orig_count_006ad758;
+    const U* const tbl = is_actual ? porsche::render_sprite_row_offsets_006b1c20 : orig_row_offsets_006b1c20;
+    std::memcpy(s->row_offsets, tbl, sizeof(s->row_offsets));
+}
+
+static void fail_case(const char* name) {
+    std::printf("divergence %s\n", name);
+    std::printf("  expected: abi=%u ret=0x%08x ev=%u stride=%d cnt=%d\n",
+                expected.abi_fail, expected.ret, expected.ev_count,
+                expected.cache_stride, expected.cache_count);
+    std::printf("  actual:   abi=%u ret=0x%08x ev=%u stride=%d cnt=%d\n",
+                actual.abi_fail, actual.ret, actual.ev_count,
+                actual.cache_stride, actual.cache_count);
+    std::fflush(nullptr);
+    ExitProcess(10u);
+}
+
+static void run_blend_px(const char* name, U fn_kind, U color, U init_word) {
+    ++cases;
+    U esp_b = 0u, esp_a = 0u;
+    U ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+    U ret_raw = 0u;
+
+    B* raw_fn = (fn_kind == 0u) ? code_573f2a : ((fn_kind == 1u) ? code_573faf : code_562eb0);
+    B* const dst_ptr = &fb_mem[16];
+
+    reset_env(0x78u, 0, 0, 100, 100);
+    write_u32(dst_ptr, init_word);
+    std::memset(&expected, 0, sizeof(expected));
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push color
+        push dst_ptr
+        mov eax, raw_fn
+        call eax
+        add esp, 8
+        mov esp_a, esp
+        mov ret_raw, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.ret = (fn_kind == 2u) ? 0u : ret_raw;
+    expected.abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+    snap_state(&expected, false);
+
+    reset_env(0x78u, 0, 0, 100, 100);
+    write_u32(dst_ptr, init_word);
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    if (fn_kind == 0u) {
+        actual.ret = addr_u32(porsche::render_rgb565_blend_pixel_00573f2a(
+            reinterpret_cast<std::uint16_t*>(dst_ptr), color));
+    } else if (fn_kind == 1u) {
+        actual.ret = addr_u32(porsche::render_argb1555_blend_pixel_00573faf(
+            reinterpret_cast<std::uint16_t*>(dst_ptr), color));
+    } else {
+        porsche::render_pal8_blend_pixel_00562eb0(dst_ptr, color);
+        actual.ret = 0u;
+    }
+    actual.abi_fail = 0u;
+    snap_state(&actual, true);
+
+    if (std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+        fail_case(name);
+    }
+}
+
+static void run_row_prepare_seq(const char* name, I w1, I h1, I w2, I h2) {
+    ++cases;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+    B* raw_fn = code_58ccf0;
+    const void* shp = shape_main;
+
+    reset_env(0x78u, 0, 0, 100, 100);
+    write_i16(shape_main + 4u, w1);
+    write_i16(shape_main + 6u, h1);
+    std::memset(&expected, 0, sizeof(expected));
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push shp
+        mov eax, raw_fn
+        call eax
+        add esp, 4
+        mov esp_a, esp
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    write_i16(shape_main + 4u, w2);
+    write_i16(shape_main + 6u, h2);
+    __asm {
+        push shp
+        mov eax, raw_fn
+        call eax
+        add esp, 4
+    }
+    expected.abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+    snap_state(&expected, false);
+
+    reset_env(0x78u, 0, 0, 100, 100);
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    write_i16(shape_main + 4u, w1);
+    write_i16(shape_main + 6u, h1);
+    porsche::render_sprite_row_table_prepare_0058ccf0(shape_main);
+    write_i16(shape_main + 4u, w2);
+    write_i16(shape_main + 6u, h2);
+    porsche::render_sprite_row_table_prepare_0058ccf0(shape_main);
+    actual.abi_fail = 0u;
+    snap_state(&actual, true);
+
+    if (std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+        fail_case(name);
+    }
+}
+
+static void run_draw_sprite(
+    const char* name, B fmt_byte, B mode_tag, I clip_l, I clip_t, I clip_r, I clip_b,
+    I x, I y, I w, I h, I mip_ret) {
+    ++cases;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+    B* raw_fn = code_563160;
+    void* shp = shape_main;
+
+    reset_env(mode_tag, clip_l, clip_t, clip_r, clip_b);
+    shape_main[0] = fmt_byte;
+    fake_mip_return = mip_ret;
+    std::memset(&expected, 0, sizeof(expected));
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push h
+        push w
+        push y
+        push x
+        push shp
+        mov eax, raw_fn
+        call eax
+        add esp, 20
+        mov esp_a, esp
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+    snap_state(&expected, false);
+
+    reset_env(mode_tag, clip_l, clip_t, clip_r, clip_b);
+    shape_main[0] = fmt_byte;
+    fake_mip_return = mip_ret;
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    porsche::splash_progress_draw_sprite_00563160(shp, x, y, w, h);
+    actual.abi_fail = 0u;
+    snap_state(&actual, true);
+
+    if (std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+        fail_case(name);
+    }
+}
+
+} // namespace
+
+namespace porsche {
+
+std::uint32_t window_shutdown_config_005de620[12]{};
+std::uint32_t render_pixel_palette_006b4b20[256]{};
+
+std::uint32_t __cdecl render_color_888_to_565_00572f30(std::uint32_t color) {
+    return ((color & 0x00f80000u) >> 8u) |
+           ((color & 0x0000fc00u) >> 5u) |
+           ((color >> 3u) & 0x1fu);
+}
+
+std::uint32_t __cdecl render_color_888_to_1555_00572f5b(std::uint32_t color) {
+    if (color == 0u) {
+        return 0u;
+    }
+    return 0x8000u |
+           ((color & 0x00f80000u) >> 9u) |
+           ((color & 0x0000f800u) >> 6u) |
+           ((color >> 3u) & 0x1fu);
+}
+
+std::uint32_t __cdecl render_descriptor_bits_00537f90(const void* descriptor_format) {
+    const auto* const bytes = static_cast<const B*>(descriptor_format);
+    record_event(1u, addr_u32(bytes), static_cast<U>(bytes[0]), 0u, 0u);
+    return static_cast<U>(bytes[0]);
+}
+
+void* __cdecl render_sprite_convert_depth_005350a0(const void* shape, std::uint32_t bits) {
+    record_event(2u, addr_u32(shape), bits, 0u, 0u);
+    return shape_conv;
+}
+
+void __cdecl splash_progress_free_00531f90(void* resource) {
+    record_event(3u, addr_u32(resource), 0u, 0u, 0u);
+}
+
+std::int32_t __cdecl render_sprite_filter_select_00563ab0(std::int32_t abs_scale) {
+    record_event(4u, static_cast<U>(abs_scale), 0u, 0u, 0u);
+    return fake_mip_return;
+}
+
+std::int32_t __cdecl render_shape_row_stride_005712f0(const void* shape) {
+    std::int16_t w = 0;
+    std::memcpy(&w, static_cast<const B*>(shape) + 4u, sizeof(w));
+    const I stride = static_cast<I>(w) * 4;
+    record_event(5u, addr_u32(shape), static_cast<U>(stride), 0u, 0u);
+    return stride;
+}
+
+void* __cdecl render_buffer_address_00574050(std::int32_t x, std::int32_t y) {
+    record_event(6u, static_cast<U>(x), static_cast<U>(y), 0u, 0u);
+    const U idx = (static_cast<U>(y & 15) * 48u + static_cast<U>(x & 15) * 2u) % (kFbBytes - 64u);
+    return &fb_mem[idx];
+}
+
+std::uint32_t __cdecl render_sprite_sample_0058ccbf(
+    const void* src, std::int32_t u_fixed, std::int32_t v_fixed, std::int32_t row_bytes) {
+    if (fake_sample_override_enabled != 0u) {
+        return fake_sample_override_argb;
+    }
+    const auto* const p = static_cast<const B*>(src);
+    U raw = 0u;
+    std::memcpy(&raw, p, sizeof(raw));
+    const U out = raw ^ (static_cast<U>(u_fixed) >> 12u) ^ (static_cast<U>(v_fixed) >> 12u) ^ static_cast<U>(row_bytes);
+    record_event(7u, addr_u32(src), static_cast<U>(u_fixed), static_cast<U>(v_fixed), out);
+    return out;
+}
+
+void __cdecl render_sprite_blend_direct_00573b20(
+    std::int32_t x, std::int32_t y, std::uint32_t argb) {
+    record_event(8u, static_cast<U>(x), static_cast<U>(y), argb, 0u);
+}
+
+} // namespace porsche
+
+int main() {
+    init_original_code();
+
+    // 1. Pixel blenders: 00573f2a (565), 00573faf (1555), 00562eb0 (pal8).
+    const U test_colors[] = {
+        0x00123456u, 0x0f123456u, 0x10123456u, 0x80abcdefu,
+        0x80ffffffu, 0xfb804020u, 0xfc874727u, 0xff123456u,
+    };
+    const U init_words[] = { 0x00000000u, 0x0000ffffu, 0x00007befu, 0x00001234u };
+    for (U ci = 0u; ci < sizeof(test_colors) / sizeof(test_colors[0]); ++ci) {
+        for (U wi = 0u; wi < sizeof(init_words) / sizeof(init_words[0]); ++wi) {
+            run_blend_px("blend-565", 0u, test_colors[ci], init_words[wi]);
+            run_blend_px("blend-1555", 1u, test_colors[ci], init_words[wi]);
+            run_blend_px("blend-pal8", 2u, test_colors[ci], init_words[wi]);
+        }
+    }
+
+    // 2. Row offset cache prepare 0058ccf0: fresh, grow same stride, shrink no-op, stride change reset.
+    run_row_prepare_seq("row-grow", 8, 3, 8, 7);
+    run_row_prepare_seq("row-shrink-noop", 8, 9, 8, 4);
+    run_row_prepare_seq("row-stride-change", 8, 5, 10, 6);
+
+    // 3. 00563160 + 00562cf0 across all 4 format modes, conversion, clipping, negative flip, and scale threshold.
+    run_draw_sprite("draw-565-basic", 0x20u, 0x78u, 0, 0, 40, 40, 2, 3, 5, 4, 0x10000);
+    run_draw_sprite("draw-1555-conv", 0x10u, 0x7eu, 0, 0, 40, 40, 1, 2, 4, 4, 0x20000);
+    run_draw_sprite("draw-pal8-lut", 0x20u, 0x7bu, 0, 0, 40, 40, 2, 2, 4, 4, 0x4000);
+    run_draw_sprite("draw-direct-fallback", 0x20u, 0x6du, 0, 0, 40, 40, 3, 1, 4, 3, 0x10000);
+    run_draw_sprite("draw-clipped-all-sides", 0x20u, 0x78u, 5, 6, 12, 11, 2, 3, 15, 12, 0x10000);
+    run_draw_sprite("draw-clipped-empty", 0x20u, 0x78u, 10, 10, 12, 12, 20, 20, 5, 5, 0x10000);
+    run_draw_sprite("draw-negative-flip", 0x20u, 0x78u, 0, 0, 40, 40, 2, 2, -5, 4, 0x10000);
+    run_draw_sprite("draw-tiny-width-height", 0x20u, 0x78u, 0, 0, 40, 40, 2, 2, 1, 1, 0x10000);
+    run_draw_sprite("draw-below-scale-threshold", 0x20u, 0x78u, 0, 0, 40, 40, 2, 2, 0, 4, 0x10000);
+
+    // Exact 0x28f boundary: src_w=100, width=1 => (1 << 16) / 100 == 655 == 0x28f (must NOT draw).
+    ++cases;
+    {
+        U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+        U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+        B* raw_fn = code_563160;
+        void* shp = shape_main;
+        reset_env(0x78u, 0, 0, 40, 40);
+        write_i16(shape_main + 4u, 100);
+        fake_mip_return = 0x10000;
+        std::memset(&expected, 0, sizeof(expected));
+        cur = &expected;
+        __asm {
+            mov ebx_b, ebx
+            mov esi_b, esi
+            mov edi_b, edi
+            mov ebp_b, ebp
+            mov esp_b, esp
+            push 4
+            push 1
+            push 2
+            push 2
+            push shp
+            mov eax, raw_fn
+            call eax
+            add esp, 20
+            mov esp_a, esp
+            mov ebx_a, ebx
+            mov esi_a, esi
+            mov edi_a, edi
+            mov ebp_a, ebp
+        }
+        expected.abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+        snap_state(&expected, false);
+        reset_env(0x78u, 0, 0, 40, 40);
+        write_i16(shape_main + 4u, 100);
+        fake_mip_return = 0x10000;
+        std::memset(&actual, 0, sizeof(actual));
+        cur = &actual;
+        porsche::splash_progress_draw_sprite_00563160(shp, 2, 2, 1, 4);
+        actual.abi_fail = 0u;
+        snap_state(&actual, true);
+        if (std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+            fail_case("draw-exact-0x28f-boundary");
+        }
+    }
+
+    std::printf("splash_draw_sprite_817_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

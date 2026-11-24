@@ -19,10 +19,10 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run820](iterations/v2/001-original-recovery/runs/820-sim-audio-and-scene-insert-integration/README.md)
-is the current shared build (`472` TUs, `69` unresolved names / `76`
-references), integrating Runs `813` and `818` (`1,356` registry entries).
-Deferred proof-only: [Run807](iterations/v2/001-original-recovery/runs/807-render-color-pack/README.md) (unlocked by ready `Run817`). Active WIP: `Run819`, `Run821`.
+[Run824](iterations/v2/001-original-recovery/runs/824-sprite-draw-and-color-closure-integration/README.md)
+is the current shared build (`475` TUs, `69` unresolved names / `77`
+references), integrating Runs `807`, `817`, and `822` (`1,370` registry
+entries). Active WIP: `Run819`, `Run821`, `Run823`.
 
 ## Recovery milestones
 

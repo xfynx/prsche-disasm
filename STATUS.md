@@ -4,15 +4,15 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run820](iterations/v2/001-original-recovery/runs/820-sim-audio-and-scene-insert-integration/README.md)
-compiles 472 TUs across eight projects (**69 unresolved names / 76
-references**, no EXE), accepting `813/008` & `818/001`: `1,356` registry entries
-(`+10`), `78` comparisons, `22` mutations, `180B` `.rdata` & `176B` `.bss` (`813`),
-`1,166` source pins; closes `5` (`004acc10`, `00425330`, `0060c9c4`, `0060c9f4`,
-`0044db70`), `0` new.
-Deferred proof-only: [Run807](iterations/v2/001-original-recovery/runs/807-render-color-pack/README.md) (`004/receipt.json` PASS; `Run817` ready).
+[Run824](iterations/v2/001-original-recovery/runs/824-sprite-draw-and-color-closure-integration/README.md)
+compiles 475 TUs across eight projects (**69 unresolved names / 77
+references**, no EXE), accepting `807/004` + `817/003` + `822/006`: `1,370`
+registry entries (`+14`), `534` comparisons, `29` mutations, `256B` `.rdata` &
+`8,208B` `.data`/`.bss`, `1,174` source pins; closes `00563160` + `005712f0`
+alias, opens `0058ccbf`.
 
-Historical: [Run816](iterations/v2/001-original-recovery/runs/816-scene-register-heap-abi-integration/README.md),
+Historical: [Run820](iterations/v2/001-original-recovery/runs/820-sim-audio-and-scene-insert-integration/README.md),
+[Run816](iterations/v2/001-original-recovery/runs/816-scene-register-heap-abi-integration/README.md),
 [Run812](iterations/v2/001-original-recovery/runs/812-scene-table-load-integration/README.md),
 [Run809](iterations/v2/001-original-recovery/runs/809-scene-reset-and-input-caps-integration/README.md),
 [Run808](iterations/v2/001-original-recovery/runs/808-scene-texture-and-render-query-integration/README.md)

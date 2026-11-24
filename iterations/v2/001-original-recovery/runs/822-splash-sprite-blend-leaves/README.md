@@ -1,0 +1,4 @@
+# Run822: Splash sprite blend leaves & `005712f0` ABI binding
+
+Recovers `render_sprite_convert_depth_005350a0` (`32B`), `render_sprite_filter_select_00563ab0` (`28B`), `render_buffer_read_pixel_00570d50` (`290B`), and `render_sprite_blend_direct_00573b20` (`622B`; `972B` total, `4B` `.data` `005deba0`, `0` new unresolved symbols) in `sprite_blend_leaves_822.{cpp,hpp}` plus canonical `005712f0` ABI binding (`render_shape_row_stride_005712f0` -> `Run611` `splash_shape_row_stride_005712f0`), closing 4 of 5 `Run817` boundaries.
+Native diff `local/experiments/v2-splash-sprite-blend-leaves-822/006/receipt.json` **PASS** (`27` cases/variant `/Od` & `/O2`, `9/9` mutations killed, linking `807` + `817` + `822`); REA `local/experiments/v2-render-input-822-rea/001/receipt.json` + `validation.json` **PASS** (`5` dossiers).

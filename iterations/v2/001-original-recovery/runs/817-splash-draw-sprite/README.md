@@ -1,0 +1,4 @@
+# Run817: Splash sprite drawing & alpha-blend span leaves
+
+Recovers `splash_progress_draw_sprite_00563160` (`433B`), `render_sprite_span_blend_00562cf0` (`445B`), `render_pal8_blend_pixel_00562eb0` (`284B`), `render_rgb565_blend_pixel_00573f2a` (`133B`), `render_argb1555_blend_pixel_00573faf` (`146B`), and `render_sprite_row_table_prepare_0058ccf0` (`112B`; `1,553B` total, `8,200B` `.bss` `006ad754`/`006ad758`/`006b1c20`, `5` typed frontiers `005350a0`/`00563ab0`/`005712f0`/`0058ccbf`/`00573b20`) in `sprite_draw_817.{cpp,hpp}`, unlocking `Run807` (`807-render-color-pack`).
+Native diff `local/experiments/v2-splash-draw-sprite-817/003/receipt.json` **PASS** (`109` cases/variant `/Od` & `/O2`, `10/10` mutations killed); REA `local/experiments/v2-render-input-817-rea/001/receipt.json` + `validation.json` **PASS** (`6` dossiers).

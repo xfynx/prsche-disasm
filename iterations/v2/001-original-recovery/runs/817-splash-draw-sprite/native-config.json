@@ -1,0 +1,122 @@
+{
+  "run": 817,
+  "experiment": "local/experiments/v2-splash-draw-sprite-817",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+    "iterations/v2/001-original-recovery/runs/807-render-color-pack/render_color_pack_807.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite",
+    "iterations/v2/001-original-recovery/runs/807-render-color-pack",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.hpp",
+    "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00563160",
+      "bytes": 433,
+      "sha256": "4779391a671f5feed75712ac4e37db23e8798556a09c1dc81deef85397439917",
+      "token": "@BODY_00563160@"
+    },
+    {
+      "va": "00562cf0",
+      "bytes": 445,
+      "sha256": "d2ad299d59fd6ccb85f1bc3c1c2c95139c131cbe2d4ca8a04297d09139b2e616",
+      "token": "@BODY_00562CF0@"
+    },
+    {
+      "va": "00562eb0",
+      "bytes": 284,
+      "sha256": "75db9f45d471bc54e6e8ee985bd6f40e0d202bd4f9bc33166c3f4d1eb008be13",
+      "token": "@BODY_00562EB0@"
+    },
+    {
+      "va": "00573f2a",
+      "bytes": 133,
+      "sha256": "82e2b9222356dfb8c030cb5099381f26541a7f32339909c4160653663df131b2",
+      "token": "@BODY_00573F2A@"
+    },
+    {
+      "va": "00573faf",
+      "bytes": 146,
+      "sha256": "31ffeb8f57fc97d7b039de95076467e2468b9db20dfdb15a80f7753ef70df3cf",
+      "token": "@BODY_00573FAF@"
+    },
+    {
+      "va": "0058ccf0",
+      "bytes": 112,
+      "sha256": "8d628725da2d4c976395c17afc418b8d185751ee7d9b1f814277c90739685641",
+      "token": "@BODY_0058CCF0@"
+    }
+  ],
+  "pass_marker": "splash_draw_sprite_817_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-58ccf0-cached-count",
+      "source": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+      "old": "    render_sprite_row_count_006ad758 = height;",
+      "new": "    render_sprite_row_count_006ad758 = height + 1;"
+    },
+    {
+      "name": "wrong-562eb0-alpha-round",
+      "source": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+      "old": "        static_cast<std::uint32_t>((prod >> 16) + ((prod >> 15) & 1));",
+      "new": "        static_cast<std::uint32_t>(prod >> 16);"
+    },
+    {
+      "name": "wrong-562eb0-alpha-zero-skip",
+      "source": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+      "old": "    if (alpha == 0u) {",
+      "new": "    if (false && alpha == 0u) {"
+    },
+    {
+      "name": "wrong-573f2a-min-alpha",
+      "source": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+      "old": "    if (color < 0x10000000u) {\n        return dst + 1;\n    }\n    if (color < 0xfc000000u) {\n        const std::uint32_t px = static_cast<std::uint32_t>(*dst);\n        const std::uint32_t unpacked =\n            ((px << 16u) & 0xf8000000u) + (px & 0x001fu) + ((px & 0x07e0u) << 8u);",
+      "new": "    if (color < 0x0f000000u) {\n        return dst + 1;\n    }\n    if (color < 0xfc000000u) {\n        const std::uint32_t px = static_cast<std::uint32_t>(*dst);\n        const std::uint32_t unpacked =\n            ((px << 16u) & 0xf8000000u) + (px & 0x001fu) + ((px & 0x07e0u) << 8u);"
+    },
+    {
+      "name": "wrong-573faf-opaque-alpha",
+      "source": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+      "old": "    if (color < 0xfc000000u) {\n        const std::uint32_t px = static_cast<std::uint32_t>(*dst);\n        const std::uint32_t unpacked =\n            ((px & 0x7c00u) << 17u) + ((px & 0x03e0u) << 9u) + (px & 0x001fu);",
+      "new": "    if (color < 0xff000000u) {\n        const std::uint32_t px = static_cast<std::uint32_t>(*dst);\n        const std::uint32_t unpacked =\n            ((px & 0x7c00u) << 17u) + ((px & 0x03e0u) << 9u) + (px & 0x001fu);"
+    },
+    {
+      "name": "wrong-562cf0-pal8-advance",
+      "source": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+      "old": "            render_pal8_blend_pixel_00562eb0(dst_u8, sampled);\n            dst = dst_u8 + 1;",
+      "new": "            render_pal8_blend_pixel_00562eb0(dst_u8, sampled);\n            dst = dst_u8 + 2;"
+    },
+    {
+      "name": "wrong-563160-scale-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+      "old": "    if (abs_scale_x > 0x28f) {",
+      "new": "    if (abs_scale_x >= 0x28f) {"
+    },
+    {
+      "name": "wrong-563160-clip-left-u",
+      "source": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+      "old": "            u0 = u_start + clip_left_delta * du;",
+      "new": "            u0 = u_start;"
+    },
+    {
+      "name": "wrong-563160-clip-top-v",
+      "source": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+      "old": "            v0 = v_start + clip_top_delta * dv;",
+      "new": "            v0 = v_start;"
+    },
+    {
+      "name": "wrong-563160-free-converted",
+      "source": "iterations/v2/001-original-recovery/runs/817-splash-draw-sprite/sprite_draw_817.cpp",
+      "old": "    if (allocated != nullptr) {",
+      "new": "    if (false && allocated != nullptr) {"
+    }
+  ]
+}

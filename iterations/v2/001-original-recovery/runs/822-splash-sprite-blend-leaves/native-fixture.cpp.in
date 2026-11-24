@@ -1,0 +1,644 @@
+// Native x86-vs-C++ differential fixture for Run822 sprite blend leaves & ABI alias.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "sprite_blend_leaves_822.hpp"
+
+extern "C" std::int32_t __cdecl call_row_stride_822(const void* shape);
+extern "C" void* __cdecl row_stride_addr_822();
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kMaxEvents = 64u,
+    kFbBytes = 1024u,
+};
+
+struct EventRec {
+    U kind;
+    U a0;
+    U a1;
+    U a2;
+    U a3;
+};
+
+struct Snapshot {
+    U abi_fail;
+    U ret;
+    U ev_count;
+    EventRec ev[kMaxEvents];
+    B fb[kFbBytes];
+};
+
+static U cases = 0u;
+static Snapshot expected{};
+static Snapshot actual{};
+static Snapshot* cur = nullptr;
+
+static B fb_mem[kFbBytes]{};
+static B thrash_mem[kFbBytes]{};
+static U lock_struct[2]{};
+static U fake_lock_ok = 1u;
+static B shape_buf[64]{};
+static B conv_out_buf[64]{};
+
+static B* code_5350a0 = nullptr;
+static B* code_563ab0 = nullptr;
+static B* code_570d50 = nullptr;
+static B* code_573b20 = nullptr;
+static B* code_5712f0 = nullptr;
+static B* code_58dfb0 = nullptr;
+static B* code_58ddb0 = nullptr;
+static B* code_58dd80 = nullptr;
+static B* code_58df90 = nullptr;
+
+static U jt_570e74[6]{};
+static const B map_570e8c[29] = {
+    0u, 5u, 5u, 5u, 1u, 5u, 5u, 5u, 5u, 5u, 5u, 2u, 2u, 5u, 5u,
+    5u, 5u, 5u, 5u, 5u, 3u, 5u, 5u, 5u, 5u, 5u, 5u, 5u, 4u,
+};
+
+static U addr_u32(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static void write_u32(B* dst, U v) {
+    std::memcpy(dst, &v, sizeof(v));
+}
+
+static void write_rel32(B* insn_start, const void* target) {
+    B* const next_ip = insn_start + 5;
+    const std::int32_t rel =
+        static_cast<std::int32_t>(reinterpret_cast<const B*>(target) - next_ip);
+    std::memcpy(insn_start + 1, &rel, sizeof(rel));
+}
+
+static void record_event(U kind, U a0, U a1, U a2, U a3) {
+    if (cur == nullptr || cur->ev_count >= kMaxEvents) {
+        return;
+    }
+    auto& e = cur->ev[cur->ev_count++];
+    e.kind = kind;
+    e.a0 = a0;
+    e.a1 = a1;
+    e.a2 = a2;
+    e.a3 = a3;
+}
+
+static void* __stdcall stub_thrash_lockwindow() {
+    record_event(1u, fake_lock_ok, 0u, 0u, 0u);
+    return fake_lock_ok ? static_cast<void*>(lock_struct) : nullptr;
+}
+
+static U __stdcall stub_thrash_unlockwindow(void* lock) {
+    record_event(2u, addr_u32(lock), 0u, 0u, 0u);
+    return 1u;
+}
+
+static void init_original_code() {
+    static const B kRaw5350a0[32] = { @BODY_005350A0@ };
+    static const B kRaw563ab0[28] = { @BODY_00563AB0@ };
+    static const B kRaw570d50[290] = { @BODY_00570D50@ };
+    static const B kRaw573b20[622] = { @BODY_00573B20@ };
+    static const B kRaw5712f0[49] = { @BODY_005712F0@ };
+    static const B kRaw58dfb0[59] = { @BODY_0058DFB0@ };
+    static const B kRaw58ddb0[68] = { @BODY_0058DDB0@ };
+    static const B kRaw58dd80[48] = { @BODY_0058DD80@ };
+    static const B kRaw58df90[17] = { @BODY_0058DF90@ };
+
+    auto* const mem = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    code_5350a0 = mem;
+    code_563ab0 = mem + 128u;
+    code_570d50 = mem + 256u;
+    code_573b20 = mem + 640u;
+    code_5712f0 = mem + 1408u;
+    code_58dfb0 = mem + 1536u;
+    code_58ddb0 = mem + 1664u;
+    code_58dd80 = mem + 1792u;
+    code_58df90 = mem + 1920u;
+
+    std::memcpy(code_5350a0, kRaw5350a0, sizeof(kRaw5350a0));
+    std::memcpy(code_563ab0, kRaw563ab0, sizeof(kRaw563ab0));
+    std::memcpy(code_570d50, kRaw570d50, sizeof(kRaw570d50));
+    std::memcpy(code_573b20, kRaw573b20, sizeof(kRaw573b20));
+    std::memcpy(code_5712f0, kRaw5712f0, sizeof(kRaw5712f0));
+    std::memcpy(code_58dfb0, kRaw58dfb0, sizeof(kRaw58dfb0));
+    std::memcpy(code_58ddb0, kRaw58ddb0, sizeof(kRaw58ddb0));
+    std::memcpy(code_58dd80, kRaw58dd80, sizeof(kRaw58dd80));
+    std::memcpy(code_58df90, kRaw58df90, sizeof(kRaw58df90));
+
+    // 005350a0: call 535380 (+0x09), call 534d40 (+0x17).
+    write_rel32(code_5350a0 + 0x09u, reinterpret_cast<const void*>(&porsche::texture_depth_format_00535380));
+    write_rel32(code_5350a0 + 0x17u, reinterpret_cast<const void*>(&porsche::render_shape_convert_type_00534d40));
+
+    // 0058ddb0: call 58df90 (+0x11), call 58dd80 (+0x34).
+    write_rel32(code_58ddb0 + 0x11u, code_58df90);
+    write_rel32(code_58ddb0 + 0x34u, code_58dd80);
+
+    // 00563ab0: call 58dfb0 (+0x09), call 58ddb0 (+0x13).
+    write_rel32(code_563ab0 + 0x09u, code_58dfb0);
+    write_rel32(code_563ab0 + 0x13u, code_58ddb0);
+
+    // 005712f0: call 537f90 (+0x14).
+    write_rel32(code_5712f0 + 0x14u, reinterpret_cast<const void*>(&porsche::render_descriptor_bits_00537f90));
+
+    // 00570d50 jump table & relocs.
+    jt_570e74[0] = addr_u32(code_570d50 + (0x570e1du - 0x570d50u));
+    jt_570e74[1] = addr_u32(code_570d50 + (0x570e3eu - 0x570d50u));
+    jt_570e74[2] = addr_u32(code_570d50 + (0x570e4bu - 0x570d50u));
+    jt_570e74[3] = addr_u32(code_570d50 + (0x570e57u - 0x570d50u));
+    jt_570e74[4] = addr_u32(code_570d50 + (0x570e69u - 0x570d50u));
+    jt_570e74[5] = addr_u32(code_570d50 + (0x570e6bu - 0x570d50u));
+
+    auto* const cfg = reinterpret_cast<const B*>(porsche::window_shutdown_config_005de620);
+    write_u32(code_570d50 + 0x01u, addr_u32(&porsche::window_shutdown_mode_005de630));
+    write_u32(code_570d50 + 0x18u, addr_u32(&porsche::window_shutdown_state_005de64c));
+    write_u32(code_570d50 + 0x22u, addr_u32(&porsche::render_thrash_exports_006bd910[21]));
+    write_u32(code_570d50 + 0x2eu, addr_u32(&porsche::window_shutdown_config_005de620[5]));
+    write_u32(code_570d50 + 0x36u, addr_u32(&porsche::window_shutdown_config_005de620[7]));
+    write_u32(code_570d50 + 0x41u, addr_u32(&porsche::window_shutdown_config_005de620[6]));
+    write_u32(code_570d50 + 0x4bu, addr_u32(&porsche::window_shutdown_config_005de620[8]));
+    write_u32(code_570d50 + 0x5au, addr_u32(&porsche::splash_progress_format_005dead0));
+    write_u32(code_570d50 + 0x71u, addr_u32(&porsche::render_thrash_exports_006bd910[7]));
+    write_u32(code_570d50 + 0x79u, addr_u32(&porsche::window_shutdown_config_005de620[5]));
+    write_u32(code_570d50 + 0x81u, addr_u32(&porsche::window_shutdown_config_005de620[7]));
+    write_u32(code_570d50 + 0x8du, addr_u32(&porsche::window_shutdown_config_005de620[6]));
+    write_u32(code_570d50 + 0x97u, addr_u32(&porsche::window_shutdown_config_005de620[8]));
+    write_rel32(code_570d50 + 0x9fu, reinterpret_cast<const void*>(&porsche::render_buffer_address_00574050));
+    write_u32(code_570d50 + 0xb2u, addr_u32(cfg + 0x0du));
+    write_u32(code_570d50 + 0xc2u, addr_u32(map_570e8c));
+    write_u32(code_570d50 + 0xc9u, addr_u32(jt_570e74));
+    write_rel32(code_570d50 + 0x10au, reinterpret_cast<const void*>(&porsche::render_buffer_read_word_0056e2a8));
+
+    // 00573b20 relocs.
+    write_u32(code_573b20 + 0x0bu, addr_u32(&porsche::window_shutdown_config_005de620[5]));
+    write_u32(code_573b20 + 0x1cu, addr_u32(&porsche::window_shutdown_config_005de620[7]));
+    write_u32(code_573b20 + 0x2bu, addr_u32(&porsche::window_shutdown_config_005de620[6]));
+    write_u32(code_573b20 + 0x39u, addr_u32(&porsche::window_shutdown_config_005de620[8]));
+    write_u32(code_573b20 + 0x45u, addr_u32(cfg + 0x0cu));
+    write_u32(code_573b20 + 0x4eu, addr_u32(&porsche::window_shutdown_state_005de64c));
+    write_rel32(code_573b20 + 0x5cu, reinterpret_cast<const void*>(&porsche::render_buffer_address_00574050));
+    write_rel32(code_573b20 + 0x65u, reinterpret_cast<const void*>(&porsche::render_rgb565_blend_pixel_00573f2a));
+    write_rel32(code_573b20 + 0x85u, reinterpret_cast<const void*>(&porsche::render_color_pack_00537ed0));
+    write_rel32(code_573b20 + 0x90u, reinterpret_cast<const void*>(&porsche::render_buffer_select_00556910));
+    write_rel32(code_573b20 + 0xd5u, code_570d50);
+    write_rel32(code_573b20 + 0xdbu, reinterpret_cast<const void*>(&porsche::render_buffer_convert_00574b70));
+    write_u32(code_573b20 + 0x10cu, addr_u32(&porsche::render_blend_mode_flags_005deba0));
+    write_rel32(code_573b20 + 0x24eu, reinterpret_cast<const void*>(&porsche::render_color_pack_00537ed0));
+    write_rel32(code_573b20 + 0x25fu, reinterpret_cast<const void*>(&porsche::render_buffer_select_00556910));
+
+    FlushInstructionCache(GetCurrentProcess(), mem, 2048u);
+}
+
+static void reset_env(
+    B mode_tag, B bpp, B win_mode, U win_state, U format_bits, U blend_flags,
+    I cl, I ct, I cr, I cb) {
+    std::memset(porsche::window_shutdown_config_005de620, 0, sizeof(porsche::window_shutdown_config_005de620));
+    auto* const cfg = reinterpret_cast<B*>(porsche::window_shutdown_config_005de620);
+    cfg[0x0cu] = mode_tag;
+    cfg[0x0du] = bpp;
+    porsche::window_shutdown_mode_005de630 = win_mode;
+    porsche::window_shutdown_config_005de620[5] = static_cast<U>(cl);
+    porsche::window_shutdown_config_005de620[6] = static_cast<U>(ct);
+    porsche::window_shutdown_config_005de620[7] = static_cast<U>(cr);
+    porsche::window_shutdown_config_005de620[8] = static_cast<U>(cb);
+    porsche::window_shutdown_state_005de64c = win_state;
+    porsche::splash_progress_format_005dead0 = format_bits;
+    porsche::render_blend_mode_flags_005deba0 = blend_flags;
+
+    std::memset(porsche::render_thrash_exports_006bd910, 0, sizeof(porsche::render_thrash_exports_006bd910));
+    porsche::render_thrash_exports_006bd910[7] = addr_u32(reinterpret_cast<const void*>(&stub_thrash_unlockwindow));
+    porsche::render_thrash_exports_006bd910[21] = addr_u32(reinterpret_cast<const void*>(&stub_thrash_lockwindow));
+    lock_struct[0] = addr_u32(thrash_mem);
+    lock_struct[1] = 64u;
+    fake_lock_ok = 1u;
+
+    for (U i = 0u; i < kFbBytes; ++i) {
+        fb_mem[i] = static_cast<B>((i * 37u + 11u) & 0xffu);
+        thrash_mem[i] = static_cast<B>((i * 53u + 29u) & 0xffu);
+    }
+    for (U i = 0u; i < 256u; ++i) {
+        porsche::render_pixel_palette_006b4b20[i] =
+            ((i * 13u + 1u) & 0xffu) |
+            (((i * 29u + 3u) & 0xffu) << 8u) |
+            (((i * 47u + 7u) & 0xffu) << 16u);
+    }
+    porsche::render_color_lut_0069e0ac = nullptr;
+}
+
+static void fail_case(const char* name) {
+    std::printf("divergence %s\n", name);
+    std::printf("  expected: abi=%u ret=0x%08x ev=%u\n", expected.abi_fail, expected.ret, expected.ev_count);
+    for (U i = 0u; i < expected.ev_count && i < 8u; ++i) {
+        std::printf("    exp ev[%u]: kind=%u a0=0x%x a1=0x%x a2=0x%x\n",
+                    i, expected.ev[i].kind, expected.ev[i].a0, expected.ev[i].a1, expected.ev[i].a2);
+    }
+    std::printf("  actual:   abi=%u ret=0x%08x ev=%u\n", actual.abi_fail, actual.ret, actual.ev_count);
+    for (U i = 0u; i < actual.ev_count && i < 8u; ++i) {
+        std::printf("    act ev[%u]: kind=%u a0=0x%x a1=0x%x a2=0x%x\n",
+                    i, actual.ev[i].kind, actual.ev[i].a0, actual.ev[i].a1, actual.ev[i].a2);
+    }
+    std::fflush(nullptr);
+    ExitProcess(10u);
+}
+
+static void check_snap(const char* name) {
+    if (std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+        fail_case(name);
+    }
+}
+
+static void run_convert_depth(const char* name, U bits) {
+    ++cases;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u, ret_raw = 0u;
+    B* raw_fn = code_5350a0;
+    const void* shp = shape_buf;
+
+    std::memset(&expected, 0, sizeof(expected));
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push bits
+        push shp
+        mov eax, raw_fn
+        call eax
+        add esp, 8
+        mov esp_a, esp
+        mov ret_raw, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.ret = ret_raw;
+    expected.abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    actual.ret = addr_u32(porsche::render_sprite_convert_depth_005350a0(shp, bits));
+    actual.abi_fail = 0u;
+    check_snap(name);
+}
+
+static void run_filter_select(const char* name, I abs_scale) {
+    ++cases;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u, ret_raw = 0u;
+    B* raw_fn = code_563ab0;
+
+    std::memset(&expected, 0, sizeof(expected));
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push abs_scale
+        mov eax, raw_fn
+        call eax
+        add esp, 4
+        mov esp_a, esp
+        mov ret_raw, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.ret = ret_raw;
+    expected.abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    actual.ret = static_cast<U>(porsche::render_sprite_filter_select_00563ab0(abs_scale));
+    actual.abi_fail = 0u;
+    check_snap(name);
+}
+
+static void run_read_pixel(
+    const char* name, B bpp, B win_mode, U win_state, U format_bits, U lock_ok, I x, I y) {
+    ++cases;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u, ret_raw = 0u;
+    B* raw_fn = code_570d50;
+
+    reset_env(0x78u, bpp, win_mode, win_state, format_bits, 0u, 0, 0, 32, 32);
+    fake_lock_ok = lock_ok;
+    std::memset(&expected, 0, sizeof(expected));
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push y
+        push x
+        mov eax, raw_fn
+        call eax
+        add esp, 8
+        mov esp_a, esp
+        mov ret_raw, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.ret = ret_raw;
+    expected.abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+    std::memcpy(expected.fb, fb_mem, sizeof(fb_mem));
+
+    reset_env(0x78u, bpp, win_mode, win_state, format_bits, 0u, 0, 0, 32, 32);
+    fake_lock_ok = lock_ok;
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    actual.ret = porsche::render_buffer_read_pixel_00570d50(x, y);
+    actual.abi_fail = 0u;
+    std::memcpy(actual.fb, fb_mem, sizeof(fb_mem));
+    check_snap(name);
+}
+
+static void run_blend_direct(
+    const char* name, B mode_tag, B bpp, B win_mode, U win_state, U blend_flags,
+    I x, I y, U argb) {
+    ++cases;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+    B* raw_fn = code_573b20;
+
+    reset_env(mode_tag, bpp, win_mode, win_state, 2u, blend_flags, 2, 3, 20, 20);
+    std::memset(&expected, 0, sizeof(expected));
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push argb
+        push y
+        push x
+        mov eax, raw_fn
+        call eax
+        add esp, 12
+        mov esp_a, esp
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+    std::memcpy(expected.fb, fb_mem, sizeof(fb_mem));
+
+    reset_env(mode_tag, bpp, win_mode, win_state, 2u, blend_flags, 2, 3, 20, 20);
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    porsche::render_sprite_blend_direct_00573b20(x, y, argb);
+    actual.abi_fail = 0u;
+    std::memcpy(actual.fb, fb_mem, sizeof(fb_mem));
+    check_snap(name);
+}
+
+static void run_stride_alias(const char* name, B tag, I width) {
+    ++cases;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u, ret_raw = 0u;
+    B* raw_fn = code_5712f0;
+    const void* shp = shape_buf;
+
+    std::memset(shape_buf, 0, sizeof(shape_buf));
+    shape_buf[0] = tag;
+    const std::int16_t w16 = static_cast<std::int16_t>(width);
+    std::memcpy(shape_buf + 4u, &w16, sizeof(w16));
+
+    std::memset(&expected, 0, sizeof(expected));
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push shp
+        mov eax, raw_fn
+        call eax
+        add esp, 4
+        mov esp_a, esp
+        mov ret_raw, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.ret = ret_raw;
+    expected.abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    actual.ret = static_cast<U>(call_row_stride_822(shp));
+    actual.abi_fail = 0u;
+    check_snap(name);
+}
+
+} // namespace
+
+namespace porsche {
+
+std::uint32_t window_shutdown_config_005de620[12]{};
+std::uint8_t& window_shutdown_mode_005de630 =
+    reinterpret_cast<std::uint8_t*>(window_shutdown_config_005de620)[0x10];
+std::uint32_t& window_shutdown_state_005de64c = window_shutdown_config_005de620[11];
+std::uint32_t splash_progress_format_005dead0 = 0u;
+std::uint32_t render_thrash_exports_006bd910[43]{};
+std::uint32_t render_pixel_palette_006b4b20[256]{};
+
+std::uint32_t __cdecl render_color_888_to_565_00572f30(std::uint32_t color) {
+    return ((color & 0x00f80000u) >> 8u) |
+           ((color & 0x0000fc00u) >> 5u) |
+           ((color >> 3u) & 0x1fu);
+}
+
+std::uint32_t __cdecl render_color_888_to_1555_00572f5b(std::uint32_t color) {
+    if (color == 0u) {
+        return 0u;
+    }
+    return 0x8000u |
+           ((color & 0x00f80000u) >> 9u) |
+           ((color & 0x0000f800u) >> 6u) |
+           ((color >> 3u) & 0x1fu);
+}
+
+std::uint32_t __cdecl texture_depth_format_00535380(std::uint32_t depth) {
+    record_event(3u, depth, 0u, 0u, 0u);
+    return (depth == 32u) ? 0x7du : 0x78u;
+}
+
+void* __cdecl render_shape_convert_type_00534d40(
+    const void* shape, std::uint32_t target_type,
+    std::int32_t use_dither, std::int32_t direct_mode) {
+    record_event(4u, addr_u32(shape), target_type, static_cast<U>(use_dither), static_cast<U>(direct_mode));
+    return conv_out_buf;
+}
+
+void* __cdecl render_buffer_address_00574050(std::int32_t x, std::int32_t y) {
+    record_event(5u, static_cast<U>(x), static_cast<U>(y), 0u, 0u);
+    const U idx = (static_cast<U>(y & 15) * 48u + static_cast<U>(x & 15) * 2u) % (kFbBytes - 64u);
+    return &fb_mem[idx];
+}
+
+void __cdecl render_buffer_select_00556910(std::int32_t x, std::int32_t y, std::uint32_t pixel) {
+    record_event(6u, static_cast<U>(x), static_cast<U>(y), pixel, 0u);
+}
+
+std::uint32_t __cdecl render_buffer_convert_00574b70(std::uint32_t pixel) {
+    record_event(7u, pixel, 0u, 0u, 0u);
+    if ((pixel & 0xffffu) == 0x1111u) {
+        return 0x00abcdefu; // zero dst alpha test case
+    }
+    return 0x80214365u | ((pixel & 0x0fu) << 2u);
+}
+
+std::uint32_t __cdecl render_descriptor_bits_00537f90(const void* descriptor_format) {
+    const auto* const bytes = static_cast<const B*>(descriptor_format);
+    record_event(8u, addr_u32(bytes), static_cast<U>(bytes[0]), 0u, 0u);
+    return (bytes[0] == 0x7eu) ? 15u : ((bytes[0] == 0x78u) ? 16u : 32u);
+}
+
+std::uint32_t __cdecl render_buffer_read_word_0056e2a8(const void* src, std::int32_t bytes) {
+    const auto* const p = static_cast<const B*>(src) + bytes - 4;
+    U val = 0u;
+    std::memcpy(&val, p, sizeof(val));
+    const U shift = static_cast<U>((-bytes) * 8 + 32) & 0x1fu;
+    return val >> shift;
+}
+
+std::int32_t __cdecl splash_shape_row_stride_005712f0(const void* shape) {
+    const auto* const bytes = static_cast<const B*>(shape);
+    std::int16_t w16 = 0;
+    std::memcpy(&w16, bytes + 4u, sizeof(w16));
+    const I width = w16;
+    if (bytes[0] == 0x7bu) {
+        return width;
+    }
+    I bpp = static_cast<I>(render_descriptor_bits_00537f90(shape));
+    if (bpp == 15) {
+        bpp = 16;
+    }
+    return (bpp * width + 7) >> 3;
+}
+
+void* __cdecl render_sprite_sample_0058ccbf_unused() { return nullptr; }
+std::uint32_t __cdecl render_sprite_sample_0058ccbf(
+    const void*, std::int32_t, std::int32_t, std::int32_t) { return 0u; }
+void __cdecl splash_progress_free_00531f90(void*) {}
+
+} // namespace porsche
+
+int main() {
+    init_original_code();
+
+    if (row_stride_addr_822() != reinterpret_cast<const void*>(&porsche::splash_shape_row_stride_005712f0)) {
+        std::printf("divergence row-stride-alias-mismatch\n");
+        std::fflush(nullptr);
+        return 10;
+    }
+
+    // 1. 005350a0: depth conversion wrapper.
+    run_convert_depth("conv-depth-32", 32u);
+    run_convert_depth("conv-depth-16", 16u);
+
+    // 2. 00563ab0: filter ratio (1LL << 32) / abs_scale.
+    run_filter_select("filter-0x10000", 0x10000);
+    run_filter_select("filter-0x290", 0x290);
+    run_filter_select("filter-neg-0x8000", -0x8000);
+
+    // 3. 00570d50: read pixel across bpp {4,8,15,16,24,32,7} and thrash lock vs framebuffer.
+    run_read_pixel("read-4bpp-even", 4u, 0u, 0u, 2u, 1u, 4, 3);
+    run_read_pixel("read-4bpp-odd", 4u, 0u, 0u, 2u, 1u, 5, 3);
+    run_read_pixel("read-8bpp-fb", 8u, 0xffu, 0u, 2u, 1u, 6, 4);
+    run_read_pixel("read-15bpp-thrash", 15u, 1u, 0u, 2u, 1u, 7, 5);
+    run_read_pixel("read-16bpp-thrash-state1", 16u, 1u, 1u, 2u, 1u, 7, 5);
+    run_read_pixel("read-24bpp-thrash", 24u, 1u, 0u, 3u, 1u, 3, 2);
+    run_read_pixel("read-32bpp-thrash", 32u, 1u, 0u, 1u, 1u, 2, 1);
+    run_read_pixel("read-invalid-bpp-default", 7u, 0u, 0u, 2u, 1u, 2, 1);
+
+    // 4. 00573b20: direct sprite blend across clip edges, 565 fastpath, alpha 0/255/dst0, flags 0/1.
+    run_blend_direct("blend-clip-left", 0x78u, 16u, 0u, 0u, 0u, 1, 5, 0x80ffffffu);
+    run_blend_direct("blend-clip-right", 0x78u, 16u, 0u, 0u, 0u, 20, 5, 0x80ffffffu);
+    run_blend_direct("blend-clip-top", 0x78u, 16u, 0u, 0u, 0u, 5, 2, 0x80ffffffu);
+    run_blend_direct("blend-clip-bottom", 0x78u, 16u, 0u, 0u, 0u, 5, 20, 0x80ffffffu);
+    run_blend_direct("blend-565-fastpath", 0x78u, 16u, 0u, 1u, 0u, 5, 6, 0x80abcdefu);
+    run_blend_direct("blend-alpha-ff", 0x6du, 16u, 0u, 0u, 0u, 5, 6, 0xff123456u);
+    run_blend_direct("blend-alpha-00", 0x6du, 16u, 0u, 0u, 0u, 5, 6, 0x00123456u);
+    run_blend_direct("blend-flag0-normal", 0x6du, 16u, 0u, 0u, 0u, 5, 6, 0x80abcdefu);
+    run_blend_direct("blend-flag0-round-carry", 0x6du, 16u, 0u, 0u, 0u, 5, 6, 0x800f0f0fu);
+    run_blend_direct("blend-flag1-premul", 0x6du, 16u, 0u, 0u, 1u, 5, 6, 0x80abcdefu);
+
+    // Force dst_argb alpha == 0 path (fb_mem byte/word at (4,4) -> 0x1111).
+    reset_env(0x6du, 16u, 0u, 0u, 2u, 0u, 2, 3, 20, 20);
+    {
+        ++cases;
+        U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+        U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+        B* raw_fn = code_573b20;
+        auto* const p16 = reinterpret_cast<B*>(porsche::render_buffer_address_00574050(4, 4));
+        p16[0] = 0x11u;
+        p16[1] = 0x11u;
+        std::memset(&expected, 0, sizeof(expected));
+        cur = &expected;
+        __asm {
+            mov ebx_b, ebx
+            mov esi_b, esi
+            mov edi_b, edi
+            mov ebp_b, ebp
+            mov esp_b, esp
+            push 0x80123456
+            push 4
+            push 4
+            mov eax, raw_fn
+            call eax
+            add esp, 12
+            mov esp_a, esp
+            mov ebx_a, ebx
+            mov esi_a, esi
+            mov edi_a, edi
+            mov ebp_a, ebp
+        }
+        expected.abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+        std::memcpy(expected.fb, fb_mem, sizeof(fb_mem));
+        cur = nullptr;
+
+        reset_env(0x6du, 16u, 0u, 0u, 2u, 0u, 2, 3, 20, 20);
+        auto* const p16_act = reinterpret_cast<B*>(porsche::render_buffer_address_00574050(4, 4));
+        p16_act[0] = 0x11u;
+        p16_act[1] = 0x11u;
+        std::memset(&actual, 0, sizeof(actual));
+        cur = &actual;
+        porsche::render_sprite_blend_direct_00573b20(4, 4, 0x80123456u);
+        actual.abi_fail = 0u;
+        std::memcpy(actual.fb, fb_mem, sizeof(fb_mem));
+        check_snap("blend-dst-alpha-0");
+    }
+
+    // 5. 005712f0 canonical ABI alias to Run611 splash_shape_row_stride_005712f0.
+    run_stride_alias("stride-pal8", 0x7bu, 17);
+    run_stride_alias("stride-1555", 0x7eu, 17);
+    run_stride_alias("stride-32", 0x7du, 17);
+
+    std::printf("splash_sprite_blend_leaves_822_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}
