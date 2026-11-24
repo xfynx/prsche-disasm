@@ -1,6 +1,11 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run804 PASS (`797/002` + `798/007`: 14 bodies, 264 cases, 21
+Текущее: Run808 PASS (`801/004` + `802/002`: 4 bodies, 418 cases, 20 mutations,
+13B `.rdata`, 465 TUs, 77/87 names/refs, 1,147 pins, registry 1,329, no EXE).
+`801` bounds format codes; `802` supplements `00556d20`; live renderer,
+startup and gameplay remain open.
+
+Historical: Run804 PASS (`797/002` + `798/007`: 14 bodies, 264 cases, 21
 mutations, 22B writable + 175B literals, 463 TUs, 79/89 names/refs, 1,142 pins,
 registry 1,325, no EXE). `797` supplements `00538b30`; `798` bounds synthetic
 BIG/BIGH v1/v2 payloads; live renderer/audio/startup/gameplay remain open.

@@ -1,0 +1,567 @@
+// Native x86-vs-C++ differential fixture for Run801:
+//   005557d0..0055596e (415B) porsche::scene_texture_descriptor_shrink_005557d0
+//   00574c70..00574e40 (465B) porsche::scene_texture_shape_create_00574c70
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+
+#include <array>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "porsche/fe_stream.hpp"
+#include "porsche/files.hpp"
+#include "porsche/formatter_entry.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/shared_runtime_globals.hpp"
+#include "porsche/splash_progress.hpp"
+#include "porsche/startup_sequence.hpp"
+#include "render_descriptor.hpp"
+#include "scene_texture_shrink_801.hpp"
+#include "texture_constructor.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using W = std::uint16_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store16(void* base, U off, W v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 2u);
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+static U fnv1a(const char* s) {
+    U h = 2166136261u;
+    while (*s != '\0') {
+        h = (h ^ static_cast<B>(*s++)) * 16777619u;
+    }
+    return h;
+}
+
+enum : U {
+    kEvFormat = 1u,
+    kEvAlloc = 2u,
+    kEvFill = 3u,
+    kEvAvail = 4u,
+    kEvDiag = 5u,
+    kEvBits = 6u,
+    kEvDepthFmt = 7u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+};
+
+enum : U { kMaxEvents = 32u, kPoolBytes = 16384u, kInputBytes = 16384u };
+
+struct Snapshot {
+    U abi_fail;
+    U ret_eax;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    U errors_005deb80;
+    U diag_file_hash;
+    U diag_line;
+    std::array<B, kPoolBytes> alloc_pool;
+    U alloc_used;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static alignas(16) B g_input_desc[kInputBytes];
+static alignas(16) B g_alloc_pool[kPoolBytes];
+static U g_alloc_cursor = 0u;
+static bool g_alloc_fail = false;
+
+static const char kSourceFile[] = "\\real\\cmn\\creates.c";
+static const char kFmtShp[] = "SHP%dx%dx%d";
+static const char kErrInvalidDims[] =
+    "createshape - INVALID SHAPE DIMENSIONS\nrequested: %dx%dx%d maximum: %dx%d\n";
+static const char kErrInvalidDepth[] =
+    "createshape - INVALID DEPTH\nrequested: %dx%dx%d BPP MUST BE 1,4,8,15,16,24,OR 32\n";
+static const char kErrOutOfMemory[] =
+    "SHAPE_create - OUT OF MEMORY\nrequested: %dx%dx%d bytes: %d available: %d\n";
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c};
+}
+
+static void __cdecl controlled_diag_report(const char* fmt, ...) {
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    std::vsnprintf(buf, sizeof buf, fmt, args);
+    va_end(args);
+    record_event(kEvDiag, fnv1a(fmt), fnv1a(buf));
+}
+
+namespace porsche {
+
+U splash_progress_format_005dead0 = 0u;
+U render_descriptor_flags_005deb60 = 0u;
+U render_descriptor_option_005deb88 = 1u;
+U texture_create_errors_005deb80 = 0u;
+void (__cdecl* diagnostic_handler_005debf0)(const char*) =
+    reinterpret_cast<void(__cdecl*)(const char*)>(&controlled_diag_report);
+
+U __cdecl texture_depth_format_00535380(U depth) {
+    U fmt = 0u;
+    switch (depth) {
+    case 1u: fmt = 0x79u; break;
+    case 4u: fmt = 0x7au; break;
+    case 8u: fmt = 0x7bu; break;
+    case 15u: case 0x22bu: case 0x613u: fmt = 0x7eu; break;
+    case 16u: case 0x235u: fmt = 0x78u; break;
+    case 24u: case 0x378u: fmt = 0x7fu; break;
+    case 32u: case 0x22b8u: fmt = 0x7du; break;
+    case 0x115cu: fmt = 0x6du; break;
+    default: fmt = 0u; break;
+    }
+    record_event(kEvDepthFmt, depth, fmt);
+    return fmt;
+}
+
+U __cdecl render_descriptor_bits_00537f90(const void* descriptor_format) {
+    const B fmt = static_cast<const B*>(descriptor_format)[0] & 0x7fu;
+    U bits = 8u;
+    switch (fmt) {
+    case 0x79u: bits = 1u; break;
+    case 0x7au: bits = 4u; break;
+    case 0x7bu: case 0x03u: case 0x42u: case 0x50u: case 0x68u: bits = 8u; break;
+    case 0x7eu: bits = 15u; break;
+    case 0x78u: case 0x05u: case 0x51u: case 0x52u: case 0x6au: bits = 16u; break;
+    case 0x7fu: case 0x6du: bits = 24u; break;
+    case 0x7du: bits = 32u; break;
+    case 0x44u: bits = 0u; break; // invalid depth probe test
+    default: bits = 16u; break;
+    }
+    record_event(kEvBits, fmt, bits);
+    return bits;
+}
+
+I __cdecl formatter_entry_005a0fbf(char* output, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    const int n = std::vsnprintf(output, 16u, format, args);
+    va_end(args);
+    record_event(kEvFormat, fnv1a(format), fnv1a(output));
+    return n;
+}
+
+void* __cdecl allocate_00531ca0(const char* name, I bytes, U align) {
+    record_event(kEvAlloc, fnv1a(name), static_cast<U>(bytes), align);
+    if (g_alloc_fail) {
+        return nullptr;
+    }
+    const U aligned = (static_cast<U>(bytes) + 15u) & ~15u;
+    require(g_alloc_cursor + aligned <= kPoolBytes, "pool overflow");
+    void* const p = g_alloc_pool + g_alloc_cursor;
+    g_alloc_cursor += aligned;
+    return p;
+}
+
+void __cdecl heap_fill_0053c290(void* dst, U value, U bytes) {
+    record_event(kEvFill, address(dst), value, bytes);
+    std::memset(dst, static_cast<int>(value & 0xffu), bytes);
+}
+
+U __cdecl startup_sequence_value_00569a90() {
+    record_event(kEvAvail, 0x00100000u);
+    return 0x00100000u;
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_005557d0 = nullptr;
+static B* slot_00574c70 = nullptr;
+
+static U g_jt1[5] = {};
+static B g_idx_tbl[0x7cu] = {};
+static U g_jt2[4] = {};
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void relocate_imm32(
+    B* slot, U imm_off, U expected_addr, const void* replacement) {
+    const U actual = load32(slot, imm_off);
+    require(actual == expected_addr, "imm32/disp32 target");
+    store32(slot, imm_off, address(replacement));
+}
+
+static void init() {
+    static const B body_005557d0[] = {@BODY_005557D0@};
+    static const B body_00574c70[] = {@BODY_00574C70@};
+    require(sizeof body_005557d0 == 415u, "415B 005557d0");
+    require(sizeof body_00574c70 == 465u, "465B 00574c70");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+
+    slot_005557d0 = code_page + 0x000u;
+    slot_00574c70 = code_page + 0x200u;
+
+    std::memcpy(slot_005557d0, body_005557d0, sizeof body_005557d0);
+    std::memcpy(slot_00574c70, body_00574c70, sizeof body_00574c70);
+
+    // 005557d0 switch tables (0x00555970, 0x00555984, 0x00555a00)
+    const U jt1_vas[5] = {0x005557fbu, 0x00555810u, 0x00555802u, 0x00555809u, 0x00555967u};
+    for (U i = 0u; i < 5u; ++i) {
+        g_jt1[i] = address(slot_005557d0 + (jt1_vas[i] - 0x005557d0u));
+    }
+    std::memset(g_idx_tbl, 4, sizeof g_idx_tbl);
+    g_idx_tbl[0x03u - 3u] = 0u;
+    g_idx_tbl[0x42u - 3u] = 0u;
+    g_idx_tbl[0x50u - 3u] = 0u;
+    g_idx_tbl[0x68u - 3u] = 0u;
+    g_idx_tbl[0x7eu - 3u] = 0u;
+    g_idx_tbl[0x05u - 3u] = 1u;
+    g_idx_tbl[0x6au - 3u] = 1u;
+    g_idx_tbl[0x7du - 3u] = 1u;
+    g_idx_tbl[0x51u - 3u] = 2u;
+    g_idx_tbl[0x78u - 3u] = 2u;
+    g_idx_tbl[0x52u - 3u] = 3u;
+    g_idx_tbl[0x6du - 3u] = 3u;
+    const U jt2_vas[4] = {0x0055587bu, 0x005558bau, 0x005558f7u, 0x00555934u};
+    for (U i = 0u; i < 4u; ++i) {
+        g_jt2[i] = address(slot_005557d0 + (jt2_vas[i] - 0x005557d0u));
+    }
+
+    // 00574c70 relocations
+    relocate_imm32(slot_00574c70, 0x00cu, 0x005dead0u, &porsche::splash_progress_format_005dead0);
+    relocate_call_rel32(slot_00574c70, 0x00574c70u, 0x01eu, 0x00535380u,
+                        reinterpret_cast<const void*>(&porsche::texture_depth_format_00535380));
+    relocate_call_rel32(slot_00574c70, 0x00574c70u, 0x02cu, 0x00537f90u,
+                        reinterpret_cast<const void*>(&porsche::render_descriptor_bits_00537f90));
+    relocate_call_rel32(slot_00574c70, 0x00574c70u, 0x077u, 0x00535380u,
+                        reinterpret_cast<const void*>(&porsche::texture_depth_format_00535380));
+    relocate_imm32(slot_00574c70, 0x084u, 0x005deb88u, &porsche::render_descriptor_option_005deb88);
+    relocate_imm32(slot_00574c70, 0x094u, 0x005c0980u, kErrInvalidDepth);
+    relocate_imm32(slot_00574c70, 0x09au, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    relocate_imm32(slot_00574c70, 0x09eu, 0x005c096cu, kSourceFile);
+    relocate_imm32(slot_00574c70, 0x0a4u, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    relocate_imm32(slot_00574c70, 0x0aeu, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    relocate_imm32(slot_00574c70, 0x0d8u, 0x005c0960u, kFmtShp);
+    relocate_call_rel32(slot_00574c70, 0x00574c70u, 0x0ebu, 0x005a0fbfu,
+                        reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    relocate_call_rel32(slot_00574c70, 0x00574c70u, 0x0fbu, 0x00531ca0u,
+                        reinterpret_cast<const void*>(&porsche::allocate_00531ca0));
+    relocate_imm32(slot_00574c70, 0x10au, 0x005deb88u, &porsche::render_descriptor_option_005deb88);
+    relocate_imm32(slot_00574c70, 0x118u, 0x005deb80u, &porsche::texture_create_errors_005deb80);
+    relocate_imm32(slot_00574c70, 0x11eu, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    relocate_imm32(slot_00574c70, 0x122u, 0x005c096cu, kSourceFile);
+    relocate_imm32(slot_00574c70, 0x129u, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    relocate_imm32(slot_00574c70, 0x133u, 0x005deb80u, &porsche::texture_create_errors_005deb80);
+    relocate_call_rel32(slot_00574c70, 0x00574c70u, 0x137u, 0x00569a90u,
+                        reinterpret_cast<const void*>(&porsche::startup_sequence_value_00569a90));
+    relocate_imm32(slot_00574c70, 0x146u, 0x005c0914u, kErrOutOfMemory);
+    relocate_imm32(slot_00574c70, 0x14cu, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+    relocate_call_rel32(slot_00574c70, 0x00574c70u, 0x162u, 0x0053c290u,
+                        reinterpret_cast<const void*>(&porsche::heap_fill_0053c290));
+    relocate_imm32(slot_00574c70, 0x190u, 0x005deb88u, &porsche::render_descriptor_option_005deb88);
+    relocate_imm32(slot_00574c70, 0x1a6u, 0x005c08c8u, kErrInvalidDims);
+    relocate_imm32(slot_00574c70, 0x1acu, 0x005deb74u, &porsche::shared_runtime_word_005deb74);
+    relocate_imm32(slot_00574c70, 0x1b0u, 0x005c096cu, kSourceFile);
+    relocate_imm32(slot_00574c70, 0x1b6u, 0x005deb78u, &porsche::shared_runtime_word_005deb78);
+    relocate_imm32(slot_00574c70, 0x1c0u, 0x005debf0u, &porsche::diagnostic_handler_005debf0);
+
+    // 005557d0 relocations
+    relocate_imm32(slot_005557d0, 0x020u, 0x00555984u, g_idx_tbl);
+    relocate_imm32(slot_005557d0, 0x027u, 0x00555970u, g_jt1);
+    relocate_imm32(slot_005557d0, 0x046u, 0x005deb60u, &porsche::render_descriptor_flags_005deb60);
+    relocate_call_rel32(slot_005557d0, 0x005557d0u, 0x050u, 0x00537f90u,
+                        reinterpret_cast<const void*>(&porsche::render_descriptor_bits_00537f90));
+    relocate_call_rel32(slot_005557d0, 0x005557d0u, 0x06bu, 0x00574c70u, slot_00574c70);
+    relocate_imm32(slot_005557d0, 0x0a7u, 0x00555a00u, g_jt2);
+}
+
+static U invoke_cdecl_1(const void* fn, U a0, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a0
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        add esp, 4
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espc1
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espc1:
+        cmp ebx, 0x13572468
+        je ok_ebxc1
+        or abi_fail, 2
+    ok_ebxc1:
+        cmp esi, 0x24681357
+        je ok_esic1
+        or abi_fail, 4
+    ok_esic1:
+        cmp edi, 0x55aa33cc
+        je ok_edic1
+        or abi_fail, 8
+    ok_edic1:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static U invoke_cdecl_4(const void* fn, U a0, U a1, U a2, U a3, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a3
+        push a2
+        push a1
+        push a0
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        add esp, 16
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espc4
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espc4:
+        cmp ebx, 0x13572468
+        je ok_ebxc4
+        or abi_fail, 2
+    ok_ebxc4:
+        cmp esi, 0x24681357
+        je ok_esic4
+        or abi_fail, 4
+    ok_esic4:
+        cmp edi, 0x55aa33cc
+        je ok_edic4
+        or abi_fail, 8
+    ok_edic4:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static void reset_fixtures(U seed) {
+    g_event_count = 0u;
+    g_alloc_cursor = 0u;
+    g_alloc_fail = false;
+    porsche::splash_progress_format_005dead0 = 0u;
+    porsche::render_descriptor_flags_005deb60 = 0x10u;
+    porsche::render_descriptor_option_005deb88 = 1u;
+    porsche::texture_create_errors_005deb80 = 0u;
+    porsche::shared_runtime_word_005deb74 = 0u;
+    porsche::shared_runtime_word_005deb78 = 0u;
+    std::memset(g_events, 0, sizeof g_events);
+    std::memset(g_alloc_pool, 0x5au, sizeof g_alloc_pool);
+    for (U i = 0u; i < kInputBytes; ++i) {
+        g_input_desc[i] = static_cast<B>((seed + i * 29u) & 0xffu);
+    }
+}
+
+static void capture(Snapshot& out, U abi_fail, U ret_eax) {
+    out.abi_fail = abi_fail;
+    out.ret_eax = ret_eax;
+    out.event_count = g_event_count;
+    std::memcpy(out.events.data(), g_events, sizeof g_events);
+    out.errors_005deb80 = porsche::texture_create_errors_005deb80;
+    const char* const df = porsche::diagnostic_file_005deb74();
+    out.diag_file_hash = (df != nullptr) ? fnv1a(df) : 0u;
+    out.diag_line = porsche::application_diagnostic_line_005deb78;
+    std::memcpy(out.alloc_pool.data(), g_alloc_pool, kPoolBytes);
+    out.alloc_used = g_alloc_cursor;
+}
+
+static void check_equal(const Snapshot& orig, const Snapshot& cpp, const char* tag) {
+    require(orig.abi_fail == 0u, tag);
+    require(cpp.abi_fail == 0u, tag);
+    require(orig.ret_eax == cpp.ret_eax, tag);
+    require(orig.event_count == cpp.event_count, tag);
+    for (U i = 0u; i < orig.event_count; ++i) {
+        require(orig.events[i].kind == cpp.events[i].kind &&
+                    orig.events[i].a == cpp.events[i].a &&
+                    orig.events[i].b == cpp.events[i].b &&
+                    orig.events[i].c == cpp.events[i].c,
+                tag);
+    }
+    require(orig.errors_005deb80 == cpp.errors_005deb80, tag);
+    require(orig.diag_file_hash == cpp.diag_file_hash, tag);
+    require(orig.diag_line == cpp.diag_line, tag);
+    require(orig.alloc_used == cpp.alloc_used, tag);
+    require(orig.alloc_pool == cpp.alloc_pool, tag);
+    ++cases;
+}
+
+template <class Setup>
+static void run_create_case(I w, I h, I d, U flags, Setup&& setup, const char* tag) {
+    Snapshot orig{}, cpp{};
+    U r0 = 0u, r1 = 0u;
+    reset_fixtures(1u);
+    setup();
+    U f0 = invoke_cdecl_4(slot_00574c70, static_cast<U>(w), static_cast<U>(h),
+                          static_cast<U>(d), flags, r0);
+    capture(orig, f0, r0);
+    reset_fixtures(1u);
+    setup();
+    U f1 = invoke_cdecl_4(
+        reinterpret_cast<const void*>(&porsche::scene_texture_shape_create_00574c70),
+        static_cast<U>(w), static_cast<U>(h), static_cast<U>(d), flags, r1);
+    capture(cpp, f1, r1);
+    check_equal(orig, cpp, tag);
+}
+
+template <class Setup>
+static void run_shrink_case(Setup&& setup, const char* tag) {
+    Snapshot orig{}, cpp{};
+    U r0 = 0u, r1 = 0u;
+    reset_fixtures(3u);
+    setup();
+    U f0 = invoke_cdecl_1(slot_005557d0, address(g_input_desc), r0);
+    capture(orig, f0, r0);
+    reset_fixtures(3u);
+    setup();
+    U f1 = invoke_cdecl_1(
+        reinterpret_cast<const void*>(&porsche::scene_texture_descriptor_shrink_005557d0),
+        address(g_input_desc), r1);
+    capture(cpp, f1, r1);
+    check_equal(orig, cpp, tag);
+}
+
+int main() {
+    init();
+
+    // 1. Direct 00574c70 shape create tests (valid depths, depth==0 fallback, invalid dims, invalid depth, OOM)
+    for (I d : {0, 1, 4, 8, 15, 16, 24, 32, 0x115c, 7}) {
+        run_create_case(13, 6, d, 0x10u, [=]() {
+            porsche::splash_progress_format_005dead0 = (d == 0) ? 0u : 8u;
+        }, "create depth matrix");
+    }
+    run_create_case(10, 4, 0, 0x10u, []() {
+        porsche::splash_progress_format_005dead0 = 24u;
+    }, "create default fallback");
+    for (U diag : {0u, 1u}) {
+        run_create_case(-1, 4, 16, 0x10u, [=]() {
+            porsche::render_descriptor_option_005deb88 = diag;
+        }, "create bad w<0");
+        run_create_case(0x4001, 4, 16, 0x10u, [=]() {
+            porsche::render_descriptor_option_005deb88 = diag;
+        }, "create bad w>4000");
+        run_create_case(8, -1, 16, 0x10u, [=]() {
+            porsche::render_descriptor_option_005deb88 = diag;
+        }, "create bad h<0");
+        run_create_case(8, 0x2001, 16, 0x10u, [=]() {
+            porsche::render_descriptor_option_005deb88 = diag;
+        }, "create bad h>2000");
+        run_create_case(8, 8, 99, 0x10u, [=]() {
+            porsche::render_descriptor_option_005deb88 = diag;
+        }, "create bad depth");
+        run_create_case(8, 8, 16, 0x10u, [=]() {
+            porsche::render_descriptor_option_005deb88 = diag;
+            g_alloc_fail = true;
+        }, "create oom");
+    }
+
+    run_create_case(0x4000, 4, 16, 0x10u, []() {
+        porsche::render_descriptor_option_005deb88 = 1u;
+        g_alloc_fail = true;
+    }, "create exact max w");
+    run_create_case(8, 0x2000, 16, 0x10u, []() {
+        porsche::render_descriptor_option_005deb88 = 1u;
+        g_alloc_fail = true;
+    }, "create exact max h");
+
+    // 2. Direct 005557d0 shrink tests: all switch format codes (mode 1..4 + default) & even/odd widths & h<=1
+    const U valid_types[] = {
+        0x03u, 0x42u, 0x50u, 0x68u, 0x7eu,
+        0x05u, 0x6au, 0x7du,
+        0x51u, 0x78u,
+        0x52u, 0x6du,
+    };
+    for (U ty : valid_types) {
+        for (W w : {static_cast<W>(8u), static_cast<W>(9u)}) {
+            for (W h : {static_cast<W>(1u), static_cast<W>(6u)}) {
+                run_shrink_case([=]() {
+                    store32(g_input_desc, 0x00u, 0xaabbcc00u | ty);
+                    store16(g_input_desc, 0x04u, w);
+                    store16(g_input_desc, 0x06u, h);
+                }, "shrink mode matrix");
+            }
+        }
+    }
+    for (U bad_ty : {0x00u, 0x04u, 0x7fu}) {
+        run_shrink_case([=]() {
+            store32(g_input_desc, 0x00u, 0x11223300u | bad_ty);
+            store16(g_input_desc, 0x04u, 16u);
+            store16(g_input_desc, 0x06u, 16u);
+        }, "shrink unsupported");
+    }
+
+    std::printf("scene_texture_shrink_801_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

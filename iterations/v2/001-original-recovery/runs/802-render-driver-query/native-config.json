@@ -1,0 +1,116 @@
+{
+  "run": 802,
+  "experiment": "local/experiments/v2-render-driver-query-802",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/802-render-driver-query/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/802-render-driver-query",
+    "iterations/v2/001-original-recovery/runs/515-render-driver-constructors",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/802-render-driver-query/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00556d20",
+      "bytes": 870,
+      "sha256": "f2628dead7feaea375dce1115fde5aec2bf5f8a3b42549c205d4567e866ea3d8",
+      "token": "@BODY_00556D20@"
+    },
+    {
+      "va": "00557240",
+      "bytes": 267,
+      "sha256": "4adc8d7e2f088344568e730bf4c1538fc6a97d180e001182fc30c885deda8d41",
+      "token": "@BODY_00557240@"
+    }
+  ],
+  "pass_marker": "render_driver_query_802_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-556d20-zero-target",
+      "source": "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp",
+      "old": "    const std::uint32_t mismatch = (zero_count != 0x40u) ? 1u : 0u;",
+      "new": "    const std::uint32_t mismatch = (zero_count != 0x41u) ? 1u : 0u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-556d20-alloc-stride",
+      "source": "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp",
+      "old": "            render_driver_query_pbuf_tag_005cf80c, 140u * bpp_bytes, 0u));",
+      "new": "            render_driver_query_pbuf_tag_005cf80c, 128u * bpp_bytes, 0u));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-556d20-low-byte-mask",
+      "source": "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp",
+      "old": "        if ((render_pixel_to_argb8888_00557240(pixel, mode) & 0xffu) == 0u) {",
+      "new": "        if (render_pixel_to_argb8888_00557240(pixel, mode) == 0u) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-556d20-loop-step",
+      "source": "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp",
+      "old": "    for (std::int32_t x = 0; x < 0x80; x += 2) {",
+      "new": "    for (std::int32_t x = 0; x < 0x80; x += 4) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-556d20-vertex-z",
+      "source": "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp",
+      "old": "    q.words[2] = 0x3f7fff00u;",
+      "new": "    q.words[2] = 0x3f800000u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-556d20-mode5-bpp",
+      "source": "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp",
+      "old": "    case 5u:\n        return 3u;",
+      "new": "    case 5u:\n        return 4u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-556d20-mode4-bpp",
+      "source": "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp",
+      "old": "    case 3u:\n    case 4u:\n    case 7u:\n    default:\n        return 2u;",
+      "new": "    case 4u:\n        return 4u;\n    case 3u:\n    case 7u:\n    default:\n        return 2u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-557240-565-green",
+      "source": "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp",
+      "old": "        const std::uint32_t g = expand_6_to_8((pixel >> 5u) & 0x3fu);",
+      "new": "        const std::uint32_t g = expand_5_to_8((pixel >> 5u) & 0x1fu);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-557240-zero-pixel",
+      "source": "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp",
+      "old": "        if (pixel == 0u) {\n            return 0u;\n        }\n        const std::uint32_t r = expand_5_to_8((pixel >> 10u) & 0x1fu);",
+      "new": "        const std::uint32_t r = expand_5_to_8((pixel >> 10u) & 0x1fu);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-557240-mode5-alpha",
+      "source": "iterations/v2/001-original-recovery/runs/802-render-driver-query/render_driver_query_802.cpp",
+      "old": "    case 5u:\n    case 6u:\n        return pixel | 0xff000000u;",
+      "new": "    case 5u:\n    case 6u:\n        return pixel;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

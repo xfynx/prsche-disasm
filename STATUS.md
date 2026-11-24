@@ -4,7 +4,13 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run804](iterations/v2/001-original-recovery/runs/804-render-mode-and-sim-startup-integration/README.md)
+[Run808](iterations/v2/001-original-recovery/runs/808-scene-texture-and-render-query-integration/README.md)
+compiles 465 TUs across eight projects (**77 unresolved names / 87
+references**, no EXE), accepting Runs801/802: `1,329` registry entries (`+4`),
+`418` comparisons, `20` mutations, `13B .rdata` (`802`), `1,147` source pins.
+Two names close (`005557d0`, `00556d20`) with zero new unresolved names.
+
+Historical: [Run804](iterations/v2/001-original-recovery/runs/804-render-mode-and-sim-startup-integration/README.md)
 compiles 463 TUs across eight projects (**79 unresolved names / 89
 references**, no EXE), accepting Runs797/798: `1,325` registry entries (`+14`),
 `264` comparisons, `21` mutations, `8B .data` (`797`) + `175B` literals (`202B`

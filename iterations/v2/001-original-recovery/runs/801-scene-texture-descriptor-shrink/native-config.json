@@ -1,0 +1,125 @@
+{
+  "run": 801,
+  "experiment": "local/experiments/v2-scene-texture-descriptor-shrink-801",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink",
+    "iterations/v2/001-original-recovery/runs/375-texture-constructor",
+    "iterations/v2/001-original-recovery/runs/374-render-descriptor",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.hpp",
+    "iterations/v2/001-original-recovery/runs/375-texture-constructor/texture_constructor.hpp",
+    "iterations/v2/001-original-recovery/runs/374-render-descriptor/render_descriptor.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/fe_stream.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/files.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/heap.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/shared_runtime_globals.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/splash_progress.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/startup_sequence.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "005557d0",
+      "bytes": 415,
+      "sha256": "7b2d62c361585e4e1afdd7eb85b70e433e891dd590130e6ea6d0e306c8b7339f",
+      "token": "@BODY_005557D0@"
+    },
+    {
+      "va": "00574c70",
+      "bytes": 465,
+      "sha256": "afa3f58ebacd8671f62576196110ae707d15d7876f967bfe4efd5a6f984820a2",
+      "token": "@BODY_00574C70@"
+    }
+  ],
+  "pass_marker": "scene_texture_shrink_801_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-type-mask",
+      "source": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp",
+      "old": "switch (load32(descriptor, 0x00u) & 0x7fu) {",
+      "new": "switch (load32(descriptor, 0x00u) & 0x3fu) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-odd-pad",
+      "source": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp",
+      "old": "const I src_pad = ((orig_w & 1) != 0) ? (orig_w + 1) : orig_w;",
+      "new": "const I src_pad = orig_w;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-case2-tail-dword",
+      "source": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp",
+      "old": "            src += src_pad * 4;\n        }\n        store32(dst, 0u, load32(src, 0u));",
+      "new": "            src += src_pad * 4;\n        }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-case3-mode",
+      "source": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp",
+      "old": "    case 0x52u:\n    case 0x6du:\n        mode = 3u;",
+      "new": "    case 0x52u:\n    case 0x6du:\n        mode = 2u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-depth-fallback-16",
+      "source": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp",
+      "old": "req_depth = 0x10;",
+      "new": "req_depth = 0x08;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-bpp15-storage",
+      "source": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp",
+      "old": "const I storage_bits = (bits == 0x0f) ? 0x10 : bits;",
+      "new": "const I storage_bits = bits;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-max-width",
+      "source": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp",
+      "old": "if (width < 0 || width > 0x4000 || height < 0 || height > 0x2000) {",
+      "new": "if (width < 0 || width > 0x3fff || height < 0 || height > 0x2000) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-shape-header-pad",
+      "source": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp",
+      "old": "const I total_bytes = pitch * height + 0x10;",
+      "new": "const I total_bytes = pitch * height + 0x14;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-oom-error-inc",
+      "source": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp",
+      "old": "texture_create_errors_005deb80 = errs + 1u;",
+      "new": "texture_create_errors_005deb80 = errs;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-diag-line-dims",
+      "source": "iterations/v2/001-original-recovery/runs/801-scene-texture-descriptor-shrink/scene_texture_shrink_801.cpp",
+      "old": "set_diag_location(0x48u);",
+      "new": "set_diag_location(0x49u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}
