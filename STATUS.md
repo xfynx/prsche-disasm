@@ -4,14 +4,15 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run829](iterations/v2/001-original-recovery/runs/829-rtti-crt-exit-and-diag-integration/README.md)
-compiles 480 TUs across eight projects (**59 unresolved names / 66
-references**, no EXE), accepting `827/002` + `828/001`: `1,402` registry
-entries (`+4`), `36` comparisons, `14` mutations, `55B` `.data`/`.bss` & `324B`
-`.rdata`, `1,188` source pins; closes `7` (`005cf908`, `005cf928`, `005ac147`,
-`005e5ec8`, 3 diagnostics), opens `rtti_type_info_table_005c18f8`.
+[Run833](iterations/v2/001-original-recovery/runs/833-player-tables-and-entry-fe-integration/README.md)
+compiles 482 TUs across eight projects (**52 unresolved names / 59
+references**, no EXE), accepting `831/003` + `832/003`: `1,418` registry
+entries (`+16`), `60` comparisons, `16` mutations, `5,444B` `.bss`, `1,194`
+source pins; closes `7` (`005e8b34`, `005e75a0`, `00628960`, `006ad750`,
+`005debec`, `005e8e50`, `00413960`), `0` new.
 
-Historical: [Run826](iterations/v2/001-original-recovery/runs/826-ff-scene-ctor-and-sprite-sample-integration/README.md),
+Historical: [Run829](iterations/v2/001-original-recovery/runs/829-rtti-crt-exit-and-diag-integration/README.md),
+[Run826](iterations/v2/001-original-recovery/runs/826-ff-scene-ctor-and-sprite-sample-integration/README.md),
 [Run824](iterations/v2/001-original-recovery/runs/824-sprite-draw-and-color-closure-integration/README.md),
 [Run820](iterations/v2/001-original-recovery/runs/820-sim-audio-and-scene-insert-integration/README.md),
 [Run816](iterations/v2/001-original-recovery/runs/816-scene-register-heap-abi-integration/README.md),

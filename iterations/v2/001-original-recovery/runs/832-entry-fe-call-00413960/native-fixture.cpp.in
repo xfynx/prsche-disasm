@@ -1,0 +1,409 @@
+// Native x86-vs-C++ differential fixture for Run832 (00413960 closure, 14 functions, 710B).
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "entry_fe_call_832.hpp"
+#include "entry_fe_scene_leaves_702.hpp"
+#include "porsche/application_state.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+static U f32_bits(float v) {
+    U b = 0u;
+    std::memcpy(&b, &v, 4u);
+    return b;
+}
+
+enum : U {
+    kEvService = 1u,
+    kEvDynCast = 2u,
+    kEvVslot38 = 3u,
+    kEvVslot40 = 4u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+    U d;
+};
+
+enum : U { kMaxEvents = 32u };
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c, d};
+}
+
+static U g_orig_state_006573e8 = 0u;
+static U g_orig_state_00657408 = 0u;
+static alignas(16) B g_orig_view_slot_table[0x218u]{};
+static U g_vec_elements[8]{};
+static U g_vec_header[2]{};
+static bool g_cast_null = false;
+
+static alignas(16) B g_cam_buf[0xc8u]{};
+static void* g_cam_vtable[20]{};
+
+static void* __fastcall mock_vslot_38(void* self, void* unused_edx, void* out_vec3) {
+    (void)unused_edx;
+    require(self == g_cam_buf, "vslot 38 self");
+    record_event(kEvVslot38);
+    store32(out_vec3, 0u, 0x41200000u);
+    store32(out_vec3, 4u, 0xc0400000u);
+    store32(out_vec3, 8u, 0x3f400000u);
+    return out_vec3;
+}
+
+static void* __fastcall mock_vslot_40(void* self, void* unused_edx, void* out_mat9) {
+    (void)unused_edx;
+    require(self == g_cam_buf, "vslot 40 self");
+    record_event(kEvVslot40);
+    for (U i = 0u; i < 9u; ++i) {
+        store32(out_mat9, i * 4u, 0x3f800000u + i * 0x10000u);
+    }
+    return out_mat9;
+}
+
+namespace porsche {
+
+ApplicationStateArena application_state_006573e8{};
+U& ApplicationStateArena::word(U va) {
+    return words_[(va - application_state_base_va) / sizeof(U)];
+}
+const U& ApplicationStateArena::word(U va) const {
+    return words_[(va - application_state_base_va) / sizeof(U)];
+}
+
+B view_slot_table_00627e80[0x218u]{};
+U* scene_elem_vector_00628168 = g_vec_header;
+const B rtti_scene_elem_005cf908[8u]{'S', 'E', 'L', 'E', 'M', 0, 0, 0};
+const B rtti_camera_elem_005cf928[8u]{'C', 'E', 'L', 'E', 'M', 0, 0, 0};
+
+void __cdecl entry_fe_service_00465790(U first, U second) {
+    record_event(kEvService, first, second);
+}
+
+U __cdecl formatter_compare_005a134b(
+    U element, U arg1, const void* scene_rtti, const void* camera_rtti, U arg4) {
+    record_event(
+        kEvDynCast,
+        element,
+        arg1,
+        scene_rtti == rtti_scene_elem_005cf908 ? 1u : 0u,
+        camera_rtti == rtti_camera_elem_005cf928 ? 1u : 0u);
+    (void)arg4;
+    return g_cast_null ? 0u : element;
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_00413960 = nullptr;
+static B* slot_0046d980 = nullptr;
+static B* slot_00469b20 = nullptr;
+static B* slot_0046af50 = nullptr;
+static B* slot_00469a80 = nullptr;
+static B* slot_00469a90 = nullptr;
+static B* slot_00469aa0 = nullptr;
+static B* slot_00469ab0 = nullptr;
+static B* slot_00469ac0 = nullptr;
+static B* slot_00469ad0 = nullptr;
+static B* slot_00469ae0 = nullptr;
+static B* slot_00469af0 = nullptr;
+static B* slot_00469b00 = nullptr;
+static B* slot_00469b10 = nullptr;
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    store32(slot, off + 1u, address(replacement) - address(slot + off + 5u));
+}
+
+static void relocate_highlow(
+    B* slot, U off, U expected_va, const void* replacement) {
+    require(load32(slot, off) == expected_va, "HIGHLOW VA");
+    store32(slot, off, address(replacement));
+}
+
+static void init() {
+    static const B body_00413960[] = {@BODY_00413960@};
+    static const B body_00469a80[] = {@BODY_00469A80@};
+    static const B body_00469a90[] = {@BODY_00469A90@};
+    static const B body_00469aa0[] = {@BODY_00469AA0@};
+    static const B body_00469ab0[] = {@BODY_00469AB0@};
+    static const B body_00469ac0[] = {@BODY_00469AC0@};
+    static const B body_00469ad0[] = {@BODY_00469AD0@};
+    static const B body_00469ae0[] = {@BODY_00469AE0@};
+    static const B body_00469af0[] = {@BODY_00469AF0@};
+    static const B body_00469b00[] = {@BODY_00469B00@};
+    static const B body_00469b10[] = {@BODY_00469B10@};
+    static const B body_00469b20[] = {@BODY_00469B20@};
+    static const B body_0046af50[] = {@BODY_0046AF50@};
+    static const B body_0046d980[] = {@BODY_0046D980@};
+
+    code_page = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc");
+
+    U cursor = 0u;
+    auto place = [&](const B* body, U len) -> B* {
+        B* p = code_page + cursor;
+        std::memcpy(p, body, len);
+        cursor = (cursor + len + 15u) & ~15u;
+        return p;
+    };
+
+    slot_00413960 = place(body_00413960, sizeof(body_00413960));
+    slot_00469a80 = place(body_00469a80, sizeof(body_00469a80));
+    slot_00469a90 = place(body_00469a90, sizeof(body_00469a90));
+    slot_00469aa0 = place(body_00469aa0, sizeof(body_00469aa0));
+    slot_00469ab0 = place(body_00469ab0, sizeof(body_00469ab0));
+    slot_00469ac0 = place(body_00469ac0, sizeof(body_00469ac0));
+    slot_00469ad0 = place(body_00469ad0, sizeof(body_00469ad0));
+    slot_00469ae0 = place(body_00469ae0, sizeof(body_00469ae0));
+    slot_00469af0 = place(body_00469af0, sizeof(body_00469af0));
+    slot_00469b00 = place(body_00469b00, sizeof(body_00469b00));
+    slot_00469b10 = place(body_00469b10, sizeof(body_00469b10));
+    slot_00469b20 = place(body_00469b20, sizeof(body_00469b20));
+    slot_0046af50 = place(body_0046af50, sizeof(body_0046af50));
+    slot_0046d980 = place(body_0046d980, sizeof(body_0046d980));
+
+    // Relocations for 0046d980 (39B)
+    relocate_highlow(slot_0046d980, 0x001u, 0x00628168u, &porsche::scene_elem_vector_00628168);
+    relocate_highlow(slot_0046d980, 0x00fu, 0x005cf928u, porsche::rtti_camera_elem_005cf928);
+    relocate_highlow(slot_0046d980, 0x014u, 0x005cf908u, porsche::rtti_scene_elem_005cf908);
+    relocate_call_rel32(slot_0046d980, 0x0046d980u, 0x01eu, 0x005a134bu, reinterpret_cast<const void*>(&porsche::formatter_compare_005a134b));
+
+    // Relocations for 00413960 (536B)
+    relocate_highlow(slot_00413960, 0x01du, 0x006573e8u, &g_orig_state_006573e8);
+    relocate_highlow(slot_00413960, 0x025u, 0x00657408u, &g_orig_state_00657408);
+    const U view_relocs[][2] = {
+        {0x03cu, 0x00627f3cu}, {0x051u, 0x00627f40u}, {0x05bu, 0x00627f40u},
+        {0x0a1u, 0x00627ea4u}, {0x0aau, 0x00627ea8u}, {0x0b2u, 0x00627eecu},
+        {0x0b8u, 0x00627eacu}, {0x0beu, 0x00627ef0u}, {0x0c4u, 0x00627ef4u},
+        {0x0d2u, 0x00627eb4u}, {0x0e1u, 0x00627eb8u}, {0x0e7u, 0x00627ef8u},
+        {0x110u, 0x00627efcu}, {0x117u, 0x00627f40u}, {0x120u, 0x00627f40u},
+        {0x12au, 0x00627ec4u}, {0x14bu, 0x00627eecu}, {0x154u, 0x00627ef0u},
+        {0x15cu, 0x00627ef4u}, {0x16au, 0x00627eb4u}, {0x179u, 0x00627ef8u},
+        {0x18au, 0x00627f40u}, {0x199u, 0x00627ebcu}, {0x1a8u, 0x00627ec0u},
+        {0x1b6u, 0x00627f3cu}, {0x1bdu, 0x00627eb0u}, {0x1d0u, 0x00627ea8u},
+        {0x1d6u, 0x00627eb0u}, {0x1dcu, 0x00627ea8u}, {0x1e9u, 0x00627f4cu},
+        {0x1fdu, 0x00627ee0u}, {0x206u, 0x00627ee4u}, {0x20fu, 0x00627ee8u},
+    };
+    for (const auto& r : view_relocs) {
+        relocate_highlow(slot_00413960, r[0], r[1], g_orig_view_slot_table + (r[1] - 0x00627e80u));
+    }
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x009u, 0x0046d980u, slot_0046d980);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x02fu, 0x00469ac0u, slot_00469ac0);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x04bu, 0x00465790u, reinterpret_cast<const void*>(&porsche::entry_fe_service_00465790));
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x066u, 0x0046af50u, slot_0046af50);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x075u, 0x00469ac0u, slot_00469ac0);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x07du, 0x00465790u, reinterpret_cast<const void*>(&porsche::entry_fe_service_00465790));
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x087u, 0x00469ab0u, slot_00469ab0);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x0cau, 0x00469af0u, slot_00469af0);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x0dau, 0x00469b00u, slot_00469b00);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x0edu, 0x00469aa0u, slot_00469aa0);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x132u, 0x00469ab0u, slot_00469ab0);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x162u, 0x00469af0u, slot_00469af0);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x172u, 0x00469b00u, slot_00469b00);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x17fu, 0x00469aa0u, slot_00469aa0);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x191u, 0x00469ad0u, slot_00469ad0);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x1a1u, 0x00469ae0u, slot_00469ae0);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x1aeu, 0x00469a90u, slot_00469a90);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x1c5u, 0x00469a80u, slot_00469a80);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x1e2u, 0x00469b10u, slot_00469b10);
+    relocate_call_rel32(slot_00413960, 0x00413960u, 0x1f4u, 0x00469b20u, slot_00469b20);
+
+    FlushInstructionCache(GetCurrentProcess(), code_page, 4096u);
+}
+
+static void setup_cam(
+    U f78, U f7c, U f80, U f84_bits, U f88, U f8c, U f90, U f94_bits, U f98, U f9c_bits, U fa0_bits) {
+    std::memset(g_cam_buf, 0x55, sizeof(g_cam_buf));
+    g_cam_vtable[0x38u / 4u] = reinterpret_cast<void*>(&mock_vslot_38);
+    g_cam_vtable[0x40u / 4u] = reinterpret_cast<void*>(&mock_vslot_40);
+    store32(g_cam_buf, 0x00u, address(g_cam_vtable));
+    store32(g_cam_buf, 0x78u, f78);
+    store32(g_cam_buf, 0x7cu, f7c);
+    store32(g_cam_buf, 0x80u, f80);
+    store32(g_cam_buf, 0x84u, f84_bits);
+    store32(g_cam_buf, 0x88u, f88);
+    store32(g_cam_buf, 0x8cu, f8c);
+    store32(g_cam_buf, 0x90u, f90);
+    store32(g_cam_buf, 0x94u, f94_bits);
+    store32(g_cam_buf, 0x98u, f98);
+    store32(g_cam_buf, 0x9cu, f9c_bits);
+    store32(g_cam_buf, 0xa0u, fa0_bits);
+    store32(g_cam_buf, 0xb4u, 0x41100000u);
+    store32(g_cam_buf, 0xb8u, 0xc0a00000u);
+    store32(g_cam_buf, 0xbcu, 0x3fc00000u);
+}
+
+static void check_leaves() {
+    setup_cam(11u, 1u, 1u, 0x40200000u, 0u, 1u, 1u, 0x41400000u, 1u, 0x42200000u, 0x42b40000u);
+
+    auto check_u32 = [](B* slot, U(__fastcall* fn)(const void*, void*), const char* name) {
+        ++cases;
+        const U o = reinterpret_cast<U(__fastcall*)(const void*, void*)>(slot)(g_cam_buf, nullptr);
+        const U c = fn(g_cam_buf, nullptr);
+        require(o == c, name);
+    };
+    auto check_f32 = [](B* slot, float(__fastcall* fn)(const void*, void*), const char* name) {
+        ++cases;
+        const float o = reinterpret_cast<float(__fastcall*)(const void*, void*)>(slot)(g_cam_buf, nullptr);
+        const float c = fn(g_cam_buf, nullptr);
+        require(f32_bits(o) == f32_bits(c), name);
+    };
+
+    check_u32(slot_00469a80, porsche::camera_elem_u32_80_00469a80, "00469a80");
+    check_f32(slot_00469a90, porsche::camera_elem_f32_84_00469a90, "00469a90");
+    check_u32(slot_00469aa0, porsche::camera_elem_u32_88_00469aa0, "00469aa0");
+    check_u32(slot_00469ab0, porsche::camera_elem_u32_8c_00469ab0, "00469ab0");
+    check_u32(slot_00469ac0, porsche::camera_elem_u32_78_00469ac0, "00469ac0");
+    check_u32(slot_00469ad0, porsche::camera_elem_u32_90_00469ad0, "00469ad0");
+    check_f32(slot_00469ae0, porsche::camera_elem_f32_94_00469ae0, "00469ae0");
+    check_u32(slot_00469af0, porsche::camera_elem_u32_98_00469af0, "00469af0");
+    check_f32(slot_00469b00, porsche::camera_elem_f32_9c_00469b00, "00469b00");
+    check_f32(slot_00469b10, porsche::camera_elem_f32_a0_00469b10, "00469b10");
+    check_u32(slot_0046af50, porsche::camera_elem_u32_7c_0046af50, "0046af50");
+
+    // 00469b20
+    ++cases;
+    U ov[3]{}, cv[3]{};
+    void* or_b2 = reinterpret_cast<void*(__fastcall*)(void*, void*, void*)>(slot_00469b20)(g_cam_buf, nullptr, ov);
+    void* cr_b2 = porsche::camera_elem_vec3_b4_00469b20(g_cam_buf, nullptr, cv);
+    require(or_b2 == ov && cr_b2 == cv && std::memcmp(ov, cv, 12u) == 0, "00469b20");
+
+    // 0046d980 (including sign-extension of high bit in low 16 bits, index 0xffff -> -1)
+    g_vec_elements[0] = 0x12340000u;
+    g_vec_elements[1] = address(g_cam_buf);
+    g_vec_elements[2] = 0x56780000u;
+    g_vec_header[0] = address(&g_vec_elements[1]);
+    g_vec_header[1] = address(&g_vec_elements[3]);
+    for (U idx : {0u, 1u, 0x00010000u, 0xffffffffu}) {
+        for (bool null_cast : {false, true}) {
+            ++cases;
+            g_cast_null = null_cast;
+            g_event_count = 0u;
+            void* o_elem = reinterpret_cast<void*(__cdecl*)(U)>(slot_0046d980)(idx);
+            const U o_ev = g_event_count;
+            Event o_evs[kMaxEvents];
+            std::memcpy(o_evs, g_events, o_ev * sizeof(Event));
+
+            g_event_count = 0u;
+            void* c_elem = porsche::scene_camera_elem_at_0046d980(idx);
+            require(o_elem == c_elem, "0046d980 ret");
+            require(g_event_count == o_ev && std::memcmp(g_events, o_evs, o_ev * sizeof(Event)) == 0, "0046d980 ev");
+        }
+    }
+}
+
+static void check_entry_fe_call_00413960() {
+    g_vec_elements[1] = address(g_cam_buf);
+    g_vec_header[0] = address(&g_vec_elements[1]);
+    g_vec_header[1] = address(&g_vec_elements[2]);
+
+    struct Scenario {
+        bool cast_null;
+        U s3e8;
+        U s408;
+        U slot_f3c;
+        U slot_f40;
+        U f78;
+        U f7c;
+        U f80;
+        U f88;
+        U f8c;
+        U f90;
+        U f98;
+    };
+
+    const Scenario scenarios[] = {
+        {true,  0u, 0u, 0x0bu, 0x0fu, 11u, 1u, 1u, 0u, 1u, 1u, 1u}, // cam == nullptr
+        {false, 3u, 1u, 0x0au, 0x00u, 11u, 1u, 1u, 0u, 1u, 1u, 1u}, // state==3,408!=0,f78==11,f3c==10 early ret
+        {false, 3u, 1u, 0x0bu, 0x00u, 11u, 1u, 1u, 0u, 1u, 1u, 1u}, // state==3,408!=0,f78==11,f3c!=10 set bit3
+        {false, 3u, 0u, 0x0bu, 0x0fu, 7u,  0u, 1u, 0u, 1u, 1u, 1u}, // f7c==0, all inner ifs true, f3c==11
+        {false, 1u, 1u, 0x09u, 0x0fu, 7u,  0u, 0u, 1u, 0u, 0u, 0u}, // f7c==0, all inner ifs false, f3c!=11
+        {false, 2u, 1u, 0x0bu, 0x0fu, 5u,  1u, 1u, 0u, 1u, 1u, 1u}, // f7c!=0, all inner ifs true (incl vslot38/40), f3c==11
+        {false, 2u, 1u, 0x0bu, 0x0fu, 5u,  1u, 0u, 1u, 0u, 0u, 0u}, // f7c!=0, f88!=0, f80==0, f3c==11
+    };
+
+    for (const auto& sc : scenarios) {
+        ++cases;
+        g_cast_null = sc.cast_null;
+        setup_cam(sc.f78, sc.f7c, sc.f80, 0x40200000u, sc.f88, sc.f8c, sc.f90, 0x41400000u, sc.f98, 0x42200000u, 0x42b40000u);
+
+        std::array<B, 0x218u> init_table;
+        init_table.fill(0xaau);
+        std::memcpy(init_table.data() + (0x00627ea8u - 0x00627e80u), &sc.f80, 4u); // initial float slot_ea8
+        store32(init_table.data(), 0x00627ea8u - 0x00627e80u, 0x41000000u);
+        store32(init_table.data(), 0x00627f3cu - 0x00627e80u, 0xdead0000u | sc.slot_f3c);
+        init_table[0x00627f40u - 0x00627e80u] = static_cast<B>(sc.slot_f40);
+
+        // Run original x86
+        g_orig_state_006573e8 = sc.s3e8;
+        g_orig_state_00657408 = sc.s408;
+        std::memcpy(g_orig_view_slot_table, init_table.data(), 0x218u);
+        g_event_count = 0u;
+        reinterpret_cast<void(__cdecl*)(U)>(slot_00413960)(0u);
+        const U o_ev = g_event_count;
+        Event o_evs[kMaxEvents];
+        std::memcpy(o_evs, g_events, o_ev * sizeof(Event));
+
+        // Run C++
+        porsche::application_state_006573e8.word(0x006573e8u) = sc.s3e8;
+        porsche::application_state_006573e8.word(0x00657408u) = sc.s408;
+        std::memcpy(porsche::view_slot_table_00627e80, init_table.data(), 0x218u);
+        g_event_count = 0u;
+        porsche::entry_fe_call_00413960(0u);
+
+        require(g_event_count == o_ev && std::memcmp(g_events, o_evs, o_ev * sizeof(Event)) == 0, "00413960 ev");
+        require(std::memcmp(g_orig_view_slot_table, porsche::view_slot_table_00627e80, 0x218u) == 0, "00413960 view_slot_table");
+    }
+}
+
+int main() {
+    init();
+    check_leaves();
+    check_entry_fe_call_00413960();
+    std::printf("entry_fe_call_832_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

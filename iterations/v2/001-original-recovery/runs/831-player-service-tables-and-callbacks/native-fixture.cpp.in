@@ -1,0 +1,264 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "player_service_tables_831.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+enum : U {
+    kOff471B60 = 0x0000u,
+    kOff572983 = 0x0040u,
+    kCodeBytes = 0x0200u,
+    kMaxEvents = 32u,
+};
+
+struct Trace {
+    U abi_fail;
+    U count;
+    U ev_kind[kMaxEvents];
+    U ev_arg0[kMaxEvents];
+    U ev_arg1[kMaxEvents];
+    U ret;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U events_total = 0u;
+static U which = 0u;
+static B* code = nullptr;
+
+static const B kBody471B60[11] = { @BODY_00471B60@ };
+static const B kBody572983[6]  = { @BODY_00572983@ };
+
+static void fail(const char* why) {
+    std::printf("player_service_tables_original_x86_vs_cpp=FAIL case=%u side=%u reason=%s\n",
+                cases, which, why);
+    std::exit(1);
+}
+
+static void push_ev(U k, U a0, U a1) {
+    if (trace.count >= kMaxEvents) fail("ev_overflow");
+    trace.ev_kind[trace.count] = k;
+    trace.ev_arg0[trace.count] = a0;
+    trace.ev_arg1[trace.count] = a1;
+    ++trace.count;
+    ++events_total;
+}
+
+static void __fastcall mock_frame_service_execute(void* self) {
+    push_ev(1u, static_cast<U>(reinterpret_cast<std::uintptr_t>(self)), 0u);
+}
+
+static void __cdecl mock_mouse_cb_a(U flags) {
+    push_ev(2u, flags, 0xaaaa0001u);
+}
+
+static void __cdecl mock_mouse_cb_b(U flags) {
+    push_ev(3u, flags, 0xbbbb0002u);
+}
+
+static void* __cdecl mock_res_transform(void* buf, const char* path, U flags) {
+    push_ev(4u, static_cast<U>(reinterpret_cast<std::uintptr_t>(buf)), flags);
+    return const_cast<char*>(path);
+}
+
+static void write_u32(B* p, U v) { std::memcpy(p, &v, 4u); }
+static void write_rel32(B* site, const void* tgt) {
+    const I rel = static_cast<I>(
+        reinterpret_cast<std::uintptr_t>(tgt) -
+        (reinterpret_cast<std::uintptr_t>(site) + 4u));
+    std::memcpy(site, &rel, 4u);
+}
+
+static void init_original_code() {
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, kCodeBytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (code == nullptr) fail("virtualalloc");
+    std::memset(code, 0xcc, kCodeBytes);
+
+    std::memcpy(code + kOff471B60, kBody471B60, sizeof(kBody471B60));
+    write_u32(code + kOff471B60 + 2u,
+              static_cast<U>(reinterpret_cast<std::uintptr_t>(&porsche::frame_service_root_00628960)));
+    write_rel32(code + kOff471B60 + 7u, reinterpret_cast<const void*>(&mock_frame_service_execute));
+
+    std::memcpy(code + kOff572983, kBody572983, sizeof(kBody572983));
+    code[kOff572983 + sizeof(kBody572983)] = 0xc3u;
+}
+
+static void call_x86_0(void* fn) {
+    U s0 = 0u, s1 = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        call fn
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+}
+
+static U g_abi_fail = 0u;
+
+__declspec(naked) static void __cdecl raw_invoke_helper(void* fn, U cb, U mode_flags) {
+    __asm {
+        mov ecx, dword ptr [esp + 4]
+        mov eax, dword ptr [esp + 8]
+        mov edx, dword ptr [esp + 12]
+        push ebp
+        push esi
+        push edi
+        mov edi, 0x44445555
+        mov ebp, edx
+        push esp
+        call ecx
+        pop edx
+        cmp edx, esp
+        je ok_sp
+        mov g_abi_fail, 3
+    ok_sp:
+        cmp edi, 0x44445555
+        je ok_di
+        mov g_abi_fail, 2
+    ok_di:
+        pop edi
+        pop esi
+        pop ebp
+        ret
+    }
+}
+
+static void call_x86_invoke(void* fn, U cb, U mode_flags) {
+    g_abi_fail = 0u;
+    raw_invoke_helper(fn, cb, mode_flags);
+    if (g_abi_fail != 0u) trace.abi_fail = g_abi_fail;
+}
+
+static void compare_traces() {
+    if (trace.abi_fail != 0u || expected.abi_fail != 0u) fail("abi");
+    if (trace.ret != expected.ret) fail("ret");
+    if (trace.count != expected.count) fail("count");
+    for (U i = 0u; i < trace.count; ++i) {
+        if (trace.ev_kind[i] != expected.ev_kind[i] ||
+            trace.ev_arg0[i] != expected.ev_arg0[i] ||
+            trace.ev_arg1[i] != expected.ev_arg1[i]) {
+            fail("ev_mismatch");
+        }
+    }
+}
+
+template <class Setup, class RunOrig, class RunCpp>
+static void run_case(Setup setup, RunOrig run_orig, RunCpp run_cpp) {
+    ++cases;
+    which = 0u;
+    std::memset(&trace, 0, sizeof(trace));
+    setup();
+    run_orig();
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof(trace));
+    setup();
+    run_cpp();
+    compare_traces();
+}
+
+int main(int argc, char** argv) {
+    (void)argc;
+    (void)argv;
+    // Verify loader-zero .bss initial state before any writes.
+    if (porsche::frame_service_root_00628960 != 0u) fail("init_frame_root");
+    if (porsche::resource_open_transform_006ad750 != nullptr) fail("init_res_transform");
+    for (U i = 0u; i < 9u; ++i) {
+        if (porsche::application_player_object_table_005e8b34[i] != 0u) fail("init_obj_table");
+    }
+    for (U i = 0u; i < 9u * 0x96u; ++i) {
+        if (porsche::application_player_setup_table_005e75a0[i] != 0u) fail("init_setup_table");
+    }
+
+    init_original_code();
+
+    // Case 1: render_event_invoke_callback_005debec (00572983 slice vs C++)
+    run_case(
+        []() {},
+        []() {
+            call_x86_invoke(code + kOff572983,
+                            static_cast<U>(reinterpret_cast<std::uintptr_t>(&mock_mouse_cb_a)),
+                            0x1234u);
+            call_x86_invoke(code + kOff572983,
+                            static_cast<U>(reinterpret_cast<std::uintptr_t>(&mock_mouse_cb_b)),
+                            0x5678u);
+        },
+        []() {
+            porsche::render_event_invoke_callback_005debec(
+                static_cast<U>(reinterpret_cast<std::uintptr_t>(&mock_mouse_cb_a)),
+                0x1234u);
+            porsche::render_event_invoke_callback_005debec(
+                static_cast<U>(reinterpret_cast<std::uintptr_t>(&mock_mouse_cb_b)),
+                0x5678u);
+        });
+
+    // Case 2: frame_service_root_00628960 read by 00471b60 + table bounds + resource_open_transform_006ad750
+    run_case(
+        []() {
+            porsche::frame_service_root_00628960 = 0x11223344u;
+            porsche::resource_open_transform_006ad750 = &mock_res_transform;
+        },
+        []() {
+            call_x86_0(code + kOff471B60);
+            U dummy = 0u;
+            void* p = porsche::resource_open_transform_006ad750(&dummy, "test.viv", 3u);
+            trace.ret = (std::strcmp(static_cast<const char*>(p), "test.viv") == 0) ? 1u : 0u;
+        },
+        []() {
+            mock_frame_service_execute(reinterpret_cast<void*>(
+                static_cast<std::uintptr_t>(porsche::frame_service_root_00628960)));
+            U dummy = 0u;
+            void* p = porsche::resource_open_transform_006ad750(&dummy, "test.viv", 3u);
+            trace.ret = (std::strcmp(static_cast<const char*>(p), "test.viv") == 0) ? 1u : 0u;
+        });
+
+    // Case 3: player object table (9 x 4B) and setup table (9 x 0x96 DWORDs) write/read stride
+    run_case(
+        []() {
+            std::memset(porsche::application_player_object_table_005e8b34, 0,
+                        sizeof(porsche::application_player_object_table_005e8b34));
+            std::memset(porsche::application_player_setup_table_005e75a0, 0,
+                        sizeof(porsche::application_player_setup_table_005e75a0));
+        },
+        []() {
+            porsche::application_player_object_table_005e8b34[0] = 0xa0000001u;
+            porsche::application_player_object_table_005e8b34[8] = 0xa0000009u;
+            porsche::application_player_setup_table_005e75a0[0] = 0x1111u;
+            porsche::application_player_setup_table_005e75a0[8u * 0x96u + 0x95u] = 0x9999u;
+            trace.ret = porsche::application_player_object_table_005e8b34[8] ^
+                        porsche::application_player_setup_table_005e75a0[8u * 0x96u + 0x95u];
+        },
+        []() {
+            porsche::application_player_object_table_005e8b34[0] = 0xa0000001u;
+            porsche::application_player_object_table_005e8b34[8] = 0xa0000009u;
+            porsche::application_player_setup_table_005e75a0[0] = 0x1111u;
+            porsche::application_player_setup_table_005e75a0[8u * 0x96u + 0x95u] = 0x9999u;
+            trace.ret = porsche::application_player_object_table_005e8b34[8] ^
+                        porsche::application_player_setup_table_005e75a0[8u * 0x96u + 0x95u];
+        });
+
+    std::printf("player_service_tables_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

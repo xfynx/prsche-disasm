@@ -1,13 +1,14 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-24. [Run829](runs/829-rtti-crt-exit-and-diag-integration/README.md)
-PASS (`build-001`): folds `827/002` (`51B` `.data` + `148B` `.rdata`,
-`bindings.cmake`) and `828/001` (`4B` `.bss` + `176B` `.rdata`): **480 TUs / 8
-projects**, **59 unresolved / 66 refs**, `1,188` pins, `36` comparisons, `14`
-mutations, `2` REA sessions, no EXE; registry **1,402** (`+4`). Closes `7`,
-opens `1` (`rtti_type_info_table_005c18f8`). Next (`Run833`): `825`/`830`/`831`.
+Current 2026-11-25. [Run833](runs/833-player-tables-and-entry-fe-integration/README.md)
+PASS (`build-001`): folds `831/003` (`5,444B` `.bss`, `bindings.cmake`) and
+`832/003` (`710B`, 14 bodies, `0B` data/bss): **482 TUs / 8 projects**, **52
+unresolved / 59 refs**, `1,194` pins, `60` comparisons, `16` mutations, `2` REA
+sessions, no EXE; registry **1,418** (`+16`). Closes `7`, `0` new. Next
+(`Run836`): `825`+`830`/`834`/`835`.
 
-Historical: [Run826](runs/826-ff-scene-ctor-and-sprite-sample-integration/README.md),
+Historical: [Run829](runs/829-rtti-crt-exit-and-diag-integration/README.md),
+[Run826](runs/826-ff-scene-ctor-and-sprite-sample-integration/README.md),
 [Run824](runs/824-sprite-draw-and-color-closure-integration/README.md),
 [Run820](runs/820-sim-audio-and-scene-insert-integration/README.md),
 [Run816](runs/816-scene-register-heap-abi-integration/README.md),

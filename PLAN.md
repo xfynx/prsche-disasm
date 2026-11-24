@@ -19,10 +19,10 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run829](iterations/v2/001-original-recovery/runs/829-rtti-crt-exit-and-diag-integration/README.md)
-is the current shared build (`480` TUs, `59` unresolved names / `66`
-references), integrating Runs `827` and `828` (`1,402` registry entries).
-Active WIP: `Run825`, `Run830`, `Run831`.
+[Run833](iterations/v2/001-original-recovery/runs/833-player-tables-and-entry-fe-integration/README.md)
+is the current shared build (`482` TUs, `52` unresolved names / `59`
+references), integrating Runs `831` and `832` (`1,418` registry entries).
+Queued/active WIP: `Run830` (held for `Run825`), `Run834`, `Run835`.
 
 ## Recovery milestones
 

@@ -1,11 +1,11 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run829 PASS (`827/002` + `828/001`: 2 RTTI graphs + 5 CRT/diag closers,
-36 cases, 14 mutations, 55B `.data`/`.bss` + 324B `.rdata`, 480 TUs, 59/66
-names/refs, 1,188 pins, registry 1,402, no EXE). Closes `7` (`rtti_type_info_table_005c18f8`
-open); live renderer & startup open.
+Текущее: Run833 PASS (`831/003` + `832/003`: 16 bodies + tables/alias, 60 cases,
+16 mutations, 5,444B `.bss`, 482 TUs, 52/59 names/refs, 1,194 pins, registry
+1,418, no EXE). Closes `7`, `0` new; live renderer & startup open.
 
-Historical: Run826 PASS (`819/008` + `821/003` + `823/001`: 28 bodies + wrapper,
+Historical: Run829 PASS (`827/002` + `828/001`: 2 RTTI graphs + 5 CRT/diag closers,
+36 cases, 14 mutations, 55B `.data`/`.bss` + 324B `.rdata`, 480 TUs, 59/66
 632 cases, 30 mutations, 351B `.rdata` + 4B `.bss`, 478 TUs, 65/72 names/refs,
 534 cases, 29 mutations, 256B `.rdata` + 8,208B `.data`/`.bss`, 475 TUs, 69/77
 names/refs, 1,174 pins, registry 1,370, no EXE). Run820 PASS (`813/008` + `818/001`: 10 bodies, 78 cases, 22
