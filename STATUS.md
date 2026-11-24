@@ -4,7 +4,14 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run792](iterations/v2/001-original-recovery/runs/792-scene-render-sim-integration/README.md)
+[Run796](iterations/v2/001-original-recovery/runs/796-render-font-and-sim-queue-teardown-integration/README.md)
+compiles 459 TUs across eight projects (**82 unresolved names / 92
+references**, no EXE), accepting Runs793/794: `1,307` registry entries (`+12`),
+`272` comparisons, `24` mutations, `264B` read-only data + `41B .bss`, `1,132`
+source pins. Three names close (`0053c6c0`, `004afd30`, `004afe50`) with zero
+new unresolved names.
+
+Historical: [Run792](iterations/v2/001-original-recovery/runs/792-scene-render-sim-integration/README.md)
 compiles 457 TUs across eight projects (**85 unresolved names / 94
 references**, no EXE), accepting Runs786/789/790/791: `1,295` registry entries
 (`+21`), `216` comparisons, `41` mutations, `2,148B .bss` (`786`+`790`) + `64B

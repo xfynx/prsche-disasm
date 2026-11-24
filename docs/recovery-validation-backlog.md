@@ -1,6 +1,12 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run792 PASS (`786`/`789`/`790`/`791`: 21 bodies, 216 cases, 41
+Текущее: Run796 PASS (`793/004` + `794/002`: 12 bodies, 272 cases, 24
+mutations, 264B read-only + 41B `.bss`, 459 TUs, 82/92 names/refs, 1,132 pins,
+registry 1,307, no EXE). `793` leaves `005dec08` ops[5] open; `794` uses
+bounded mock file/bank/heap/callback stubs and CRT `std::puts`; live
+renderer/audio/startup/gameplay remain open.
+
+Historical: Run792 PASS (`786`/`789`/`790`/`791`: 21 bodies, 216 cases, 41
 mutations, 2,148B `.bss` + 64B `.data`, 457 TUs, 85/94 names/refs, 1,127 pins,
 registry 1,295, no EXE). Open bounds: `786` 40 sky slots; `789` `w0+w1>0`;
 `790` 5 queue banks (`004af970`/`004afd30`/`004afe50`/`004b0a20` external); `791`

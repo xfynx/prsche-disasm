@@ -1,0 +1,152 @@
+{
+  "run": 794,
+  "experiment": "local/experiments/v2-sim-audio-queue-teardown-794",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown",
+    "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict",
+    "iterations/v2/001-original-recovery/runs/703-audio-finalize-period-callback",
+    "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload",
+    "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control",
+    "iterations/v2/001-original-recovery/runs/608-frame-audio-channel-volume",
+    "iterations/v2/001-original-recovery/runs/464-audio-probe-startup",
+    "iterations/v2/001-original-recovery/runs/435-audio-stop-voice",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.hpp",
+    "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004afd30",
+      "bytes": 278,
+      "sha256": "4a87d5a9fe979386f4c84ce1d24b6fbca862fbf7ec00ee5c800ea362a843e6fc",
+      "token": "@BODY_004AFD30@"
+    },
+    {
+      "va": "004afe50",
+      "bytes": 372,
+      "sha256": "5eb2b00cdc49c3bf87ec35b17534d645e78d9030a7c450fcd7050ece4b171623",
+      "token": "@BODY_004AFE50@"
+    },
+    {
+      "va": "004af970",
+      "bytes": 958,
+      "sha256": "95b46253f990146be2ff668bf9d8a2ffac726a14d85eb9d0334498632f93a63f",
+      "token": "@BODY_004AF970@"
+    },
+    {
+      "va": "004a8490",
+      "bytes": 209,
+      "sha256": "93f0768b0dfdfe8ba681038811c5758ac5fd718fa867fcd954ac1bdcc28f4207",
+      "token": "@BODY_004A8490@"
+    }
+  ],
+  "pass_marker": "sim_audio_queue_teardown_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-bank-open-success-code",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "    if (open_res == 8) {",
+      "new": "    if (open_res == 7) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-record-set-size-zero-skip",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "    if (size == 0u) {",
+      "new": "    if (size == 1u) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-magic-check-bnkl",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "        if (magic != 0x6c4b4e42u) {",
+      "new": "        if (magic != 0x6c4b4e43u) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-hdr-version-byte",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "        if (hdr[4] != 4u) {",
+      "new": "        if (hdr[4] != 5u) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-pool-split-limit-reset",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "            audio_pool_limit_00656afc = 0x7ffc;",
+      "new": "            audio_pool_limit_00656afc = 0x7ff8;",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-pump-stall-early-return",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "                            audio_queue_stall_00656af0 = 1u;\n                            return;",
+      "new": "                            audio_queue_stall_00656af0 = 0u;\n                            return;",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-pump-consumer-wrap",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "        (static_cast<std::int32_t>(audio_queue_consumer_00656ac8) >= 0x3f)",
+      "new": "        (static_cast<std::int32_t>(audio_queue_consumer_00656ac8) >= 0x3e)",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-flush-ring-mark-zero",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "            audio_queue_ring_00656b00[cur].bank_1e = -1;",
+      "new": "            audio_queue_ring_00656b00[cur].bank_1e = 0;",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-reset-state-byte-3a6",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "    audio_state_byte_006573a6 = 2u;",
+      "new": "    audio_state_byte_006573a6 = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-teardown-close-magic-0x64",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "            (void)close_00533da0(reinterpret_cast<void*>(static_cast<std::uintptr_t>(bank.tag_00)), 0x64u);",
+      "new": "            (void)close_00533da0(reinterpret_cast<void*>(static_cast<std::uintptr_t>(bank.tag_00)), 0x63u);",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-teardown-bank-count-4",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "    for (std::uint32_t i = 0u; i < 5u; ++i) {",
+      "new": "    for (std::uint32_t i = 0u; i < 4u; ++i) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-teardown-pool-free-skip",
+      "source": "iterations/v2/001-original-recovery/runs/794-sim-audio-queue-teardown/sim_audio_queue_teardown_794.cpp",
+      "old": "    if (audio_pool_base_00656acc != nullptr) {",
+      "new": "    if (audio_pool_base_00656acc == nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    }
+  ]
+}

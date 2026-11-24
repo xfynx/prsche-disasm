@@ -1,0 +1,773 @@
+// Native x86-vs-C++ differential fixture for Run793 0053c6c0..00573b1a.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#define PORSCHE_DEFINE_SHARED_RUNTIME_GLOBALS_FIXTURE
+#include "render_debug_font_create_793.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kArenaBytes = 0x100u,
+    kMaxCalls = 24u,
+    kMaxDiags = 4u,
+};
+
+struct CallRec {
+    U kind;
+    U arg1;
+    U arg2;
+};
+
+struct DiagRec {
+    U fmt_match;
+    U file_match;
+    U line;
+    I state;
+};
+
+struct Snapshot {
+    U abi_fail;
+    U ret;
+    U cursor_off;
+    U reader_tag;
+    U reader_res;
+    U reader_adv;
+    U alloc_req;
+    U call_count;
+    CallRec calls[kMaxCalls];
+    U diag_count;
+    DiagRec diags[kMaxDiags];
+    B arena[kArenaBytes];
+};
+
+static const char kDiagFile[] = "\\real\\cmn\\fontattr.c";
+static const float kFixedScale = 1.0f / 65536.0f;
+static std::uint16_t orig_sjis_full_buf[128]{};
+
+static U cases = 0u;
+static U side = 0u;
+static Snapshot expected{};
+static Snapshot actual{};
+static Snapshot* cur = nullptr;
+
+static B arena_buf[kArenaBytes]{};
+static U alloc_fail_mode = 0u;
+static U ops_table[8]{};
+
+static B* code_53c6c0 = nullptr;
+static B* code_53d920 = nullptr;
+static B* code_53d970 = nullptr;
+static B* code_53e5c0 = nullptr;
+static B* code_573a90 = nullptr;
+static B* code_573ab0 = nullptr;
+static B* code_573ac0 = nullptr;
+static B* code_573ae0 = nullptr;
+static U jump_53e5c0[17]{};
+
+static U ptr_u(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* p) {
+    U v = 0u;
+    std::memcpy(&v, p, sizeof v);
+    return v;
+}
+
+static void store32(void* p, U v) {
+    std::memcpy(p, &v, sizeof v);
+}
+
+static void write_rel32(B* site, U dst) {
+    const U src = ptr_u(site) + 4u;
+    store32(site, dst - src);
+}
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", why, cases, side);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* info) {
+    std::printf("divergence native-fault %08lx case=%u side=%u\n",
+                info->ExceptionRecord->ExceptionCode, cases, side);
+    std::fflush(stdout);
+    ExitProcess(7);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void* __cdecl stub_alloc(I bytes) {
+    if (cur != nullptr) {
+        cur->alloc_req = static_cast<U>(bytes);
+    }
+    if (alloc_fail_mode != 0u) {
+        return nullptr;
+    }
+    if (bytes <= 0 || static_cast<U>(bytes) > kArenaBytes) {
+        return nullptr;
+    }
+    return arena_buf;
+}
+
+static void __cdecl stub_diag_handler(const char* fmt, I state) {
+    if (cur != nullptr && cur->diag_count < kMaxDiags) {
+        DiagRec& d = cur->diags[cur->diag_count++];
+        d.fmt_match = (fmt != nullptr &&
+                       std::strcmp(fmt, porsche::font_setstate_invalid_state_005bbb20) == 0)
+            ? 1u
+            : 0u;
+        const char* file = porsche::diagnostic_file_005deb74();
+        d.file_match = (file != nullptr && std::strcmp(file, kDiagFile) == 0) ? 1u : 0u;
+        d.line = porsche::diagnostic_line_005deb78;
+        d.state = state;
+    }
+}
+
+} // namespace
+
+namespace porsche {
+
+void* render_service_ops_005dec08 = nullptr;
+void (__cdecl* diagnostic_handler_005debf0)(const char*) = nullptr;
+
+std::uint32_t __cdecl render_buffer_read_word_0056e2a8(const void* src, std::int32_t bytes) {
+    const auto* const p = static_cast<const std::uint8_t*>(src) + bytes - 4;
+    std::uint32_t val = 0u;
+    std::memcpy(&val, p, sizeof val);
+    const std::uint32_t shift = static_cast<std::uint32_t>((-bytes) * 8 + 32) & 0x1fu;
+    return val >> shift;
+}
+
+void __cdecl font_state_set_pair_0053eea0(
+    void* obj, std::uint32_t first, std::uint32_t second) {
+    if (cur != nullptr && cur->call_count < kMaxCalls) {
+        cur->calls[cur->call_count++] = {1u, first, second};
+    }
+    store32(static_cast<B*>(obj) + 0x3cu, first);
+    store32(static_cast<B*>(obj) + 0x40u, second);
+}
+
+void __cdecl font_setstatef_0053e890(void* font, std::int32_t state, float value) {
+    U fbits = 0u;
+    std::memcpy(&fbits, &value, sizeof fbits);
+    if (cur != nullptr && cur->call_count < kMaxCalls) {
+        cur->calls[cur->call_count++] = {2u, static_cast<U>(state), fbits};
+    }
+    switch (state) {
+    case 1:
+        store32(static_cast<B*>(font) + 0xb0u, fbits);
+        return;
+    case 2:
+        store32(static_cast<B*>(font) + 0xb4u, fbits);
+        return;
+    case 3:
+        store32(static_cast<B*>(font) + 0xb8u, fbits);
+        return;
+    case 18:
+        store32(static_cast<B*>(font) + 0xd0u, fbits);
+        return;
+    case 19:
+        store32(static_cast<B*>(font) + 0xd4u, fbits);
+        return;
+    case 20:
+        store32(static_cast<B*>(font) + 0xd8u, fbits);
+        return;
+    case 21:
+        store32(static_cast<B*>(font) + 0xdcu, fbits);
+        return;
+    case 22:
+        store32(static_cast<B*>(font) + 0xe0u, fbits);
+        return;
+    case 23:
+        store32(static_cast<B*>(font) + 0xe4u, fbits);
+        return;
+    default:
+        return;
+    }
+}
+
+} // namespace porsche
+
+namespace {
+
+static U invoke1(void* fn, U a0, U& abi_fail) {
+    U fail = 0u, before = 0u, frame = 0u, rv = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x369cf147
+        push a0
+        mov eax, fn
+        call eax
+        mov rv, eax
+        add esp, 4
+        cmp esp, before
+        je ok_esp
+        mov fail, 1
+    ok_esp:
+        cmp ebx, 0x13572468
+        jne bad_nv
+        cmp esi, 0x2468ace0
+        jne bad_nv
+        cmp edi, 0x369cf147
+        je done_nv
+    bad_nv:
+        mov fail, 1
+    done_nv:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail | frame;
+    return rv;
+}
+
+static U invoke2(void* fn, U a0, U a1, U& abi_fail) {
+    U fail = 0u, before = 0u, rv = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x369cf147
+        push a1
+        push a0
+        mov eax, fn
+        call eax
+        mov rv, eax
+        add esp, 8
+        cmp esp, before
+        je ok_esp
+        mov fail, 1
+    ok_esp:
+        cmp ebx, 0x13572468
+        jne bad_nv
+        cmp esi, 0x2468ace0
+        jne bad_nv
+        cmp edi, 0x369cf147
+        je done_nv
+    bad_nv:
+        mov fail, 1
+    done_nv:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return rv;
+}
+
+static U invoke3(void* fn, U a0, U a1, U a2, U& abi_fail) {
+    U fail = 0u, before = 0u, rv = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x369cf147
+        push a2
+        push a1
+        push a0
+        mov eax, fn
+        call eax
+        mov rv, eax
+        add esp, 12
+        cmp esp, before
+        je ok_esp
+        mov fail, 1
+    ok_esp:
+        cmp ebx, 0x13572468
+        jne bad_nv
+        cmp esi, 0x2468ace0
+        jne bad_nv
+        cmp edi, 0x369cf147
+        je done_nv
+    bad_nv:
+        mov fail, 1
+    done_nv:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return rv;
+}
+
+static U invoke4(void* fn, U a0, U a1, U a2, U a3, U& abi_fail) {
+    U fail = 0u, before = 0u, rv = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov ebx, 0x13572468
+        mov esi, 0x2468ace0
+        mov edi, 0x369cf147
+        push a3
+        push a2
+        push a1
+        push a0
+        mov eax, fn
+        call eax
+        mov rv, eax
+        add esp, 16
+        cmp esp, before
+        je ok_esp
+        mov fail, 1
+    ok_esp:
+        cmp ebx, 0x13572468
+        jne bad_nv
+        cmp esi, 0x2468ace0
+        jne bad_nv
+        cmp edi, 0x369cf147
+        je done_nv
+    bad_nv:
+        mov fail, 1
+    done_nv:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return rv;
+}
+
+static void init_originals() {
+    static const B b_53c6c0[] = {@BODY_0053C6C0@};
+    static const B b_53d920[] = {@BODY_0053D920@};
+    static const B b_53d970[] = {@BODY_0053D970@};
+    static const B b_53e5c0[] = {@BODY_0053E5C0@};
+    static const B b_573a90[] = {@BODY_00573A90@};
+    static const B b_573ab0[] = {@BODY_00573AB0@};
+    static const B b_573ac0[] = {@BODY_00573AC0@};
+    static const B b_573ae0[] = {@BODY_00573AE0@};
+
+    B* page = static_cast<B*>(VirtualAlloc(
+        nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(page != nullptr, "virtualalloc");
+
+    code_53c6c0 = page + 0x000u;
+    code_53d920 = page + 0x280u;
+    code_53d970 = page + 0x300u;
+    code_53e5c0 = page + 0x380u;
+    code_573a90 = page + 0x640u;
+    code_573ab0 = page + 0x680u;
+    code_573ac0 = page + 0x6c0u;
+    code_573ae0 = page + 0x700u;
+
+    std::memcpy(code_53c6c0, b_53c6c0, sizeof b_53c6c0);
+    std::memcpy(code_53d920, b_53d920, sizeof b_53d920);
+    std::memcpy(code_53d970, b_53d970, sizeof b_53d970);
+    std::memcpy(code_53e5c0, b_53e5c0, sizeof b_53e5c0);
+    std::memcpy(code_573a90, b_573a90, sizeof b_573a90);
+    std::memcpy(code_573ab0, b_573ab0, sizeof b_573ab0);
+    std::memcpy(code_573ac0, b_573ac0, sizeof b_573ac0);
+    std::memcpy(code_573ae0, b_573ae0, sizeof b_573ae0);
+
+    for (U i = 0u; i < 96u; ++i) {
+        orig_sjis_full_buf[0x20u + i] = porsche::font_ascii_to_sjis_fullwidth_005dfcc8[i];
+    }
+
+    // Relocate 00573ac0
+    store32(code_573ac0 + (0x573ad9u - 0x573ac0u), ptr_u(&orig_sjis_full_buf[0]));
+
+    // Relocate 00573ae0
+    write_rel32(code_573ae0 + (0x573b0au - 0x573ae0u), ptr_u(code_573ac0));
+
+    // Relocate 0053d970
+    write_rel32(code_53d970 + (0x53d991u - 0x53d970u), ptr_u(&porsche::render_buffer_read_word_0056e2a8));
+
+    // Relocate 0053d920
+    write_rel32(code_53d920 + (0x53d946u - 0x53d920u), ptr_u(&porsche::render_buffer_read_word_0056e2a8));
+    write_rel32(code_53d920 + (0x53d95eu - 0x53d920u), ptr_u(code_53d970));
+
+    // Relocate 0053e5c0
+    static const U jt_targets[17] = {
+        0x53e5d7u, 0x53e758u, 0x53e789u, 0x53e7bau, 0x53e7ebu,
+        0x53e608u, 0x53e62eu, 0x53e65bu, 0x53e688u, 0x53e6a7u,
+        0x53e6c6u, 0x53e6e5u, 0x53e704u, 0x53e71cu, 0x53e72bu,
+        0x53e73au, 0x53e749u,
+    };
+    for (U i = 0u; i < 17u; ++i) {
+        jump_53e5c0[i] = ptr_u(code_53e5c0) + (jt_targets[i] - 0x53e5c0u);
+    }
+    store32(code_53e5c0 + (0x53e5d3u - 0x53e5c0u), ptr_u(&jump_53e5c0[0]));
+    store32(code_53e5c0 + (0x53e773u - 0x53e5c0u), ptr_u(&kFixedScale));
+    store32(code_53e5c0 + (0x53e7a4u - 0x53e5c0u), ptr_u(&kFixedScale));
+    store32(code_53e5c0 + (0x53e7d5u - 0x53e5c0u), ptr_u(&kFixedScale));
+    store32(code_53e5c0 + (0x53e806u - 0x53e5c0u), ptr_u(&kFixedScale));
+    store32(code_53e5c0 + (0x53e81eu - 0x53e5c0u), ptr_u(&porsche::font_setstate_invalid_state_005bbb20[0]));
+    store32(code_53e5c0 + (0x53e824u - 0x53e5c0u), ptr_u(&porsche::shared_runtime_word_005deb74));
+    store32(code_53e5c0 + (0x53e828u - 0x53e5c0u), ptr_u(&kDiagFile[0]));
+    store32(code_53e5c0 + (0x53e82eu - 0x53e5c0u), ptr_u(&porsche::shared_runtime_word_005deb78));
+    store32(code_53e5c0 + (0x53e838u - 0x53e5c0u), ptr_u(&porsche::diagnostic_handler_005debf0));
+    static const U call_53e890_sites[7] = {
+        0x53e5e2u, 0x53e5efu, 0x53e5fcu, 0x53e77eu, 0x53e7afu, 0x53e7e0u, 0x53e811u,
+    };
+    for (U va : call_53e890_sites) {
+        write_rel32(code_53e5c0 + (va - 0x53e5c0u), ptr_u(&porsche::font_setstatef_0053e890));
+    }
+
+    // Relocate 0053c6c0
+    store32(code_53c6c0 + (0x53c6c1u - 0x53c6c0u), ptr_u(&porsche::render_service_ops_005dec08));
+    store32(code_53c6c0 + (0x53c754u - 0x53c6c0u), ptr_u(code_573ae0));
+    store32(code_53c6c0 + (0x53c772u - 0x53c6c0u), ptr_u(code_573ae0));
+    store32(code_53c6c0 + (0x53c77bu - 0x53c6c0u), ptr_u(code_573ab0));
+    store32(code_53c6c0 + (0x53c784u - 0x53c6c0u), ptr_u(code_573a90));
+    write_rel32(code_53c6c0 + (0x53c761u - 0x53c6c0u), ptr_u(&porsche::render_buffer_read_word_0056e2a8));
+    write_rel32(code_53c6c0 + (0x53c78eu - 0x53c6c0u), ptr_u(&porsche::font_state_set_pair_0053eea0));
+    static const U call_53e5c0_sites[9] = {
+        0x53c798u, 0x53c7a2u, 0x53c7acu, 0x53c7b6u, 0x53c7c0u,
+        0x53c7cdu, 0x53c7dau, 0x53c7e7u, 0x53c7f4u,
+    };
+    for (U va : call_53e5c0_sites) {
+        write_rel32(code_53c6c0 + (va - 0x53c6c0u), ptr_u(code_53e5c0));
+    }
+    static const U call_53e890_c6c0_sites[6] = {
+        0x53c7feu, 0x53c808u, 0x53c815u, 0x53c81fu, 0x53c829u, 0x53c836u,
+    };
+    for (U va : call_53e890_c6c0_sites) {
+        write_rel32(code_53c6c0 + (va - 0x53c6c0u), ptr_u(&porsche::font_setstatef_0053e890));
+    }
+    static const U call_53d920_sites[5] = {
+        0x53c845u, 0x53c854u, 0x53c863u, 0x53c872u, 0x53c881u,
+    };
+    for (U va : call_53d920_sites) {
+        write_rel32(code_53c6c0 + (va - 0x53c6c0u), ptr_u(code_53d920));
+    }
+}
+
+static void reset_common() {
+    std::memset(arena_buf, 0x5au, sizeof arena_buf);
+    porsche::shared_runtime_word_005deb74 = 0u;
+    porsche::shared_runtime_word_005deb78 = 0u;
+    porsche::diagnostic_handler_005debf0 =
+        reinterpret_cast<void(__cdecl*)(const char*)>(&stub_diag_handler);
+    std::memset(ops_table, 0, sizeof ops_table);
+    ops_table[5] = ptr_u(&stub_alloc);
+    porsche::render_service_ops_005dec08 = &ops_table[0];
+    alloc_fail_mode = 0u;
+}
+
+static void check_snapshots(const char* label) {
+    require(expected.abi_fail == 0u && actual.abi_fail == 0u, label);
+    require(std::memcmp(&expected, &actual, sizeof(Snapshot)) == 0, label);
+    ++cases;
+}
+
+static void test_readers() {
+    const B stream[] = {0x41u, 0x20u, 0x7fu, 0x1fu, 0x80u, 0x40u, 0x82u, 0x60u, 0xffu, 0x01u, 0x00u, 0x10u};
+    for (U off = 0u; off <= 8u; ++off) {
+        for (U kind = 0u; kind < 3u; ++kind) {
+            void* orig_fn = (kind == 0u) ? code_573a90 : (kind == 1u ? code_573ab0 : code_573ae0);
+            void* cpp_fn = (kind == 0u)
+                ? reinterpret_cast<void*>(&porsche::font_read_u16_cursor_00573a90)
+                : (kind == 1u
+                       ? reinterpret_cast<void*>(&porsche::font_read_u8_cursor_00573ab0)
+                       : reinterpret_cast<void*>(&porsche::font_read_sjis_cursor_00573ae0));
+            for (U s = 0u; s < 2u; ++s) {
+                side = s;
+                Snapshot& dst = (s == 0u) ? expected : actual;
+                std::memset(&dst, 0, sizeof dst);
+                cur = &dst;
+                const B* p = &stream[off];
+                U abi = 0u;
+                dst.ret = invoke1(s == 0u ? orig_fn : cpp_fn, ptr_u(&p), abi);
+                dst.abi_fail = abi;
+                dst.cursor_off = static_cast<U>(p - &stream[0]);
+            }
+            check_snapshots("reader");
+        }
+    }
+
+    const U ac0_inputs[] = {
+        0x00u, 0x1fu, 0x20u, 0x21u, 0x30u, 0x41u, 0x5au, 0x61u, 0x7au, 0x7eu,
+        0x7fu, 0x80u, 0xffffu, 0x1234001fu, 0x12340020u, 0x12340041u, 0x1234007fu, 0x12340080u,
+    };
+    for (U v : ac0_inputs) {
+        for (U s = 0u; s < 2u; ++s) {
+            side = s;
+            Snapshot& dst = (s == 0u) ? expected : actual;
+            std::memset(&dst, 0, sizeof dst);
+            cur = &dst;
+            U abi = 0u;
+            dst.ret = invoke1(
+                s == 0u ? static_cast<void*>(code_573ac0)
+                        : reinterpret_cast<void*>(&porsche::font_ascii_to_sjis_fullwidth_00573ac0),
+                v, abi);
+            dst.abi_fail = abi;
+        }
+        check_snapshots("ascii_sjis_573ac0");
+    }
+}
+
+static void write_le16(B* dst, U code) {
+    dst[0] = static_cast<B>(code & 0xffu);
+    dst[1] = static_cast<B>((code >> 8u) & 0xffu);
+}
+
+static void test_glyph_search() {
+    // 256 bytes prefix padding so negative idx reads stay safely inside buffer.
+    B table_mem[256 + 16 * 11]{};
+    std::memset(table_mem, 0x77, sizeof table_mem);
+    B* const table = &table_mem[256];
+    const U codes[7] = {0x0020u, 0x0041u, 0x0042u, 0x0044u, 0x0045u, 0x8140u, 0x8260u};
+    for (U i = 0u; i < 7u; ++i) {
+        write_le16(table + i * 11u, codes[i]);
+    }
+    const U query_codes[] = {0x001fu, 0x0020u, 0x0021u, 0x0041u, 0x0043u, 0x0045u, 0x8140u, 0x8260u, 0x9999u};
+    const I counts[] = {0, 1, 2, 7};
+    for (I cnt : counts) {
+        for (U key : query_codes) {
+            for (U s = 0u; s < 2u; ++s) {
+                side = s;
+                Snapshot& dst = (s == 0u) ? expected : actual;
+                std::memset(&dst, 0, sizeof dst);
+                cur = &dst;
+                U abi = 0u;
+                U res = invoke4(
+                    s == 0u ? static_cast<void*>(code_53d970)
+                            : reinterpret_cast<void*>(&porsche::font_bsearch_glyph_0053d970),
+                    key, ptr_u(table), static_cast<U>(cnt), 11u, abi);
+                dst.abi_fail = abi;
+                dst.ret = (res == 0u) ? 0u : (res - ptr_u(table) + 1u);
+            }
+            check_snapshots("bsearch_53d970");
+        }
+    }
+
+    // Direct-path + fallback cases for 0053d920
+    B dense_mem[256 + 40 * 11]{};
+    std::memset(dense_mem, 0x22, sizeof dense_mem);
+    B* const dense = &dense_mem[256];
+    for (U i = 0u; i < 38u; ++i) {
+        U code = 0x0020u + i;
+        if (i == 4u) {
+            code = 0x0099u;
+        } else if (i == 6u) {
+            code = 0x0001u;
+        } else if (i == 33u) {
+            // Break direct-index at 'A' (0x41 = 0x20 + 33) -> falls back to bsearch
+            code = 0x0042u;
+        } else if (i == 34u) {
+            code = 0x0043u;
+        }
+        write_le16(dense + i * 11u, code);
+    }
+    const U find_queries[] = {0x001fu, 0x0020u, 0x0025u, 0x0040u, 0x0041u, 0x0042u, 0x0043u, 0x0045u, 0x0046u, 0x8140u};
+    for (U q : find_queries) {
+        for (U s = 0u; s < 2u; ++s) {
+            side = s;
+            Snapshot& dst = (s == 0u) ? expected : actual;
+            std::memset(&dst, 0, sizeof dst);
+            cur = &dst;
+            reset_common();
+            store32(&arena_buf[0x1cu], 38u);
+            store32(&arena_buf[0x28u], ptr_u(dense));
+            U abi = 0u;
+            U res = invoke2(
+                s == 0u ? static_cast<void*>(code_53d920)
+                        : reinterpret_cast<void*>(&porsche::font_find_glyph_0053d920),
+                ptr_u(arena_buf), q, abi);
+            dst.abi_fail = abi;
+            dst.ret = (res == 0u) ? 0u : (res - ptr_u(dense) + 1u);
+        }
+        check_snapshots("find_glyph_53d920");
+    }
+}
+
+static void test_setstate() {
+    struct Case {
+        I state;
+        U value;
+        U init_val;
+    };
+    const Case list[] = {
+        {0, 0u, 0u},
+        {1, 0u, 0u},
+        {1, 0x00018000u, 0u},
+        {2, 0x80000081u, 0u},
+        {3, 0xffffffffu, 0u},
+        {4, 0x00020000u, 0u},
+        {5, 1u, 6u},
+        {5, 0u, 7u},
+        {6, 1u, 5u},
+        {6, 2u, 7u},
+        {7, 1u, 3u},
+        {7, 0u, 7u},
+        {8, 0x11223344u, 0x11223344u},
+        {8, 0x55667788u, 0x11223344u},
+        {9, 0x11223344u, 0x11223344u},
+        {9, 0x99aabbccu, 0x11223344u},
+        {10, 0xaabbccddu, 0xaabbccddu},
+        {10, 0x01020304u, 0xaabbccddu},
+        {11, 0xdeadbeefu, 0xdeadbeefu},
+        {11, 0x12345678u, 0xdeadbeefu},
+        {12, 0xfedcba98u, 0u},
+        {13, 0x01010101u, 0u},
+        {14, 0x02020202u, 0u},
+        {15, 0x03030303u, 0u},
+        {16, 0x04040404u, 0u},
+        {17, 0u, 0u},
+        {-1, 0u, 0u},
+        {99, 123u, 0u},
+    };
+    for (const Case& c : list) {
+        for (U s = 0u; s < 2u; ++s) {
+            side = s;
+            Snapshot& dst = (s == 0u) ? expected : actual;
+            std::memset(&dst, 0, sizeof dst);
+            cur = &dst;
+            reset_common();
+            store32(&arena_buf[0x5cu], c.init_val);
+            store32(&arena_buf[0x60u], c.init_val);
+            store32(&arena_buf[0x64u], c.init_val);
+            store32(&arena_buf[0x68u], c.init_val);
+            store32(&arena_buf[0xbcu], c.init_val);
+            arena_buf[0xacu] = 0u;
+            U abi = 0u;
+            invoke3(
+                s == 0u ? static_cast<void*>(code_53e5c0)
+                        : reinterpret_cast<void*>(&porsche::font_setstate_0053e5c0),
+                ptr_u(arena_buf), static_cast<U>(c.state), c.value, abi);
+            dst.abi_fail = abi;
+            std::memcpy(dst.arena, arena_buf, kArenaBytes);
+        }
+        check_snapshots("setstate_53e5c0");
+    }
+}
+
+static U tag_reader(U fn_ptr) {
+    if (fn_ptr == ptr_u(code_573a90) || fn_ptr == ptr_u(&porsche::font_read_u16_cursor_00573a90)) {
+        return 1u;
+    }
+    if (fn_ptr == ptr_u(code_573ab0) || fn_ptr == ptr_u(&porsche::font_read_u8_cursor_00573ab0)) {
+        return 2u;
+    }
+    if (fn_ptr == ptr_u(code_573ae0) || fn_ptr == ptr_u(&porsche::font_read_sjis_cursor_00573ae0)) {
+        return 3u;
+    }
+    return fn_ptr;
+}
+
+static void test_font_create() {
+    struct CreateCase {
+        U fail_alloc;
+        U flags;
+        U num_chars;
+        U word20;
+        B metric10;
+        B metric11;
+        B metric12;
+        B metric13;
+        U glyph_code;
+        B glyph_h;
+        B glyph_yoff;
+    };
+    const CreateCase list[] = {
+        {1u, 0x00000000u, 10u, 0x0041u, 1u, 2u, 10u, 4u, 0x0041u, 12u, 0xfeu},
+        {0u, 0x00010000u, 10u, 0x0041u, 0xfcu, 0x05u, 14u, 6u, 0x0041u, 11u, 0x02u},
+        {0u, 0x00020000u, 10u, 0x0041u, 2u, 3u, 16u, 5u, 0x0043u, 9u, 0xffu},
+        {0u, 0x00000000u, 1u, 0x0041u, 0u, 1u, 12u, 4u, 0x0045u, 8u, 0x01u},
+        {0u, 0x00000000u, 260u, 0x0041u, 1u, 1u, 12u, 3u, 0x0042u, 7u, 0x00u},
+        {0u, 0x00030000u, 10u, 0x8140u, 1u, 1u, 12u, 3u, 0x0046u, 7u, 0x00u},
+    };
+    B font_data_mem[512]{};
+    const B probe_bytes[4] = {0x41u, 0x81u, 0x40u, 0x00u};
+
+    for (const CreateCase& c : list) {
+        std::memset(font_data_mem, 0, sizeof font_data_mem);
+        // Header starts at offset 16 so 0056e2a8(src, 2) prefix reads stay inside font_data_mem.
+        B* const fd = &font_data_mem[16];
+        fd[0x0au] = static_cast<B>(c.num_chars & 0xffu);
+        fd[0x0bu] = static_cast<B>((c.num_chars >> 8u) & 0xffu);
+        store32(fd + 0x0cu, c.flags);
+        fd[0x10u] = c.metric10;
+        fd[0x11u] = c.metric11;
+        fd[0x12u] = c.metric12;
+        fd[0x13u] = c.metric13;
+        store32(fd + 0x14u, 0x40u); // glyph table offset
+        store32(fd + 0x1cu, 0x80u); // bitmap data offset
+        write_le16(fd + 0x20u, c.word20);
+
+        B* const gtable = fd + 0x40u;
+        write_le16(gtable, c.glyph_code);
+        gtable[3] = c.glyph_h;
+        gtable[0xau] = c.glyph_yoff;
+
+        for (U s = 0u; s < 2u; ++s) {
+            side = s;
+            Snapshot& dst = (s == 0u) ? expected : actual;
+            std::memset(&dst, 0, sizeof dst);
+            cur = &dst;
+            reset_common();
+            alloc_fail_mode = c.fail_alloc;
+            U abi = 0u;
+            U res = invoke1(
+                s == 0u ? static_cast<void*>(code_53c6c0)
+                        : reinterpret_cast<void*>(&porsche::render_debug_font_create_0053c6c0),
+                ptr_u(fd), abi);
+            dst.abi_fail = abi;
+            if (res == 0u) {
+                dst.ret = 0u;
+            } else {
+                require(res == ptr_u(arena_buf), "alloc_ptr");
+                dst.ret = 1u;
+                const U reader_ptr = load32(&arena_buf[0x30u]);
+                dst.reader_tag = tag_reader(reader_ptr);
+                require(dst.reader_tag >= 1u && dst.reader_tag <= 3u, "reader_tag");
+                const B* p = &probe_bytes[0];
+                U r_abi = 0u;
+                dst.reader_res = invoke1(reinterpret_cast<void*>(static_cast<std::uintptr_t>(reader_ptr)),
+                                         ptr_u(&p), r_abi);
+                require(r_abi == 0u, "reader_abi");
+                dst.reader_adv = static_cast<U>(p - &probe_bytes[0]);
+
+                // Canonicalize pointers relative to fd / tag before snapshot copy
+                store32(&arena_buf[0x24u], load32(&arena_buf[0x24u]) - ptr_u(fd));
+                store32(&arena_buf[0x28u], load32(&arena_buf[0x28u]) - ptr_u(fd));
+                store32(&arena_buf[0x2cu], load32(&arena_buf[0x2cu]) - ptr_u(fd));
+                store32(&arena_buf[0x30u], dst.reader_tag);
+                std::memcpy(dst.arena, arena_buf, kArenaBytes);
+            }
+        }
+        check_snapshots("create_53c6c0");
+    }
+}
+
+} // namespace
+
+int main() {
+    SetUnhandledExceptionFilter(fault_handler);
+    init_originals();
+    test_readers();
+    test_glyph_search();
+    test_setstate();
+    test_font_create();
+    std::printf("render_debug_font_create_793_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

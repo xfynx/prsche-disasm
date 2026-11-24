@@ -1,0 +1,178 @@
+{
+  "run": 793,
+  "experiment": "local/experiments/v2-render-debug-font-create-793",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/793-render-debug-font-create",
+    "iterations/v2/001-original-recovery/runs/782-render-calibrate-service",
+    "iterations/v2/001-original-recovery/runs/671-font-state-and-vec3-dist",
+    "iterations/v2/001-original-recovery/runs/611-splash-sprite-horizflip",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/runs/525-render-driver-destruction",
+    "iterations/v2/001-original-recovery/runs/521-render-initialize",
+    "iterations/v2/001-original-recovery/runs/518-render-driver-start",
+    "iterations/v2/001-original-recovery/runs/515-render-driver-constructors",
+    "iterations/v2/001-original-recovery/runs/378-buffer-select",
+    "iterations/v2/001-original-recovery/runs/374-render-descriptor",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0053c6c0",
+      "bytes": 490,
+      "sha256": "0658474add7296a6a72644df525815d1ec63ea7c7c2cdd0e771965828aaa2255",
+      "token": "@BODY_0053C6C0@"
+    },
+    {
+      "va": "0053d920",
+      "bytes": 74,
+      "sha256": "fc0c506edf8b1f9071ee76f06e64e7d3b153e7ef4c1a20609992013f2a6d8fa2",
+      "token": "@BODY_0053D920@"
+    },
+    {
+      "va": "0053d970",
+      "bytes": 74,
+      "sha256": "89d5df0652d45062f154e3b8195cf03dcdbfc28e0e5a746a9eeb159d175ca8cc",
+      "token": "@BODY_0053D970@"
+    },
+    {
+      "va": "0053e5c0",
+      "bytes": 643,
+      "sha256": "37c8f194ff3b5513310333668852ae822b101393a27b376cef56c0377f323996",
+      "token": "@BODY_0053E5C0@"
+    },
+    {
+      "va": "00573a90",
+      "bytes": 17,
+      "sha256": "73d031dd2eb28d910847fb4063c5230305d0f91f8b204f5d67677152c59aea92",
+      "token": "@BODY_00573A90@"
+    },
+    {
+      "va": "00573ab0",
+      "bytes": 14,
+      "sha256": "cbab94d390dea50181ee22bb95bced50e841d134313b869a38f95bfd37c3d289",
+      "token": "@BODY_00573AB0@"
+    },
+    {
+      "va": "00573ac0",
+      "bytes": 30,
+      "sha256": "b78589bcb669599df9f2e1d85e9bc9ba7b94929607566ae0c81987f1bbce7c2c",
+      "token": "@BODY_00573AC0@"
+    },
+    {
+      "va": "00573ae0",
+      "bytes": 59,
+      "sha256": "32246b7b5952fb9cfddfde40f637d61649b778df401b6e62bf0768373ec55540",
+      "token": "@BODY_00573AE0@"
+    }
+  ],
+  "pass_marker": "render_debug_font_create_793_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-53c6c0-alloc-size",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "    void* const font = alloc_fn(0xec);",
+      "new": "    void* const font = alloc_fn(0xe8);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53c6c0-encoding-mask",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "    const std::int32_t encoding = (read_i32(base, 0x0cu) >> 16) & 3;",
+      "new": "    const std::int32_t encoding = (read_i32(base, 0x0cu) >> 16) & 1;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53c6c0-glyph-probe-limit",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "    for (std::uint32_t ch = 0x41u; ch <= 0x45u; ++ch) {",
+      "new": "    for (std::uint32_t ch = 0x41u; ch <= 0x44u; ++ch) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53c6c0-ascent-adjust",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "        write_i32(font, 0x10u, prev_ascent - height - y_offset);",
+      "new": "        write_i32(font, 0x10u, prev_ascent - height + y_offset);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53d920-direct-bias",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "    const std::int32_t idx = static_cast<std::int32_t>(ch - 0x20u);",
+      "new": "    const std::int32_t idx = static_cast<std::int32_t>(ch - 0x21u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53d970-bsearch-step",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "        if (diff > 0) {\n            base = mid + stride;\n            --rem;\n        }",
+      "new": "        if (diff > 0) {\n            base = mid;\n            --rem;\n        }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53e5c0-flag-mask",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "    case 6:\n        set_flag_bit(font, 2u, value);",
+      "new": "    case 6:\n        set_flag_bit(font, 4u, value);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53e5c0-dirty-always",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "    if (read_u32(font, offset) != value) {",
+      "new": "    if (read_u32(font, offset) == value || true) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53e5c0-diag-line",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "        diagnostic_line_005deb78 = 0xb6u;",
+      "new": "        diagnostic_line_005deb78 = 0xb5u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-53e5c0-fixed-shift",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "        static_cast<double>(static_cast<std::int64_t>(value)) * (1.0 / 65536.0));",
+      "new": "        static_cast<double>(static_cast<std::int64_t>(value)) * (1.0 / 32768.0));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-573ac0-range-high",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "    if (lo < 0x20u || lo > 0x7fu) {",
+      "new": "    if (lo < 0x20u || lo >= 0x7fu) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-573ae0-lead-bit",
+      "source": "iterations/v2/001-original-recovery/runs/793-render-debug-font-create/render_debug_font_create_793.cpp",
+      "old": "    if ((b0 & 0x80u) != 0u) {",
+      "new": "    if ((b0 & 0x40u) != 0u) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

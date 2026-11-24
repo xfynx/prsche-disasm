@@ -1,6 +1,14 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-24. [Run792](runs/792-scene-render-sim-integration/README.md)
+Current 2026-11-24. [Run796](runs/796-render-font-and-sim-queue-teardown-integration/README.md)
+PASS (`build-001`): folds `793/004` (`0053c6c0` + 7 leaves, `226B` read-only)
+and `794/002` (`004afd30`, `004afe50`, `004af970`, `004a8490`, `38B` literals +
+`41B .bss`): **459 TUs / 8 projects**, **82 unresolved / 92 refs**, `1,132`
+pins, `272` comparisons, `24` mutations, `2` REA sessions, no EXE; registry
+**1,307** (`+12`; `0053c8e0` updated). Closes `3` (`0053c6c0`, `004afd30`,
+`004afe50`), `0` new. Next (`Run799`+): `795`/`797`/`798`.
+
+Historical: [Run792](runs/792-scene-render-sim-integration/README.md)
 PASS (`build-001`): folds `786/004` (`00452120` cluster, `8B .bss`), `789/002`
 (`00594980` cluster), `790/004` (`004a8570` cluster, `2,140B .bss`), `791/003`
 (`0044da10` cluster, `64B .data`): **457 TUs / 8 projects**, **85 unresolved /
