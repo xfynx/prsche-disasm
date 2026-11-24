@@ -19,10 +19,10 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run839](iterations/v2/001-original-recovery/runs/839-render-input-path-and-window-ops-integration/README.md)
-is the current shared build (`486` TUs, `39` unresolved names / `43`
-references), integrating Runs `834` and `837` (`1,432` registry entries).
-Queued/active WIP: `Run835`, `Run838`, `Run840`, `Run842`.
+[Run841](iterations/v2/001-original-recovery/runs/841-entry-fe-service-and-crt-shutdown-integration/README.md)
+is the current shared build (`488` TUs, `38` unresolved names / `41`
+references), integrating Runs `835` and `838` (`1,469` registry entries).
+Active WIP: `Run840`, `Run842`.
 
 ## Recovery milestones
 

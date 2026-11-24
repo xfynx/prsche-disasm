@@ -1,0 +1,1196 @@
+// Native x86-vs-C++ differential fixture for Run835 (entry_fe_service_00465790 closure,
+// 17 functions, 4,563B).
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "entry_fe_service_835.hpp"
+#include "porsche/application_alloc.hpp"
+#include "porsche/application_context_base.hpp"
+#include "porsche/application_state.hpp"
+#include "porsche/context_effects.hpp"
+#include "porsche/context_services.hpp"
+#include "porsche/heap.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U g_cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, g_cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U addr32(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+static U f32_bits(float v) {
+    U b = 0u;
+    std::memcpy(&b, &v, 4u);
+    return b;
+}
+
+enum : U {
+    kEvRouteCounter = 1u,
+    kEvTransformVec = 2u,
+    kEvAlloc59ef90 = 3u,
+    kEvRelease59f050 = 4u,
+    kEvStorage4211d0 = 5u,
+    kEvClear4237d0 = 6u,
+    kEvEmpty505810 = 7u,
+    kEvTableRel59ecd0 = 8u,
+    kEvHeapEnter = 9u,
+    kEvHeapLeave = 10u,
+    kEvSurfCenter = 11u,
+    kEvSurfContains = 12u,
+    kEvSurfNormal = 13u,
+    kEvSurfVertex = 14u,
+    kEvSurfVCount = 15u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+    U d;
+};
+
+enum : U { kMaxEvents = 256u, kArenaBytes = 0x20000u };
+
+struct SideChannel {
+    B arena[kArenaBytes];
+    U arena_used;
+    B heap_state[0x100u];
+    U heap_lock_obj;
+    Event events[kMaxEvents];
+    U event_count;
+};
+
+static SideChannel g_cpp_side;
+static SideChannel g_nat_side;
+static SideChannel* g_active_side = &g_cpp_side;
+
+static void side_reset(SideChannel* s) {
+    std::memset(s, 0, sizeof(*s));
+    store32(s->heap_state, 0x28u, addr32(&s->heap_lock_obj));
+}
+
+static void log_event(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u) {
+    if (g_active_side->event_count < kMaxEvents) {
+        Event& ev = g_active_side->events[g_active_side->event_count++];
+        ev.kind = kind;
+        ev.a = a;
+        ev.b = b;
+        ev.c = c;
+        ev.d = d;
+    }
+}
+
+static void* side_alloc_bytes(U bytes) {
+    const U aligned = (bytes + 15u) & ~15u;
+    require(g_active_side->arena_used + aligned <= kArenaBytes, "arena_overflow");
+    void* const p = g_active_side->arena + g_active_side->arena_used;
+    g_active_side->arena_used += aligned;
+    std::memset(p, 0xcd, aligned);
+    return p;
+}
+
+static U side_rel_ptr(const SideChannel* s, U raw) {
+    if (raw == 0u) {
+        return 0u;
+    }
+    const U base = addr32(s->arena);
+    if (raw >= base && raw < base + kArenaBytes) {
+        return 0x10000000u + (raw - base);
+    }
+    const U hbase = addr32(s->heap_state);
+    if (raw >= hbase && raw < hbase + sizeof(s->heap_state)) {
+        return 0x20000000u + (raw - hbase);
+    }
+    if (raw == addr32(&s->heap_lock_obj)) {
+        return 0x30000000u;
+    }
+    return raw;
+}
+
+// ---------------------------------------------------------------------------
+// C++ side canonical extern definitions (in namespace porsche)
+// ---------------------------------------------------------------------------
+namespace porsche {
+
+ApplicationStateArena application_state_006573e8{};
+std::uint8_t view_slot_table_00627e80[0x218u] = {};
+std::uint32_t entry_fe_flag_word_006280e0 = 0u;
+std::uint32_t entry_fe_flag_word_006280e4 = 0u;
+std::uint32_t frame_reset_word_006280e8 = 0u;
+std::uint32_t frame_reset_word_006280ec = 0u;
+std::uint32_t frame_reset_word_006280f0 = 0u;
+std::uint32_t frame_reset_word_006280f8 = 0u;
+std::uint32_t frame_reset_word_006280fc = 0u;
+std::uint32_t frame_reset_word_00628100 = 0u;
+std::uint32_t frame_service_root_00628960 = 0u;
+void* track_road_data_00628bc0 = nullptr;
+void* startup_network_00628c70 = nullptr;
+std::uint32_t global_005e99f4 = 0u;
+std::uint32_t fe_loop_word_00606850 = 0u;
+std::uint32_t global_00657430 = 0u;
+
+void* __cdecl application_context_heap_state_005e4fe8() {
+    return g_active_side->heap_state;
+}
+
+void* __cdecl startup_network_allocate_0059ef90(U bytes) {
+    void* const p = side_alloc_bytes(bytes);
+    log_event(kEvAlloc59ef90, bytes, side_rel_ptr(g_active_side, addr32(p)));
+    return p;
+}
+
+U __cdecl application_release_0059f050(void* address) {
+    log_event(kEvRelease59f050, side_rel_ptr(g_active_side, addr32(address)));
+    return 1u;
+}
+
+void* __cdecl application_context_member_storage_004211d0(U bytes, U mode) {
+    void* const p = side_alloc_bytes(bytes);
+    log_event(kEvStorage4211d0, bytes, mode, side_rel_ptr(g_active_side, addr32(p)));
+    return p;
+}
+
+void __cdecl application_context_clear_004237d0(void* address, U bytes, U value) {
+    log_event(kEvClear4237d0, side_rel_ptr(g_active_side, addr32(address)), bytes, value);
+}
+
+void* __fastcall context_empty_range_00505810(void* object, void* unused_edx, U) {
+    (void)unused_edx;
+    std::memset(object, 0, 12u);
+    const U raw = addr32(object);
+    const U rel = (raw >= addr32(g_active_side->arena) && raw < addr32(g_active_side->arena) + kArenaBytes)
+        ? side_rel_ptr(g_active_side, raw)
+        : 0x40000000u;
+    log_event(kEvEmpty505810, rel);
+    return object;
+}
+
+void __cdecl context_table_release_0059ecd0(void* block) {
+    log_event(kEvTableRel59ecd0, side_rel_ptr(g_active_side, addr32(block)));
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    log_event(kEvHeapEnter, side_rel_ptr(g_active_side, addr32(lock)));
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    log_event(kEvHeapLeave, side_rel_ptr(g_active_side, addr32(lock)));
+}
+
+void __cdecl view_route_counter_00465cf0(I index) {
+    log_event(kEvRouteCounter, static_cast<U>(index));
+}
+
+void __cdecl transform_vectors_00532a40(
+    I count, const float* input_vec3, const void* matrix_3x3, float* output_vec3) {
+    const float* const m = static_cast<const float*>(matrix_3x3);
+    for (I i = 0; i < count; ++i) {
+        const float x = input_vec3[i * 3 + 0];
+        const float y = input_vec3[i * 3 + 1];
+        const float z = input_vec3[i * 3 + 2];
+        output_vec3[i * 3 + 0] = x * m[0] + y * m[3] + z * m[6];
+        output_vec3[i * 3 + 1] = x * m[1] + y * m[4] + z * m[7];
+        output_vec3[i * 3 + 2] = x * m[2] + y * m[5] + z * m[8];
+    }
+    log_event(kEvTransformVec, static_cast<U>(count),
+        f32_bits(output_vec3[0]), f32_bits(output_vec3[1]), f32_bits(output_vec3[2]));
+}
+
+} // namespace porsche
+
+// ---------------------------------------------------------------------------
+// Native side global storage + x86 ABI adapters
+// ---------------------------------------------------------------------------
+static B g_nat_view_slot_table[0x218u];
+static U g_nat_reset_6280e0[9]; // 006280e0 .. 00628100
+static porsche::ViewModeCameraPreset005cf610 g_nat_presets_5cf610[21];
+static U g_nat_heap_state_ptr = 0u;
+static U g_nat_frame_service_root = 0u;
+static U g_nat_sector_query_count = 0u;
+static U g_nat_sector_cache_hits = 0u;
+static U g_nat_track_road_data = 0u;
+static float g_nat_quadtree_sizes[16];
+static float g_nat_quadtree_offset = 0.0f;
+static U g_nat_startup_network = 0u;
+static U g_nat_global_5e99f4 = 0u;
+static U g_nat_fe_loop_606850 = 0u;
+static U g_nat_global_657430 = 0u;
+static B g_nat_app_state[0x3e24u];
+
+static const float g_f05 = 0.5f;
+static const float g_f00 = 0.0f;
+static const float g_f15 = 15.0f;
+static const float g_f025 = 0.25f;
+static const float g_f10 = 1.0f;
+static const float g_f20 = 2.0f;
+static const float g_f30 = 3.0f;
+
+__declspec(naked) static void native_ftol_005a0f98() {
+    __asm {
+        push ebp
+        mov ebp, esp
+        add esp, -0xc
+        wait
+        fnstcw word ptr [ebp - 2]
+        wait
+        mov ax, word ptr [ebp - 2]
+        or ah, 0xc
+        mov word ptr [ebp - 4], ax
+        fldcw word ptr [ebp - 4]
+        fistp qword ptr [ebp - 0xc]
+        fldcw word ptr [ebp - 2]
+        mov eax, dword ptr [ebp - 0xc]
+        mov edx, dword ptr [ebp - 8]
+        leave
+        ret
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Controlled fake surface object (shared vtable layout for C++ and native x86)
+// ---------------------------------------------------------------------------
+struct FakeSurface {
+    void** vtable;      // +0x00
+    U pad04;            // +0x04
+    std::uint16_t tag8; // +0x08
+    std::uint16_t flags;// +0x0a
+    U id;               // +0x0c (test id)
+    float center[3];    // +0x10
+    float normal[3];    // +0x1c
+    float verts[4][3];  // +0x28
+    I vcount;           // +0x58
+    B contains_ret;     // +0x5c
+    float hit_bounds[4];// +0x60: minx, maxx, minz, maxz (optional dynamic contains)
+    bool use_box;
+};
+
+static void __fastcall surf_get_center(FakeSurface* s, void*, float* out_vec3) {
+    out_vec3[0] = s->center[0];
+    out_vec3[1] = s->center[1];
+    out_vec3[2] = s->center[2];
+    log_event(kEvSurfCenter, s->id);
+}
+
+static B __fastcall surf_contains(FakeSurface* s, void*, const float* pos) {
+    B ret = s->contains_ret;
+    if (s->use_box) {
+        ret = (s->hit_bounds[0] <= pos[0] && pos[0] <= s->hit_bounds[1] &&
+               s->hit_bounds[2] <= pos[2] && pos[2] <= s->hit_bounds[3]) ? 1u : 0u;
+    }
+    log_event(kEvSurfContains, s->id, ret);
+    return ret;
+}
+
+static void __fastcall surf_get_normal(FakeSurface* s, void*, float* out_vec3) {
+    out_vec3[0] = s->normal[0];
+    out_vec3[1] = s->normal[1];
+    out_vec3[2] = s->normal[2];
+    log_event(kEvSurfNormal, s->id);
+}
+
+static const float* __fastcall surf_get_vertex(FakeSurface* s, void*, I idx) {
+    log_event(kEvSurfVertex, s->id, static_cast<U>(idx));
+    return s->verts[idx];
+}
+
+static I __fastcall surf_vertex_count(FakeSurface* s, void*) {
+    log_event(kEvSurfVCount, s->id);
+    return s->vcount;
+}
+
+static void* g_surface_vtable[9] = {
+    nullptr,
+    reinterpret_cast<void*>(&surf_get_center),
+    nullptr,
+    reinterpret_cast<void*>(&surf_contains),
+    nullptr,
+    reinterpret_cast<void*>(&surf_get_normal),
+    reinterpret_cast<void*>(&surf_get_vertex),
+    nullptr,
+    reinterpret_cast<void*>(&surf_vertex_count),
+};
+
+// ---------------------------------------------------------------------------
+// Native executable copies of the 17 original Porsche.exe function bodies
+// ---------------------------------------------------------------------------
+static const B kBody0042bcb0[17] = { @BODY_0042BCB0@ };
+static const B kBody00461370[531] = { @BODY_00461370@ };
+static const B kBody004618b0[378] = { @BODY_004618B0@ };
+static const B kBody00463260[419] = { @BODY_00463260@ };
+static const B kBody00465790[592] = { @BODY_00465790@ };
+static const B kBody0046db70[37] = { @BODY_0046DB70@ };
+static const B kBody00473240[239] = { @BODY_00473240@ };
+static const B kBody00473420[553] = { @BODY_00473420@ };
+static const B kBody00474060[108] = { @BODY_00474060@ };
+static const B kBody004816f0[162] = { @BODY_004816F0@ };
+static const B kBody004817d0[319] = { @BODY_004817D0@ };
+static const B kBody00484450[163] = { @BODY_00484450@ };
+static const B kBody00484500[296] = { @BODY_00484500@ };
+static const B kBody00484630[640] = { @BODY_00484630@ };
+static const B kBody0048a060[54] = { @BODY_0048A060@ };
+static const B kBody00532910[19] = { @BODY_00532910@ };
+static const B kBody0056e8d1[36] = { @BODY_0056E8D1@ };
+
+static B* g_nat_0042bcb0 = nullptr;
+static B* g_nat_00461370 = nullptr;
+static B* g_nat_004618b0 = nullptr;
+static B* g_nat_00463260 = nullptr;
+static B* g_nat_00465790 = nullptr;
+static B* g_nat_0046db70 = nullptr;
+static B* g_nat_00473240 = nullptr;
+static B* g_nat_00473420 = nullptr;
+static B* g_nat_00474060 = nullptr;
+static B* g_nat_004816f0 = nullptr;
+static B* g_nat_004817d0 = nullptr;
+static B* g_nat_00484450 = nullptr;
+static B* g_nat_00484500 = nullptr;
+static B* g_nat_00484630 = nullptr;
+static B* g_nat_0048a060 = nullptr;
+static B* g_nat_00532910 = nullptr;
+static B* g_nat_0056e8d1 = nullptr;
+
+static B* alloc_exec(const B* src, U size) {
+    B* const buf = static_cast<B*>(
+        VirtualAlloc(nullptr, size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(buf != nullptr, "virtual_alloc");
+    std::memcpy(buf, src, size);
+    return buf;
+}
+
+static void patch_call(B* code, U rel_off, const void* target) {
+    const I disp = static_cast<I>(addr32(target)) - static_cast<I>(addr32(code) + rel_off + 4u);
+    std::memcpy(code + rel_off, &disp, 4u);
+}
+
+static void patch_abs(B* code, U abs_off, U val) {
+    std::memcpy(code + abs_off, &val, 4u);
+}
+
+static void patch_slot_va(B* code, U abs_off, U orig_va) {
+    require(orig_va >= 0x00627e80u && orig_va < 0x00628098u, "slot_va_range");
+    patch_abs(code, abs_off, addr32(g_nat_view_slot_table) + (orig_va - 0x00627e80u));
+}
+
+static void patch_reset_va(B* code, U abs_off, U orig_va) {
+    require(orig_va >= 0x006280e0u && orig_va <= 0x00628100u, "reset_va_range");
+    patch_abs(code, abs_off, addr32(g_nat_reset_6280e0) + (orig_va - 0x006280e0u));
+}
+
+static void init_native_bodies() {
+    g_nat_0042bcb0 = alloc_exec(kBody0042bcb0, sizeof(kBody0042bcb0));
+    g_nat_00461370 = alloc_exec(kBody00461370, sizeof(kBody00461370));
+    g_nat_004618b0 = alloc_exec(kBody004618b0, sizeof(kBody004618b0));
+    g_nat_00463260 = alloc_exec(kBody00463260, sizeof(kBody00463260));
+    g_nat_00465790 = alloc_exec(kBody00465790, sizeof(kBody00465790));
+    g_nat_0046db70 = alloc_exec(kBody0046db70, sizeof(kBody0046db70));
+    g_nat_00473240 = alloc_exec(kBody00473240, sizeof(kBody00473240));
+    g_nat_00473420 = alloc_exec(kBody00473420, sizeof(kBody00473420));
+    g_nat_00474060 = alloc_exec(kBody00474060, sizeof(kBody00474060));
+    g_nat_004816f0 = alloc_exec(kBody004816f0, sizeof(kBody004816f0));
+    g_nat_004817d0 = alloc_exec(kBody004817d0, sizeof(kBody004817d0));
+    g_nat_00484450 = alloc_exec(kBody00484450, sizeof(kBody00484450));
+    g_nat_00484500 = alloc_exec(kBody00484500, sizeof(kBody00484500));
+    g_nat_00484630 = alloc_exec(kBody00484630, sizeof(kBody00484630));
+    g_nat_0048a060 = alloc_exec(kBody0048a060, sizeof(kBody0048a060));
+    g_nat_00532910 = alloc_exec(kBody00532910, sizeof(kBody00532910));
+    g_nat_0056e8d1 = alloc_exec(kBody0056e8d1, sizeof(kBody0056e8d1));
+
+    // 00461370 relocs + calls
+    patch_slot_va(g_nat_00461370, 0x45u, 0x00627e80u);
+    patch_slot_va(g_nat_00461370, 0x4bu, 0x00627f5cu);
+    patch_abs(g_nat_00461370, 0xa5u, addr32(&g_f10));
+    patch_slot_va(g_nat_00461370, 0xf4u, 0x00627e80u);
+    patch_abs(g_nat_00461370, 0x100u, addr32(&g_f20));
+    patch_abs(g_nat_00461370, 0x117u, addr32(&g_f20));
+    patch_abs(g_nat_00461370, 0x14fu, addr32(&g_f10));
+    patch_abs(g_nat_00461370, 0x167u, addr32(&g_f10));
+    patch_abs(g_nat_00461370, 0x16du, addr32(&g_f10));
+    patch_abs(g_nat_00461370, 0x17cu, addr32(&g_f10));
+    patch_abs(g_nat_00461370, 0x1b5u, addr32(&g_nat_heap_state_ptr));
+    patch_call(g_nat_00461370, 0x66u, g_nat_00473420);
+    patch_call(g_nat_00461370, 0x147u, g_nat_0048a060);
+    patch_call(g_nat_00461370, 0x1cdu, reinterpret_cast<const void*>(&porsche::context_table_release_0059ecd0));
+    patch_call(g_nat_00461370, 0x1dau, reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    patch_call(g_nat_00461370, 0x1f3u, reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+    patch_call(g_nat_00461370, 0x200u, reinterpret_cast<const void*>(&porsche::application_release_0059f050));
+
+    // 004618b0 relocs + calls
+    patch_slot_va(g_nat_004618b0, 0x1au, 0x00627f3cu);
+    patch_abs(g_nat_004618b0, 0x23u, addr32(g_nat_presets_5cf610));
+    patch_slot_va(g_nat_004618b0, 0x3bu, 0x00627e80u);
+    patch_slot_va(g_nat_004618b0, 0x68u, 0x00627e80u);
+    patch_slot_va(g_nat_004618b0, 0x84u, 0x00627ea4u);
+    patch_slot_va(g_nat_004618b0, 0xb6u, 0x00627e80u);
+    patch_slot_va(g_nat_004618b0, 0xc7u, 0x00627e88u);
+    patch_slot_va(g_nat_004618b0, 0xcfu, 0x00627e80u);
+    patch_slot_va(g_nat_004618b0, 0xe3u, 0x00627ea8u);
+    patch_slot_va(g_nat_004618b0, 0xe9u, 0x00627e80u);
+    patch_slot_va(g_nat_004618b0, 0xfdu, 0x00627eacu);
+    patch_slot_va(g_nat_004618b0, 0x10fu, 0x00627e80u);
+    patch_slot_va(g_nat_004618b0, 0x11eu, 0x00627efcu);
+    patch_slot_va(g_nat_004618b0, 0x129u, 0x00627f00u);
+    patch_slot_va(g_nat_004618b0, 0x134u, 0x00627f04u);
+    patch_slot_va(g_nat_004618b0, 0x13du, 0x00627f08u);
+    patch_slot_va(g_nat_004618b0, 0x146u, 0x00627f0cu);
+    patch_slot_va(g_nat_004618b0, 0x14fu, 0x00627f10u);
+    patch_slot_va(g_nat_004618b0, 0x15au, 0x00627f14u);
+    patch_slot_va(g_nat_004618b0, 0x165u, 0x00627f18u);
+    patch_slot_va(g_nat_004618b0, 0x170u, 0x00627f1cu);
+    patch_call(g_nat_004618b0, 0x54u, reinterpret_cast<const void*>(&porsche::transform_vectors_00532a40));
+    patch_call(g_nat_004618b0, 0x7au, g_nat_00461370);
+    patch_call(g_nat_004618b0, 0x8cu, g_nat_00461370);
+
+    // 00463260 relocs + calls
+    patch_abs(g_nat_00463260, 0x0du, addr32(&g_f10));
+    patch_slot_va(g_nat_00463260, 0x1cu, 0x00627f4cu);
+    patch_slot_va(g_nat_00463260, 0x22u, 0x00627e80u);
+    patch_abs(g_nat_00463260, 0x28u, addr32(&g_f15));
+    patch_abs(g_nat_00463260, 0x3bu, addr32(&g_nat_track_road_data));
+    patch_abs(g_nat_00463260, 0x57u, addr32(&g_nat_global_657430));
+    patch_abs(g_nat_00463260, 0x66u, addr32(&g_f00));
+    patch_abs(g_nat_00463260, 0x89u, addr32(&g_f00));
+    patch_abs(g_nat_00463260, 0xa0u, addr32(&g_nat_fe_loop_606850));
+    patch_abs(g_nat_00463260, 0xe9u, addr32(&g_nat_track_road_data));
+    patch_abs(g_nat_00463260, 0x107u, addr32(&g_nat_track_road_data));
+    patch_abs(g_nat_00463260, 0x118u, addr32(&g_nat_track_road_data));
+    patch_slot_va(g_nat_00463260, 0x11fu, 0x00627f5cu);
+    patch_slot_va(g_nat_00463260, 0x12bu, 0x00627ea4u);
+    patch_slot_va(g_nat_00463260, 0x14cu, 0x00627eb0u);
+    patch_abs(g_nat_00463260, 0x152u, addr32(&g_f00));
+    patch_slot_va(g_nat_00463260, 0x15fu, 0x00627eb0u);
+    patch_abs(g_nat_00463260, 0x167u, addr32(&g_f30));
+    patch_slot_va(g_nat_00463260, 0x16du, 0x00627ea8u);
+    patch_slot_va(g_nat_00463260, 0x175u, 0x00627ea8u);
+    patch_slot_va(g_nat_00463260, 0x17bu, 0x00627ee0u);
+    patch_slot_va(g_nat_00463260, 0x181u, 0x00627ee4u);
+    patch_slot_va(g_nat_00463260, 0x187u, 0x00627ee8u);
+    patch_slot_va(g_nat_00463260, 0x18du, 0x00627ea4u);
+    patch_slot_va(g_nat_00463260, 0x196u, 0x00627f5cu);
+    patch_call(g_nat_00463260, 0x2du, reinterpret_cast<const void*>(&native_ftol_005a0f98));
+    patch_call(g_nat_00463260, 0x52u, g_nat_00532910);
+    patch_call(g_nat_00463260, 0xf0u, g_nat_004816f0);
+    patch_call(g_nat_00463260, 0x112u, g_nat_004817d0);
+    patch_call(g_nat_00463260, 0x19bu, g_nat_00474060);
+
+    // 00465790 relocs + calls
+    patch_reset_va(g_nat_00465790, 0x12u, 0x006280f0u);
+    patch_reset_va(g_nat_00465790, 0x1cu, 0x006280ecu);
+    patch_reset_va(g_nat_00465790, 0x26u, 0x006280e8u);
+    patch_reset_va(g_nat_00465790, 0x33u, 0x00628100u);
+    patch_reset_va(g_nat_00465790, 0x40u, 0x006280fcu);
+    patch_reset_va(g_nat_00465790, 0x4au, 0x006280f8u);
+    patch_slot_va(g_nat_00465790, 0x55u, 0x00627f3cu);
+    patch_reset_va(g_nat_00465790, 0x5bu, 0x006280e0u);
+    patch_reset_va(g_nat_00465790, 0x65u, 0x006280e4u);
+    patch_slot_va(g_nat_00465790, 0x88u, 0x00627f3cu);
+    patch_abs(g_nat_00465790, 0x9au, addr32(g_nat_app_state) + (0x00658294u - 0x006573e8u));
+    patch_slot_va(g_nat_00465790, 0xa1u, 0x00627f3cu);
+    patch_slot_va(g_nat_00465790, 0xa8u, 0x00627f3cu);
+    patch_slot_va(g_nat_00465790, 0xbau, 0x00627f41u);
+    patch_slot_va(g_nat_00465790, 0xc6u, 0x00627ebcu);
+    patch_slot_va(g_nat_00465790, 0xccu, 0x00627ec0u);
+    patch_slot_va(g_nat_00465790, 0xd2u, 0x00627eb4u);
+    patch_slot_va(g_nat_00465790, 0xd8u, 0x00627eb8u);
+    patch_slot_va(g_nat_00465790, 0xdeu, 0x00627ef8u);
+    patch_slot_va(g_nat_00465790, 0xe4u, 0x00627ec4u);
+    patch_slot_va(g_nat_00465790, 0xeeu, 0x00627ec8u);
+    patch_slot_va(g_nat_00465790, 0xf8u, 0x00627ed8u);
+    patch_slot_va(g_nat_00465790, 0xfeu, 0x00627edcu);
+    patch_slot_va(g_nat_00465790, 0x108u, 0x00627eb0u);
+    patch_slot_va(g_nat_00465790, 0x112u, 0x00627ee0u);
+    patch_slot_va(g_nat_00465790, 0x118u, 0x00627ee4u);
+    patch_slot_va(g_nat_00465790, 0x11eu, 0x00627ee8u);
+    patch_slot_va(g_nat_00465790, 0x125u, 0x00627f46u);
+    patch_slot_va(g_nat_00465790, 0x12cu, 0x00627f48u);
+    patch_slot_va(g_nat_00465790, 0x132u, 0x00627f40u);
+    patch_slot_va(g_nat_00465790, 0x139u, 0x00627f3cu);
+    patch_abs(g_nat_00465790, 0x142u, addr32(g_nat_presets_5cf610));
+    patch_slot_va(g_nat_00465790, 0x15au, 0x00627f40u);
+    patch_slot_va(g_nat_00465790, 0x173u, 0x00627f40u);
+    patch_slot_va(g_nat_00465790, 0x18cu, 0x00627f40u);
+    patch_slot_va(g_nat_00465790, 0x1a5u, 0x00627f40u);
+    patch_slot_va(g_nat_00465790, 0x1beu, 0x00627f40u);
+    patch_slot_va(g_nat_00465790, 0x1d7u, 0x00627f40u);
+    patch_slot_va(g_nat_00465790, 0x1deu, 0x00627f3cu);
+    patch_slot_va(g_nat_00465790, 0x1e5u, 0x00627f43u);
+    patch_slot_va(g_nat_00465790, 0x1f8u, 0x00627f43u);
+    patch_slot_va(g_nat_00465790, 0x1ffu, 0x00627f3cu);
+    patch_abs(g_nat_00465790, 0x210u, addr32(&g_nat_startup_network));
+    patch_abs(g_nat_00465790, 0x23cu, addr32(&g_nat_global_5e99f4));
+    patch_call(g_nat_00465790, 0x76u, reinterpret_cast<const void*>(&porsche::view_route_counter_00465cf0));
+    patch_call(g_nat_00465790, 0xb1u, g_nat_00463260);
+    patch_call(g_nat_00465790, 0x22fu, g_nat_004618b0);
+    patch_call(g_nat_00465790, 0x245u, g_nat_004618b0);
+
+    // 00473240 relocs + calls
+    patch_abs(g_nat_00473240, 0x0au, addr32(&g_nat_sector_query_count));
+    patch_abs(g_nat_00473240, 0x1cu, addr32(&g_nat_sector_query_count));
+    patch_abs(g_nat_00473240, 0x45u, addr32(&g_nat_sector_cache_hits));
+    patch_abs(g_nat_00473240, 0x4du, addr32(&g_nat_frame_service_root));
+    patch_abs(g_nat_00473240, 0xa7u, addr32(&g_f00));
+    patch_call(g_nat_00473240, 0x31u, g_nat_00484450);
+    patch_call(g_nat_00473240, 0x58u, g_nat_00484500);
+
+    // 00473420 relocs + calls
+    patch_abs(g_nat_00473420, 0x44u, addr32(&g_nat_frame_service_root));
+    patch_abs(g_nat_00473420, 0x1ceu, addr32(&g_nat_heap_state_ptr));
+    patch_call(g_nat_00473420, 0x0au, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    patch_call(g_nat_00473420, 0x1fu, reinterpret_cast<const void*>(&porsche::context_empty_range_00505810));
+    patch_call(g_nat_00473420, 0x31u, reinterpret_cast<const void*>(&porsche::context_empty_range_00505810));
+    patch_call(g_nat_00473420, 0x50u, g_nat_00484630);
+    patch_call(g_nat_00473420, 0x114u, reinterpret_cast<const void*>(&porsche::application_context_member_storage_004211d0));
+    patch_call(g_nat_00473420, 0x128u, g_nat_0046db70);
+    patch_call(g_nat_00473420, 0x135u, g_nat_0042bcb0);
+    patch_call(g_nat_00473420, 0x148u, g_nat_0046db70);
+    patch_call(g_nat_00473420, 0x170u, reinterpret_cast<const void*>(&porsche::application_context_clear_004237d0));
+    patch_call(g_nat_00473420, 0x1e6u, reinterpret_cast<const void*>(&porsche::context_table_release_0059ecd0));
+    patch_call(g_nat_00473420, 0x1fdu, reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    patch_call(g_nat_00473420, 0x216u, reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+
+    // 00474060 calls
+    patch_call(g_nat_00474060, 0x28u, g_nat_00473240);
+
+    // 00484450 relocs
+    patch_abs(g_nat_00484450, 0x15u, addr32(g_nat_quadtree_sizes));
+    patch_abs(g_nat_00484450, 0x45u, addr32(&g_nat_quadtree_offset));
+    patch_abs(g_nat_00484450, 0x53u, addr32(&g_nat_quadtree_offset));
+
+    // 00484500 relocs
+    patch_abs(g_nat_00484500, 0x3bu, addr32(g_nat_quadtree_sizes));
+    patch_abs(g_nat_00484500, 0x63u, addr32(&g_f05));
+    patch_abs(g_nat_00484500, 0x71u, addr32(&g_nat_quadtree_offset));
+    patch_abs(g_nat_00484500, 0x7bu, addr32(&g_f05));
+    patch_abs(g_nat_00484500, 0x83u, addr32(&g_nat_quadtree_offset));
+    patch_abs(g_nat_00484500, 0x9cu, addr32(&g_f025));
+    patch_abs(g_nat_00484500, 0xf3u, addr32(&g_f05));
+
+    // 00484630 relocs + calls
+    patch_abs(g_nat_00484630, 0x48u, addr32(g_nat_quadtree_sizes));
+    patch_abs(g_nat_00484630, 0x5eu, addr32(&g_f05));
+    patch_abs(g_nat_00484630, 0x6au, addr32(&g_nat_quadtree_offset));
+    patch_abs(g_nat_00484630, 0x78u, addr32(&g_f05));
+    patch_abs(g_nat_00484630, 0x80u, addr32(&g_nat_quadtree_offset));
+    patch_abs(g_nat_00484630, 0x21bu, addr32(&g_nat_heap_state_ptr));
+    patch_call(g_nat_00484630, 0xbcu, g_nat_00484630);
+    patch_call(g_nat_00484630, 0xe1u, g_nat_00484630);
+    patch_call(g_nat_00484630, 0x11bu, g_nat_00484630);
+    patch_call(g_nat_00484630, 0x19du, reinterpret_cast<const void*>(&porsche::application_context_member_storage_004211d0));
+    patch_call(g_nat_00484630, 0x1b5u, g_nat_0042bcb0);
+    patch_call(g_nat_00484630, 0x1e9u, g_nat_0042bcb0);
+    patch_call(g_nat_00484630, 0x232u, reinterpret_cast<const void*>(&porsche::context_table_release_0059ecd0));
+    patch_call(g_nat_00484630, 0x23fu, reinterpret_cast<const void*>(&porsche::heap_enter_005322b0));
+    patch_call(g_nat_00484630, 0x25cu, reinterpret_cast<const void*>(&porsche::heap_leave_005322c0));
+
+    // 00532910 calls
+    patch_call(g_nat_00532910, 0x0bu, g_nat_0056e8d1);
+}
+
+static void compare_sides(const char* why) {
+    if (g_cpp_side.event_count != g_nat_side.event_count) {
+        std::printf("event_count cpp=%u nat=%u\n", g_cpp_side.event_count, g_nat_side.event_count);
+        for (U i = 0u; i < g_cpp_side.event_count || i < g_nat_side.event_count; ++i) {
+            const Event ce = (i < g_cpp_side.event_count) ? g_cpp_side.events[i] : Event{};
+            const Event ne = (i < g_nat_side.event_count) ? g_nat_side.events[i] : Event{};
+            if (!(ce.kind == ne.kind && ce.a == ne.a && ce.b == ne.b && ce.c == ne.c && ce.d == ne.d)) {
+                std::printf("  diff[%u] cpp=(%u,%x,%x,%x,%x) nat=(%u,%x,%x,%x,%x)\n",
+                    i, ce.kind, ce.a, ce.b, ce.c, ce.d, ne.kind, ne.a, ne.b, ne.c, ne.d);
+            }
+        }
+    }
+    require(g_cpp_side.event_count == g_nat_side.event_count, why);
+    for (U i = 0u; i < g_cpp_side.event_count; ++i) {
+        const Event& ce = g_cpp_side.events[i];
+        const Event& ne = g_nat_side.events[i];
+        if (!(ce.kind == ne.kind && ce.a == ne.a && ce.b == ne.b &&
+              ce.c == ne.c && ce.d == ne.d)) {
+            std::printf("ev[%u] cpp=(%u,%x,%x,%x,%x) nat=(%u,%x,%x,%x,%x)\n",
+                i, ce.kind, ce.a, ce.b, ce.c, ce.d, ne.kind, ne.a, ne.b, ne.c, ne.d);
+            require(false, why);
+        }
+    }
+    for (U i = 0u; i < 32u; ++i) {
+        const U cb = load32(g_cpp_side.heap_state, 0x34u + i * 4u);
+        const U nb = load32(g_nat_side.heap_state, 0x34u + i * 4u);
+        if (side_rel_ptr(&g_cpp_side, cb) != side_rel_ptr(&g_nat_side, nb)) {
+            std::printf("bucket[%u] cpp=%x nat=%x\n", i, side_rel_ptr(&g_cpp_side, cb), side_rel_ptr(&g_nat_side, nb));
+            require(false, why);
+        }
+    }
+}
+
+static void compare_f32(float a, float b, const char* why, float tol = 1e-5f) {
+    if (f32_bits(a) == f32_bits(b)) {
+        return;
+    }
+    const float diff = std::fabs(a - b);
+    require(diff <= tol, why);
+}
+
+// ---------------------------------------------------------------------------
+// Test environment builders (mirror identical structures into both sides)
+// ---------------------------------------------------------------------------
+struct QTNode {
+    U tag;        // +0x00
+    U nw;         // +0x04
+    U ne;         // +0x08
+    U sw;         // +0x0c
+    U se;         // +0x10
+    U entries;    // +0x14
+};
+
+struct Vec12 {
+    U begin;
+    U end;
+    U cap;
+};
+
+struct QTEntry {
+    B flag;
+    B pad[3];
+    U surf;
+};
+
+static U make_tag(U gx, U gz, U level) {
+    return (gx & 0x3fffu) | ((gz & 0x3fffu) << 14u) | ((level & 0xfu) << 28u);
+}
+
+static void reset_both_globals() {
+    side_reset(&g_cpp_side);
+    side_reset(&g_nat_side);
+
+    std::memset(porsche::view_slot_table_00627e80, 0, sizeof(porsche::view_slot_table_00627e80));
+    std::memset(g_nat_view_slot_table, 0, sizeof(g_nat_view_slot_table));
+    porsche::entry_fe_flag_word_006280e0 = 0x11111111u;
+    porsche::entry_fe_flag_word_006280e4 = 0x22222222u;
+    porsche::frame_reset_word_006280e8 = 0x33333333u;
+    porsche::frame_reset_word_006280ec = 0x44444444u;
+    porsche::frame_reset_word_006280f0 = 0x55555555u;
+    porsche::frame_reset_word_006280f8 = 0x66666666u;
+    porsche::frame_reset_word_006280fc = 0x77777777u;
+    porsche::frame_reset_word_00628100 = 0x88888888u;
+    for (U i = 0u; i < 9u; ++i) {
+        g_nat_reset_6280e0[i] = (i + 1u) * 0x11111111u;
+    }
+    std::memcpy(g_nat_presets_5cf610, porsche::view_mode_camera_presets_005cf610,
+        sizeof(g_nat_presets_5cf610));
+    g_nat_heap_state_ptr = addr32(g_nat_side.heap_state);
+
+    porsche::sector_query_count_006289ec = 0u;
+    porsche::sector_cache_hits_006289f0 = 0u;
+    g_nat_sector_query_count = 0u;
+    g_nat_sector_cache_hits = 0u;
+
+    std::memset(porsche::quadtree_cell_sizes_00628be8, 0, sizeof(porsche::quadtree_cell_sizes_00628be8));
+    std::memset(g_nat_quadtree_sizes, 0, sizeof(g_nat_quadtree_sizes));
+    porsche::quadtree_cell_sizes_00628be8[0] = 64.0f;
+    porsche::quadtree_cell_sizes_00628be8[1] = 32.0f;
+    porsche::quadtree_cell_sizes_00628be8[2] = 16.0f;
+    porsche::quadtree_origin_offset_00628c30 = 32.0f;
+    std::memcpy(g_nat_quadtree_sizes, porsche::quadtree_cell_sizes_00628be8, sizeof(g_nat_quadtree_sizes));
+    g_nat_quadtree_offset = 32.0f;
+
+    std::memset(porsche::application_state_006573e8.words_.data(), 0, porsche::application_state_bytes);
+    std::memset(g_nat_app_state, 0, sizeof(g_nat_app_state));
+    porsche::global_005e99f4 = 0u;
+    g_nat_global_5e99f4 = 0u;
+    porsche::fe_loop_word_00606850 = 0u;
+    g_nat_fe_loop_606850 = 0u;
+    porsche::global_00657430 = 0u;
+    g_nat_global_657430 = 0u;
+    porsche::startup_network_00628c70 = nullptr;
+    g_nat_startup_network = 0u;
+}
+
+static void run_leaf_math_cases() {
+    // 1. 0042bcb0
+    ++g_cases;
+    U src = 0xdeadbeefu, cdst = 0u, ndst = 0u;
+    porsche::assign_dword_if_nonnull_0042bcb0(nullptr, &src);
+    reinterpret_cast<void(__cdecl*)(U*, const U*)>(g_nat_0042bcb0)(nullptr, &src);
+    porsche::assign_dword_if_nonnull_0042bcb0(&cdst, &src);
+    reinterpret_cast<void(__cdecl*)(U*, const U*)>(g_nat_0042bcb0)(&ndst, &src);
+    require(cdst == ndst && cdst == src, "42bcb0");
+
+    // 2. 0046db70
+    ++g_cases;
+    const U arr[3] = {11u, 22u, 33u};
+    U cbuf[4]{}, nbuf[4]{};
+    U* const cret0 = porsche::copy_dword_range_0046db70(arr, arr + 1, nullptr);
+    U* const nret0 = reinterpret_cast<U*(__cdecl*)(const U*, const U*, U*)>(g_nat_0046db70)(arr, arr + 1, nullptr);
+    require(addr32(cret0) == 4u && addr32(nret0) == 4u, "46db70_null_ret");
+    U* const cret1 = porsche::copy_dword_range_0046db70(arr, arr + 3, cbuf);
+    U* const nret1 = reinterpret_cast<U*(__cdecl*)(const U*, const U*, U*)>(g_nat_0046db70)(arr, arr + 3, nbuf);
+    require((cret1 - cbuf) == 3 && (nret1 - nbuf) == 3 && std::memcmp(cbuf, nbuf, 12u) == 0, "46db70_copy");
+
+    // 3. 0056e8d1, 00532910, 0048a060
+    const float vecs[][3] = {
+        {1.5f, -2.25f, 3.75f},
+        {-4.0f, 0.5f, 2.0f},
+        {0.25f, 8.0f, -1.5f},
+        {10.0f, 2.0f, -5.0f},
+    };
+    for (U i = 0u; i < 4u; ++i) {
+        for (U j = 0u; j < 4u; ++j) {
+            ++g_cases;
+            const float cd = porsche::vec3_dot_00532910(vecs[i], vecs[j]);
+            const float nd = reinterpret_cast<float(__cdecl*)(const float*, const float*)>(g_nat_00532910)(vecs[i], vecs[j]);
+            compare_f32(cd, nd, "532910_dot");
+            const float cp = porsche::ray_plane_param_0048a060(vecs[i], vecs[j], vecs[(i + 1u) & 3u]);
+            const float np = reinterpret_cast<float(__cdecl*)(const float*, const float*, const float*)>(g_nat_0048a060)(vecs[i], vecs[j], vecs[(i + 1u) & 3u]);
+            compare_f32(cp, np, "48a060_plane");
+        }
+    }
+}
+
+static void run_quadtree_cases() {
+    reset_both_globals();
+    // Root: level 0 (sz=64), gx=0, gz=0 => x in [-32, 32], z in [-32, 32], center (0, 0).
+    // Children: level 1 (sz=32) at nw(0,1), ne(1,1), sw(0,0), se(1,0).
+    QTNode root{make_tag(0u, 0u, 0u), 0u, 0u, 0u, 0u, 0u};
+    QTNode c_nw{make_tag(0u, 1u, 1u), 0u, 0u, 0u, 0u, 0u};
+    QTNode c_ne{make_tag(1u, 1u, 1u), 0u, 0u, 0u, 0u, 0u};
+    QTNode c_sw{make_tag(0u, 0u, 1u), 0u, 0u, 0u, 0u, 0u};
+    QTNode c_se{make_tag(1u, 0u, 1u), 0u, 0u, 0u, 0u, 0u};
+    U dummy_entries = 1u;
+    c_nw.entries = addr32(&dummy_entries);
+    c_ne.entries = addr32(&dummy_entries);
+    c_sw.entries = addr32(&dummy_entries);
+    c_se.entries = addr32(&dummy_entries);
+    root.nw = addr32(&c_nw);
+    root.ne = addr32(&c_ne);
+    root.sw = addr32(&c_sw);
+    root.se = addr32(&c_se);
+
+    const float pts[][3] = {
+        {-10.0f, 0.0f, 10.0f},  // nw
+        {10.0f, 0.0f, 10.0f},   // ne
+        {-10.0f, 0.0f, -10.0f}, // sw
+        {10.0f, 0.0f, -10.0f},  // se
+        {-32.0f, 0.0f, 32.0f},  // exact root boundary
+        {32.0f, 0.0f, -32.0f},
+        {32.1f, 0.0f, 0.0f},    // outside x
+        {0.0f, 0.0f, 32.1f},    // outside z (catches < vs <= at z_min + sz)
+        {0.0f, 0.0f, -32.1f},
+    };
+    for (U i = 0u; i < sizeof(pts) / sizeof(pts[0]); ++i) {
+        ++g_cases;
+        const B cc = porsche::quadtree_node_contains_xz_00484450(&root, nullptr, pts[i]);
+        const B nc = reinterpret_cast<B(__fastcall*)(void*, void*, const float*)>(g_nat_00484450)(&root, nullptr, pts[i]);
+        require(cc == nc, "484450_contains");
+
+        void* const cl = porsche::quadtree_lookup_leaf_00484500(&root, nullptr, pts[i]);
+        void* const nl = reinterpret_cast<void*(__fastcall*)(void*, void*, const float*)>(g_nat_00484500)(&root, nullptr, pts[i]);
+        require(cl == nl, "484500_lookup");
+    }
+
+    // Also test null-child fallback and 00484630 vector growth (>1 element)
+    QTNode partial{make_tag(0u, 0u, 0u), 0u, 0u, addr32(&c_sw), 0u, 0u};
+    ++g_cases;
+    void* const cp = porsche::quadtree_lookup_leaf_00484500(&partial, nullptr, pts[1]);
+    void* const np = reinterpret_cast<void*(__fastcall*)(void*, void*, const float*)>(g_nat_00484500)(&partial, nullptr, pts[1]);
+    require(cp == &partial && np == &partial, "484500_null_child");
+
+    const float radii[] = {1.0f, 25.0f};
+    for (U r = 0u; r < 2u; ++r) {
+        ++g_cases;
+        reset_both_globals();
+        Vec12 cvec{}, nvec{};
+        g_active_side = &g_cpp_side;
+        porsche::quadtree_collect_leaves_00484630(&root, nullptr, pts[4], radii[r], &cvec);
+        g_active_side = &g_nat_side;
+        reinterpret_cast<void(__fastcall*)(void*, void*, const float*, float, void*)>(g_nat_00484630)(
+            &root, nullptr, pts[4], radii[r], &nvec);
+        const U ccnt = (cvec.end - cvec.begin) >> 2u;
+        const U ncnt = (nvec.end - nvec.begin) >> 2u;
+        require(ccnt == ncnt, "484630_count");
+        for (U k = 0u; k < ccnt; ++k) {
+            require(load32(reinterpret_cast<void*>(cvec.begin), k * 4u) ==
+                    load32(reinterpret_cast<void*>(nvec.begin), k * 4u), "484630_elem");
+        }
+        compare_sides("484630_side");
+    }
+}
+
+static void run_track_portal_cases() {
+    // 2 regions: region 0 = [0..9], region 1 = [10..19]
+    // portals at seg 9 (portal 0 -> forward branch to seg 10, region 1; backward branch dead-end)
+    // and seg 10 (portal 1 -> backward branch to seg 9, region 0).
+    struct Region40 { I min_s; I pad1; I pad2; I pad3; I max_s; I rest[5]; };
+    struct Branch16 { I next_seg; I next_reg; I pad; U dir_flag; };
+    struct Portal56 { U branches[8]; I bcount; U pad[5]; };
+
+    Region40 regions[2]{};
+    regions[0].min_s = 0; regions[0].max_s = 9;
+    regions[1].min_s = 10; regions[1].max_s = 19;
+    Vec12 reg_vec{addr32(regions), addr32(regions + 2), addr32(regions + 2)};
+
+    Branch16 b_fwd{10, 1, 0, 0u};
+    Branch16 b_back{9, 0, 0, 1u};
+    Branch16 b_dead{0, -1, 0, 1u};
+    Portal56 portals[2]{};
+    portals[0].branches[0] = addr32(&b_fwd);
+    portals[0].branches[1] = addr32(&b_back);
+    portals[0].bcount = 2;
+    portals[1].branches[0] = addr32(&b_back);
+    portals[1].branches[1] = addr32(&b_dead);
+    portals[1].bcount = 2;
+    Vec12 port_vec{addr32(portals), addr32(portals + 2), addr32(portals + 2)};
+
+    std::int8_t seg_portals[20];
+    std::memset(seg_portals, -1, sizeof(seg_portals));
+    seg_portals[9] = 0;
+    seg_portals[10] = 1;
+
+    U track_obj[8]{};
+    track_obj[0] = 20u; // total segs
+    track_obj[5] = addr32(seg_portals);
+    track_obj[6] = addr32(&reg_vec);
+    track_obj[7] = addr32(&port_vec);
+
+    struct QCase { I seg; I delta; I hint; } qcases[] = {
+        {5, 2, -1}, {8, 3, -1}, {11, -3, -1}, {1, -5, -1}, {18, 5, -1}, {8, 3, 0}, {10, -2, 1},
+    };
+    for (U i = 0u; i < sizeof(qcases) / sizeof(qcases[0]); ++i) {
+        ++g_cases;
+        void* const cp = porsche::track_portal_query_004816f0(track_obj, nullptr, qcases[i].seg, qcases[i].delta);
+        void* const np = reinterpret_cast<void*(__fastcall*)(void*, void*, I, I)>(g_nat_004816f0)(
+            track_obj, nullptr, qcases[i].seg, qcases[i].delta);
+        require(cp == np, "4816f0");
+
+        const std::int16_t cs = porsche::track_segment_advance_004817d0(
+            track_obj, nullptr, qcases[i].seg, qcases[i].delta, qcases[i].hint);
+        const std::int16_t ns = reinterpret_cast<std::int16_t(__fastcall*)(void*, void*, I, I, I)>(
+            g_nat_004817d0)(track_obj, nullptr, qcases[i].seg, qcases[i].delta, qcases[i].hint);
+        require(cs == ns, "4817d0");
+    }
+}
+
+static void setup_scene_and_car(
+    SideChannel* side, B* slot_table, U slot_idx,
+    FakeSurface* surfs, U surf_count,
+    bool many_leaves,
+    U* out_car_ptr, U* out_fs_root_ptr, U* out_road_ptr) {
+    g_active_side = side;
+
+    // 2 quadtree leaves: leaf0 in x<0, leaf1 in x>=0
+    QTEntry* const ents0 = static_cast<QTEntry*>(side_alloc_bytes(sizeof(QTEntry) * surf_count));
+    for (U i = 0u; i < surf_count; ++i) {
+        ents0[i].flag = (i == 2u) ? 0u : 1u;
+        ents0[i].surf = addr32(&surfs[i]);
+    }
+    auto* const vec0 = static_cast<Vec12*>(side_alloc_bytes(sizeof(Vec12)));
+    vec0->begin = addr32(ents0);
+    vec0->end = addr32(ents0 + surf_count);
+    vec0->cap = vec0->end;
+
+    QTNode* const qt_root = static_cast<QTNode*>(side_alloc_bytes(sizeof(QTNode)));
+    std::memset(qt_root, 0, sizeof(QTNode));
+    qt_root->tag = make_tag(0u, 0u, 0u);
+    QTNode* const leaf_sw = static_cast<QTNode*>(side_alloc_bytes(sizeof(QTNode)));
+    std::memset(leaf_sw, 0, sizeof(QTNode));
+    leaf_sw->tag = make_tag(0u, 0u, 1u);
+    leaf_sw->entries = addr32(vec0);
+    QTNode* const leaf_se = static_cast<QTNode*>(side_alloc_bytes(sizeof(QTNode)));
+    std::memset(leaf_se, 0, sizeof(QTNode));
+    leaf_se->tag = make_tag(1u, 0u, 1u);
+    leaf_se->entries = addr32(vec0);
+    QTNode* const leaf_nw = static_cast<QTNode*>(side_alloc_bytes(sizeof(QTNode)));
+    std::memset(leaf_nw, 0, sizeof(QTNode));
+    leaf_nw->tag = make_tag(0u, 1u, 1u);
+    leaf_nw->entries = addr32(vec0);
+    QTNode* const leaf_ne = static_cast<QTNode*>(side_alloc_bytes(sizeof(QTNode)));
+    std::memset(leaf_ne, 0, sizeof(QTNode));
+    leaf_ne->tag = make_tag(1u, 1u, 1u);
+    leaf_ne->entries = addr32(vec0);
+    qt_root->sw = addr32(leaf_sw);
+    qt_root->se = addr32(leaf_se);
+    qt_root->nw = addr32(leaf_nw);
+    qt_root->ne = addr32(leaf_ne);
+
+    if (many_leaves) {
+        // Expand nw into a chain so >1 leaf hits force vector growth
+        QTNode* const sub0 = static_cast<QTNode*>(side_alloc_bytes(sizeof(QTNode)));
+        std::memset(sub0, 0, sizeof(QTNode));
+        sub0->tag = make_tag(0u, 2u, 2u);
+        sub0->entries = addr32(vec0);
+        QTNode* const sub1 = static_cast<QTNode*>(side_alloc_bytes(sizeof(QTNode)));
+        std::memset(sub1, 0, sizeof(QTNode));
+        sub1->tag = make_tag(1u, 2u, 2u);
+        sub1->entries = addr32(vec0);
+        leaf_nw->sw = addr32(sub0);
+        leaf_nw->se = addr32(sub1);
+    }
+
+    U* const qt_holder = static_cast<U*>(side_alloc_bytes(8u));
+    qt_holder[0] = addr32(qt_root);
+    B* const fs_root = static_cast<B*>(side_alloc_bytes(0x30u));
+    store32(fs_root, 0x24u, addr32(qt_holder));
+    *out_fs_root_ptr = addr32(fs_root);
+
+    // Car object (~0xd70 bytes)
+    B* const car = static_cast<B*>(side_alloc_bytes(0xd80u));
+    std::memset(car, 0, 0xd80u);
+    const std::int16_t car_seg = 1;
+    std::memcpy(car + 8u, &car_seg, 2u);
+    const float car_pos[3] = {-5.0f, 10.0f, -5.0f};
+    std::memcpy(car + 0x330u, car_pos, 12u);
+    const float car_mat[9] = {
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f,
+    };
+    std::memcpy(car + 0x364u, car_mat, sizeof(car_mat));
+    const float car_fwd_dir[3] = {0.0f, 0.0f, 1.0f};
+    std::memcpy(car + 0x37cu, car_fwd_dir, 12u);
+    const float speed = 1.0f;
+    std::memcpy(car + 0xd60u, &speed, 4u);
+    *out_car_ptr = addr32(car);
+
+    B* const slot = slot_table + slot_idx * 0x10cu;
+    store32(slot, 0u, addr32(car));
+    const float init_cam[3] = {-4.0f, 10.5f, -4.0f};
+    std::memcpy(slot + 0x24u, init_cam, 12u);
+    const float f_bias = 0.25f;
+    std::memcpy(slot + 0xccu, &f_bias, 4u);
+    const B c0_init = 0x81u; // bit 0 & bit 7 set
+    slot[0xc0u] = c0_init;
+    slot[0xc3u] = 0xa7u;
+
+    // Road track data for 00463260
+    struct Region40 { I min_s; I p1; I p2; I p3; I max_s; I r[5]; };
+    struct Seg80 { U w[20]; };
+    Region40* const regs = static_cast<Region40*>(side_alloc_bytes(sizeof(Region40)));
+    std::memset(regs, 0, sizeof(Region40));
+    regs->min_s = 0; regs->max_s = 12;
+    Vec12* const rvec = static_cast<Vec12*>(side_alloc_bytes(sizeof(Vec12)));
+    rvec->begin = addr32(regs); rvec->end = addr32(regs + 1); rvec->cap = rvec->end;
+
+    Seg80* const segs = static_cast<Seg80*>(side_alloc_bytes(sizeof(Seg80) * 14u));
+    std::memset(segs, 0, sizeof(Seg80) * 14u);
+    for (U s = 0u; s < 14u; ++s) {
+        const float p[3] = {-5.0f + static_cast<float>(s) * 0.5f, 10.0f, -5.0f};
+        const float dir[3] = {0.0f, 0.0f, 1.0f};
+        std::memcpy(reinterpret_cast<B*>(&segs[s]) + 4u, p, 12u);
+        std::memcpy(reinterpret_cast<B*>(&segs[s]) + 0x1cu, dir, 12u);
+    }
+    B* const portals_idx = static_cast<B*>(side_alloc_bytes(16u));
+    std::memset(portals_idx, 0xff, 16u);
+    B* const road = static_cast<B*>(side_alloc_bytes(0x24u));
+    std::memset(road, 0, 0x24u);
+    store32(road, 0u, 14u);
+    store32(road, 0x0cu, addr32(segs));
+    store32(road, 0x14u, addr32(portals_idx));
+    store32(road, 0x18u, addr32(rvec));
+    *out_road_ptr = addr32(road);
+}
+
+static void compare_slot_tables(const char* why) {
+    for (U s = 0u; s < 2u; ++s) {
+        const U base = s * 0x10cu;
+        const B* const cb = porsche::view_slot_table_00627e80 + base;
+        const B* const nb = g_nat_view_slot_table + base;
+        require(side_rel_ptr(&g_cpp_side, load32(cb, 0u)) ==
+                side_rel_ptr(&g_nat_side, load32(nb, 0u)), why);
+        require(std::memcmp(cb + 4u, nb + 4u, 0x100u) == 0, why);
+        require(side_rel_ptr(&g_cpp_side, load32(cb, 0x104u)) ==
+                side_rel_ptr(&g_nat_side, load32(nb, 0x104u)), why);
+        require(side_rel_ptr(&g_cpp_side, load32(cb, 0x108u)) ==
+                side_rel_ptr(&g_nat_side, load32(nb, 0x108u)), why);
+    }
+}
+
+static void run_entry_fe_service_cases() {
+    FakeSurface surfs[4]{};
+    for (U i = 0u; i < 4u; ++i) {
+        surfs[i].vtable = g_surface_vtable;
+        surfs[i].id = i + 1u;
+        surfs[i].vcount = 2;
+        surfs[i].normal[0] = 0.0f; surfs[i].normal[1] = 1.0f; surfs[i].normal[2] = 0.0f;
+        surfs[i].verts[0][0] = -5.0f; surfs[i].verts[0][1] = 15.0f; surfs[i].verts[0][2] = -5.0f;
+        surfs[i].verts[1][0] = -4.0f; surfs[i].verts[1][1] = 15.0f; surfs[i].verts[1][2] = -4.0f;
+        surfs[i].contains_ret = 1u;
+    }
+    // surf 0: ground surface (low nibble != 0, bit 15 = 0)
+    surfs[0].flags = 0x0003u;
+    surfs[0].center[1] = 10.5f;
+    // surf 1: ceiling surface outside car_y +/- 2 (bit 15 = 1, low nibble = 0), y=13.5
+    surfs[1].flags = 0x8000u;
+    surfs[1].center[1] = 13.5f;
+    surfs[1].verts[0][1] = 13.2f;
+    surfs[1].verts[1][1] = 13.2f;
+    // surf 2: filtered out by rec.flag == 0
+    surfs[2].flags = 0x8000u;
+    surfs[2].center[1] = 14.0f;
+    // surf 3: ceiling inside [car_y - 2, car_y + 2] (filtered out by center check!)
+    surfs[3].flags = 0x8000u;
+    surfs[3].center[1] = 11.0f;
+
+    struct ServiceCase {
+        U slot_idx;
+        std::int16_t init_mode;
+        U second;
+        std::int16_t fallback_mode;
+        U net_mode; // 0=null, 1=bd0, 2=bd1, 3=bf1
+        U global_5e99f4;
+        U fe_loop;
+        U g_657430;
+        float speed;
+        float init_y_off;
+    } scases[] = {
+        {0u, 0, 1u, 0, 0u, 0u, 0u, 0u, 1.0f, 3.0f},
+        {0u, 3, 2u, 0, 0u, 0u, 0u, 0u, 1.0f, 3.0f},
+        {0u, 1, 11u, 0, 0u, 1u, 0u, 0u, 1.0f, 0.0f},
+        {1u, 8, 11u, 0, 1u, 2u, 0u, 1u, -2.0f, 2.5f},
+        {0u, 0, 25u, 13, 2u, 0u, 0x14u, 0u, 1.0f, 3.0f},
+        {0u, 0, 20u, 13, 2u, 0u, 0x14u, 0u, 1.0f, 3.0f},
+        {1u, 5, 30u, 8, 3u, 1u, 0u, 0u, 1.0f, 3.0f},
+        {0u, 9, 0u, 0, 0u, 2u, 0u, 0u, 1.0f, 3.0f},
+    };
+
+    for (U c = 0u; c < sizeof(scases) / sizeof(scases[0]); ++c) {
+        const auto& sc = scases[c];
+        ++g_cases;
+        reset_both_globals();
+
+        U c_car = 0u, c_fs = 0u, c_road = 0u;
+        setup_scene_and_car(&g_cpp_side, porsche::view_slot_table_00627e80,
+            sc.slot_idx, surfs, 4u, (c & 1u) != 0u, &c_car, &c_fs, &c_road);
+        U n_car = 0u, n_fs = 0u, n_road = 0u;
+        setup_scene_and_car(&g_nat_side, g_nat_view_slot_table,
+            sc.slot_idx, surfs, 4u, (c & 1u) != 0u, &n_car, &n_fs, &n_road);
+
+        porsche::frame_service_root_00628960 = c_fs;
+        g_nat_frame_service_root = n_fs;
+        porsche::track_road_data_00628bc0 = reinterpret_cast<void*>(c_road);
+        g_nat_track_road_data = n_road;
+
+        std::memcpy(reinterpret_cast<B*>(c_car) + 0xd60u, &sc.speed, 4u);
+        std::memcpy(reinterpret_cast<B*>(n_car) + 0xd60u, &sc.speed, 4u);
+
+        B* const c_slot = porsche::view_slot_table_00627e80 + sc.slot_idx * 0x10cu;
+        B* const n_slot = g_nat_view_slot_table + sc.slot_idx * 0x10cu;
+        std::memcpy(c_slot + 0xbcu, &sc.init_mode, 2u);
+        std::memcpy(n_slot + 0xbcu, &sc.init_mode, 2u);
+        std::memcpy(c_slot + 0x30u, &sc.init_y_off, 4u);
+        std::memcpy(n_slot + 0x30u, &sc.init_y_off, 4u);
+
+        const U fb_off = (0x00658294u - porsche::application_state_base_va) + sc.slot_idx * 0x580u;
+        std::memcpy(reinterpret_cast<B*>(porsche::application_state_006573e8.words_.data()) + fb_off, &sc.fallback_mode, 2u);
+        std::memcpy(g_nat_app_state + fb_off, &sc.fallback_mode, 2u);
+
+        porsche::global_005e99f4 = sc.global_5e99f4;
+        g_nat_global_5e99f4 = sc.global_5e99f4;
+        porsche::fe_loop_word_00606850 = sc.fe_loop;
+        g_nat_fe_loop_606850 = sc.fe_loop;
+        porsche::global_00657430 = sc.g_657430;
+        g_nat_global_657430 = sc.g_657430;
+
+        B net_buf[0xc8u]{};
+        if (sc.net_mode != 0u) {
+            store32(net_buf, 8u, 1u);
+            net_buf[0xbd] = (sc.net_mode == 2u) ? 1u : 0u;
+            net_buf[0xbf] = (sc.net_mode == 3u) ? 1u : 0u;
+            porsche::startup_network_00628c70 = net_buf;
+            g_nat_startup_network = addr32(net_buf);
+        }
+
+        g_active_side = &g_cpp_side;
+        porsche::entry_fe_service_00465790(sc.slot_idx, sc.second);
+
+        g_active_side = &g_nat_side;
+        reinterpret_cast<void(__cdecl*)(U, U)>(g_nat_00465790)(sc.slot_idx, sc.second);
+
+        compare_slot_tables("465790_slot_bytes");
+        require(porsche::entry_fe_flag_word_006280e0 == g_nat_reset_6280e0[0] &&
+                porsche::entry_fe_flag_word_006280e4 == g_nat_reset_6280e0[1] &&
+                porsche::frame_reset_word_006280e8 == g_nat_reset_6280e0[2] &&
+                porsche::frame_reset_word_006280ec == g_nat_reset_6280e0[3] &&
+                porsche::frame_reset_word_006280f0 == g_nat_reset_6280e0[4] &&
+                porsche::frame_reset_word_006280f8 == g_nat_reset_6280e0[6] &&
+                porsche::frame_reset_word_006280fc == g_nat_reset_6280e0[7] &&
+                porsche::frame_reset_word_00628100 == g_nat_reset_6280e0[8], "465790_resets");
+        require(porsche::sector_query_count_006289ec == g_nat_sector_query_count &&
+                porsche::sector_cache_hits_006289f0 == g_nat_sector_cache_hits, "465790_counters");
+        compare_sides("465790_events");
+    }
+
+    // Extra direct test of 00463260 limit=8 clamp & 00474060 cached reuse vs miss & 00461370 clamp=1.0
+    ++g_cases;
+    reset_both_globals();
+    U c_car = 0u, c_fs = 0u, c_road = 0u;
+    setup_scene_and_car(&g_cpp_side, porsche::view_slot_table_00627e80,
+        0u, surfs, 4u, false, &c_car, &c_fs, &c_road);
+    U n_car = 0u, n_fs = 0u, n_road = 0u;
+    setup_scene_and_car(&g_nat_side, g_nat_view_slot_table,
+        0u, surfs, 4u, false, &n_car, &n_fs, &n_road);
+    porsche::frame_service_root_00628960 = c_fs;
+    g_nat_frame_service_root = n_fs;
+    porsche::track_road_data_00628bc0 = reinterpret_cast<void*>(c_road);
+    g_nat_track_road_data = n_road;
+
+    // 0xcc = 0.0 -> (1.0 - 0.0)*15 = 15 -> +1 = 16 -> clamped to 8
+    const float zero_f = 0.0f;
+    std::memcpy(porsche::view_slot_table_00627e80 + 0xccu, &zero_f, 4u);
+    std::memcpy(g_nat_view_slot_table + 0xccu, &zero_f, 4u);
+    g_active_side = &g_cpp_side;
+    porsche::view_route_select_00463260(0);
+    // Call 00474060 again with reuse_cached = 1 (cache hit!) and reuse_cached = 0 (re-query!)
+    porsche::sector_track_step_00474060(
+        porsche::view_slot_table_00627e80 + 0xdcu, nullptr,
+        reinterpret_cast<const float*>(porsche::view_slot_table_00627e80 + 0x24u), 1u);
+    porsche::sector_track_step_00474060(
+        porsche::view_slot_table_00627e80 + 0xdcu, nullptr,
+        reinterpret_cast<const float*>(porsche::view_slot_table_00627e80 + 0x24u), 0u);
+
+    g_active_side = &g_nat_side;
+    reinterpret_cast<void(__cdecl*)(I)>(g_nat_00463260)(0);
+    reinterpret_cast<void(__fastcall*)(void*, void*, const float*, B)>(g_nat_00474060)(
+        g_nat_view_slot_table + 0xdcu, nullptr,
+        reinterpret_cast<const float*>(g_nat_view_slot_table + 0x24u), 1u);
+    reinterpret_cast<void(__fastcall*)(void*, void*, const float*, B)>(g_nat_00474060)(
+        g_nat_view_slot_table + 0xdcu, nullptr,
+        reinterpret_cast<const float*>(g_nat_view_slot_table + 0x24u), 0u);
+
+    compare_slot_tables("463260_clamp8");
+    require(porsche::sector_query_count_006289ec == g_nat_sector_query_count &&
+            porsche::sector_cache_hits_006289f0 == g_nat_sector_cache_hits, "474060_cache_hits");
+    compare_sides("463260_474060_events");
+}
+
+int main() {
+    init_native_bodies();
+    run_leaf_math_cases();
+    run_quadtree_cases();
+    run_track_portal_cases();
+    run_entry_fe_service_cases();
+    std::printf("entry_fe_service_835_original_x86_vs_cpp=PASS cases=%u\n", g_cases);
+    return 0;
+}

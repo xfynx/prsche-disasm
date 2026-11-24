@@ -1,0 +1,389 @@
+{
+  "005a36d6": {
+    "status": "absent from indexed function records; exact raw body bounded from PE and independently decoded",
+    "start_va": "005a36d6",
+    "end_va_exclusive": "005a36ea",
+    "last_byte_va": "005a36e9",
+    "raw_bytes": 20,
+    "raw_sha256": "2df176d038b075fa548f8a800fb0250d6b64888b238d93327df62b6ef124d061",
+    "raw_hex": "e822400000803de0fc6a00007405e9df660000c3",
+    "section": "PE .text",
+    "note": "CRT onexit shutdown static callback called by exit_shutdown_execute_005a2490 (005a2490): flushes all stdio streams via 005a76fd, checks exit_shutdown_mode_word_006afce0 low byte, and tail-calls 005a9dc8 (_fcloseall) when nonzero.",
+    "instructions": [
+      {
+        "va": "005a36d6",
+        "bytes": "e822400000",
+        "mnemonic": "call",
+        "operands": "0x5a76fd"
+      },
+      {
+        "va": "005a36db",
+        "bytes": "803de0fc6a0000",
+        "mnemonic": "cmp",
+        "operands": "byte ptr [0x6afce0], 0"
+      },
+      {
+        "va": "005a36e2",
+        "bytes": "7405",
+        "mnemonic": "je",
+        "operands": "0x5a36e9"
+      },
+      {
+        "va": "005a36e4",
+        "bytes": "e9df660000",
+        "mnemonic": "jmp",
+        "operands": "0x5a9dc8"
+      },
+      {
+        "va": "005a36e9",
+        "bytes": "c3",
+        "mnemonic": "ret",
+        "operands": ""
+      }
+    ]
+  },
+  "005a76fd": {
+    "status": "absent from indexed function records; exact raw body bounded from PE and independently decoded",
+    "start_va": "005a76fd",
+    "end_va_exclusive": "005a7706",
+    "last_byte_va": "005a7705",
+    "raw_bytes": 9,
+    "raw_sha256": "7727cf1cb5a5144037ec6202bde31bb3f9b026e35b009c17c76e42132ed915b7",
+    "raw_hex": "6a01e80200000059c3",
+    "section": "PE .text",
+    "note": "CRT _flushall wrapper called by 005a36d6: calls __flsall(1) at 005a7706.",
+    "instructions": [
+      {
+        "va": "005a76fd",
+        "bytes": "6a01",
+        "mnemonic": "push",
+        "operands": "1"
+      },
+      {
+        "va": "005a76ff",
+        "bytes": "e802000000",
+        "mnemonic": "call",
+        "operands": "0x5a7706"
+      },
+      {
+        "va": "005a7704",
+        "bytes": "59",
+        "mnemonic": "pop",
+        "operands": "ecx"
+      },
+      {
+        "va": "005a7705",
+        "bytes": "c3",
+        "mnemonic": "ret",
+        "operands": ""
+      }
+    ]
+  },
+  "005a9dc8": {
+    "status": "absent from indexed function records; exact raw body bounded from PE and independently decoded",
+    "start_va": "005a9dc8",
+    "end_va_exclusive": "005a9e49",
+    "last_byte_va": "005a9e48",
+    "raw_bytes": 129,
+    "raw_sha256": "432c16f5563056f6dfe5062e45f06096927b105c5e2939c33e891ba125d2bf37",
+    "raw_hex": "53576a0233dbe8d1adffff596a035f393d20156c007e5d56a108056c008bf7c1e6028b040685c07441f6400c83740d50e82782ffff83f8ff5974014383ff147c29a108056c008b040683c02050ff1568205b00a108056c00ff3406e8759dffffa108056c005983240600473b3d20156c007ca55e6a02e8c2adffff598bc35f5bc3",
+    "section": "PE .text",
+    "note": "CRT _fcloseall tail-called by 005a36d6: locks CRT lock 2, iterates __piob[3.._nstream-1], calls fclose (005a2024) on open streams, and deletes critical section + frees + zeroes entries >= 20.",
+    "instructions": [
+      {
+        "va": "005a9dc8",
+        "bytes": "53",
+        "mnemonic": "push",
+        "operands": "ebx"
+      },
+      {
+        "va": "005a9dc9",
+        "bytes": "57",
+        "mnemonic": "push",
+        "operands": "edi"
+      },
+      {
+        "va": "005a9dca",
+        "bytes": "6a02",
+        "mnemonic": "push",
+        "operands": "2"
+      },
+      {
+        "va": "005a9dcc",
+        "bytes": "33db",
+        "mnemonic": "xor",
+        "operands": "ebx, ebx"
+      },
+      {
+        "va": "005a9dce",
+        "bytes": "e8d1adffff",
+        "mnemonic": "call",
+        "operands": "0x5a4ba4"
+      },
+      {
+        "va": "005a9dd3",
+        "bytes": "59",
+        "mnemonic": "pop",
+        "operands": "ecx"
+      },
+      {
+        "va": "005a9dd4",
+        "bytes": "6a03",
+        "mnemonic": "push",
+        "operands": "3"
+      },
+      {
+        "va": "005a9dd6",
+        "bytes": "5f",
+        "mnemonic": "pop",
+        "operands": "edi"
+      },
+      {
+        "va": "005a9dd7",
+        "bytes": "393d20156c00",
+        "mnemonic": "cmp",
+        "operands": "dword ptr [0x6c1520], edi"
+      },
+      {
+        "va": "005a9ddd",
+        "bytes": "7e5d",
+        "mnemonic": "jle",
+        "operands": "0x5a9e3c"
+      },
+      {
+        "va": "005a9ddf",
+        "bytes": "56",
+        "mnemonic": "push",
+        "operands": "esi"
+      },
+      {
+        "va": "005a9de0",
+        "bytes": "a108056c00",
+        "mnemonic": "mov",
+        "operands": "eax, dword ptr [0x6c0508]"
+      },
+      {
+        "va": "005a9de5",
+        "bytes": "8bf7",
+        "mnemonic": "mov",
+        "operands": "esi, edi"
+      },
+      {
+        "va": "005a9de7",
+        "bytes": "c1e602",
+        "mnemonic": "shl",
+        "operands": "esi, 2"
+      },
+      {
+        "va": "005a9dea",
+        "bytes": "8b0406",
+        "mnemonic": "mov",
+        "operands": "eax, dword ptr [esi + eax]"
+      },
+      {
+        "va": "005a9ded",
+        "bytes": "85c0",
+        "mnemonic": "test",
+        "operands": "eax, eax"
+      },
+      {
+        "va": "005a9def",
+        "bytes": "7441",
+        "mnemonic": "je",
+        "operands": "0x5a9e32"
+      },
+      {
+        "va": "005a9df1",
+        "bytes": "f6400c83",
+        "mnemonic": "test",
+        "operands": "byte ptr [eax + 0xc], 0x83"
+      },
+      {
+        "va": "005a9df5",
+        "bytes": "740d",
+        "mnemonic": "je",
+        "operands": "0x5a9e04"
+      },
+      {
+        "va": "005a9df7",
+        "bytes": "50",
+        "mnemonic": "push",
+        "operands": "eax"
+      },
+      {
+        "va": "005a9df8",
+        "bytes": "e82782ffff",
+        "mnemonic": "call",
+        "operands": "0x5a2024"
+      },
+      {
+        "va": "005a9dfd",
+        "bytes": "83f8ff",
+        "mnemonic": "cmp",
+        "operands": "eax, -1"
+      },
+      {
+        "va": "005a9e00",
+        "bytes": "59",
+        "mnemonic": "pop",
+        "operands": "ecx"
+      },
+      {
+        "va": "005a9e01",
+        "bytes": "7401",
+        "mnemonic": "je",
+        "operands": "0x5a9e04"
+      },
+      {
+        "va": "005a9e03",
+        "bytes": "43",
+        "mnemonic": "inc",
+        "operands": "ebx"
+      },
+      {
+        "va": "005a9e04",
+        "bytes": "83ff14",
+        "mnemonic": "cmp",
+        "operands": "edi, 0x14"
+      },
+      {
+        "va": "005a9e07",
+        "bytes": "7c29",
+        "mnemonic": "jl",
+        "operands": "0x5a9e32"
+      },
+      {
+        "va": "005a9e09",
+        "bytes": "a108056c00",
+        "mnemonic": "mov",
+        "operands": "eax, dword ptr [0x6c0508]"
+      },
+      {
+        "va": "005a9e0e",
+        "bytes": "8b0406",
+        "mnemonic": "mov",
+        "operands": "eax, dword ptr [esi + eax]"
+      },
+      {
+        "va": "005a9e11",
+        "bytes": "83c020",
+        "mnemonic": "add",
+        "operands": "eax, 0x20"
+      },
+      {
+        "va": "005a9e14",
+        "bytes": "50",
+        "mnemonic": "push",
+        "operands": "eax"
+      },
+      {
+        "va": "005a9e15",
+        "bytes": "ff1568205b00",
+        "mnemonic": "call",
+        "operands": "dword ptr [0x5b2068]"
+      },
+      {
+        "va": "005a9e1b",
+        "bytes": "a108056c00",
+        "mnemonic": "mov",
+        "operands": "eax, dword ptr [0x6c0508]"
+      },
+      {
+        "va": "005a9e20",
+        "bytes": "ff3406",
+        "mnemonic": "push",
+        "operands": "dword ptr [esi + eax]"
+      },
+      {
+        "va": "005a9e23",
+        "bytes": "e8759dffff",
+        "mnemonic": "call",
+        "operands": "0x5a3b9d"
+      },
+      {
+        "va": "005a9e28",
+        "bytes": "a108056c00",
+        "mnemonic": "mov",
+        "operands": "eax, dword ptr [0x6c0508]"
+      },
+      {
+        "va": "005a9e2d",
+        "bytes": "59",
+        "mnemonic": "pop",
+        "operands": "ecx"
+      },
+      {
+        "va": "005a9e2e",
+        "bytes": "83240600",
+        "mnemonic": "and",
+        "operands": "dword ptr [esi + eax], 0"
+      },
+      {
+        "va": "005a9e32",
+        "bytes": "47",
+        "mnemonic": "inc",
+        "operands": "edi"
+      },
+      {
+        "va": "005a9e33",
+        "bytes": "3b3d20156c00",
+        "mnemonic": "cmp",
+        "operands": "edi, dword ptr [0x6c1520]"
+      },
+      {
+        "va": "005a9e39",
+        "bytes": "7ca5",
+        "mnemonic": "jl",
+        "operands": "0x5a9de0"
+      },
+      {
+        "va": "005a9e3b",
+        "bytes": "5e",
+        "mnemonic": "pop",
+        "operands": "esi"
+      },
+      {
+        "va": "005a9e3c",
+        "bytes": "6a02",
+        "mnemonic": "push",
+        "operands": "2"
+      },
+      {
+        "va": "005a9e3e",
+        "bytes": "e8c2adffff",
+        "mnemonic": "call",
+        "operands": "0x5a4c05"
+      },
+      {
+        "va": "005a9e43",
+        "bytes": "59",
+        "mnemonic": "pop",
+        "operands": "ecx"
+      },
+      {
+        "va": "005a9e44",
+        "bytes": "8bc3",
+        "mnemonic": "mov",
+        "operands": "eax, ebx"
+      },
+      {
+        "va": "005a9e46",
+        "bytes": "5f",
+        "mnemonic": "pop",
+        "operands": "edi"
+      },
+      {
+        "va": "005a9e47",
+        "bytes": "5b",
+        "mnemonic": "pop",
+        "operands": "ebx"
+      },
+      {
+        "va": "005a9e48",
+        "bytes": "c3",
+        "mnemonic": "ret",
+        "operands": ""
+      }
+    ]
+  }
+}

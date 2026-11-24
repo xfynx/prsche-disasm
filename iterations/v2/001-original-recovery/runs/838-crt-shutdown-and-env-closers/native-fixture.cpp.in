@@ -1,0 +1,808 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "crt_shutdown_env_838.hpp"
+#include "porsche/exit_registry.hpp"
+#include "porsche/exit_shutdown.hpp"
+#include "porsche/formatter_bootstrap.hpp"
+#include "porsche/formatter_cleanup.hpp"
+#include "porsche/formatter_crt_runtime.hpp"
+#include "porsche/formatter_locale.hpp"
+#include "porsche/formatter_lowio.hpp"
+#include "porsche/formatter_output.hpp"
+#include "porsche/formatter_runtime.hpp"
+#include "porsche/formatter_search.hpp"
+#include "porsche/formatter_stdio.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+namespace porsche {
+
+std::uint32_t exit_shutdown_mode_word_006afce0 = 0u;
+const std::uint8_t* formatter_cleanup_handle_table_006c01e0[64]{};
+std::uint32_t formatter_cleanup_handle_limit_006c02e0 = 0u;
+FormatterLocaleCodepageState formatter_locale_codepage_006c02ec{};
+std::uint32_t formatter_locale_default_codepage_006afd90 = 1252u;
+
+} // namespace porsche
+
+enum : U {
+    kOff5A36D6 = 0x0000u,
+    kOff5A76FD = 0x0020u,
+    kOff5A7706 = 0x0040u,
+    kOff5A7673 = 0x0100u,
+    kOff5ACBEA = 0x0140u,
+    kOff5A9DC8 = 0x01e0u,
+    kOff5A2024 = 0x0280u,
+    kOff5A2055 = 0x02c0u,
+    kOff5A7648 = 0x0320u,
+    kOff5A7568 = 0x0360u,
+    kOff5A75C5 = 0x03e0u,
+    kOff5A3071 = 0x0480u,
+    kOff5A9A4A = 0x0520u,
+    kOff5AA28F = 0x05a0u,
+    kOff5AA416 = 0x0740u,
+    kOff5AA46E = 0x07a0u,
+    kOff5AD832 = 0x0820u,
+    kOff5AD79B = 0x0860u,
+    kOff5A9A0B = 0x0900u,
+    kOff5AD042 = 0x0960u,
+    kCodeBytes = 0x1000u,
+    kArenaBytes = 65536u,
+    kMaxEvents = 64u,
+};
+
+struct Trace {
+    U count;
+    U codes[kMaxEvents];
+    U arg0[kMaxEvents];
+    U arg1[kMaxEvents];
+    int ret0;
+    int ret1;
+    U err_val;
+    U doserr_val;
+    U str_hash;
+    U bool_flags;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U events_total = 0u;
+static U which = 0u;
+static B* code = nullptr;
+
+static B arena[kArenaBytes]{};
+static U arena_cursor = 0u;
+static B handle_bank0[32 * 36]{};
+static B handle_bank1[32 * 36]{};
+static std::int32_t mock_errno = 0;
+static std::uint32_t mock_doserrno = 0u;
+static int mock_flush_fail_mask = 0;
+
+static const wchar_t kDummyW[2] = {0, 0};
+static const char kDummyA[2] = {0, 0};
+static const U kSehScopeTable[9] = {0xffffffffu, 0u, 0u, 0xffffffffu, 0u, 0u, 0xffffffffu, 0u, 0u};
+
+static void* iat_flush_file_buffers = nullptr;
+static void* iat_get_last_error = nullptr;
+static void* iat_delete_cs = nullptr;
+static void* iat_close_handle = nullptr;
+static void* iat_wide_to_mb = nullptr;
+static void* iat_set_env_a = nullptr;
+static void* iat_compare_w = nullptr;
+static void* iat_compare_a = nullptr;
+static void* iat_get_cp_info = nullptr;
+static void* iat_mb_to_wide = nullptr;
+
+static const B kBody5A36D6[20] = { @BODY_005A36D6@ };
+static const B kBody5A76FD[9] = { @BODY_005A76FD@ };
+static const B kBody5A7706[164] = { @BODY_005A7706@ };
+static const B kBody5A7673[46] = { @BODY_005A7673@ };
+static const B kBody5ACBEA[147] = { @BODY_005ACBEA@ };
+static const B kBody5A9DC8[129] = { @BODY_005A9DC8@ };
+static const B kBody5A2024[49] = { @BODY_005A2024@ };
+static const B kBody5A2055[76] = { @BODY_005A2055@ };
+static const B kBody5A7648[43] = { @BODY_005A7648@ };
+static const B kBody5A7568[93] = { @BODY_005A7568@ };
+static const B kBody5A75C5[131] = { @BODY_005A75C5@ };
+static const B kBody5A3071[125] = { @BODY_005A3071@ };
+static const B kBody5A9A4A[110] = { @BODY_005A9A4A@ };
+static const B kBody5AA28F[391] = { @BODY_005AA28F@ };
+static const B kBody5AA416[88] = { @BODY_005AA416@ };
+static const B kBody5AA46E[103] = { @BODY_005AA46E@ };
+static const B kBody5AD832[43] = { @BODY_005AD832@ };
+static const B kBody5AD79B[151] = { @BODY_005AD79B@ };
+static const B kBody5A9A0B[63] = { @BODY_005A9A0B@ };
+static const B kBody5AD042[637] = { @BODY_005AD042@ };
+
+static void fail(const char* why) {
+    std::printf("crt_shutdown_env_original_x86_vs_cpp=FAIL case=%u side=%u reason=%s\n",
+                cases, which, why);
+    std::exit(1);
+}
+
+static U fnv1a(const char* s) {
+    if (!s) return 0u;
+    U h = 2166136261u;
+    for (const B* p = reinterpret_cast<const B*>(s); *p; ++p) {
+        h ^= *p;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void record(U code_id, U a0 = 0u, U a1 = 0u) {
+    if (trace.count >= kMaxEvents) fail("trace_overflow");
+    trace.codes[trace.count] = code_id;
+    trace.arg0[trace.count] = a0;
+    trace.arg1[trace.count] = a1;
+    ++trace.count;
+    ++events_total;
+}
+
+static U arena_loc(const void* p) {
+    if (!p) return 0u;
+    const auto a = reinterpret_cast<std::uintptr_t>(p);
+    const auto base = reinterpret_cast<std::uintptr_t>(arena);
+    if (a >= base && a < base + kArenaBytes) {
+        return 0x10000000u + static_cast<U>(a - base);
+    }
+    return static_cast<U>(a);
+}
+
+static void* arena_alloc(U bytes) {
+    const U hdr = 4u;
+    const U sz = (bytes + 3u) & ~3u;
+    if (arena_cursor + hdr + sz > kArenaBytes) return nullptr;
+    B* p = arena + arena_cursor;
+    std::memcpy(p, &bytes, 4u);
+    std::memset(p + hdr, 0, sz);
+    arena_cursor += hdr + sz;
+    return p + hdr;
+}
+
+__declspec(naked) static void __cdecl stub_chkstk() {
+    __asm {
+        pop ecx
+        sub esp, eax
+        jmp ecx
+    }
+}
+
+static int __cdecl dummy_except_handler3(void*, void*, void*, void*) {
+    return 1;
+}
+
+namespace porsche {
+
+void __cdecl exit_registry_lock_api_005a4ba4(std::uint32_t id) {
+    record(1u, id);
+}
+
+void __cdecl exit_registry_unlock_api_005a4c05(std::uint32_t id) {
+    record(2u, id);
+}
+
+void* __cdecl exit_registry_malloc_005a3be5(std::uint32_t bytes) {
+    void* p = arena_alloc(bytes);
+    record(3u, bytes, arena_loc(p));
+    return p;
+}
+
+void __cdecl formatter_crt_free_005a3b9d(void* p) {
+    record(4u, arena_loc(p));
+}
+
+void* __cdecl exit_registry_reallocate_005a8029(void* p, std::uint32_t bytes) {
+    if (!p) {
+        void* q = arena_alloc(bytes);
+        record(5u, 0u, bytes);
+        return q;
+    }
+    U old_sz = 0u;
+    std::memcpy(&old_sz, static_cast<const B*>(p) - 4, 4u);
+    void* q = arena_alloc(bytes);
+    if (q) {
+        std::memcpy(q, p, old_sz < bytes ? old_sz : bytes);
+    }
+    record(5u, arena_loc(p), bytes);
+    return q;
+}
+
+void __cdecl formatter_stdio_lock_pointer_005a36ea(FormatterOriginalDescriptor32* d) {
+    record(6u, arena_loc(d));
+}
+
+void __cdecl formatter_stdio_unlock_pointer_005a373c(FormatterOriginalDescriptor32* d) {
+    record(7u, arena_loc(d));
+}
+
+void __cdecl formatter_stdio_lock_index_005a3719(std::int32_t idx, FormatterOriginalDescriptor32* d) {
+    record(8u, static_cast<U>(idx), arena_loc(d));
+}
+
+void __cdecl formatter_stdio_unlock_index_005a376b(std::int32_t idx, FormatterOriginalDescriptor32* d) {
+    record(9u, static_cast<U>(idx), arena_loc(d));
+}
+
+int __cdecl formatter_stdio_flush_005a76a1(FormatterOriginalDescriptor32* d) {
+    const U fid = static_cast<U>(d->opaque_tail[0]);
+    const int fail_it = (mock_flush_fail_mask & (1 << (fid & 7u))) ? -1 : 0;
+    record(10u, arena_loc(d), static_cast<U>(fail_it));
+    return fail_it;
+}
+
+void __cdecl formatter_lowio_lock_005ab726(std::uint32_t id) {
+    record(11u, id);
+}
+
+void __cdecl formatter_lowio_unlock_005ab785(std::uint32_t id) {
+    record(12u, id);
+}
+
+std::uint32_t __cdecl formatter_lowio_handle_005ab6e4(std::uint32_t id) {
+    if (id >= formatter_cleanup_handle_limit_006c02e0) return 0xffffffffu;
+    const B* rec = formatter_cleanup_handle_table_006c01e0[id >> 5] + (id & 31u) * 36u;
+    if ((rec[4] & 1u) == 0u) return 0xffffffffu;
+    U h = 0xffffffffu;
+    std::memcpy(&h, rec, 4u);
+    return h;
+}
+
+std::int32_t __cdecl formatter_lowio_detach_005ab665(std::uint32_t id) {
+    if (id >= formatter_cleanup_handle_limit_006c02e0) return -1;
+    B* rec = const_cast<B*>(formatter_cleanup_handle_table_006c01e0[id >> 5]) + (id & 31u) * 36u;
+    const U neg1 = 0xffffffffu;
+    std::memcpy(rec, &neg1, 4u);
+    record(13u, id);
+    return 0;
+}
+
+std::int32_t* __cdecl formatter_lowio_errno_005a669e() {
+    return &mock_errno;
+}
+
+std::uint32_t* __cdecl formatter_lowio_doserrno_005a66a7() {
+    return &mock_doserrno;
+}
+
+std::int32_t* __cdecl formatter_output_map_error_005a662b(std::uint32_t err) {
+    mock_doserrno = err;
+    mock_errno = 9;
+    record(14u, err);
+    return &mock_errno;
+}
+
+std::uint32_t __cdecl formatter_strlen_005a6730(const char* s) {
+    return static_cast<U>(std::strlen(s));
+}
+
+char* __cdecl formatter_error_copy_005aa4e0(char* dst, const char* src) {
+    return std::strcpy(dst, src);
+}
+
+const char* __cdecl formatter_search_character_005a2780(const char* s, int c) {
+    return std::strchr(s, c);
+}
+
+[[noreturn]] void __cdecl formatter_fatal_005a2e22(int msg) {
+    record(15u, static_cast<U>(msg));
+    fail("unexpected_fatal");
+    std::abort();
+}
+
+std::uint32_t __cdecl formatter_locale_bounded_length_005ad2bf(const char* s, std::uint32_t n) {
+    U k = 0u;
+    while (k < n && s[k] != '\0') ++k;
+    return k;
+}
+
+std::uint32_t __stdcall formatter_crt_get_last_error() {
+    return ::GetLastError();
+}
+
+int __stdcall formatter_locale_from_wide(
+    std::uint32_t cp, std::uint32_t flags, const std::uint16_t* in, int cch,
+    char* out, int cap, const char* defch, int* used) {
+    return ::WideCharToMultiByte(cp, flags, reinterpret_cast<LPCWSTR>(in), cch, out, cap, defch, used);
+}
+
+int __stdcall formatter_locale_to_wide(
+    std::uint32_t cp, std::uint32_t flags, const char* in, int cch,
+    std::uint16_t* out, int cap) {
+    return ::MultiByteToWideChar(cp, flags, in, cch, reinterpret_cast<LPWSTR>(out), cap);
+}
+
+int __stdcall formatter_locale_codepage_info(std::uint32_t cp, FormatterLocaleCPInfo* info) {
+    return ::GetCPInfo(cp, reinterpret_cast<CPINFO*>(info));
+}
+
+} // namespace porsche
+
+static void write_u32(B* p, U v) { std::memcpy(p, &v, 4u); }
+static void write_rel32(B* slot, const void* target) {
+    const std::int32_t rel = static_cast<std::int32_t>(
+        reinterpret_cast<std::uintptr_t>(target) -
+        (reinterpret_cast<std::uintptr_t>(slot) + 4u));
+    std::memcpy(slot, &rel, 4u);
+}
+
+static void init_code_buffer() {
+    code = static_cast<B*>(::VirtualAlloc(nullptr, kCodeBytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!code) fail("virtual_alloc");
+    std::memset(code, 0xcc, kCodeBytes);
+
+    iat_flush_file_buffers = reinterpret_cast<void*>(&::FlushFileBuffers);
+    iat_get_last_error = reinterpret_cast<void*>(&porsche::formatter_crt_get_last_error);
+    iat_delete_cs = reinterpret_cast<void*>(&::DeleteCriticalSection);
+    iat_close_handle = reinterpret_cast<void*>(&::CloseHandle);
+    iat_wide_to_mb = reinterpret_cast<void*>(&porsche::formatter_locale_from_wide);
+    iat_set_env_a = reinterpret_cast<void*>(&::SetEnvironmentVariableA);
+    iat_compare_w = reinterpret_cast<void*>(&::CompareStringW);
+    iat_compare_a = reinterpret_cast<void*>(&::CompareStringA);
+    iat_get_cp_info = reinterpret_cast<void*>(&porsche::formatter_locale_codepage_info);
+    iat_mb_to_wide = reinterpret_cast<void*>(&porsche::formatter_locale_to_wide);
+
+    std::memcpy(code + kOff5A36D6, kBody5A36D6, sizeof(kBody5A36D6));
+    std::memcpy(code + kOff5A76FD, kBody5A76FD, sizeof(kBody5A76FD));
+    std::memcpy(code + kOff5A7706, kBody5A7706, sizeof(kBody5A7706));
+    std::memcpy(code + kOff5A7673, kBody5A7673, sizeof(kBody5A7673));
+    std::memcpy(code + kOff5ACBEA, kBody5ACBEA, sizeof(kBody5ACBEA));
+    std::memcpy(code + kOff5A9DC8, kBody5A9DC8, sizeof(kBody5A9DC8));
+    std::memcpy(code + kOff5A2024, kBody5A2024, sizeof(kBody5A2024));
+    std::memcpy(code + kOff5A2055, kBody5A2055, sizeof(kBody5A2055));
+    std::memcpy(code + kOff5A7648, kBody5A7648, sizeof(kBody5A7648));
+    std::memcpy(code + kOff5A7568, kBody5A7568, sizeof(kBody5A7568));
+    std::memcpy(code + kOff5A75C5, kBody5A75C5, sizeof(kBody5A75C5));
+    std::memcpy(code + kOff5A3071, kBody5A3071, sizeof(kBody5A3071));
+    std::memcpy(code + kOff5A9A4A, kBody5A9A4A, sizeof(kBody5A9A4A));
+    std::memcpy(code + kOff5AA28F, kBody5AA28F, sizeof(kBody5AA28F));
+    std::memcpy(code + kOff5AA416, kBody5AA416, sizeof(kBody5AA416));
+    std::memcpy(code + kOff5AA46E, kBody5AA46E, sizeof(kBody5AA46E));
+    std::memcpy(code + kOff5AD832, kBody5AD832, sizeof(kBody5AD832));
+    std::memcpy(code + kOff5AD79B, kBody5AD79B, sizeof(kBody5AD79B));
+    std::memcpy(code + kOff5A9A0B, kBody5A9A0B, sizeof(kBody5A9A0B));
+    std::memcpy(code + kOff5AD042, kBody5AD042, sizeof(kBody5AD042));
+
+    auto r32 = [](U base_off, U site_va, U fn_va, const void* tgt) {
+        write_rel32(code + base_off + (site_va - fn_va) + 1u, tgt);
+    };
+    auto rhl = [](U base_off, U off, const void* ptr) {
+        write_u32(code + base_off + off, static_cast<U>(reinterpret_cast<std::uintptr_t>(ptr)));
+    };
+
+    // 005a36d6
+    r32(kOff5A36D6, 0x005a36d6u, 0x005a36d6u, code + kOff5A76FD);
+    r32(kOff5A36D6, 0x005a36e4u, 0x005a36d6u, code + kOff5A9DC8);
+    rhl(kOff5A36D6, 7u, &porsche::exit_shutdown_mode_word_006afce0);
+
+    // 005a76fd
+    r32(kOff5A76FD, 0x005a76ffu, 0x005a76fdu, code + kOff5A7706);
+
+    // 005a7706
+    r32(kOff5A7706, 0x005a770fu, 0x005a7706u, reinterpret_cast<const void*>(&porsche::exit_registry_lock_api_005a4ba4));
+    r32(kOff5A7706, 0x005a7733u, 0x005a7706u, reinterpret_cast<const void*>(&porsche::formatter_stdio_lock_index_005a3719));
+    r32(kOff5A7706, 0x005a7752u, 0x005a7706u, code + kOff5A7673);
+    r32(kOff5A7706, 0x005a776du, 0x005a7706u, code + kOff5A7673);
+    r32(kOff5A7706, 0x005a7783u, 0x005a7706u, reinterpret_cast<const void*>(&porsche::formatter_stdio_unlock_index_005a376b));
+    r32(kOff5A7706, 0x005a7795u, 0x005a7706u, reinterpret_cast<const void*>(&porsche::exit_registry_unlock_api_005a4c05));
+    rhl(kOff5A7706, 19u, &porsche::crt_nstream_006c1520);
+    rhl(kOff5A7706, 26u, &porsche::crt_piob_006c0508);
+    rhl(kOff5A7706, 51u, &porsche::crt_piob_006c0508);
+    rhl(kOff5A7706, 117u, &porsche::crt_piob_006c0508);
+    rhl(kOff5A7706, 135u, &porsche::crt_nstream_006c1520);
+
+    // 005a7673
+    r32(kOff5A7673, 0x005a7679u, 0x005a7673u, reinterpret_cast<const void*>(&porsche::formatter_stdio_flush_005a76a1));
+    r32(kOff5A7673, 0x005a7691u, 0x005a7673u, code + kOff5ACBEA);
+
+    // 005acbea
+    r32(kOff5ACBEA, 0x005acc1au, 0x005acbeau, reinterpret_cast<const void*>(&porsche::formatter_lowio_lock_005ab726));
+    r32(kOff5ACBEA, 0x005acc2au, 0x005acbeau, reinterpret_cast<const void*>(&porsche::formatter_lowio_handle_005ab6e4));
+    r32(kOff5ACBEA, 0x005acc4bu, 0x005acbeau, reinterpret_cast<const void*>(&porsche::formatter_lowio_doserrno_005a66a7));
+    r32(kOff5ACBEA, 0x005acc52u, 0x005acbeau, reinterpret_cast<const void*>(&porsche::formatter_lowio_errno_005a669e));
+    r32(kOff5ACBEA, 0x005acc61u, 0x005acbeau, reinterpret_cast<const void*>(&porsche::formatter_lowio_unlock_005ab785));
+    r32(kOff5ACBEA, 0x005acc6bu, 0x005acbeau, reinterpret_cast<const void*>(&porsche::formatter_lowio_errno_005a669e));
+    rhl(kOff5ACBEA, 7u, &porsche::formatter_cleanup_handle_limit_006c02e0);
+    rhl(kOff5ACBEA, 23u, porsche::formatter_cleanup_handle_table_006c01e0);
+    rhl(kOff5ACBEA, 73u, &iat_flush_file_buffers);
+    rhl(kOff5ACBEA, 83u, &iat_get_last_error);
+
+    // 005a9dc8
+    r32(kOff5A9DC8, 0x005a9dceu, 0x005a9dc8u, reinterpret_cast<const void*>(&porsche::exit_registry_lock_api_005a4ba4));
+    r32(kOff5A9DC8, 0x005a9df8u, 0x005a9dc8u, code + kOff5A2024);
+    r32(kOff5A9DC8, 0x005a9e23u, 0x005a9dc8u, reinterpret_cast<const void*>(&porsche::formatter_crt_free_005a3b9d));
+    r32(kOff5A9DC8, 0x005a9e3eu, 0x005a9dc8u, reinterpret_cast<const void*>(&porsche::exit_registry_unlock_api_005a4c05));
+    rhl(kOff5A9DC8, 17u, &porsche::crt_nstream_006c1520);
+    rhl(kOff5A9DC8, 25u, &porsche::crt_piob_006c0508);
+    rhl(kOff5A9DC8, 66u, &porsche::crt_piob_006c0508);
+    rhl(kOff5A9DC8, 79u, &iat_delete_cs);
+    rhl(kOff5A9DC8, 84u, &porsche::crt_piob_006c0508);
+    rhl(kOff5A9DC8, 97u, &porsche::crt_piob_006c0508);
+    rhl(kOff5A9DC8, 109u, &porsche::crt_nstream_006c1520);
+
+    // 005a2024
+    r32(kOff5A2024, 0x005a203au, 0x005a2024u, reinterpret_cast<const void*>(&porsche::formatter_stdio_lock_pointer_005a36ea));
+    r32(kOff5A2024, 0x005a2040u, 0x005a2024u, code + kOff5A2055);
+    r32(kOff5A2024, 0x005a2048u, 0x005a2024u, reinterpret_cast<const void*>(&porsche::formatter_stdio_unlock_pointer_005a373c));
+
+    // 005a2055
+    r32(kOff5A2055, 0x005a2065u, 0x005a2055u, reinterpret_cast<const void*>(&porsche::formatter_stdio_flush_005a76a1));
+    r32(kOff5A2055, 0x005a206du, 0x005a2055u, code + kOff5A7648);
+    r32(kOff5A2055, 0x005a2075u, 0x005a2055u, code + kOff5A7568);
+    r32(kOff5A2055, 0x005a208eu, 0x005a2055u, reinterpret_cast<const void*>(&porsche::formatter_crt_free_005a3b9d));
+
+    // 005a7648
+    r32(kOff5A7648, 0x005a765bu, 0x005a7648u, reinterpret_cast<const void*>(&porsche::formatter_crt_free_005a3b9d));
+
+    // 005a7568
+    r32(kOff5A7568, 0x005a7592u, 0x005a7568u, reinterpret_cast<const void*>(&porsche::formatter_lowio_lock_005ab726));
+    r32(kOff5A7568, 0x005a7598u, 0x005a7568u, code + kOff5A75C5);
+    r32(kOff5A7568, 0x005a75a0u, 0x005a7568u, reinterpret_cast<const void*>(&porsche::formatter_lowio_unlock_005ab785));
+    r32(kOff5A7568, 0x005a75adu, 0x005a7568u, reinterpret_cast<const void*>(&porsche::formatter_lowio_errno_005a669e));
+    r32(kOff5A7568, 0x005a75b8u, 0x005a7568u, reinterpret_cast<const void*>(&porsche::formatter_lowio_doserrno_005a66a7));
+    rhl(kOff5A7568, 7u, &porsche::formatter_cleanup_handle_limit_006c02e0);
+    rhl(kOff5A7568, 26u, porsche::formatter_cleanup_handle_table_006c01e0);
+
+    // 005a75c5
+    r32(kOff5A75C5, 0x005a75ccu, 0x005a75c5u, reinterpret_cast<const void*>(&porsche::formatter_lowio_handle_005ab6e4));
+    r32(kOff5A75C5, 0x005a75e3u, 0x005a75c5u, reinterpret_cast<const void*>(&porsche::formatter_lowio_handle_005ab6e4));
+    r32(kOff5A75C5, 0x005a75ecu, 0x005a75c5u, reinterpret_cast<const void*>(&porsche::formatter_lowio_handle_005ab6e4));
+    r32(kOff5A75C5, 0x005a75f8u, 0x005a75c5u, reinterpret_cast<const void*>(&porsche::formatter_lowio_handle_005ab6e4));
+    r32(kOff5A75C5, 0x005a7616u, 0x005a75c5u, reinterpret_cast<const void*>(&porsche::formatter_lowio_detach_005ab665));
+    r32(kOff5A75C5, 0x005a7638u, 0x005a75c5u, reinterpret_cast<const void*>(&porsche::formatter_output_map_error_005a662b));
+    rhl(kOff5A75C5, 60u, &iat_close_handle);
+    rhl(kOff5A75C5, 70u, &iat_get_last_error);
+    rhl(kOff5A75C5, 98u, porsche::formatter_cleanup_handle_table_006c01e0);
+
+    // 005a3071
+    r32(kOff5A3071, 0x005a308fu, 0x005a3071u, code + kOff5A9A4A);
+    r32(kOff5A3071, 0x005a30abu, 0x005a3071u, reinterpret_cast<const void*>(&porsche::formatter_strlen_005a6730));
+    r32(kOff5A3071, 0x005a30bau, 0x005a3071u, reinterpret_cast<const void*>(&porsche::formatter_strlen_005a6730));
+    r32(kOff5A3071, 0x005a30cfu, 0x005a3071u, code + kOff5A9A0B);
+    rhl(kOff5A3071, 2u, &porsche::crt_env_initialized_006c1528);
+    rhl(kOff5A3071, 11u, &porsche::crt_environ_006afcc8);
+    rhl(kOff5A3071, 24u, &porsche::crt_wenviron_006afcd0);
+    rhl(kOff5A3071, 41u, &porsche::crt_environ_006afcc8);
+
+    // 005a9a4a
+    r32(kOff5A9A4A, 0x005a9a76u, 0x005a9a4au, reinterpret_cast<const void*>(&porsche::exit_registry_malloc_005a3be5));
+    r32(kOff5A9A4A, 0x005a9a9au, 0x005a9a4au, code + kOff5AA28F);
+    rhl(kOff5A9A4A, 6u, &porsche::crt_wenviron_006afcd0);
+    rhl(kOff5A9A4A, 21u, &iat_wide_to_mb);
+
+    // 005aa28f
+    r32(kOff5AA28F, 0x005aa2a3u, 0x005aa28fu, code + kOff5AD79B);
+    r32(kOff5AA28F, 0x005aa2ceu, 0x005aa28fu, code + kOff5AA46E);
+    r32(kOff5AA28F, 0x005aa2eau, 0x005aa28fu, code + kOff5A9A4A);
+    r32(kOff5AA28F, 0x005aa305u, 0x005aa28fu, reinterpret_cast<const void*>(&porsche::exit_registry_malloc_005a3be5));
+    r32(kOff5AA28F, 0x005aa320u, 0x005aa28fu, reinterpret_cast<const void*>(&porsche::exit_registry_malloc_005a3be5));
+    r32(kOff5AA28F, 0x005aa341u, 0x005aa28fu, code + kOff5AA416);
+    r32(kOff5AA28F, 0x005aa35du, 0x005aa28fu, reinterpret_cast<const void*>(&porsche::formatter_crt_free_005a3b9d));
+    r32(kOff5AA28F, 0x005aa37cu, 0x005aa28fu, reinterpret_cast<const void*>(&porsche::exit_registry_reallocate_005a8029));
+    r32(kOff5AA28F, 0x005aa3a4u, 0x005aa28fu, reinterpret_cast<const void*>(&porsche::exit_registry_reallocate_005a8029));
+    r32(kOff5AA28F, 0x005aa3ccu, 0x005aa28fu, reinterpret_cast<const void*>(&porsche::formatter_strlen_005a6730));
+    r32(kOff5AA28F, 0x005aa3d4u, 0x005aa28fu, reinterpret_cast<const void*>(&porsche::exit_registry_malloc_005a3be5));
+    r32(kOff5AA28F, 0x005aa3e5u, 0x005aa28fu, reinterpret_cast<const void*>(&porsche::formatter_error_copy_005aa4e0));
+    r32(kOff5AA28F, 0x005aa409u, 0x005aa28fu, reinterpret_cast<const void*>(&porsche::formatter_crt_free_005a3b9d));
+    rhl(kOff5AA28F, 42u, &porsche::crt_environ_006afcc8);
+    rhl(kOff5AA28F, 56u, &porsche::crt_initenv_006afccc);
+    rhl(kOff5AA28F, 70u, &porsche::crt_environ_006afcc8);
+    rhl(kOff5AA28F, 85u, &porsche::crt_wenviron_006afcd0);
+    rhl(kOff5AA28F, 127u, &porsche::crt_environ_006afcc8);
+    rhl(kOff5AA28F, 137u, &porsche::crt_wenviron_006afcd0);
+    rhl(kOff5AA28F, 154u, &porsche::crt_wenviron_006afcd0);
+    rhl(kOff5AA28F, 167u, &porsche::crt_environ_006afcc8);
+    rhl(kOff5AA28F, 304u, &porsche::crt_environ_006afcc8);
+    rhl(kOff5AA28F, 373u, &iat_set_env_a);
+
+    // 005aa416
+    r32(kOff5AA416, 0x005aa42eu, 0x005aa416u, code + kOff5A9A0B);
+    rhl(kOff5AA416, 3u, &porsche::crt_environ_006afcc8);
+    rhl(kOff5AA416, 63u, &porsche::crt_environ_006afcc8);
+    rhl(kOff5AA416, 79u, &porsche::crt_environ_006afcc8);
+
+    // 005aa46e
+    r32(kOff5AA46E, 0x005aa49au, 0x005aa46eu, reinterpret_cast<const void*>(&porsche::exit_registry_malloc_005a3be5));
+    r32(kOff5AA46E, 0x005aa4aau, 0x005aa46eu, reinterpret_cast<const void*>(&porsche::formatter_fatal_005a2e22));
+    r32(kOff5AA46E, 0x005aa4bcu, 0x005aa46eu, code + kOff5AD832);
+
+    // 005ad832
+    r32(kOff5AD832, 0x005ad83cu, 0x005ad832u, reinterpret_cast<const void*>(&porsche::formatter_strlen_005a6730));
+    r32(kOff5AD832, 0x005ad843u, 0x005ad832u, reinterpret_cast<const void*>(&porsche::exit_registry_malloc_005a3be5));
+    r32(kOff5AD832, 0x005ad850u, 0x005ad832u, reinterpret_cast<const void*>(&porsche::formatter_error_copy_005aa4e0));
+
+    // 005ad79b
+    r32(kOff5AD79B, 0x005ad7afu, 0x005ad79bu, reinterpret_cast<const void*>(&porsche::formatter_search_character_005a2780));
+    r32(kOff5AD79B, 0x005ad7bau, 0x005ad79bu, reinterpret_cast<const void*>(&porsche::exit_registry_lock_api_005a4ba4));
+    r32(kOff5AD79B, 0x005ad7ffu, 0x005ad79bu, reinterpret_cast<const void*>(&porsche::exit_registry_unlock_api_005a4c05));
+    r32(kOff5AD79B, 0x005ad80bu, 0x005ad79bu, reinterpret_cast<const void*>(&porsche::exit_registry_unlock_api_005a4c05));
+    r32(kOff5AD79B, 0x005ad818u, 0x005ad79bu, reinterpret_cast<const void*>(&porsche::exit_registry_unlock_api_005a4c05));
+    rhl(kOff5AD79B, 5u, &porsche::formatter_locale_codepage_006c02ec.multibyte);
+    rhl(kOff5AD79B, 54u, &porsche::formatter_locale_codepage_006c02ec.class_bits[1]);
+
+    // 005a9a0b
+    r32(kOff5A9A0B, 0x005a9a32u, 0x005a9a0bu, code + kOff5AD042);
+    rhl(kOff5A9A0B, 15u, &porsche::formatter_locale_codepage_006c02ec.codepage);
+    rhl(kOff5A9A0B, 35u, &porsche::formatter_locale_codepage_006c02ec.locale);
+
+    // 005ad042
+    r32(kOff5AD042, 0x005ad0c0u, 0x005ad042u, reinterpret_cast<const void*>(&porsche::formatter_locale_bounded_length_005ad2bf));
+    r32(kOff5AD042, 0x005ad0d7u, 0x005ad042u, reinterpret_cast<const void*>(&porsche::formatter_locale_bounded_length_005ad2bf));
+    r32(kOff5AD042, 0x005ad1e6u, 0x005ad042u, reinterpret_cast<const void*>(&stub_chkstk));
+    r32(kOff5AD042, 0x005ad255u, 0x005ad042u, reinterpret_cast<const void*>(&stub_chkstk));
+    rhl(kOff5AD042, 6u, kSehScopeTable);
+    rhl(kOff5AD042, 11u, reinterpret_cast<const void*>(&dummy_except_handler3));
+    rhl(kOff5AD042, 42u, &porsche::crt_compare_use_mode_006b0028);
+    rhl(kOff5AD042, 53u, kDummyW);
+    rhl(kOff5AD042, 64u, &iat_compare_w);
+    rhl(kOff5AD042, 74u, &porsche::crt_compare_use_mode_006b0028);
+    rhl(kOff5AD042, 82u, kDummyA);
+    rhl(kOff5AD042, 93u, &iat_compare_a);
+    rhl(kOff5AD042, 107u, &porsche::crt_compare_use_mode_006b0028);
+    rhl(kOff5AD042, 160u, &porsche::crt_compare_use_mode_006b0028);
+    rhl(kOff5AD042, 187u, &iat_compare_a);
+    rhl(kOff5AD042, 210u, &porsche::formatter_locale_default_codepage_006afd90);
+    rhl(kOff5AD042, 268u, &iat_get_cp_info);
+    rhl(kOff5AD042, 395u, &iat_mb_to_wide);
+    rhl(kOff5AD042, 486u, &iat_mb_to_wide);
+    rhl(kOff5AD042, 587u, &iat_mb_to_wide);
+    rhl(kOff5AD042, 611u, &iat_compare_w);
+
+    ::FlushInstructionCache(::GetCurrentProcess(), code, kCodeBytes);
+}
+
+static void reset_state() {
+    std::memset(&trace, 0, sizeof(trace));
+    std::memset(arena, 0, sizeof(arena));
+    arena_cursor = 0u;
+    std::memset(handle_bank0, 0, sizeof(handle_bank0));
+    std::memset(handle_bank1, 0, sizeof(handle_bank1));
+    std::memset(porsche::formatter_cleanup_handle_table_006c01e0, 0, sizeof(porsche::formatter_cleanup_handle_table_006c01e0));
+    porsche::formatter_cleanup_handle_table_006c01e0[0] = handle_bank0;
+    porsche::formatter_cleanup_handle_table_006c01e0[1] = handle_bank1;
+    porsche::formatter_cleanup_handle_limit_006c02e0 = 64u;
+    porsche::crt_nstream_006c1520 = 0;
+    porsche::crt_piob_006c0508 = nullptr;
+    porsche::exit_shutdown_mode_word_006afce0 = 0u;
+    porsche::crt_env_initialized_006c1528 = 0u;
+    porsche::crt_environ_006afcc8 = nullptr;
+    porsche::crt_initenv_006afccc = nullptr;
+    porsche::crt_wenviron_006afcd0 = nullptr;
+    porsche::crt_compare_use_mode_006b0028 = 0u;
+    std::memset(&porsche::formatter_locale_codepage_006c02ec, 0, sizeof(porsche::formatter_locale_codepage_006c02ec));
+    porsche::formatter_locale_codepage_006c02ec.codepage = 1252u;
+    porsche::formatter_locale_codepage_006c02ec.locale = 0u;
+    porsche::formatter_locale_default_codepage_006afd90 = 1252u;
+    mock_errno = 0;
+    mock_doserrno = 0u;
+    mock_flush_fail_mask = 0;
+}
+
+static void set_lowio(U fd, U os_handle, B flags) {
+    B* rec = (fd < 32u ? handle_bank0 : handle_bank1) + (fd & 31u) * 36u;
+    std::memcpy(rec, &os_handle, 4u);
+    rec[4] = flags;
+}
+
+static porsche::FormatterOriginalDescriptor32* make_stream(U flags, U fid, char* base, char* tmp) {
+    auto* s = static_cast<porsche::FormatterOriginalDescriptor32*>(arena_alloc(56u));
+    s->flags = flags;
+    s->base = base;
+    s->cursor = base;
+    std::memcpy(s->opaque_tail, &fid, 4u);
+    std::memcpy(s->opaque_tail + 12, &tmp, 4u);
+    if (tmp) {
+        std::memset(s + 1, 0, 24u);
+    }
+    return s;
+}
+
+static void compare_traces(const Trace& a, const Trace& b) {
+    if (a.count != b.count || a.ret0 != b.ret0 || a.ret1 != b.ret1 ||
+        a.err_val != b.err_val || a.doserr_val != b.doserr_val ||
+        a.str_hash != b.str_hash || a.bool_flags != b.bool_flags) {
+        fail("trace_summary_mismatch");
+    }
+    for (U i = 0u; i < a.count; ++i) {
+        if (a.codes[i] != b.codes[i] || a.arg0[i] != b.arg0[i] || a.arg1[i] != b.arg1[i]) {
+            fail("trace_event_mismatch");
+        }
+    }
+}
+
+template <typename Fn>
+static void run_case(Fn fn) {
+    ++cases;
+    which = 0u;
+    reset_state();
+    fn(false);
+    expected = trace;
+
+    which = 1u;
+    reset_state();
+    fn(true);
+    compare_traces(expected, trace);
+}
+
+int main() {
+    init_code_buffer();
+
+    auto* const orig_5a36d6 = reinterpret_cast<void(__cdecl*)()>(code + kOff5A36D6);
+    auto* const orig_5a7706 = reinterpret_cast<int(__cdecl*)(int)>(code + kOff5A7706);
+    auto* const orig_5a7673 = reinterpret_cast<int(__cdecl*)(porsche::FormatterOriginalDescriptor32*)>(code + kOff5A7673);
+    auto* const orig_5a2024 = reinterpret_cast<int(__cdecl*)(porsche::FormatterOriginalDescriptor32*)>(code + kOff5A2024);
+    auto* const orig_5a7568 = reinterpret_cast<int(__cdecl*)(U)>(code + kOff5A7568);
+    auto* const orig_5a3071 = reinterpret_cast<const char*(__cdecl*)(const char*)>(code + kOff5A3071);
+    auto* const orig_5aa28f = reinterpret_cast<int(__cdecl*)(char*, int)>(code + kOff5AA28F);
+    auto* const orig_5ad79b = reinterpret_cast<const char*(__cdecl*)(const char*, U)>(code + kOff5AD79B);
+    auto* const orig_5a9a0b = reinterpret_cast<int(__cdecl*)(const char*, const char*, U)>(code + kOff5A9A0B);
+    auto* const orig_5ad042 = reinterpret_cast<int(__cdecl*)(U, U, const char*, int, const char*, int, U)>(code + kOff5AD042);
+
+    // Case 1: exit_shutdown_static_callback_005a36d6 with mode_word==0 (flush only, skip fcloseall).
+    run_case([&](bool cpp) {
+        auto** piob = static_cast<porsche::FormatterOriginalDescriptor32**>(arena_alloc(4u * 4u));
+        piob[0] = make_stream(0x01u, 0u, nullptr, nullptr);
+        piob[1] = make_stream(0x02u, 1u, nullptr, nullptr);
+        piob[2] = nullptr;
+        piob[3] = make_stream(0x80u, 3u, nullptr, nullptr);
+        porsche::crt_nstream_006c1520 = 4;
+        porsche::crt_piob_006c0508 = piob;
+        porsche::exit_shutdown_mode_word_006afce0 = 0x100u;
+        if (cpp) porsche::exit_shutdown_static_callback_005a36d6();
+        else orig_5a36d6();
+        trace.bool_flags = (piob[3]->flags != 0u) ? 1u : 0u;
+    });
+
+    // Case 2: exit_shutdown_static_callback_005a36d6 with mode_word!=0 (flush + fcloseall, i>=3 closed, i>=20 freed, slots 0..2 untouched).
+    run_case([&](bool cpp) {
+        auto** piob = static_cast<porsche::FormatterOriginalDescriptor32**>(arena_alloc(22u * 4u));
+        HANDLE ev3 = ::CreateEventA(nullptr, TRUE, FALSE, nullptr);
+        HANDLE ev20 = ::CreateEventA(nullptr, TRUE, FALSE, nullptr);
+        if (!ev3 || !ev20) fail("create_event");
+        set_lowio(0u, static_cast<U>(reinterpret_cast<std::uintptr_t>(::GetStdHandle(STD_INPUT_HANDLE))), 0x01u);
+        set_lowio(3u, static_cast<U>(reinterpret_cast<std::uintptr_t>(ev3)), 0x01u);
+        set_lowio(20u, static_cast<U>(reinterpret_cast<std::uintptr_t>(ev20)), 0x01u);
+        piob[0] = make_stream(0x01u, 0u, nullptr, nullptr);
+        piob[1] = make_stream(0x02u, 1u, nullptr, nullptr);
+        piob[2] = nullptr;
+        char* buf3 = static_cast<char*>(arena_alloc(16u));
+        char* tmp3 = static_cast<char*>(arena_alloc(12u));
+        piob[3] = make_stream(0x8au, 3u, buf3, tmp3);
+        piob[20] = make_stream(0x02u, 20u, nullptr, nullptr);
+        ::InitializeCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(piob[20] + 1));
+        piob[21] = make_stream(0x00u, 21u, nullptr, nullptr);
+        ::InitializeCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(piob[21] + 1));
+        porsche::crt_nstream_006c1520 = 22;
+        porsche::crt_piob_006c0508 = piob;
+        porsche::exit_shutdown_mode_word_006afce0 = 0x01u;
+        if (cpp) porsche::exit_shutdown_static_callback_005a36d6();
+        else orig_5a36d6();
+        DWORD dummy = 0;
+        const U ev3_alive = ::GetHandleInformation(ev3, &dummy) ? 1u : 0u;
+        const U ev20_alive = ::GetHandleInformation(ev20, &dummy) ? 1u : 0u;
+        trace.bool_flags = (piob[0]->flags != 0u ? 1u : 0u) |
+                           (piob[3]->flags == 0u ? 2u : 0u) |
+                           (piob[20] == nullptr ? 4u : 0u) |
+                           (piob[21] == nullptr ? 8u : 0u) |
+                           (ev3_alive << 4u) |
+                           (ev20_alive << 5u);
+    });
+
+    // Case 3: crt_flsall_005a7706(0) flush-write-only + crt_fflush_nolock_005a7673 with 0x4000 commit flag on INVALID_HANDLE_VALUE and real temp file.
+    run_case([&](bool cpp) {
+        char tmp_dir[MAX_PATH]{};
+        char tmp_file[MAX_PATH]{};
+        if (!::GetTempPathA(MAX_PATH, tmp_dir) || !::GetTempFileNameA(tmp_dir, "p83", 0, tmp_file)) fail("temp_file");
+        HANDLE hf = ::CreateFileA(tmp_file, GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                                  FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
+        if (hf == INVALID_HANDLE_VALUE) fail("create_temp_file");
+        set_lowio(4u, static_cast<U>(reinterpret_cast<std::uintptr_t>(hf)), 0x01u);
+        set_lowio(5u, 0xffffffffu, 0x01u);
+        auto* s_ok = make_stream(0x4002u, 4u, nullptr, nullptr);
+        auto* s_bad = make_stream(0x4002u, 5u, nullptr, nullptr);
+        auto* s_ro = make_stream(0x01u, 6u, nullptr, nullptr);
+        auto** piob = static_cast<porsche::FormatterOriginalDescriptor32**>(arena_alloc(2u * 4u));
+        piob[0] = s_ro;
+        piob[1] = s_ok;
+        porsche::crt_nstream_006c1520 = 2;
+        porsche::crt_piob_006c0508 = piob;
+        trace.ret0 = cpp ? porsche::crt_flsall_005a7706(0) : orig_5a7706(0);
+        trace.ret1 = cpp ? porsche::crt_fflush_nolock_005a7673(s_bad) : orig_5a7673(s_bad);
+        trace.err_val = static_cast<U>(mock_errno);
+        trace.doserr_val = mock_doserrno;
+        ::CloseHandle(hf);
+    });
+
+    // Case 4: crt_fclose_005a2024 (_IOSTRG 0x40) + crt_close_005a7568 shared stdout/stderr handle preservation & invalid fd.
+    run_case([&](bool cpp) {
+        HANDLE shared = ::CreateEventA(nullptr, TRUE, FALSE, nullptr);
+        if (!shared) fail("create_shared");
+        set_lowio(1u, static_cast<U>(reinterpret_cast<std::uintptr_t>(shared)), 0x01u);
+        set_lowio(2u, static_cast<U>(reinterpret_cast<std::uintptr_t>(shared)), 0x01u);
+        auto* strg = make_stream(0x41u, 9u, nullptr, nullptr);
+        trace.ret0 = cpp ? porsche::crt_fclose_005a2024(strg) : orig_5a2024(strg);
+        trace.ret1 = cpp ? porsche::crt_close_005a7568(1u) : orig_5a7568(1u);
+        DWORD flags = 0;
+        const U still_alive = ::GetHandleInformation(shared, &flags) ? 1u : 0u;
+        const int bad_ret = cpp ? porsche::crt_close_005a7568(99u) : orig_5a7568(99u);
+        trace.err_val = static_cast<U>(mock_errno);
+        trace.bool_flags = (strg->flags == 0u ? 1u : 0u) | (still_alive << 1u) | (bad_ret == -1 ? 4u : 0u);
+        ::CloseHandle(shared);
+    });
+
+    // Case 5: application_diagnostic_environment_inner_005a3071 via wide->mb init, prefix collision, and case-insensitive match.
+    run_case([&](bool cpp) {
+        wchar_t w0[] = L"PORSCHE_BAR=wrong";
+        wchar_t w1[] = L"porsche_foo=alpha";
+        wchar_t w2[] = L"PORSCHE_FOO_EXTRA=beta";
+        wchar_t* wenv[] = {w0, w1, w2, nullptr};
+        porsche::crt_env_initialized_006c1528 = 1u;
+        porsche::crt_wenviron_006afcd0 = wenv;
+        const char* r0 = cpp ? porsche::application_diagnostic_environment_inner_005a3071("PORSCHE_FOO") : orig_5a3071("PORSCHE_FOO");
+        const char* r1 = cpp ? porsche::application_diagnostic_environment_inner_005a3071("PORSCHE_BA") : orig_5a3071("PORSCHE_BA");
+        trace.str_hash = fnv1a(r0);
+        trace.bool_flags = (r0 != nullptr ? 1u : 0u) | (r1 == nullptr ? 2u : 0u);
+    });
+
+    // Case 6: crt_setenv_005aa28f with copy_environ + SetEnvironmentVariableA set/remove + GetEnvironmentVariableA check.
+    run_case([&](bool cpp) {
+        char e0[] = "PORSCHE_KEEP=one";
+        char e1[] = "PORSCHE_T838=first";
+        char* init_env[] = {e0, e1, nullptr};
+        porsche::crt_environ_006afcc8 = init_env;
+        porsche::crt_initenv_006afccc = init_env;
+        porsche::crt_env_initialized_006c1528 = 1u;
+
+        char* set_opt = static_cast<char*>(arena_alloc(32u));
+        std::strcpy(set_opt, "PORSCHE_T838=second");
+        trace.ret0 = cpp ? porsche::crt_setenv_005aa28f(set_opt, 1) : orig_5aa28f(set_opt, 1);
+        char env_buf[64]{};
+        const DWORD got1 = ::GetEnvironmentVariableA("PORSCHE_T838", env_buf, sizeof(env_buf));
+        const U h1 = fnv1a(env_buf);
+
+        char* del_opt = static_cast<char*>(arena_alloc(32u));
+        std::strcpy(del_opt, "PORSCHE_T838=");
+        trace.ret1 = cpp ? porsche::crt_setenv_005aa28f(del_opt, 1) : orig_5aa28f(del_opt, 1);
+        ::SetLastError(0u);
+        const DWORD got2 = ::GetEnvironmentVariableA("PORSCHE_T838", env_buf, sizeof(env_buf));
+        trace.err_val = ::GetLastError();
+        const char* after = cpp ? porsche::application_diagnostic_environment_inner_005a3071("PORSCHE_T838") : orig_5a3071("PORSCHE_T838");
+        trace.str_hash = h1;
+        trace.bool_flags = (got1 == 6u ? 1u : 0u) | (got2 == 0u ? 2u : 0u) | (after == nullptr ? 4u : 0u);
+    });
+
+    // Case 7: crt_mbschr_005ad79b (DBCS lead byte skip + single-byte match) + crt_mbsnbicoll_005a9a0b + crt_compare_string_a_005ad042 edge cases.
+    run_case([&](bool cpp) {
+        porsche::formatter_locale_codepage_006c02ec.multibyte = 1u;
+        porsche::formatter_locale_codepage_006c02ec.class_bits[1u + 0x81u] = 0x04u;
+        const char dbcs[] = "\x81=ok=end";
+        const char* m0 = cpp ? porsche::crt_mbschr_005ad79b(dbcs, '=') : orig_5ad79b(dbcs, '=');
+        const int c_lt = cpp ? porsche::crt_mbsnbicoll_005a9a0b("abc", "abd", 3u) : orig_5a9a0b("abc", "abd", 3u);
+        const int c_eq = cpp ? porsche::crt_mbsnbicoll_005a9a0b("AbC", "aBcZ", 3u) : orig_5a9a0b("AbC", "aBcZ", 3u);
+        const int c_gt = cpp ? porsche::crt_mbsnbicoll_005a9a0b("abe", "abd", 3u) : orig_5a9a0b("abe", "abd", 3u);
+        const int c_z1 = cpp ? porsche::crt_compare_string_a_005ad042(0u, 1u, "", 0, "x", 1, 1252u)
+                             : orig_5ad042(0u, 1u, "", 0, "x", 1, 1252u);
+        const int c_zn = cpp ? porsche::crt_compare_string_a_005ad042(0u, 1u, "", 0, "xy", -1, 1252u)
+                             : orig_5ad042(0u, 1u, "", 0, "xy", -1, 1252u);
+        trace.ret0 = c_lt;
+        trace.ret1 = c_gt;
+        trace.str_hash = fnv1a(m0);
+        trace.bool_flags = (m0 == dbcs + 4 ? 1u : 0u) |
+                           (c_eq == 0 ? 2u : 0u) |
+                           (c_z1 == 1 ? 4u : 0u) |
+                           (c_zn == 1 ? 8u : 0u);
+    });
+
+    std::printf("crt_shutdown_env_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

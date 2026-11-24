@@ -1,11 +1,11 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run839 PASS (`834/005` + `837/003`: 9 bodies/sub-slices + ops tables,
-32 cases, 13 mutations, 45B `.rdata` + 108B `.data`/`.bss`, 486 TUs, 39/43
-names/refs, 1,205 pins, registry 1,432, no EXE). Closes `8`, `0` new; live
+Текущее: Run841 PASS (`835/012` + `838/002`: 37 bodies, 106 cases, 21 mutations,
+440B `.data`/`.bss`, 488 TUs, 38/41 names/refs, 1,210 pins, registry 1,469, no
+EXE). Closes `3`, opens `global_00657430`/`transform_vectors_00532a40`; live
 renderer & startup open.
 
-Historical: Run836 PASS (`825/010` + `830/001` + `rtti.cpp`: 5 RTTI/cast bodies +
+Historical: Run839 PASS (`834/005` + `837/003`: 9 bodies/sub-slices + ops tables,
 16 mutations, 5,444B `.bss`, 482 TUs, 52/59 names/refs, 1,194 pins, registry
 36 cases, 14 mutations, 55B `.data`/`.bss` + 324B `.rdata`, 480 TUs, 59/66
 632 cases, 30 mutations, 351B `.rdata` + 4B `.bss`, 478 TUs, 65/72 names/refs,
