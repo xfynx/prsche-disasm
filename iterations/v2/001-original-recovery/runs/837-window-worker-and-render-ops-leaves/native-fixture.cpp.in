@@ -1,0 +1,334 @@
+// Native x86-vs-C++ differential fixture for Run837 window worker and render ops leaves.
+#define _CRT_SECURE_NO_WARNINGS
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "window_render_ops_837.hpp"
+#include "porsche/fe_stream.hpp"
+#include "porsche/window_scheduler.hpp"
+#include "porsche/window_shutdown.hpp"
+#include "porsche/window_worker.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kMaxEvents = 16u,
+};
+
+struct EventRec {
+    U kind;
+    U a0;
+    U a1;
+    char tag[32];
+};
+
+struct Snapshot {
+    U abi_fail;
+    U ret;
+    U palette;
+    U alloc_flags;
+    U ev_count;
+    EventRec ev[kMaxEvents];
+};
+
+Snapshot expected;
+Snapshot actual;
+Snapshot* cur = nullptr;
+
+U g_cases = 0u;
+U g_worker_cb_hits = 0u;
+U g_alloc_ret = 0x12340000u;
+
+void push_event(U kind, U a0, U a1, const char* tag) {
+    if (cur && cur->ev_count < kMaxEvents) {
+        EventRec rec{};
+        rec.kind = kind;
+        rec.a0 = a0;
+        rec.a1 = a1;
+        if (tag) {
+            const std::size_t len = std::strlen(tag);
+            const std::size_t n = (len < sizeof(rec.tag) - 1u) ? len : (sizeof(rec.tag) - 1u);
+            std::memcpy(rec.tag, tag, n);
+            rec.tag[n] = '\0';
+        }
+        cur->ev[cur->ev_count++] = rec;
+    }
+}
+
+void write_u32(void* p, std::size_t off, U value) {
+    std::memcpy(static_cast<B*>(p) + off, &value, sizeof(value));
+}
+
+void write_rel32(B* code, std::size_t disp_off, const void* target) {
+    const auto next_ip = reinterpret_cast<std::uintptr_t>(code + disp_off + 4u);
+    const auto dst = reinterpret_cast<std::uintptr_t>(target);
+    const auto rel = static_cast<std::int32_t>(dst - next_ip);
+    std::memcpy(code + disp_off, &rel, sizeof(rel));
+}
+
+B* alloc_rwx(const B* bytes, std::size_t count) {
+    auto* mem = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!mem) {
+        std::printf("divergence VirtualAlloc failed\n");
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+    std::memcpy(mem, bytes, count);
+    return mem;
+}
+
+const B kRaw53cec0[] = {@BODY_0053CEC0@};
+const B kRaw53d360[] = {@BODY_0053D360@};
+const B kRaw53d380[] = {@BODY_0053D380@};
+const B kRaw572610[] = {@BODY_00572610@};
+const B kRaw572630[] = {@BODY_00572630@};
+
+static_assert(sizeof(kRaw53cec0) == 15u, "0053cec0 size mismatch");
+static_assert(sizeof(kRaw53d360) == 25u, "0053d360 size mismatch");
+static_assert(sizeof(kRaw53d380) == 12u, "0053d380 size mismatch");
+static_assert(sizeof(kRaw572610) == 25u, "00572610 size mismatch");
+static_assert(sizeof(kRaw572630) == 12u, "00572630 size mismatch");
+
+const char kSoftFontTag[] = "SOFTFONT";
+const char kMouseFontTag[] = "FONT_dtexfalloc";
+
+B* g_code_53cec0 = nullptr;
+B* g_code_53d360 = nullptr;
+B* g_code_53d380 = nullptr;
+B* g_code_572610 = nullptr;
+B* g_code_572630 = nullptr;
+
+void fail_if_diff(const char* name) {
+    if (expected.abi_fail != 0u || actual.abi_fail != 0u ||
+        std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+        std::printf("divergence %s\n", name);
+        std::printf("  expected: abi=%u ret=0x%08x pal=0x%08x flags=0x%08x ev=%u\n",
+                    expected.abi_fail, expected.ret, expected.palette, expected.alloc_flags, expected.ev_count);
+        std::printf("  actual:   abi=%u ret=0x%08x pal=0x%08x flags=0x%08x ev=%u\n",
+                    actual.abi_fail, actual.ret, actual.palette, actual.alloc_flags, actual.ev_count);
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+}
+
+void exec_u32_1arg(Snapshot* snap, void* fn, U arg) {
+    cur = snap;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u, ret = 0u;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push arg
+        mov eax, fn
+        call eax
+        add esp, 4
+        mov esp_a, esp
+        mov ret, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    snap->abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a ||
+                      edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+    snap->ret = ret;
+    snap->palette = porsche::render_service_palette_0069eb98;
+    snap->alloc_flags = porsche::render_alloc_flags_005deb60;
+}
+
+void run_set_flag(const char* name, U initial_pal, U arg) {
+    ++g_cases;
+    std::memset(&expected, 0, sizeof(expected));
+    std::memset(&actual, 0, sizeof(actual));
+    porsche::render_service_palette_0069eb98 = initial_pal;
+    exec_u32_1arg(&expected, g_code_53cec0, arg);
+    porsche::render_service_palette_0069eb98 = initial_pal;
+    exec_u32_1arg(&actual, reinterpret_cast<void*>(&porsche::render_service_set_flag_0053cec0), arg);
+    fail_if_diff(name);
+}
+
+void run_alloc(const char* name, void* x86_fn, void* cpp_fn, U flags, I size, U ret_token) {
+    ++g_cases;
+    std::memset(&expected, 0, sizeof(expected));
+    std::memset(&actual, 0, sizeof(actual));
+    porsche::render_alloc_flags_005deb60 = flags;
+    g_alloc_ret = ret_token;
+    exec_u32_1arg(&expected, x86_fn, static_cast<U>(size));
+    porsche::render_alloc_flags_005deb60 = flags;
+    g_alloc_ret = ret_token;
+    exec_u32_1arg(&actual, cpp_fn, static_cast<U>(size));
+    fail_if_diff(name);
+}
+
+void run_free(const char* name, void* x86_fn, void* cpp_fn, U ptr_val) {
+    ++g_cases;
+    std::memset(&expected, 0, sizeof(expected));
+    std::memset(&actual, 0, sizeof(actual));
+    exec_u32_1arg(&expected, x86_fn, ptr_val);
+    expected.ret = 0u; // void __cdecl return
+    exec_u32_1arg(&actual, cpp_fn, ptr_val);
+    actual.ret = 0u;
+    fail_if_diff(name);
+}
+
+void __cdecl sample_worker_cb() {
+    ++g_worker_cb_hits;
+}
+
+void setup_rwx() {
+    g_code_53cec0 = alloc_rwx(kRaw53cec0, sizeof(kRaw53cec0));
+    write_u32(g_code_53cec0, 0x05u, static_cast<U>(reinterpret_cast<std::uintptr_t>(&porsche::render_service_palette_0069eb98)));
+
+    g_code_53d360 = alloc_rwx(kRaw53d360, sizeof(kRaw53d360));
+    write_u32(g_code_53d360, 0x01u, static_cast<U>(reinterpret_cast<std::uintptr_t>(&porsche::render_alloc_flags_005deb60)));
+    write_u32(g_code_53d360, 0x0cu, static_cast<U>(reinterpret_cast<std::uintptr_t>(kSoftFontTag)));
+    write_rel32(g_code_53d360, 0x11u, reinterpret_cast<void*>(&porsche::allocate_00531ca0));
+
+    g_code_53d380 = alloc_rwx(kRaw53d380, sizeof(kRaw53d380));
+    write_rel32(g_code_53d380, 0x06u, reinterpret_cast<void*>(&porsche::free_00531f90));
+
+    g_code_572610 = alloc_rwx(kRaw572610, sizeof(kRaw572610));
+    write_u32(g_code_572610, 0x01u, static_cast<U>(reinterpret_cast<std::uintptr_t>(&porsche::render_alloc_flags_005deb60)));
+    write_u32(g_code_572610, 0x0cu, static_cast<U>(reinterpret_cast<std::uintptr_t>(kMouseFontTag)));
+    write_rel32(g_code_572610, 0x11u, reinterpret_cast<void*>(&porsche::allocate_00531ca0));
+
+    g_code_572630 = alloc_rwx(kRaw572630, sizeof(kRaw572630));
+    write_rel32(g_code_572630, 0x06u, reinterpret_cast<void*>(&porsche::free_00531f90));
+}
+
+} // namespace
+
+namespace porsche {
+
+std::uint32_t worker_callback_0069e5a4 = 0u;
+
+void* __cdecl allocate_00531ca0(const char* name, std::int32_t size, std::uint32_t flags) {
+    push_event(1u, static_cast<U>(size), flags, name);
+    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(g_alloc_ret));
+}
+
+std::uint32_t __cdecl free_00531f90(void* ptr) {
+    push_event(2u, static_cast<U>(reinterpret_cast<std::uintptr_t>(ptr)), 0u, "free");
+    return 1u;
+}
+
+std::uint32_t __cdecl window_shutdown_callback_0053bae0(
+    std::uint32_t /*callback_context*/, std::uint32_t /*elapsed*/) {
+    return 0u;
+}
+
+std::uint32_t __cdecl window_scheduler_register_005365e0(
+    TimedCallback callback, std::uint32_t period, std::uint32_t initial_delay) {
+    const U is_shutdown = (callback == &window_shutdown_callback_0053bae0) ? 1u : 0u;
+    push_event(3u, is_shutdown, (period << 16u) ^ initial_delay, "sched");
+    return 77u + period + initial_delay;
+}
+
+} // namespace porsche
+
+int main() {
+    setup_rwx();
+
+    run_set_flag("set-flag-zero", 0x12345678u, 0u);
+    run_set_flag("set-flag-nonzero", 0u, 0x00abcdefu);
+
+    run_alloc("service-alloc-0", g_code_53d360, reinterpret_cast<void*>(&porsche::render_service_alloc_0053d360), 0u, 0xecu, 0x40001000u);
+    run_alloc("service-alloc-flags", g_code_53d360, reinterpret_cast<void*>(&porsche::render_service_alloc_0053d360), 0x10u, 0x400u, 0u);
+    run_free("service-free", g_code_53d380, reinterpret_cast<void*>(&porsche::render_service_free_0053d380), 0x40001000u);
+
+    run_alloc("mouse-alloc-0", g_code_572610, reinterpret_cast<void*>(&porsche::render_mouse_alloc_00572610), 0u, 0xecu, 0x50002000u);
+    run_alloc("mouse-alloc-flags", g_code_572610, reinterpret_cast<void*>(&porsche::render_mouse_alloc_00572610), 0x08u, 0x200u, 0u);
+    run_free("mouse-free", g_code_572630, reinterpret_cast<void*>(&porsche::render_mouse_free_00572630), 0x50002000u);
+
+    // Verify ops tables wire slots [3], [5], [6] cleanly through render_service_ops_005dec08 / render_mouse_ops_table_005dfb60.
+    ++g_cases;
+    auto* const svc_ops = static_cast<void* const*>(porsche::render_service_ops_005dec08);
+    if (svc_ops != reinterpret_cast<void* const*>(&porsche::render_service_default_ops_005dec18[0])) {
+        std::printf("divergence service_ops_default\n");
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+    using SetFlagFn = U(__cdecl*)(U);
+    using AllocFn = void*(__cdecl*)(I);
+    using FreeFn = void(__cdecl*)(void*);
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    g_alloc_ret = 0x60003000u;
+    porsche::render_alloc_flags_005deb60 = 3u;
+    const U flag_rc = reinterpret_cast<SetFlagFn>(svc_ops[3])(0x55aa55aau);
+    void* const p_svc = reinterpret_cast<AllocFn>(svc_ops[5])(0x40);
+    reinterpret_cast<FreeFn>(svc_ops[6])(p_svc);
+    if (flag_rc != 1u || porsche::render_service_palette_0069eb98 != 0x55aa55aau ||
+        p_svc != reinterpret_cast<void*>(0x60003000u) || actual.ev_count != 2u ||
+        std::strcmp(actual.ev[0].tag, "SOFTFONT") != 0) {
+        std::printf("divergence service_ops_slots\n");
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+
+    ++g_cases;
+    if (porsche::render_mouse_ops_table_005dfb60[7] != 0xffffffffu) {
+        std::printf("divergence mouse_ops_sentinel\n");
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    g_alloc_ret = 0x70004000u;
+    void* const p_mouse = reinterpret_cast<AllocFn>(
+        static_cast<std::uintptr_t>(porsche::render_mouse_ops_table_005dfb60[5]))(0xec);
+    reinterpret_cast<FreeFn>(
+        static_cast<std::uintptr_t>(porsche::render_mouse_ops_table_005dfb60[6]))(p_mouse);
+    if (p_mouse != reinterpret_cast<void*>(0x70004000u) || actual.ev_count != 2u ||
+        std::strcmp(actual.ev[0].tag, "FONT_dtexfalloc") != 0) {
+        std::printf("divergence mouse_ops_slots\n");
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+
+    // Verify window_worker_callback & window_worker_idle_callback.
+    ++g_cases;
+    g_worker_cb_hits = 0u;
+    porsche::worker_callback_0069e5a4 = 0u;
+    porsche::window_worker_callback();
+    if (g_worker_cb_hits != 0u) {
+        std::printf("divergence worker_callback_null\n");
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+    porsche::worker_callback_0069e5a4 =
+        static_cast<U>(reinterpret_cast<std::uintptr_t>(&sample_worker_cb));
+    porsche::window_worker_callback();
+    if (g_worker_cb_hits != 1u) {
+        std::printf("divergence worker_callback_call\n");
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+
+    ++g_cases;
+    std::memset(&actual, 0, sizeof(actual));
+    cur = &actual;
+    const U sched_rc = porsche::window_worker_idle_callback(1u, 10u, 0x0053bae0u);
+    if (sched_rc != 88u || actual.ev_count != 1u || actual.ev[0].kind != 3u ||
+        actual.ev[0].a0 != 1u || actual.ev[0].a1 != ((1u << 16u) ^ 10u)) {
+        std::printf("divergence worker_idle_callback\n");
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+
+    std::printf("window_render_ops_837_original_x86_vs_cpp=PASS cases=%u\n", g_cases);
+    std::fflush(nullptr);
+    return 0;
+}

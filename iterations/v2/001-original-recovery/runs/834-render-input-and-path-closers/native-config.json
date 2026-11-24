@@ -1,0 +1,90 @@
+{
+  "run": 834,
+  "experiment": "local/experiments/v2-render-input-path-834",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers/render_input_path_834.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers/render_input_path_834.hpp",
+    "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00467535",
+      "bytes": 25,
+      "sha256": "4150d13083b2a50b4867fd76dfaf8ba4e1bd18bed5eda30062dd12027caffb89",
+      "token": "@BODY_00467535@"
+    },
+    {
+      "va": "00532e10",
+      "bytes": 51,
+      "sha256": "643984231432206d6b4f36a234c67aacf2969619257fc193441c1ce6d0e96f20",
+      "token": "@BODY_00532E10@"
+    },
+    {
+      "va": "0059d680",
+      "bytes": 25,
+      "sha256": "f193bdf1962a2f653a31259c0bcfe298c12b6ff41e20c721bf091a352851c096",
+      "token": "@BODY_0059D680@"
+    }
+  ],
+  "pass_marker": "render_input_path_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-missing-cfg-text",
+      "source": "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers/render_input_path_834.cpp",
+      "old": "\"Run 3D Setup before running the game.\";",
+      "new": "\"Run 3D Audio before running the game.\";",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-missing-cfg-title",
+      "source": "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers/render_input_path_834.cpp",
+      "old": "const char render_missing_setup_title_005cf7b4[7] = \"Error:\";",
+      "new": "const char render_missing_setup_title_005cf7b4[7] = \"Fatal:\";",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-missing-cfg-flags",
+      "source": "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers/render_input_path_834.cpp",
+      "old": "        0u, render_missing_setup_text_005cf78c, render_missing_setup_title_005cf7b4, 0u);",
+      "new": "        0u, render_missing_setup_text_005cf78c, render_missing_setup_title_005cf7b4, 16u);",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-missing-cfg-exit",
+      "source": "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers/render_input_path_834.cpp",
+      "old": "    process_exit_005a246e(1u);",
+      "new": "    process_exit_005a246e(2u);",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-neg-input-ret",
+      "source": "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers/render_input_path_834.cpp",
+      "old": "void* __cdecl input_negative_index_00532e10(std::int32_t index, std::uint32_t mode) {\n    (void)index;\n    (void)mode;\n    return nullptr;\n}",
+      "new": "void* __cdecl input_negative_index_00532e10(std::int32_t index, std::uint32_t mode) {\n    (void)index;\n    (void)mode;\n    return reinterpret_cast<void*>(1u);\n}",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-unmapped-input-ret",
+      "source": "iterations/v2/001-original-recovery/runs/834-render-input-and-path-closers/render_input_path_834.cpp",
+      "old": "void* __cdecl input_unmapped_index_00532e10(std::uint32_t index, std::uint32_t mode) {\n    (void)index;\n    (void)mode;\n    return nullptr;\n}",
+      "new": "void* __cdecl input_unmapped_index_00532e10(std::uint32_t index, std::uint32_t mode) {\n    (void)index;\n    (void)mode;\n    return reinterpret_cast<void*>(1u);\n}",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    }
+  ]
+}

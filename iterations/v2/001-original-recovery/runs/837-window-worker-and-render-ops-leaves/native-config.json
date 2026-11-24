@@ -1,0 +1,97 @@
+{
+  "run": 837,
+  "experiment": "local/experiments/v2-window-render-ops-837",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/window_render_ops_837.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/window_render_ops_837.hpp",
+    "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/original-index-supplement.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "0053cec0",
+      "bytes": 15,
+      "sha256": "c82dd2390ab5e0bf1fcd0b30f9f18c30c01e0ef89c7dacbf4e6fb93f6296f13d",
+      "token": "@BODY_0053CEC0@"
+    },
+    {
+      "va": "0053d360",
+      "bytes": 25,
+      "sha256": "ec3bec91c33fd5ea97bd45d9a688947c89145e9d165e741856ad939afd025648",
+      "token": "@BODY_0053D360@"
+    },
+    {
+      "va": "0053d380",
+      "bytes": 12,
+      "sha256": "1cdd28119a962b6591d79c140dfb01d50c5896c1a5c72bc8ddb5e95b1bd7ec10",
+      "token": "@BODY_0053D380@"
+    },
+    {
+      "va": "00572610",
+      "bytes": 25,
+      "sha256": "ea1ecdab3228a26aedde6059f89d5b37d545650f1ca3970d71d3ae6a9610fb09",
+      "token": "@BODY_00572610@"
+    },
+    {
+      "va": "00572630",
+      "bytes": 12,
+      "sha256": "2c1f9e808542dbd5c9266fbcd21574f1f1c95df8ba4971ca23667276bb10cd21",
+      "token": "@BODY_00572630@"
+    }
+  ],
+  "pass_marker": "window_render_ops_837_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-53cec0-ret",
+      "source": "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/window_render_ops_837.cpp",
+      "old": "    render_service_palette_0069eb98 = value;\n    return 1u;",
+      "new": "    render_service_palette_0069eb98 = value;\n    return 0u;"
+    },
+    {
+      "name": "wrong-53d360-tag",
+      "source": "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/window_render_ops_837.cpp",
+      "old": "    return allocate_00531ca0(\"SOFTFONT\", size, render_alloc_flags_005deb60);",
+      "new": "    return allocate_00531ca0(\"BADFONT\", size, render_alloc_flags_005deb60);"
+    },
+    {
+      "name": "wrong-53d380-skip",
+      "source": "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/window_render_ops_837.cpp",
+      "old": "void __cdecl render_service_free_0053d380(void* ptr) {\n    (void)free_00531f90(ptr);\n}",
+      "new": "void __cdecl render_service_free_0053d380(void* ptr) {\n    (void)ptr;\n}"
+    },
+    {
+      "name": "wrong-572610-tag",
+      "source": "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/window_render_ops_837.cpp",
+      "old": "    return allocate_00531ca0(\"FONT_dtexfalloc\", size, render_alloc_flags_005deb60);",
+      "new": "    return allocate_00531ca0(\"FONT_wrong\", size, render_alloc_flags_005deb60);"
+    },
+    {
+      "name": "wrong-572630-skip",
+      "source": "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/window_render_ops_837.cpp",
+      "old": "void __cdecl render_mouse_free_00572630(void* ptr) {\n    (void)free_00531f90(ptr);\n}",
+      "new": "void __cdecl render_mouse_free_00572630(void* ptr) {\n    (void)ptr;\n}"
+    },
+    {
+      "name": "wrong-worker-idle-delay",
+      "source": "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/window_render_ops_837.cpp",
+      "old": "    return window_scheduler_register_005365e0(target, period, delay);",
+      "new": "    return window_scheduler_register_005365e0(target, period, delay ^ 1u);"
+    },
+    {
+      "name": "wrong-worker-cb-skip",
+      "source": "iterations/v2/001-original-recovery/runs/837-window-worker-and-render-ops-leaves/window_render_ops_837.cpp",
+      "old": "    if (worker_callback_0069e5a4 != 0u) {",
+      "new": "    if (worker_callback_0069e5a4 == 0xffffffffu) {"
+    }
+  ]
+}

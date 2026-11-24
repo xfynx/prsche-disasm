@@ -4,14 +4,15 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run836](iterations/v2/001-original-recovery/runs/836-rtti-cast-and-network-rtti-integration/README.md)
-compiles 484 TUs across eight projects (**47 unresolved names / 53
-references**, no EXE), accepting `825/010` + `830/001` + `rtti.cpp`: `1,423`
-registry entries (`+5`), `84` comparisons, `16` mutations, `60B` `.rdata`
-network RTTI, `1,200` source pins; closes `5` (`005a134b`, `005c5190`,
-`005c51d8`, `005c5228`, `005c18f8`), `0` new.
+[Run839](iterations/v2/001-original-recovery/runs/839-render-input-path-and-window-ops-integration/README.md)
+compiles 486 TUs across eight projects (**39 unresolved names / 43
+references**, no EXE), accepting `834/005` + `837/003`: `1,432` registry
+entries (`+9`), `32` comparisons, `13` mutations, `45B` `.rdata` & `108B`
+`.data`/`.bss`, `1,205` source pins; closes `8` (`00467535`, `2x 00532e10`,
+`0059d650`, `2x window_worker_*`, `005dec08`, `005dfb60`), `0` new.
 
-Historical: [Run833](iterations/v2/001-original-recovery/runs/833-player-tables-and-entry-fe-integration/README.md),
+Historical: [Run836](iterations/v2/001-original-recovery/runs/836-rtti-cast-and-network-rtti-integration/README.md),
+[Run833](iterations/v2/001-original-recovery/runs/833-player-tables-and-entry-fe-integration/README.md),
 [Run829](iterations/v2/001-original-recovery/runs/829-rtti-crt-exit-and-diag-integration/README.md),
 [Run826](iterations/v2/001-original-recovery/runs/826-ff-scene-ctor-and-sprite-sample-integration/README.md),
 [Run824](iterations/v2/001-original-recovery/runs/824-sprite-draw-and-color-closure-integration/README.md),

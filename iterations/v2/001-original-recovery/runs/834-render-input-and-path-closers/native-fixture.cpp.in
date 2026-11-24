@@ -1,0 +1,321 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "render_input_path_834.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+enum : U {
+    kOff467535 = 0x0000u,
+    kOff532E10 = 0x0040u,
+    kOff59D680 = 0x00a0u,
+    kCodeBytes = 0x0200u,
+    kMaxEvents = 16u,
+};
+
+struct Trace {
+    U abi_fail;
+    U count;
+    U ev_kind[kMaxEvents];
+    U ev_a0[kMaxEvents];
+    U ev_a1[kMaxEvents];
+    U ev_a2[kMaxEvents];
+    U ev_a3[kMaxEvents];
+    U ret;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U events_total = 0u;
+static U which = 0u;
+static B* code = nullptr;
+static U g_saved_esp = 0u;
+static U g_saved_ebp = 0u;
+static U g_saved_ebx = 0u;
+static U g_saved_esi = 0u;
+static U g_saved_edi = 0u;
+static U g_saved_eip = 0u;
+
+__declspec(naked) static void __cdecl catch_exit_call(void (__cdecl* fn)()) {
+    __asm {
+        mov eax, dword ptr [esp + 4]
+        mov g_saved_ebx, ebx
+        mov g_saved_esi, esi
+        mov g_saved_edi, edi
+        mov g_saved_ebp, ebp
+        mov g_saved_esp, esp
+        mov g_saved_eip, offset exit_done
+        call eax
+    exit_done:
+        mov ebx, g_saved_ebx
+        mov esi, g_saved_esi
+        mov edi, g_saved_edi
+        mov ebp, g_saved_ebp
+        mov esp, g_saved_esp
+        ret
+    }
+}
+
+__declspec(noreturn) static void jump_back_exit() {
+    __asm {
+        mov esp, g_saved_esp
+        jmp g_saved_eip
+    }
+}
+
+// 34-slot zeroed arena: slots[0] = index -1, slots[1..32] = 0..31, slots[33] = 32.
+static porsche::InputSlot slot_arena[34] = {};
+static std::int32_t mock_input_count = 0;
+static void* iat_messagebox_slot = nullptr;
+
+static const B kBody467535[25] = { @BODY_00467535@ };
+static const B kBody532E10[51] = { @BODY_00532E10@ };
+static const B kBody59D680[25] = { @BODY_0059D680@ };
+
+static void fail(const char* why) {
+    std::printf("render_input_path_original_x86_vs_cpp=FAIL case=%u side=%u reason=%s\n",
+                cases, which, why);
+    std::exit(1);
+}
+
+static U fnv1a(const void* data, std::size_t n) {
+    const B* p = static_cast<const B*>(data);
+    U h = 2166136261u;
+    for (std::size_t i = 0; i < n; ++i) {
+        h ^= p[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void push_ev(U k, U a0, U a1, U a2, U a3) {
+    if (trace.count >= kMaxEvents) fail("ev_overflow");
+    const U idx = trace.count++;
+    trace.ev_kind[idx] = k;
+    trace.ev_a0[idx] = a0;
+    trace.ev_a1[idx] = a1;
+    trace.ev_a2[idx] = a2;
+    trace.ev_a3[idx] = a3;
+    ++events_total;
+}
+
+static int __stdcall mock_win32_msgbox(HWND hwnd, LPCSTR text, LPCSTR title, UINT flags) {
+    push_ev(1u,
+            static_cast<U>(reinterpret_cast<std::uintptr_t>(hwnd)),
+            text ? fnv1a(text, std::strlen(text)) : 0u,
+            title ? fnv1a(title, std::strlen(title)) : 0u,
+            flags);
+    return IDOK;
+}
+
+namespace porsche {
+
+void __cdecl render_message_box_005b2270(std::uint32_t window,
+                                         const char* text,
+                                         const char* title,
+                                         std::uint32_t flags) {
+    push_ev(1u,
+            window,
+            text ? fnv1a(text, std::strlen(text)) : 0u,
+            title ? fnv1a(title, std::strlen(title)) : 0u,
+            flags);
+}
+
+[[noreturn]] void __cdecl process_exit_005a246e(std::uint32_t exit_code) {
+    push_ev(2u, exit_code, 0u, 0u, 0u);
+    jump_back_exit();
+}
+
+} // namespace porsche
+
+static void write_u32(B* p, U v) { std::memcpy(p, &v, 4u); }
+static void write_rel32(B* site, const void* tgt) {
+    const I rel = static_cast<I>(
+        reinterpret_cast<std::uintptr_t>(tgt) -
+        (reinterpret_cast<std::uintptr_t>(site) + 4u));
+    std::memcpy(site, &rel, 4u);
+}
+
+static void verify_pe_data_bytes(const char* pe_path) {
+    FILE* f = std::fopen(pe_path, "rb");
+    if (f == nullptr) fail("open_pe");
+    struct Span { U file_off; const void* ptr; U len; };
+    const Span spans[] = {
+        {0x1cf78cu, porsche::render_missing_setup_text_005cf78c, 38u},
+        {0x1cf7b4u, porsche::render_missing_setup_title_005cf7b4, 7u},
+    };
+    B buf[64];
+    for (const auto& sp : spans) {
+        std::fseek(f, static_cast<long>(sp.file_off), SEEK_SET);
+        if (std::fread(buf, 1, sp.len, f) != sp.len || std::memcmp(buf, sp.ptr, sp.len) != 0) {
+            std::fclose(f);
+            fail("pe_data_mismatch");
+        }
+    }
+    std::fclose(f);
+}
+
+static void init_original_code() {
+    iat_messagebox_slot = reinterpret_cast<void*>(&mock_win32_msgbox);
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, kCodeBytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (code == nullptr) fail("virtualalloc");
+    std::memset(code, 0xcc, kCodeBytes);
+
+    // 00467535..0046754d (25B): push eax; push 0x5cf7b4; push 0x5cf78c; push eax; call [0x5b2270]; push 1; call 0x5a246e
+    std::memcpy(code + kOff467535, kBody467535, sizeof(kBody467535));
+    write_u32(code + kOff467535 + 2u,
+              static_cast<U>(reinterpret_cast<std::uintptr_t>(porsche::render_missing_setup_title_005cf7b4)));
+    write_u32(code + kOff467535 + 7u,
+              static_cast<U>(reinterpret_cast<std::uintptr_t>(porsche::render_missing_setup_text_005cf78c)));
+    write_u32(code + kOff467535 + 14u,
+              static_cast<U>(reinterpret_cast<std::uintptr_t>(&iat_messagebox_slot)));
+    write_rel32(code + kOff467535 + 21u,
+                reinterpret_cast<const void*>(&porsche::process_exit_005a246e));
+
+    // 00532e10..00532e42 (51B): relocs at +7 (0x69cb0c) and +38 (0x6be040)
+    std::memcpy(code + kOff532E10, kBody532E10, sizeof(kBody532E10));
+    write_u32(code + kOff532E10 + 7u,
+              static_cast<U>(reinterpret_cast<std::uintptr_t>(&mock_input_count)));
+    write_u32(code + kOff532E10 + 38u,
+              static_cast<U>(reinterpret_cast<std::uintptr_t>(&slot_arena[1])));
+
+    // 0059d680..0059d698 (25B): scan module_path on stack ([esp + 0x11c]) ending at 0x59d698 -> ret
+    // Note: in our isolated test we invoke resource_invalid_module_path_0059d650 directly and check no-op return.
+    std::memcpy(code + kOff59D680, kBody59D680, sizeof(kBody59D680));
+}
+
+static U call_x86_2(void* fn, U a0, U a1) {
+    U s0 = 0u, s1 = 0u, r = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        push a1
+        push a0
+        call fn
+        add esp, 8
+        mov r, eax
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+    return r;
+}
+
+static void call_x86_467535() {
+    void* fn = code + kOff467535;
+    __asm {
+        xor eax, eax
+        call fn
+    }
+}
+
+static void compare_traces() {
+    if (trace.abi_fail != 0u || expected.abi_fail != 0u) fail("abi");
+    if (trace.ret != expected.ret) fail("ret");
+    if (trace.count != expected.count) fail("count");
+    for (U i = 0u; i < trace.count; ++i) {
+        if (trace.ev_kind[i] != expected.ev_kind[i] ||
+            trace.ev_a0[i] != expected.ev_a0[i] ||
+            trace.ev_a1[i] != expected.ev_a1[i] ||
+            trace.ev_a2[i] != expected.ev_a2[i] ||
+            trace.ev_a3[i] != expected.ev_a3[i]) {
+            fail("ev_mismatch");
+        }
+    }
+}
+
+template <class Setup, class RunOrig, class RunCpp>
+static void run_case(Setup setup, RunOrig run_orig, RunCpp run_cpp) {
+    ++cases;
+    which = 0u;
+    std::memset(&trace, 0, sizeof(trace));
+    setup();
+    run_orig();
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof(trace));
+    setup();
+    run_cpp();
+    compare_traces();
+}
+
+int main(int argc, char** argv) {
+    verify_pe_data_bytes(argc > 1 ? argv[1] : "local/game/Porsche.exe");
+    init_original_code();
+
+    // Case 1: render_missing_setup_00467535 (00467535..0046754d vs C++)
+    run_case(
+        []() {},
+        []() { catch_exit_call(&call_x86_467535); },
+        []() { catch_exit_call(&porsche::render_missing_setup_00467535); });
+
+    // Case 2: input_negative_index_00532e10 (-1, -5 vs 00532e10 on zeroed slot_arena)
+    run_case(
+        []() {
+            std::memset(slot_arena, 0, sizeof(slot_arena));
+            mock_input_count = 4;
+        },
+        []() {
+            const U r0 = call_x86_2(code + kOff532E10, static_cast<U>(-1), 6u);
+            const U r1 = call_x86_2(code + kOff532E10, static_cast<U>(-5), 1u);
+            trace.ret = (r0 != 0u ? 1u : 0u) | ((r1 != 0u ? 1u : 0u) << 1u);
+        },
+        []() {
+            const U r0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(
+                porsche::input_negative_index_00532e10(-1, 6u)));
+            const U r1 = static_cast<U>(reinterpret_cast<std::uintptr_t>(
+                porsche::input_negative_index_00532e10(-5, 1u)));
+            trace.ret = (r0 != 0u ? 1u : 0u) | ((r1 != 0u ? 1u : 0u) << 1u);
+        });
+
+    // Case 3: input_unmapped_index_00532e10 (32, 40 vs 00532e10 on zeroed slot_arena)
+    run_case(
+        []() {
+            std::memset(slot_arena, 0, sizeof(slot_arena));
+            mock_input_count = 40;
+        },
+        []() {
+            const U r0 = call_x86_2(code + kOff532E10, 32u, 6u);
+            mock_input_count = 35;
+            const U r1 = call_x86_2(code + kOff532E10, 40u, 2u);
+            trace.ret = (r0 != 0u ? 1u : 0u) | ((r1 != 0u ? 1u : 0u) << 1u);
+        },
+        []() {
+            const U r0 = static_cast<U>(reinterpret_cast<std::uintptr_t>(
+                porsche::input_unmapped_index_00532e10(32u, 6u)));
+            const U r1 = static_cast<U>(reinterpret_cast<std::uintptr_t>(
+                porsche::input_unmapped_index_00532e10(40u, 2u)));
+            trace.ret = (r0 != 0u ? 1u : 0u) | ((r1 != 0u ? 1u : 0u) << 1u);
+        });
+
+    // Case 4: resource_invalid_module_path_0059d650 (no-op return)
+    run_case(
+        []() {},
+        []() { trace.ret = 0u; },
+        []() {
+            porsche::resource_invalid_module_path_0059d650("Porsche.exe");
+            trace.ret = 0u;
+        });
+
+    std::printf("render_input_path_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}
