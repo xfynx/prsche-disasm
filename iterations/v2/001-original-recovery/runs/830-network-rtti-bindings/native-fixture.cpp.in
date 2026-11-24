@@ -1,0 +1,220 @@
+// Native x86-vs-C++ differential fixture for Run830:
+//   005c5190 (20B) porsche::network_rtti_005c5190 (CConClient COL)
+//   005c51d8 (20B) porsche::network_rtti_005c51d8 (CConnection COL)
+//   005c5228 (20B) porsche::network_rtti_005c5228 (CConHost COL)
+// Tested against original Porsche.exe RTTI consumers 005a14b3, 005a14cd, and 005a4c20.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "network_rtti_bindings_830.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+namespace porsche {
+
+const RttiTypeInfoTable rtti_type_info_table_005c18f8{nullptr, nullptr};
+RttiTypeDescriptor<17> rtti_client_type_005d0630{
+    {&rtti_type_info_table_005c18f8.destructor, nullptr}, ".?AVCConClient@@"};
+RttiTypeDescriptor<18> rtti_connection_type_005d0650{
+    {&rtti_type_info_table_005c18f8.destructor, nullptr}, ".?AVCConnection@@"};
+RttiTypeDescriptor<15> rtti_host_type_005d0690{
+    {&rtti_type_info_table_005c18f8.destructor, nullptr}, ".?AVCConHost@@"};
+
+namespace {
+
+const RttiBaseDescriptor kClientBase{&rtti_client_type_005d0630.prefix, 1u, {0, -1, 0}, 0u};
+const RttiBaseDescriptor kConnBase{&rtti_connection_type_005d0650.prefix, 0u, {0, -1, 0}, 0u};
+const RttiBaseDescriptor kHostBase{&rtti_host_type_005d0690.prefix, 1u, {0, -1, 0}, 0u};
+const RttiBaseDescriptor* const kClientBases[] = {&kClientBase, &kConnBase};
+const RttiBaseDescriptor* const kConnBases[] = {&kConnBase};
+const RttiBaseDescriptor* const kHostBases[] = {&kHostBase, &kConnBase};
+const RttiHierarchy kClientHier{0u, 0u, 2u, kClientBases};
+const RttiHierarchy kConnHier{0u, 0u, 1u, kConnBases};
+const RttiHierarchy kHostHier{0u, 0u, 2u, kHostBases};
+
+} // namespace
+
+const RttiCompleteObjectLocator network_rtti_005c5190{
+    0u, 0u, 0u, &rtti_client_type_005d0630.prefix, &kClientHier};
+const RttiCompleteObjectLocator network_rtti_005c51d8{
+    0u, 0u, 0u, &rtti_connection_type_005d0650.prefix, &kConnHier};
+const RttiCompleteObjectLocator network_rtti_005c5228{
+    0u, 0u, 0u, &rtti_host_type_005d0690.prefix, &kHostHier};
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_005a4c20 = nullptr;
+static B* slot_005a14b3 = nullptr;
+static B* slot_005a14cd = nullptr;
+
+static porsche::RttiCompleteObjectLocator g_raw_cols[3]{};
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void init() {
+    static const B body_005c5190[] = {@BODY_005C5190@};
+    static const B body_005c51d8[] = {@BODY_005C51D8@};
+    static const B body_005c5228[] = {@BODY_005C5228@};
+    static const B body_005a14b3[] = {@BODY_005A14B3@};
+    static const B body_005a14cd[] = {@BODY_005A14CD@};
+    static const B body_005a4c20[] = {@BODY_005A4C20@};
+
+    const B* raw_col_bytes[3] = {body_005c5190, body_005c51d8, body_005c5228};
+    const porsche::RttiTypePrefix* tds[3] = {
+        &porsche::rtti_client_type_005d0630.prefix,
+        &porsche::rtti_connection_type_005d0650.prefix,
+        &porsche::rtti_host_type_005d0690.prefix,
+    };
+    const porsche::RttiHierarchy* hiers[3] = {
+        porsche::network_rtti_005c5190.hierarchy,
+        porsche::network_rtti_005c51d8.hierarchy,
+        porsche::network_rtti_005c5228.hierarchy,
+    };
+    const U expected_td_vas[3] = {0x005d0630u, 0x005d0650u, 0x005d0690u};
+    const U expected_hier_vas[3] = {0x005c5180u, 0x005c51c8u, 0x005c5218u};
+    for (U i = 0u; i < 3u; ++i) {
+        require(load32(raw_col_bytes[i], 12u) == expected_td_vas[i], "raw COL td VA");
+        require(load32(raw_col_bytes[i], 16u) == expected_hier_vas[i], "raw COL hier VA");
+        g_raw_cols[i] = {
+            load32(raw_col_bytes[i], 0u),
+            load32(raw_col_bytes[i], 4u),
+            load32(raw_col_bytes[i], 8u),
+            tds[i],
+            hiers[i]};
+    }
+
+    code_page = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc");
+
+    slot_005a4c20 = code_page;
+    std::memcpy(slot_005a4c20, body_005a4c20, sizeof(body_005a4c20));
+
+    slot_005a14b3 = code_page + 256u;
+    std::memcpy(slot_005a14b3, body_005a14b3, sizeof(body_005a14b3));
+
+    slot_005a14cd = code_page + 512u;
+    std::memcpy(slot_005a14cd, body_005a14cd, sizeof(body_005a14cd));
+    relocate_call_rel32(slot_005a14cd, 0x005a14cdu, 0x02du, 0x005a4c20u, slot_005a4c20);
+
+    FlushInstructionCache(GetCurrentProcess(), code_page, 4096u);
+}
+
+static void check_binding_targets() {
+    using CmpFn = I (__cdecl*)(const char*, const char*);
+    using CompleteFn = void* (__cdecl*)(void*);
+    using FindFn = const porsche::RttiBaseDescriptor* (__cdecl*)(
+        void*, const porsche::RttiCompleteObjectLocator*,
+        const porsche::RttiTypePrefix*, U, const porsche::RttiTypePrefix*);
+
+    auto cmp_x86 = reinterpret_cast<CmpFn>(slot_005a4c20);
+    auto complete_x86 = reinterpret_cast<CompleteFn>(slot_005a14b3);
+    auto find_x86 = reinterpret_cast<FindFn>(slot_005a14cd);
+
+    const char* expected_names[3] = {
+        ".?AVCConClient@@",
+        ".?AVCConnection@@",
+        ".?AVCConHost@@",
+    };
+
+    for (U i = 0u; i < 3u; ++i) {
+        ++cases;
+        const auto* col = porsche::network_rtti_binding_targets_830[i];
+        require(col != nullptr, "nonnull col");
+        require(col->signature == g_raw_cols[i].signature &&
+                col->offset == g_raw_cols[i].offset &&
+                col->constructor_displacement == g_raw_cols[i].constructor_displacement &&
+                col->type == g_raw_cols[i].type &&
+                col->hierarchy == g_raw_cols[i].hierarchy,
+                "col fields parity");
+        require(cmp_x86(reinterpret_cast<const char*>(col->type) + 8, expected_names[i]) == 0,
+                "col type name");
+    }
+
+    // Verify original 005a14b3 (complete object) and 005a14cd (find single) through simulated vtable owners.
+    struct VtableWithCol {
+        const porsche::RttiCompleteObjectLocator* col;
+        U send_slot;
+    };
+    struct FakeObj {
+        const U* vptr;
+        U payload;
+    };
+
+    for (U i = 0u; i < 3u; ++i) {
+        VtableWithCol raw_vt{&g_raw_cols[i], 0u};
+        VtableWithCol cpp_vt{porsche::network_rtti_binding_targets_830[i], 0u};
+        FakeObj raw_obj{&raw_vt.send_slot, 0x1111u + i};
+        FakeObj cpp_obj{&cpp_vt.send_slot, 0x1111u + i};
+
+        ++cases;
+        require(complete_x86(&raw_obj) == &raw_obj, "raw complete obj");
+        require(complete_x86(&cpp_obj) == &cpp_obj, "cpp complete obj");
+
+        for (U ti = 0u; ti < 3u; ++ti) {
+            ++cases;
+            const auto* rb = find_x86(
+                nullptr, &g_raw_cols[i], g_raw_cols[i].type, 0u, g_raw_cols[ti].type);
+            const auto* cb = find_x86(
+                nullptr,
+                porsche::network_rtti_binding_targets_830[i],
+                porsche::network_rtti_binding_targets_830[i]->type,
+                0u,
+                porsche::network_rtti_binding_targets_830[ti]->type);
+            require((rb == nullptr) == (cb == nullptr), "find_single match parity");
+            if (rb != nullptr) {
+                require(rb->contained_bases == cb->contained_bases &&
+                        rb->attributes == cb->attributes &&
+                        cmp_x86(reinterpret_cast<const char*>(rb->type) + 8,
+                                reinterpret_cast<const char*>(cb->type) + 8) == 0,
+                        "find_single base parity");
+            }
+        }
+    }
+}
+
+int main() {
+    init();
+    check_binding_targets();
+    std::printf("network_rtti_bindings_830_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

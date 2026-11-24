@@ -1,0 +1,117 @@
+{
+  "run": 825,
+  "experiment": "local/experiments/v2-rtti-cast-leaves-825",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/rtti.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.hpp",
+    "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/bindings.cmake",
+    "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/original-index-supplement.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "005a134b",
+      "bytes": 279,
+      "sha256": "176263546626d3f3c53688fda182fc21744f2a4b53ac338b36ec3c8b070848c7",
+      "token": "@BODY_005A134B@"
+    },
+    {
+      "va": "005a12f9",
+      "bytes": 34,
+      "sha256": "ec003cf6227865e787958110e5c694e30218eca190379cdcda7004d00e2bf585",
+      "token": "@BODY_005A12F9@"
+    },
+    {
+      "va": "005a1462",
+      "bytes": 24,
+      "sha256": "5fb442a4bd595fb26aaec41d6219f6af479658b5335415d3ab55f27465043c1d",
+      "token": "@BODY_005A1462@"
+    },
+    {
+      "va": "005a5088",
+      "bytes": 61,
+      "sha256": "73f817b527e53001fdee637fec4b0209cc963d05f0aee05e181d8a4140381a13",
+      "token": "@BODY_005A5088@"
+    },
+    {
+      "va": "005a5304",
+      "bytes": 58,
+      "sha256": "73634557837bb62bbbaccde084236306a8c0a558ff6572fac18f67a39229a812",
+      "token": "@BODY_005A5304@"
+    }
+  ],
+  "pass_marker": "rtti_cast_825_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-5a134b-null-element",
+      "source": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+      "old": "    if (element == 0u) {\n        return 0u;\n    }",
+      "new": "    if (element == 0u) {\n        return 1u;\n    }"
+    },
+    {
+      "name": "wrong-5a134b-vf-delta-sign",
+      "source": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+      "old": "        const std::uint32_t adjusted = element - vf_delta;",
+      "new": "        const std::uint32_t adjusted = element + vf_delta;"
+    },
+    {
+      "name": "wrong-5a134b-single-bit",
+      "source": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+      "old": "        if ((attributes & 1u) == 0u) {",
+      "new": "        if ((attributes & 1u) != 0u) {"
+    },
+    {
+      "name": "wrong-5a134b-multiple-bit",
+      "source": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+      "old": "        } else if ((attributes & 2u) == 0u) {",
+      "new": "        } else if ((attributes & 4u) == 0u) {"
+    },
+    {
+      "name": "wrong-5a134b-is-ref-guard",
+      "source": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+      "old": "    if (result != 0u || arg4 == 0u) {",
+      "new": "    if (result != 0u || arg4 != 0u) {"
+    },
+    {
+      "name": "wrong-5a134b-av-throw",
+      "source": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+      "old": "        rtti_non_rtti_object_005a12f9(&ex, nullptr, \"Access violation - no RTTI data!\");",
+      "new": "        rtti_non_rtti_object_005a12f9(&ex, nullptr, \"Access violation - wrong!\");"
+    },
+    {
+      "name": "wrong-5a12f9-vtable",
+      "source": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+      "old": "    self->vtable = kNonRttiVtable_005c1924;",
+      "new": "    self->vtable = nullptr;"
+    },
+    {
+      "name": "wrong-5a1462-vtable",
+      "source": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+      "old": "    self->vtable = kBadCastVtable_005c1960;",
+      "new": "    self->vtable = nullptr;"
+    },
+    {
+      "name": "wrong-5a5088-do-free",
+      "source": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+      "old": "    self->do_free = 1u;",
+      "new": "    self->do_free = 0u;"
+    },
+    {
+      "name": "wrong-5a5304-magic",
+      "source": "iterations/v2/001-original-recovery/runs/825-rtti-dynamic-cast-and-runtime-leaves/rtti_cast_825.cpp",
+      "old": "        static_cast<ULONG_PTR>(0x19930520u),",
+      "new": "        static_cast<ULONG_PTR>(0x19930521u),"
+    }
+  ]
+}

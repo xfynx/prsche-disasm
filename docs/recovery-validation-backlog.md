@@ -1,10 +1,12 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run833 PASS (`831/003` + `832/003`: 16 bodies + tables/alias, 60 cases,
-16 mutations, 5,444B `.bss`, 482 TUs, 52/59 names/refs, 1,194 pins, registry
-1,418, no EXE). Closes `7`, `0` new; live renderer & startup open.
+Текущее: Run836 PASS (`825/010` + `830/001` + `rtti.cpp`: 5 RTTI/cast bodies +
+bindings, 84 cases, 16 mutations, 60B `.rdata`, 484 TUs, 47/53 names/refs,
+1,200 pins, registry 1,423, no EXE). Closes `5`, `0` new; live renderer &
+startup open.
 
-Historical: Run829 PASS (`827/002` + `828/001`: 2 RTTI graphs + 5 CRT/diag closers,
+Historical: Run833 PASS (`831/003` + `832/003`: 16 bodies + tables/alias, 60 cases,
+16 mutations, 5,444B `.bss`, 482 TUs, 52/59 names/refs, 1,194 pins, registry
 36 cases, 14 mutations, 55B `.data`/`.bss` + 324B `.rdata`, 480 TUs, 59/66
 632 cases, 30 mutations, 351B `.rdata` + 4B `.bss`, 478 TUs, 65/72 names/refs,
 534 cases, 29 mutations, 256B `.rdata` + 8,208B `.data`/`.bss`, 475 TUs, 69/77

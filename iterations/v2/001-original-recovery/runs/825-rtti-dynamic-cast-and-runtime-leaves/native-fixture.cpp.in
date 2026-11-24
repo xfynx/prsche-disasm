@@ -1,0 +1,688 @@
+// Native x86-vs-C++ differential fixture for Run825 RTTI dynamic_cast and exception helpers.
+#define _CRT_SECURE_NO_WARNINGS
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <intrin.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "rtti_cast_825.hpp"
+#include "porsche/application_alloc.hpp"
+#include "porsche/exit_registry.hpp"
+#include "porsche/formatter_bootstrap.hpp"
+#include "porsche/formatter_crt_runtime.hpp"
+#include "porsche/formatter_runtime.hpp"
+#include "porsche/rtti.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kMaxEvents = 16u,
+};
+
+struct EventRec {
+    U kind;
+    U a0;
+    U a1;
+    U a2;
+};
+
+struct Snapshot {
+    U abi_fail;
+    U ret;
+    U threw;
+    U seh_code;
+    U seh_flags;
+    U seh_nargs;
+    U seh_magic;
+    U has_what;
+    U do_free;
+    char what[96];
+    U ev_count;
+    EventRec ev[kMaxEvents];
+};
+
+Snapshot expected;
+Snapshot actual;
+Snapshot* cur = nullptr;
+
+bool g_alloc_fail = false;
+bool g_x86_5a134b_active = false;
+U g_cases = 0u;
+
+void push_event(U kind, U a0, U a1, U a2) {
+    if (cur && cur->ev_count < kMaxEvents) {
+        cur->ev[cur->ev_count++] = EventRec{kind, a0, a1, a2};
+    }
+}
+
+void copy_what(char* dst, std::size_t dst_cap, const char* src) {
+    if (!src || dst_cap == 0u) {
+        return;
+    }
+    const std::size_t len = std::strlen(src);
+    const std::size_t n = (len < dst_cap - 1u) ? len : (dst_cap - 1u);
+    std::memcpy(dst, src, n);
+    dst[n] = '\0';
+}
+
+void write_u32(void* p, std::size_t off, U value) {
+    std::memcpy(static_cast<B*>(p) + off, &value, sizeof(value));
+}
+
+void write_rel32(B* code, std::size_t disp_off, const void* target) {
+    const auto next_ip = reinterpret_cast<std::uintptr_t>(code + disp_off + 4u);
+    const auto dst = reinterpret_cast<std::uintptr_t>(target);
+    const auto rel = static_cast<std::int32_t>(dst - next_ip);
+    std::memcpy(code + disp_off, &rel, sizeof(rel));
+}
+
+B* alloc_rwx(const B* bytes, std::size_t count) {
+    auto* mem = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!mem) {
+        std::printf("divergence VirtualAlloc failed\n");
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+    std::memcpy(mem, bytes, count);
+    return mem;
+}
+
+const B kRaw5a134b[] = {@BODY_005A134B@};
+const B kRaw5a12f9[] = {@BODY_005A12F9@};
+const B kRaw5a1462[] = {@BODY_005A1462@};
+const B kRaw5a5088[] = {@BODY_005A5088@};
+const B kRaw5a5304[] = {@BODY_005A5304@};
+
+static_assert(sizeof(kRaw5a134b) == 279u, "005a134b size mismatch");
+static_assert(sizeof(kRaw5a12f9) == 34u, "005a12f9 size mismatch");
+static_assert(sizeof(kRaw5a1462) == 24u, "005a1462 size mismatch");
+static_assert(sizeof(kRaw5a5088) == 61u, "005a5088 size mismatch");
+static_assert(sizeof(kRaw5a5304) == 58u, "005a5304 size mismatch");
+
+struct SehScopeEntry {
+    U enclosing_level;
+    const void* filter;
+    const void* handler;
+};
+
+struct Eh3Registration {
+    Eh3Registration* next;
+    void* handler;
+    SehScopeEntry* scopetable;
+    I trylevel;
+};
+
+B* g_code_5a134b = nullptr;
+B* g_code_5a12f9 = nullptr;
+B* g_code_5a1462 = nullptr;
+B* g_code_5a5088 = nullptr;
+B* g_code_5a5304 = nullptr;
+
+SehScopeEntry g_scopetable_5a134b = {0xFFFFFFFFu, nullptr, nullptr};
+const char kBadCastMsg[] = "Bad dynamic_cast!";
+const char kNonRttiMsg[] = "Access violation - no RTTI data!";
+const U kThrowInfoDummy[4] = {0u, 0u, 0u, 0u};
+const U kCxxThrowTemplate[8] = {
+    0xE06D7363u, 1u, 0u, 0u, 3u, 0x19930520u, 0u, 0u
+};
+using RaiseExcFn = void(__stdcall*)(DWORD, DWORD, DWORD, const ULONG_PTR*);
+RaiseExcFn g_raise_exc_ptr = &RaiseException;
+
+const U kEhSentinel = 0x5A522C85u;
+
+int __cdecl call_eh3_filter(const void* filter_fn, U frame_ebp) {
+    int rc = 0;
+    __asm {
+        push ebp
+        mov eax, filter_fn
+        mov ebp, frame_ebp
+        call eax
+        pop ebp
+        mov rc, eax
+    }
+    return rc;
+}
+
+LONG CALLBACK veh_handler_5a134b(PEXCEPTION_POINTERS ep) {
+    if (!g_x86_5a134b_active || !ep || !ep->ExceptionRecord || !ep->ContextRecord) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    auto* reg = reinterpret_cast<Eh3Registration*>(static_cast<std::uintptr_t>(__readfsdword(0u)));
+    if (!reg || reinterpret_cast<std::uintptr_t>(reg->handler) != kEhSentinel) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    if (reg->trylevel == 0 && reg->scopetable && reg->scopetable->filter && reg->scopetable->handler) {
+        reinterpret_cast<U*>(reg)[-1] = static_cast<U>(reinterpret_cast<std::uintptr_t>(ep));
+        const U frame_ebp = static_cast<U>(reinterpret_cast<std::uintptr_t>(reg)) + 0x10u;
+        const int take = call_eh3_filter(reg->scopetable->filter, frame_ebp);
+        reg->trylevel = -1;
+        __writefsdword(0u, static_cast<DWORD>(reinterpret_cast<std::uintptr_t>(reg->next)));
+        if (take == 1) {
+            ep->ContextRecord->Ebp = frame_ebp;
+            ep->ContextRecord->Eip =
+                static_cast<DWORD>(reinterpret_cast<std::uintptr_t>(reg->scopetable->handler));
+            return EXCEPTION_CONTINUE_EXECUTION;
+        }
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    __writefsdword(0u, static_cast<DWORD>(reinterpret_cast<std::uintptr_t>(reg->next)));
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+int capture_seh(EXCEPTION_POINTERS* ep, Snapshot* snap) {
+    if (!ep || !ep->ExceptionRecord) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    const auto* er = ep->ExceptionRecord;
+    if (er->ExceptionCode != 0xE06D7363u) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    snap->threw = 1u;
+    snap->seh_code = er->ExceptionCode;
+    snap->seh_flags = er->ExceptionFlags;
+    snap->seh_nargs = er->NumberParameters;
+    if (er->NumberParameters >= 2u) {
+        snap->seh_magic = static_cast<U>(er->ExceptionInformation[0]);
+        const auto* ex = reinterpret_cast<const porsche::RttiStdException*>(
+            er->ExceptionInformation[1]);
+        if (ex) {
+            snap->do_free = ex->do_free;
+            snap->has_what = (ex->what != nullptr) ? 1u : 0u;
+            copy_what(snap->what, sizeof(snap->what), ex->what);
+        }
+    }
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+void fail_if_diff(const char* name) {
+    if (expected.abi_fail != 0u || actual.abi_fail != 0u ||
+        std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+        std::printf("divergence %s\n", name);
+        std::printf("  expected: abi=%u ret=0x%08x threw=%u code=0x%08x flags=%u nargs=%u magic=0x%08x what=%s do_free=%u ev=%u\n",
+                    expected.abi_fail, expected.ret, expected.threw, expected.seh_code,
+                    expected.seh_flags, expected.seh_nargs, expected.seh_magic,
+                    expected.what, expected.do_free, expected.ev_count);
+        std::printf("  actual:   abi=%u ret=0x%08x threw=%u code=0x%08x flags=%u nargs=%u magic=0x%08x what=%s do_free=%u ev=%u\n",
+                    actual.abi_fail, actual.ret, actual.threw, actual.seh_code,
+                    actual.seh_flags, actual.seh_nargs, actual.seh_magic,
+                    actual.what, actual.do_free, actual.ev_count);
+        std::fflush(nullptr);
+        ExitProcess(10u);
+    }
+}
+
+struct TypeDesc {
+    const void* vtable;
+    void* spare;
+    char name[32];
+};
+
+const TypeDesc td_base = {nullptr, nullptr, ".?AVBase825@@"};
+const TypeDesc td_mid = {nullptr, nullptr, ".?AVMid825@@"};
+const TypeDesc td_other = {nullptr, nullptr, ".?AVOther825@@"};
+const TypeDesc td_leaf = {nullptr, nullptr, ".?AVLeaf825@@"};
+const TypeDesc td_vbase = {nullptr, nullptr, ".?AVVBase825@@"};
+const TypeDesc td_ambig = {nullptr, nullptr, ".?AVAmbig825@@"};
+
+const porsche::RttiBaseDescriptor bd_base_single = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_base), 0u, {0, -1, 0}, 0u};
+const porsche::RttiBaseDescriptor bd_leaf_single = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_leaf), 1u, {0, -1, 0}, 0u};
+const porsche::RttiBaseDescriptor* const arr_single[] = {&bd_leaf_single, &bd_base_single};
+const porsche::RttiHierarchy hier_single = {0u, 0u, 2u, arr_single};
+const porsche::RttiCompleteObjectLocator col_single = {
+    0u, 0u, 0u,
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_leaf),
+    &hier_single};
+
+const porsche::RttiBaseDescriptor bd_mid_a = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_base), 0u, {0, -1, 0}, 0u};
+const porsche::RttiBaseDescriptor bd_mid_host = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_mid), 1u, {8, -1, 0}, 1u};
+const porsche::RttiBaseDescriptor bd_mid_b = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_other), 0u, {8, -1, 0}, 0u};
+const porsche::RttiBaseDescriptor bd_leaf_multi = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_leaf), 3u, {0, -1, 0}, 0u};
+const porsche::RttiBaseDescriptor* const arr_multi[] = {
+    &bd_leaf_multi, &bd_mid_a, &bd_mid_host, &bd_mid_b};
+const porsche::RttiHierarchy hier_multi = {0u, 1u, 4u, arr_multi};
+const porsche::RttiCompleteObjectLocator col_multi_0 = {
+    0u, 0u, 0u,
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_leaf),
+    &hier_multi};
+const porsche::RttiCompleteObjectLocator col_multi_8 = {
+    0u, 8u, 0u,
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_leaf),
+    &hier_multi};
+const porsche::RttiCompleteObjectLocator col_multi_12 = {
+    0u, 12u, 0u,
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_leaf),
+    &hier_multi};
+
+const porsche::RttiBaseDescriptor bd_vbase = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_vbase), 0u, {0, 4, 4}, 0u};
+const porsche::RttiBaseDescriptor bd_ambig_1 = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_ambig), 1u, {0, -1, 0}, 1u};
+const porsche::RttiBaseDescriptor bd_ambig_src_1 = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_leaf), 0u, {0, -1, 0}, 0u};
+const porsche::RttiBaseDescriptor bd_ambig_2 = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_ambig), 1u, {8, -1, 0}, 1u};
+const porsche::RttiBaseDescriptor bd_ambig_src_2 = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_leaf), 0u, {0, -1, 0}, 0u};
+const porsche::RttiBaseDescriptor bd_mid_v = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_mid), 1u, {0, -1, 0}, 0u};
+const porsche::RttiBaseDescriptor bd_leaf_v = {
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_leaf), 6u, {0, -1, 0}, 0u};
+const porsche::RttiBaseDescriptor* const arr_v[] = {
+    &bd_leaf_v, &bd_mid_v, &bd_vbase, &bd_ambig_1, &bd_ambig_src_1, &bd_ambig_2, &bd_ambig_src_2};
+const porsche::RttiHierarchy hier_v = {0u, 3u, 7u, arr_v};
+const porsche::RttiCompleteObjectLocator col_v = {
+    0u, 0u, 0u,
+    reinterpret_cast<const porsche::RttiTypePrefix*>(&td_leaf),
+    &hier_v};
+
+struct VtableSlot {
+    const porsche::RttiCompleteObjectLocator* col;
+    void* fn;
+};
+
+const VtableSlot vt_single = {&col_single, nullptr};
+const VtableSlot vt_multi_0 = {&col_multi_0, nullptr};
+const VtableSlot vt_multi_8 = {&col_multi_8, nullptr};
+const VtableSlot vt_multi_12 = {&col_multi_12, nullptr};
+const VtableSlot vt_v = {&col_v, nullptr};
+
+struct ObjSingle {
+    const void* vptr;
+    U payload;
+};
+
+struct ObjMulti {
+    const void* vptr0;
+    U a;
+    const void* vptr1;
+    const void* vptr2;
+};
+
+const I vbtable_v[2] = {0, 12};
+struct ObjVirtual {
+    const void* vptr;
+    const I* vbptr;
+    U payload;
+    U vbase_field;
+};
+
+void exec_exception_ctor_side(Snapshot* snap, bool use_x86, const char* msg, bool fail_alloc) {
+    cur = snap;
+    g_alloc_fail = fail_alloc;
+    porsche::RttiStdException ex{};
+    const char* p = msg;
+    const char* const* pp = &p;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u, ret = 0u;
+    void* fn = use_x86
+        ? static_cast<void*>(g_code_5a5088)
+        : reinterpret_cast<void*>(&porsche::rtti_exception_ctor_005a5088);
+    porsche::RttiStdException* self = &ex;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push pp
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov esp_a, esp
+        mov ret, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    snap->abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a ||
+                      edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+    snap->ret = (ret == static_cast<U>(reinterpret_cast<std::uintptr_t>(&ex))) ? 1u : 0u;
+    snap->do_free = ex.do_free;
+    snap->has_what = (ex.what != nullptr) ? 1u : 0u;
+    copy_what(snap->what, sizeof(snap->what), ex.what);
+    if (ex.what) {
+        std::free(const_cast<char*>(ex.what));
+    }
+    g_alloc_fail = false;
+}
+
+void run_exception_ctor(const char* name, const char* msg, bool fail_alloc) {
+    ++g_cases;
+    std::memset(&expected, 0, sizeof(expected));
+    std::memset(&actual, 0, sizeof(actual));
+    exec_exception_ctor_side(&expected, true, msg, fail_alloc);
+    exec_exception_ctor_side(&actual, false, msg, fail_alloc);
+    fail_if_diff(name);
+}
+
+void exec_bad_cast_side(Snapshot* snap, bool use_x86, const char* msg) {
+    cur = snap;
+    porsche::RttiStdException ex{};
+    const char* p = msg;
+    const char* const* pp = &p;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u, ret = 0u;
+    void* fn = use_x86
+        ? static_cast<void*>(g_code_5a1462)
+        : reinterpret_cast<void*>(&porsche::rtti_bad_cast_ctor_005a1462);
+    porsche::RttiStdException* self = &ex;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push pp
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov esp_a, esp
+        mov ret, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    snap->abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a ||
+                      edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+    snap->ret = (ret == static_cast<U>(reinterpret_cast<std::uintptr_t>(&ex)) && ex.vtable != nullptr) ? 1u : 0u;
+    snap->do_free = ex.do_free;
+    snap->has_what = (ex.what != nullptr) ? 1u : 0u;
+    copy_what(snap->what, sizeof(snap->what), ex.what);
+    if (ex.what) {
+        std::free(const_cast<char*>(ex.what));
+    }
+}
+
+void run_bad_cast_ctor(const char* name, const char* msg) {
+    ++g_cases;
+    std::memset(&expected, 0, sizeof(expected));
+    std::memset(&actual, 0, sizeof(actual));
+    exec_bad_cast_side(&expected, true, msg);
+    exec_bad_cast_side(&actual, false, msg);
+    fail_if_diff(name);
+}
+
+void exec_non_rtti_side(Snapshot* snap, bool use_x86, const char* msg) {
+    cur = snap;
+    porsche::RttiStdException ex{};
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u, ret = 0u;
+    void* fn = use_x86
+        ? static_cast<void*>(g_code_5a12f9)
+        : reinterpret_cast<void*>(&porsche::rtti_non_rtti_object_005a12f9);
+    porsche::RttiStdException* self = &ex;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_b, esp
+        push msg
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov esp_a, esp
+        mov ret, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    snap->abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a ||
+                      edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+    snap->ret = (ret == static_cast<U>(reinterpret_cast<std::uintptr_t>(&ex)) && ex.vtable != nullptr) ? 1u : 0u;
+    snap->do_free = ex.do_free;
+    snap->has_what = (ex.what != nullptr) ? 1u : 0u;
+    copy_what(snap->what, sizeof(snap->what), ex.what);
+    if (ex.what) {
+        std::free(const_cast<char*>(ex.what));
+    }
+}
+
+void run_non_rtti_ctor(const char* name, const char* msg) {
+    ++g_cases;
+    std::memset(&expected, 0, sizeof(expected));
+    std::memset(&actual, 0, sizeof(actual));
+    exec_non_rtti_side(&expected, true, msg);
+    exec_non_rtti_side(&actual, false, msg);
+    fail_if_diff(name);
+}
+
+void exec_cxx_throw_side(Snapshot* snap, bool use_x86, const char* msg) {
+    cur = snap;
+    porsche::RttiStdException ex{nullptr, msg, 1u};
+    void* fn = use_x86
+        ? static_cast<void*>(g_code_5a5304)
+        : reinterpret_cast<void*>(&porsche::rtti_cxx_throw_005a5304);
+    using ThrowFn = void(__stdcall*)(void*, const void*);
+    __try {
+        reinterpret_cast<ThrowFn>(fn)(&ex, kThrowInfoDummy);
+    } __except (capture_seh(GetExceptionInformation(), snap)) {
+    }
+}
+
+void run_cxx_throw(const char* name, const char* msg) {
+    ++g_cases;
+    std::memset(&expected, 0, sizeof(expected));
+    std::memset(&actual, 0, sizeof(actual));
+    exec_cxx_throw_side(&expected, true, msg);
+    exec_cxx_throw_side(&actual, false, msg);
+    fail_if_diff(name);
+}
+
+void exec_dynamic_cast_side(
+    Snapshot* snap,
+    bool use_x86,
+    U element,
+    U vf_delta,
+    const void* src_type,
+    const void* dst_type,
+    U is_ref,
+    U base_addr) {
+    cur = snap;
+    U esp_b = 0u, esp_a = 0u, ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u, ret = 0u;
+    void* fn = use_x86
+        ? static_cast<void*>(g_code_5a134b)
+        : reinterpret_cast<void*>(&porsche::formatter_compare_005a134b);
+    __try {
+        g_x86_5a134b_active = use_x86;
+        __asm {
+            mov ebx_b, ebx
+            mov esi_b, esi
+            mov edi_b, edi
+            mov ebp_b, ebp
+            mov esp_b, esp
+            push is_ref
+            push dst_type
+            push src_type
+            push vf_delta
+            push element
+            mov eax, fn
+            call eax
+            add esp, 20
+            mov esp_a, esp
+            mov ret, eax
+            mov ebx_a, ebx
+            mov esi_a, esi
+            mov edi_a, edi
+            mov ebp_a, ebp
+        }
+        g_x86_5a134b_active = false;
+        snap->abi_fail = (esp_b != esp_a || ebx_b != ebx_a || esi_b != esi_a ||
+                          edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+        snap->ret = (ret == 0u) ? 0u : (ret - base_addr + 0x10000000u);
+    } __except (capture_seh(GetExceptionInformation(), snap)) {
+        g_x86_5a134b_active = false;
+    }
+}
+
+void run_dynamic_cast(
+    const char* name,
+    U element,
+    U vf_delta,
+    const void* src_type,
+    const void* dst_type,
+    U is_ref,
+    U base_addr) {
+    ++g_cases;
+    std::memset(&expected, 0, sizeof(expected));
+    std::memset(&actual, 0, sizeof(actual));
+    exec_dynamic_cast_side(&expected, true, element, vf_delta, src_type, dst_type, is_ref, base_addr);
+    exec_dynamic_cast_side(&actual, false, element, vf_delta, src_type, dst_type, is_ref, base_addr);
+    fail_if_diff(name);
+}
+
+void setup_rwx() {
+    g_code_5a5088 = alloc_rwx(kRaw5a5088, sizeof(kRaw5a5088));
+    write_rel32(g_code_5a5088, 0x11u, reinterpret_cast<void*>(&porsche::formatter_strlen_005a6730));
+    write_rel32(g_code_5a5088, 0x18u, reinterpret_cast<void*>(&porsche::startup_network_allocate_0059ef90));
+    write_rel32(g_code_5a5088, 0x29u, reinterpret_cast<void*>(&porsche::formatter_error_copy_005aa4e0));
+
+    g_code_5a1462 = alloc_rwx(kRaw5a1462, sizeof(kRaw5a1462));
+    write_rel32(g_code_5a1462, 0x08u, g_code_5a5088);
+
+    g_code_5a12f9 = alloc_rwx(kRaw5a12f9, sizeof(kRaw5a12f9));
+    write_rel32(g_code_5a12f9, 0x11u, g_code_5a5088);
+
+    g_code_5a5304 = alloc_rwx(kRaw5a5304, sizeof(kRaw5a5304));
+    write_u32(g_code_5a5304, 0x0fu, static_cast<U>(reinterpret_cast<std::uintptr_t>(kCxxThrowTemplate)));
+    write_u32(g_code_5a5304, 0x30u, static_cast<U>(reinterpret_cast<std::uintptr_t>(&g_raise_exc_ptr)));
+
+    g_code_5a134b = alloc_rwx(kRaw5a134b, sizeof(kRaw5a134b));
+    g_scopetable_5a134b.enclosing_level = 0xFFFFFFFFu;
+    g_scopetable_5a134b.filter = g_code_5a134b + (0x5a1430u - 0x5a134bu);
+    g_scopetable_5a134b.handler = g_code_5a134b + (0x5a1444u - 0x5a134bu);
+    write_u32(g_code_5a134b, 0x06u, static_cast<U>(reinterpret_cast<std::uintptr_t>(&g_scopetable_5a134b)));
+    write_u32(g_code_5a134b, 0x0bu, kEhSentinel);
+    write_rel32(g_code_5a134b, 0x44u, reinterpret_cast<void*>(&porsche::rtti_complete_object_005a14b3));
+    write_rel32(g_code_5a134b, 0x76u, reinterpret_cast<void*>(&porsche::rtti_find_single_005a14cd));
+    write_rel32(g_code_5a134b, 0x8bu, reinterpret_cast<void*>(&porsche::rtti_find_multiple_005a1527));
+    write_rel32(g_code_5a134b, 0x92u, reinterpret_cast<void*>(&porsche::rtti_find_virtual_005a1620));
+    write_rel32(g_code_5a134b, 0xa6u, reinterpret_cast<void*>(&porsche::rtti_pmd_offset_005a1758));
+    write_u32(g_code_5a134b, 0xc7u, static_cast<U>(reinterpret_cast<std::uintptr_t>(kBadCastMsg)));
+    write_rel32(g_code_5a134b, 0xd3u, g_code_5a1462);
+    write_u32(g_code_5a134b, 0xd8u, static_cast<U>(reinterpret_cast<std::uintptr_t>(kThrowInfoDummy)));
+    write_rel32(g_code_5a134b, 0xe1u, g_code_5a5304);
+    write_u32(g_code_5a134b, 0xfdu, static_cast<U>(reinterpret_cast<std::uintptr_t>(kNonRttiMsg)));
+    write_rel32(g_code_5a134b, 0x105u, g_code_5a12f9);
+    write_u32(g_code_5a134b, 0x10au, static_cast<U>(reinterpret_cast<std::uintptr_t>(kThrowInfoDummy)));
+    write_rel32(g_code_5a134b, 0x113u, g_code_5a5304);
+}
+
+} // namespace
+
+namespace porsche {
+
+void __cdecl exit_registry_lock_api_005a4ba4(std::uint32_t slot) {
+    push_event(1u, slot, 0u, 0u);
+}
+
+void __cdecl exit_registry_unlock_api_005a4c05(std::uint32_t slot) {
+    push_event(2u, slot, 0u, 0u);
+}
+
+void __cdecl formatter_crt_free_005a3b9d(void* ptr) {
+    push_event(3u, static_cast<U>(reinterpret_cast<std::uintptr_t>(ptr) != 0u), 0u, 0u);
+    std::free(ptr);
+}
+
+std::uint32_t __cdecl application_release_0059f050(void* ptr) {
+    push_event(4u, static_cast<U>(reinterpret_cast<std::uintptr_t>(ptr) != 0u), 0u, 0u);
+    std::free(ptr);
+    return 1u;
+}
+
+std::uint32_t __cdecl formatter_strlen_005a6730(const char* text) {
+    return static_cast<std::uint32_t>(std::strlen(text));
+}
+
+void* __cdecl startup_network_allocate_0059ef90(std::uint32_t bytes) {
+    push_event(5u, bytes, g_alloc_fail ? 1u : 0u, 0u);
+    if (g_alloc_fail) {
+        return nullptr;
+    }
+    return std::malloc(bytes);
+}
+
+char* __cdecl formatter_error_copy_005aa4e0(char* dst, const char* src) {
+    return std::strcpy(dst, src);
+}
+
+} // namespace porsche
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    PVOID veh = AddVectoredExceptionHandler(1u, &veh_handler_5a134b);
+    setup_rwx();
+
+    run_exception_ctor("exc-empty", "", false);
+    run_exception_ctor("exc-bad-cast", "Bad dynamic_cast!", false);
+    run_exception_ctor("exc-alloc-fail", "Bad dynamic_cast!", true);
+    run_bad_cast_ctor("bad-cast-ctor", "Bad dynamic_cast!");
+    run_non_rtti_ctor("non-rtti-ctor", "Access violation - no RTTI data!");
+    run_cxx_throw("cxx-throw", "Bad dynamic_cast!");
+
+    ObjSingle s_obj = {&vt_single.fn, 42u};
+    const U s_addr = static_cast<U>(reinterpret_cast<std::uintptr_t>(&s_obj));
+    run_dynamic_cast("cast-null-ptr", 0u, 0u, &td_base, &td_leaf, 0u, s_addr);
+    run_dynamic_cast("cast-null-ref", 0u, 0u, &td_base, &td_leaf, 1u, s_addr);
+    run_dynamic_cast("single-to-base", s_addr, 0u, &td_leaf, &td_base, 0u, s_addr);
+    run_dynamic_cast("single-to-leaf", s_addr, 0u, &td_base, &td_leaf, 0u, s_addr);
+    run_dynamic_cast("single-fail-ptr", s_addr, 0u, &td_base, &td_other, 0u, s_addr);
+    run_dynamic_cast("single-fail-ref", s_addr, 0u, &td_base, &td_other, 1u, s_addr);
+    run_dynamic_cast("single-vf-delta", s_addr + 4u, 4u, &td_base, &td_leaf, 0u, s_addr);
+
+    ObjMulti m_obj = {&vt_multi_0.fn, 1u, &vt_multi_8.fn, &vt_multi_12.fn};
+    const U m_addr = static_cast<U>(reinterpret_cast<std::uintptr_t>(&m_obj));
+    run_dynamic_cast("multi-sub0-to-other", m_addr, 0u, &td_base, &td_other, 0u, m_addr);
+    run_dynamic_cast("multi-sub8-to-leaf", m_addr + 8u, 0u, &td_other, &td_leaf, 0u, m_addr);
+    run_dynamic_cast("multi-sub8-to-base", m_addr + 8u, 0u, &td_other, &td_base, 0u, m_addr);
+    run_dynamic_cast("multi-vf-delta", m_addr + 12u, 4u, &td_other, &td_mid, 0u, m_addr);
+    run_dynamic_cast("multi-fail-ref", m_addr + 8u, 0u, &td_other, &td_vbase, 1u, m_addr);
+
+    ObjVirtual v_obj = {&vt_v.fn, vbtable_v, 11u, 99u};
+    const U v_addr = static_cast<U>(reinterpret_cast<std::uintptr_t>(&v_obj));
+    run_dynamic_cast("virt-to-vbase", v_addr, 0u, &td_leaf, &td_vbase, 0u, v_addr);
+    run_dynamic_cast("virt-to-mid", v_addr, 0u, &td_leaf, &td_mid, 0u, v_addr);
+    run_dynamic_cast("virt-ambig-ptr", v_addr, 0u, &td_leaf, &td_ambig, 0u, v_addr);
+    run_dynamic_cast("virt-fail-ptr", v_addr, 0u, &td_leaf, &td_other, 0u, v_addr);
+    run_dynamic_cast("virt-fail-ref", v_addr, 0u, &td_leaf, &td_other, 1u, v_addr);
+
+    const VtableSlot vt_client = {&porsche::network_rtti_005c5190, nullptr};
+    ObjSingle c_obj = {&vt_client.fn, 77u};
+    const U c_addr = static_cast<U>(reinterpret_cast<std::uintptr_t>(&c_obj));
+    run_dynamic_cast("net-client-to-conn", c_addr, 0u,
+                     &porsche::rtti_client_type_005d0630.prefix,
+                     &porsche::rtti_connection_type_005d0650.prefix, 0u, c_addr);
+    run_dynamic_cast("net-client-to-host-fail", c_addr, 0u,
+                     &porsche::rtti_client_type_005d0630.prefix,
+                     &porsche::rtti_host_type_005d0690.prefix, 1u, c_addr);
+
+    run_dynamic_cast("av-bad-ptr-0", 0x00000010u, 0u, &td_base, &td_leaf, 0u, 0u);
+    run_dynamic_cast("av-bad-ptr-ref", 0x00000010u, 0u, &td_base, &td_leaf, 1u, 0u);
+
+    if (veh) {
+        RemoveVectoredExceptionHandler(veh);
+    }
+    std::printf("rtti_cast_825_original_x86_vs_cpp=PASS cases=%u\n", g_cases);
+    std::fflush(nullptr);
+    return 0;
+}

@@ -1,0 +1,4 @@
+# Run 830: Network RTTI Linker Bindings (`005c5190`, `005c51d8`, `005c5228`)
+Closes `network_vtables.cpp`/`826` frontier `?network_rtti_005c5190@porsche@@3QBEB`, `?network_rtti_005c51d8@porsche@@3QBEB`, and `?network_rtti_005c5228@porsche@@3QBEB` via `bindings.cmake` aliases to `rtti.cpp`'s typed `RttiCompleteObjectLocator`s (60B `.rdata`, 0 new unresolved symbols).
+- REA: `local/experiments/v2-network-rtti-bindings-830-rea/001/receipt.json` + `rea/validation.json` (3 dossiers: `005a14b3`, `005a14cd`, `005a4c20`, 0 repeated_equal).
+- Native: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/830-network-rtti-bindings/native-config.json --attempt 001` -> `local/experiments/v2-network-rtti-bindings-830/001/receipt.json` PASS (`15` cases/variant `/Od` & `/O2`, `6/6` mutations killed).
