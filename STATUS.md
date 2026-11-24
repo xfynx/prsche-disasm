@@ -4,15 +4,16 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run816](iterations/v2/001-original-recovery/runs/816-scene-register-heap-abi-integration/README.md)
-compiles 470 TUs across eight projects (**74 unresolved names / 81
-references**, no EXE), accepting `814/003` & `815/001`: `1,346` registry entries
-(`+8`), `86` comparisons, `16` mutations, `0B` data/bss, `1,161` source pins;
-closes `5` (`00569a70`, `005af040`, `0044d380`, `2x 005a177b`), opens
-`0044db70`.
-Deferred proof-only: [Run807](iterations/v2/001-original-recovery/runs/807-render-color-pack/README.md) (`004/receipt.json` PASS; awaiting caller `00563160`/`005dec08`).
+[Run820](iterations/v2/001-original-recovery/runs/820-sim-audio-and-scene-insert-integration/README.md)
+compiles 472 TUs across eight projects (**69 unresolved names / 76
+references**, no EXE), accepting `813/008` & `818/001`: `1,356` registry entries
+(`+10`), `78` comparisons, `22` mutations, `180B` `.rdata` & `176B` `.bss` (`813`),
+`1,166` source pins; closes `5` (`004acc10`, `00425330`, `0060c9c4`, `0060c9f4`,
+`0044db70`), `0` new.
+Deferred proof-only: [Run807](iterations/v2/001-original-recovery/runs/807-render-color-pack/README.md) (`004/receipt.json` PASS; `Run817` ready).
 
-Historical: [Run812](iterations/v2/001-original-recovery/runs/812-scene-table-load-integration/README.md),
+Historical: [Run816](iterations/v2/001-original-recovery/runs/816-scene-register-heap-abi-integration/README.md),
+[Run812](iterations/v2/001-original-recovery/runs/812-scene-table-load-integration/README.md),
 [Run809](iterations/v2/001-original-recovery/runs/809-scene-reset-and-input-caps-integration/README.md),
 [Run808](iterations/v2/001-original-recovery/runs/808-scene-texture-and-render-query-integration/README.md)
 & [Run804](iterations/v2/001-original-recovery/runs/804-render-mode-and-sim-startup-integration/README.md)

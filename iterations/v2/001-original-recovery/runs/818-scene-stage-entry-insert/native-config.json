@@ -1,0 +1,128 @@
+{
+  "run": 818,
+  "experiment": "local/experiments/v2-scene-stage-entry-insert-818",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/application_context_base.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "0044db70",
+      "bytes": 223,
+      "sha256": "329db3aac4721370d447cc388ec3ca958db017a28a9e337e1ef041e730ef54da",
+      "token": "@BODY_0044DB70@"
+    },
+    {
+      "va": "0044b800",
+      "bytes": 43,
+      "sha256": "c6ae1de10c0ec5b43f40840f49030ef6a6051f8655475e8909c9af7beff3154e",
+      "token": "@BODY_0044B800@"
+    },
+    {
+      "va": "0044de20",
+      "bytes": 35,
+      "sha256": "6b785edd1a13f762d2992f4bf5672a4df094a9d3808e70d19ad51b6a797c8399",
+      "token": "@BODY_0044DE20@"
+    },
+    {
+      "va": "004314c0",
+      "bytes": 430,
+      "sha256": "289462baf292d038cf01bcd4928f1c36f13248340901a83539f6ea64f9a87535",
+      "token": "@BODY_004314C0@"
+    }
+  ],
+  "pass_marker": "scene_stage_entry_insert_818_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-key-high-less",
+      "source": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp",
+      "old": "if (l0 < r0) {\n        return true;\n    }",
+      "new": "if (l0 <= r0) {\n        return true;\n    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-key-low-less",
+      "source": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp",
+      "old": "return load32(lhs, 0x04u) < load32(rhs, 0x04u);",
+      "new": "return load32(lhs, 0x04u) <= load32(rhs, 0x04u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-copy-bytes",
+      "source": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp",
+      "old": "std::memcpy(dst, src, 0x10u);",
+      "new": "std::memcpy(dst, src, 0x0cu);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-rebalance-root-color",
+      "source": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp",
+      "old": "set_node_color(*root_ptr, static_cast<B>(kBlack));",
+      "new": "set_node_color(*root_ptr, static_cast<B>(kRed));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-rebalance-uncle-recolor",
+      "source": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp",
+      "old": "set_node_color(uncle, static_cast<B>(kBlack));",
+      "new": "set_node_color(uncle, static_cast<B>(kRed));",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-rebalance-inner-rotate",
+      "source": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp",
+      "old": "rotate_tree_step(node, root_ptr, near_off, far_off);",
+      "new": "(void)node;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-insert-size-inc",
+      "source": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp",
+      "old": "store32(tree, 0x04u, load32(tree, 0x04u) + 1u);",
+      "new": "store32(tree, 0x04u, load32(tree, 0x04u) + 2u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-sentinel-left-min",
+      "source": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp",
+      "old": "} else if (y == load_ptr(sentinel, kOffLeft)) {\n            store_ptr(sentinel, kOffLeft, new_node);\n        }",
+      "new": "}",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-sentinel-right-max",
+      "source": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp",
+      "old": "if (y == load_ptr(sentinel, kOffRight)) {\n            store_ptr(sentinel, kOffRight, new_node);\n        }",
+      "new": "",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-out-pair-node",
+      "source": "iterations/v2/001-original-recovery/runs/818-scene-stage-entry-insert/scene_stage_entry_insert_818.cpp",
+      "old": "store_ptr(out_pair, 0x00u, new_node);",
+      "new": "store_ptr(out_pair, 0x00u, y);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

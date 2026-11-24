@@ -1,0 +1,442 @@
+// Native x86-vs-C++ differential fixture for Run818:
+//   0044db70..0044dc4e (223B) porsche::scene_stage_entry_insert_0044db70
+//   0044b800..0044b828 ( 43B) porsche::scene_stage_key_less_0044b800
+//   0044de20..0044de42 ( 35B) porsche::scene_stage_entry_copy_0044de20
+//   004314c0..0043166d (430B) porsche::scene_rb_tree_rebalance_004314c0
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "porsche/application_context_base.hpp"
+#include "scene_stage_entry_insert_818.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+static void store_ptr(void* base, U off, const void* ptr) {
+    std::memcpy(static_cast<B*>(base) + off, &ptr, 4u);
+}
+
+enum : U { kEvAlloc = 1u };
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+};
+
+enum : U { kMaxEvents = 32u, kPoolBytes = 1024u };
+
+struct Snapshot {
+    U abi_fail;
+    U ret_val;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    std::array<B, 0x0cu> tree_hdr;
+    std::array<B, 0x20u> sentinel;
+    std::array<B, 0x08u> out_pair;
+    std::array<B, 0x10u> copy_dst;
+    std::array<B, kPoolBytes> node_pool;
+    U pool_used;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static alignas(8) B g_tree_hdr[0x0cu];
+static alignas(8) B g_sentinel[0x20u];
+static alignas(8) B g_out_pair[0x08u];
+static alignas(8) B g_copy_dst[0x10u];
+static alignas(8) B g_node_pool[kPoolBytes];
+static U g_pool_cursor = 0u;
+
+static void record_event(U kind, U a = 0u, U b = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b};
+}
+
+namespace porsche {
+
+void* __cdecl application_context_member_storage_004211d0(U bytes, U mode) {
+    record_event(kEvAlloc, bytes, mode);
+    require(bytes == 0x20u && mode == 0u, "004211d0 0x20 bound");
+    require(g_pool_cursor + 0x20u <= kPoolBytes, "node pool overflow");
+    void* const p = g_node_pool + g_pool_cursor;
+    g_pool_cursor += 0x20u;
+    return p;
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_0044db70 = nullptr;
+static B* slot_0044b800 = nullptr;
+static B* slot_0044de20 = nullptr;
+static B* slot_004314c0 = nullptr;
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void init() {
+    static const B body_0044db70[] = {@BODY_0044DB70@};
+    static const B body_0044b800[] = {@BODY_0044B800@};
+    static const B body_0044de20[] = {@BODY_0044DE20@};
+    static const B body_004314c0[] = {@BODY_004314C0@};
+    require(sizeof body_0044db70 == 223u, "223B 0044db70");
+    require(sizeof body_0044b800 == 43u, "43B 0044b800");
+    require(sizeof body_0044de20 == 35u, "35B 0044de20");
+    require(sizeof body_004314c0 == 430u, "430B 004314c0");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+
+    slot_0044db70 = code_page + 0x000u;
+    slot_0044b800 = code_page + 0x100u;
+    slot_0044de20 = code_page + 0x140u;
+    slot_004314c0 = code_page + 0x180u;
+
+    std::memcpy(slot_0044db70, body_0044db70, sizeof body_0044db70);
+    std::memcpy(slot_0044b800, body_0044b800, sizeof body_0044b800);
+    std::memcpy(slot_0044de20, body_0044de20, sizeof body_0044de20);
+    std::memcpy(slot_004314c0, body_004314c0, sizeof body_004314c0);
+
+    // 0044db70
+    relocate_call_rel32(slot_0044db70, 0x0044db70u, 0x04au, 0x0044b800u, slot_0044b800);
+    relocate_call_rel32(slot_0044db70, 0x0044db70u, 0x057u, 0x004211d0u,
+                        reinterpret_cast<const void*>(&porsche::application_context_member_storage_004211d0));
+    relocate_call_rel32(slot_0044db70, 0x0044db70u, 0x063u, 0x0044de20u, slot_0044de20);
+    relocate_call_rel32(slot_0044db70, 0x0044db70u, 0x07fu, 0x004211d0u,
+                        reinterpret_cast<const void*>(&porsche::application_context_member_storage_004211d0));
+    relocate_call_rel32(slot_0044db70, 0x0044db70u, 0x08bu, 0x0044de20u, slot_0044de20);
+    relocate_call_rel32(slot_0044db70, 0x0044db70u, 0x0c3u, 0x004314c0u, slot_004314c0);
+}
+
+static U invoke_cdecl_2_void(const void* fn, U a0, U a1) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a1
+        push a0
+        mov eax, fn
+        call eax
+        add esp, 8
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espc2
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espc2:
+        cmp ebx, 0x13572468
+        je ok_ebxc2
+        or abi_fail, 2
+    ok_ebxc2:
+        cmp esi, 0x24681357
+        je ok_esic2
+        or abi_fail, 4
+    ok_esic2:
+        cmp edi, 0x55aa33cc
+        je ok_edic2
+        or abi_fail, 8
+    ok_edic2:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static U invoke_thiscall_1(const void* fn, void* self, U a0, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a0
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt1
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt1:
+        cmp ebx, 0x13572468
+        je ok_ebxt1
+        or abi_fail, 2
+    ok_ebxt1:
+        cmp esi, 0x24681357
+        je ok_esit1
+        or abi_fail, 4
+    ok_esit1:
+        cmp edi, 0x55aa33cc
+        je ok_edit1
+        or abi_fail, 8
+    ok_edit1:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static U invoke_thiscall_2(const void* fn, void* self, U a0, U a1, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a1
+        push a0
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt2
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt2:
+        cmp ebx, 0x13572468
+        je ok_ebxt2
+        or abi_fail, 2
+    ok_ebxt2:
+        cmp esi, 0x24681357
+        je ok_esit2
+        or abi_fail, 4
+    ok_esit2:
+        cmp edi, 0x55aa33cc
+        je ok_edit2
+        or abi_fail, 8
+    ok_edit2:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static void reset_fixtures(U seed) {
+    g_event_count = 0u;
+    g_pool_cursor = 0u;
+    std::memset(g_events, 0, sizeof g_events);
+    std::memset(g_tree_hdr, 0, sizeof g_tree_hdr);
+    std::memset(g_sentinel, 0, sizeof g_sentinel);
+    std::memset(g_out_pair, 0x77u, sizeof g_out_pair);
+    std::memset(g_copy_dst, static_cast<int>(0x20u + seed), sizeof g_copy_dst);
+    std::memset(g_node_pool, static_cast<int>(0x40u + seed), sizeof g_node_pool);
+
+    // Empty tree setup: sentinel color=1, parent=null, left=sentinel, right=sentinel
+    g_sentinel[0] = 1u;
+    store_ptr(g_sentinel, 0x04u, nullptr);
+    store_ptr(g_sentinel, 0x08u, g_sentinel);
+    store_ptr(g_sentinel, 0x0cu, g_sentinel);
+    store_ptr(g_tree_hdr, 0x00u, g_sentinel);
+    store32(g_tree_hdr, 0x04u, 0u);
+    store32(g_tree_hdr, 0x08u, 0x55u);
+}
+
+static void capture(Snapshot& out, U abi_fail, U ret_val) {
+    out.abi_fail = abi_fail;
+    out.ret_val = ret_val;
+    out.event_count = g_event_count;
+    std::memcpy(out.events.data(), g_events, sizeof g_events);
+    std::memcpy(out.tree_hdr.data(), g_tree_hdr, sizeof g_tree_hdr);
+    std::memcpy(out.sentinel.data(), g_sentinel, sizeof g_sentinel);
+    std::memcpy(out.out_pair.data(), g_out_pair, sizeof g_out_pair);
+    std::memcpy(out.copy_dst.data(), g_copy_dst, sizeof g_copy_dst);
+    std::memcpy(out.node_pool.data(), g_node_pool, kPoolBytes);
+    out.pool_used = g_pool_cursor;
+}
+
+static void check_equal(const Snapshot& orig, const Snapshot& cpp, const char* tag) {
+    require(orig.abi_fail == 0u, tag);
+    require(cpp.abi_fail == 0u, tag);
+    require(orig.ret_val == cpp.ret_val, tag);
+    require(orig.event_count == cpp.event_count, tag);
+    for (U i = 0u; i < orig.event_count; ++i) {
+        require(orig.events[i].kind == cpp.events[i].kind &&
+                    orig.events[i].a == cpp.events[i].a &&
+                    orig.events[i].b == cpp.events[i].b,
+                tag);
+    }
+    require(orig.tree_hdr == cpp.tree_hdr, tag);
+    require(orig.sentinel == cpp.sentinel, tag);
+    require(orig.out_pair == cpp.out_pair, tag);
+    require(orig.copy_dst == cpp.copy_dst, tag);
+    require(orig.pool_used == cpp.pool_used, tag);
+    require(orig.node_pool == cpp.node_pool, tag);
+    ++cases;
+}
+
+static void make_rec(B* out, U k0, U k1, U obj, B owned) {
+    store32(out, 0x00u, k0);
+    store32(out, 0x04u, k1);
+    store32(out, 0x08u, obj);
+    out[0x0cu] = 0u;
+    out[0x0du] = owned;
+    out[0x0eu] = 0xeeu;
+    out[0x0fu] = 0xffu;
+}
+
+template <U N>
+static void run_insert_sequence(const U (&keys)[N][2], const char* tag) {
+    Snapshot orig{}, cpp{};
+    U r0 = 0u, r1 = 0u;
+    B rec[16]{};
+
+    reset_fixtures(1u);
+    U f0 = 0u;
+    for (U i = 0u; i < N; ++i) {
+        make_rec(rec, keys[i][0], keys[i][1], 0x80000000u + i, static_cast<B>(i & 1u));
+        f0 |= invoke_thiscall_2(slot_0044db70, g_tree_hdr, address(g_out_pair), address(rec), r0);
+    }
+    capture(orig, f0, r0);
+
+    reset_fixtures(1u);
+    U f1 = 0u;
+    for (U i = 0u; i < N; ++i) {
+        make_rec(rec, keys[i][0], keys[i][1], 0x80000000u + i, static_cast<B>(i & 1u));
+        f1 |= invoke_thiscall_2(
+            reinterpret_cast<const void*>(&porsche::scene_stage_entry_insert_0044db70),
+            g_tree_hdr, address(g_out_pair), address(rec), r1);
+    }
+    capture(cpp, f1, r1);
+    check_equal(orig, cpp, tag);
+}
+
+int main() {
+    init();
+
+    // 1. 0044b800 unsigned two-dword key compare matrix
+    const U pairs[5][2] = {
+        {0u, 0u},
+        {0u, 0xffffffffu},
+        {1u, 0u},
+        {0x7fffffffu, 10u},
+        {0x80000000u, 5u},
+    };
+    for (U i = 0u; i < 5u; ++i) {
+        for (U j = 0u; j < 5u; ++j) {
+            Snapshot orig{}, cpp{};
+            U r0 = 0u, r1 = 0u;
+            U lhs[2] = {pairs[i][0], pairs[i][1]};
+            U rhs[2] = {pairs[j][0], pairs[j][1]};
+            reset_fixtures(2u);
+            U f0 = invoke_thiscall_1(slot_0044b800, lhs, address(rhs), r0);
+            capture(orig, f0, r0 & 0xffu);
+            reset_fixtures(2u);
+            U f1 = invoke_thiscall_1(
+                reinterpret_cast<const void*>(&porsche::scene_stage_key_less_0044b800),
+                lhs, address(rhs), r1);
+            capture(cpp, f1, r1 & 0xffu);
+            check_equal(orig, cpp, "0044b800");
+        }
+    }
+
+    // 2. 0044de20 copy tests (null dst and non-null 16B copy)
+    {
+        B src[16]{};
+        make_rec(src, 0x11223344u, 0x55667788u, 0x99aabbcdu, 1u);
+        for (U dst_arg : {0u, address(g_copy_dst)}) {
+            Snapshot orig{}, cpp{};
+            reset_fixtures(3u);
+            U f0 = invoke_cdecl_2_void(slot_0044de20, dst_arg, address(src));
+            capture(orig, f0, 0u);
+            reset_fixtures(3u);
+            U f1 = invoke_cdecl_2_void(
+                reinterpret_cast<const void*>(&porsche::scene_stage_entry_copy_0044de20),
+                dst_arg, address(src));
+            capture(cpp, f1, 0u);
+            check_equal(orig, cpp, "0044de20");
+        }
+    }
+
+    // 3. 0044db70 + 004314c0 multi-sequence RB-tree insert & rebalance tests
+    const U seq_ascending[10][2] = {
+        {1u, 1u}, {2u, 1u}, {3u, 1u}, {4u, 1u}, {5u, 1u},
+        {6u, 1u}, {7u, 1u}, {8u, 1u}, {9u, 1u}, {10u, 1u},
+    };
+    run_insert_sequence(seq_ascending, "rb ascending");
+
+    const U seq_descending[10][2] = {
+        {10u, 1u}, {9u, 1u}, {8u, 1u}, {7u, 1u}, {6u, 1u},
+        {5u, 1u}, {4u, 1u}, {3u, 1u}, {2u, 1u}, {1u, 1u},
+    };
+    run_insert_sequence(seq_descending, "rb descending");
+
+    const U seq_zigzag[12][2] = {
+        {5u, 2u}, {2u, 5u}, {8u, 1u}, {1u, 9u}, {3u, 4u}, {7u, 0u},
+        {9u, 3u}, {5u, 1u}, {5u, 3u}, {4u, 0u}, {6u, 8u}, {5u, 2u},
+    };
+    run_insert_sequence(seq_zigzag, "rb zigzag+ties");
+
+    std::printf("scene_stage_entry_insert_818_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

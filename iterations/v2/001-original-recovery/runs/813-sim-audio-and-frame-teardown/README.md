@@ -1,0 +1,4 @@
+# Run813 — sim_audio_and_frame_teardown (`004acc10`, `00425330` + 4 leaves)
+- Recovered `application_sim_boundary_004acc10` (`004acc10..004ad4c9`, 2234B), `application_sim_boundary_00425330` (`00425330..00425743`, 1044B), `00419dc0` (67B), `0041e2c0` (436B), `00436710` (44B), and `00434f00` (150B) (3975B code total; 180B `.data`, 156B `.bss`, 0 new unresolved game symbols) in `sim_audio_and_frame_teardown_813.cpp`/`.hpp`, closing `004acc10`, `00425330`, `frame_compact_vector_0060c9c4`, and `frame_callback_vector_0060c9f4`.
+- Native differential + mutations PASS: `local/experiments/v2-sim-audio-and-frame-teardown-813/008/receipt.json` (`/Od` & `/O2`: 9 cases, 412 events; 12/12 mutations killed).
+- REA + validation PASS: `local/experiments/v2-sim-audio-and-frame-teardown-813-rea/001/receipt.json`, `validation.json` (`dossiers: 6, repeated_equal: 0`).

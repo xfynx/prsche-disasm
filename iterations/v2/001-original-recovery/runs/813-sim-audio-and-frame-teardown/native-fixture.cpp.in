@@ -1,0 +1,1238 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "sim_audio_and_frame_teardown_813.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace porsche {
+ApplicationStateArena application_state_006573e8{};
+std::uint32_t& ApplicationStateArena::word(std::uint32_t va) {
+    return words_[(va - application_state_base_va) >> 2u];
+}
+char* ApplicationStateArena::characters(std::uint32_t va) {
+    return reinterpret_cast<char*>(words_.data()) + (va - application_state_base_va);
+}
+
+ApplicationAudioRecord006564a0 application_audio_records_006564a0[8] = {};
+void* audio_channel_banks_00656aa8[2] = {};
+char* application_audio_path_prefix_0065b318 = nullptr;
+const char audio_bank_suffix_text_005d146c[5] = ".bnk";
+const char application_audio_spl_text_005d1a04[5] = ".spl";
+
+std::int32_t __cdecl formatter_entry_005a0fbf(char* dst, const char* fmt, ...);
+int __cdecl formatter_stdio_printf_005a177b(const char* fmt, ...);
+std::uint32_t __cdecl resource_loadat_quiet_0059db50(const char* name, void* buf, std::uint32_t max_bytes);
+void* __cdecl resource_load_bigheader_0059dea0(const char* name, std::uint32_t flags);
+void* __cdecl resource_load_bigheader_quiet_0059df70(const char* name, std::uint32_t flags);
+bool __cdecl open_0059e040(const char* path, std::uint32_t mode, std::uint32_t flags, void** out_handle);
+std::uint32_t __cdecl read_00533bf0(void* handle, std::uint32_t offset, void* dst, std::uint32_t bytes, std::uint32_t flags);
+std::uint32_t __cdecl close_00533da0(void* handle, std::uint32_t flags);
+void* __cdecl allocate_00531ca0(const char* tag, std::int32_t bytes, std::uint32_t heap);
+std::uint32_t __cdecl free_00531f90(void* p);
+std::uint32_t __cdecl audio_resource_data_offset_00566880(std::uint32_t source);
+std::uint32_t __cdecl audio_resource_locate_005666f0(
+    std::uint32_t source, std::uint32_t name, std::uint32_t index,
+    std::uint32_t out_offset, std::uint32_t out_size);
+std::int32_t __cdecl audio_bank_finalize_004a6bc0(
+    const char* text, std::int32_t bank_result, const void* handle, std::uint32_t kind);
+
+void __fastcall teardown_secondary_destroy_0059f1c0(void* self, void* unused_edx);
+std::uint32_t __cdecl application_release_0059f050(void* address);
+void __cdecl context_table_release_0059ecd0(void* block);
+void __cdecl heap_enter_005322b0(void* lock);
+void __cdecl heap_leave_005322c0(void* lock);
+void* __cdecl application_context_heap_state_005e4fe8();
+} // namespace porsche
+
+enum : U {
+    kOff4ACC10 = 0x0000u,
+    kOff425330 = 0x0900u,
+    kOff419DC0 = 0x0d40u,
+    kOff41E2C0 = 0x0dc0u,
+    kOff436710 = 0x0f80u,
+    kOff434F00 = 0x0fc0u,
+    kCodeBytes = 0x1100u,
+    kMaxEvents = 160u,
+};
+
+enum EventTag : U {
+    kEvAlloc = 1u,
+    kEvFree = 2u,
+    kEvLoadAtQuiet = 3u,
+    kEvLoadBig = 4u,
+    kEvLoadBigQuiet = 5u,
+    kEvOpen = 6u,
+    kEvRead = 7u,
+    kEvClose = 8u,
+    kEvBankFinalize = 9u,
+    kEvPrintf = 10u,
+    kEvSlotDelete = 11u,
+    kEvDestroy59F1C0 = 12u,
+    kEvRelease59F050 = 13u,
+    kEvRelease59ECD0 = 14u,
+    kEvHeapEnter = 15u,
+    kEvHeapLeave = 16u,
+};
+
+struct FpuSnapshot {
+    unsigned short control;
+    unsigned short status;
+    unsigned short tag;
+    unsigned short pad;
+    B values[80];
+    U mxcsr;
+};
+
+struct Event {
+    U tag;
+    U arg0;
+    U arg1;
+    U arg2;
+};
+
+struct Trace {
+    U ret;
+    U abi_fail;
+    U count;
+    Event events[kMaxEvents];
+    U table_nonnull[2];
+    U table_cc[2];
+    U table_38[2];
+    B table_d0[2];
+    std::int16_t slice_start[32];
+    std::int16_t slice_end[32];
+    B slice_tag[32];
+    U slice_data_off[32];
+    U pool_total;
+    B pool_copy[256];
+    U ptrs_after[45];
+    I refcount_after;
+    U pool_heads[32];
+    U freed_nexts[8];
+    FpuSnapshot fp;
+};
+
+alignas(16) static B fp_area[512];
+static B fp_env[28];
+
+static Trace trace{};
+static Trace expected{};
+
+static U cases = 0u;
+static U events_total = 0u;
+static U which = 0u;
+static B* code = nullptr;
+
+static const B kBody4ACC10[2234] = { @BODY_004ACC10@ };
+static const B kBody425330[1044] = { @BODY_00425330@ };
+static const B kBody419DC0[67]   = { @BODY_00419DC0@ };
+static const B kBody41E2C0[436]  = { @BODY_0041E2C0@ };
+static const B kBody436710[44]   = { @BODY_00436710@ };
+static const B kBody434F00[150]  = { @BODY_00434F00@ };
+
+static B alloc_arena[65536];
+static U alloc_cursor = 0u;
+static U alloc_ptrs[64];
+static U alloc_count = 0u;
+static U oom_size_trigger = 0u;
+
+struct MockEntry {
+    char name[32];
+    U offset;
+    U size;
+    B data[768];
+};
+static MockEntry mock_entries[8]{};
+static U mock_entry_count = 0u;
+static U mock_big_mode = 0u;
+static void* const kMockBigPtr = alloc_arena + 60000u;
+static void* const kMockFileHandle = alloc_arena + 61000u;
+
+struct MockHeapState {
+    B pad[0x28];
+    U pool_lock;
+    U pad2[2];
+    U free_lists[32];
+};
+static MockHeapState mock_heap_state{};
+static void* mock_heap_state_ptr = &mock_heap_state;
+
+struct MockSlotObj final : public porsche::VirtualDeleteSlot0_400 {
+    U id;
+    explicit MockSlotObj(U id_in = 0u) : id(id_in) {}
+    void __thiscall delete_slot0(std::uint32_t flags) override;
+};
+static MockSlotObj mock_objs[32];
+static B mock_vec_mem[4096];
+static porsche::SimVector12_813 mock_vecs[5];
+static B mock_raw_bufs[8][64];
+
+static void fail(const char* why) {
+    std::printf("sim_audio_and_frame_teardown_original_x86_vs_cpp=FAIL case=%u side=%u reason=%s\n",
+                cases, which, why);
+    std::exit(1);
+}
+
+static void push_event(U tag, U a0 = 0u, U a1 = 0u, U a2 = 0u) {
+    if (trace.count >= kMaxEvents) {
+        fail("event_overflow");
+    }
+    trace.events[trace.count++] = Event{tag, a0, a1, a2};
+    ++events_total;
+}
+
+static U id_of_ptr(const void* p) {
+    if (p == nullptr) return 0u;
+    const U addr = static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+    for (U i = 0u; i < alloc_count; ++i) {
+        if (alloc_ptrs[i] == addr) return 0x100u + i;
+    }
+    for (U i = 0u; i < 5u; ++i) {
+        if (p == &mock_vecs[i]) return 0x200u + i;
+    }
+    for (U i = 0u; i < 8u; ++i) {
+        if (p == mock_raw_bufs[i]) return 0x300u + i;
+    }
+    const U base = static_cast<U>(reinterpret_cast<std::uintptr_t>(mock_vec_mem));
+    if (addr >= base && addr < base + sizeof(mock_vec_mem)) {
+        return 0x400u + (addr - base);
+    }
+    if (p == kMockBigPtr) return 0x500u;
+    if (p == kMockFileHandle) return 0x501u;
+    if (p == &mock_heap_state.pool_lock) return 0x600u;
+    if (p == reinterpret_cast<const void*>(0x12340001u)) return 0x700u;
+    return 0x9999u;
+}
+
+void __thiscall MockSlotObj::delete_slot0(std::uint32_t flags) {
+    push_event(kEvSlotDelete, id, flags);
+}
+
+static U fnv1a(const void* data, std::size_t n) {
+    const B* p = static_cast<const B*>(data);
+    U h = 2166136261u;
+    for (std::size_t i = 0; i < n; ++i) {
+        h ^= p[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void capture_fpu(FpuSnapshot* out) {
+    std::memset(fp_area, 0, sizeof(fp_area));
+    std::memset(fp_env, 0, sizeof(fp_env));
+    __asm {
+        fnstenv fp_env
+        fxsave fp_area
+    }
+    std::memcpy(&out->control, fp_env + 0, 2);
+    std::memcpy(&out->status, fp_env + 4, 2);
+    std::memcpy(&out->tag, fp_env + 8, 2);
+    out->pad = 0u;
+    std::memcpy(out->values, fp_area + 32, 80);
+    std::memcpy(&out->mxcsr, fp_area + 24, 4);
+}
+
+static void verify_fpu(const FpuSnapshot& a, const FpuSnapshot& b) {
+    if (a.control != b.control || a.status != b.status || a.tag != b.tag || a.mxcsr != b.mxcsr) {
+        fail("fpu_ctrl");
+    }
+    if (std::memcmp(a.values, b.values, sizeof(a.values)) != 0) {
+        fail("fpu_regs");
+    }
+}
+
+namespace porsche {
+
+std::int32_t __cdecl formatter_entry_005a0fbf(char* dst, const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    const int n = std::vsprintf(dst, fmt, ap);
+    va_end(ap);
+    return static_cast<std::int32_t>(n);
+}
+
+int __cdecl formatter_stdio_printf_005a177b(const char* fmt, ...) {
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    const int n = std::vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    push_event(kEvPrintf, fnv1a(fmt, std::strlen(fmt)), fnv1a(buf, std::strlen(buf)));
+    return n;
+}
+
+std::uint32_t __cdecl resource_loadat_quiet_0059db50(const char* name, void* buf, std::uint32_t max_bytes) {
+    push_event(kEvLoadAtQuiet, fnv1a(name, std::strlen(name)), max_bytes);
+    if (buf != nullptr && max_bytes >= 8u) {
+        static_cast<B*>(buf)[4] = 0x5au;
+    }
+    return max_bytes;
+}
+
+static void* handle_big_request(U ev_tag, const char* name, U flags) {
+    push_event(ev_tag, fnv1a(name, std::strlen(name)), flags);
+    if (mock_big_mode == 1u && std::strstr(name, "16.viv") != nullptr && std::strstr(name, "sd7a") == nullptr) {
+        return kMockBigPtr;
+    }
+    if (mock_big_mode == 2u && std::strstr(name, "16.viv") == nullptr && std::strstr(name, "sd7a") == nullptr) {
+        return kMockBigPtr;
+    }
+    if (mock_big_mode == 3u && std::strstr(name, "sd7a.viv") != nullptr) {
+        return kMockBigPtr;
+    }
+    return nullptr;
+}
+
+void* __cdecl resource_load_bigheader_0059dea0(const char* name, std::uint32_t flags) {
+    return handle_big_request(kEvLoadBig, name, flags);
+}
+
+void* __cdecl resource_load_bigheader_quiet_0059df70(const char* name, std::uint32_t flags) {
+    return handle_big_request(kEvLoadBigQuiet, name, flags);
+}
+
+bool __cdecl open_0059e040(const char* path, std::uint32_t mode, std::uint32_t flags, void** out_handle) {
+    push_event(kEvOpen, fnv1a(path, std::strlen(path)), mode, flags);
+    *out_handle = kMockFileHandle;
+    return true;
+}
+
+std::uint32_t __cdecl read_00533bf0(void* handle, std::uint32_t offset, void* dst, std::uint32_t bytes, std::uint32_t flags) {
+    push_event(kEvRead, id_of_ptr(handle), offset, bytes);
+    (void)flags;
+    for (U i = 0u; i < mock_entry_count; ++i) {
+        if (mock_entries[i].offset == offset) {
+            const U n = bytes < mock_entries[i].size ? bytes : mock_entries[i].size;
+            std::memcpy(dst, mock_entries[i].data, n);
+            return n;
+        }
+    }
+    return 0u;
+}
+
+std::uint32_t __cdecl close_00533da0(void* handle, std::uint32_t flags) {
+    push_event(kEvClose, id_of_ptr(handle), flags);
+    return 0u;
+}
+
+void* __cdecl allocate_00531ca0(const char* tag, std::int32_t bytes, std::uint32_t heap) {
+    push_event(kEvAlloc, fnv1a(tag, std::strlen(tag)), static_cast<U>(bytes), heap);
+    if (oom_size_trigger != 0u && static_cast<U>(bytes) == oom_size_trigger) {
+        return nullptr;
+    }
+    const U aligned = (static_cast<U>(bytes) + 15u) & ~15u;
+    if (alloc_cursor + aligned > 58000u || alloc_count >= 64u) {
+        fail("alloc_arena_exhausted");
+    }
+    B* ptr = alloc_arena + alloc_cursor;
+    alloc_cursor += aligned;
+    alloc_ptrs[alloc_count++] = static_cast<U>(reinterpret_cast<std::uintptr_t>(ptr));
+    return ptr;
+}
+
+std::uint32_t __cdecl free_00531f90(void* p) {
+    push_event(kEvFree, id_of_ptr(p));
+    return 0u;
+}
+
+std::uint32_t __cdecl audio_resource_data_offset_00566880(std::uint32_t source) {
+    (void)source;
+    return mock_entry_count;
+}
+
+std::uint32_t __cdecl audio_resource_locate_005666f0(
+    std::uint32_t source, std::uint32_t name, std::uint32_t index,
+    std::uint32_t out_offset, std::uint32_t out_size) {
+    (void)source;
+    (void)name;
+    U* p_off = reinterpret_cast<U*>(static_cast<std::uintptr_t>(out_offset));
+    U* p_sz = reinterpret_cast<U*>(static_cast<std::uintptr_t>(out_size));
+    if (p_off != nullptr) *p_off = mock_entries[index].offset;
+    if (p_sz != nullptr) *p_sz = mock_entries[index].size;
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(mock_entries[index].name));
+}
+
+std::int32_t __cdecl audio_bank_finalize_004a6bc0(
+    const char* text, std::int32_t bank_result, const void* handle, std::uint32_t kind) {
+    push_event(kEvBankFinalize, fnv1a(text, std::strlen(text)), static_cast<U>(bank_result), kind);
+    (void)handle;
+    return 0x777 + static_cast<I>(kind);
+}
+
+void __fastcall teardown_secondary_destroy_0059f1c0(void* self, void* unused_edx) {
+    (void)unused_edx;
+    push_event(kEvDestroy59F1C0, id_of_ptr(self));
+}
+
+std::uint32_t __cdecl application_release_0059f050(void* address) {
+    push_event(kEvRelease59F050, id_of_ptr(address));
+    return 0u;
+}
+
+void __cdecl context_table_release_0059ecd0(void* block) {
+    push_event(kEvRelease59ECD0, id_of_ptr(block));
+}
+
+void __cdecl heap_enter_005322b0(void* lock) {
+    push_event(kEvHeapEnter, id_of_ptr(lock));
+}
+
+void __cdecl heap_leave_005322c0(void* lock) {
+    push_event(kEvHeapLeave, id_of_ptr(lock));
+}
+
+void* __cdecl application_context_heap_state_005e4fe8() {
+    return mock_heap_state_ptr;
+}
+
+} // namespace porsche
+
+static void write_u32(B* p, U v) { std::memcpy(p, &v, 4u); }
+static void write_rel32(B* site, const void* tgt) {
+    const I rel = static_cast<I>(
+        reinterpret_cast<std::uintptr_t>(tgt) -
+        (reinterpret_cast<std::uintptr_t>(site) + 4u));
+    std::memcpy(site, &rel, 4u);
+}
+
+static const void* resolve_global(U va) {
+    using namespace porsche;
+    switch (va) {
+    case 0x00656aa8u: return audio_channel_banks_00656aa8;
+    case 0x0065b318u: return &application_audio_path_prefix_0065b318;
+    case 0x0065741cu: return &application_state_006573e8.word(0x0065741cu);
+    case 0x006582f4u: return application_state_006573e8.characters(0x006582f4u);
+    case 0x00657c98u: return &application_state_006573e8.word(0x00657c98u);
+    case 0x006564a0u: return application_audio_records_006564a0;
+    case 0x005d1a04u: return application_audio_spl_text_005d1a04;
+    case 0x005d146cu: return audio_bank_suffix_text_005d146c;
+    case 0x005d1ad4u: return audio_file_ver_err_005d1ad4;
+    case 0x005d1af8u: return audio_file_id_err_005d1af8;
+    case 0x005d1b14u: return audio_engine_tables_tag_005d1b14;
+    case 0x005d1b24u: return audio_clt_ext_005d1b24;
+    case 0x005d1b2cu: return audio_cct_ext_005d1b2c;
+    case 0x005d1b34u: return audio_elt_ext_005d1b34;
+    case 0x005d1b3cu: return audio_ect_ext_005d1b3c;
+    case 0x005d1b44u: return audio_engine_oom_fmt_005d1b44;
+    case 0x005d1b60u: return audio_sd7a_viv_fmt_005d1b60;
+    case 0x005d1b6cu: return audio_sd7a16_viv_fmt_005d1b6c;
+    case 0x005d1b7cu: return audio_name_viv_fmt_005d1b7c;
+    case 0x005d1b88u: return audio_name16_viv_fmt_005d1b88;
+    case 0x005d1b94u: return audio_engine_tag_005d1b94;
+    case 0x005e4fe8u: return &mock_heap_state_ptr;
+    case 0x0060c7e8u: return &sim_teardown_secondary_0060c7e8;
+    case 0x0060ab10u: return &sim_teardown_buf_0060ab10;
+    case 0x0060ab18u: return &sim_teardown_buf_0060ab18;
+    case 0x0060ab1cu: return &sim_teardown_buf_0060ab1c;
+    case 0x0060c978u: return &sim_lists_refcount_0060c978;
+    case 0x0060c974u: return &sim_lists_free_buf_0060c974;
+    case 0x0060c964u: return &sim_lists_table_0060c964;
+    case 0x0060c968u: return &sim_lists_table_0060c968;
+    case 0x0060c818u: return &sim_lists_vec_0060c818;
+    case 0x0060c904u: return &sim_lists_vec_0060c904;
+    case 0x00610a80u: return &sim_pool_vec_00610a80;
+    case 0x00610a88u: return &sim_pool_lock_00610a88;
+    case 0x0060c9f4u: return &frame_callback_vector_0060c9f4;
+    case 0x0060c9c4u: return &frame_compact_vector_0060c9c4;
+    case 0x0060c9acu: return &sim_obj_0060c9ac;
+    case 0x0060c9b0u: return &sim_obj_0060c9b0;
+    case 0x0060c9bcu: return &sim_obj_0060c9bc;
+    case 0x0060c9c0u: return &sim_obj_0060c9c0;
+    case 0x0060c9f0u: return &sim_obj_0060c9f0;
+    case 0x0060c9fcu: return &sim_obj_0060c9fc;
+    case 0x0060ca0cu: return &sim_obj_0060ca0c;
+    case 0x0060ca14u: return &sim_obj_0060ca14;
+    case 0x0060ca18u: return &sim_obj_0060ca18;
+    case 0x0060ca1cu: return &sim_obj_0060ca1c;
+    case 0x0060ca20u: return &sim_obj_0060ca20;
+    case 0x0060ca24u: return &sim_obj_0060ca24;
+    case 0x0060ca28u: return &sim_obj_0060ca28;
+    case 0x0060ca2cu: return &sim_obj_0060ca2c;
+    case 0x0060ca30u: return &sim_obj_0060ca30;
+    case 0x0060ca34u: return &sim_obj_0060ca34;
+    case 0x0060ca38u: return &sim_obj_0060ca38;
+    case 0x0060ca3cu: return &sim_obj_0060ca3c;
+    case 0x0060ca40u: return &sim_obj_0060ca40;
+    case 0x0060ca44u: return &sim_obj_0060ca44;
+    case 0x0060ca48u: return &sim_obj_0060ca48;
+    case 0x0060ca4cu: return &sim_obj_0060ca4c;
+    case 0x0060ca50u: return &sim_obj_0060ca50;
+    case 0x0060ca54u: return &sim_obj_0060ca54;
+    case 0x0060ca58u: return &sim_obj_0060ca58;
+    case 0x0060ca5cu: return &sim_obj_0060ca5c;
+    case 0x0060ca60u: return &sim_obj_0060ca60;
+    case 0x0060ca64u: return &sim_obj_0060ca64;
+    case 0x0060ca68u: return &sim_obj_0060ca68;
+    case 0x0060ca7cu: return &sim_obj_0060ca7c;
+    default: fail("unknown_reloc_va"); return nullptr;
+    }
+}
+
+static const void* resolve_callee(U va) {
+    using namespace porsche;
+    switch (va) {
+    case 0x00531ca0u: return reinterpret_cast<const void*>(&allocate_00531ca0);
+    case 0x00531f90u: return reinterpret_cast<const void*>(&free_00531f90);
+    case 0x00533bf0u: return reinterpret_cast<const void*>(&read_00533bf0);
+    case 0x00533da0u: return reinterpret_cast<const void*>(&close_00533da0);
+    case 0x005666f0u: return reinterpret_cast<const void*>(&audio_resource_locate_005666f0);
+    case 0x00566880u: return reinterpret_cast<const void*>(&audio_resource_data_offset_00566880);
+    case 0x0059db50u: return reinterpret_cast<const void*>(&resource_loadat_quiet_0059db50);
+    case 0x0059dea0u: return reinterpret_cast<const void*>(&resource_load_bigheader_0059dea0);
+    case 0x0059df70u: return reinterpret_cast<const void*>(&resource_load_bigheader_quiet_0059df70);
+    case 0x0059e040u: return reinterpret_cast<const void*>(&open_0059e040);
+    case 0x005a0fbfu: return reinterpret_cast<const void*>(&formatter_entry_005a0fbf);
+    case 0x005a177bu: return reinterpret_cast<const void*>(&formatter_stdio_printf_005a177b);
+    case 0x004a6bc0u: return reinterpret_cast<const void*>(&audio_bank_finalize_004a6bc0);
+    case 0x00419dc0u: return code + kOff419DC0;
+    case 0x0041e2c0u: return code + kOff41E2C0;
+    case 0x00436710u: return code + kOff436710;
+    case 0x00434f00u: return code + kOff434F00;
+    case 0x0059f1c0u: return reinterpret_cast<const void*>(&teardown_secondary_destroy_0059f1c0);
+    case 0x0059f050u: return reinterpret_cast<const void*>(&application_release_0059f050);
+    case 0x0059ecd0u: return reinterpret_cast<const void*>(&context_table_release_0059ecd0);
+    case 0x005322b0u: return reinterpret_cast<const void*>(&heap_enter_005322b0);
+    case 0x005322c0u: return reinterpret_cast<const void*>(&heap_leave_005322c0);
+    default: fail("unknown_call_va"); return nullptr;
+    }
+}
+
+struct RelocSite { U base; U off; U va; };
+static const RelocSite kRelocs[] = {
+    {kOff4ACC10, 0x25u, 0x00656aa8u},
+    {kOff4ACC10, 0x38u, 0x005d1b94u},
+    {kOff4ACC10, 0x61u, 0x00656aa8u},
+    {kOff4ACC10, 0x128u, 0x0065b318u},
+    {kOff4ACC10, 0x14eu, 0x0065741cu},
+    {kOff4ACC10, 0x16au, 0x006582f4u},
+    {kOff4ACC10, 0x195u, 0x005d1a04u},
+    {kOff4ACC10, 0x1d5u, 0x00657c98u},
+    {kOff4ACC10, 0x1eau, 0x0065b318u},
+    {kOff4ACC10, 0x1f5u, 0x005d1b88u},
+    {kOff4ACC10, 0x21eu, 0x0065b318u},
+    {kOff4ACC10, 0x229u, 0x005d1b7cu},
+    {kOff4ACC10, 0x24eu, 0x00657c98u},
+    {kOff4ACC10, 0x257u, 0x0065b318u},
+    {kOff4ACC10, 0x262u, 0x005d1b6cu},
+    {kOff4ACC10, 0x287u, 0x0065b318u},
+    {kOff4ACC10, 0x291u, 0x005d1b60u},
+    {kOff4ACC10, 0x316u, 0x005d146cu},
+    {kOff4ACC10, 0x3a6u, 0x006564a0u},
+    {kOff4ACC10, 0x3b7u, 0x005d1b44u},
+    {kOff4ACC10, 0x3d0u, 0x005d1b3cu},
+    {kOff4ACC10, 0x45eu, 0x005d1af8u},
+    {kOff4ACC10, 0x485u, 0x005d1b34u},
+    {kOff4ACC10, 0x513u, 0x005d1af8u},
+    {kOff4ACC10, 0x53au, 0x005d1b2cu},
+    {kOff4ACC10, 0x5c8u, 0x005d1af8u},
+    {kOff4ACC10, 0x5efu, 0x005d1b24u},
+    {kOff4ACC10, 0x679u, 0x005d1af8u},
+    {kOff4ACC10, 0x696u, 0x005d1ad4u},
+    {kOff4ACC10, 0x800u, 0x005d1b14u},
+    {kOff425330, 0x3u, 0x0060ca14u},
+    {kOff425330, 0x19u, 0x0060ca18u},
+    {kOff425330, 0x1fu, 0x0060ca14u},
+    {kOff425330, 0x2fu, 0x0060ca1cu},
+    {kOff425330, 0x35u, 0x0060ca18u},
+    {kOff425330, 0x45u, 0x0060ca40u},
+    {kOff425330, 0x4bu, 0x0060ca1cu},
+    {kOff425330, 0x5bu, 0x0060ca20u},
+    {kOff425330, 0x61u, 0x0060ca40u},
+    {kOff425330, 0x71u, 0x0060ca24u},
+    {kOff425330, 0x77u, 0x0060ca20u},
+    {kOff425330, 0x87u, 0x0060ca28u},
+    {kOff425330, 0x8du, 0x0060ca24u},
+    {kOff425330, 0x9du, 0x0060ca2cu},
+    {kOff425330, 0xa3u, 0x0060ca28u},
+    {kOff425330, 0xb3u, 0x0060c9f0u},
+    {kOff425330, 0xb9u, 0x0060ca2cu},
+    {kOff425330, 0xc9u, 0x0060ca30u},
+    {kOff425330, 0xcfu, 0x0060c9f0u},
+    {kOff425330, 0xdfu, 0x0060ca34u},
+    {kOff425330, 0xe5u, 0x0060ca30u},
+    {kOff425330, 0xf5u, 0x0060ca38u},
+    {kOff425330, 0xfbu, 0x0060ca34u},
+    {kOff425330, 0x10bu, 0x0060ca3cu},
+    {kOff425330, 0x111u, 0x0060ca38u},
+    {kOff425330, 0x121u, 0x0060ca44u},
+    {kOff425330, 0x127u, 0x0060ca3cu},
+    {kOff425330, 0x137u, 0x0060ca4cu},
+    {kOff425330, 0x13du, 0x0060ca44u},
+    {kOff425330, 0x14du, 0x0060ca50u},
+    {kOff425330, 0x153u, 0x0060ca4cu},
+    {kOff425330, 0x163u, 0x0060ca54u},
+    {kOff425330, 0x169u, 0x0060ca50u},
+    {kOff425330, 0x179u, 0x0060ca5cu},
+    {kOff425330, 0x17fu, 0x0060ca54u},
+    {kOff425330, 0x18fu, 0x0060ca48u},
+    {kOff425330, 0x195u, 0x0060ca5cu},
+    {kOff425330, 0x1a5u, 0x0060c9b0u},
+    {kOff425330, 0x1abu, 0x0060ca48u},
+    {kOff425330, 0x1bbu, 0x0060ca58u},
+    {kOff425330, 0x1c1u, 0x0060c9b0u},
+    {kOff425330, 0x1d1u, 0x0060ca60u},
+    {kOff425330, 0x1d7u, 0x0060ca58u},
+    {kOff425330, 0x1e7u, 0x0060ca64u},
+    {kOff425330, 0x1edu, 0x0060ca60u},
+    {kOff425330, 0x1fdu, 0x0060ca68u},
+    {kOff425330, 0x203u, 0x0060ca64u},
+    {kOff425330, 0x213u, 0x0060c9fcu},
+    {kOff425330, 0x219u, 0x0060ca68u},
+    {kOff425330, 0x229u, 0x0060c9c0u},
+    {kOff425330, 0x22fu, 0x0060c9fcu},
+    {kOff425330, 0x23fu, 0x0060c9bcu},
+    {kOff425330, 0x245u, 0x0060c9c0u},
+    {kOff425330, 0x255u, 0x0060ca0cu},
+    {kOff425330, 0x25bu, 0x0060c9bcu},
+    {kOff425330, 0x26bu, 0x0060c9acu},
+    {kOff425330, 0x271u, 0x0060ca0cu},
+    {kOff425330, 0x281u, 0x0060c9acu},
+    {kOff425330, 0x28cu, 0x0060ca7cu},
+    {kOff425330, 0x29cu, 0x0060c9f4u},
+    {kOff425330, 0x2a2u, 0x0060ca7cu},
+    {kOff425330, 0x2e2u, 0x0060c9f4u},
+    {kOff425330, 0x302u, 0x005e4fe8u},
+    {kOff425330, 0x34du, 0x0060c9c4u},
+    {kOff425330, 0x353u, 0x0060c9f4u},
+    {kOff425330, 0x391u, 0x0060c9c4u},
+    {kOff425330, 0x3acu, 0x005e4fe8u},
+    {kOff425330, 0x3fcu, 0x0060c9c4u},
+    {kOff419DC0, 0x3u, 0x0060c7e8u},
+    {kOff419DC0, 0x1cu, 0x0060ab18u},
+    {kOff419DC0, 0x28u, 0x0060ab10u},
+    {kOff419DC0, 0x34u, 0x0060ab1cu},
+    {kOff41E2C0, 0x2u, 0x0060c978u},
+    {kOff41E2C0, 0xcu, 0x0060c978u},
+    {kOff41E2C0, 0x17u, 0x0060c974u},
+    {kOff41E2C0, 0x23u, 0x0060c968u},
+    {kOff41E2C0, 0x2cu, 0x0060c974u},
+    {kOff41E2C0, 0x37u, 0x0060c964u},
+    {kOff41E2C0, 0x3du, 0x0060c968u},
+    {kOff41E2C0, 0x48u, 0x0060c818u},
+    {kOff41E2C0, 0x53u, 0x0060c964u},
+    {kOff41E2C0, 0x8au, 0x0060c818u},
+    {kOff41E2C0, 0xa4u, 0x005e4fe8u},
+    {kOff41E2C0, 0xf6u, 0x0060c818u},
+    {kOff41E2C0, 0xfcu, 0x0060c904u},
+    {kOff41E2C0, 0x13cu, 0x0060c904u},
+    {kOff41E2C0, 0x15du, 0x005e4fe8u},
+    {kOff41E2C0, 0x1a6u, 0x0060c904u},
+    {kOff434F00, 0x1u, 0x00610a88u},
+    {kOff434F00, 0xeu, 0x00610a80u},
+    {kOff434F00, 0x2bu, 0x005e4fe8u},
+    {kOff434F00, 0x7du, 0x00610a88u},
+    {kOff434F00, 0x83u, 0x00610a80u},
+};
+static const RelocSite kCalls[] = {
+    {kOff4ACC10, 0x55u, 0x00531ca0u},
+    {kOff4ACC10, 0x1c2u, 0x0059db50u},
+    {kOff4ACC10, 0x1fbu, 0x005a0fbfu},
+    {kOff4ACC10, 0x207u, 0x0059df70u},
+    {kOff4ACC10, 0x22fu, 0x005a0fbfu},
+    {kOff4ACC10, 0x23bu, 0x0059df70u},
+    {kOff4ACC10, 0x268u, 0x005a0fbfu},
+    {kOff4ACC10, 0x274u, 0x0059df70u},
+    {kOff4ACC10, 0x297u, 0x005a0fbfu},
+    {kOff4ACC10, 0x2a3u, 0x0059dea0u},
+    {kOff4ACC10, 0x2c7u, 0x0059e040u},
+    {kOff4ACC10, 0x2d1u, 0x00566880u},
+    {kOff4ACC10, 0x2fdu, 0x005666f0u},
+    {kOff4ACC10, 0x35au, 0x00531ca0u},
+    {kOff4ACC10, 0x37au, 0x00533bf0u},
+    {kOff4ACC10, 0x38eu, 0x004a6bc0u},
+    {kOff4ACC10, 0x3bcu, 0x005a177bu},
+    {kOff4ACC10, 0x42au, 0x00531ca0u},
+    {kOff4ACC10, 0x444u, 0x00533bf0u},
+    {kOff4ACC10, 0x463u, 0x005a177bu},
+    {kOff4ACC10, 0x4dfu, 0x00531ca0u},
+    {kOff4ACC10, 0x4f9u, 0x00533bf0u},
+    {kOff4ACC10, 0x518u, 0x005a177bu},
+    {kOff4ACC10, 0x594u, 0x00531ca0u},
+    {kOff4ACC10, 0x5aeu, 0x00533bf0u},
+    {kOff4ACC10, 0x5cdu, 0x005a177bu},
+    {kOff4ACC10, 0x649u, 0x00531ca0u},
+    {kOff4ACC10, 0x65fu, 0x00533bf0u},
+    {kOff4ACC10, 0x67eu, 0x005a177bu},
+    {kOff4ACC10, 0x69bu, 0x005a177bu},
+    {kOff4ACC10, 0x6b1u, 0x00566880u},
+    {kOff4ACC10, 0x6ccu, 0x00533da0u},
+    {kOff4ACC10, 0x6d2u, 0x00531f90u},
+    {kOff4ACC10, 0x805u, 0x00531ca0u},
+    {kOff4ACC10, 0x887u, 0x00531f90u},
+    {kOff425330, 0x286u, 0x00419dc0u},
+    {kOff425330, 0x313u, 0x0059ecd0u},
+    {kOff425330, 0x320u, 0x005322b0u},
+    {kOff425330, 0x339u, 0x005322c0u},
+    {kOff425330, 0x344u, 0x0059f050u},
+    {kOff425330, 0x3c4u, 0x0059ecd0u},
+    {kOff425330, 0x3d1u, 0x005322b0u},
+    {kOff425330, 0x3eau, 0x005322c0u},
+    {kOff425330, 0x3f3u, 0x0059f050u},
+    {kOff425330, 0x405u, 0x0041e2c0u},
+    {kOff425330, 0x40au, 0x00434f00u},
+    {kOff419DC0, 0xeu, 0x0059f1c0u},
+    {kOff419DC0, 0x14u, 0x0059f050u},
+    {kOff419DC0, 0x22u, 0x0059f050u},
+    {kOff419DC0, 0x2eu, 0x0059f050u},
+    {kOff419DC0, 0x3au, 0x0059f050u},
+    {kOff41E2C0, 0x1du, 0x00531f90u},
+    {kOff41E2C0, 0x31u, 0x0059ecd0u},
+    {kOff41E2C0, 0x43u, 0x0059ecd0u},
+    {kOff41E2C0, 0x6fu, 0x00436710u},
+    {kOff41E2C0, 0xbcu, 0x0059ecd0u},
+    {kOff41E2C0, 0xc9u, 0x005322b0u},
+    {kOff41E2C0, 0xe2u, 0x005322c0u},
+    {kOff41E2C0, 0xedu, 0x0059f050u},
+    {kOff41E2C0, 0x16eu, 0x0059ecd0u},
+    {kOff41E2C0, 0x17bu, 0x005322b0u},
+    {kOff41E2C0, 0x194u, 0x005322c0u},
+    {kOff41E2C0, 0x19du, 0x0059f050u},
+    {kOff434F00, 0x8u, 0x005322b0u},
+    {kOff434F00, 0x43u, 0x0059ecd0u},
+    {kOff434F00, 0x50u, 0x005322b0u},
+    {kOff434F00, 0x69u, 0x005322c0u},
+    {kOff434F00, 0x72u, 0x0059f050u},
+    {kOff434F00, 0x8du, 0x005322c0u},
+};
+
+static void verify_pe_data_bytes(const char* pe_path) {
+    FILE* f = std::fopen(pe_path, "rb");
+    if (f == nullptr) fail("open_pe");
+    struct Span { U file_off; const char* ptr; U len; };
+    const Span spans[] = {
+        {0x1d1ad4u, porsche::audio_file_ver_err_005d1ad4, 33u},
+        {0x1d1af8u, porsche::audio_file_id_err_005d1af8, 28u},
+        {0x1d1b14u, porsche::audio_engine_tables_tag_005d1b14, 14u},
+        {0x1d1b24u, porsche::audio_clt_ext_005d1b24, 5u},
+        {0x1d1b2cu, porsche::audio_cct_ext_005d1b2c, 5u},
+        {0x1d1b34u, porsche::audio_elt_ext_005d1b34, 5u},
+        {0x1d1b3cu, porsche::audio_ect_ext_005d1b3c, 5u},
+        {0x1d1b44u, porsche::audio_engine_oom_fmt_005d1b44, 28u},
+        {0x1d1b60u, porsche::audio_sd7a_viv_fmt_005d1b60, 11u},
+        {0x1d1b6cu, porsche::audio_sd7a16_viv_fmt_005d1b6c, 13u},
+        {0x1d1b7cu, porsche::audio_name_viv_fmt_005d1b7c, 9u},
+        {0x1d1b88u, porsche::audio_name16_viv_fmt_005d1b88, 11u},
+        {0x1d1b94u, porsche::audio_engine_tag_005d1b94, 13u},
+    };
+    B buf[64];
+    for (const auto& sp : spans) {
+        std::fseek(f, static_cast<long>(sp.file_off), SEEK_SET);
+        if (std::fread(buf, 1, sp.len, f) != sp.len || std::memcmp(buf, sp.ptr, sp.len) != 0) {
+            std::fclose(f);
+            fail("pe_data_mismatch");
+        }
+    }
+    std::fclose(f);
+}
+
+static void init_original_code() {
+    code = static_cast<B*>(
+        VirtualAlloc(nullptr, kCodeBytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (code == nullptr) fail("virtualalloc");
+    std::memset(code, 0xcc, kCodeBytes);
+    std::memcpy(code + kOff4ACC10, kBody4ACC10, sizeof(kBody4ACC10));
+    std::memcpy(code + kOff425330, kBody425330, sizeof(kBody425330));
+    std::memcpy(code + kOff419DC0, kBody419DC0, sizeof(kBody419DC0));
+    std::memcpy(code + kOff41E2C0, kBody41E2C0, sizeof(kBody41E2C0));
+    std::memcpy(code + kOff436710, kBody436710, sizeof(kBody436710));
+    std::memcpy(code + kOff434F00, kBody434F00, sizeof(kBody434F00));
+    for (const auto& r : kRelocs) {
+        write_u32(code + r.base + r.off,
+                  static_cast<U>(reinterpret_cast<std::uintptr_t>(resolve_global(r.va))));
+    }
+    for (const auto& c : kCalls) {
+        write_rel32(code + c.base + c.off, resolve_callee(c.va));
+    }
+}
+
+static void call_x86_2u(void* fn, U a0, U a1) {
+    U s0 = 0u, s1 = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        push a1
+        push a0
+        call fn
+        add esp, 8
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+}
+
+static void call_x86_0(void* fn) {
+    U s0 = 0u, s1 = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        call fn
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+}
+
+static U call_x86_copy(void* fn, const U* a0, const U* a1, U* a2) {
+    U s0 = 0u, s1 = 0u, r = 0u;
+    __asm {
+        mov esi, 0x22223333
+        mov edi, 0x44445555
+        mov s0, esp
+        push a2
+        push a1
+        push a0
+        call fn
+        add esp, 12
+        mov r, eax
+        mov s1, esp
+        cmp esi, 0x22223333
+        je ok_si
+        mov trace.abi_fail, 1
+    ok_si:
+        cmp edi, 0x44445555
+        je ok_di
+        mov trace.abi_fail, 2
+    ok_di:
+    }
+    if (s0 != s1) trace.abi_fail = 3u;
+    return r;
+}
+
+static void init_table_payload(B* dst, U magic, B version, B preflag, B tag0, U off0, U len0, B tag1, U off1, U len1) {
+    std::memset(dst, 0, 768);
+    write_u32(dst + 0u, magic);
+    dst[4] = version;
+    dst[5] = preflag;
+    for (U j = 0u; j < 8u; ++j) {
+        dst[0x20u + j] = 0xffu;
+    }
+    if (static_cast<signed char>(tag0) > -1) {
+        dst[0x20u + 0u] = tag0;
+        const U slot_a = 0x128u;
+        const U slot_b = 0x148u;
+        const U curve_off = 0x180u;
+        write_u32(dst + slot_a, curve_off - slot_a);
+        write_u32(dst + slot_b, curve_off - slot_b);
+        std::memset(dst + curve_off + off0, static_cast<int>(tag0 + 0x31u), len0);
+    }
+    if (static_cast<signed char>(tag1) > -1) {
+        dst[0x20u + 3u] = tag1;
+        const U slot_a = 0x128u + 12u;
+        const U slot_b = 0x148u + 12u;
+        write_u32(dst + slot_a, 0x170u - slot_a);
+        write_u32(dst + slot_b, 0x170u - slot_b);
+        std::memset(dst + 0x170u + off1, static_cast<int>(tag1 + 0x41u), len1);
+    }
+}
+
+static void reset_audio_state(U quality, const char* car_name) {
+    using namespace porsche;
+    alloc_cursor = 0u;
+    alloc_count = 0u;
+    oom_size_trigger = 0u;
+    std::memset(alloc_arena, 0, sizeof(alloc_arena));
+    audio_channel_banks_00656aa8[0] = nullptr;
+    audio_channel_banks_00656aa8[1] = nullptr;
+    static char prefix_buf[] = "C:\\audio\\";
+    application_audio_path_prefix_0065b318 = prefix_buf;
+    application_state_006573e8.word(0x0065741cu) = 1u;
+    application_state_006573e8.word(0x00657c98u) = quality;
+    std::strcpy(application_state_006573e8.characters(0x006582f4u + 0x580u), "911");
+    std::strcpy(application_state_006573e8.characters(0x00658374u), car_name);
+    application_audio_records_006564a0[0].raw_00 = 0x1234567au;
+    application_audio_records_006564a0[1].raw_00 = 0x89abcdefu;
+    mock_entry_count = 0u;
+    std::memset(mock_entries, 0, sizeof(mock_entries));
+}
+
+static void snapshot_audio_state() {
+    using namespace porsche;
+    for (U s = 0u; s < 2u; ++s) {
+        const B* tbl = static_cast<const B*>(audio_channel_banks_00656aa8[s]);
+        trace.table_nonnull[s] = tbl != nullptr ? 1u : 0u;
+        if (tbl != nullptr) {
+            std::memcpy(&trace.table_cc[s], tbl + 0xccu, 4u);
+            std::memcpy(&trace.table_38[s], tbl + 0x38u, 4u);
+            trace.table_d0[s] = tbl[0xd0u];
+            U pool_u = 0u;
+            std::memcpy(&pool_u, tbl + 0x754u, 4u);
+            if (s == 0u || audio_channel_banks_00656aa8[0] == nullptr) {
+                for (U i = 0u; i < 32u; ++i) {
+                    const U off = 0x2d4u + i * 0x0cu;
+                    std::memcpy(&trace.slice_start[i], tbl + off + 0u, 2u);
+                    std::memcpy(&trace.slice_end[i], tbl + off + 2u, 2u);
+                    U data_u = 0u;
+                    std::memcpy(&data_u, tbl + off + 4u, 4u);
+                    trace.slice_tag[i] = tbl[off + 8u];
+                    trace.slice_data_off[i] = (pool_u != 0u && data_u != 0u) ? (data_u - pool_u) : 0xffffffffu;
+                    if (trace.slice_end[i] > trace.slice_start[i]) {
+                        const U span = static_cast<U>(trace.slice_end[i] - trace.slice_start[i]);
+                        if (trace.slice_data_off[i] != 0xffffffffu && trace.slice_data_off[i] + span <= sizeof(trace.pool_copy)) {
+                            std::memcpy(trace.pool_copy + trace.slice_data_off[i],
+                                        reinterpret_cast<const void*>(static_cast<std::uintptr_t>(data_u)),
+                                        span);
+                            if (trace.slice_data_off[i] + span > trace.pool_total) {
+                                trace.pool_total = trace.slice_data_off[i] + span;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void setup_teardown_full(U refcount_in, U cb_cap_pairs, U cmp_cap_pairs, U l1_cap_dw, U l2_cap_dw, U p_cap_dw) {
+    using namespace porsche;
+    std::memset(&mock_heap_state, 0, sizeof(mock_heap_state));
+    mock_heap_state.pool_lock = 0x12340001u;
+    for (U i = 0u; i < 32u; ++i) {
+        mock_heap_state.free_lists[i] = 0xa000u + i;
+        mock_objs[i].id = 0x800u + i;
+    }
+    std::memset(mock_vec_mem, 0, sizeof(mock_vec_mem));
+    for (U i = 0u; i < 8u; ++i) {
+        std::memset(mock_raw_bufs[i], 0, sizeof(mock_raw_bufs[i]));
+    }
+    sim_obj_0060ca14 = &mock_objs[0];
+    sim_obj_0060ca18 = &mock_objs[1];
+    sim_obj_0060ca1c = &mock_objs[2];
+    sim_obj_0060ca40 = &mock_objs[3];
+    sim_obj_0060ca20 = &mock_objs[4];
+    sim_obj_0060ca24 = &mock_objs[5];
+    sim_obj_0060ca28 = &mock_objs[6];
+    sim_obj_0060ca2c = &mock_objs[7];
+    sim_obj_0060c9f0 = &mock_objs[8];
+    sim_obj_0060ca30 = &mock_objs[9];
+    sim_obj_0060ca34 = &mock_objs[10];
+    sim_obj_0060ca38 = &mock_objs[11];
+    sim_obj_0060ca3c = &mock_objs[12];
+    sim_obj_0060ca44 = &mock_objs[13];
+    sim_obj_0060ca4c = &mock_objs[14];
+    sim_obj_0060ca50 = &mock_objs[15];
+    sim_obj_0060ca54 = &mock_objs[16];
+    sim_obj_0060ca5c = &mock_objs[17];
+    sim_obj_0060ca48 = &mock_objs[18];
+    sim_obj_0060c9b0 = &mock_objs[19];
+    sim_obj_0060ca58 = &mock_objs[20];
+    sim_obj_0060ca60 = &mock_objs[21];
+    sim_obj_0060ca64 = nullptr;
+    sim_obj_0060ca68 = &mock_objs[23];
+    sim_obj_0060c9fc = &mock_objs[24];
+    sim_obj_0060c9c0 = &mock_objs[25];
+    sim_obj_0060c9bc = &mock_objs[26];
+    sim_obj_0060ca0c = &mock_objs[27];
+    sim_obj_0060c9ac = &mock_objs[28];
+    sim_obj_0060ca7c = &mock_objs[29];
+
+    sim_teardown_secondary_0060c7e8 = mock_raw_bufs[0];
+    sim_teardown_buf_0060ab18 = mock_raw_bufs[1];
+    sim_teardown_buf_0060ab10 = mock_raw_bufs[2];
+    sim_teardown_buf_0060ab1c = mock_raw_bufs[3];
+
+    sim_lists_refcount_0060c978 = static_cast<I>(refcount_in);
+    sim_lists_free_buf_0060c974 = mock_raw_bufs[4];
+    sim_lists_table_0060c968 = mock_raw_bufs[5];
+    sim_lists_table_0060c964 = mock_raw_bufs[6];
+    sim_pool_lock_00610a88 = mock_raw_bufs[7];
+
+    auto init_vec = [](SimVector12_813& v, U mem_off, U len_bytes, U cap_bytes) {
+        const U base = static_cast<U>(reinterpret_cast<std::uintptr_t>(mock_vec_mem + mem_off));
+        v.begin = base;
+        v.end = base + len_bytes;
+        v.capacity_end = base + cap_bytes;
+    };
+    init_vec(mock_vecs[0], 0u,    16u, cb_cap_pairs * 8u);
+    init_vec(mock_vecs[1], 512u,  16u, cmp_cap_pairs * 8u);
+    init_vec(mock_vecs[2], 1024u, 8u,  l1_cap_dw * 4u);
+    init_vec(mock_vecs[3], 1536u, 8u,  l2_cap_dw * 4u);
+    init_vec(mock_vecs[4], 2048u, 8u,  p_cap_dw * 4u);
+
+    frame_callback_vector_0060c9f4 = reinterpret_cast<FrameVector_400*>(&mock_vecs[0]);
+    frame_compact_vector_0060c9c4 = reinterpret_cast<FrameVector_400*>(&mock_vecs[1]);
+    sim_lists_vec_0060c818 = &mock_vecs[2];
+    sim_lists_vec_0060c904 = &mock_vecs[3];
+    sim_pool_vec_00610a80 = &mock_vecs[4];
+}
+
+static void snapshot_teardown_state() {
+    using namespace porsche;
+    void* const cells[] = {
+        sim_obj_0060ca14, sim_obj_0060ca18, sim_obj_0060ca1c, sim_obj_0060ca40,
+        sim_obj_0060ca20, sim_obj_0060ca24, sim_obj_0060ca28, sim_obj_0060ca2c,
+        sim_obj_0060c9f0, sim_obj_0060ca30, sim_obj_0060ca34, sim_obj_0060ca38,
+        sim_obj_0060ca3c, sim_obj_0060ca44, sim_obj_0060ca4c, sim_obj_0060ca50,
+        sim_obj_0060ca54, sim_obj_0060ca5c, sim_obj_0060ca48, sim_obj_0060c9b0,
+        sim_obj_0060ca58, sim_obj_0060ca60, sim_obj_0060ca64, sim_obj_0060ca68,
+        sim_obj_0060c9fc, sim_obj_0060c9c0, sim_obj_0060c9bc, sim_obj_0060ca0c,
+        sim_obj_0060c9ac, sim_obj_0060ca7c,
+        frame_callback_vector_0060c9f4, frame_compact_vector_0060c9c4,
+        sim_lists_free_buf_0060c974, sim_lists_table_0060c968, sim_lists_table_0060c964,
+        sim_lists_vec_0060c818, sim_lists_vec_0060c904, sim_pool_vec_00610a80
+    };
+    for (U i = 0u; i < 38u; ++i) {
+        trace.ptrs_after[i] = id_of_ptr(cells[i]);
+    }
+    trace.refcount_after = sim_lists_refcount_0060c978;
+    for (U i = 0u; i < 32u; ++i) {
+        const U v = mock_heap_state.free_lists[i];
+        trace.pool_heads[i] = (v >= 0xa000u && v < 0xa020u)
+            ? v
+            : id_of_ptr(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(v)));
+    }
+    for (U i = 0u; i < 5u; ++i) {
+        U nxt = 0u;
+        std::memcpy(&nxt, mock_vec_mem + i * 512u + 4u, 4u);
+        trace.freed_nexts[i] = nxt;
+    }
+}
+
+static void compare_traces() {
+    if (trace.abi_fail != 0u) fail("abi");
+    if (expected.abi_fail != 0u) fail("abi_exp");
+    if (trace.ret != expected.ret) fail("ret");
+    if (trace.count != expected.count) fail("event_count");
+    for (U i = 0u; i < trace.count; ++i) {
+        if (std::memcmp(&trace.events[i], &expected.events[i], sizeof(Event)) != 0) {
+            fail("event_mismatch");
+        }
+    }
+    if (std::memcmp(trace.table_nonnull, expected.table_nonnull, sizeof(trace.table_nonnull)) != 0) fail("table_nonnull");
+    if (std::memcmp(trace.table_cc, expected.table_cc, sizeof(trace.table_cc)) != 0) fail("table_cc");
+    if (std::memcmp(trace.table_38, expected.table_38, sizeof(trace.table_38)) != 0) fail("table_38");
+    if (std::memcmp(trace.table_d0, expected.table_d0, sizeof(trace.table_d0)) != 0) fail("table_d0");
+    if (std::memcmp(trace.slice_start, expected.slice_start, sizeof(trace.slice_start)) != 0) fail("slice_start");
+    if (std::memcmp(trace.slice_end, expected.slice_end, sizeof(trace.slice_end)) != 0) fail("slice_end");
+    if (std::memcmp(trace.slice_tag, expected.slice_tag, sizeof(trace.slice_tag)) != 0) fail("slice_tag");
+    if (std::memcmp(trace.slice_data_off, expected.slice_data_off, sizeof(trace.slice_data_off)) != 0) fail("slice_data_off");
+    if (trace.pool_total != expected.pool_total ||
+        std::memcmp(trace.pool_copy, expected.pool_copy, trace.pool_total) != 0) fail("pool_copy");
+    if (std::memcmp(trace.ptrs_after, expected.ptrs_after, sizeof(trace.ptrs_after)) != 0) fail("ptrs_after");
+    if (trace.refcount_after != expected.refcount_after) fail("refcount_after");
+    if (std::memcmp(trace.pool_heads, expected.pool_heads, sizeof(trace.pool_heads)) != 0) fail("pool_heads");
+    if (std::memcmp(trace.freed_nexts, expected.freed_nexts, sizeof(trace.freed_nexts)) != 0) fail("freed_nexts");
+    verify_fpu(trace.fp, expected.fp);
+}
+
+template <class Setup, class RunOrig, class RunCpp>
+static void run_case(Setup setup, RunOrig run_orig, RunCpp run_cpp) {
+    ++cases;
+    which = 0u;
+    std::memset(&trace, 0, sizeof(trace));
+    setup();
+    run_orig();
+    capture_fpu(&trace.fp);
+    expected = trace;
+
+    which = 1u;
+    std::memset(&trace, 0, sizeof(trace));
+    setup();
+    run_cpp();
+    capture_fpu(&trace.fp);
+    compare_traces();
+}
+
+int main(int argc, char** argv) {
+    verify_pe_data_bytes(argc > 1 ? argv[1] : "local/game/Porsche.exe");
+    init_original_code();
+
+    run_case(
+        []() {
+            reset_audio_state(2u, "gt1");
+            porsche::audio_channel_banks_00656aa8[1] = alloc_arena + 62000u;
+        },
+        []() {
+            call_x86_2u(code + kOff4ACC10, static_cast<U>(-1), 0x00658374u);
+            call_x86_2u(code + kOff4ACC10, 2u, 0x00658374u);
+            call_x86_2u(code + kOff4ACC10, 1u, 0x00658374u);
+            snapshot_audio_state();
+        },
+        []() {
+            porsche::application_sim_boundary_004acc10(-1, 0x00658374u);
+            porsche::application_sim_boundary_004acc10(2, 0x00658374u);
+            porsche::application_sim_boundary_004acc10(1, 0x00658374u);
+            snapshot_audio_state();
+        });
+
+    run_case(
+        []() {
+            reset_audio_state(2u, "gt1");
+            mock_big_mode = 0u;
+        },
+        []() {
+            const U va_ptr = static_cast<U>(reinterpret_cast<std::uintptr_t>(
+                porsche::application_state_006573e8.characters(0x00658374u)));
+            call_x86_2u(code + kOff4ACC10, 0u, va_ptr);
+            snapshot_audio_state();
+        },
+        []() {
+            porsche::application_sim_boundary_004acc10(0, 0x00658374u);
+            snapshot_audio_state();
+        });
+
+    run_case(
+        []() {
+            reset_audio_state(1u, "box");
+            mock_big_mode = 2u;
+            mock_entry_count = 5u;
+            std::strcpy(mock_entries[0].name, "eng.bnk");
+            mock_entries[0].offset = 0x100u; mock_entries[0].size = 0x40u;
+            std::strcpy(mock_entries[1].name, "badid.ect");
+            mock_entries[1].offset = 0x200u; mock_entries[1].size = 768u;
+            init_table_payload(mock_entries[1].data, 0x44414230u, 2u, 0u, 1, 0x10u, 6u, -1, 0u, 0u);
+            std::strcpy(mock_entries[2].name, "badver.elt");
+            mock_entries[2].offset = 0x300u; mock_entries[2].size = 768u;
+            init_table_payload(mock_entries[2].data, 0x6c445243u, 3u, 0u, 2, 0x120u, 8u, -1, 0u, 0u);
+            std::strcpy(mock_entries[3].name, "good.cct");
+            mock_entries[3].offset = 0x400u; mock_entries[3].size = 768u;
+            init_table_payload(mock_entries[3].data, 0x6c445243u, 2u, 0u, 3, 0x05u, 4u, 4, 0x02u, 5u);
+            std::strcpy(mock_entries[4].name, "good.clt");
+            mock_entries[4].offset = 0x500u; mock_entries[4].size = 768u;
+            init_table_payload(mock_entries[4].data, 0x11111111u, 9u, 0u, 5, 0x08u, 7u, -1, 0u, 0u);
+        },
+        []() {
+            const U va_ptr = static_cast<U>(reinterpret_cast<std::uintptr_t>(
+                porsche::application_state_006573e8.characters(0x00658374u)));
+            call_x86_2u(code + kOff4ACC10, 0u, va_ptr);
+            snapshot_audio_state();
+        },
+        []() {
+            porsche::application_sim_boundary_004acc10(0, 0x00658374u);
+            snapshot_audio_state();
+        });
+
+    run_case(
+        []() {
+            reset_audio_state(2u, "hostignored");
+            mock_big_mode = 1u;
+            mock_entry_count = 5u;
+            std::strcpy(mock_entries[0].name, "car.bnk");
+            mock_entries[0].offset = 0x100u; mock_entries[0].size = 0x40u;
+            std::strcpy(mock_entries[1].name, "a.ect");
+            mock_entries[1].offset = 0x200u; mock_entries[1].size = 768u;
+            init_table_payload(mock_entries[1].data, 0x6c445243u, 2u, 1u, 1, 0x10u, 6u, -1, 0u, 0u);
+            std::strcpy(mock_entries[2].name, "b.elt");
+            mock_entries[2].offset = 0x300u; mock_entries[2].size = 768u;
+            init_table_payload(mock_entries[2].data, 0x6c445243u, 2u, 0u, 2, 0x04u, 8u, -1, 0u, 0u);
+            std::strcpy(mock_entries[3].name, "c.cct");
+            mock_entries[3].offset = 0x400u; mock_entries[3].size = 768u;
+            init_table_payload(mock_entries[3].data, 0x6c445243u, 2u, 1u, 3, 0x05u, 4u, -1, 0u, 0u);
+            std::strcpy(mock_entries[4].name, "d.clt");
+            mock_entries[4].offset = 0x500u; mock_entries[4].size = 768u;
+            init_table_payload(mock_entries[4].data, 0x6c445243u, 2u, 0u, 5, 0x08u, 7u, -1, 0u, 0u);
+        },
+        []() {
+            static const char kHostCar[] = "993";
+            call_x86_2u(code + kOff4ACC10, 1u,
+                        static_cast<U>(reinterpret_cast<std::uintptr_t>(kHostCar)));
+            snapshot_audio_state();
+        },
+        []() {
+            static const char kHostCar[] = "993";
+            porsche::application_sim_boundary_004acc10(
+                1, static_cast<U>(reinterpret_cast<std::uintptr_t>(kHostCar)));
+            snapshot_audio_state();
+        });
+
+    run_case(
+        []() {
+            reset_audio_state(2u, "gt1");
+            mock_big_mode = 3u;
+            mock_entry_count = 4u;
+            oom_size_trigger = 0x44u;
+            std::strcpy(mock_entries[0].name, "oom.bnk");
+            mock_entries[0].offset = 0x100u; mock_entries[0].size = 0x44u;
+            std::strcpy(mock_entries[1].name, "a.ect");
+            mock_entries[1].offset = 0x200u; mock_entries[1].size = 768u;
+            init_table_payload(mock_entries[1].data, 0x6c445243u, 2u, 0u, 1, 0x04u, 4u, -1, 0u, 0u);
+            std::strcpy(mock_entries[2].name, "b.elt");
+            mock_entries[2].offset = 0x300u; mock_entries[2].size = 768u;
+            init_table_payload(mock_entries[2].data, 0x6c445243u, 2u, 0u, 2, 0x04u, 4u, -1, 0u, 0u);
+            std::strcpy(mock_entries[3].name, "d.clt");
+            mock_entries[3].offset = 0x500u; mock_entries[3].size = 768u;
+            init_table_payload(mock_entries[3].data, 0x6c445243u, 2u, 0u, 3, 0x04u, 4u, -1, 0u, 0u);
+        },
+        []() {
+            const U va_ptr = static_cast<U>(reinterpret_cast<std::uintptr_t>(
+                porsche::application_state_006573e8.characters(0x00658374u)));
+            call_x86_2u(code + kOff4ACC10, 0u, va_ptr);
+            snapshot_audio_state();
+        },
+        []() {
+            porsche::application_sim_boundary_004acc10(0, 0x00658374u);
+            snapshot_audio_state();
+        });
+
+    run_case(
+        []() {},
+        []() {
+            static const U src[4] = {11u, 22u, 33u, 44u};
+            U dst[4] = {0u, 0u, 0u, 0u};
+            const U r1 = call_x86_copy(code + kOff436710, src, src + 3, dst);
+            const U r2 = call_x86_copy(code + kOff436710, src + 2, src + 1, dst);
+            trace.ret = (r1 - static_cast<U>(reinterpret_cast<std::uintptr_t>(dst))) ^
+                        ((r2 - static_cast<U>(reinterpret_cast<std::uintptr_t>(dst))) << 8u) ^
+                        (dst[0] * 3u + dst[1] * 5u + dst[2] * 7u);
+        },
+        []() {
+            static const U src[4] = {11u, 22u, 33u, 44u};
+            U dst[4] = {0u, 0u, 0u, 0u};
+            const U* p1 = porsche::sim_teardown_copy_dwords_00436710(src, src + 3, dst);
+            const U* p2 = porsche::sim_teardown_copy_dwords_00436710(src + 2, src + 1, dst);
+            trace.ret = static_cast<U>((p1 - dst) * 4) ^
+                        (static_cast<U>((p2 - dst) * 4) << 8u) ^
+                        (dst[0] * 3u + dst[1] * 5u + dst[2] * 7u);
+        });
+
+    run_case(
+        []() { setup_teardown_full(2u, 8u, 40u, 64u, 65u, 16u); },
+        []() { call_x86_0(code + kOff425330); snapshot_teardown_state(); },
+        []() { porsche::application_sim_boundary_00425330(); snapshot_teardown_state(); });
+
+    run_case(
+        []() {
+            setup_teardown_full(1u, 8u, 40u, 64u, 65u, 16u);
+            porsche::sim_teardown_secondary_0060c7e8 = nullptr;
+        },
+        []() { call_x86_0(code + kOff425330); snapshot_teardown_state(); },
+        []() { porsche::application_sim_boundary_00425330(); snapshot_teardown_state(); });
+
+    run_case(
+        []() {
+            setup_teardown_full(1u, 0u, 0u, 0u, 0u, 0u);
+            porsche::sim_lists_vec_0060c818 = nullptr;
+            porsche::sim_lists_vec_0060c904 = nullptr;
+            porsche::sim_pool_vec_00610a80 = nullptr;
+        },
+        []() { call_x86_0(code + kOff425330); snapshot_teardown_state(); },
+        []() { porsche::application_sim_boundary_00425330(); snapshot_teardown_state(); });
+
+    std::printf("sim_audio_and_frame_teardown_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}
