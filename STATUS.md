@@ -4,7 +4,14 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run800](iterations/v2/001-original-recovery/runs/800-scene-route-and-texture-integration/README.md)
+[Run804](iterations/v2/001-original-recovery/runs/804-render-mode-and-sim-startup-integration/README.md)
+compiles 463 TUs across eight projects (**79 unresolved names / 89
+references**, no EXE), accepting Runs797/798: `1,325` registry entries (`+14`),
+`264` comparisons, `21` mutations, `8B .data` (`797`) + `175B` literals (`202B`
+PE span) + `14B .bss` (`798`), `1,142` source pins. Two names close (`00538b30`,
+`004affd0`) with zero new unresolved names.
+
+Historical: [Run800](iterations/v2/001-original-recovery/runs/800-scene-route-and-texture-integration/README.md)
 compiles 461 TUs across eight projects (**81 unresolved names / 91
 references**, no EXE), accepting Runs795/799: `1,311` registry entries (`+4`),
 `150` comparisons, `20` mutations, `276B .bss` (`795`) + `160B .data` (`799`),

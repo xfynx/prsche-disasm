@@ -1,6 +1,11 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run800 PASS (`795/002` + `799/002`: 4 bodies, 150 cases, 20 mutations,
+Текущее: Run804 PASS (`797/002` + `798/007`: 14 bodies, 264 cases, 21
+mutations, 22B writable + 175B literals, 463 TUs, 79/89 names/refs, 1,142 pins,
+registry 1,325, no EXE). `797` supplements `00538b30`; `798` bounds synthetic
+BIG/BIGH v1/v2 payloads; live renderer/audio/startup/gameplay remain open.
+
+Historical: Run800 PASS (`795/002` + `799/002`: 4 bodies, 150 cases, 20 mutations,
 276B `.bss` + 160B `.data`, 461 TUs, 81/91 names/refs, 1,137 pins, registry
 1,311, no EXE). `795` bounds `spec_index < 4`; `799` leaves `005557d0` (`415B`)
 open; live renderer/startup/gameplay remain open.

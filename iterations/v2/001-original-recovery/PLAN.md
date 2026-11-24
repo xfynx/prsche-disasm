@@ -1,6 +1,14 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-24. [Run800](runs/800-scene-route-and-texture-integration/README.md)
+Current 2026-11-24. [Run804](runs/804-render-mode-and-sim-startup-integration/README.md)
+PASS (`build-001`): folds `797/002` (`00538b30` + 11 setters, `8B .data`) and
+`798/007` (`004affd0`, `005665b0`, `175B` literals / `202B` PE span + `14B
+.bss`): **463 TUs / 8 projects**, **79 unresolved / 89 refs**, `1,142` pins,
+`264` comparisons, `21` mutations, `2` REA sessions, no EXE; registry **1,325**
+(`+14`; `004b67b0`/`00538a30`/`00556a90`/`00557100`/`005666f0` updated). Closes
+`2` (`00538b30`, `004affd0`), `0` new. Next (`Run808`): `801`–`803`.
+
+Historical: [Run800](runs/800-scene-route-and-texture-integration/README.md)
 PASS (`build-001`): folds `795/002` (`00475c80`, `00475a60`, `276B .bss`) and
 `799/002` (`0044d7e0`, `0044d710`, `160B .data`, partial): **461 TUs / 8
 projects**, **81 unresolved / 91 refs**, `1,137` pins, `150` comparisons, `20`
