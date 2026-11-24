@@ -19,12 +19,10 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run788](iterations/v2/001-original-recovery/runs/788-scene-render-sim-integration/README.md)
-is the current shared build (`453` TUs, `87` unresolved names / `96`
-references). It integrates Run781 (scene stage constructor), Run782 (render
-calibration & service init), Run785 (sim view slot cleanup), and Run787 (render
-font prepare/destroy & calibration dtor). Active workers are finishing the next
-wave (`Run786`, `Run789`–`Run791`).
+[Run792](iterations/v2/001-original-recovery/runs/792-scene-render-sim-integration/README.md)
+is the current shared build (`457` TUs, `85` unresolved names / `94`
+references), integrating Runs `786`/`789`/`790`/`791` (`1,295` registry
+entries). Active workers are preparing `Run793`–`Run795`.
 
 ## Recovery milestones
 

@@ -4,7 +4,14 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run788](iterations/v2/001-original-recovery/runs/788-scene-render-sim-integration/README.md)
+[Run792](iterations/v2/001-original-recovery/runs/792-scene-render-sim-integration/README.md)
+compiles 457 TUs across eight projects (**85 unresolved names / 94
+references**, no EXE), accepting Runs786/789/790/791: `1,295` registry entries
+(`+21`), `216` comparisons, `41` mutations, `2,148B .bss` (`786`+`790`) + `64B
+.data` (`791`), `1,127` source pins. Three names close (`00452120`, `00594980`,
+`004a8570`) and one opens (`0044d7e0`).
+
+Historical: [Run788](iterations/v2/001-original-recovery/runs/788-scene-render-sim-integration/README.md)
 build compiles 453 C++ translation units across eight projects. The shared
 link reports **87 unresolved names / 96 references**. There is no game EXE.
 The shared audit accepts Runs781/782/785/787 within their bounded domains:

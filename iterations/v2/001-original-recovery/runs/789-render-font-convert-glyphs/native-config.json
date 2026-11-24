@@ -1,0 +1,150 @@
+{
+  "run": 789,
+  "experiment": "local/experiments/v2-render-font-convert-glyphs-789",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs",
+    "iterations/v2/001-original-recovery/runs/787-render-font-destroy-and-prepare",
+    "iterations/v2/001-original-recovery/runs/782-render-calibrate-service",
+    "iterations/v2/001-original-recovery/runs/671-font-state-and-vec3-dist",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/runs/525-render-driver-destruction",
+    "iterations/v2/001-original-recovery/runs/521-render-initialize",
+    "iterations/v2/001-original-recovery/runs/518-render-driver-start",
+    "iterations/v2/001-original-recovery/runs/515-render-driver-constructors",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "00594980",
+      "bytes": 91,
+      "sha256": "8cd53bac9e6857d78308c3416526b54ab4fea3bf7b304f0ca785d7868a7c43d9",
+      "token": "@BODY_00594980@"
+    },
+    {
+      "va": "005949e0",
+      "bytes": 70,
+      "sha256": "6ddbb6b6cca2290ace679918736348e765eabff56037626a17e1d3037ec34576",
+      "token": "@BODY_005949E0@"
+    },
+    {
+      "va": "00594a30",
+      "bytes": 285,
+      "sha256": "84702cd7a5d26c427d6250a8df759272f8f40ea8f123bb12ded4c9d5577ed75a",
+      "token": "@BODY_00594A30@"
+    },
+    {
+      "va": "00594b50",
+      "bytes": 220,
+      "sha256": "bd7c09be07663fb97f01f80084bb850427ab05ddaee4ac7ecde759c2471e92df",
+      "token": "@BODY_00594B50@"
+    },
+    {
+      "va": "00594c30",
+      "bytes": 113,
+      "sha256": "6894f94cfebbcdb1269ebfe61f5bfecae1b7b3f27449da1ac8cc1e24f4d17a11",
+      "token": "@BODY_00594C30@"
+    }
+  ],
+  "pass_marker": "render_font_convert_glyphs_789_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-594980-flag2-bit",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "    if ((flags & 2u) != 0u) {",
+      "new": "    if ((flags & 8u) != 0u) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-594980-flag4-bit",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "    } else if ((flags & 4u) != 0u) {",
+      "new": "    } else if ((flags & 1u) != 0u) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-594980-out-offset",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "    auto* const out16 = reinterpret_cast<std::uint32_t*>(font_bytes + 0x6cu);",
+      "new": "    auto* const out16 = reinterpret_cast<std::uint32_t*>(font_bytes + 0x68u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-5949e0-alpha-fallback",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "    const std::uint32_t effective_bg =\n        ((bg & 0xff000000u) != 0u) ? bg : (fg & 0x00ffffffu);\n    for (std::int32_t i = 0; i < 16; ++i) {",
+      "new": "    const std::uint32_t effective_bg = bg;\n    for (std::int32_t i = 0; i < 16; ++i) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-5949e0-ramp-dir",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "        out16[i] = render_font_blend_argb_00594a30(fg, i, effective_bg, 15 - i);",
+      "new": "        out16[i] = render_font_blend_argb_00594a30(fg, 15 - i, effective_bg, i);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-594a30-clamp-high",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "    if (value > 255) {\n        return 255u;\n    }",
+      "new": "    if (value > 255) {\n        return 254u;\n    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-594a30-clamp-low",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "    if (value < 0) {\n        return 0u;\n    }",
+      "new": "    if (value < 0) {\n        return 1u;\n    }",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-594a30-channel-pack",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "    return (a << 24u) | (r << 16u) | (g << 8u) | b;",
+      "new": "    return (a << 24u) | (b << 16u) | (g << 8u) | r;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-594b50-alpha-zero",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "    const std::uint32_t effective_bg = ((bg & 0xff000000u) != 0u) ? bg : 0u;",
+      "new": "    const std::uint32_t effective_bg = bg;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-594b50-slot-14-15",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "    out16[14] = 0u;\n    out16[15] = 0u;",
+      "new": "    out16[14] = fg;\n    out16[15] = outline;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-594c30-split-second-half",
+      "source": "iterations/v2/001-original-recovery/runs/789-render-font-convert-glyphs/render_font_convert_glyphs_789.cpp",
+      "old": "        out16[8 + i] = render_font_blend_argb_00594a30(mid_color, 7 - i, fg, i);",
+      "new": "        out16[8 + i] = render_font_blend_argb_00594a30(mid_color, 7 - i, bg, i);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

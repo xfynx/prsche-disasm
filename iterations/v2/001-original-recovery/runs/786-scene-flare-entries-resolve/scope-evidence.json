@@ -1,0 +1,104 @@
+{
+  "run": 786,
+  "status": "native/provenance/REA PASS004; shared integration pending",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "scope": "Closes Run781 exclusive child scene_flare_entries_resolve_00452120 (154B) and its sky/chunk lookup subtree (0045dd80 6B, 0045cfb0 6B, 00460b10 59B, 00460b50 258B, 0053c680 63B, 00460c80 69B; 615B total)",
+  "rea_session": {
+    "config": "iterations/v2/001-original-recovery/runs/786-scene-flare-entries-resolve/rea/queries.json",
+    "validation": "iterations/v2/001-original-recovery/runs/786-scene-flare-entries-resolve/rea/validation.json",
+    "receipt": "local/experiments/v2-scene-786-rea/001/receipt.json",
+    "dossiers": [
+      "local/experiments/v2-scene-786-rea/001/function-00452120.json",
+      "local/experiments/v2-scene-786-rea/001/function-0045dd80.json",
+      "local/experiments/v2-scene-786-rea/001/function-0045cfb0.json",
+      "local/experiments/v2-scene-786-rea/001/function-00460b10.json",
+      "local/experiments/v2-scene-786-rea/001/function-00460b50.json",
+      "local/experiments/v2-scene-786-rea/001/function-0053c680.json",
+      "local/experiments/v2-scene-786-rea/001/function-00460c80.json"
+    ]
+  },
+  "bodies": [
+    {
+      "va": "00452120",
+      "range": ["00452120", "004521b9"],
+      "bytes": 154,
+      "sha256": "09a9060be5aa78734773aa387d4e08b9daaca5e19d0614e15ac5a9dc5771752f",
+      "symbol": "porsche::scene_flare_entries_resolve_00452120",
+      "abi": "__thiscall (fastcall bridge self, unused_edx), void return, RET 0"
+    },
+    {
+      "va": "0045dd80",
+      "range": ["0045dd80", "0045dd85"],
+      "bytes": 6,
+      "sha256": "fa0660325d652a2afd28928848619acbe4cde7998a2626994564411c74330451",
+      "symbol": "porsche::scene_flare_table_get_0045dd80",
+      "abi": "__cdecl (), returns void*"
+    },
+    {
+      "va": "0045cfb0",
+      "range": ["0045cfb0", "0045cfb5"],
+      "bytes": 6,
+      "sha256": "7c7cb5f3ee599f28f4929fd966f2a43064ce468cbaa0cde7d38983e741fe8e57",
+      "symbol": "porsche::scene_route_sky_get_0045cfb0",
+      "abi": "__thiscall (fastcall bridge unused_ecx, unused_edx), returns void*, RET 0"
+    },
+    {
+      "va": "00460b10",
+      "range": ["00460b10", "00460b4a"],
+      "bytes": 59,
+      "sha256": "fb40705c89e936aa2d094679e4d0045c7f875de748f7225d59d885906a1229a4",
+      "symbol": "porsche::scene_sky_find_tag_00460b10",
+      "abi": "__thiscall (fastcall bridge self, unused_edx, tag), returns int32_t, RET 4"
+    },
+    {
+      "va": "00460b50",
+      "range": ["00460b50", "00460c51"],
+      "bytes": 258,
+      "sha256": "e8f1f082e3a236a42eb0aa628d344ec83eb5ad0255ea5234c34e9eb75d9993bd",
+      "symbol": "porsche::scene_sky_find_name_00460b50",
+      "abi": "__thiscall (fastcall bridge self, unused_edx, name), returns int32_t, RET 4"
+    },
+    {
+      "va": "0053c680",
+      "range": ["0053c680", "0053c6be"],
+      "bytes": 63,
+      "sha256": "62a9c833af615bd4b0c04c0178d7fb1f7edb7fb04801d91dd261f5876db7f42b",
+      "symbol": "porsche::scene_chunk_find_tag_0053c680",
+      "abi": "__cdecl (archive, name), returns void*"
+    },
+    {
+      "va": "00460c80",
+      "range": ["00460c80", "00460cc4"],
+      "bytes": 69,
+      "sha256": "810366dec0c42ecc716f4f6c66d82569eb83277700e51c5d24998ebc5b660cec",
+      "symbol": "porsche::scene_sky_texture_get_00460c80",
+      "abi": "__thiscall (fastcall bridge self, unused_edx, index), returns void*, RET 4"
+    }
+  ],
+  "canonical_owners_reused": [
+    "00613e04 startup_context_table_owner_00613e04 (Run649)",
+    "0044d320 startup_context_table_lookup_0044d320 (Run646)",
+    "00628130 render_display_00628130 (render_startup.hpp)",
+    "0056e2a8 render_buffer_read_word_0056e2a8 (Run611)"
+  ],
+  "newly_owned_data": [
+    {
+      "va": "00627e48",
+      "bytes": 4,
+      "section": ".bss",
+      "symbol": "porsche::scene_flare_table_00627e48",
+      "initial": "zero"
+    },
+    {
+      "va": "00627e4c",
+      "bytes": 4,
+      "section": ".bss",
+      "symbol": "porsche::scene_route_sky_00627e4c",
+      "initial": "zero"
+    }
+  ],
+  "downstream_child_frontiers": [
+    "0044da10 porsche::scene_sky_texture_create_0044da10 (__cdecl void*(const void* chunk, uint32_t tag, uint32_t mode, void* driver, uint32_t flags), 272B)"
+  ],
+  "boundaries": "Valid non-null flare holder (`>= 0x0c` bytes) and entry (`>= 0x0c` bytes), valid non-null sky struct (`>= 0x238` bytes) with valid archive header at `+0x04`, and non-null `00628130` when loading an uncached sky slot. Controlled native fixture proves exact ABI, tail-first chunk scan, 40-slot sky name caching (and full-table 0 return), bswap32 context lookup fallback, and texture caching; texture creation inside 0044da10 remains a single shared typed frontier."
+}

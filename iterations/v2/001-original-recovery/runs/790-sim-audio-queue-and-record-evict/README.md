@@ -1,0 +1,4 @@
+# Run 790: Sim Audio Queue & Record Evict
+Closes `?application_sim_boundary_004a8570@porsche@@YAHHHH@Z` (`004a8570..004a865e`, 239B) and callees `audio_record_evict_slot_004a83e0` (`004a83e0..004a8481`, 162B), `audio_queue_request_init_004af8d0` (`004af8d0..004af8f7`, 40B), `audio_queue_enqueue_004b05a0` (`004b05a0..004b0670`, 209B), and `audio_queue_count_active_004b0cf0` (`004b0cf0..004b0d2a`, 59B; 709B code total) in `sim_audio_queue_790.{cpp,hpp}`.
+Owns 2140B loader-zero `.bss` queue state (`00656ae4`, `00656af4`, `00656b00..006572ff`, `00657300`, `00657308..00657357`); reuses `00656528`, `00606ac4`, `005659f0`, and `00531f90` with 0 new unresolved symbols.
+Verified: `local/experiments/v2-sim-audio-queue-790/004/receipt.json` PASS (13 cases / 4 events per `/Od` and `/O2`, 10/10 mutations killed); REA `local/experiments/v2-sim-audio-queue-790-rea/001/receipt.json` + `validation.json` PASS (5 dossiers); bounded mock bank tables and shutdown/free stubs.

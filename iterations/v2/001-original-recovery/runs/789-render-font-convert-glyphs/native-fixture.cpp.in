@@ -1,0 +1,252 @@
+// Native x86-vs-C++ differential fixture for Run789 00594980..00594ca0.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+
+#include "render_font_convert_glyphs_789.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+struct Snapshot {
+    U abi_fail;
+    U ret;
+    B font_buf[0xf0];
+};
+
+static U cases = 0u;
+static U side = 0u;
+static B font_buf[0xf0]{};
+static B desc_buf[0x20]{};
+static Snapshot trace{};
+static Snapshot expected{};
+static B* code = nullptr;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", why, cases, side);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static LONG WINAPI fault(EXCEPTION_POINTERS* info) {
+    std::printf("divergence native-fault %08lx case=%u side=%u\n",
+                info->ExceptionRecord->ExceptionCode, cases, side);
+    std::fflush(stdout);
+    ExitProcess(7);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static U ptr_u(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* p) {
+    U v = 0u;
+    std::memcpy(&v, p, sizeof v);
+    return v;
+}
+
+static void store32(void* p, U v) {
+    std::memcpy(p, &v, sizeof v);
+}
+
+static void reset_state(U flags, U fg, U bg, U outline, U extra) {
+    std::memset(desc_buf, 0x33, sizeof desc_buf);
+    store32(&desc_buf[0x0c], flags);
+
+    std::memset(font_buf, 0xa5, sizeof font_buf);
+    store32(&font_buf[0x24], ptr_u(&desc_buf[0]));
+    store32(&font_buf[0x5c], fg);
+    store32(&font_buf[0x60], bg);
+    store32(&font_buf[0x64], outline);
+    store32(&font_buf[0x68], extra);
+}
+
+static void capture(Snapshot& out, U abi_fail, U ret) {
+    std::memset(&out, 0, sizeof out);
+    out.abi_fail = abi_fail;
+    out.ret = ret;
+    std::memcpy(out.font_buf, font_buf, sizeof font_buf);
+}
+
+static void compare_snapshots(const char* label) {
+    require(expected.abi_fail == 0u && trace.abi_fail == 0u, label);
+    require(std::memcmp(&expected, &trace, sizeof(Snapshot)) == 0, label);
+}
+
+static void invoke_cdecl1_void(void* fn, U arg0, U& abi_fail) {
+    U fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push arg0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je ok
+    bad:
+        mov fail, 1
+    ok:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+}
+
+static U invoke_cdecl4(void* fn, U a0, U a1, U a2, U a3, U& abi_fail) {
+    U ret = 0u, fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a3
+        push a2
+        push a1
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        add esp, 16
+        mov ret, eax
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je ok
+    bad:
+        mov fail, 1
+    ok:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return ret;
+}
+
+static B* setup_original_code() {
+    static const B body_594980[] = { @BODY_00594980@ };
+    static const B body_5949e0[] = { @BODY_005949E0@ };
+    static const B body_594a30[] = { @BODY_00594A30@ };
+    static const B body_594b50[] = { @BODY_00594B50@ };
+    static const B body_594c30[] = { @BODY_00594C30@ };
+    static_assert(sizeof body_594980 == 91u, "00594980 size");
+    static_assert(sizeof body_5949e0 == 70u, "005949e0 size");
+    static_assert(sizeof body_594a30 == 285u, "00594a30 size");
+    static_assert(sizeof body_594b50 == 220u, "00594b50 size");
+    static_assert(sizeof body_594c30 == 113u, "00594c30 size");
+
+    B* const mem = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(mem != nullptr, "virtualalloc");
+    std::memset(mem, 0xcc, 4096u);
+
+    // Copy the contiguous block at exact original relative spacing so every
+    // internal relative call (0x594980..0x594ca0) resolves unmodified.
+    std::memcpy(mem + 0x000u, body_594980, sizeof body_594980); // 00594980 (+0x000)
+    std::memcpy(mem + 0x060u, body_5949e0, sizeof body_5949e0); // 005949e0 (+0x060)
+    std::memcpy(mem + 0x0b0u, body_594a30, sizeof body_594a30); // 00594a30 (+0x0b0)
+    std::memcpy(mem + 0x1d0u, body_594b50, sizeof body_594b50); // 00594b50 (+0x1d0)
+    std::memcpy(mem + 0x2b0u, body_594c30, sizeof body_594c30); // 00594c30 (+0x2b0)
+
+    FlushInstructionCache(GetCurrentProcess(), mem, 4096u);
+    return mem;
+}
+
+static void run_blend_case(U c0, I w0, U c1, I w1) {
+    B* const fn_orig = code + 0x0b0u;
+    void* const fn_cpp = reinterpret_cast<void*>(&porsche::render_font_blend_argb_00594a30);
+    U abi_orig = 0u, abi_cpp = 0u;
+
+    side = 0u;
+    reset_state(0u, 0u, 0u, 0u, 0u);
+    const U r_orig = invoke_cdecl4(fn_orig, c0, static_cast<U>(w0), c1, static_cast<U>(w1), abi_orig);
+    capture(expected, abi_orig, r_orig);
+
+    side = 1u;
+    reset_state(0u, 0u, 0u, 0u, 0u);
+    const U r_cpp = invoke_cdecl4(fn_cpp, c0, static_cast<U>(w0), c1, static_cast<U>(w1), abi_cpp);
+    capture(trace, abi_cpp, r_cpp);
+
+    compare_snapshots("00594a30");
+    ++cases;
+}
+
+static void run_convert_case(U flags, U fg, U bg, U outline, U extra) {
+    B* const fn_orig = code + 0x000u;
+    void* const fn_cpp = reinterpret_cast<void*>(&porsche::render_font_convert_glyphs_00594980);
+    U abi_orig = 0u, abi_cpp = 0u;
+
+    side = 0u;
+    reset_state(flags, fg, bg, outline, extra);
+    invoke_cdecl1_void(fn_orig, ptr_u(&font_buf[0]), abi_orig);
+    capture(expected, abi_orig, 0u);
+
+    side = 1u;
+    reset_state(flags, fg, bg, outline, extra);
+    invoke_cdecl1_void(fn_cpp, ptr_u(&font_buf[0]), abi_cpp);
+    capture(trace, abi_cpp, 0u);
+
+    compare_snapshots("00594980");
+    ++cases;
+}
+
+} // namespace
+
+int main() {
+    AddVectoredExceptionHandler(1, fault);
+    code = setup_original_code();
+
+    // Direct blend tests including negative/over-255 clamping.
+    run_blend_case(0xff804020u, 3, 0x10203040u, 5);
+    run_blend_case(0xffffffffu, 10, 0x00000000u, -2); // > 255 clamped to 255
+    run_blend_case(0x00000000u, 10, 0xffffffffu, -2); // < 0 clamped to 0
+    run_blend_case(0x12345678u, -3, 0x87654321u, 7);
+
+    // Full glyph palette dispatcher + 3 palette builders matrix.
+    for (U flags : {0u, 1u, 2u, 4u, 6u, 0x80000000u}) {
+        for (U bg : {0x00112233u, 0xff445566u, 0x80ff0080u}) {
+            run_convert_case(flags, 0xffabcdefu, bg, 0xaa119933u, 0x55778899u);
+            run_convert_case(flags, 0x40102030u, bg, 0x0000ff00u, 0xffffffffu);
+        }
+    }
+
+    std::printf("render_font_convert_glyphs_789_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

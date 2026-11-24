@@ -1,6 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-24. [Run788](runs/788-scene-render-sim-integration/README.md)
+Current 2026-11-24. [Run792](runs/792-scene-render-sim-integration/README.md)
+PASS (`build-001`): folds `786/004` (`00452120` cluster, `8B .bss`), `789/002`
+(`00594980` cluster), `790/004` (`004a8570` cluster, `2,140B .bss`), `791/003`
+(`0044da10` cluster, `64B .data`): **457 TUs / 8 projects**, **85 unresolved /
+94 refs**, `1,127` pins, `216` comparisons, `41` mutations, `4` REA sessions,
+no EXE; registry **1,295** (`+21`; `004522b0`/`00571a10` updated). Closes `3`
+(`00452120`, `00594980`, `004a8570`), opens `1` (`0044d7e0`). Next (`Run796`):
+`793`–`795`.
+
+Historical: [Run788](runs/788-scene-render-sim-integration/README.md)
 PASS (`build-001`): folds frozen `781/003` (`004522b0`, `004524a0`, `0059ece0`,
 partial), `782/001` (`00536870`, `0053c8d0`, `0053c8e0`, `0053d840`, partial),
 `785/001` (`004642f0`), and `787/001` (`00571a10`, `00536840`, `0053c8b0`,

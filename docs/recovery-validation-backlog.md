@@ -1,6 +1,12 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run788 PASS (`781/003` + `782/001` + `785/001` + `787/001`: 12 bodies,
+Текущее: Run792 PASS (`786`/`789`/`790`/`791`: 21 bodies, 216 cases, 41
+mutations, 2,148B `.bss` + 64B `.data`, 457 TUs, 85/94 names/refs, 1,127 pins,
+registry 1,295, no EXE). Open bounds: `786` 40 sky slots; `789` `w0+w1>0`;
+`790` 5 queue banks (`004af970`/`004afd30`/`004afe50`/`004b0a20` external); `791`
+`0044d7e0`; live renderer/DirectSound/startup/gameplay.
+
+Historical: Run788 PASS (`781/003` + `782/001` + `785/001` + `787/001`: 12 bodies,
 228 native comparisons, 38 mutations, 25B `.bss` + 4B `.rdata` `005bb708` +
 7,093B `FNTF` payload `005dfd8c`, 453 TUs, 87 names / 96 refs, 1,118 pins; no
 EXE; registry 1,274). `781` bounds `<=200` flare slots (`00452120` open until

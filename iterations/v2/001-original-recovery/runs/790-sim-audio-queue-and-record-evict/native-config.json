@@ -1,0 +1,138 @@
+{
+  "run": 790,
+  "experiment": "local/experiments/v2-sim-audio-queue-790",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict",
+    "iterations/v2/001-original-recovery/runs/691-app-sim-teardown-audio-unload",
+    "iterations/v2/001-original-recovery/runs/690-audio-probe-start-and-period-control",
+    "iterations/v2/001-original-recovery/runs/464-audio-probe-startup",
+    "iterations/v2/001-original-recovery/runs/434-audio-canonical-bindings",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.hpp",
+    "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004a8570",
+      "bytes": 239,
+      "sha256": "dabdb9c61557dac4649780d64f9a80aae3f81a1a3ce152a428191cc397b960ef",
+      "token": "@BODY_004A8570@"
+    },
+    {
+      "va": "004a83e0",
+      "bytes": 162,
+      "sha256": "eb06bb362d427e4716f426d2158d4a046dfa423bc6bfdbec82896a4f7bda738e",
+      "token": "@BODY_004A83E0@"
+    },
+    {
+      "va": "004af8d0",
+      "bytes": 40,
+      "sha256": "cc94905c890ba406238e9b68c450170bf99dc2cd33196ccc06481d468a08cec2",
+      "token": "@BODY_004AF8D0@"
+    },
+    {
+      "va": "004b05a0",
+      "bytes": 209,
+      "sha256": "688a6f78f8c69bfc4c48ad3224758297c94ba3db851fb11fe57bf5b8abe383aa",
+      "token": "@BODY_004B05A0@"
+    },
+    {
+      "va": "004b0cf0",
+      "bytes": 59,
+      "sha256": "275a7f4d77944c94401a3b728910b33934553081ffe2fbc5d70d14321799599d",
+      "token": "@BODY_004B0CF0@"
+    }
+  ],
+  "pass_marker": "sim_audio_queue_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-cache-hit-channel",
+      "source": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp",
+      "old": "if (rec.channel_04 == second && rec.raw_00 == static_cast<std::uint32_t>(first)) {",
+      "new": "if (rec.channel_04 != second && rec.raw_00 == static_cast<std::uint32_t>(first)) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-flag-nonzero-skip-enqueue",
+      "source": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp",
+      "old": "if (flag_byte != 0u) {",
+      "new": "if (flag_byte == 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-active-limit",
+      "source": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp",
+      "old": "if (audio_queue_count_active_004b0cf0() >= 6) {",
+      "new": "if (audio_queue_count_active_004b0cf0() >= 5) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-evict-threshold-offset",
+      "source": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp",
+      "old": "std::int32_t oldest_time = static_cast<std::int32_t>(startup_sequence_word_00606ac4) - 0x10;",
+      "new": "std::int32_t oldest_time = static_cast<std::int32_t>(startup_sequence_word_00606ac4) - 0x20;",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-evict-slot-zero-skip",
+      "source": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp",
+      "old": "if (best_slot >= 0) {",
+      "new": "if (best_slot > 0) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-init-bank-default",
+      "source": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp",
+      "old": "req->bank_1e = 2;",
+      "new": "req->bank_1e = 1;",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-enqueue-max-depth",
+      "source": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp",
+      "old": "if (static_cast<std::int8_t>(pending) > 0x20) {",
+      "new": "if (static_cast<std::int8_t>(pending) > 0x1f) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-enqueue-wrap-limit",
+      "source": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp",
+      "old": "audio_queue_tail_00657300 = (static_cast<std::int32_t>(slot) >= 0x3f) ? 0u : (slot + 1u);",
+      "new": "audio_queue_tail_00657300 = (static_cast<std::int32_t>(slot) >= 0x3e) ? 0u : (slot + 1u);",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-count-active-bank-sign",
+      "source": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp",
+      "old": "if (req.bank_1e > -1 && req.flag_1d != 0u) {",
+      "new": "if (req.flag_1d != 0u) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    },
+    {
+      "name": "wrong-count-active-flag-check",
+      "source": "iterations/v2/001-original-recovery/runs/790-sim-audio-queue-and-record-evict/sim_audio_queue_790.cpp",
+      "old": "if (req.bank_1e > -1 && req.flag_1d != 0u) {",
+      "new": "if (req.bank_1e > -1) {",
+      "expected_exit": 1,
+      "failure_marker": "reason=mismatch"
+    }
+  ]
+}

@@ -1,0 +1,539 @@
+// Native x86-vs-C++ differential fixture for Run791:
+//   0044da10..0044db1f (272B) porsche::scene_sky_texture_create_0044da10
+//   00536460..0053646a ( 11B) porsche::render_resource_node_prepare_00536460
+//   00554950..0055495f ( 16B) porsche::render_texture_format_table_set_00554950
+//   00555630..00555630 (  1B) porsche::render_texture_noop_00555630
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "format_preferences_579.hpp"
+#include "porsche/application_alloc.hpp"
+#include "porsche/fe_stream.hpp"
+#include "porsche/render_mode.hpp"
+#include "render_resource_533.hpp"
+#include "scene_sky_texture_791.hpp"
+#include "startup_text_fallbacks_650.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+static U fnv1a(const char* s) {
+    U h = 2166136261u;
+    while (*s != '\0') {
+        h = (h ^ static_cast<B>(*s++)) * 16777619u;
+    }
+    return h;
+}
+
+enum : U {
+    kEvMaskPtr = 1u,
+    kEvParseDesc = 2u,
+    kEvAlloc = 3u,
+    kEvNodeCtor = 4u,
+    kEvFree = 5u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+    U d;
+};
+
+enum : U { kMaxEvents = 32u };
+
+struct Snapshot {
+    U abi_fail;
+    U ret_eax;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    std::array<B, 0x54u> node_bytes;
+    std::array<U*, 18u> pref_table;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static alignas(8) B g_node_buf[0x54u];
+static alignas(8) B g_chunk_buf[0x40u];
+static alignas(8) B g_inner_desc[0x20u];
+static alignas(8) B g_free_buf1[0x20u];
+static alignas(8) B g_free_buf2[0x20u];
+static alignas(4) U g_quality_mask = 0u;
+static bool g_alloc_fail = false;
+static U g_parse_extra_flags = 0u;
+static void* g_parse_buf1 = nullptr;
+static void* g_parse_buf2 = nullptr;
+static const char kPadSpaces[] = "      ";
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c, d};
+}
+
+namespace porsche {
+
+B render_mode_state_00619790[0x71] = {};
+U* render_texture_format_preference_table_005def98[18] = {};
+
+U* __cdecl startup_text_quality_mask_ptr_0044dfe0(U index) {
+    record_event(kEvMaskPtr, index, g_quality_mask);
+    return &g_quality_mask;
+}
+
+void* __fastcall scene_texture_descriptor_parse_0044d7e0(
+    void* out_desc, void*, const void* chunk, U mode, U fourcc) {
+    record_event(kEvParseDesc, address(chunk), mode, fourcc);
+    store32(out_desc, 0x04u, g_parse_extra_flags);
+    store32(out_desc, 0x0cu, address(g_inner_desc));
+    store32(out_desc, 0x14u, address(g_parse_buf1));
+    store32(out_desc, 0x18u, address(g_parse_buf2));
+    return out_desc;
+}
+
+void* __cdecl startup_network_allocate_0059ef90(U bytes) {
+    record_event(kEvAlloc, bytes, g_alloc_fail ? 1u : 0u);
+    if (g_alloc_fail) {
+        return nullptr;
+    }
+    require(bytes == 0x54u, "0059ef90 0x54 bound");
+    return g_node_buf;
+}
+
+void* __fastcall render_resource_node_ctor_00535bc0(
+    void* self, void*, const void* desc, void* parent, U flags, const char* name) {
+    record_event(kEvNodeCtor, address(self), address(desc), address(parent),
+                 flags ^ fnv1a(name));
+    store32(self, 0x00u, flags);
+    store32(self, 0x04u, address(desc));
+    store32(self, 0x08u, address(parent));
+    std::memset(static_cast<B*>(self) + 0x10u, 0, 12u);
+    std::strncpy(reinterpret_cast<char*>(static_cast<B*>(self) + 0x10u), name, 11u);
+    return self;
+}
+
+U __cdecl free_00531f90(void* block) {
+    record_event(kEvFree, address(block));
+    return 1u;
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_0044da10 = nullptr;
+static B* slot_00536460 = nullptr;
+static B* slot_00554950 = nullptr;
+static B* slot_00555630 = nullptr;
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void relocate_imm32(
+    B* slot, U insn_off, U imm_off, U expected_addr, const void* replacement) {
+    const U actual = load32(slot, insn_off + imm_off);
+    require(actual == expected_addr, "imm32/disp32 target");
+    store32(slot, insn_off + imm_off, address(replacement));
+}
+
+static void init() {
+    static const B body_0044da10[] = {@BODY_0044DA10@};
+    static const B body_00536460[] = {@BODY_00536460@};
+    static const B body_00554950[] = {@BODY_00554950@};
+    static const B body_00555630[] = {@BODY_00555630@};
+    require(sizeof body_0044da10 == 272u, "272B 0044da10");
+    require(sizeof body_00536460 == 11u, "11B 00536460");
+    require(sizeof body_00554950 == 16u, "16B 00554950");
+    require(sizeof body_00555630 == 1u, "1B 00555630");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+
+    slot_0044da10 = code_page + 0x000u;
+    slot_00536460 = code_page + 0x200u;
+    slot_00554950 = code_page + 0x240u;
+    slot_00555630 = code_page + 0x280u;
+
+    std::memcpy(slot_0044da10, body_0044da10, sizeof body_0044da10);
+    std::memcpy(slot_00536460, body_00536460, sizeof body_00536460);
+    std::memcpy(slot_00554950, body_00554950, sizeof body_00554950);
+    std::memcpy(slot_00555630, body_00555630, sizeof body_00555630);
+
+    // 00536460
+    relocate_call_rel32(slot_00536460, 0x00536460u, 0x004u, 0x00555630u, slot_00555630);
+
+    // 00554950
+    relocate_imm32(slot_00554950, 0x008u, 3u, 0x005def98u,
+                   &porsche::render_texture_format_preference_table_005def98[0]);
+
+    // 0044da10
+    relocate_imm32(slot_0044da10, 0x000u, 1u, 0x006197a8u,
+                   &porsche::render_mode_state_00619790[0x18u]);
+    relocate_call_rel32(slot_0044da10, 0x0044da10u, 0x01du, 0x0044dfe0u,
+                        reinterpret_cast<const void*>(&porsche::startup_text_quality_mask_ptr_0044dfe0));
+    relocate_call_rel32(slot_0044da10, 0x0044da10u, 0x044u, 0x0044d7e0u,
+                        reinterpret_cast<const void*>(&porsche::scene_texture_descriptor_parse_0044d7e0));
+    relocate_imm32(slot_0044da10, 0x049u, 1u, 0x005ce574u, kPadSpaces);
+    relocate_imm32(slot_0044da10, 0x079u, 1u, 0x006197aeu,
+                   &porsche::render_mode_state_00619790[0x1eu]);
+    relocate_call_rel32(slot_0044da10, 0x0044da10u, 0x092u, 0x0059ef90u,
+                        reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    relocate_call_rel32(slot_0044da10, 0x0044da10u, 0x0b2u, 0x00535bc0u,
+                        reinterpret_cast<const void*>(&porsche::render_resource_node_ctor_00535bc0));
+    relocate_call_rel32(slot_0044da10, 0x0044da10u, 0x0c5u, 0x00536460u, slot_00536460);
+    relocate_call_rel32(slot_0044da10, 0x0044da10u, 0x0d3u, 0x00531f90u,
+                        reinterpret_cast<const void*>(&porsche::free_00531f90));
+    relocate_call_rel32(slot_0044da10, 0x0044da10u, 0x0e4u, 0x00531f90u,
+                        reinterpret_cast<const void*>(&porsche::free_00531f90));
+    relocate_imm32(slot_0044da10, 0x0ecu, 1u, 0x005ce52cu,
+                   porsche::scene_sky_format_prefs_a_005ce52c);
+    relocate_call_rel32(slot_0044da10, 0x0044da10u, 0x0f3u, 0x00554950u, slot_00554950);
+    relocate_imm32(slot_0044da10, 0x0f8u, 1u, 0x005ce54cu,
+                   porsche::scene_sky_format_prefs_b_005ce54c);
+    relocate_call_rel32(slot_0044da10, 0x0044da10u, 0x0ffu, 0x00554950u, slot_00554950);
+}
+
+static U invoke_cdecl_1_void(const void* fn, U a0) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a0
+        mov eax, fn
+        call eax
+        add esp, 4
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_esp1c
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_esp1c:
+        cmp ebx, 0x13572468
+        je ok_ebx1c
+        or abi_fail, 2
+    ok_ebx1c:
+        cmp esi, 0x24681357
+        je ok_esi1c
+        or abi_fail, 4
+    ok_esi1c:
+        cmp edi, 0x55aa33cc
+        je ok_edi1c
+        or abi_fail, 8
+    ok_edi1c:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static U invoke_cdecl_2_void(const void* fn, U a0, U a1) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a1
+        push a0
+        mov eax, fn
+        call eax
+        add esp, 8
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_esp2c
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_esp2c:
+        cmp ebx, 0x13572468
+        je ok_ebx2c
+        or abi_fail, 2
+    ok_ebx2c:
+        cmp esi, 0x24681357
+        je ok_esi2c
+        or abi_fail, 4
+    ok_esi2c:
+        cmp edi, 0x55aa33cc
+        je ok_edi2c
+        or abi_fail, 8
+    ok_edi2c:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static U invoke_thiscall_0_void(const void* fn, void* self) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt0
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt0:
+        cmp ebx, 0x13572468
+        je ok_ebxt0
+        or abi_fail, 2
+    ok_ebxt0:
+        cmp esi, 0x24681357
+        je ok_esit0
+        or abi_fail, 4
+    ok_esit0:
+        cmp edi, 0x55aa33cc
+        je ok_edit0
+        or abi_fail, 8
+    ok_edit0:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static U invoke_cdecl_5(const void* fn, U a0, U a1, U a2, U a3, U a4, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a4
+        push a3
+        push a2
+        push a1
+        push a0
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        add esp, 20
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_esp5
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_esp5:
+        cmp ebx, 0x13572468
+        je ok_ebx5
+        or abi_fail, 2
+    ok_ebx5:
+        cmp esi, 0x24681357
+        je ok_esi5
+        or abi_fail, 4
+    ok_esi5:
+        cmp edi, 0x55aa33cc
+        je ok_edi5
+        or abi_fail, 8
+    ok_edi5:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static void reset_fixtures(U seed) {
+    g_event_count = 0u;
+    g_quality_mask = 0u;
+    g_alloc_fail = false;
+    g_parse_extra_flags = 0u;
+    g_parse_buf1 = nullptr;
+    g_parse_buf2 = nullptr;
+    std::memset(g_events, 0, sizeof g_events);
+    std::memset(g_node_buf, static_cast<int>(0x20u + seed), sizeof g_node_buf);
+    std::memset(porsche::render_mode_state_00619790, 0,
+                sizeof porsche::render_mode_state_00619790);
+    for (U i = 0u; i < 18u; ++i) {
+        porsche::render_texture_format_preference_table_005def98[i] = nullptr;
+    }
+}
+
+static void capture(Snapshot& out, U abi_fail, U ret_eax) {
+    out.abi_fail = abi_fail;
+    out.ret_eax = ret_eax;
+    out.event_count = g_event_count;
+    std::memcpy(out.events.data(), g_events, sizeof g_events);
+    std::memcpy(out.node_bytes.data(), g_node_buf, sizeof g_node_buf);
+    for (U i = 0u; i < 18u; ++i) {
+        out.pref_table[i] = porsche::render_texture_format_preference_table_005def98[i];
+    }
+}
+
+static void check_equal(const Snapshot& orig, const Snapshot& cpp, const char* tag) {
+    require(orig.abi_fail == 0u, tag);
+    require(cpp.abi_fail == 0u, tag);
+    require(orig.ret_eax == cpp.ret_eax, tag);
+    require(orig.event_count == cpp.event_count, tag);
+    for (U i = 0u; i < orig.event_count; ++i) {
+        require(orig.events[i].kind == cpp.events[i].kind &&
+                    orig.events[i].a == cpp.events[i].a &&
+                    orig.events[i].b == cpp.events[i].b &&
+                    orig.events[i].c == cpp.events[i].c &&
+                    orig.events[i].d == cpp.events[i].d,
+                tag);
+    }
+    require(orig.node_bytes == cpp.node_bytes, tag);
+    require(orig.pref_table == cpp.pref_table, tag);
+    ++cases;
+}
+
+template <class Setup>
+static void run_create_case(
+    U tag_arg, U mode, U driver_flags, U extra_flags, Setup&& setup, const char* tag) {
+    Snapshot orig{};
+    Snapshot cpp{};
+    U r0 = 0u, r1 = 0u;
+    reset_fixtures(1u);
+    setup();
+    U f0 = invoke_cdecl_5(slot_0044da10, address(g_chunk_buf), tag_arg, mode, driver_flags, extra_flags, r0);
+    capture(orig, f0, r0);
+    reset_fixtures(1u);
+    setup();
+    U f1 = invoke_cdecl_5(
+        reinterpret_cast<const void*>(&porsche::scene_sky_texture_create_0044da10),
+        address(g_chunk_buf), tag_arg, mode, driver_flags, extra_flags, r1);
+    capture(cpp, f1, r1);
+    check_equal(orig, cpp, tag);
+}
+
+int main() {
+    init();
+
+    // 1. Direct leaf tests: 00555630, 00536460, 00554950
+    {
+        Snapshot orig{}, cpp{};
+        reset_fixtures(1u);
+        U f0 = invoke_cdecl_1_void(slot_00555630, 0x12345678u);
+        capture(orig, f0, 0u);
+        reset_fixtures(1u);
+        U f1 = invoke_cdecl_1_void(
+            reinterpret_cast<const void*>(&porsche::render_texture_noop_00555630), 0x12345678u);
+        capture(cpp, f1, 0u);
+        check_equal(orig, cpp, "00555630");
+
+        reset_fixtures(1u);
+        store32(g_node_buf, 0x08u, 0xabcdef01u);
+        f0 = invoke_thiscall_0_void(slot_00536460, g_node_buf);
+        capture(orig, f0, 0u);
+        reset_fixtures(1u);
+        store32(g_node_buf, 0x08u, 0xabcdef01u);
+        f1 = invoke_thiscall_0_void(
+            reinterpret_cast<const void*>(&porsche::render_resource_node_prepare_00536460), g_node_buf);
+        capture(cpp, f1, 0u);
+        check_equal(orig, cpp, "00536460");
+
+        for (U slot : {0u, 4u, 6u, 17u}) {
+            reset_fixtures(1u);
+            f0 = invoke_cdecl_2_void(slot_00554950, slot, address(porsche::scene_sky_format_prefs_a_005ce52c));
+            capture(orig, f0, 0u);
+            reset_fixtures(1u);
+            f1 = invoke_cdecl_2_void(
+                reinterpret_cast<const void*>(&porsche::render_texture_format_table_set_00554950),
+                slot, address(porsche::scene_sky_format_prefs_a_005ce52c));
+            capture(cpp, f1, 0u);
+            check_equal(orig, cpp, "00554950");
+        }
+    }
+
+    // 2. 0044da10 tag < 0x20 ("CARx" + spaces) vs tag >= 0x20 (4CC + spaces),
+    //    mode_state[0x18] & mode_state[0x1e] combinations, quality mask bit, buffers, alloc fail
+    for (U t : {0u, 1u, 0x1fu, 0x20u, 0x41424320u, 0x534b5920u}) {
+        for (U flags18 : {0u, 1u}) {
+            for (U flags1e : {0u, 1u}) {
+                run_create_case(t, (t & 3u) + 1u, 0x11223344u + t, 0x80u, [=]() {
+                    porsche::render_mode_state_00619790[0x18u] = static_cast<B>(flags18);
+                    porsche::render_mode_state_00619790[0x1eu] = static_cast<B>(flags1e);
+                    g_parse_extra_flags = 0x0003u;
+                    g_quality_mask = (flags18 != 0u) ? 0x00080000u : 0x00040000u;
+                    g_parse_buf1 = (flags1e != 0u) ? g_free_buf1 : nullptr;
+                    g_parse_buf2 = (flags18 != 0u) ? g_free_buf2 : nullptr;
+                }, "create mode matrix");
+            }
+        }
+    }
+
+    // 3. 0044da10 alloc failure (node == nullptr, quality_mask bit clear, both free buffers present)
+    run_create_case(0x534b5920u, 1u, 0x10u, 0u, []() {
+        g_alloc_fail = true;
+        g_quality_mask = 0u;
+        g_parse_buf1 = g_free_buf1;
+        g_parse_buf2 = g_free_buf2;
+    }, "create alloc fail");
+
+    std::printf("scene_sky_texture_791_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}
