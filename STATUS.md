@@ -4,14 +4,15 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run809](iterations/v2/001-original-recovery/runs/809-scene-reset-and-input-caps-integration/README.md)
-compiles 467 TUs across eight projects (**76 unresolved names / 86
-references**, no EXE), accepting Runs805/806: `1,332` registry entries (`+3`),
-`64` comparisons, `19` mutations, `8B .data`/`4B .bss` (`805`) & `32B .rdata`
-(`806`), `1,152` source pins. Closes `2` (`0056fdf9`, `00448b10`), opens `1`
-(`0044d270`).
+[Run812](iterations/v2/001-original-recovery/runs/812-scene-table-load-integration/README.md)
+compiles 468 TUs across eight projects (**78 unresolved names / 88
+references**, no EXE), accepting Run810/003: `1,338` registry entries (`+6`),
+`78` comparisons, `10` mutations, `0B` data/bss, `1,155` source pins; closes
+`0044d270`, opens `0059f8f0`/`0044d380`/`005af040`.
+Deferred proof-only: [Run807](iterations/v2/001-original-recovery/runs/807-render-color-pack/README.md) (`004/receipt.json` PASS; awaiting caller `00563160`/`005dec08`).
 
-Historical: [Run808](iterations/v2/001-original-recovery/runs/808-scene-texture-and-render-query-integration/README.md)
+Historical: [Run809](iterations/v2/001-original-recovery/runs/809-scene-reset-and-input-caps-integration/README.md),
+[Run808](iterations/v2/001-original-recovery/runs/808-scene-texture-and-render-query-integration/README.md)
 & [Run804](iterations/v2/001-original-recovery/runs/804-render-mode-and-sim-startup-integration/README.md)
 compiles 463 TUs across eight projects (**79 unresolved names / 89
 references**, no EXE), accepting Runs797/798: `1,325` registry entries (`+14`),

@@ -31,8 +31,8 @@ is not accepted as original behavior.
   The [active plan](iterations/v2/001-original-recovery/PLAN.md) owns subsystem scope,
   proof artifacts and the next dependency work. [STATUS.md](STATUS.md) records the latest
   measured build and its limitations.
-  [Run809](iterations/v2/001-original-recovery/runs/809-scene-reset-and-input-caps-integration/README.md)
-  compiles 467 translation units with 76 unresolved linker names.
+  [Run812](iterations/v2/001-original-recovery/runs/812-scene-table-load-integration/README.md)
+  compiles 468 translation units with 78 unresolved linker names.
 - **Experimental Rust/WebGPU prototype:** [012-campaign-fidelity](iterations/012-campaign-fidelity/README.md).
   [PR #25 intake](docs/research/pr25-integration-review-2026-10-26.md) adds original-code
   recorders and vehicle, AI, audio and interface work.

@@ -1,0 +1,140 @@
+{
+  "run": 810,
+  "experiment": "local/experiments/v2-scene-stage-table-load-810",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.hpp",
+    "iterations/v2/001-original-recovery/source/include/porsche/application_heap.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "0044d270",
+      "bytes": 165,
+      "sha256": "1c222795e16b9a67eb55dd85ec83b88434c135944b2b2e7faa717a4fdcd3f143",
+      "token": "@BODY_0044D270@"
+    },
+    {
+      "va": "00537f30",
+      "bytes": 8,
+      "sha256": "9b8a71e6d4e3ed6c04caf8590ebe29a62f205ab4b372b02c67e8ca015ae4ba36",
+      "token": "@BODY_00537F30@"
+    },
+    {
+      "va": "00537f60",
+      "bytes": 37,
+      "sha256": "576354a8f8a9ce85f9a8270b9ea8d4b7b3544a257f2639560c0b0e954f82861b",
+      "token": "@BODY_00537F60@"
+    },
+    {
+      "va": "0059f880",
+      "bytes": 19,
+      "sha256": "d85f182dabcb5e901176256d11aa61ea528234a86e3a09d7cf98af4534cff789",
+      "token": "@BODY_0059F880@"
+    },
+    {
+      "va": "0059f8a0",
+      "bytes": 69,
+      "sha256": "427b25653d34382bb44be1074034632fbb75e3565561f92bb441893eb1c5c55e",
+      "token": "@BODY_0059F8A0@"
+    },
+    {
+      "va": "0059fb90",
+      "bytes": 46,
+      "sha256": "f5dae36e3a1ae47dc1866cc31eaef4b33bf6e74290eb7b6339bb0bd4f9131e01",
+      "token": "@BODY_0059FB90@"
+    }
+  ],
+  "pass_marker": "scene_stage_table_load_810_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "wrong-entry-tag-offset",
+      "source": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp",
+      "old": "*out_tag = load32(table, 0x10u + static_cast<U>(index) * 8u);",
+      "new": "*out_tag = load32(table, 0x14u + static_cast<U>(index) * 8u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-tag-bounds-check",
+      "source": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp",
+      "old": "if (index < count) {",
+      "new": "if (index <= count) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-init-flag-10",
+      "source": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp",
+      "old": "bytes[0x10u] = 0u;",
+      "new": "bytes[0x10u] = 1u;",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-close-page-release",
+      "source": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp",
+      "old": "(void)application_page_release_0059ed90(data);",
+      "new": "",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-close-dtor-flag",
+      "source": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp",
+      "old": "(void)dtor(owner, nullptr, 1u);",
+      "new": "(void)dtor(owner, nullptr, 0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-protect-ro-arg",
+      "source": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp",
+      "old": "load_ptr(bytes, 0x04u), size, 1u);",
+      "new": "load_ptr(bytes, 0x04u), size, 0u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-protect-owner-check",
+      "source": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp",
+      "old": "if (load_ptr(bytes, 0x00u) == nullptr) {",
+      "new": "if (load_ptr(bytes, 0x00u) != nullptr) {",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-entry-data-offset",
+      "source": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp",
+      "old": "const U entry_off = load32(table, 0x14u + idx * 8u);",
+      "new": "const U entry_off = load32(table, 0x10u + idx * 8u);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "wrong-register-flags-arg",
+      "source": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp",
+      "old": "self, nullptr, entry_ptr, 0u, entry_tag, 0u, 1u, 1u, zero);",
+      "new": "self, nullptr, entry_ptr, 0u, entry_tag, 0u, 1u, 0u, zero);",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    },
+    {
+      "name": "skip-success-close",
+      "source": "iterations/v2/001-original-recovery/runs/810-scene-stage-table-load/scene_stage_table_load_810.cpp",
+      "old": "    }\n    scene_mapped_file_close_0059f8a0(&mapped, nullptr);\n}",
+      "new": "    }\n}",
+      "expected_exit": 7,
+      "failure_marker": "divergence "
+    }
+  ]
+}

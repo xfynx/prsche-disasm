@@ -1,0 +1,374 @@
+// Native x86-vs-C++ differential fixture for Run807 color-pack routines.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "render_color_pack_807.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kMaxEvents = 32u,
+    kLutSize = 32768u,
+};
+
+struct EventRec {
+    U kind;
+    U arg0;
+};
+
+struct Snapshot {
+    U abi_fail;
+    U ret;
+    U ev_count;
+    EventRec ev[kMaxEvents];
+};
+
+static U cases = 0u;
+static U side = 0u;
+static Snapshot expected{};
+static Snapshot actual{};
+static Snapshot* cur = nullptr;
+
+static const B kOrigPaletteEnabled[256] = {
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+    1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 0u, 0u
+};
+
+static B lut_storage[kLutSize]{};
+static U custom_palette[256]{};
+
+static B* code_537e30 = nullptr;
+static B* code_537ed0 = nullptr;
+static B* code_572f90 = nullptr;
+static B* code_573000 = nullptr;
+
+static U addr_u32(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static void write_u32(B* dst, U v) {
+    std::memcpy(dst, &v, sizeof(v));
+}
+
+static void write_rel32(B* imm_slot, const void* target) {
+    const std::intptr_t delta =
+        reinterpret_cast<const B*>(target) - (imm_slot + 4);
+    const std::int32_t rel = static_cast<std::int32_t>(delta);
+    std::memcpy(imm_slot, &rel, sizeof(rel));
+}
+
+static void record_event(U kind, U arg0) {
+    if (cur == nullptr || cur->ev_count >= kMaxEvents) {
+        return;
+    }
+    cur->ev[cur->ev_count].kind = kind;
+    cur->ev[cur->ev_count].arg0 = arg0;
+    ++cur->ev_count;
+}
+
+static U __cdecl helper_888_to_565(U color) {
+    record_event(1u, color);
+    return ((color & 0x00f80000u) >> 8u) |
+           ((color & 0x0000fc00u) >> 5u) |
+           ((color >> 3u) & 0x1fu);
+}
+
+static U __cdecl helper_888_to_1555(U color) {
+    record_event(2u, color);
+    if (color == 0u) {
+        return 0u;
+    }
+    return 0x8000u |
+           ((color & 0x00f80000u) >> 9u) |
+           ((color & 0x0000f800u) >> 6u) |
+           ((color >> 3u) & 0x1fu);
+}
+
+static void init_original_code() {
+    static const B kRaw537e30[156] = {
+        @BODY_00537E30@
+    };
+    static const B kRaw537ed0[95] = {
+        @BODY_00537ED0@
+    };
+    static const B kRaw572f90[77] = {
+        @BODY_00572F90@
+    };
+    static const B kRaw573000[47] = {
+        @BODY_00573000@
+    };
+
+    auto* const mem = static_cast<B*>(
+        VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    code_537e30 = mem;
+    code_537ed0 = mem + 256u;
+    code_572f90 = mem + 512u;
+    code_573000 = mem + 768u;
+
+    std::memcpy(code_537e30, kRaw537e30, sizeof(kRaw537e30));
+    std::memcpy(code_537ed0, kRaw537ed0, sizeof(kRaw537ed0));
+    std::memcpy(code_572f90, kRaw572f90, sizeof(kRaw572f90));
+    std::memcpy(code_573000, kRaw573000, sizeof(kRaw573000));
+
+    // 00537e30 data refs: 0x6b4b20 at +0x3a, 0x5de790 at +0x50.
+    write_u32(code_537e30 + 0x3au, addr_u32(porsche::render_pixel_palette_006b4b20));
+    write_u32(code_537e30 + 0x50u, addr_u32(kOrigPaletteEnabled));
+
+    // 00572f90 refs: 0x69e0ac at +0x09, 0x6b4b20 at +0x3d, call 00537e30 at +0x43.
+    write_u32(code_572f90 + 0x09u, addr_u32(&porsche::render_color_lut_0069e0ac));
+    write_u32(code_572f90 + 0x3du, addr_u32(porsche::render_pixel_palette_006b4b20));
+    write_rel32(code_572f90 + 0x43u, code_537e30);
+
+    // 00537ed0 refs: 0x5de62d at +0x01, 0x5de62c at +0x2f, calls at +0x0f/+0x21/+0x3c/+0x4a.
+    auto* const cfg = reinterpret_cast<const B*>(porsche::window_shutdown_config_005de620);
+    write_u32(code_537ed0 + 0x01u, addr_u32(cfg + 0x0du));
+    write_rel32(code_537ed0 + 0x0fu, code_572f90);
+    write_rel32(code_537ed0 + 0x21u, reinterpret_cast<const void*>(&helper_888_to_1555));
+    write_u32(code_537ed0 + 0x2fu, addr_u32(cfg + 0x0cu));
+    write_rel32(code_537ed0 + 0x3cu, code_573000);
+    write_rel32(code_537ed0 + 0x4au, reinterpret_cast<const void*>(&helper_888_to_565));
+
+    FlushInstructionCache(GetCurrentProcess(), mem, 1024u);
+}
+
+static void reset_env() {
+    std::memset(porsche::window_shutdown_config_005de620, 0, sizeof(porsche::window_shutdown_config_005de620));
+    std::memset(porsche::render_pixel_palette_006b4b20, 0, sizeof(porsche::render_pixel_palette_006b4b20));
+    std::memset(custom_palette, 0, sizeof(custom_palette));
+    porsche::render_color_lut_0069e0ac = nullptr;
+    for (U i = 0u; i < kLutSize; ++i) {
+        lut_storage[i] = static_cast<B>((i * 37u + 13u) & 0xffu);
+    }
+    for (U i = 0u; i < 256u; ++i) {
+        porsche::render_pixel_palette_006b4b20[i] =
+            ((i * 11u) & 0xffu) |
+            (((i * 23u) & 0xffu) << 8u) |
+            (((i * 41u) & 0xffu) << 16u);
+        custom_palette[i] =
+            (((255u - i) * 7u) & 0xffu) |
+            ((((255u - i) * 19u) & 0xffu) << 8u) |
+            ((((255u - i) * 29u) & 0xffu) << 16u);
+    }
+}
+
+static void fail_case(const char* name) {
+    std::printf("divergence %s\n", name);
+    std::printf("  expected: abi=%u ret=0x%08x ev=%u\n",
+                expected.abi_fail, expected.ret, expected.ev_count);
+    std::printf("  actual:   abi=%u ret=0x%08x ev=%u\n",
+                actual.abi_fail, actual.ret, actual.ev_count);
+    std::fflush(nullptr);
+    ExitProcess(10u);
+}
+
+template <typename Fn>
+static void run_cdecl_1(const char* name, B* raw_fn, Fn cpp_fn, U arg0) {
+    ++cases;
+    U esp_before = 0u, esp_after = 0u;
+    U ebx_b = 0x11223344u, esi_b = 0x55667788u, edi_b = 0x99aabbccu, ebp_b = 0xddeeff00u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+    U ret_raw = 0u;
+
+    std::memset(&expected, 0, sizeof(expected));
+    side = 0u;
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_before, esp
+        push arg0
+        mov eax, raw_fn
+        call eax
+        add esp, 4
+        mov esp_after, esp
+        mov ret_raw, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.ret = ret_raw;
+    expected.abi_fail = (esp_before != esp_after || ebx_b != ebx_a ||
+                         esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+
+    std::memset(&actual, 0, sizeof(actual));
+    side = 1u;
+    cur = &actual;
+    actual.ret = cpp_fn(arg0);
+    actual.abi_fail = 0u;
+
+    if (std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+        fail_case(name);
+    }
+}
+
+static void run_nearest(const char* name, const void* pal, U color) {
+    ++cases;
+    U esp_before = 0u, esp_after = 0u;
+    U ebx_b = 0u, esi_b = 0u, edi_b = 0u, ebp_b = 0u;
+    U ebx_a = 0u, esi_a = 0u, edi_a = 0u, ebp_a = 0u;
+    U ret_raw = 0u;
+    B* raw_fn = code_537e30;
+
+    std::memset(&expected, 0, sizeof(expected));
+    side = 0u;
+    cur = &expected;
+    __asm {
+        mov ebx_b, ebx
+        mov esi_b, esi
+        mov edi_b, edi
+        mov ebp_b, ebp
+        mov esp_before, esp
+        push color
+        push pal
+        mov eax, raw_fn
+        call eax
+        add esp, 8
+        mov esp_after, esp
+        mov ret_raw, eax
+        mov ebx_a, ebx
+        mov esi_a, esi
+        mov edi_a, edi
+        mov ebp_a, ebp
+    }
+    expected.ret = ret_raw;
+    expected.abi_fail = (esp_before != esp_after || ebx_b != ebx_a ||
+                         esi_b != esi_a || edi_b != edi_a || ebp_b != ebp_a) ? 1u : 0u;
+
+    std::memset(&actual, 0, sizeof(actual));
+    side = 1u;
+    cur = &actual;
+    actual.ret = porsche::render_palette_nearest_00537e30(pal, color);
+    actual.abi_fail = 0u;
+
+    if (std::memcmp(&expected, &actual, sizeof(Snapshot)) != 0) {
+        fail_case(name);
+    }
+}
+
+static void set_cfg(B mode_tag, B bpp) {
+    auto* const cfg = reinterpret_cast<B*>(porsche::window_shutdown_config_005de620);
+    cfg[0x0cu] = mode_tag;
+    cfg[0x0du] = bpp;
+}
+
+} // namespace
+
+namespace porsche {
+
+std::uint32_t window_shutdown_config_005de620[12]{};
+std::uint32_t render_pixel_palette_006b4b20[256]{};
+
+std::uint32_t __cdecl render_color_888_to_565_00572f30(std::uint32_t color) {
+    return helper_888_to_565(color);
+}
+
+std::uint32_t __cdecl render_color_888_to_1555_00572f5b(std::uint32_t color) {
+    return helper_888_to_1555(color);
+}
+
+} // namespace porsche
+
+int main() {
+    init_original_code();
+
+    // 1. 00537e30: null fallback, custom palette, entries 253..255 skip, ties, and >=0x1869f cap.
+    reset_env();
+    porsche::render_pixel_palette_006b4b20[5] = 0x00123456u;
+    run_nearest("nearest-null-pal-0", nullptr, 0x00123456u);
+    run_nearest("nearest-null-pal-alpha", nullptr, 0xab123456u);
+    run_nearest("nearest-custom-pal", custom_palette, 0x00abcdefu);
+
+    // Entry 254/255 disabled while 253 enabled.
+    reset_env();
+    for (U i = 0u; i < 256u; ++i) {
+        custom_palette[i] = 0x00000000u;
+    }
+    custom_palette[254] = 0x008090a0u;
+    custom_palette[255] = 0x008090a0u;
+    run_nearest("nearest-skip-254-255", custom_palette, 0x008090a0u);
+    custom_palette[253] = 0x008090a0u;
+    run_nearest("nearest-hit-253", custom_palette, 0x008090a0u);
+
+    // Exact tie keeps earlier index (< vs <=).
+    reset_env();
+    for (U i = 0u; i < 256u; ++i) {
+        custom_palette[i] = 0x00ffffffu;
+    }
+    custom_palette[42] = 0x00102030u;
+    custom_palette[99] = 0x00102030u;
+    run_nearest("nearest-tie-keeps-earlier", custom_palette, 0x00112131u);
+
+    // Distance cap 0x1869f (99999): if all enabled >= 99999, stays 0; 99737 updates best.
+    reset_env();
+    for (U i = 0u; i < 256u; ++i) {
+        custom_palette[i] = 0x00000000u;
+    }
+    custom_palette[5] = 0x00404040u; // delta (191,191,191) -> 109443 >= 99999
+    run_nearest("nearest-all-ge-cap-returns-0", custom_palette, 0x00ffffffu);
+    // 182^2 + 182^2 + 183^2 = 33124 + 33124 + 33489 = 99737 < 99999.
+    custom_palette[77] = 0x00ffffffu ^ 0x00b6b6b7u; // delta (182, 182, 183) -> 99737
+    run_nearest("nearest-below-cap-hits-77", custom_palette, 0x00ffffffu);
+
+    // 2. 00572f90: LUT active vs LUT null fallback.
+    reset_env();
+    run_cdecl_1("pal8-no-lut-0", code_572f90, porsche::render_color_888_to_pal8_00572f90, 0x0055aa33u);
+    porsche::render_color_lut_0069e0ac = lut_storage;
+    const U lut_colors[] = {
+        0x00000000u, 0xffffffffu, 0x00f80000u, 0x0000f800u,
+        0x000000f8u, 0x07070707u, 0xab123456u, 0x12f0c898u,
+    };
+    for (U idx = 0u; idx < sizeof(lut_colors) / sizeof(lut_colors[0]); ++idx) {
+        run_cdecl_1("pal8-lut", code_572f90, porsche::render_color_888_to_pal8_00572f90, lut_colors[idx]);
+    }
+
+    // 3. 00573000: ARGB8888 -> ARGB4444.
+    const U c4444[] = {
+        0x00000000u, 0xffffffffu, 0xf0000000u, 0x00f00000u,
+        0x0000f000u, 0x000000f0u, 0x0f0f0f0fu, 0x12345678u,
+        0xabcd1234u, 0x89abcdefu,
+    };
+    for (U idx = 0u; idx < sizeof(c4444) / sizeof(c4444[0]); ++idx) {
+        run_cdecl_1("argb4444", code_573000, porsche::render_color_8888_to_4444_00573000, c4444[idx]);
+    }
+
+    // 4. 00537ed0: bpp & mode dispatch.
+    reset_env();
+    porsche::render_color_lut_0069e0ac = lut_storage;
+    const B bpps[] = {0u, 1u, 4u, 8u, 9u, 14u, 15u, 16u, 17u, 23u, 24u, 32u, 255u};
+    const B modes[] = {0x00u, 0x6cu, 0x6du, 0x6eu};
+    for (U bi = 0u; bi < sizeof(bpps) / sizeof(bpps[0]); ++bi) {
+        for (U mi = 0u; mi < sizeof(modes) / sizeof(modes[0]); ++mi) {
+            set_cfg(modes[mi], bpps[bi]);
+            run_cdecl_1("pack-c1", code_537ed0, porsche::render_color_pack_00537ed0, 0x89abcdefu);
+            run_cdecl_1("pack-c0", code_537ed0, porsche::render_color_pack_00537ed0, 0x00000000u);
+        }
+    }
+
+    std::printf("render_color_pack_807_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

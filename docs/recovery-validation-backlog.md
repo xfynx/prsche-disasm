@@ -1,13 +1,17 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run809 PASS (`805/003` + `806/002`: 3 bodies, 64 cases, 19 mutations,
-8B `.data` + 4B `.bss` + 32B `.rdata`, 467 TUs, 76/86 names/refs, 1,152 pins,
-registry 1,332, no EXE). `805` resets scene tables (`0044d270` open); `806`
-closes `0056fdb0` caps success path; live renderer, startup and gameplay open.
+Текущее: Run812 PASS (`810/003`: 6 bodies, 78 cases, 10 mutations, 0B data/bss,
+468 TUs, 78/88 names/refs, 1,155 pins, registry 1,338, no EXE). `810` closes
+`0044d270` (`0059f8f0`/`0044d380`/`005af040` open). Deferred proof-only:
+Run807 (`004/receipt.json` PASS, 4 bodies, 262 cases, 10 mutations, 256B `.data`
++ 4B `.bss`, awaiting caller `00563160`/`005dec08`).
 
-Historical: Run808 PASS (`801/004` + `802/002`: 4 bodies, 418 cases, 20
-mutations, 13B `.rdata`, 465 TUs, 77/87 names/refs, 1,147 pins, registry 1,329,
-no EXE). Run804 PASS (`797/002` + `798/007`: 14 bodies, 264 cases, 21
+Historical: Run809 PASS (`805/003` + `806/002`: 3 bodies, 64 cases, 19
+mutations, 8B `.data` + 4B `.bss` + 32B `.rdata`, 467 TUs, 76/86 names/refs,
+1,152 pins, registry 1,332, no EXE). Run808 PASS (`801/004` + `802/002`: 4
+bodies, 418 cases, 20 mutations, 13B `.rdata`, 465 TUs, 77/87 names/refs,
+1,147 pins, registry 1,329, no EXE). Run804 PASS (`797/002` + `798/007`: 14
+bodies, 264 cases, 21
 mutations, 22B writable + 175B literals, 463 TUs, 79/89 names/refs, 1,142 pins,
 registry 1,325, no EXE). `797` supplements `00538b30`; `798` bounds synthetic
 BIG/BIGH v1/v2 payloads; live renderer/audio/startup/gameplay remain open.

@@ -1,0 +1,570 @@
+// Native x86-vs-C++ differential fixture for Run810:
+//   0044d270..0044d314 (165B) porsche::scene_stage_table_load_0044d270
+//   00537f30..00537f37 (  8B) porsche::scene_shape_table_count_00537f30
+//   00537f60..00537f84 ( 37B) porsche::scene_shape_table_tag_00537f60
+//   0059f880..0059f892 ( 19B) porsche::scene_mapped_file_init_0059f880
+//   0059f8a0..0059f8e4 ( 69B) porsche::scene_mapped_file_close_0059f8a0
+//   0059fb90..0059fbbd ( 46B) porsche::scene_mapped_file_data_0059fb90
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "porsche/application_heap.hpp"
+#include "scene_stage_table_load_810.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static U cases = 0u;
+
+static void require(bool ok, const char* why) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", why, cases);
+        std::fflush(stdout);
+        ExitProcess(7);
+    }
+}
+
+static U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U load32(const void* base, U off = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(base) + off, 4u);
+    return v;
+}
+
+static void store32(void* base, U off, U v) {
+    std::memcpy(static_cast<B*>(base) + off, &v, 4u);
+}
+
+static U fnv1a(const char* s) {
+    U h = 2166136261u;
+    while (*s != '\0') {
+        h = (h ^ static_cast<B>(*s++)) * 16777619u;
+    }
+    return h;
+}
+
+enum : U {
+    kEvOpen = 1u,
+    kEvRegister = 2u,
+    kEvProtect = 3u,
+    kEvPageRelease = 4u,
+    kEvVtableDtor = 5u,
+};
+
+struct Event {
+    U kind;
+    U a;
+    U b;
+    U c;
+    U d;
+};
+
+enum : U { kMaxEvents = 32u };
+
+struct Snapshot {
+    U abi_fail;
+    U ret_eax;
+    U event_count;
+    std::array<Event, kMaxEvents> events;
+    std::array<B, 0x14u> mapped;
+    U out_tag;
+};
+
+static Event g_events[kMaxEvents];
+static U g_event_count = 0u;
+
+static alignas(8) B g_mapped_buf[0x14u];
+static alignas(8) B g_table_buf[0x100u];
+static alignas(8) B g_self_obj[0x20u];
+static alignas(8) B g_owner_obj[0x10u];
+static U g_out_tag = 0u;
+
+static bool g_open_returns_data = true;
+static bool g_open_has_owner = false;
+static U g_open_size = 0x80u;
+static B g_open_flag = 0u;
+
+static void record_event(U kind, U a = 0u, U b = 0u, U c = 0u, U d = 0u) {
+    require(g_event_count < kMaxEvents, "event overflow");
+    g_events[g_event_count++] = Event{kind, a, b, c, d};
+}
+
+static void* __fastcall mock_owner_dtor(void* obj, void*, U flags) {
+    record_event(kEvVtableDtor, address(obj), flags);
+    return obj;
+}
+
+static const U g_owner_vtable[1] = {
+    reinterpret_cast<U>(&mock_owner_dtor),
+};
+
+namespace porsche {
+
+void __fastcall scene_mapped_file_open_0059f8f0(
+    void* self, void*, const char* path, U flags) {
+    record_event(kEvOpen, fnv1a(path), flags);
+    store32(self, 0x00u, g_open_has_owner ? address(g_owner_obj) : 0u);
+    store32(self, 0x04u, g_open_returns_data ? address(g_table_buf) : 0u);
+    store32(self, 0x08u, 0x11112222u);
+    store32(self, 0x0cu, g_open_size);
+    static_cast<B*>(self)[0x10u] = g_open_flag;
+}
+
+void* __fastcall scene_stage_entry_register_0044d380(
+    void* self, void*, const void* entry_ptr,
+    U zero_a, U entry_tag, U zero_b, U one_a, U one_b, U flags) {
+    record_event(
+        kEvRegister,
+        address(self),
+        static_cast<U>(static_cast<const B*>(entry_ptr) - g_table_buf),
+        entry_tag ^ (zero_a << 1u) ^ (zero_b << 2u),
+        (one_a << 8u) ^ (one_b << 12u) ^ flags);
+    return self;
+}
+
+void __cdecl application_page_protect_005af040(void* addr, U bytes, U ro) {
+    record_event(kEvProtect, address(addr), bytes, ro);
+}
+
+U __cdecl application_page_release_0059ed90(void* addr) {
+    record_event(kEvPageRelease, address(addr));
+    return 1u;
+}
+
+} // namespace porsche
+
+static B* code_page = nullptr;
+static B* slot_0044d270 = nullptr;
+static B* slot_00537f30 = nullptr;
+static B* slot_00537f60 = nullptr;
+static B* slot_0059f880 = nullptr;
+static B* slot_0059f8a0 = nullptr;
+static B* slot_0059fb90 = nullptr;
+
+static void relocate_call_rel32(
+    B* slot, U orig_base_va, U off, U expected_target_va, const void* replacement) {
+    require(slot[off] == 0xe8u, "CALL rel32 opcode");
+    const I old_disp = static_cast<I>(load32(slot, off + 1u));
+    const U actual_target = (orig_base_va + off + 5u + static_cast<U>(old_disp)) & 0xffffffffu;
+    require(actual_target == expected_target_va, "CALL rel32 target VA");
+    const U new_disp = address(replacement) - address(slot + off + 5u);
+    store32(slot, off + 1u, new_disp);
+}
+
+static void init() {
+    static const B body_0044d270[] = {@BODY_0044D270@};
+    static const B body_00537f30[] = {@BODY_00537F30@};
+    static const B body_00537f60[] = {@BODY_00537F60@};
+    static const B body_0059f880[] = {@BODY_0059F880@};
+    static const B body_0059f8a0[] = {@BODY_0059F8A0@};
+    static const B body_0059fb90[] = {@BODY_0059FB90@};
+    require(sizeof body_0044d270 == 165u, "165B 0044d270");
+    require(sizeof body_00537f30 == 8u, "8B 00537f30");
+    require(sizeof body_00537f60 == 37u, "37B 00537f60");
+    require(sizeof body_0059f880 == 19u, "19B 0059f880");
+    require(sizeof body_0059f8a0 == 69u, "69B 0059f8a0");
+    require(sizeof body_0059fb90 == 46u, "46B 0059fb90");
+
+    code_page = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                             PAGE_EXECUTE_READWRITE));
+    require(code_page != nullptr, "VirtualAlloc RWX");
+
+    slot_0044d270 = code_page + 0x000u;
+    slot_00537f30 = code_page + 0x100u;
+    slot_00537f60 = code_page + 0x140u;
+    slot_0059f880 = code_page + 0x1c0u;
+    slot_0059f8a0 = code_page + 0x200u;
+    slot_0059fb90 = code_page + 0x280u;
+
+    std::memcpy(slot_0044d270, body_0044d270, sizeof body_0044d270);
+    std::memcpy(slot_00537f30, body_00537f30, sizeof body_00537f30);
+    std::memcpy(slot_00537f60, body_00537f60, sizeof body_00537f60);
+    std::memcpy(slot_0059f880, body_0059f880, sizeof body_0059f880);
+    std::memcpy(slot_0059f8a0, body_0059f8a0, sizeof body_0059f8a0);
+    std::memcpy(slot_0059fb90, body_0059fb90, sizeof body_0059fb90);
+
+    // 0059f8a0
+    relocate_call_rel32(slot_0059f8a0, 0x0059f8a0u, 0x02du, 0x0059ed90u,
+                        reinterpret_cast<const void*>(&porsche::application_page_release_0059ed90));
+
+    // 0059fb90
+    relocate_call_rel32(slot_0059fb90, 0x0059fb90u, 0x01du, 0x005af040u,
+                        reinterpret_cast<const void*>(&porsche::application_page_protect_005af040));
+
+    // 0044d270
+    relocate_call_rel32(slot_0044d270, 0x0044d270u, 0x00cu, 0x0059f880u, slot_0059f880);
+    relocate_call_rel32(slot_0044d270, 0x0044d270u, 0x01cu, 0x0059f8f0u,
+                        reinterpret_cast<const void*>(&porsche::scene_mapped_file_open_0059f8f0));
+    relocate_call_rel32(slot_0044d270, 0x0044d270u, 0x025u, 0x0059fb90u, slot_0059fb90);
+    relocate_call_rel32(slot_0044d270, 0x0044d270u, 0x034u, 0x0059f8a0u, slot_0059f8a0);
+    relocate_call_rel32(slot_0044d270, 0x0044d270u, 0x045u, 0x00537f30u, slot_00537f30);
+    relocate_call_rel32(slot_0044d270, 0x0044d270u, 0x060u, 0x00537f60u, slot_00537f60);
+    relocate_call_rel32(slot_0044d270, 0x0044d270u, 0x083u, 0x0044d380u,
+                        reinterpret_cast<const void*>(&porsche::scene_stage_entry_register_0044d380));
+    relocate_call_rel32(slot_0044d270, 0x0044d270u, 0x095u, 0x0059f8a0u, slot_0059f8a0);
+}
+
+static U invoke_cdecl_1(const void* fn, U a0, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a0
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        add esp, 4
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espc1
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espc1:
+        cmp ebx, 0x13572468
+        je ok_ebxc1
+        or abi_fail, 2
+    ok_ebxc1:
+        cmp esi, 0x24681357
+        je ok_esic1
+        or abi_fail, 4
+    ok_esic1:
+        cmp edi, 0x55aa33cc
+        je ok_edic1
+        or abi_fail, 8
+    ok_edic1:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static U invoke_cdecl_3_void(const void* fn, U a0, U a1, U a2) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a2
+        push a1
+        push a0
+        mov eax, fn
+        call eax
+        add esp, 12
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espc3
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espc3:
+        cmp ebx, 0x13572468
+        je ok_ebxc3
+        or abi_fail, 2
+    ok_ebxc3:
+        cmp esi, 0x24681357
+        je ok_esic3
+        or abi_fail, 4
+    ok_esic3:
+        cmp edi, 0x55aa33cc
+        je ok_edic3
+        or abi_fail, 8
+    ok_edic3:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static U invoke_thiscall_0(const void* fn, void* self, U& ret_eax) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    U out_eax = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov out_eax, eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt0
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt0:
+        cmp ebx, 0x13572468
+        je ok_ebxt0
+        or abi_fail, 2
+    ok_ebxt0:
+        cmp esi, 0x24681357
+        je ok_esit0
+        or abi_fail, 4
+    ok_esit0:
+        cmp edi, 0x55aa33cc
+        je ok_edit0
+        or abi_fail, 8
+    ok_edit0:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    ret_eax = out_eax;
+    return abi_fail;
+}
+
+static U invoke_thiscall_2_void(const void* fn, void* self, U a0, U a1) {
+    U abi_fail = 0u;
+    U esp_before = 0u;
+    U esp_after = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov ebx, 0x13572468
+        mov esi, 0x24681357
+        mov edi, 0x55aa33cc
+        mov esp_before, esp
+        push a1
+        push a0
+        mov ecx, self
+        mov eax, fn
+        call eax
+        mov esp_after, esp
+        mov eax, esp_after
+        cmp eax, esp_before
+        je ok_espt2
+        mov esp, esp_before
+        or abi_fail, 1
+    ok_espt2:
+        cmp ebx, 0x13572468
+        je ok_ebxt2
+        or abi_fail, 2
+    ok_ebxt2:
+        cmp esi, 0x24681357
+        je ok_esit2
+        or abi_fail, 4
+    ok_esit2:
+        cmp edi, 0x55aa33cc
+        je ok_edit2
+        or abi_fail, 8
+    ok_edit2:
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return abi_fail;
+}
+
+static void reset_fixtures(U seed) {
+    g_event_count = 0u;
+    g_out_tag = 0xdeadbeefu;
+    g_open_returns_data = true;
+    g_open_has_owner = false;
+    g_open_size = 0x80u;
+    g_open_flag = 0u;
+    std::memset(g_events, 0, sizeof g_events);
+    std::memset(g_mapped_buf, static_cast<int>(0x40u + seed), sizeof g_mapped_buf);
+    std::memset(g_table_buf, 0, sizeof g_table_buf);
+    std::memset(g_self_obj, 0x11u, sizeof g_self_obj);
+    std::memset(g_owner_obj, 0, sizeof g_owner_obj);
+    store32(g_owner_obj, 0x00u, address(g_owner_vtable));
+}
+
+static void populate_table(U count) {
+    store32(g_table_buf, 0x08u, count);
+    for (U i = 0u; i < count; ++i) {
+        store32(g_table_buf, 0x10u + i * 8u, 0x53485030u + i);
+        store32(g_table_buf, 0x14u + i * 8u, 0x60u + i * 0x10u);
+    }
+    store32(g_table_buf, 0x10u + count * 8u, 0x53454e54u);
+}
+
+static void capture(Snapshot& out, U abi_fail, U ret_eax) {
+    out.abi_fail = abi_fail;
+    out.ret_eax = ret_eax;
+    out.event_count = g_event_count;
+    std::memcpy(out.events.data(), g_events, sizeof g_events);
+    std::memcpy(out.mapped.data(), g_mapped_buf, sizeof g_mapped_buf);
+    out.out_tag = g_out_tag;
+}
+
+static void check_equal(const Snapshot& orig, const Snapshot& cpp, const char* tag) {
+    require(orig.abi_fail == 0u, tag);
+    require(cpp.abi_fail == 0u, tag);
+    require(orig.ret_eax == cpp.ret_eax, tag);
+    require(orig.event_count == cpp.event_count, tag);
+    for (U i = 0u; i < orig.event_count; ++i) {
+        require(orig.events[i].kind == cpp.events[i].kind &&
+                    orig.events[i].a == cpp.events[i].a &&
+                    orig.events[i].b == cpp.events[i].b &&
+                    orig.events[i].c == cpp.events[i].c &&
+                    orig.events[i].d == cpp.events[i].d,
+                tag);
+    }
+    require(orig.mapped == cpp.mapped, tag);
+    require(orig.out_tag == cpp.out_tag, tag);
+    ++cases;
+}
+
+int main() {
+    init();
+
+    // 1. 00537f30 & 00537f60 direct tests (count, in-bounds, out-of-bounds, negative index)
+    for (U count : {0u, 3u, 5u}) {
+        Snapshot orig{}, cpp{};
+        U r0 = 0u, r1 = 0u;
+        reset_fixtures(1u);
+        populate_table(count);
+        U f0 = invoke_cdecl_1(slot_00537f30, address(g_table_buf), r0);
+        capture(orig, f0, r0);
+        reset_fixtures(1u);
+        populate_table(count);
+        U f1 = invoke_cdecl_1(
+            reinterpret_cast<const void*>(&porsche::scene_shape_table_count_00537f30),
+            address(g_table_buf), r1);
+        capture(cpp, f1, r1);
+        check_equal(orig, cpp, "00537f30");
+
+        for (I idx : {-1, 0, 2, 3, 5}) {
+            reset_fixtures(1u);
+            populate_table(count);
+            f0 = invoke_cdecl_3_void(slot_00537f60, address(g_table_buf),
+                                     static_cast<U>(idx), address(&g_out_tag));
+            capture(orig, f0, 0u);
+            reset_fixtures(1u);
+            populate_table(count);
+            f1 = invoke_cdecl_3_void(
+                reinterpret_cast<const void*>(&porsche::scene_shape_table_tag_00537f60),
+                address(g_table_buf), static_cast<U>(idx), address(&g_out_tag));
+            capture(cpp, f1, 0u);
+            check_equal(orig, cpp, "00537f60");
+        }
+    }
+
+    // 2. 0059f880, 0059f8a0, 0059fb90 direct tests
+    {
+        Snapshot orig{}, cpp{};
+        U r0 = 0u, r1 = 0u;
+        reset_fixtures(2u);
+        U f0 = invoke_thiscall_0(slot_0059f880, g_mapped_buf, r0);
+        capture(orig, f0, 0u);
+        reset_fixtures(2u);
+        U f1 = invoke_thiscall_0(
+            reinterpret_cast<const void*>(&porsche::scene_mapped_file_init_0059f880),
+            g_mapped_buf, r1);
+        capture(cpp, f1, 0u);
+        check_equal(orig, cpp, "0059f880");
+
+        for (U flag : {0u, 1u}) {
+            for (U owner : {0u, 1u}) {
+                for (U sz : {0u, 0x40u}) {
+                    auto setup_mapped = [=]() {
+                        store32(g_mapped_buf, 0x00u, owner ? address(g_owner_obj) : 0u);
+                        store32(g_mapped_buf, 0x04u, address(g_table_buf));
+                        store32(g_mapped_buf, 0x08u, 0x99u);
+                        store32(g_mapped_buf, 0x0cu, sz);
+                        g_mapped_buf[0x10u] = static_cast<B>(flag);
+                    };
+                    reset_fixtures(3u);
+                    setup_mapped();
+                    f0 = invoke_thiscall_0(slot_0059fb90, g_mapped_buf, r0);
+                    capture(orig, f0, r0);
+                    reset_fixtures(3u);
+                    setup_mapped();
+                    f1 = invoke_thiscall_0(
+                        reinterpret_cast<const void*>(&porsche::scene_mapped_file_data_0059fb90),
+                        g_mapped_buf, r1);
+                    capture(cpp, f1, r1);
+                    check_equal(orig, cpp, "0059fb90");
+                }
+            }
+        }
+
+        for (U has_data : {0u, 1u}) {
+            for (U has_owner : {0u, 1u}) {
+                auto setup_close = [=]() {
+                    store32(g_mapped_buf, 0x00u, has_owner ? address(g_owner_obj) : 0u);
+                    store32(g_mapped_buf, 0x04u, has_data ? address(g_table_buf) : 0u);
+                    store32(g_mapped_buf, 0x08u, 0x77u);
+                };
+                reset_fixtures(4u);
+                setup_close();
+                f0 = invoke_thiscall_0(slot_0059f8a0, g_mapped_buf, r0);
+                capture(orig, f0, 0u);
+                reset_fixtures(4u);
+                setup_close();
+                f1 = invoke_thiscall_0(
+                    reinterpret_cast<const void*>(&porsche::scene_mapped_file_close_0059f8a0),
+                    g_mapped_buf, r1);
+                capture(cpp, f1, 0u);
+                check_equal(orig, cpp, "0059f8a0");
+            }
+        }
+    }
+
+    // 3. 0044d270 full table load cases (null table, 0 entries, 3 entries, owner vs page-release)
+    const char path_str[] = "Data\\Fe\\common.fsh";
+    for (bool has_data : {false, true}) {
+        for (bool has_owner : {false, true}) {
+            for (U count : {0u, 3u}) {
+                Snapshot orig{}, cpp{};
+                auto setup_load = [=]() {
+                    g_open_returns_data = has_data;
+                    g_open_has_owner = has_owner;
+                    g_open_size = 0x100u;
+                    g_open_flag = 0u;
+                    populate_table(count);
+                };
+                reset_fixtures(5u);
+                setup_load();
+                U f0 = invoke_thiscall_2_void(
+                    slot_0044d270, g_self_obj, address(path_str), 0x42u);
+                capture(orig, f0, 0u);
+                reset_fixtures(5u);
+                setup_load();
+                U f1 = invoke_thiscall_2_void(
+                    reinterpret_cast<const void*>(&porsche::scene_stage_table_load_0044d270),
+                    g_self_obj, address(path_str), 0x42u);
+                capture(cpp, f1, 0u);
+                check_equal(orig, cpp, "0044d270");
+            }
+        }
+    }
+
+    std::printf("scene_stage_table_load_810_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    return 0;
+}

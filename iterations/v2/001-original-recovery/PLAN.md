@@ -1,13 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-24. [Run809](runs/809-scene-reset-and-input-caps-integration/README.md)
-PASS (`build-001`): folds `805/003` (`00448b10`, `0044d0b0`, `8B .data`,
-`4B .bss`) and `806/002` (`0056fdf9`, `32B .rdata`): **467 TUs / 8 projects**,
-**76 unresolved / 86 refs**, `1,152` pins, `64` comparisons, `19` mutations, `2`
-REA sessions, no EXE; registry **1,332** (`+3`; `0056fdb0` updated). Closes
-`2` (`0056fdf9`, `00448b10`), opens `1` (`0044d270`). Next: `803`/`807`/`810`.
+Current 2026-11-24. [Run812](runs/812-scene-table-load-integration/README.md)
+PASS (`build-001`): folds `810/003` (`0044d270`, `00537f30`, `00537f60`,
+`0059f880`, `0059f8a0`, `0059fb90`, `0B` data/bss): **468 TUs / 8 projects**,
+**78 unresolved / 88 refs**, `1,155` pins, `78` comparisons, `10` mutations, `1`
+REA session, no EXE; registry **1,338** (`+6`; `00448b10` updated). Closes
+`0044d270`, opens `0059f8f0`/`0044d380`/`005af040`.
+Deferred proof-only: [Run807](runs/807-render-color-pack/README.md) (`004/receipt.json` PASS; awaiting caller `00563160`/`005dec08`).
 
-Historical: [Run808](runs/808-scene-texture-and-render-query-integration/README.md)
+Historical: [Run809](runs/809-scene-reset-and-input-caps-integration/README.md),
+[Run808](runs/808-scene-texture-and-render-query-integration/README.md)
 & [Run804](runs/804-render-mode-and-sim-startup-integration/README.md)
 PASS (`build-001`): folds `797/002` (`00538b30` + 11 setters, `8B .data`) and
 `798/007` (`004affd0`, `005665b0`, `175B` literals / `202B` PE span + `14B
