@@ -1,96 +1,12 @@
-# Модели и роли агентов
+# Recovery workers
 
-Правило пользователя от 2026-09-19: **любые провайдеры и модели допустимы**,
-включая локальные. Названия моделей не являются требованиями проекта.
-Сильная доступная модель координирует, реализация делегируется исполнителям
-достаточной сложности. Это заменяет прежние обязательные назначения по брендам.
+[PLAN.md](../PLAN.md) specifies the coordinator and worker models for Codex and other providers. Select from models actually available in the client. Check the effective model and effort before assigning a fixed profile. The [sample configs](../agent-configs/README.md) and legacy Cursor roles are client-specific examples.
 
-- planner: сильный координатор; архитектура, сложный реверс, приёмка.
-- formats: средний исполнитель; парсеры/ресурсы, эскалация сложных гипотез.
-- renderer: профильный исполнитель; native/WASM/GPU, уровень по задаче.
-- builds: лёгкий исполнитель; инвентаризация, скрипты, CI, воспроизводимость.
+- **Coordinator / planner** owns scope, ambiguous reverse engineering, the registry, shared builds, acceptance and publication. A small blocking task can stay with the coordinator.
+- **Builds** handles inventories, scripts, CI, reproducibility and documentation. **Formats** handles known parser layouts and resources. **Renderer** handles wgpu, native/web and GPU behavior. Assign ordinary implementation and its fixtures to a bounded worker.
+- Usually run one or two independent packets with disjoint files. Send the original addresses, known inputs/outputs, allowed paths, required comparison and stop condition. Preserve other work in the checkout and keep originals read-only.
+- The coordinator confirms new addresses against the registry and overlap ranges before implementation. While workers run, do independent work and serialize builds sharing a target.
+- After two failed attempts on one ambiguity, send evidence to the coordinator. At a quota limit, preserve the uncommitted work and resume with an adequate available worker. If delegation is unavailable, report it and continue sequentially.
+- Return findings, changed files, checks and remaining boundaries in at most eight lines. Workers keep their assigned task and publish only on explicit assignment. Close the worker after acceptance.
 
-`agent-configs/*.toml` — заменяемые примеры для одной среды; см.
-[пояснение](../agent-configs/README.md). Они не ограничивают выбор провайдера.
-Активный клиент может использовать другой формат профилей и способ делегирования.
-Сохранять роли и правила, не требовать совместимости с Codex/OpenAI API.
-
-## Recovery assignments
-
-The coordinator sets the frontier target, owned files and acceptance evidence
-for each worker. See the provider-specific assignments in the root PLAN.
-Use the simplest available worker that can complete the packet. After two failed
-attempts on one ambiguity, send the evidence to the coordinator. If a worker
-hits a limit, resume its uncommitted packet with another available worker.
-
-## Назначать по сложности, а не по названию файла
-
-Предпочтения проекта, не обещание тарифов/доступности моделей:
-
-- Понятная рутина: лёгкая/быстрая модель — инвентарь, отчёт, небольшой скрипт,
-  документирование результата, синтетические тесты по заданной спецификации.
-  Роль builds ограничена скриптами/CI/docs; тесты кода назначать отдельным исполнителям.
-- Ограниченная логика и форматы: средняя модель для известной схемы; повышать
-  уровень для неоднозначных смещений, связей и проверки границ.
-- wgpu/WASM/камера и ошибки GPU: профиль `renderer`; простую правку текста UI
-  не отправлять в дорогой профиль только потому, что файл относится к viewer.
-- Архитектура, конфликтующие гипотезы реверса, итоговая приёмка: сильный координатор.
-  Не создавать второго planner для обычного планирования, которое уже делает он.
-
-Выбирать минимальный ожидаемый расход ресурсов при достаточном качестве с учётом
-стоимости, задержки, контекста, инструментов и результатов проверок, а не бренда.
-Слова «лёгкая/средняя/сильная» относительны; режимы reasoning/effort у разных
-провайдеров не считать напрямую сопоставимыми. Не выдумывать тарифы и доступность.
-Использовать роли/модели, реально доступные в текущей среде. Профиль может
-фиксировать модель: параметры запуска не гарантируют переопределение.
-При отсутствии подходящего простого агента или самого механизма делегирования
-сообщить ограничение и выполнить небольшой шаг последовательно. Не имитировать
-запуск агента и не утверждать экономию, если её нельзя подтвердить.
-Глобальные настройки, квоты и права ради этого не менять.
-
-## Проверка владельца до восстановления
-
-Перед кодированием пакета сверяй все candidate VA с
-`iterations/v2/001-original-recovery/source/recovered/functions.json`.
-Уже принятая функция сохраняет канонического владельца; подключай его к новому
-стенду напрямую или через typed alias. Повторная проверка — regression, не новая
-восстановленная функция. Проверяй также interior entries и полные body ranges.
-Координатор подтверждает список новых адресов до исполнения; общий SHA-аудит
-и сборка объединяются по готовым связанным пакетам.
-
-## Экономный цикл
-
-1. Один проверяемый результат на задачу; обычно 1–2 агента одновременно.
-   Параллельно — только независимые задачи с непересекающимися файлами.
-2. Передать пути, подтверждённые факты, вход/выход, проверки и стоп-условие.
-   Не передавать всю переписку; без необходимости не включать fork полного контекста.
-3. Координатор продолжает другую работу; не повторяет исследование исполнителя
-   и не опрашивает его в коротком цикле. Сборки с общим target выполняются последовательно.
-4. Принять diff, запустить относящиеся к изменению проверки. Полный corpus/GPU
-   прогон — на границе этапа, не после каждой правки документации.
-5. Две неудачные проверки одной гипотезы: передать факты координатору и повысить
-   уровень задачи при необходимости. При quota/usage limit сохранить артефакты,
-   проверить оставленный код; не плодить агентов с тем же запросом.
-6. Закрыть исполнителя после приёмки. Субагент не делегирует дальше и не коммитит
-   без явного поручения координатора. Крошечную или срочную блокирующую правку
-   координатор делает сам — запуск агента тоже расходует токены.
-
-Короткая карточка поручения:
-
-```text
-ID / результат:
-Роль, провайдер/модель, режим рассуждения (если доступен; фактические):
-Зависимости и подтверждённые факты:
-Можно менять / только читать:
-Проверки и критерий приёмки:
-Стоп: неоднозначный формат, выход за scope, две неудачные попытки.
-Не один в репозитории; чужие правки сохранять. local/game только читать.
-Итог <=8 строк: находка, файлы/артефакты, проверки, остаток.
-```
-
-Политика выше независима от клиента. Для сохранённых примеров Codex механика
-сверена 2026-09-19 с [его документацией](https://learn.chatgpt.com/docs/agent-configuration/subagents).
-Для другого клиента проверять его возможности отдельно; установка/настройка
-провайдера не входит в изменение этих правил.
-
-Прежние .cursor/agents/*.md сохранены как описания ролей в другом формате.
+[Project rules](../AGENTS.md) cover the original-code method, batch acceptance and Git handoff.

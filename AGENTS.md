@@ -1,131 +1,22 @@
-# Работа в проекте
+# Project rules
 
-## Lean recovery workflow (2026-10-21)
+## Resume and publish
 
-- First-executable priority (2026-11-11): choose packets on the actual unresolved
-  linker/startup path. Defer archive-only providers until a reachable parent needs
-  them. Use bounded original comparisons, ABI checks and material mutation controls;
-  keep narrower domains PARTIAL. Reuse accepted proof and defer broader fault,
-  alias, concurrency and unrelated FP matrices. Preserve original algorithms;
-  this priority does not authorize guessed behavior or skipped acceptance gates.
-- Use English for new work and chat. Keep one concise handoff per logical batch
-  and generate only the evidence needed to reproduce its acceptance.
-- Resume uncommitted work after interruptions. Commit and push each accepted
-  batch, report branch status and upstream alignment, then continue recovery.
-  Workers may publish completed independent batches on isolated branches.
-  The coordinator owns the shared build, registry and integration on main.
-- CodeGraph is optional source navigation; verify its callers and definitions
-  against the real source closure. Original semantics still require the binary
-  index, REA and native comparison. See docs/research/codegraph-evaluation-2026-11-11.md.
-- Include registry `body_ranges` in overlap checks for manually supplemented
-  entries missing from the main index. Their complete CFG evidence lives beside
-  the source in `original-index-supplement.json`.
-- Batch related functions and proven ABI bindings by subsystem; avoid a new run,
-  agent, bespoke runner and audit for every small function. Do not enlarge a
-  passed batch just to improve its count; put later work in the next batch.
-- Reuse native harnesses, shared manifest/hash caches and manifest-driven REA.
-  Add only the new oracle/case logic. New general tooling must replace repeated
-  work immediately; do not pause recovery for a broad framework rewrite.
-- Prefer neutral labels for generated test executables. Run581 observed
-  WinError740 with an unmanifested name containing `dispatch`/`patch`.
-  Inspect launch errors separately from antivirus detections and preserve attempts.
-- Keep original comparisons and required checks. Reuse unchanged accepted proof;
-  build/audit integration once per batch. Repeat only for changed inputs, failures
-  or a specific unresolved concern. Generated JSON is an artifact, not prose to
-  copy into chat or manually regenerate for cosmetic metadata.
-- One active iteration PLAN owns detailed scope, evidence, commands and next
-  steps. Root PLAN, STATUS and README get brief current pointers, not duplicated
-  histories or full packet reports. One concise handoff per completed batch.
-- Usually use 1–2 workers on independent module batches. Start new agents with
-  compact context and file ownership, not the full conversation. Use adequate
-  model/effort; reserve stronger reasoning for ambiguous reverse engineering.
-- User decision (2026-11-16) keeps orchestration and final acceptance on a strong
-  model. Default bounded execution, fixture repair and routine implementation to
-  a simpler worker model. Escalate a concrete ambiguity after two failed attempts.
-- Prioritize closing real game dependencies and verified subsystem integration.
-  Fidelity, provenance, immutable originals and explicit unresolved boundaries
-  remain mandatory; reducing paperwork does not permit guessed implementations.
+- Read `git status --short --branch`, [PLAN](PLAN.md), [STATUS](STATUS.md), the active iteration plan and the latest relevant run handoffs before editing. If no next iteration exists, use [docs/next-iteration.md](docs/next-iteration.md). Resume uncommitted work after interruptions.
+- Use English for new work and chat. Keep the active plan current after meaningful findings and at handoff. Record scope, owners, proven facts, hypotheses, evidence, checks and the next concrete step there. Root documents point to current results. Limit logs and generated artifacts to the evidence needed.
+- Commit and push each accepted batch, give the [progress report after every commit](PLAN.md#report-after-every-commit), report branch and upstream status after each push, then continue unless paused. The coordinator owns shared acceptance and main. Assigned workers may publish independent batches on isolated branches.
+- Keep `local/game` read-only. Preserve completed snapshots, including 001 through 011, and immutable attempts. Keep runs in their own iteration; start each new iteration at run 001.
 
-## Восстановление оригинала — основной метод
+## Recover original behavior
 
-- Решение пользователя 2026-10-04 действует для всего проекта и старого кода:
-  физики, повреждений, ИИ, сценариев, прогрессии, форматов, UI и звука.
-  Восстанавливай исходные алгоритмы и поведение, а не создавай похожую реализацию
-  с нуля и не подбирай коэффициенты по субъективному ощущению.
-- До переноса фиксируй источник: модуль/SHA/адреса и вычисления для алгоритма,
-  поля исходного ресурса для данных, эталонные кадры/переходы для интерфейса.
-  Наличие строки, загрузчика или SIM-таблицы не доказывает алгоритм применения.
-- Сверяй входы → промежуточное состояние → выходы с оригиналом. Собственные
-  тесты и стабильная езда не заменяют эту проверку.
-- Неизученное поведение оставляй явно незавершённым. Гипотезы проверяй отдельно
-  в local/experiments; не подключай приближение к игровой сборке без явного
-  согласования с пользователем. Современная платформенная инфраструктура допустима,
-  но не должна незаметно менять исходную игровую семантику.
-- Проверяй существующую реализацию по тем же критериям: сохраняй подтверждённое,
-  заменяй остальное по конкретным исходным consumers. Снимки 001–011 не редактируй.
-  Не устраивай полное переписывание без трассировки.
+- Start with the [original binary index](research/binary-index/README.md). Trace strings, imports and resource references to functions, callers and callees. Record the query, module/SHA, addresses and original calculations. For data, identify fields and consumers. For UI, retain original frames and transitions.
+- Resolve missing entries by checking coverage and analysis errors, then supplement the index. Check the registry, interior entries and full `body_ranges` for overlaps. Use the adjacent `original-index-supplement.json` for manually added CFGs. Check canonical owners throughout the compiled source/header closure and bind proved providers with their actual ABI.
+- Validate algorithms against original inputs, intermediate state and outputs. Apply the same standard to older code. A string, loader or SIM table alone does not establish its consumer's behavior. Preserve unknown state, original algorithms, provenance and explicit partial domains. Verify UI and gameplay visually when the build permits.
+- Keep hypotheses in `local/experiments`. Introducing approximations into the game build needs explicit user agreement. Platform infrastructure must preserve original semantics. Use [CodeGraph](docs/research/codegraph-evaluation-2026-11-11.md) for navigation and verify its results against source, binary evidence, REA and native comparisons.
 
-## Сначала индекс оригинала
+## Batch and validate
 
-- Перед реализацией или изменением игрового поведения, физики, сценариев,
-  форматов и интерфейса сначала ищи оригинал в индексе бинарников.
-  Точка входа: `research/binary-index/README.md`; индексы версионируются в репозитории.
-- Ищи строки/ресурсы/импорты, затем проверяй функции, вызывающие их функции
-  и вызываемые ими функции. Индекс — навигация, а не доказательство семантики.
-- В плане или отчёте правки укажи запрос, модуль/адреса, найденные свидетельства
-  и связь с реализацией. Отделяй подтверждённое поведение от гипотез.
-- Если нужного кода нет в индексе, проверь покрытие и ошибки анализа, затем
-  дополни индекс. Не подменяй отсутствие свидетельств догадкой об оригинале.
-- Поиск по индексу не разрешает реализацию по догадке. Если семантика не доказана,
-  сохраняй следующий конкретный шаг трассировки. Правило действует для всех исполнителей.
-
-## Экономия токенов — для координатора и всех субагентов
-
-- Пиши кратко: результат, существенная находка, блокер или следующий шаг.
-- Не повторяй запрос, план, уже известные факты и полные журналы команд.
-- Читай нужные участки через `rg` и ограничивай вывод; полный лог сохраняй
-  в локальный артефакт, в контекст выводи ошибки и итог.
-- Делегируй ограниченные независимые задачи, с файлами владения и ожидаемым
-  результатом. Передавай компактный контекст, не дублируй исследование агентов.
-- Используй роли из `docs/agents.md`. Итог агента: находка, изменённые файлы,
-  проверки, остаток. Краткость сообщений не означает остановку работы.
-
-## Назначение исполнителей
-
-Правила выбора исполнителя — `docs/agents.md`; простой агент по умолчанию для
-ограниченной реализации, сложный — только при доказанной необходимости.
-
-- Любые провайдеры и модели допустимы; конкретный бренд не является требованием.
-- Сильная модель — координатор: решения, сложный реверс, интеграция и приёмка.
-- Лёгкие исполнители — инвентари, скрипты, документация, простые тесты;
-  средние — парсеры и обычная реализация; профильные/сильные — сложные форматы
-  и GPU. Выбирай достаточную модель с минимальным ожидаемым расходом ресурсов.
-- Обычно достаточно 1–2 исполнителей. Не создавай агента ради мелкой правки
-  или немедленно блокирующего шага, если проще выполнить его самому.
-- Модель/effort проверяй при назначении; фиксированный профиль роли не считай
-  переопределённым параметром spawn. Без доступной лёгкой модели сообщи об этом.
-- После двух безуспешных попыток по одной гипотезе — краткие факты координатору,
-  а не бесконечные перезапуски. После лимита проверь незавершённые изменения.
-
-## План и передача работы
-
-- Перед работой прочитай `PLAN.md`, `STATUS.md`,
-  `iterations/<активная-итерация>/PLAN.md` и последние `runs/*/README.md`.
-  Если следующая итерация ещё не создана, её план — `docs/next-iteration.md`;
-  не считай PLAN завершённого снимка активным заданием.
-- Поддерживай общий `PLAN.md` и отдельный `PLAN.md` активной итерации.
-  Обновляй после существенной находки, изменения направления, завершения
-  подзадачи/проверки и перед завершением сеанса; не оставляй план устаревшим
-  на протяжении длинной задачи.
-- В плане итерации сохраняй цель и критерии готовности, выполненное,
-  подтверждённые факты и гипотезы отдельно, текущие задачи/владельцев,
-  точные команды проверки и ближайший конкретный следующий шаг.
-- При передаче работы убирай устаревшие назначения, указывай файлы и артефакты,
-  известные дефекты и блокеры. Другой агент должен продолжить без перечитывания
-  всей переписки. Сверяй `STATUS.md` с фактическими результатами.
-- Успешная сборка/парсинг не заменяет визуальную проверку. Не объявляй
-  итерацию закрытой при невыполненных критериях.
-
-Игровые ресурсы `local/game` только читаются. Историю `runs` сохраняй внутри своего снимка;
-папки со снимками `runs` не переносятся при создании новой итерации (каждая итерация ведёт
-собственные runs, начиная с `001`).
+- Prioritize the actual unresolved linker and startup path. Defer archive-only providers until a reachable parent needs them. Group related functions and ABI bindings by subsystem. Freeze a passed batch and put later work in the next batch.
+- Follow the [recovery skill](.agents/skills/porsche-recovery/SKILL.md). Reuse native harnesses, accepted proof, hash caches and manifest-driven REA. Compare bounded original behavior and ABI and use material mutations. Repeat checks only for changed inputs, failures or a specific open concern. Defer unrelated fault, alias, concurrency and FP matrices.
+- Perform one shared build and audit per frozen batch. Publish one concise handoff; keep generated receipts as artifacts. Add general tooling only when it immediately replaces repeated work. Use neutral fixture executable names. Run581 recorded WinError740 for a name containing `dispatch` or `patch`; preserve failed attempts and distinguish launch errors from antivirus detections.
+- Use [worker roles](docs/agents.md) and the provider assignments in [PLAN](PLAN.md). Give independent workers compact scope and file ownership. Keep the coordinator on integration and final acceptance.
