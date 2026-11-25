@@ -1,13 +1,13 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-25. [Run841](runs/841-entry-fe-service-and-crt-shutdown-integration/README.md)
-PASS (`build-001`): folds `835/012` (`4,563B`, `336B` `.data` + `76B` `.bss`)
-and `838/002` (20 CRT bodies, `28B` `.bss`): **488 TUs / 8 projects**, **38
-unresolved / 41 refs**, `1,210` pins, `106` comparisons, `21` mutations, `2` REA
-sessions, no EXE; registry **1,469** (`+37`). Closes `3`, opens `2`
-(`global_00657430`, `transform_vectors_00532a40`). Next: `840`/`842`.
+Current 2026-11-25. [Run843](runs/843-application-replay-save-integration/README.md)
+PASS (`build-001`): folds `842/004` (`00413fd0`, `0059e170`, `00562460`,
+`00562390`, `126B` `.rdata`, `0B` writable): **489 TUs / 8 projects**, **37
+unresolved / 40 refs**, `1,213` pins, `10` comparisons, `6` mutations, `1` REA
+session, no EXE; registry **1,473** (`+4`). Closes `00413fd0`, `0` new.
 
-Historical: [Run839](runs/839-render-input-path-and-window-ops-integration/README.md),
+Historical: [Run841](runs/841-entry-fe-service-and-crt-shutdown-integration/README.md),
+[Run839](runs/839-render-input-path-and-window-ops-integration/README.md),
 [Run836](runs/836-rtti-cast-and-network-rtti-integration/README.md),
 [Run833](runs/833-player-tables-and-entry-fe-integration/README.md),
 [Run829](runs/829-rtti-crt-exit-and-diag-integration/README.md),

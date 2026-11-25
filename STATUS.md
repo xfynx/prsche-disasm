@@ -4,14 +4,14 @@ Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-
 
 ## Recovered C/C++ game
 
-[Run841](iterations/v2/001-original-recovery/runs/841-entry-fe-service-and-crt-shutdown-integration/README.md)
-compiles 488 TUs across eight projects (**38 unresolved names / 41
-references**, no EXE), accepting `835/012` + `838/002`: `1,469` registry
-entries (`+37`), `106` comparisons, `21` mutations, `440B` `.data`/`.bss`,
-`1,210` source pins; closes `3` (`005a3071`, `00465790`, `005a36d6`), opens
-`2` (`global_00657430`, `transform_vectors_00532a40`).
+[Run843](iterations/v2/001-original-recovery/runs/843-application-replay-save-integration/README.md)
+compiles 489 TUs across eight projects (**37 unresolved names / 40
+references**, no EXE), accepting `842/004`: `1,473` registry entries (`+4`),
+`10` comparisons, `6` mutations, `126B` `.rdata`, `1,213` source pins; closes
+`application_sim_boundary_00413fd0`, `0` new.
 
-Historical: [Run839](iterations/v2/001-original-recovery/runs/839-render-input-path-and-window-ops-integration/README.md),
+Historical: [Run841](iterations/v2/001-original-recovery/runs/841-entry-fe-service-and-crt-shutdown-integration/README.md),
+[Run839](iterations/v2/001-original-recovery/runs/839-render-input-path-and-window-ops-integration/README.md),
 [Run836](iterations/v2/001-original-recovery/runs/836-rtti-cast-and-network-rtti-integration/README.md),
 [Run833](iterations/v2/001-original-recovery/runs/833-player-tables-and-entry-fe-integration/README.md),
 [Run829](iterations/v2/001-original-recovery/runs/829-rtti-crt-exit-and-diag-integration/README.md),

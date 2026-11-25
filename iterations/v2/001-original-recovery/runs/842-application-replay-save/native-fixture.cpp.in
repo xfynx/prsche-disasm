@@ -1,0 +1,390 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "application_replay_save_842.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+namespace porsche {
+
+std::uint32_t global_005e99f4 = 0u;
+std::uint32_t startup_sequence_word_00606ac4 = 0u;
+static const char* mock_engine_service_root_storage = nullptr;
+const char*& engine_service_root_0065b360 = mock_engine_service_root_storage;
+ApplicationStateArena application_state_006573e8{};
+std::uint32_t replay_snapshot_005e9a20[application_state_word_count]{};
+std::uint32_t replay_tail_word_005ed844 = 0u;
+std::uint32_t replay_saved_word_00606a80 = 0u;
+
+char file_root_006af168[260]{};
+std::uint32_t resource_leaf_group_005df770 = 0x64u;
+std::uint32_t shared_runtime_word_005deb74 = 0u;
+std::uint32_t& application_diagnostic_source_005deb74 = shared_runtime_word_005deb74;
+std::uint32_t shared_runtime_word_005deb78 = 0u;
+std::uint32_t& application_diagnostic_line_005deb78 = shared_runtime_word_005deb78;
+std::uint32_t& diagnostic_line_005deb78 = shared_runtime_word_005deb78;
+void (__cdecl* diagnostic_handler_005debf0)(const char*) = nullptr;
+
+std::uint32_t& ApplicationStateArena::word(std::uint32_t va) {
+    return words_[(va - application_state_base_va) / sizeof(std::uint32_t)];
+}
+const std::uint32_t& ApplicationStateArena::word(std::uint32_t va) const {
+    return words_[(va - application_state_base_va) / sizeof(std::uint32_t)];
+}
+std::array<std::uint32_t, application_state_word_count>& ApplicationStateArena::words() noexcept {
+    return words_;
+}
+const std::array<std::uint32_t, application_state_word_count>& ApplicationStateArena::words() const noexcept {
+    return words_;
+}
+
+void diagnostic_file_005deb74_set(const char* value) noexcept {
+    const std::uintptr_t bits = reinterpret_cast<std::uintptr_t>(value);
+    shared_runtime_word_005deb74 = static_cast<std::uint32_t>(bits);
+}
+
+} // namespace porsche
+
+enum : U {
+    kOff413FD0 = 0x0000u,
+    kOff59E170 = 0x0100u,
+    kOff562460 = 0x0180u,
+    kOff562390 = 0x0200u,
+    kCodeBytes = 0x0400u,
+    kMaxEvents = 32u,
+};
+
+struct Trace {
+    U count;
+    U codes[kMaxEvents];
+    U arg0[kMaxEvents];
+    U arg1[kMaxEvents];
+    U arg2[kMaxEvents];
+    int ret0;
+    U diag_line;
+    U tail_word;
+    U snap_hash;
+    U snap_word15;
+};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U events_total = 0u;
+static U which = 0u;
+static B* code = nullptr;
+
+static const char kFmtConcat[5] = "%s%s";
+static int mock_open_ok = 1;
+static U mock_written_bytes = 0u;
+static int mock_dispatch_forward = 1;
+static void* const kFakeHandle = reinterpret_cast<void*>(static_cast<std::uintptr_t>(0x12345678u));
+
+static const B kBody413FD0[142] = { @BODY_00413FD0@ };
+static const B kBody59E170[64] = { @BODY_0059E170@ };
+static const B kBody562460[71] = { @BODY_00562460@ };
+static const B kBody562390[194] = { @BODY_00562390@ };
+
+static void fail(const char* why) {
+    std::printf("application_replay_save_original_x86_vs_cpp=FAIL case=%u side=%u reason=%s\n",
+                cases, which, why);
+    std::exit(1);
+}
+
+static U fnv1a(const void* data, std::size_t n) {
+    if (!data) return 0u;
+    const B* p = static_cast<const B*>(data);
+    U h = 2166136261u;
+    for (std::size_t i = 0; i < n; ++i) {
+        h ^= p[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void record(U cid, U a0 = 0u, U a1 = 0u, U a2 = 0u) {
+    if (trace.count >= kMaxEvents) fail("trace_overflow");
+    trace.codes[trace.count] = cid;
+    trace.arg0[trace.count] = a0;
+    trace.arg1[trace.count] = a1;
+    trace.arg2[trace.count] = a2;
+    ++trace.count;
+    ++events_total;
+}
+
+static void __cdecl mock_diag_sink(const char* fmt, ...) {
+    char buf[512]{};
+    va_list ap;
+    va_start(ap, fmt);
+    (void)std::vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    const char* file = reinterpret_cast<const char*>(static_cast<std::uintptr_t>(porsche::shared_runtime_word_005deb74));
+    record(1u, fnv1a(buf, std::strlen(buf)), porsche::shared_runtime_word_005deb78, file ? fnv1a(file, std::strlen(file)) : 0u);
+    trace.diag_line = porsche::shared_runtime_word_005deb78;
+}
+
+namespace porsche {
+
+std::int32_t __cdecl formatter_entry_005a0fbf(char* out, const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    const int n = std::vsprintf(out, fmt, ap);
+    va_end(ap);
+    record(2u, fnv1a(out, std::strlen(out)));
+    return n;
+}
+
+int __cdecl formatter_stdio_printf_005a177b(const char* fmt, ...) {
+    char buf[256]{};
+    va_list ap;
+    va_start(ap, fmt);
+    const int n = std::vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    record(3u, fnv1a(buf, std::strlen(buf)));
+    return n;
+}
+
+std::uint32_t __cdecl file_device_name_00568e90(const char* path) {
+    record(4u, fnv1a(path, std::strlen(path)));
+    return 0x77u;
+}
+
+std::int32_t __cdecl resource_leaf_atomic_dispatch_00568d50(
+    ResourceLeafAtomicCallback cb, std::uint32_t device, std::uint32_t group, void* context) {
+    auto* ctx = static_cast<ResourceAtomicContext*>(context);
+    record(5u, device, group, ctx->callback_diagnostic_flag);
+    if (!mock_dispatch_forward) return 0;
+    return cb(group, context);
+}
+
+bool __cdecl file_open_00533b90(const char* path, std::uint32_t mode, std::uint32_t group, void** out_handle) {
+    record(6u, fnv1a(path, std::strlen(path)), mode, group);
+    if (!mock_open_ok) {
+        *out_handle = nullptr;
+        return false;
+    }
+    *out_handle = kFakeHandle;
+    return true;
+}
+
+std::uint32_t __cdecl file_read_offset_00533d70(
+    void* handle, std::uint32_t offset, void* buffer, std::int32_t size, std::uint32_t group) {
+    const std::size_t sample_len = (static_cast<U>(size) < sizeof(replay_snapshot_005e9a20))
+                                       ? static_cast<std::size_t>(size)
+                                       : sizeof(replay_snapshot_005e9a20);
+    record(7u, static_cast<U>(reinterpret_cast<std::uintptr_t>(handle)), static_cast<U>(size), group);
+    record(8u, offset, fnv1a(buffer, sample_len));
+    return mock_written_bytes;
+}
+
+std::uint32_t __cdecl close_00533da0(void* handle, std::uint32_t group) {
+    record(9u, static_cast<U>(reinterpret_cast<std::uintptr_t>(handle)), group);
+    return 1u;
+}
+
+} // namespace porsche
+
+static std::uint32_t __cdecl stub_file_open_x86(
+    const char* path, std::uint32_t mode, std::uint32_t group, void** out_handle) {
+    return porsche::file_open_00533b90(path, mode, group, out_handle) ? 1u : 0u;
+}
+
+static void write_u32(B* p, U v) { std::memcpy(p, &v, 4u); }
+static void write_rel32(B* slot, const void* target) {
+    const std::int32_t rel = static_cast<std::int32_t>(
+        reinterpret_cast<std::uintptr_t>(target) -
+        (reinterpret_cast<std::uintptr_t>(slot) + 4u));
+    std::memcpy(slot, &rel, 4u);
+}
+
+static void init_code_buffer() {
+    code = static_cast<B*>(::VirtualAlloc(nullptr, kCodeBytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!code) fail("virtual_alloc");
+    std::memset(code, 0xcc, kCodeBytes);
+
+    std::memcpy(code + kOff413FD0, kBody413FD0, sizeof(kBody413FD0));
+    std::memcpy(code + kOff59E170, kBody59E170, sizeof(kBody59E170));
+    std::memcpy(code + kOff562460, kBody562460, sizeof(kBody562460));
+    std::memcpy(code + kOff562390, kBody562390, sizeof(kBody562390));
+
+    auto r32 = [](U base_off, U site_va, U fn_va, const void* tgt) {
+        write_rel32(code + base_off + (site_va - fn_va) + 1u, tgt);
+    };
+    auto rhl = [](U base_off, U off, const void* ptr) {
+        write_u32(code + base_off + off, static_cast<U>(reinterpret_cast<std::uintptr_t>(ptr)));
+    };
+
+    // 00413fd0
+    r32(kOff413FD0, 0x00414028u, 0x00413fd0u, reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    r32(kOff413FD0, 0x00414039u, 0x00413fd0u, reinterpret_cast<const void*>(&porsche::formatter_stdio_printf_005a177b));
+    r32(kOff413FD0, 0x0041404du, 0x00413fd0u, code + kOff59E170);
+    rhl(kOff413FD0, 1u, &porsche::global_005e99f4);
+    rhl(kOff413FD0, 16u, &porsche::startup_sequence_word_00606ac4);
+    rhl(kOff413FD0, 21u, &porsche::replay_saved_word_00606a80);
+    rhl(kOff413FD0, 27u, &porsche::engine_service_root_0065b360);
+    rhl(kOff413FD0, 39u, porsche::application_state_006573e8.words_.data());
+    rhl(kOff413FD0, 44u, porsche::replay_snapshot_005e9a20);
+    rhl(kOff413FD0, 52u, &porsche::replay_saved_word_00606a80);
+    rhl(kOff413FD0, 57u, porsche::replay_default_filename_005cc68c);
+    rhl(kOff413FD0, 67u, kFmtConcat);
+    rhl(kOff413FD0, 74u, &porsche::replay_snapshot_005e9a20[15]);
+    rhl(kOff413FD0, 84u, &porsche::replay_tail_word_005ed844);
+    rhl(kOff413FD0, 95u, &porsche::replay_saved_word_00606a80);
+    rhl(kOff413FD0, 101u, porsche::replay_final_gametick_fmt_005cc678);
+    rhl(kOff413FD0, 120u, porsche::replay_snapshot_005e9a20);
+
+    // 0059e170
+    r32(kOff59E170, 0x0059e18au, 0x0059e170u, reinterpret_cast<const void*>(&porsche::formatter_entry_005a0fbf));
+    r32(kOff59E170, 0x0059e1a4u, 0x0059e170u, code + kOff562460);
+    rhl(kOff59E170, 16u, porsche::file_root_006af168);
+    rhl(kOff59E170, 21u, kFmtConcat);
+
+    // 00562460
+    r32(kOff562460, 0x00562490u, 0x00562460u, reinterpret_cast<const void*>(&porsche::file_device_name_00568e90));
+    r32(kOff562460, 0x0056249eu, 0x00562460u, reinterpret_cast<const void*>(&porsche::resource_leaf_atomic_dispatch_00568d50));
+    rhl(kOff562460, 25u, &porsche::resource_leaf_group_005df770);
+    rhl(kOff562460, 58u, code + kOff562390);
+
+    // 00562390
+    r32(kOff562390, 0x005623abu, 0x00562390u, reinterpret_cast<const void*>(&stub_file_open_x86));
+    r32(kOff562390, 0x005623c9u, 0x00562390u, reinterpret_cast<const void*>(&porsche::file_read_offset_00533d70));
+    r32(kOff562390, 0x005623d6u, 0x00562390u, reinterpret_cast<const void*>(&porsche::close_00533da0));
+    rhl(kOff562390, 105u, &porsche::shared_runtime_word_005deb74);
+    rhl(kOff562390, 109u, porsche::file_save_source_005bcd00);
+    rhl(kOff562390, 115u, porsche::file_save_write_err_005bceb0);
+    rhl(kOff562390, 121u, &porsche::shared_runtime_word_005deb78);
+    rhl(kOff562390, 131u, &porsche::diagnostic_handler_005debf0);
+    rhl(kOff562390, 154u, porsche::file_save_open_err_005bce8c);
+    rhl(kOff562390, 160u, &porsche::shared_runtime_word_005deb74);
+    rhl(kOff562390, 164u, porsche::file_save_source_005bcd00);
+    rhl(kOff562390, 170u, &porsche::shared_runtime_word_005deb78);
+    rhl(kOff562390, 180u, &porsche::diagnostic_handler_005debf0);
+
+    ::FlushInstructionCache(::GetCurrentProcess(), code, kCodeBytes);
+}
+
+static void reset_state() {
+    std::memset(&trace, 0, sizeof(trace));
+    porsche::global_005e99f4 = 0u;
+    porsche::startup_sequence_word_00606ac4 = 0u;
+    porsche::engine_service_root_0065b360 = "C:\\game\\";
+    std::memset(&porsche::application_state_006573e8, 0, sizeof(porsche::application_state_006573e8));
+    std::memset(porsche::replay_snapshot_005e9a20, 0, sizeof(porsche::replay_snapshot_005e9a20));
+    porsche::replay_tail_word_005ed844 = 0u;
+    porsche::replay_saved_word_00606a80 = 0u;
+    std::memset(porsche::file_root_006af168, 0, sizeof(porsche::file_root_006af168));
+    std::strcpy(porsche::file_root_006af168, "root\\");
+    porsche::resource_leaf_group_005df770 = 0x64u;
+    porsche::shared_runtime_word_005deb74 = 0u;
+    porsche::shared_runtime_word_005deb78 = 0u;
+    porsche::diagnostic_handler_005debf0 = reinterpret_cast<void(__cdecl*)(const char*)>(&mock_diag_sink);
+    mock_open_ok = 1;
+    mock_written_bytes = 0x1ce28u;
+    mock_dispatch_forward = 1;
+}
+
+static void compare_traces(const Trace& a, const Trace& b) {
+    if (a.count != b.count || a.ret0 != b.ret0 || a.diag_line != b.diag_line ||
+        a.tail_word != b.tail_word || a.snap_hash != b.snap_hash || a.snap_word15 != b.snap_word15) {
+        fail("trace_summary_mismatch");
+    }
+    for (U i = 0u; i < a.count; ++i) {
+        if (a.codes[i] != b.codes[i] || a.arg0[i] != b.arg0[i] ||
+            a.arg1[i] != b.arg1[i] || a.arg2[i] != b.arg2[i]) {
+            fail("trace_event_mismatch");
+        }
+    }
+}
+
+template <typename Fn>
+static void run_case(Fn fn) {
+    ++cases;
+    which = 0u;
+    reset_state();
+    fn(false);
+    expected = trace;
+
+    which = 1u;
+    reset_state();
+    fn(true);
+    compare_traces(expected, trace);
+}
+
+int main() {
+    init_code_buffer();
+
+    auto* const orig_413fd0 = reinterpret_cast<void(__cdecl*)()>(code + kOff413FD0);
+    auto* const orig_59e170 = reinterpret_cast<void(__cdecl*)(const char*, const void*, std::int32_t)>(code + kOff59E170);
+    auto* const orig_562390 = reinterpret_cast<std::int32_t(__cdecl*)(U, void*)>(code + kOff562390);
+
+    // Case 1: application_sim_boundary_00413fd0 with global_005e99f4 == 0 (captures startup_sequence_word_00606ac4).
+    run_case([&](bool cpp) {
+        porsche::global_005e99f4 = 0u;
+        porsche::startup_sequence_word_00606ac4 = 0x1234u;
+        porsche::replay_saved_word_00606a80 = 0x9999u;
+        for (std::size_t i = 0; i < porsche::application_state_word_count; ++i) {
+            porsche::application_state_006573e8.words_[i] = static_cast<U>(i * 3u + 7u);
+        }
+        if (cpp) porsche::application_sim_boundary_00413fd0();
+        else orig_413fd0();
+        trace.tail_word = porsche::replay_tail_word_005ed844;
+        trace.snap_word15 = porsche::replay_snapshot_005e9a20[15];
+        trace.snap_hash = fnv1a(porsche::replay_snapshot_005e9a20, sizeof(porsche::replay_snapshot_005e9a20));
+    });
+
+    // Case 2: application_sim_boundary_00413fd0 with global_005e99f4 != 0 (preserves existing replay_saved_word_00606a80).
+    run_case([&](bool cpp) {
+        porsche::global_005e99f4 = 2u;
+        porsche::startup_sequence_word_00606ac4 = 0x5555u;
+        porsche::replay_saved_word_00606a80 = 0x7777u;
+        porsche::application_state_006573e8.words_[0] = 0xdeadbeefu;
+        porsche::application_state_006573e8.words_[15] = 0x11111111u;
+        if (cpp) porsche::application_sim_boundary_00413fd0();
+        else orig_413fd0();
+        trace.tail_word = porsche::replay_tail_word_005ed844;
+        trace.snap_word15 = porsche::replay_snapshot_005e9a20[15];
+        trace.snap_hash = fnv1a(porsche::replay_snapshot_005e9a20, sizeof(porsche::replay_snapshot_005e9a20));
+    });
+
+    // Case 3: resource_save_0059e170 direct write success with custom group and prefix.
+    run_case([&](bool cpp) {
+        B payload[64]{};
+        for (int i = 0; i < 64; ++i) payload[i] = static_cast<B>(i ^ 0x5au);
+        mock_written_bytes = 64u;
+        porsche::resource_leaf_group_005df770 = 42u;
+        if (cpp) porsche::resource_save_0059e170("save.dat", payload, 64);
+        else orig_59e170("save.dat", payload, 64);
+    });
+
+    // Case 4: file_save_callback_00562390 diagnostic on open failure (flag=1 and flag=0).
+    run_case([&](bool cpp) {
+        B payload[16]{};
+        mock_open_ok = 0;
+        porsche::ResourceAtomicContext ctx{"bad_open.rpl", static_cast<U>(reinterpret_cast<std::uintptr_t>(payload)), 16u, 1u};
+        trace.ret0 = cpp ? porsche::file_save_callback_00562390(50u, &ctx) : orig_562390(50u, &ctx);
+        porsche::ResourceAtomicContext ctx_q{"quiet_open.rpl", static_cast<U>(reinterpret_cast<std::uintptr_t>(payload)), 16u, 0u};
+        const int r_q = cpp ? porsche::file_save_callback_00562390(50u, &ctx_q) : orig_562390(50u, &ctx_q);
+        trace.tail_word = static_cast<U>(r_q);
+    });
+
+    // Case 5: file_save_callback_00562390 diagnostic on short write failure (written != size).
+    run_case([&](bool cpp) {
+        B payload[32]{};
+        mock_open_ok = 1;
+        mock_written_bytes = 12u;
+        porsche::ResourceAtomicContext ctx{"short_write.rpl", static_cast<U>(reinterpret_cast<std::uintptr_t>(payload)), 32u, 1u};
+        trace.ret0 = cpp ? porsche::file_save_callback_00562390(25u, &ctx) : orig_562390(25u, &ctx);
+    });
+
+    std::printf("application_replay_save_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                cases, events_total);
+    return 0;
+}

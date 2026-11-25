@@ -1,0 +1,78 @@
+{
+  "run": 842,
+  "experiment": "local/experiments/v2-application-replay-save-842",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/842-application-replay-save/application_replay_save_842.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/842-application-replay-save/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/842-application-replay-save",
+    "iterations/v2/001-original-recovery/runs/668-startup-replay-load",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/842-application-replay-save/application_replay_save_842.hpp",
+    "iterations/v2/001-original-recovery/runs/842-application-replay-save/scope-evidence.json",
+    "iterations/v2/001-original-recovery/runs/842-application-replay-save/original-index-supplement.json"
+  ],
+  "original_bodies": [
+    {"va": "00413fd0", "bytes": 142, "sha256": "708e299973b906c5ae91107c1ff61a8dbe468d326293f1f88cc971eaecf3d074", "token": "@BODY_00413FD0@"},
+    {"va": "0059e170", "bytes": 64, "sha256": "d2c0ca778a561d0725979fc1e0b4d00b88dcb81c072522063161c6de1d76124b", "token": "@BODY_0059E170@"},
+    {"va": "00562460", "bytes": 71, "sha256": "92a43b5123a37ac1239a037ef141d25178d5d6a94fd78e8474a4dd7d1898a303", "token": "@BODY_00562460@"},
+    {"va": "00562390", "bytes": 194, "sha256": "ffe4286b24b0b892f9f3c3aa07d8de6cb33c513f39288785b50480cacbd1e407", "token": "@BODY_00562390@"}
+  ],
+  "pass_marker": "application_replay_save_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-saved-tick-fallback",
+      "source": "iterations/v2/001-original-recovery/runs/842-application-replay-save/application_replay_save_842.cpp",
+      "old": "    if (global_005e99f4 == 0u) {\n        replay_saved_word_00606a80 = startup_sequence_word_00606ac4;\n    }",
+      "new": "    if (global_005e99f4 != 0u) {\n        replay_saved_word_00606a80 = startup_sequence_word_00606ac4;\n    }",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-snapshot-mode-word",
+      "source": "iterations/v2/001-original-recovery/runs/842-application-replay-save/application_replay_save_842.cpp",
+      "old": "    replay_snapshot_005e9a20[15] = 2u;",
+      "new": "    replay_snapshot_005e9a20[15] = 1u;",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-save-size",
+      "source": "iterations/v2/001-original-recovery/runs/842-application-replay-save/application_replay_save_842.cpp",
+      "old": "    resource_save_0059e170(path, replay_snapshot_005e9a20, 0x1ce28);",
+      "new": "    resource_save_0059e170(path, replay_snapshot_005e9a20, 0x3e24);",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-open-mode",
+      "source": "iterations/v2/001-original-recovery/runs/842-application-replay-save/application_replay_save_842.cpp",
+      "old": "    if (!file_open_00533b90(path, 6u, group, &handle)) {",
+      "new": "    if (!file_open_00533b90(path, 1u, group, &handle)) {",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-subgroup-decrement",
+      "source": "iterations/v2/001-original-recovery/runs/842-application-replay-save/application_replay_save_842.cpp",
+      "old": "    const std::uint32_t sub_group = group - 1u;",
+      "new": "    const std::uint32_t sub_group = group;",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    },
+    {
+      "name": "wrong-write-diag-line",
+      "source": "iterations/v2/001-original-recovery/runs/842-application-replay-save/application_replay_save_842.cpp",
+      "old": "        diagnostic_line_005deb78 = 0x26eu;",
+      "new": "        diagnostic_line_005deb78 = 0x274u;",
+      "expected_exit": 1,
+      "failure_marker": "=FAIL"
+    }
+  ]
+}
