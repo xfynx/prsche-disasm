@@ -1,16 +1,17 @@
 # Current project status
 
-Updated 2026-11-24. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
+Updated 2026-11-25. Active work: [v2 / 001-original-recovery](iterations/v2/001-original-recovery/PLAN.md).
 
 ## Recovered C/C++ game
 
-[Run843](iterations/v2/001-original-recovery/runs/843-application-replay-save-integration/README.md)
-compiles 489 TUs across eight projects (**37 unresolved names / 40
-references**, no EXE), accepting `842/004`: `1,473` registry entries (`+4`),
-`10` comparisons, `6` mutations, `126B` `.rdata`, `1,213` source pins; closes
-`application_sim_boundary_00413fd0`, `0` new.
+[Run846](iterations/v2/001-original-recovery/runs/846-audio-period-device-state/README.md)
+compiles 489 translation units across eight projects. The linker reports **36
+unresolved names / 39 references**. The audio callback now uses the canonical
+device state. Native comparison passed 2,560 cases and caught both mutations.
+The registry contains 1,473 entries. A game executable is still pending.
 
-Historical: [Run841](iterations/v2/001-original-recovery/runs/841-entry-fe-service-and-crt-shutdown-integration/README.md),
+Historical: [Run843](iterations/v2/001-original-recovery/runs/843-application-replay-save-integration/README.md),
+[Run841](iterations/v2/001-original-recovery/runs/841-entry-fe-service-and-crt-shutdown-integration/README.md),
 [Run839](iterations/v2/001-original-recovery/runs/839-render-input-path-and-window-ops-integration/README.md),
 [Run836](iterations/v2/001-original-recovery/runs/836-rtti-cast-and-network-rtti-integration/README.md),
 [Run833](iterations/v2/001-original-recovery/runs/833-player-tables-and-entry-fe-integration/README.md),

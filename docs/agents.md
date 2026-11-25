@@ -15,26 +15,13 @@
 Активный клиент может использовать другой формат профилей и способ делегирования.
 Сохранять роли и правила, не требовать совместимости с Codex/OpenAI API.
 
-## Current model preference, 2026-11-16
+## Recovery assignments
 
-- A strong model coordinates scope, resolves original-code ambiguities and owns
-  final acceptance. Sol/high is sufficient for the established recovery workflow.
-- Use a simpler worker for bounded implementation, fixture repair and execution.
-  The current batch uses GPT-6 Luna/medium with compact context and file ownership.
-- Escalate a concrete ambiguity after two failed attempts. Reserve Astra for a
-  blocker that needs stronger reasoning.
-- Select the smallest adequate available model. Speed and limit savings require
-  measurement before making quantitative claims.
-- Уточнение 2026-11-20: модели субагентов берутся из фактически доступного
-  набора подписки opencode-go; конкретную модель выбирает координатор по
-  сложности задачи (по умолчанию сейчас glm-5.3-flash). Сильная glm-5.3
-  остаётся на оркестрации и приёмке. Проверяй фактическую доступность в
-  подписке перед spawn; другой провайдер — только если в подписке нет
-  подходящей простой модели.
-- При отказе spawn/исполнении по лимиту кредитов/токенов меняй модель, не
-  жди освобождения: субагенты всегда на самых простых доступных моделях,
-  цепочка предпочтения — glm-5.3-flash (opencode-go), затем более простые
-  модели других доступных провайдеров. Сильная модель только оркестратор.
+The coordinator sets the frontier target, owned files and acceptance evidence
+for each worker. See the provider-specific assignments in the root PLAN.
+Use the simplest available worker that can complete the packet. After two failed
+attempts on one ambiguity, send the evidence to the coordinator. If a worker
+hits a limit, resume its uncommitted packet with another available worker.
 
 ## Назначать по сложности, а не по названию файла
 

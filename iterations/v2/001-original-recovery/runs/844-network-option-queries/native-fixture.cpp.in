@@ -1,0 +1,167 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "network_udp_probe.hpp"
+#include "porsche/formatter_text.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+using I = std::int32_t;
+static const B raw[] = {@PROBE@};
+static const B raw_prefixes[] = {@PREFIXES@};
+static B* code;
+static constexpr U base = 0x5839d0;
+static B oracle_address[32];
+static char* observed_address;
+static unsigned scenario;
+struct Event { U kind, first, second, third; };
+struct Snapshot { Event events[8]; U size, result; B address[32]; };
+static Snapshot snapshot;
+
+static void fail(const char* label) {
+    std::printf("fixture failure %s\n", label);
+    std::exit(2);
+}
+static void event(U kind, U a = 0, U b = 0, U c = 0) {
+    if (snapshot.size >= 8) fail("event overflow");
+    snapshot.events[snapshot.size++] = {kind, a, b, c};
+}
+
+namespace porsche {
+char network_udp_local_address_006b4a80[32];
+I __stdcall network_wsa_startup_005894e6(std::uint16_t version, void* data) {
+    event(1, version, data != nullptr);
+    if (!data) fail("WSADATA pointer");
+    std::memset(data, 0xba, 0x190);
+    return scenario == 0 ? static_cast<I>(0x80000000u) : 0;
+}
+U __cdecl network_read_local_address_00583740(char* address) {
+    event(2, address == observed_address);
+    if (address != observed_address) fail("hostname buffer");
+    const char* names[] = {"", "", "127.2.4.8", "0.7.8.1",
+                           "192.0.2.12", "192.0.2.12", "1.2.3.4", "127x", "0x", ""};
+    std::strcpy(address, names[scenario]);
+    return scenario == 1 ? 0 : 0x80000000;
+}
+int __cdecl formatter_text_compare_n_005a2210(const char* address, const char* prefix, U n) {
+    if (address != observed_address || (n != 2 && n != 4))
+        fail("comparison arguments");
+    U bytes = 0;
+    std::memcpy(&bytes, prefix, n);
+    event(3, bytes, n);
+    return std::strncmp(address, prefix, n);
+}
+U __stdcall network_wsa_socket_00587bd8(I af, I type, I protocol) {
+    event(4, af, type, protocol);
+    if (scenario == 4) return 0xffffffffu;
+    return scenario == 5 ? 0 : 0x87345621;
+}
+I __stdcall network_wsa_close_socket_00587bc0(U token) {
+    event(5, token);
+    observed_address[31] = 0xe1;
+    return scenario == 5 ? -1 : 0;
+}
+I __stdcall network_wsa_cleanup_005894e0() {
+    event(6);
+    observed_address[30] = 0xe2;
+    return -1;
+}
+}
+
+static U word(const void* ptr) {
+    U result;
+    std::memcpy(&result, ptr, sizeof result);
+    return result;
+}
+static void put(void* ptr, U value) { std::memcpy(ptr, &value, sizeof value); }
+static U address(const void* ptr) { return static_cast<U>(reinterpret_cast<std::uintptr_t>(ptr)); }
+static void operand(U offset, U original, const void* replacement) {
+    if (word(code + offset) != original) fail("absolute operand");
+    put(code + offset, address(replacement));
+}
+static void call(U site, U original, const void* replacement) {
+    const U offset = site - base;
+    if (code[offset] != 0xe8 || site + 5 + word(code + offset + 1) != original)
+        fail("relative operand");
+    put(code + offset + 1, address(replacement) - address(code + offset + 5));
+}
+static void install() {
+    using namespace porsche;
+    if (std::memcmp(raw_prefixes, network_udp_excluded_prefixes_005c11d8, sizeof raw_prefixes))
+        fail("prefix image");
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    if (!code) fail("allocation");
+    std::memcpy(code, raw, sizeof raw);
+    operand(0x1d, 0x6b4a80, oracle_address);
+    operand(0x30, 0x5c11dc, raw_prefixes + 4);
+    operand(0x35, 0x6b4a80, oracle_address);
+    operand(0x48, 0x5c11d8, raw_prefixes);
+    operand(0x4d, 0x6b4a80, oracle_address);
+    call(0x5839e3, 0x5894e6, reinterpret_cast<const void*>(&network_wsa_startup_005894e6));
+    call(0x5839f1, 0x583740, reinterpret_cast<const void*>(&network_read_local_address_00583740));
+    call(0x583a09, 0x5a2210, reinterpret_cast<const void*>(&formatter_text_compare_n_005a2210));
+    call(0x583a21, 0x5a2210, reinterpret_cast<const void*>(&formatter_text_compare_n_005a2210));
+    call(0x583a32, 0x587bd8, reinterpret_cast<const void*>(&network_wsa_socket_00587bd8));
+    call(0x583a42, 0x587bc0, reinterpret_cast<const void*>(&network_wsa_close_socket_00587bc0));
+    call(0x583a47, 0x5894e0, reinterpret_cast<const void*>(&network_wsa_cleanup_005894e0));
+    DWORD old;
+    if (!VirtualProtect(code, 4096, PAGE_EXECUTE_READ, &old)) fail("protection");
+    FlushInstructionCache(GetCurrentProcess(), code, 4096);
+}
+
+struct Capture { U sp0, sp1, bp0, bp1, bx0, bx1, si0, si1, di0, di1, eax; };
+static Capture invoke(const void* fn) {
+    Capture result{};
+    __asm {
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,6a31c5e7h
+        lea edx,result
+        mov [edx],esp
+        mov [edx+8],ebp
+        mov [edx+16],ebx
+        mov [edx+24],esi
+        mov [edx+32],edi
+        mov ecx,0abc98765h
+        call fn
+        lea edx,result
+        mov [edx+40],eax
+        mov [edx+4],esp
+        mov [edx+12],ebp
+        mov [edx+20],ebx
+        mov [edx+28],esi
+        mov [edx+36],edi
+    }
+    return result;
+}
+static Snapshot execute(const void* fn, char* buffer) {
+    snapshot = {};
+    observed_address = buffer;
+    std::memset(buffer, 0xcd, 32);
+    const auto registers = invoke(fn);
+    if (registers.sp0 != registers.sp1 || registers.bp0 != registers.bp1 ||
+        registers.bx0 != registers.bx1 || registers.si0 != registers.si1 ||
+        registers.di0 != registers.di1) fail("ABI");
+    snapshot.result = registers.eax;
+    std::memcpy(snapshot.address, buffer, sizeof snapshot.address);
+    return snapshot;
+}
+
+int main() {
+    using namespace porsche;
+    install();
+    for (scenario = 0; scenario < 10; ++scenario) {
+        const auto original = execute(code, reinterpret_cast<char*>(oracle_address));
+        const auto recovered = execute(reinterpret_cast<const void*>(&network_udp_start_005839d0),
+                                       network_udp_local_address_006b4a80);
+        if (std::memcmp(&original, &recovered, sizeof original)) {
+            std::printf("divergence case=%u result=%u/%u count=%u/%u\n", scenario,
+                        original.result, recovered.result, original.size, recovered.size);
+            return 1;
+        }
+    }
+    std::puts("network_udp_probe_original_vs_cpp=PASS cases=10");
+    return 0;
+}

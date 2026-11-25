@@ -19,10 +19,9 @@ and explicit unsupported domains. The requested
 bounded retrieval trial could measure its benefit. Next is the existing C++
 dependency work; recovery acceptance remains unchanged.
 
-[Run843](iterations/v2/001-original-recovery/runs/843-application-replay-save-integration/README.md)
-is the current shared build (`489` TUs, `37` unresolved names / `40`
-references), integrating Run `842` (`1,473` registry entries).
-Active WIP: `Run840`.
+[Run846](iterations/v2/001-original-recovery/runs/846-audio-period-device-state/README.md) is the current shared build with 489 translation units,
+36 unresolved names / 39 references and 1,473 registry entries.
+Current assignments and unfinished work are tracked in the active iteration plan.
 
 ## Recovery milestones
 
@@ -44,6 +43,16 @@ Active WIP: `Run840`.
 The older [Rust iteration 012 prototype](iterations/012-campaign-fidelity/README.md) is unfinished
 and integration is paused. Snapshots 001?011 remain immutable. New experimental paths do
 not silently replace the original-recovery goal or count as full-game acceptance.
+
+## Coordinator and workers
+
+- **Codex / ChatGPT** uses Astra for orchestration and final acceptance. Assign
+  bounded recovery or fixture work to Sol or a lighter available model.
+- **Other providers** use a strong coordinator and the simplest adequate workers
+  available on that provider. On opencode-go, prefer glm-5.3 and glm-5.3-flash
+  respectively when available.
+- Run independent subsystem packets in parallel. Integrate accepted sources in
+  one shared build, publish the completed batch and continue from its frontier.
 
 ## Working rules
 

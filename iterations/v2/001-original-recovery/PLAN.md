@@ -1,12 +1,15 @@
 # v2 / 001 - original source recovery plan
 
-Current 2026-11-25. [Run843](runs/843-application-replay-save-integration/README.md)
-PASS (`build-001`): folds `842/004` (`00413fd0`, `0059e170`, `00562460`,
-`00562390`, `126B` `.rdata`, `0B` writable): **489 TUs / 8 projects**, **37
-unresolved / 40 refs**, `1,213` pins, `10` comparisons, `6` mutations, `1` REA
-session, no EXE; registry **1,473** (`+4`). Closes `00413fd0`, `0` new.
+Current 2026-11-25. [Run846](runs/846-audio-period-device-state/README.md) passed with 489 translation units, 36 unresolved names /
+39 references and 1,473 registry entries. The linker still requires game providers.
 
-Historical: [Run841](runs/841-entry-fe-service-and-crt-shutdown-integration/README.md),
+Paused at the user's request. [Run844](runs/844-network-option-queries/README.md) has standalone native proof for the UDP availability probe.
+Resume its parent by tracing the callback at context offset +8 and shared registry ownership.
+[Run845](runs/845-transform-vectors-trace/README.md) traces the camera transform through x87, SSE and 3DNow.
+Its next proof needs the dispatch-cache and scratch writers. Run840 has no located artifacts or scope.
+
+Historical: [Run843](runs/843-application-replay-save-integration/README.md),
+[Run841](runs/841-entry-fe-service-and-crt-shutdown-integration/README.md),
 [Run839](runs/839-render-input-path-and-window-ops-integration/README.md),
 [Run836](runs/836-rtti-cast-and-network-rtti-integration/README.md),
 [Run833](runs/833-player-tables-and-entry-fe-integration/README.md),

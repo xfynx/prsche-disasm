@@ -8,7 +8,12 @@
   keep narrower domains PARTIAL. Reuse accepted proof and defer broader fault,
   alias, concurrency and unrelated FP matrices. Preserve original algorithms;
   this priority does not authorize guessed behavior or skipped acceptance gates.
-- After every push, report the resulting repository status to the user.
+- Use English for new work and chat. Keep one concise handoff per logical batch
+  and generate only the evidence needed to reproduce its acceptance.
+- Resume uncommitted work after interruptions. Commit and push each accepted
+  batch, report branch status and upstream alignment, then continue recovery.
+  Workers may publish completed independent batches on isolated branches.
+  The coordinator owns the shared build, registry and integration on main.
 - CodeGraph is optional source navigation; verify its callers and definitions
   against the real source closure. Original semantics still require the binary
   index, REA and native comparison. See docs/research/codegraph-evaluation-2026-11-11.md.

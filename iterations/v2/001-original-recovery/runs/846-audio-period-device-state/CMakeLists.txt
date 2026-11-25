@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.20)
+project(porsche_integration_846 LANGUAGES CXX)
+include("${CMAKE_CURRENT_SOURCE_DIR}/../843-application-replay-save-integration/CMakeLists.txt")
+get_target_property(_entry_sources porsche_game_entry_bridges SOURCES)
+list(FILTER _entry_sources EXCLUDE REGEX "697-audio-period-callback-and-probe-message/audio_period_callback_probe_697\.cpp$")
+set_property(TARGET porsche_game_entry_bridges PROPERTY SOURCES "${_entry_sources}")
+target_sources(porsche_game_entry_bridges PRIVATE "${CMAKE_CURRENT_LIST_DIR}/audio_period_callback_probe_846.cpp")
+target_include_directories(porsche_game_entry_bridges PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
