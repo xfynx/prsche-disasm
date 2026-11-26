@@ -1,0 +1,10 @@
+{
+ "run":862,"module":"Porsche.exe","module_sha256":"ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+ "function":{"va":"005ad68c","ranges":[["005ad68c","005ad76c"]],"bytes":225,"sha256":"a54dfe439390ed4aca028eb492cb706ef5015784fe095460b62554912f2b2189","abi":"__cdecl(left,right,uint32 count) -> int"},
+ "ownership":{"registry_exact_entries_before_run":[],"registry_body_overlaps_before_run":[],"new_storage":["crt_wide_collate_locale_006afd7c","crt_wide_collate_codepage_006afd94"],"reused_canonical":["formatter_text_locale_writer_006c02e4","formatter_text_locale_readers_006c02e8","formatter_text_increment_005b2258","formatter_text_decrement_005b2254","exit_registry_lock_api_005a4ba4","exit_registry_unlock_api_005a4c05","formatter_lowio_errno_005a669e"]},
+ "returns":{"count_zero":0,"default_locale":"exact return of 005ae901","locale_success":"005ae6b6 return minus 2","locale_failure":"INT_MAX and errno 22"},
+ "synchronization":"Nonzero collate locale increments readers. A present writer decrements readers then takes lock 19; otherwise the reader is decremented after comparison. Locale is reread after synchronization and can fall back to 005ae901. Every exit releases the matching reader/lock state.",
+ "proof":{"config":"iterations/v2/001-original-recovery/runs/862-wide-locale-compare/native-config.json","receipt":"local/experiments/v2-wide-locale-compare-862/002/receipt.json","cases_per_variant":10,"events_per_variant":42,"mutations":5,"coverage":["zero count","default dependency returns","localized results 0/1/2/3","writer absent/present","locale changes to zero or another LCID while locking","codepage forwarding","errno and compare bias","cdecl ABI"]},
+ "new_typed_dependencies":["crt_wcsnicoll_default_005ae901","crt_wcsnicoll_locale_005ae6b6"],
+ "boundary":"Complete wrapper 005ad68c. Both original comparison engines remain exact typed dependencies; no CRT or host-locale approximation is introduced."
+}

@@ -1,0 +1,72 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include "crt_wide_compare_862.hpp"
+#include "porsche/formatter_text.hpp"
+using U=std::uint32_t;using B=std::uint8_t;
+namespace {struct Trace{U abi,ret,count,hash,readers,err;}trace{},expected{};U cases=0,events=0,default_result=0,locale_result=0,locale_after_lock=0xffffffffu;B* code;void* iinc;void* idec;int error_value;
+void require(bool v,const char*s){if(!v){std::printf("divergence %s case=%u\n",s,cases);std::fflush(stdout);ExitProcess(1);}}
+U addr(const void*p){return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));}U rd(const void*p,U o){U v;std::memcpy(&v,static_cast<const B*>(p)+o,4);return v;}void wr(void*p,U o,U v){std::memcpy(static_cast<B*>(p)+o,&v,4);}U mix(U h,U v){return(h^v)*16777619u;}void ev(U t,U a=0,U b=0){++trace.count;trace.hash=mix(mix(mix(trace.hash,t),a),b);}
+}
+namespace porsche{
+std::uint32_t formatter_text_locale_writer_006c02e4=0;std::int32_t formatter_text_locale_readers_006c02e8=0;
+std::int32_t __stdcall inc(std::int32_t*p){ev(1,static_cast<U>(*p));return ++*p;}std::int32_t __stdcall dec(std::int32_t*p){ev(2,static_cast<U>(*p));return --*p;}
+FormatterTextAtomic formatter_text_increment_005b2258=&inc;FormatterTextAtomic formatter_text_decrement_005b2254=&dec;
+void __cdecl exit_registry_lock_api_005a4ba4(U id){ev(3,id);if(locale_after_lock!=0xffffffffu)crt_wide_collate_locale_006afd7c=locale_after_lock;}
+void __cdecl exit_registry_unlock_api_005a4c05(U id){ev(4,id);}
+std::int32_t* __cdecl formatter_lowio_errno_005a669e(){ev(5);return &error_value;}
+int __cdecl crt_wcsnicoll_default_005ae901(const wchar_t*a,const wchar_t*b,U n){ev(6,n,default_result);return static_cast<int>(default_result);}
+int __cdecl crt_wcsnicoll_locale_005ae6b6(U loc,U flags,const wchar_t*a,int na,const wchar_t*b,int nb,U cp){ev(7,loc,flags);ev(8,static_cast<U>(na),static_cast<U>(nb));ev(9,cp);return static_cast<int>(locale_result);}
+}
+namespace{
+U invoke(void*fn,const U*args,U argc,U&out){U before=0,frame=0,bad=0,eax_out=0;__asm{
+ push ebx
+ push esi
+ push edi
+ mov before,esp
+ mov frame,ebp
+ mov ecx,argc
+ mov eax,args
+ test ecx,ecx
+ je icall
+ipush:
+ dec ecx
+ push dword ptr[eax+ecx*4]
+ test ecx,ecx
+ jne ipush
+icall:
+ mov ebx,13579bdfh
+ mov esi,2468ace0h
+ mov edi,10203040h
+ call fn
+ mov eax_out,eax
+ mov ecx,argc
+ lea esp,[esp+ecx*4]
+ cmp esp,before
+ jne ibad
+ cmp ebp,frame
+ jne ibad
+ cmp ebx,13579bdfh
+ jne ibad
+ cmp esi,2468ace0h
+ jne ibad
+ cmp edi,10203040h
+ jne ibad
+ jmp idone
+ibad:
+ mov bad,1
+idone:
+ mov esp,before
+ pop edi
+ pop esi
+ pop ebx
+}out=eax_out;return bad;}
+void rel(U site,const void*t){U o=site-0x5ad68c+1;require(code[o-1]==0xe8,"call opcode");wr(code,o,addr(t)-addr(code+o+4));}U absall(U old,const void*p){U c=0;for(U i=0;i+4<=225;++i)if(rd(code,i)==old){wr(code,i,addr(p));++c;}return c;}
+void init(){static const B body[]={@BODY_005AD68C@};code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(code,"alloc");std::memcpy(code,body,sizeof body);iinc=(void*)&porsche::inc;idec=(void*)&porsche::dec;require(absall(0x6afd7c,&porsche::crt_wide_collate_locale_006afd7c)==2,"locale refs");require(absall(0x6afd94,&porsche::crt_wide_collate_codepage_006afd94)==1,"cp ref");require(absall(0x6c02e8,&porsche::formatter_text_locale_readers_006c02e8)==1,"reader ref");require(absall(0x6c02e4,&porsche::formatter_text_locale_writer_006c02e4)==1,"writer ref");require(absall(0x5b2258,&iinc)==1,"inc iat");require(absall(0x5b2254,&idec)==1,"dec iat");rel(0x5ad6c8,(void*)&porsche::exit_registry_lock_api_005a4ba4);rel(0x5ad6ea,(void*)&porsche::exit_registry_unlock_api_005a4c05);rel(0x5ad6fe,(void*)&porsche::crt_wcsnicoll_default_005ae901);rel(0x5ad720,(void*)&porsche::crt_wcsnicoll_locale_005ae6b6);rel(0x5ad735,(void*)&porsche::exit_registry_unlock_api_005a4c05);rel(0x5ad740,(void*)&porsche::formatter_lowio_errno_005a669e);rel(0x5ad75a,(void*)&porsche::exit_registry_unlock_api_005a4c05);FlushInstructionCache(GetCurrentProcess(),code,4096);}
+struct S{U count,locale,writer,after,def,loc,cp;};
+void one(const S&s,bool cpp){trace={};trace.hash=2166136261u;error_value=77;porsche::formatter_text_locale_readers_006c02e8=4;porsche::formatter_text_locale_writer_006c02e4=s.writer;porsche::crt_wide_collate_locale_006afd7c=s.locale;porsche::crt_wide_collate_codepage_006afd94=s.cp;locale_after_lock=s.after;default_result=s.def;locale_result=s.loc;static const wchar_t a[]=L"Alpha",b[]=L"alpha";U args[]={addr(a),addr(b),s.count};trace.abi=invoke(cpp?(void*)&porsche::crt_wcsnicoll_005ad68c:code,args,3,trace.ret);trace.readers=static_cast<U>(porsche::formatter_text_locale_readers_006c02e8);trace.err=static_cast<U>(error_value);}
+void run(const S&s){++cases;one(s,false);expected=trace;events+=trace.count;one(s,true);require(std::memcmp(&trace,&expected,sizeof trace)==0,"trace");require(!trace.abi,"abi");}
+}
+int main(){init();const S v[]={{0,0,0,0xffffffffu,9,9,1252},{3,0,0,0xffffffffu,0xffffffffu,9,1252},{3,0,0,0xffffffffu,1,9,1252},{3,1033,0,0xffffffffu,9,1,1252},{3,1033,0,0xffffffffu,9,2,932},{3,1033,0,0xffffffffu,9,3,65001},{3,1033,0,0xffffffffu,9,0,1252},{3,1033,1,0xffffffffu,9,1,1252},{3,1033,1,0,0xffffffffu,9,1252},{3,1033,1,1041,9,3,932}};for(const auto&s:v)run(s);std::printf("crt_wide_locale_compare_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events);return 0;}

@@ -1,0 +1,131 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "session_records_859.hpp"
+#include "porsche/window_handlers.hpp"
+
+using namespace porsche;
+using Word = std::uint32_t;
+using Byte = std::uint8_t;
+using Object = SessionResetObject0040e3b0;
+using Parent = decltype(&session_reset_children_0040e3b0);
+using Helper = decltype(&session_records_helper_0040e440);
+using Compare = decltype(&session_records_compare_0040e5f0);
+using Payload = std::array<Word, 1100>;
+
+const Byte parent_bytes[] = {@BODY_0040E3B0@};
+const Byte helper_bytes[] = {@BODY_0040E440@};
+const Byte compare_bytes[] = {@BODY_0040E5F0@};
+const float original_scalar = 1.0f;
+unsigned cases;
+
+void require(bool ok, const char* label) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", label, cases);
+        std::exit(10);
+    }
+}
+
+void patch(Byte* operand, Word expected, Word replacement) {
+    Word value;
+    std::memcpy(&value, operand, sizeof value);
+    require(value == expected, "relocation");
+    std::memcpy(operand, &replacement, sizeof value);
+}
+
+struct Oracle { Parent parent; Helper helper; Compare compare; };
+
+Oracle prepare() {
+    auto* code = static_cast<Byte*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+    require(code != nullptr, "allocate");
+    auto* parser = code + (0x40e440 - 0x40e3b0);
+    auto* compare = code + (0x40e5f0 - 0x40e3b0);
+    std::memcpy(code, parent_bytes, sizeof parent_bytes);
+    std::memcpy(parser, helper_bytes, sizeof helper_bytes);
+    std::memcpy(compare, compare_bytes, sizeof compare_bytes);
+    patch(code + 0x5b, 0x40e5f0, reinterpret_cast<Word>(compare));
+    patch(code + 0x7e, 0x5b24a8, reinterpret_cast<Word>(&original_scalar));
+    require(code[0x66] == 0xe8, "qsort call");
+    patch(code + 0x67, 0x5a112b - 0x40e41b,
+          reinterpret_cast<Word>(&window_handler_sort_005a112b) - reinterpret_cast<Word>(code + 0x6b));
+    DWORD old;
+    require(VirtualProtect(code, 4096, PAGE_EXECUTE_READ, &old) != 0, "protect");
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096) != 0, "flush");
+    return {reinterpret_cast<Parent>(code), reinterpret_cast<Helper>(parser), reinterpret_cast<Compare>(compare)};
+}
+
+struct Guarded { Word before; Object object; Word after; };
+
+void check_parent(const Oracle& oracle, const Payload& initial, bool present) {
+    Payload data = initial;
+    Guarded original, candidate;
+    std::memset(&original, 0x5a, sizeof original);
+    candidate = original;
+    oracle.parent(&original.object, nullptr, present ? data.data() : nullptr);
+    const Payload expected = data;
+    data = initial;
+    session_reset_children_0040e3b0(&candidate.object, nullptr, present ? data.data() : nullptr);
+    require(std::memcmp(&candidate, &original, sizeof original) == 0 && data == expected, "parent writes");
+    ++cases;
+}
+
+void check_helper(const Oracle& oracle, Word type, Word flag, Word length) {
+    Guarded original, candidate;
+    std::memset(&original, 0x6a, sizeof original);
+    original.object.count = 3;
+    candidate = original;
+    Payload initial{};
+    initial[0] = type;
+    initial[14] = length;
+    initial[15] = 0x12345678;
+    Payload data = initial;
+    const Word span = oracle.helper(&original.object, nullptr, data.data(), flag);
+    const Payload expected = data;
+    data = initial;
+    require(session_records_helper_0040e440(&candidate.object, nullptr, data.data(), flag) == span,
+            "record span");
+    require(std::memcmp(&candidate, &original, sizeof original) == 0 && data == expected, "helper writes");
+    ++cases;
+}
+
+int main() {
+    const Oracle oracle = prepare();
+    Payload data{};
+    check_parent(oracle, data, false);
+    check_parent(oracle, data, true);
+    data[0] = 0xffffffff;
+    check_parent(oracle, data, true);
+    for (Word count : {1u, 2u, 3u, 7u, 8u, 12u, 100u}) {
+        data.fill(0);
+        data[0] = count;
+        Word* cursor = data.data() + 1;
+        for (Word i = 0; i < count; ++i) {
+            const Word type = count == 100 ? 1u : (i % 4 == 3 ? 5u : i % 4 + 1);
+            cursor[0] = type;
+            cursor[1] = (11 - i % 12) % 5 - 2;
+            if (type == 5) cursor[14] = i % 3;
+            cursor += type == 5 ? 16 + (i % 3) * 5 : type == 3 ? 18 : 5;
+        }
+        check_parent(oracle, data, true);
+    }
+    data[0] = 4;
+    data[1] = 0xff;
+    check_parent(oracle, data, true);
+    for (Word type : {0u, 1u, 2u, 3u, 4u, 5u, 0xffffffffu})
+        for (Word flag : {0u, 1u, 0x100u, 0xffu})
+            for (Word length : {0u, 3u, 0xffffffffu}) check_helper(oracle, type, flag, length);
+    const Word keys[] = {0, 1, 0x7fffffff, 0x80000000, 0xffffffff};
+    for (Word left : keys) for (Word right : keys) {
+        Word a[] = {1, left}, b[] = {2, right};
+        Word* first = a;
+        Word* second = b;
+        require(oracle.compare(&first, &second) == session_records_compare_0040e5f0(&first, &second),
+                "comparator return");
+        ++cases;
+    }
+    std::printf("cases=%u session_records_original_x86_vs_cpp=PASS\n", cases);
+}
