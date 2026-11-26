@@ -1,0 +1,139 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "world_cleanup_858.hpp"
+
+namespace {
+
+using Word = std::uint32_t;
+using Byte = std::uint8_t;
+
+const Byte body[] = {@BODY_00471C40@};
+
+void require(bool ok, const char* label) {
+    if (!ok) {
+        std::printf("divergence %s\n", label);
+        std::exit(10);
+    }
+}
+
+void put_word(void* dest, Word value) {
+    *static_cast<Word*>(dest) = value;
+}
+
+struct Trace {
+    Word root_before;
+    Word root_after;
+    Word destroy_object;
+    Word free_object;
+    const char* messages[2];
+    unsigned calls;
+};
+
+Trace trace{};
+const char* const first_message = "BWorld_DeInit...";
+const char* const second_message = "done.\n";
+
+} // namespace
+
+namespace porsche {
+
+std::uint32_t frame_service_root_00628960 = 0;
+
+int __cdecl formatter_stdio_printf_005a177b(const char* message, ...) {
+    require(trace.calls < 2, "log call bound");
+    trace.messages[trace.calls++] = message;
+    return 0;
+}
+
+extern "C" void __fastcall frame_world_destroy_00487590(void* object, void*) {
+    trace.destroy_object = static_cast<Word>(reinterpret_cast<std::uintptr_t>(object));
+}
+
+std::uint32_t __cdecl application_release_0059f050(void* object) {
+    trace.free_object = static_cast<Word>(reinterpret_cast<std::uintptr_t>(object));
+    return 0;
+}
+
+} // namespace porsche
+
+namespace {
+
+template <std::size_t Size>
+const void* prepare_original(const Byte (&source)[Size], Word* root) {
+    auto* code = static_cast<Byte*>(
+        VirtualAlloc(nullptr, Size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    require(code != nullptr, "oracle allocation");
+    for (std::size_t i = 0; i < Size; ++i) code[i] = source[i];
+    require(*reinterpret_cast<Word*>(code + 13) == 0x00628960u,
+            "oracle root read operand");
+    put_word(code + 13, reinterpret_cast<std::uintptr_t>(root));
+    require(*reinterpret_cast<Word*>(code + 47) == 0x00628960u,
+            "oracle root write operand");
+    put_word(code + 47, reinterpret_cast<std::uintptr_t>(root));
+    require(*reinterpret_cast<Word*>(code + 2) == 0x005cfeb0u &&
+            *reinterpret_cast<Word*>(code + 41) == 0x005cfea8u,
+            "oracle log strings");
+    put_word(code + 2, reinterpret_cast<std::uintptr_t>(first_message));
+    put_word(code + 41, reinterpret_cast<std::uintptr_t>(second_message));
+    require(code[6] == 0xe8 && *reinterpret_cast<Word*>(code + 7) == 0x0012fb30u,
+            "oracle first log call");
+    auto patch_call = [&](std::size_t offset, Word original, const void* target) {
+        require(code[offset - 1] == 0xe8 && *reinterpret_cast<Word*>(code + offset) == original,
+                "oracle call operand");
+        const auto next = reinterpret_cast<std::uintptr_t>(code + offset + 4);
+        put_word(code + offset, reinterpret_cast<std::uintptr_t>(target) - next);
+    };
+    patch_call(7, 0x0012fb30u, reinterpret_cast<const void*>(&porsche::formatter_stdio_printf_005a177b));
+    patch_call(27, 0x00015931u, reinterpret_cast<const void*>(&porsche::frame_world_destroy_00487590));
+    patch_call(33, 0x0012d3ebu, reinterpret_cast<const void*>(&porsche::application_release_0059f050));
+    patch_call(56, 0x0012faffu, reinterpret_cast<const void*>(&porsche::formatter_stdio_printf_005a177b));
+    DWORD old_protection = 0;
+    require(VirtualProtect(code, Size, PAGE_EXECUTE_READ, &old_protection) != FALSE,
+            "oracle protection");
+    FlushInstructionCache(GetCurrentProcess(), code, Size);
+    return code;
+}
+
+Trace run(const void* function, Word root_value) {
+    trace = {};
+    porsche::frame_service_root_00628960 = root_value;
+    trace.root_before = porsche::frame_service_root_00628960;
+    reinterpret_cast<void(__cdecl*)()>(function)();
+    trace.root_after = porsche::frame_service_root_00628960;
+    return trace;
+}
+
+void compare(const Trace& expected, const Trace& actual) {
+    require(expected.root_before == actual.root_before && expected.root_after == actual.root_after,
+            "root state");
+    require(expected.destroy_object == actual.destroy_object &&
+            expected.free_object == actual.free_object, "destructive callback objects");
+    require(expected.calls == actual.calls, "log call count");
+    for (unsigned i = 0; i < expected.calls; ++i) {
+        require(expected.messages[i] != nullptr && actual.messages[i] != nullptr,
+                "log message presence");
+        require(std::strcmp(expected.messages[i], actual.messages[i]) == 0,
+                "log message");
+    }
+}
+
+} // namespace
+
+int main() {
+    const Word roots[] = {0u, 1u, 0x81234567u, 0xffffffffu};
+    Word comparisons = 0;
+    for (Word root : roots) {
+        const auto* original = prepare_original(body, &porsche::frame_service_root_00628960);
+        const auto expected = run(original, root);
+        const auto actual = run(reinterpret_cast<const void*>(&porsche::application_sim_boundary_00471c40), root);
+        compare(expected, actual);
+        ++comparisons;
+    }
+    std::printf("cases=%u world_cleanup_original_x86_vs_cpp=PASS\n", comparisons);
+}

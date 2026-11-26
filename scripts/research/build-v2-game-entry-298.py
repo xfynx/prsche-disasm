@@ -85,7 +85,12 @@ def main():
     compiler = []
     for line in log.splitlines():
         if re.search(r'\berror LNK(?:2001|2019):', line):
-            symbols = re.findall(r'\((\?[^()]+)\)', line)
+            detail = line.split('error LNK', 1)[1]
+            symbols = re.findall(r'\((\?[^()]+)\)', detail)
+            # The linker prints x86 C names directly, before any quoted C++ caller.
+            direct = re.search(r'(?:^|\s)([_@][\w@$?]+)(?=[\s,]|$)', detail.split('"', 1)[0])
+            if direct:
+                symbols.insert(0, direct.group(1))
             assert symbols, line
             frontier.setdefault(symbols[0], []).append(dict(caller=symbols[1] if len(symbols) > 1 else None, diagnostic=line))
         elif re.search(r'\b(?:fatal )?error LNK\d+:', line) and 'LNK1120:' not in line:

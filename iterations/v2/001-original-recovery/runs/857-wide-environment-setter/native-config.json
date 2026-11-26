@@ -1,0 +1,33 @@
+{
+  "run":857,
+  "experiment":"local/experiments/v2-wide-environment-857",
+  "original_pe":"local/game/Porsche.exe",
+  "original_sha256":"ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources":["iterations/v2/001-original-recovery/runs/857-wide-environment-setter/crt_wide_env_857.cpp"],
+  "fixture":"iterations/v2/001-original-recovery/runs/857-wide-environment-setter/native-fixture.cpp.in",
+  "include_dirs":[
+    "iterations/v2/001-original-recovery/runs/857-wide-environment-setter",
+    "iterations/v2/001-original-recovery/runs/838-crt-shutdown-and-env-closers",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers":["iterations/v2/001-original-recovery/runs/857-wide-environment-setter/crt_wide_env_857.hpp","iterations/v2/001-original-recovery/runs/857-wide-environment-setter/scope-evidence.json"],
+  "original_bodies":[
+    {"va":"005aa039","bytes":403,"sha256":"dfaca9b0cfa319b8f42d37d8b4883a4612993eb2d7b554739f5eb6dae1cb6e76","token":"@BODY_005AA039@"},
+    {"va":"005aa1cc","bytes":92,"sha256":"36a70fce692924c2995f64aec132caac42001398b8bdd76d66b3daefd3af8a71","token":"@BODY_005AA1CC@"},
+    {"va":"005aa228","bytes":103,"sha256":"e704d31d3b30bce0c527d9fd3a3ee2fb11dbde8503e2fa05cd5a383317bba0ff","token":"@BODY_005AA228@"},
+    {"va":"005ad5fb","bytes":104,"sha256":"c01e685f667049ad56ee46f4c44fe17fa8a8b483c7563f692abbf71b692bac30","token":"@BODY_005AD5FB@"},
+    {"va":"005ad663","bytes":41,"sha256":"f45ff00e5df9e3b318f3b9c169bd370598888a3ff42554f2c6a4ad9aca4b4793","token":"@BODY_005AD663@"},
+    {"va":"005ad5b9","bytes":37,"sha256":"f99f7f2e1f82d316e97935cfa2609fac9456e62a80aee9256a381f843031b294","token":"@BODY_005AD5B9@"},
+    {"va":"005ad5de","bytes":29,"sha256":"66e3418a1b5d16894ce1d41355c902b4edcfab4f1a2d9781a8529990682ce603","token":"@BODY_005AD5DE@"},
+    {"va":"005ad76d","bytes":46,"sha256":"f5c33c5a24ce7f296144f3d1c3a981edaa0ac47dca1362f7d91c9fba1cf63b5b","token":"@BODY_005AD76D@"}
+  ],
+  "pass_marker":"crt_wide_environment_original_x86_vs_cpp=PASS",
+  "timeout_seconds":180,
+  "mutations":[
+    {"name":"accept-leading-equals","source":"iterations/v2/001-original-recovery/runs/857-wide-environment-setter/crt_wide_env_857.cpp","old":"if (equals == nullptr || equals == option)","new":"if (equals == nullptr)","expected_exit":1,"failure_marker":"divergence"},
+    {"name":"wrong-remove-test","source":"iterations/v2/001-original-recovery/runs/857-wide-environment-setter/crt_wide_env_857.cpp","old":"const int remove = (equals[1] == L'\\0') ? 1 : 0;","new":"const int remove = (equals[1] != L'\\0') ? 1 : 0;","expected_exit":1,"failure_marker":"divergence"},
+    {"name":"wrong-wide-table-growth","source":"iterations/v2/001-original-recovery/runs/857-wide-environment-setter/crt_wide_env_857.cpp","old":"static_cast<std::uint32_t>(index) * 4u + 8u","new":"static_cast<std::uint32_t>(index) * 4u + 4u","expected_exit":1,"failure_marker":"divergence"},
+    {"name":"wrong-os-value-pointer","source":"iterations/v2/001-original-recovery/runs/857-wide-environment-setter/crt_wide_env_857.cpp","old":"remove != 0 ? nullptr : copy + name_length + 1;","new":"remove != 0 ? copy : copy + name_length + 1;","expected_exit":1,"failure_marker":"divergence"},
+    {"name":"wrong-oem-codepage","source":"iterations/v2/001-original-recovery/runs/857-wide-environment-setter/crt_wide_env_857.cpp","old":"formatter_locale_to_wide(1u, 0u, *cursor, -1, nullptr, 0)","new":"formatter_locale_to_wide(0u, 0u, *cursor, -1, nullptr, 0)","expected_exit":1,"failure_marker":"divergence"}
+  ]
+}

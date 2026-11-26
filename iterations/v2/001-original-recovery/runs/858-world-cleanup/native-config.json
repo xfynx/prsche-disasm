@@ -1,0 +1,42 @@
+{
+  "run": 858,
+  "experiment": "local/experiments/v2-world-cleanup-858",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/858-world-cleanup/world_cleanup_858.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/858-world-cleanup/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/858-world-cleanup",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "original_bodies": [
+    {
+      "va": "00471c40",
+      "bytes": 65,
+      "sha256": "54bb7f14bd46218a9022036cf631a844c4294749ab25f628842fbf10781e8702",
+      "token": "@BODY_00471C40@"
+    }
+  ],
+  "pass_marker": "world_cleanup_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-cleanup-root-clear",
+      "source": "iterations/v2/001-original-recovery/runs/858-world-cleanup/world_cleanup_858.cpp",
+      "old": "    frame_service_root_00628960 = 0;",
+      "new": "    frame_service_root_00628960 = 1;",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-cleanup-destroy-argument",
+      "source": "iterations/v2/001-original-recovery/runs/858-world-cleanup/world_cleanup_858.cpp",
+      "old": "        frame_world_destroy_00487590(root, nullptr);",
+      "new": "        frame_world_destroy_00487590(nullptr, nullptr);",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    }
+  ]
+}

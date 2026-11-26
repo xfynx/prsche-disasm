@@ -1,0 +1,122 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+
+#include "crt_wide_env_857.hpp"
+#include "crt_shutdown_env_838.hpp"
+
+using U=std::uint32_t; using B=std::uint8_t;
+namespace {
+struct Trace { U abi,ret,count,hash,wcount,whash,acount,ahash; } trace{},expected{};
+U cases=0,events=0,fail_alloc=0,fail_realloc=0,fail_mb=0,alloc_no=0;
+void* blocks[128]{}; U block_count=0; bool recording=false;
+B* code=nullptr; B *f039,*f1cc,*f228,*fd5fb,*fd663,*fd5b9,*fd5de,*fd76d;
+void* iat_mbtw=nullptr; void* iat_setenv=nullptr;
+void require(bool ok,const char* s){if(!ok){std::printf("divergence %s case=%u\n",s,cases);std::fflush(stdout);ExitProcess(1);}}
+U addr(const void* p){return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));}
+U rd(const void* p,U o){U v;std::memcpy(&v,static_cast<const B*>(p)+o,4);return v;}
+void wr(void* p,U o,U v){std::memcpy(static_cast<B*>(p)+o,&v,4);}
+U mix(U h,U v){return (h^v)*16777619u;}
+U ahash(const char* s){U h=2166136261u;if(s)while(*s)h=mix(h,static_cast<B>(*s++));return h;}
+U whash(const wchar_t* s){U h=2166136261u;if(s)while(*s)h=mix(h,static_cast<U>(*s++));return h;}
+void ev(U tag,U a=0,U b=0){if(recording){++trace.count;trace.hash=mix(mix(mix(trace.hash,tag),a),b);}}
+void track(void* p){if(p){require(block_count<128,"blocks");blocks[block_count++]=p;}}
+void cleanup(){for(U i=0;i<block_count;++i)if(blocks[i])HeapFree(GetProcessHeap(),0,blocks[i]);block_count=0;}
+void* raw_alloc(U n){void* p=HeapAlloc(GetProcessHeap(),HEAP_ZERO_MEMORY,n?n:1);track(p);return p;}
+void mark_freed(void* p){for(U i=0;i<block_count;++i)if(blocks[i]==p){blocks[i]=nullptr;return;}}
+wchar_t* makew(const wchar_t* s){U n=static_cast<U>(wcslen(s)+1)*2;auto* p=static_cast<wchar_t*>(raw_alloc(n));std::memcpy(p,s,n);return p;}
+char* makea(const char* s){U n=static_cast<U>(std::strlen(s)+1);auto* p=static_cast<char*>(raw_alloc(n));std::memcpy(p,s,n);return p;}
+template<class T>T** table(std::initializer_list<T*> xs){auto** p=static_cast<T**>(raw_alloc((static_cast<U>(xs.size())+1)*4));U i=0;for(T* x:xs)p[i++]=x;p[i]=nullptr;return p;}
+}
+
+namespace porsche {
+std::uint32_t crt_env_initialized_006c1528=1;
+char** crt_environ_006afcc8=nullptr; char** crt_initenv_006afccc=nullptr;
+wchar_t** crt_wenviron_006afcd0=nullptr;
+void* __cdecl exit_registry_malloc_005a3be5(U n){++alloc_no;ev(1,n,alloc_no);if(fail_alloc==alloc_no)return nullptr;return raw_alloc(n);}
+void* __cdecl exit_registry_reallocate_005a8029(void* p,U n){ev(2,n,0);if(fail_realloc)return nullptr;void* q=HeapReAlloc(GetProcessHeap(),HEAP_ZERO_MEMORY,p,n?n:1);require(q!=nullptr,"realloc host");for(U i=0;i<block_count;++i)if(blocks[i]==p){blocks[i]=q;break;}return q;}
+void __cdecl formatter_crt_free_005a3b9d(void* p){ev(3,0,0);if(p){mark_freed(p);HeapFree(GetProcessHeap(),0,p);}}
+[[noreturn]] void __cdecl formatter_fatal_005a2e22(int m){std::printf("divergence fatal=%d\n",m);ExitProcess(1);}
+int __cdecl crt_wcsnicoll_005ad68c(const wchar_t* a,const wchar_t* b,U n){ev(4,n,0);for(U i=0;i<n;++i){wchar_t x=a[i],y=b[i];if(x>=L'A'&&x<=L'Z')x+=32;if(y>=L'A'&&y<=L'Z')y+=32;if(x!=y)return static_cast<int>(x)-static_cast<int>(y);if(!x)return 0;}return 0;}
+int __stdcall formatter_locale_to_wide(U cp,U flags,const char* in,int count,std::uint16_t* out,int cap){ev(5,cp,static_cast<U>(cap));if(fail_mb)return 0;U n=static_cast<U>(std::strlen(in))+1;if(!out)return static_cast<int>(n);if(cap<static_cast<int>(n))return 0;for(U i=0;i<n;++i)out[i]=static_cast<B>(in[i]);return static_cast<int>(n);}
+}
+
+namespace {
+int __stdcall setenv_stub(const wchar_t* name,const wchar_t* value){ev(6,whash(name),whash(value));return 1;}
+U invoke(void* fn,const U* args,U argc,U& out){
+ U before=0,frame=0,bad=0,eax_out=0;
+ __asm {
+  push ebx
+  push esi
+  push edi
+  mov before,esp
+  mov frame,ebp
+  mov ecx,argc
+  mov eax,args
+  test ecx,ecx
+  je invoke_call
+ invoke_push:
+  dec ecx
+  push dword ptr[eax+ecx*4]
+  test ecx,ecx
+  jne invoke_push
+ invoke_call:
+  mov ebx,13579bdfh
+  mov esi,2468ace0h
+  mov edi,10203040h
+  call fn
+  mov eax_out,eax
+  mov ecx,argc
+  lea esp,[esp+ecx*4]
+  cmp esp,before
+  jne invoke_bad
+  cmp ebp,frame
+  jne invoke_bad
+  cmp ebx,13579bdfh
+  jne invoke_bad
+  cmp esi,2468ace0h
+  jne invoke_bad
+  cmp edi,10203040h
+  jne invoke_bad
+  jmp invoke_done
+ invoke_bad:
+  mov bad,1
+ invoke_done:
+  mov esp,before
+  pop edi
+  pop esi
+  pop ebx
+ }
+ out=eax_out;return bad;
+}
+void rel(B* s,U base,U site,const void* t){U o=site-base+1;require(s[o-1]==0xe8,"rel opcode");wr(s,o,addr(t)-addr(s+o+4));}
+U absall(B* s,U n,U old,const void* p){U c=0;for(U i=0;i+4<=n;++i)if(rd(s,i)==old){wr(s,i,addr(p));++c;}return c;}
+void init(){
+ static const B b039[]={@BODY_005AA039@},b1cc[]={@BODY_005AA1CC@},b228[]={@BODY_005AA228@},bd5fb[]={@BODY_005AD5FB@},bd663[]={@BODY_005AD663@},bd5b9[]={@BODY_005AD5B9@},bd5de[]={@BODY_005AD5DE@},bd76d[]={@BODY_005AD76D@};
+ code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));require(code,"code");
+ f039=code;f1cc=code+512;f228=code+768;fd5fb=code+1024;fd663=code+1280;fd5b9=code+1408;fd5de=code+1536;fd76d=code+1664;
+ std::memcpy(f039,b039,sizeof b039);std::memcpy(f1cc,b1cc,sizeof b1cc);std::memcpy(f228,b228,sizeof b228);std::memcpy(fd5fb,bd5fb,sizeof bd5fb);std::memcpy(fd663,bd663,sizeof bd663);std::memcpy(fd5b9,bd5b9,sizeof bd5b9);std::memcpy(fd5de,bd5de,sizeof bd5de);std::memcpy(fd76d,bd76d,sizeof bd76d);
+ rel(f039,0x5aa039,0x5aa04d,fd663);rel(f039,0x5aa039,0x5aa076,f228);rel(f039,0x5aa039,0x5aa093,fd5fb);rel(f039,0x5aa039,0x5aa0b2,(void*)&porsche::exit_registry_malloc_005a3be5);rel(f039,0x5aa039,0x5aa0cd,(void*)&porsche::exit_registry_malloc_005a3be5);rel(f039,0x5aa039,0x5aa0f3,f1cc);rel(f039,0x5aa039,0x5aa10f,(void*)&porsche::formatter_crt_free_005a3b9d);rel(f039,0x5aa039,0x5aa12e,(void*)&porsche::exit_registry_reallocate_005a8029);rel(f039,0x5aa039,0x5aa156,(void*)&porsche::exit_registry_reallocate_005a8029);rel(f039,0x5aa039,0x5aa17e,fd5de);rel(f039,0x5aa039,0x5aa188,(void*)&porsche::exit_registry_malloc_005a3be5);rel(f039,0x5aa039,0x5aa199,fd5b9);rel(f039,0x5aa039,0x5aa1bf,(void*)&porsche::formatter_crt_free_005a3b9d);
+ require(absall(f039,403,0x006afcd0,&porsche::crt_wenviron_006afcd0)==6,"wenv refs");require(absall(f039,403,0x006afcd4,&porsche::crt_winitenv_006afcd4)==1,"winit ref");require(absall(f039,403,0x006afcc8,&porsche::crt_environ_006afcc8)==2,"env refs");iat_setenv=(void*)&setenv_stub;require(absall(f039,403,0x005b20cc,&iat_setenv)==1,"setenv iat");
+ rel(f1cc,0x5aa1cc,0x5aa1e4,(void*)&porsche::crt_wcsnicoll_005ad68c);require(absall(f1cc,92,0x006afcd0,&porsche::crt_wenviron_006afcd0)==3,"find refs");
+ rel(f228,0x5aa228,0x5aa254,(void*)&porsche::exit_registry_malloc_005a3be5);rel(f228,0x5aa228,0x5aa264,(void*)&porsche::formatter_fatal_005a2e22);rel(f228,0x5aa228,0x5aa276,fd76d);
+ iat_mbtw=(void*)&porsche::formatter_locale_to_wide;require(absall(fd5fb,104,0x005b2178,&iat_mbtw)==1,"mbtw iat");require(absall(fd5fb,104,0x006afcc8,&porsche::crt_environ_006afcc8)==1,"convert env");rel(fd5fb,0x5ad5fb,0x5ad627,(void*)&porsche::exit_registry_malloc_005a3be5);rel(fd5fb,0x5ad5fb,0x5ad646,f039);
+ rel(fd76d,0x5ad76d,0x5ad777,fd5de);rel(fd76d,0x5ad76d,0x5ad781,(void*)&porsche::exit_registry_malloc_005a3be5);rel(fd76d,0x5ad76d,0x5ad78e,fd5b9);
+ FlushInstructionCache(GetCurrentProcess(),code,4096);
+}
+void snap(){trace.wcount=0;trace.whash=2166136261u;if(porsche::crt_wenviron_006afcd0)for(auto**p=porsche::crt_wenviron_006afcd0;*p&&trace.wcount<16;++p){trace.whash=mix(trace.whash,whash(*p));++trace.wcount;}trace.acount=0;trace.ahash=2166136261u;if(porsche::crt_environ_006afcc8)for(auto**p=porsche::crt_environ_006afcc8;*p&&trace.acount<16;++p){trace.ahash=mix(trace.ahash,ahash(*p));++trace.acount;}}
+struct Setup{wchar_t* option;int update;};
+Setup setup(U s){trace={};alloc_no=0;fail_alloc=0;fail_realloc=0;fail_mb=0;porsche::crt_environ_006afcc8=nullptr;porsche::crt_initenv_006afccc=nullptr;porsche::crt_wenviron_006afcd0=nullptr;porsche::crt_winitenv_006afcd4=nullptr;porsche::crt_set_environment_variable_w_api_857=&setenv_stub;Setup z{nullptr,0};
+ if(s==0)return z;if(s==1){z.option=makew(L"NOVALUE");return z;}if(s==2){z.option=makew(L"=X");return z;}
+ if(s==3){z.option=makew(L"A=B");return z;}if(s==4){z.option=makew(L"A=");return z;}
+ auto* a=makew(L"A=1");auto* b=makew(L"B=2");porsche::crt_wenviron_006afcd0=table<wchar_t>({a,b});
+ if(s==5){porsche::crt_winitenv_006afcd4=porsche::crt_wenviron_006afcd0;z.option=makew(L"A=9");return z;}
+ if(s==6){z.option=makew(L"C=3");return z;}if(s==7){z.option=makew(L"A=");z.update=1;return z;}if(s==8){z.option=makew(L"A=9");z.update=1;return z;}if(s==9){z.option=makew(L"C=3");fail_realloc=1;return z;}
+ if(s>=10){porsche::crt_wenviron_006afcd0=nullptr;porsche::crt_environ_006afcc8=table<char>({makea("N=1"),makea("M=2")});z.option=makew(L"X=3");z.update=1;if(s==11)fail_mb=1;if(s==12)fail_alloc=1;return z;}return z;}
+void one(U s,bool cpp){Setup z=setup(s);recording=true;trace.hash=2166136261u;U args[2]={addr(z.option),static_cast<U>(z.update)};trace.abi=invoke(cpp?(void*)&porsche::crt_wsetenv_005aa039:f039,args,2,trace.ret);snap();recording=false;}
+void run(U s){++cases;one(s,false);expected=trace;events+=trace.count;cleanup();one(s,true);require(trace.abi==0&&expected.abi==0,"abi");require(std::memcmp(&trace,&expected,sizeof trace)==0,"trace/state");cleanup();}
+}
+int main(){SetUnhandledExceptionFilter([](EXCEPTION_POINTERS* p)->LONG{std::printf("divergence fault=%08lx at=%p case=%u\n",p->ExceptionRecord->ExceptionCode,p->ExceptionRecord->ExceptionAddress,cases);std::fflush(stdout);ExitProcess(1);return EXCEPTION_EXECUTE_HANDLER;});init();for(U s=0;s<=12;++s)run(s);std::printf("crt_wide_environment_original_x86_vs_cpp=PASS cases=%u events=%u\n",cases,events);return 0;}

@@ -1,0 +1,19 @@
+{
+  "run":857,
+  "module":"Porsche.exe",
+  "module_sha256":"ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "functions":[
+    {"va":"005aa039","name":"crt_wsetenv_005aa039","ranges":[["005aa039","005aa1cb"]],"bytes":403,"sha256":"dfaca9b0cfa319b8f42d37d8b4883a4612993eb2d7b554739f5eb6dae1cb6e76"},
+    {"va":"005aa1cc","name":"crt_wfindenv_005aa1cc","ranges":[["005aa1cc","005aa227"]],"bytes":92,"sha256":"36a70fce692924c2995f64aec132caac42001398b8bdd76d66b3daefd3af8a71"},
+    {"va":"005aa228","name":"crt_copy_wenviron_005aa228","ranges":[["005aa228","005aa28e"]],"bytes":103,"sha256":"e704d31d3b30bce0c527d9fd3a3ee2fb11dbde8503e2fa05cd5a383317bba0ff"},
+    {"va":"005ad5fb","name":"crt_mbtow_environ_wide_005ad5fb","ranges":[["005ad5fb","005ad662"]],"bytes":104,"sha256":"c01e685f667049ad56ee46f4c44fe17fa8a8b483c7563f692abbf71b692bac30"},
+    {"va":"005ad663","name":"crt_wcschr_005ad663","ranges":[["005ad663","005ad68b"]],"bytes":41,"sha256":"f45ff00e5df9e3b318f3b9c169bd370598888a3ff42554f2c6a4ad9aca4b4793"},
+    {"va":"005ad5b9","name":"crt_wcscpy_005ad5b9","ranges":[["005ad5b9","005ad5dd"]],"bytes":37,"sha256":"f99f7f2e1f82d316e97935cfa2609fac9456e62a80aee9256a381f843031b294"},
+    {"va":"005ad5de","name":"crt_wcslen_005ad5de","ranges":[["005ad5de","005ad5fa"]],"bytes":29,"sha256":"66e3418a1b5d16894ce1d41355c902b4edcfab4f1a2d9781a8529990682ce603"},
+    {"va":"005ad76d","name":"crt_wcsdup_005ad76d","ranges":[["005ad76d","005ad79a"]],"bytes":46,"sha256":"f5c33c5a24ce7f296144f3d1c3a981edaa0ac47dca1362f7d91c9fba1cf63b5b"}
+  ],
+  "ownership":{"registry_exact_entries_before_run":[],"registry_body_overlaps_before_run":[],"new_storage":"crt_winitenv_006afcd4","reused_run838_storage":["crt_environ_006afcc8","crt_wenviron_006afcd0"],"new_typed_boundary":"crt_wcsnicoll_005ad68c"},
+  "behavior":"Validates NAME=VALUE, copies the initial wide environment on first write, creates/converts missing tables, inserts/replaces/removes entries, preserves successful table mutation when shrink realloc fails, and mirrors updates to SetEnvironmentVariableW while ignoring its return exactly as original.",
+  "proof":{"config":"iterations/v2/001-original-recovery/runs/857-wide-environment-setter/native-config.json","receipt":"local/experiments/v2-wide-environment-857/005/receipt.json","cases_per_variant":13,"events_per_variant":42,"mutations":5,"external_endpoints":"Fixture replaces MultiByteToWideChar and SetEnvironmentVariableW only; production defaults the SetEnvironmentVariableW pointer to the real Kernel32 import."},
+  "boundary":"Eight complete original bodies. Locale-sensitive wide collation 005ad68c remains explicit and unrecovered; no ASCII or ordinal approximation enters the game source."
+}
