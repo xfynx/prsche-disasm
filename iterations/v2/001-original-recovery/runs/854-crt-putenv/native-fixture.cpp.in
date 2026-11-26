@@ -1,0 +1,350 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "crt_putenv_854.hpp"
+#include "crt_shutdown_env_838.hpp"
+
+using U = std::uint32_t;
+using B = std::uint8_t;
+
+namespace {
+
+enum : U {
+    kLock = 1u,
+    kUnlock = 2u,
+    kLength = 3u,
+    kMalloc = 4u,
+    kCopy = 5u,
+    kSetenv = 6u,
+    kToWide = 7u,
+    kWsetenv = 8u,
+    kMaxEvents = 24u
+};
+
+struct Event {
+    U tag;
+    U a;
+    U b;
+    U c;
+    char text[64];
+};
+
+struct Trace {
+    U abi_fail;
+    U result;
+    U count;
+    Event events[kMaxEvents];
+};
+
+Trace trace{};
+Trace expected{};
+U case_number = 0u;
+U total_events = 0u;
+
+U initialized = 1u;
+U wide_environment = 1u;
+U fail_allocation = 0u;
+U setenv_result = 0u;
+U query_result = 0u;
+U convert_result = 0u;
+U wsetenv_result = 0u;
+U allocation_count = 0u;
+B arena[512]{};
+U arena_used = 0u;
+wchar_t* dummy_wenv[] = {reinterpret_cast<wchar_t*>(1u), nullptr};
+
+B* code = nullptr;
+B* outer = nullptr;
+B* inner = nullptr;
+void* mbtow_slot = nullptr;
+
+void require(bool ok, const char* what) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", what, case_number);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+U address(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+U word(const void* p, U off) {
+    U value = 0u;
+    std::memcpy(&value, static_cast<const B*>(p) + off, sizeof value);
+    return value;
+}
+
+void put(void* p, U off, U value) {
+    std::memcpy(static_cast<B*>(p) + off, &value, sizeof value);
+}
+
+Event& event(U tag, U a = 0u, U b = 0u, U c = 0u, const char* text = nullptr) {
+    require(trace.count < kMaxEvents, "event capacity");
+    Event& e = trace.events[trace.count++];
+    e.tag = tag;
+    e.a = a;
+    e.b = b;
+    e.c = c;
+    std::memset(e.text, 0, sizeof e.text);
+    if (text != nullptr) {
+        std::strncpy(e.text, text, sizeof e.text - 1u);
+    }
+    return e;
+}
+
+void record_wide(Event& e, const wchar_t* text) {
+    if (text == nullptr) {
+        return;
+    }
+    for (U i = 0u; i + 1u < sizeof e.text && text[i] != 0; ++i) {
+        e.text[i] = static_cast<char>(text[i] & 0xffu);
+    }
+}
+
+} // namespace
+
+namespace porsche {
+
+std::uint32_t crt_env_initialized_006c1528 = 0u;
+char** crt_environ_006afcc8 = nullptr;
+char** crt_initenv_006afccc = nullptr;
+wchar_t** crt_wenviron_006afcd0 = nullptr;
+
+void __cdecl exit_registry_lock_api_005a4ba4(U id) {
+    event(kLock, id);
+}
+
+void __cdecl exit_registry_unlock_api_005a4c05(U id) {
+    event(kUnlock, id);
+}
+
+U __cdecl formatter_strlen_005a6730(const char* text) {
+    const U length = static_cast<U>(std::strlen(text));
+    event(kLength, length, 0u, 0u, text);
+    return length;
+}
+
+void* __cdecl exit_registry_malloc_005a3be5(U bytes) {
+    ++allocation_count;
+    event(kMalloc, bytes, allocation_count);
+    if (fail_allocation == allocation_count) {
+        return nullptr;
+    }
+    const U aligned = (bytes + 3u) & ~3u;
+    require(arena_used + aligned <= sizeof arena, "arena capacity");
+    void* result = arena + arena_used;
+    arena_used += aligned;
+    return result;
+}
+
+char* __cdecl formatter_error_copy_005aa4e0(char* destination, const char* source) {
+    event(kCopy, 0u, 0u, 0u, source);
+    return std::strcpy(destination, source);
+}
+
+int __cdecl crt_setenv_005aa28f(char* option, int update_os) {
+    event(kSetenv, static_cast<U>(update_os), static_cast<U>(setenv_result), 0u, option);
+    return static_cast<int>(setenv_result);
+}
+
+int __stdcall formatter_locale_to_wide(U codepage, U flags, const char* input,
+                                       int count, std::uint16_t* output, int capacity) {
+    Event& e = event(kToWide, codepage, flags, static_cast<U>(capacity), input);
+    e.b |= (static_cast<U>(count) << 16);
+    const U needed = static_cast<U>(std::strlen(input)) + 1u;
+    if (output == nullptr) {
+        return query_result != 0u ? 0 : static_cast<int>(needed);
+    }
+    if (convert_result != 0u || capacity < static_cast<int>(needed)) {
+        return 0;
+    }
+    for (U i = 0u; i < needed; ++i) {
+        output[i] = static_cast<std::uint8_t>(input[i]);
+    }
+    return static_cast<int>(needed);
+}
+
+int __cdecl crt_wsetenv_005aa039(wchar_t* option, int update_os) {
+    Event& e = event(kWsetenv, static_cast<U>(update_os), wsetenv_result);
+    record_wide(e, option);
+    return static_cast<int>(wsetenv_result);
+}
+
+} // namespace porsche
+
+namespace {
+
+U invoke(void* function, const U* args, U argc, U& result) {
+    U before = 0u;
+    U frame = 0u;
+    U failed = 0u;
+    U eax_out = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ecx, argc
+        mov eax, args
+        test ecx, ecx
+        je invoke_call
+    invoke_push:
+        dec ecx
+        push dword ptr [eax + ecx * 4]
+        test ecx, ecx
+        jne invoke_push
+    invoke_call:
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        std
+        cld
+        call function
+        mov eax_out, eax
+        mov ecx, argc
+        lea esp, [esp + ecx * 4]
+        cmp esp, before
+        jne invoke_bad
+        cmp ebp, frame
+        jne invoke_bad
+        cmp ebx, 13579bdfh
+        jne invoke_bad
+        cmp esi, 2468ace0h
+        jne invoke_bad
+        cmp edi, 10203040h
+        jne invoke_bad
+        pushfd
+        pop eax
+        test eax, 400h
+        jz invoke_done
+    invoke_bad:
+        mov failed, 1
+    invoke_done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    result = eax_out;
+    return failed;
+}
+
+void relocate_rel(B* slot, U slot_va, U off, U target_va, const void* replacement) {
+    require(slot[off - 1u] == 0xe8u, "call opcode");
+    require(slot_va + off + 4u + word(slot, off) == target_va, "call target");
+    put(slot, off, address(replacement) - address(slot + off + 4u));
+}
+
+void relocate_abs(B* slot, U off, U expected_value, const void* replacement) {
+    require(word(slot, off) == expected_value, "absolute target");
+    put(slot, off, address(replacement));
+}
+
+void init_code() {
+    static const B body_outer[] = {@BODY_005A38C7@};
+    static const B body_inner[] = {@BODY_005A38E8@};
+    require(sizeof body_outer == 33u && sizeof body_inner == 148u, "body sizes");
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "code allocation");
+    outer = code;
+    inner = code + 256u;
+    std::memcpy(outer, body_outer, sizeof body_outer);
+    std::memcpy(inner, body_inner, sizeof body_inner);
+
+    relocate_rel(outer, 0x005a38c7u, 0x04u, 0x005a4ba4u,
+                 reinterpret_cast<const void*>(&porsche::exit_registry_lock_api_005a4ba4));
+    relocate_rel(outer, 0x005a38c7u, 0x0du, 0x005a38e8u, inner);
+    relocate_rel(outer, 0x005a38c7u, 0x16u, 0x005a4c05u,
+                 reinterpret_cast<const void*>(&porsche::exit_registry_unlock_api_005a4c05));
+
+    relocate_abs(inner, 0x07u, 0x006c1528u, &porsche::crt_env_initialized_006c1528);
+    relocate_rel(inner, 0x005a38e8u, 0x14u, 0x005a6730u,
+                 reinterpret_cast<const void*>(&porsche::formatter_strlen_005a6730));
+    relocate_rel(inner, 0x005a38e8u, 0x1bu, 0x005a3be5u,
+                 reinterpret_cast<const void*>(&porsche::exit_registry_malloc_005a3be5));
+    relocate_rel(inner, 0x005a38e8u, 0x2au, 0x005aa4e0u,
+                 reinterpret_cast<const void*>(&porsche::formatter_error_copy_005aa4e0));
+    relocate_rel(inner, 0x005a38e8u, 0x32u, 0x005aa28fu,
+                 reinterpret_cast<const void*>(&porsche::crt_setenv_005aa28f));
+    relocate_abs(inner, 0x3fu, 0x006afcd0u, &porsche::crt_wenviron_006afcd0);
+    mbtow_slot = reinterpret_cast<void*>(&porsche::formatter_locale_to_wide);
+    relocate_abs(inner, 0x47u, 0x005b2178u, &mbtow_slot);
+    relocate_rel(inner, 0x005a38e8u, 0x60u, 0x005a3be5u,
+                 reinterpret_cast<const void*>(&porsche::exit_registry_malloc_005a3be5));
+    relocate_rel(inner, 0x005a38e8u, 0x7eu, 0x005aa039u,
+                 reinterpret_cast<const void*>(&porsche::crt_wsetenv_005aa039));
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0,
+            "instruction cache");
+}
+
+void reset() {
+    std::memset(&trace, 0, sizeof trace);
+    std::memset(arena, 0xa5, sizeof arena);
+    arena_used = 0u;
+    allocation_count = 0u;
+    porsche::crt_env_initialized_006c1528 = initialized;
+    porsche::crt_wenviron_006afcd0 = wide_environment != 0u ? dummy_wenv : nullptr;
+}
+
+void compare() {
+    require(trace.abi_fail == 0u && expected.abi_fail == 0u, "cdecl ABI");
+    require(trace.result == expected.result, "return value");
+    require(trace.count == expected.count, "event count");
+    require(std::memcmp(trace.events, expected.events,
+                        trace.count * sizeof(Event)) == 0, "event sequence");
+}
+
+void run_case(void* original, void* recovered, const char* text) {
+    ++case_number;
+    const U args[] = {address(text)};
+    reset();
+    expected.abi_fail = invoke(original, args, 1u, expected.result);
+    expected.count = trace.count;
+    std::memcpy(expected.events, trace.events, sizeof trace.events);
+    reset();
+    trace.abi_fail = invoke(recovered, args, 1u, trace.result);
+    total_events += trace.count;
+    compare();
+}
+
+void scenario(U init, U wide, U fail_alloc, U set_fail, U query_fail,
+              U conversion_fail, U wset_fail) {
+    initialized = init;
+    wide_environment = wide;
+    fail_allocation = fail_alloc;
+    setenv_result = set_fail;
+    query_result = query_fail;
+    convert_result = conversion_fail;
+    wsetenv_result = wset_fail;
+    static const char* const inputs[] = {"A=B", "PATH=C:\\NFS5", "EMPTY=", "x=y z"};
+    for (const char* input : inputs) {
+        run_case(inner, reinterpret_cast<void*>(&porsche::crt_putenv_inner_005a38e8), input);
+        run_case(outer, reinterpret_cast<void*>(&porsche::crt_putenv_005a38c7), input);
+    }
+}
+
+} // namespace
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    init_code();
+    scenario(0u, 1u, 0u, 0u, 0u, 0u, 0u);
+    scenario(1u, 1u, 1u, 0u, 0u, 0u, 0u);
+    scenario(1u, 1u, 0u, 1u, 0u, 0u, 0u);
+    scenario(1u, 0u, 0u, 0u, 0u, 0u, 0u);
+    scenario(1u, 1u, 0u, 0u, 1u, 0u, 0u);
+    scenario(1u, 1u, 2u, 0u, 0u, 0u, 0u);
+    scenario(1u, 1u, 0u, 0u, 0u, 1u, 0u);
+    scenario(1u, 1u, 0u, 0u, 0u, 0u, 1u);
+    scenario(1u, 1u, 0u, 0u, 0u, 0u, 0u);
+    std::printf("crt_putenv_original_x86_vs_cpp=PASS cases=%u events=%u\n",
+                case_number, total_events);
+    return 0;
+}

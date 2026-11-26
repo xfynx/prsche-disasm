@@ -1,0 +1,72 @@
+{
+  "run": 853,
+  "experiment": "local/experiments/v2-session-input-reset-853",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/853-session-input-reset/session_input_reset_853.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/853-session-input-reset/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/853-session-input-reset",
+    "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters",
+    "iterations/v2/001-original-recovery/runs/683-input-ff-slot-callers-and-render-leaves",
+    "iterations/v2/001-original-recovery/runs/695-ff-effect-initialize",
+    "iterations/v2/001-original-recovery/runs/831-player-service-tables-and-callbacks",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "original_bodies": [
+    {
+      "va": "00412150",
+      "bytes": 58,
+      "sha256": "8c3d2860740fa7becd32cb1e52ca1a8c825f8e7c33de97d802da98a298f10d67",
+      "token": "@BODY_00412150@"
+    },
+    {
+      "va": "004066d0",
+      "bytes": 58,
+      "sha256": "46c00363af90a497aab6fcde55fb3d9bd59cde8b22b1c908eff1ee6cf8370216",
+      "token": "@BODY_004066D0@"
+    },
+    {
+      "va": "00516950",
+      "bytes": 1,
+      "sha256": "ae3f4619b0413d70d3004b9131c3752153074e45725be13b9a148978895e359e",
+      "token": "@BODY_00516950@"
+    },
+    {
+      "va": "005e6774",
+      "bytes": 36,
+      "sha256": "6db65fd59fd356f6729140571b5bcd6bb3b83492a16e1bf0a3884442fc3c8a0e",
+      "token": "@DATA_005E6774@"
+    }
+  ],
+  "pass_marker": "session_input_reset_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name": "wrong-ff-enabled-guard",
+      "source": "iterations/v2/001-original-recovery/runs/853-session-input-reset/session_input_reset_853.cpp",
+      "old": "    if (enabled == 0) {",
+      "new": "    if (enabled != 0) {",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-ff-command-state",
+      "source": "iterations/v2/001-original-recovery/runs/853-session-input-reset/session_input_reset_853.cpp",
+      "old": "    store_ff_state(0x12c, 1u);",
+      "new": "    store_ff_state(0x12c, 0u);",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-player-release-argument",
+      "source": "iterations/v2/001-original-recovery/runs/853-session-input-reset/session_input_reset_853.cpp",
+      "old": "            vtable[1](extension, 1u);",
+      "new": "            vtable[1](extension, 0u);",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    }
+  ]
+}

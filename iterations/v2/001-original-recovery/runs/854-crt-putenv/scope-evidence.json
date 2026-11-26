@@ -1,0 +1,52 @@
+{
+  "run": 854,
+  "module": "Porsche.exe",
+  "module_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "query": [
+    "query-binary-index.py --binary Porsche.exe --address 0x5a38c7 --disassemble",
+    "query-binary-index.py --binary Porsche.exe --address 0x5a38e8 --disassemble"
+  ],
+  "originals": [
+    {
+      "name": "crt_putenv_005a38c7",
+      "entry_va": "005a38c7",
+      "body_ranges_inclusive": [["005a38c7", "005a38e7"]],
+      "body_bytes": 33,
+      "body_sha256": "512d4e552aec7847d6d9255bc7a2e92e9e6b2852f1550812cfa63baacf09ed88",
+      "calling_convention": "__cdecl (const char*; RET int)",
+      "callers": ["00573030"],
+      "direct_callees": ["005a4ba4", "005a38e8", "005a4c05"]
+    },
+    {
+      "name": "crt_putenv_inner_005a38e8",
+      "entry_va": "005a38e8",
+      "body_ranges_inclusive": [["005a38e8", "005a397b"]],
+      "body_bytes": 148,
+      "body_sha256": "f65fe9e8da8058cd3c6a3a56467835baa24ea27ba4375bec640866c6f676dbce",
+      "calling_convention": "__cdecl (const char*; RET int)",
+      "callers": ["005a38c7"],
+      "direct_callees": ["005a6730", "005a3be5", "005aa4e0", "005aa28f", "KERNEL32.MultiByteToWideChar", "005aa039"],
+      "globals_read": ["006c1528", "006afcd0"],
+      "calculation": "strlen(entry)+1 narrow bytes; OEM code page 1 query/convert with -1 input count; wide allocation is returned_count*2 bytes"
+    }
+  ],
+  "ownership": {
+    "registry_exact_entries_before_run": [],
+    "registry_body_overlaps_before_run": [],
+    "catalog_entries": [
+      {"va":"005a38c7","range":["005a38c7","005a38e7"],"status":"unrecovered"},
+      {"va":"005a38e8","range":["005a38e8","005a397b"],"status":"unrecovered"}
+    ],
+    "reused_providers": {
+      "Run838": ["crt_env_initialized_006c1528", "crt_wenviron_006afcd0", "crt_setenv_005aa28f"],
+      "canonical": ["exit_registry_lock_api_005a4ba4", "exit_registry_unlock_api_005a4c05", "formatter_strlen_005a6730", "exit_registry_malloc_005a3be5", "formatter_error_copy_005aa4e0", "formatter_locale_to_wide"]
+    },
+    "new_typed_boundary": "crt_wsetenv_005aa039"
+  },
+  "proof": {
+    "config": "iterations/v2/001-original-recovery/runs/854-crt-putenv/native-config.json",
+    "receipt": "local/experiments/v2-crt-putenv-854/003/receipt.json",
+    "domains": ["both original entries", "cdecl callee-saved registers and stack", "lock/unlock order", "uninitialized CRT", "first and second allocation failures", "narrow setenv failure", "wide environment absent", "query and conversion failures", "wide setenv failure", "material strings"]
+  },
+  "boundary": "Complete two-function bodies with controlled canonical direct callees. Wide setter 005aa039 remains an explicit typed unresolved production boundary; live process environment mutation is not claimed."
+}

@@ -1,0 +1,313 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <initializer_list>
+
+#include "session_input_reset_853.hpp"
+#include "../400-frame-loop-clusters/frame_loop_clusters_400.hpp"
+#include "../683-input-ff-slot-callers-and-render-leaves/input_ff_render_leaves_683.hpp"
+#include "../695-ff-effect-initialize/ff_effect_initialize_695.hpp"
+#include "../831-player-service-tables-and-callbacks/player_service_tables_831.hpp"
+
+namespace {
+
+using Word = std::uint32_t;
+using Byte = std::uint8_t;
+using namespace porsche;
+
+const Byte ff_body[] = {@BODY_00412150@};
+const Byte players_body[] = {@BODY_004066D0@};
+const Byte service_body[] = {@BODY_00516950@};
+const Byte slots_initial[] = {@DATA_005E6774@};
+
+void require(bool ok, const char* label) {
+    if (!ok) {
+        std::printf("divergence %s\n", label);
+        std::exit(10);
+    }
+}
+
+Word read_word(const void* src) {
+    Word value;
+    std::memcpy(&value, src, sizeof value);
+    return value;
+}
+
+void put_word(void* dest, Word value) {
+    std::memcpy(dest, &value, sizeof value);
+}
+
+struct Operand {
+    std::size_t offset;
+    Word original;
+    const void* target;
+};
+
+const void* prepare_original(const Byte* body, std::size_t size,
+                             std::initializer_list<Operand> relocations,
+                             Operand call = {}) {
+    auto* code = static_cast<Byte*>(
+        VirtualAlloc(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    require(code != nullptr, "oracle code allocation");
+    std::memcpy(code, body, size);
+    for (const auto& operand : relocations) {
+        require(read_word(code + operand.offset) == operand.original, "oracle operand address");
+        put_word(code + operand.offset, reinterpret_cast<std::uintptr_t>(operand.target));
+    }
+    if (call.target != nullptr) {
+        require(code[call.offset - 1] == 0xe8 && read_word(code + call.offset) == call.original,
+                "oracle call instruction");
+        const auto next = reinterpret_cast<std::uintptr_t>(code + call.offset + 4);
+        put_word(code + call.offset, reinterpret_cast<std::uintptr_t>(call.target) - next);
+    }
+    DWORD old_protection = 0;
+    require(VirtualProtect(code, size, PAGE_EXECUTE_READ, &old_protection) != FALSE,
+            "oracle code protection");
+    require(FlushInstructionCache(GetCurrentProcess(), code, size) != FALSE,
+            "oracle instruction cache flush");
+    return code;
+}
+
+// Run692 cdecl canary for the two no-argument functions.
+void invoke(const void* fn) {
+    Word before = 0, frame = 0, failed = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        jmp done
+    bad:
+        mov failed, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    require(failed == 0, "cdecl ABI");
+}
+
+using FfState = std::array<Byte, 0x134>;
+using SlotState = std::array<void*, 9>;
+
+FfState snapshot_ff() {
+    FfState state;
+    std::memcpy(state.data(), frame_control_ff_state_005e9408, state.size());
+    return state;
+}
+
+SlotState snapshot_slots() {
+    SlotState state;
+    std::memcpy(state.data(), session_player_extension_slots_005e6774, sizeof state);
+    return state;
+}
+
+struct FfTrace {
+    FfState at_command;
+    FfState after;
+    Word commands;
+    Word command;
+    Word slot;
+};
+
+FfTrace ff_trace{};
+InputVtable input_vtable{};
+InputDevice devices[] = {{&input_vtable}, {&input_vtable}};
+
+Word __stdcall observe_ff_command(void* object, Word command) {
+    require(ff_trace.commands == 0, "unexpected repeated FF call");
+    require(object == &devices[0] || object == &devices[1], "FF device pointer");
+    ff_trace.at_command = snapshot_ff();
+    ff_trace.commands = 1;
+    ff_trace.command = command;
+    ff_trace.slot = object == &devices[0] ? 0u : 1u;
+    // Observe that subsequent caller stores do not undo live endpoint writes.
+    put_word(frame_control_ff_state_005e9408 + 0x10, 0x12345678u);
+    return 0u;
+}
+
+FfTrace run_ff(const void* fn, Word enabled, Word slot, Word devices_mode, Word player) {
+    ff_trace = {};
+    for (std::size_t index = 0; index < sizeof frame_control_ff_state_005e9408; ++index) {
+        frame_control_ff_state_005e9408[index] = static_cast<Byte>(index * 23u + player);
+    }
+    put_word(frame_control_ff_state_005e9408 + 0x04, enabled);
+    put_word(frame_control_ff_state_005e9408 + 0x08, slot);
+    application_player_object_table_005e8b34[0] = player;
+    application_player_object_table_005e8b34[1] = ~player;
+    input_count_0069cb0c = 2;
+    input_slots_006be040[0].device = (devices_mode & 1u) ? &devices[0] : nullptr;
+    input_slots_006be040[1].device = &devices[1];
+    input_slots_006be040[0].flags_04 = (devices_mode & 2u) ? 1u : 0u;
+    input_slots_006be040[1].flags_04 = 1u;
+    invoke(fn);
+    ff_trace.after = snapshot_ff();
+    require(application_player_object_table_005e8b34[0] == player &&
+            application_player_object_table_005e8b34[1] == ~player, "player table preserved");
+    return ff_trace;
+}
+
+struct ReleaseEvent {
+    Word object;
+    Word argument;
+    int count;
+    SlotState before;
+};
+
+struct ReleaseTrace {
+    std::array<ReleaseEvent, 9> events;
+    SlotState after;
+    int count_after;
+    std::size_t calls;
+};
+
+ReleaseTrace release_trace{};
+void* extension_vtable[2];
+struct Extension {
+    void** vtable;
+    Word id;
+};
+Extension extensions[9];
+Word release_mode;
+
+void __fastcall observe_release(Extension* object, void*, Word argument) {
+    require(release_trace.calls < release_trace.events.size(), "release event bound");
+    require(object->id < 9u && object == &extensions[object->id], "release this pointer");
+    release_trace.events[release_trace.calls++] =
+        {object->id, argument, application_active_player_count_005e8b58, snapshot_slots()};
+    if (release_trace.calls == 1u) {
+        if (release_mode == 1u) {
+            application_active_player_count_005e8b58 = 0;
+        } else if (release_mode == 2u) {
+            application_active_player_count_005e8b58 = 9;
+        } else if (release_mode == 3u) {
+            session_player_extension_slots_005e6774[object->id] = &extensions[8];
+            session_player_extension_slots_005e6774[8] = &extensions[8];
+        }
+    }
+}
+
+ReleaseTrace run_players(const void* fn, int count, Word mask, Word mode) {
+    release_trace = {};
+    release_mode = mode;
+    application_active_player_count_005e8b58 = count;
+    for (std::size_t index = 0; index < std::size(extensions); ++index) {
+        session_player_extension_slots_005e6774[index] =
+            (mask & (1u << index)) != 0 ? &extensions[index] : nullptr;
+    }
+    invoke(fn);
+    release_trace.after = snapshot_slots();
+    release_trace.count_after = application_active_player_count_005e8b58;
+    return release_trace;
+}
+
+} // namespace
+
+namespace porsche {
+
+std::uint8_t frame_control_ff_state_005e9408[0x134] = {};
+std::uint32_t application_player_object_table_005e8b34[9] = {};
+std::int32_t input_count_0069cb0c = 0;
+InputSlot input_slots_006be040[32] = {};
+
+void __cdecl startup_service_noop_00516950() {}
+
+void __cdecl input_slot_pause_ff_00533320(std::int32_t slot_index) {
+    if (slot_index < 0 || slot_index >= input_count_0069cb0c) return;
+    auto* const device = input_slots_006be040[slot_index].device;
+    if (device == nullptr || (input_slots_006be040[slot_index].flags_04 & 1u) == 0u) return;
+    using Command = std::uint32_t (__stdcall*)(void*, std::uint32_t);
+    auto command = reinterpret_cast<Command>(device->vtable->other_28[12]);
+    command(device, 0x10u);
+}
+
+} // namespace porsche
+
+int main() {
+    static_assert(sizeof slots_initial == sizeof session_player_extension_slots_005e6774);
+    require(std::memcmp(slots_initial, session_player_extension_slots_005e6774,
+                        sizeof slots_initial) == 0, "initial extension slots");
+    require(application_active_player_count_005e8b58 == 0, "initial player count");
+    require(application_player_object_table_005e8b34[0] == 0, "initial player table");
+    require(snapshot_ff() == FfState{}, "initial FF block");
+
+    input_vtable.other_28[12] = reinterpret_cast<void*>(&observe_ff_command);
+    extension_vtable[1] = reinterpret_cast<void*>(&observe_release);
+    for (Word index = 0; index < 9; ++index) {
+        extensions[index] = {extension_vtable, index};
+    }
+    const auto* ff = frame_control_ff_state_005e9408;
+    // Use the same already-proven application FF child on both sides.
+    const auto* original_ff = prepare_original(ff_body, sizeof ff_body, {
+        {2, 0x005e940cu, ff + 0x04}, {14, 0x005e9410u, ff + 0x08},
+        {20, 0x005e8b34u, application_player_object_table_005e8b34},
+        {27, 0x005e9414u, ff + 0x0c}, {33, 0x005e9534u, ff + 0x12c},
+        {42, 0x005e9418u, ff + 0x10}, {47, 0x005e941cu, ff + 0x14},
+    }, {52, 0x00121198u, reinterpret_cast<const void*>(&input_slot_pause_ff_00533320)});
+    const auto* original_service = prepare_original(service_body, sizeof service_body, {});
+    const auto* original_players = prepare_original(players_body, sizeof players_body, {
+        {1, 0x005e8b58u, &application_active_player_count_005e8b58},
+        {14, 0x005e6774u, session_player_extension_slots_005e6774},
+        {38, 0x005e8b58u, &application_active_player_count_005e8b58},
+    }, {52, 0x00110248u, original_service});
+
+    const auto* candidate_ff = reinterpret_cast<const void*>(&frame_reset_service_00412150);
+    const auto* candidate_players = reinterpret_cast<const void*>(&frame_reset_service_004066d0);
+    Word comparisons = 0;
+    for (Word enabled : {0u, 1u, 0x80000000u}) {
+        for (Word slot : {0u, 1u, 2u, 0xffffffffu}) {
+            for (Word mode = 0; mode < 4; ++mode) {
+                for (Word player : {0u, 0x81234567u}) {
+                    const auto expected = run_ff(original_ff, enabled, slot, mode, player);
+                    const auto actual = run_ff(candidate_ff, enabled, slot, mode, player);
+                    require(expected.at_command == actual.at_command &&
+                            expected.after == actual.after &&
+                            expected.commands == actual.commands &&
+                            expected.command == actual.command &&
+                            expected.slot == actual.slot, "00412150 state and FF call trace");
+                    ++comparisons;
+                }
+            }
+        }
+    }
+    for (int count = -1; count <= 9; ++count) {
+        for (Word mask : {0u, 1u, 0x101u, 0x155u, 0x1ffu}) {
+            for (Word mode = 0; mode < 4; ++mode) {
+                const auto expected = run_players(original_players, count, mask, mode);
+                const auto actual = run_players(candidate_players, count, mask, mode);
+                require(expected.after == actual.after &&
+                        expected.count_after == actual.count_after &&
+                        expected.calls == actual.calls, "004066d0 final state");
+                for (std::size_t i = 0; i < expected.calls; ++i) {
+                    const auto& a = expected.events[i];
+                    const auto& b = actual.events[i];
+                    require(a.object == b.object && a.argument == b.argument &&
+                            a.count == b.count && a.before == b.before, "004066d0 release trace");
+                }
+                ++comparisons;
+            }
+        }
+    }
+    std::printf("cases=%u session_input_reset_original_x86_vs_cpp=PASS\n", comparisons);
+}

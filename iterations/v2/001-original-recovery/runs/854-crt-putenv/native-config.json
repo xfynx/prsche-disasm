@@ -1,0 +1,67 @@
+{
+  "run": 854,
+  "experiment": "local/experiments/v2-crt-putenv-854",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/854-crt-putenv/crt_putenv_854.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/854-crt-putenv/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/854-crt-putenv",
+    "iterations/v2/001-original-recovery/runs/838-crt-shutdown-and-env-closers",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/854-crt-putenv/crt_putenv_854.hpp",
+    "iterations/v2/001-original-recovery/runs/854-crt-putenv/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {"va":"005a38c7","bytes":33,"sha256":"512d4e552aec7847d6d9255bc7a2e92e9e6b2852f1550812cfa63baacf09ed88","token":"@BODY_005A38C7@"},
+    {"va":"005a38e8","bytes":148,"sha256":"f65fe9e8da8058cd3c6a3a56467835baa24ea27ba4375bec640866c6f676dbce","token":"@BODY_005A38E8@"}
+  ],
+  "pass_marker": "crt_putenv_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 180,
+  "mutations": [
+    {
+      "name":"wrong-lock-id",
+      "source":"iterations/v2/001-original-recovery/runs/854-crt-putenv/crt_putenv_854.cpp",
+      "old":"exit_registry_lock_api_005a4ba4(12u);",
+      "new":"exit_registry_lock_api_005a4ba4(11u);",
+      "expected_exit":1,
+      "failure_marker":"divergence"
+    },
+    {
+      "name":"skip-narrow-failure",
+      "source":"iterations/v2/001-original-recovery/runs/854-crt-putenv/crt_putenv_854.cpp",
+      "old":"if (crt_setenv_005aa28f(narrow, 1) != 0) {",
+      "new":"if (crt_setenv_005aa28f(narrow, 1) == 0) {",
+      "expected_exit":1,
+      "failure_marker":"divergence"
+    },
+    {
+      "name":"wrong-wide-codepage",
+      "source":"iterations/v2/001-original-recovery/runs/854-crt-putenv/crt_putenv_854.cpp",
+      "old":"const int wide_count = formatter_locale_to_wide(1u, 0u, entry, -1, nullptr, 0);",
+      "new":"const int wide_count = formatter_locale_to_wide(0u, 0u, entry, -1, nullptr, 0);",
+      "expected_exit":1,
+      "failure_marker":"divergence"
+    },
+    {
+      "name":"wrong-wide-allocation-size",
+      "source":"iterations/v2/001-original-recovery/runs/854-crt-putenv/crt_putenv_854.cpp",
+      "old":"exit_registry_malloc_005a3be5(static_cast<std::uint32_t>(wide_count) * 2u));",
+      "new":"exit_registry_malloc_005a3be5(static_cast<std::uint32_t>(wide_count)));",
+      "expected_exit":1,
+      "failure_marker":"divergence"
+    },
+    {
+      "name":"ignore-wide-setenv-failure",
+      "source":"iterations/v2/001-original-recovery/runs/854-crt-putenv/crt_putenv_854.cpp",
+      "old":"return (crt_wsetenv_005aa039(wide, 0) == 0) ? 0 : -1;",
+      "new":"return (crt_wsetenv_005aa039(wide, 0) != 0) ? 0 : -1;",
+      "expected_exit":1,
+      "failure_marker":"divergence"
+    }
+  ]
+}
