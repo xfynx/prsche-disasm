@@ -1,0 +1,186 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "network_context.hpp"
+#include "porsche/event_lifecycle.hpp"
+#include "porsche/formatter_bootstrap.hpp"
+#include "porsche/heap.hpp"
+
+using U = std::uint32_t;
+using B = unsigned char;
+using Receive = void (__cdecl*)(void*, const void*);
+using namespace porsche;
+static const B raw[] = {@CREATE@};
+static constexpr U base = 0x587bf0;
+static B* code;
+static B object[0xb4], descriptor[0x60], alternate[0x60];
+static const B guid[16] = {1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+static const char name[] = "name012345678901234567890123456789012345678901234567890123456789";
+static const char short_name[] = "short";
+static unsigned scenario;
+static int initial_lock, updated_lock;
+struct Event { U kind, a, b, c; };
+struct Snapshot { Event events[10]; U size, result, count; B object_bytes[sizeof object]; };
+static Snapshot snapshot;
+
+static void fail(const char* message) {
+    std::printf("fixture failure %s\n", message);
+    std::exit(2);
+}
+static void event(U kind, U a = 0, U b = 0, U c = 0) {
+    if (snapshot.size >= 10) fail("event overflow");
+    snapshot.events[snapshot.size++] = {kind, a, b, c};
+}
+static U word(const void* ptr) {
+    U result;
+    std::memcpy(&result, ptr, sizeof result);
+    return result;
+}
+static void put(void* ptr, U value) { std::memcpy(ptr, &value, sizeof value); }
+static U address(const void* ptr) { return static_cast<U>(reinterpret_cast<std::uintptr_t>(ptr)); }
+
+namespace porsche {
+std::uint32_t network_shared_context_count_006ad748;
+void* thread_start_lock_006a57d8;
+void __cdecl network_shared_context_service_00587cc0() { fail("unexpected service"); }
+void __cdecl network_shared_context_receive_00582320(void*, const void*) { fail("unexpected receive"); }
+
+void __cdecl heap_enter_005322b0(void* lock) { event(2, lock == &initial_lock); }
+void __cdecl auxiliary_event_callback_add_0053bfe0(AuxiliaryEventCallback callback) {
+    event(3, callback == network_shared_context_service_00587cc0);
+    thread_start_lock_006a57d8 = &updated_lock;
+}
+void __cdecl heap_leave_005322c0(void* lock) { event(4, lock == &updated_lock); }
+void __cdecl heap_copy_dispatch_005323e0(void* dst, const void* src, U size) {
+    event(7, dst == object + 0x94 && src == guid, size, word(object + 0xa4));
+    if (size != 16) fail("GUID size");
+    std::memcpy(dst, src, size);
+}
+char* __cdecl formatter_error_copy_n_005a28a0(char* dst, const char* src, U size) {
+    event(8, address(dst) - address(object), src == name ? 1u : src == short_name ? 2u : 0u, size);
+    if (size > 0x33) fail("text size");
+    const auto length = std::strlen(src);
+    const auto copied = length < size ? length : size;
+    std::memcpy(dst, src, copied);
+    std::memset(dst + copied, 0, size - copied);
+    return dst;
+}
+}
+
+static U __cdecl start() {
+    event(1, network_shared_context_count_006ad748, word(object + 0x10));
+    return scenario == 0 ? 0 : 0x80000000u;
+}
+static void* __cdecl open(U endpoint, void* context, Receive receive) {
+    event(5, endpoint, context == object && receive == network_shared_context_receive_00582320,
+          word(object + 0x10));
+    if (scenario == 1 || scenario == 3) return nullptr;
+    if (scenario == 4) put(object + 0xc, address(alternate));
+    return reinterpret_cast<void*>(0x80001001);
+}
+static U read(unsigned source, void* handle, void* dst) {
+    event(6, source, address(handle) == word(object + 0x10), dst == object + 0x38);
+    if (dst != object + 0x38) fail("address destination");
+    std::memset(dst, 0x39, 20);
+    return 0;
+}
+static U __cdecl read_address(void* handle, void* dst) { return read(1, handle, dst); }
+static U __cdecl read_alternate(void* handle, void* dst) { return read(2, handle, dst); }
+
+static void operand(U site, U original, const void* replacement) {
+    B* dst = code + (site - base);
+    if (word(dst) != original) fail("absolute operand");
+    put(dst, address(replacement));
+}
+static void call(U site, U original, const void* replacement) {
+    B* dst = code + (site - base);
+    if (dst[0] != 0xe8 || site + 5 + word(dst + 1) != original) fail("relative operand");
+    put(dst + 1, address(replacement) - address(dst + 5));
+}
+static void install() {
+    code = static_cast<B*>(VirtualAlloc(nullptr, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    if (!code) fail("allocation");
+    std::memcpy(code, raw, sizeof raw);
+    operand(0x587bf1, 0x6ad748, &network_shared_context_count_006ad748);
+    operand(0x587c00, 0x6ad748, &network_shared_context_count_006ad748);
+    operand(0x587c15, 0x6a57d8, &thread_start_lock_006a57d8);
+    operand(0x587c20, 0x587cc0, reinterpret_cast<const void*>(&network_shared_context_service_00587cc0));
+    operand(0x587c2b, 0x6a57d8, &thread_start_lock_006a57d8);
+    operand(0x587c40, 0x582320, reinterpret_cast<const void*>(&network_shared_context_receive_00582320));
+    call(0x587c1a, 0x5322b0, reinterpret_cast<const void*>(&heap_enter_005322b0));
+    call(0x587c24, 0x53bfe0, reinterpret_cast<const void*>(&auxiliary_event_callback_add_0053bfe0));
+    call(0x587c30, 0x5322c0, reinterpret_cast<const void*>(&heap_leave_005322c0));
+    call(0x587c7d, 0x5323e0, reinterpret_cast<const void*>(&heap_copy_dispatch_005323e0));
+    call(0x587c8d, 0x5a28a0, reinterpret_cast<const void*>(&formatter_error_copy_n_005a28a0));
+    call(0x587ca0, 0x5a28a0, reinterpret_cast<const void*>(&formatter_error_copy_n_005a28a0));
+    DWORD old;
+    if (!VirtualProtect(code, 4096, PAGE_EXECUTE_READ, &old)) fail("protection");
+    if (!FlushInstructionCache(GetCurrentProcess(), code, sizeof raw)) fail("instruction cache");
+    put(descriptor + 0x14, address(reinterpret_cast<const void*>(&start)));
+    put(descriptor + 0x1c, address(reinterpret_cast<const void*>(&open)));
+    put(descriptor + 0x44, address(reinterpret_cast<const void*>(&read_address)));
+    put(alternate + 0x44, address(reinterpret_cast<const void*>(&read_alternate)));
+}
+
+static U invoke(const void* fn, U endpoint) {
+    U before, after, result, saved_bx, saved_si, saved_di, bp_before, bp_after;
+    __asm {
+        mov before,esp
+        mov bp_before,ebp
+        mov ebx,13579bdfh
+        mov esi,2468ace0h
+        mov edi,6a31c5e7h
+        push offset short_name
+        push offset name
+        push endpoint
+        push 0
+        push offset guid
+        push offset object
+        call fn
+        add esp,24
+        mov result,eax
+        mov after,esp
+        mov bp_after,ebp
+        mov saved_bx,ebx
+        mov saved_si,esi
+        mov saved_di,edi
+    }
+    if (before != after || bp_before != bp_after || saved_bx != 0x13579bdf ||
+        saved_si != 0x2468ace0 || saved_di != 0x6a31c5e7) fail("ABI");
+    return result;
+}
+static Snapshot execute(const void* fn, U initial_count, U endpoint) {
+    snapshot = {};
+    std::memset(object, 0xcd, sizeof object);
+    put(object + 0xc, address(descriptor));
+    network_shared_context_count_006ad748 = initial_count;
+    thread_start_lock_006a57d8 = &initial_lock;
+    snapshot.result = invoke(fn, endpoint);
+    snapshot.count = network_shared_context_count_006ad748;
+    std::memcpy(snapshot.object_bytes, object, sizeof object);
+    return snapshot;
+}
+
+int main() {
+    install();
+    constexpr U counts[] = {0, 0, 0, 9, 9, 0xffffffffu, 0x80000000u};
+    constexpr U endpoints[] = {0, 1, 0xaabbccddu, 0xffffffffu};
+    unsigned cases = 0;
+    for (scenario = 0; scenario < sizeof counts / sizeof counts[0]; ++scenario) {
+        for (U endpoint : endpoints) {
+            const auto original = execute(code, counts[scenario], endpoint);
+            const auto recovered = execute(reinterpret_cast<const void*>(&network_shared_context_create_00587bf0),
+                                           counts[scenario], endpoint);
+            if (std::memcmp(&original, &recovered, sizeof original)) {
+                std::printf("divergence case=%u endpoint=%x result=%u/%u count=%u/%u events=%u/%u\n",
+                            scenario, endpoint, original.result, recovered.result, original.count,
+                            recovered.count, original.size, recovered.size);
+                return 1;
+            }
+            ++cases;
+        }
+    }
+    std::printf("network_shared_context_original_vs_cpp=PASS cases=%u\n", cases);
+}

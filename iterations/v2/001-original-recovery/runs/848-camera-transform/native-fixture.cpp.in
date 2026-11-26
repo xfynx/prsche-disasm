@@ -1,0 +1,265 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+#include "camera_transform_848.hpp"
+
+using namespace porsche;
+using U = std::uint32_t;
+using B = std::uint8_t;
+static_assert(sizeof(void*) == sizeof(U));
+
+struct State {
+    U mode;
+    U stride;
+    const void* matrix;
+    U dirty;
+};
+struct Trace {
+    State at_dispatch;
+    U mode;
+    U count;
+    U input;
+    U output;
+    U calls;
+};
+static State original{};
+static Trace trace{};
+static bool use_original = false;
+static U effect = 0u;
+static U cases = 0u;
+static U dispatch_calls = 0u;
+static float data[32]{};
+static B* wrapper;
+static B* matrix_setter;
+static B* stride_setter;
+
+static U address(const void* p) {
+    return reinterpret_cast<U>(p);
+}
+
+static void require(bool ok, const char* check) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", check, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+    }
+}
+
+static State read_state() {
+    return use_original ? original : State{
+        transform_cached_mode_005df358, transform_destination_stride_005df360,
+        transform_matrix_006a3b38, transform_matrix_dirty_006a3b5c};
+}
+
+static void write_state(const State& state) {
+    if (use_original) {
+        original = state;
+    } else {
+        transform_cached_mode_005df358 = state.mode;
+        transform_destination_stride_005df360 = state.stride;
+        transform_matrix_006a3b38 = state.matrix;
+        transform_matrix_dirty_006a3b5c = state.dirty;
+    }
+}
+
+// Controlled 0055a930 endpoint. Records the boundary and can change all four
+// cells before the wrapper restores its previously saved matrix and stride.
+std::uint32_t __cdecl porsche::transform_vector_dispatch_0055a930(
+    U mode, std::int32_t count, const float* input, float* output) {
+    ++trace.calls;
+    trace.at_dispatch = read_state();
+    trace.mode = mode;
+    trace.count = static_cast<U>(count);
+    trace.input = address(input);
+    trace.output = address(output);
+    if ((effect & 1u) != 0u) {
+        write_state({0x56563434u, 0x78781212u, data + 12, 0x99999999u});
+    }
+    if ((effect & 2u) != 0u && count > 0 && input != nullptr && output != nullptr) {
+        output[0] = input[0] + 1.0f;
+    }
+    return 0xdeadbeefu;
+}
+
+static U invoke(void* fn, const U* args, U argc) {
+    U esp_before = 0u, ebp_before = 0u, result = 0u, fail = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov esp_before, esp
+        mov ebp_before, ebp
+        mov ecx, argc
+        mov eax, args
+    push_argument:
+        dec ecx
+        push dword ptr [eax + ecx * 4]
+        test ecx, ecx
+        jne push_argument
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov ecx, argc
+        lea esp, [esp + ecx * 4]
+        mov result, eax
+        cmp esp, esp_before
+        jne bad
+        cmp ebp, ebp_before
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        pushfd
+        pop eax
+        test eax, 400h
+        jz done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, esp_before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    require(fail == 0u, "cdecl stack, nonvolatile registers or direction flag");
+    return result;
+}
+
+static U word(const B* p) {
+    U result;
+    std::memcpy(&result, p, sizeof result);
+    return result;
+}
+
+static void relocate(B* location, U expected, U replacement) {
+    require(word(location) == expected, "original relocation word");
+    std::memcpy(location, &replacement, sizeof replacement);
+}
+
+static void relocate_call(B* body, U va, U offset, U target_va, const void* target) {
+    require(body[offset - 1] == 0xe8u, "original call opcode");
+    relocate(body + offset, target_va - (va + offset + 4u),
+             address(target) - address(body + offset + 4u));
+}
+
+static void init() {
+    static constexpr B wrapper_bytes[] = {@BODY_00532A40@};
+    static constexpr B matrix_bytes[] = {@BODY_00559A40@};
+    static constexpr B stride_bytes[] = {@BODY_00559AB0@};
+    static constexpr B state_bytes[] = {@DATA_005DF358@};
+    static_assert(sizeof(wrapper_bytes) == 63 && sizeof(matrix_bytes) == 41 &&
+                  sizeof(stride_bytes) == 30 && sizeof(state_bytes) == 12);
+
+    const State initial = read_state();
+    require(initial.mode == word(state_bytes) && initial.stride == word(state_bytes + 8) &&
+            initial.matrix == nullptr && initial.dirty == 0u, "production initial state");
+
+    B* code = static_cast<B*>(VirtualAlloc(nullptr, 4096u,
+                                         MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "oracle allocation");
+    wrapper = code;
+    matrix_setter = code + 0x100;
+    stride_setter = code + 0x200;
+    std::memcpy(wrapper, wrapper_bytes, sizeof(wrapper_bytes));
+    std::memcpy(matrix_setter, matrix_bytes, sizeof(matrix_bytes));
+    std::memcpy(stride_setter, stride_bytes, sizeof(stride_bytes));
+
+    relocate_call(wrapper, 0x532a40u, 0x08u, 0x559a40u, matrix_setter);
+    relocate_call(wrapper, 0x532a40u, 0x11u, 0x559ab0u, stride_setter);
+    relocate_call(wrapper, 0x532a40u, 0x29u, 0x55a930u,
+                  reinterpret_cast<void*>(&transform_vector_dispatch_0055a930));
+    relocate_call(wrapper, 0x532a40u, 0x2fu, 0x559a40u, matrix_setter);
+    relocate_call(wrapper, 0x532a40u, 0x35u, 0x559ab0u, stride_setter);
+    relocate(matrix_setter + 0x05, 0x6a3b38u, address(&original.matrix));
+    relocate(matrix_setter + 0x0d, 0x6a3b38u, address(&original.matrix));
+    relocate(matrix_setter + 0x15, 0x6a3b5cu, address(&original.dirty));
+    relocate(matrix_setter + 0x20, 0x5df358u, address(&original.mode));
+    relocate(stride_setter + 0x05, 0x5df360u, address(&original.stride));
+    relocate(stride_setter + 0x0d, 0x5df360u, address(&original.stride));
+    relocate(stride_setter + 0x15, 0x5df358u, address(&original.mode));
+    require(FlushInstructionCache(GetCurrentProcess(), code, 4096u) != 0, "oracle cache");
+}
+
+static void reset(const State& initial) {
+    write_state(initial);
+    for (unsigned i = 0u; i < sizeof(data) / sizeof(*data); ++i) {
+        data[i] = static_cast<float>(i);
+    }
+    trace = {};
+}
+
+static void compare(void* oracle, void* recovered, const State& initial,
+                    const U* args, U argc, bool compare_return) {
+    ++cases;
+    use_original = true;
+    reset(initial);
+    const U expected_return = invoke(oracle, args, argc);
+    const State expected_state = read_state();
+    const Trace expected_trace = trace;
+    float expected_data[sizeof(data) / sizeof(*data)];
+    std::memcpy(expected_data, data, sizeof data);
+
+    use_original = false;
+    reset(initial);
+    const U actual_return = invoke(recovered, args, argc);
+    const State actual_state = read_state();
+    require(!compare_return || actual_return == expected_return, "setter EAX");
+    require(std::memcmp(&actual_state, &expected_state, sizeof(State)) == 0, "final state");
+    require(std::memcmp(&trace, &expected_trace, sizeof(Trace)) == 0, "dispatch trace");
+    require(std::memcmp(data, expected_data, sizeof data) == 0, "aliased vector memory");
+    require(trace.calls == (compare_return ? 0u : 1u), "dispatch call count");
+    dispatch_calls += trace.calls;
+}
+
+int main() {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    SetUnhandledExceptionFilter([](EXCEPTION_POINTERS* exception) -> LONG {
+        std::printf("divergence fault=%08lx ip=%p case=%u\n",
+                    exception->ExceptionRecord->ExceptionCode,
+                    exception->ExceptionRecord->ExceptionAddress, cases);
+        std::fflush(stdout);
+        ExitProcess(1);
+        return EXCEPTION_EXECUTE_HANDLER;
+    });
+    init();
+    for (U mode : {0u, 2u, 0xffffffffu, 0x00030001u}) {
+        for (U stride : {0u, 12u, 32u, 0xfffffff4u}) {
+            for (const void* matrix : {static_cast<const void*>(nullptr),
+                                       static_cast<const void*>(data + 8)}) {
+                for (U dirty : {0u, 1u, 0x12345678u}) {
+                    const State initial{mode, stride, matrix, dirty};
+                    for (U new_matrix : {0u, address(data + 8), address(data + 16)}) {
+                        compare(matrix_setter, reinterpret_cast<void*>(&set_transform_matrix_00559a40),
+                                initial, &new_matrix, 1u, true);
+                    }
+                    for (U new_stride : {0u, 12u, 32u, 0x80000000u, 0xfffffff4u}) {
+                        compare(stride_setter,
+                                reinterpret_cast<void*>(&set_transform_destination_stride_00559ab0),
+                                initial, &new_stride, 1u, true);
+                    }
+                    for (U new_matrix : {0u, address(data + 8), address(data)}) {
+                        for (U count : {0u, 1u, 3u, 0xffffffffu, 0x80000000u}) {
+                            for (U input : {0u, address(data)}) {
+                                for (U output : {0u, address(data), address(data + 1), address(data + 8)}) {
+                                    for (effect = 0u; effect < 4u; ++effect) {
+                                        const U args[] = {count, input, new_matrix, output};
+                                        compare(wrapper, reinterpret_cast<void*>(&transform_vectors_00532a40),
+                                                initial, args, 4u, false);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    std::printf("camera_transform_original_x86_vs_cpp=PASS cases=%u dispatch_calls=%u\n",
+                cases, dispatch_calls);
+}

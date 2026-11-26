@@ -1,0 +1,66 @@
+{
+  "run": 847,
+  "experiment": "local/experiments/v2-network-context-847",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "timeout_seconds": 90,
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/847-network-context/network_context.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/847-network-context/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/847-network-context",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "original_bodies": [
+    {
+      "token": "@CREATE@",
+      "va": "00587bf0",
+      "bytes": 195,
+      "sha256": "40c5c0efcb25eae91df13a775cd5c7499e918bfd1e420699f9aa1a963988abb8"
+    }
+  ],
+  "pass_marker": "network_shared_context_original_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "undo-failed-start",
+      "source": "iterations/v2/001-original-recovery/runs/847-network-context/network_context.cpp",
+      "old": "if (!read<StartTransport>(descriptor + 0x14)()) return 0;",
+      "new": "if (!read<StartTransport>(descriptor + 0x14)()) { --network_shared_context_count_006ad748; return 0; }",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "leave-stale-lock",
+      "source": "iterations/v2/001-original-recovery/runs/847-network-context/network_context.cpp",
+      "old": "heap_enter_005322b0(thread_start_lock_006a57d8);\n        auxiliary_event_callback_add_0053bfe0(network_shared_context_service_00587cc0);\n        heap_leave_005322c0(thread_start_lock_006a57d8);",
+      "new": "auto* lock = thread_start_lock_006a57d8;\n        heap_enter_005322b0(lock);\n        auxiliary_event_callback_add_0053bfe0(network_shared_context_service_00587cc0);\n        heap_leave_005322c0(lock);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "retain-old-handle",
+      "source": "iterations/v2/001-original-recovery/runs/847-network-context/network_context.cpp",
+      "old": "write<void*>(object + 0x10, nullptr);",
+      "new": "// The old handle remains visible during open.",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "stale-descriptor",
+      "source": "iterations/v2/001-original-recovery/runs/847-network-context/network_context.cpp",
+      "old": "    descriptor = read<Byte*>(object + 0x0c);\n    read<ReadAddress>",
+      "new": "    read<ReadAddress>",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "late-ready-flag",
+      "source": "iterations/v2/001-original-recovery/runs/847-network-context/network_context.cpp",
+      "old": "    write<std::uint32_t>(object + 0xa4, 1);\n    heap_copy_dispatch_005323e0(object + 0x94, identity, 0x10);",
+      "new": "    heap_copy_dispatch_005323e0(object + 0x94, identity, 0x10);\n    write<std::uint32_t>(object + 0xa4, 1);",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

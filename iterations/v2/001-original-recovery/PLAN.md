@@ -1,12 +1,13 @@
 # Original C/C++ recovery handoff
 
-**Paused at Run846.** For the measured corpus, registry and shared build, see [current status](../../../STATUS.md). The coordinator owns registry changes, the shared Win32 build, acceptance and publication. No workers are active.
+[Run852](runs/852-camera-and-route-integration/README.md) is the accepted shared build. See [current status](../../../STATUS.md) for the measured corpus, registry and linker frontier. The coordinator owns registry updates, shared builds and publication.
 
 ## Next dependencies
 
-- [Run844, network transports](runs/844-network-option-queries/README.md). The UDP availability probe at `005839d0` passed standalone native comparison. Before integrating the UDP/IPX initializers, trace callback `00587bf0` at context offset +8 and determine registry bounds and ownership. The descriptors reference 29 callbacks. The local-address provider and buffer are still open.
-- [Run845, camera transform](runs/845-transform-vectors-trace/README.md). The camera reaches `00532a40` in mode 2. The original dispatch selects x87, SSE or 3DNow. Trace cache/scratch writers, then compare the three paths, including stride and FP state. A production provider and differential proof are pending.
-- [Run846, audio period callback](runs/846-audio-period-device-state/README.md). Integrated. The proof covers group-zero selectors. Other selectors and live playback remain open.
+- [Run851, session reset](runs/851-session-reset/README.md). The parent and three of ten callees now compile in the game. Run853 continues the FF/input reset at `00412150` and the slot iteration at `004066d0`. Verify callbacks and canonical data before integration.
+- [Run848, camera transform](runs/848-camera-transform/README.md). The wrapper and both setters now compile. The remaining dispatch at `0055a930` selects CPU-specific kernels. Trace cache and scratch writers and compare each reachable path using [Run845](runs/845-transform-vectors-trace/README.md).
+- [Run847, network callback](runs/847-network-context/README.md) has standalone proof. Establish the service and receive callbacks, shared registry extents and descriptor ownership before admitting the [transport initializers](runs/844-network-option-queries/README.md).
+- Run854 investigates the CRT environment setter at `005a38c7` and its inner handler, reusing the environment providers integrated in Run841.
 
 Run772 is archived locally in `local/experiments/v2-run772-exploration/` (two extraction scripts and two dumps). The IAT script reuses the first slot address for each DLL, so the dump cannot establish slot ownership. [Run806](runs/806-input-caps-query/README.md) recovered the input-capability continuation and [Run809](runs/809-scene-reset-and-input-caps-integration/README.md) integrated it. For later CRT shutdown work see [Run838](runs/838-crt-shutdown-and-env-closers/README.md) and [Run841](runs/841-entry-fe-service-and-crt-shutdown-integration/README.md). Run840 was named in earlier plans but its scope and artifacts could not be located.
 
@@ -18,7 +19,7 @@ From the repository root, these read or audit existing results. The shared audit
 
 ```powershell
 py -3 scripts/research/recovery-progress.py
-py -3 scripts/research/audit-v2-native-game-batch.py --config iterations/v2/001-original-recovery/runs/846-audio-period-device-state/acceptance.json
+py -3 scripts/research/audit-v2-native-game-batch.py --config iterations/v2/001-original-recovery/runs/852-camera-and-route-integration/acceptance.json
 ```
 
 [Run history](runs/) contains per-batch proofs, commands and known limits. The [full handoff through Run846](https://github.com/xfynx/prsche-disasm/blob/9bc538dcdaaa3915ac5d1e7e77dfd071d2056465/iterations/v2/001-original-recovery/PLAN.md) preserves prior assignments, hypotheses, exact verification commands and the compiler/ABI research trail.

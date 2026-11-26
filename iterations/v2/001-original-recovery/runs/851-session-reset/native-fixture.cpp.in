@@ -1,0 +1,179 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "frame_loop_clusters_400.hpp"
+#include "session_reset_851.hpp"
+
+namespace {
+
+using Word = std::uint32_t;
+using Byte = std::uint8_t;
+using namespace porsche;
+
+using State = std::array<Word, 7>;
+State original_state{};
+const std::array<Word*, 7> candidate_cells = {{
+    &session_random_state_005d1028,
+    &session_random_multiplier_005d102c,
+    &session_random_product_00655a0c,
+    &session_random_word_00655a10,
+    &second_session_random_state_005ceae0,
+    &second_session_random_multiplier_005ceae4,
+    &session_reset_word_005e67b0,
+}};
+
+const Byte first_initial[] = {@DATA_005D1028@};
+const Byte second_initial[] = {@DATA_005CEAE0@};
+const Byte reset_initial[] = {@DATA_005E67B0@};
+const Byte first_body[] = {@BODY_004A4780@};
+const Byte second_body[] = {@BODY_0044FD00@};
+const Byte reset_body[] = {@BODY_004069D0@};
+
+constexpr Word original_addresses[] = {
+    0x005d1028u, 0x005d102cu, 0x00655a0cu, 0x00655a10u,
+    0x005ceae0u, 0x005ceae4u, 0x005e67b0u,
+};
+
+struct AddressOperand {
+    std::size_t offset;
+    std::size_t cell;
+};
+
+// Offsets of absolute dword operands in the original machine code.
+constexpr AddressOperand first_operands[] = {{21, 1}, {31, 0}, {37, 3}, {59, 2}, {75, 0}};
+constexpr AddressOperand second_operands[] = {{21, 5}, {31, 4}, {70, 4}};
+constexpr AddressOperand reset_operands[] = {{2, 6}};
+
+void require(bool ok, const char* label) {
+    if (!ok) {
+        std::printf("divergence %s\n", label);
+        std::exit(10);
+    }
+}
+
+Word read_word(const void* source) {
+    Word value;
+    std::memcpy(&value, source, sizeof value);
+    return value;
+}
+
+template <std::size_t Size, std::size_t Count>
+const void* prepare_original(const Byte (&body)[Size], const AddressOperand (&operands)[Count]) {
+    auto* code = static_cast<Byte*>(
+        VirtualAlloc(nullptr, Size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    require(code != nullptr, "oracle code allocation");
+    std::memcpy(code, body, Size);
+    for (const auto& operand : operands) {
+        auto* field = code + operand.offset;
+        require(read_word(field) == original_addresses[operand.cell], "oracle operand address");
+        const auto replacement = reinterpret_cast<std::uintptr_t>(&original_state[operand.cell]);
+        static_assert(sizeof replacement == sizeof(Word));
+        std::memcpy(field, &replacement, sizeof replacement);
+    }
+    DWORD old_protection = 0;
+    require(VirtualProtect(code, Size, PAGE_EXECUTE_READ, &old_protection) != FALSE,
+            "oracle code protection");
+    require(FlushInstructionCache(GetCurrentProcess(), code, Size) != FALSE,
+            "oracle instruction cache flush");
+    return code;
+}
+
+// Adapted from the Run692 cdecl canary for both zero- and one-argument calls.
+bool invoke(const void* fn, Word value, Word has_argument) {
+    Word before = 0, frame = 0, failed = 0;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        cmp has_argument, 0
+        je call_target
+        push value
+    call_target:
+        call fn
+        mov ecx, has_argument
+        lea ecx, [esp + ecx * 4]
+        cmp ecx, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        jmp done
+    bad:
+        mov failed, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return failed == 0;
+}
+
+void compare_cells(Word input, const char* label) {
+    for (std::size_t index = 0; index < original_state.size(); ++index) {
+        const Word actual = *candidate_cells[index];
+        const Word expected = original_state[index];
+        if (actual != expected) {
+            std::printf("divergence %s input=%08x VA=%08x original=%08x candidate=%08x\n",
+                        label, input, original_addresses[index], expected, actual);
+            std::exit(10);
+        }
+    }
+}
+
+} // namespace
+
+int main() {
+    // First check production initializers against the raw PE dwords and two
+    // loader-zero cells in the .data virtual tail, before assigning sentinels.
+    original_state = {read_word(first_initial), read_word(first_initial + 4), 0u, 0u,
+                      read_word(second_initial), read_word(second_initial + 4),
+                      read_word(reset_initial)};
+    compare_cells(0, "loader initial state");
+    const auto* original_first = prepare_original(first_body, first_operands);
+    const auto* original_second = prepare_original(second_body, second_operands);
+    const auto* original_reset = prepare_original(reset_body, reset_operands);
+    const auto* candidate_first = reinterpret_cast<const void*>(&frame_reset_service_004a4780);
+    const auto* candidate_second = reinterpret_cast<const void*>(&frame_reset_service_0044fd00);
+    const auto* candidate_reset = reinterpret_cast<const void*>(&frame_reset_service_004069d0);
+
+    // Each block reaches every remainder. The upper block also reaches UINT_MAX.
+    constexpr Word starts[] = {0u, 500u, 0x7ffffe0cu, 0x80000000u, 0xfffffe0cu};
+    Word comparisons = 0;
+    for (Word start : starts) {
+        for (Word offset = 0; offset < 500u; ++offset) {
+            const Word value = start + offset;
+            for (std::size_t index = 0; index < original_state.size(); ++index) {
+                const Word sentinel = 0xa5a50000u ^ (value * 37u) ^ original_addresses[index];
+                original_state[index] = sentinel;
+                *candidate_cells[index] = sentinel;
+            }
+            require(invoke(original_first, value, 1), "004a4780 original cdecl ABI");
+            require(invoke(candidate_first, value, 1), "004a4780 candidate cdecl ABI");
+            compare_cells(value, "004a4780");
+            require(invoke(original_second, value, 1), "0044fd00 original cdecl ABI");
+            require(invoke(candidate_second, value, 1), "0044fd00 candidate cdecl ABI");
+            compare_cells(value, "0044fd00");
+            require(invoke(original_reset, 0, 0), "004069d0 original cdecl ABI");
+            require(invoke(candidate_reset, 0, 0), "004069d0 candidate cdecl ABI");
+            compare_cells(value, "004069d0");
+            comparisons += 3;
+        }
+    }
+    std::printf("cases=%u session_reset_original_x86_vs_cpp=PASS\n", comparisons);
+}

@@ -1,0 +1,102 @@
+{
+  "run": 848,
+  "experiment": "local/experiments/v2-camera-transform-848",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/848-camera-transform/camera_transform_848.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/848-camera-transform/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/848-camera-transform"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/848-camera-transform/camera_transform_848.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "00532a40",
+      "bytes": 63,
+      "sha256": "ebdf4852a3cddf6860ce30c8fb95b918d67c5727da40fa81e24b4802629ff00e",
+      "token": "@BODY_00532A40@"
+    },
+    {
+      "va": "00559a40",
+      "bytes": 41,
+      "sha256": "976251b2907ddafe5945544aa5c986b4eb38004ebe8792170d3731e40e1fe5ec",
+      "token": "@BODY_00559A40@"
+    },
+    {
+      "va": "00559ab0",
+      "bytes": 30,
+      "sha256": "07ef2c25f7b476f457fa75f41e9eafedc8c9eeaf13dfdd94329fe363cf05af92",
+      "token": "@BODY_00559AB0@"
+    },
+    {
+      "va": "005df358",
+      "bytes": 12,
+      "sha256": "6d3369968e138fbfc7ea7959dbaa4c36bc1d6832118d0deea09e3663e528024f",
+      "token": "@DATA_005DF358@"
+    }
+  ],
+  "pass_marker": "camera_transform_original_x86_vs_cpp=PASS",
+  "timeout_seconds": 300,
+  "mutations": [
+    {
+      "name": "wrong-mode",
+      "source": "iterations/v2/001-original-recovery/runs/848-camera-transform/camera_transform_848.cpp",
+      "old": "transform_vector_dispatch_0055a930(2u,",
+      "new": "transform_vector_dispatch_0055a930(4u,",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-wrapper-stride",
+      "source": "iterations/v2/001-original-recovery/runs/848-camera-transform/camera_transform_848.cpp",
+      "old": "set_transform_destination_stride_00559ab0(12u)",
+      "new": "set_transform_destination_stride_00559ab0(32u)",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "null-matrix-does-not-invalidate",
+      "source": "iterations/v2/001-original-recovery/runs/848-camera-transform/camera_transform_848.cpp",
+      "old": "if (matrix == nullptr) {",
+      "new": "if (matrix != nullptr) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "zero-stride-does-not-invalidate",
+      "source": "iterations/v2/001-original-recovery/runs/848-camera-transform/camera_transform_848.cpp",
+      "old": "if (stride == 0u) {",
+      "new": "if (stride == 1u) {",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "missing-matrix-restoration",
+      "source": "iterations/v2/001-original-recovery/runs/848-camera-transform/camera_transform_848.cpp",
+      "old": "set_transform_matrix_00559a40(previous_matrix);",
+      "new": "(void)previous_matrix;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "missing-stride-restoration",
+      "source": "iterations/v2/001-original-recovery/runs/848-camera-transform/camera_transform_848.cpp",
+      "old": "set_transform_destination_stride_00559ab0(previous_stride);",
+      "new": "(void)previous_stride;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "bad-initial-stride",
+      "source": "iterations/v2/001-original-recovery/runs/848-camera-transform/camera_transform_848.cpp",
+      "old": "transform_destination_stride_005df360 = 32u;",
+      "new": "transform_destination_stride_005df360 = 12u;",
+      "expected_exit": 1,
+      "failure_marker": "divergence"
+    }
+  ]
+}

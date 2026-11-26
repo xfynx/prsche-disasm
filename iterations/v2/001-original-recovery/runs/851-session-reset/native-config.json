@@ -1,0 +1,86 @@
+{
+  "run": 851,
+  "experiment": "local/experiments/v2-session-reset-851",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/851-session-reset/session_reset_851.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/851-session-reset/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/851-session-reset",
+    "iterations/v2/001-original-recovery/runs/400-frame-loop-clusters",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "original_bodies": [
+    {
+      "va": "004a4780",
+      "bytes": 80,
+      "sha256": "3f40f6d0aba7bb73d045c3a5917e81ecc23ee146bca9eca3c7f32ac572862c3b",
+      "token": "@BODY_004A4780@"
+    },
+    {
+      "va": "0044fd00",
+      "bytes": 75,
+      "sha256": "9b0d9142ddc03d31e52797c4e4676152689ecf28652acc9fca024f26dc84c513",
+      "token": "@BODY_0044FD00@"
+    },
+    {
+      "va": "004069d0",
+      "bytes": 11,
+      "sha256": "43797629a33518eb026b3438903805fbbe5ec9a9b3b574910fff49e29940ad1c",
+      "token": "@BODY_004069D0@"
+    },
+    {
+      "va": "005d1028",
+      "bytes": 8,
+      "sha256": "dc042175cbc234b8ed2025a070aec5660c5f004f73ab7944d1bac9a3aac19ea3",
+      "token": "@DATA_005D1028@"
+    },
+    {
+      "va": "005ceae0",
+      "bytes": 8,
+      "sha256": "dc042175cbc234b8ed2025a070aec5660c5f004f73ab7944d1bac9a3aac19ea3",
+      "token": "@DATA_005CEAE0@"
+    },
+    {
+      "va": "005e67b0",
+      "bytes": 4,
+      "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+      "token": "@DATA_005E67B0@"
+    }
+  ],
+  "pass_marker": "session_reset_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "wrong-product",
+      "source": "iterations/v2/001-original-recovery/runs/851-session-reset/session_reset_851.cpp",
+      "old": "session_random_product_00655a0c = product;",
+      "new": "session_random_product_00655a0c = product & 0xffffu;"
+    },
+    {
+      "name": "wrong-retain",
+      "source": "iterations/v2/001-original-recovery/runs/851-session-reset/session_reset_851.cpp",
+      "old": "    session_random_word_00655a10 = 0u;",
+      "new": "    session_random_word_00655a10 = 0u;\n    session_random_product_00655a0c = 0u;"
+    },
+    {
+      "name": "wrong-divisor",
+      "source": "iterations/v2/001-original-recovery/runs/851-session-reset/session_reset_851.cpp",
+      "old": "session_random_word_00655a10 = 0u;\n\n    const std::uint32_t steps = value % 500u;",
+      "new": "session_random_word_00655a10 = 0u;\n\n    const std::uint32_t steps = value % 499u;"
+    },
+    {
+      "name": "wrong-factor",
+      "source": "iterations/v2/001-original-recovery/runs/851-session-reset/session_reset_851.cpp",
+      "old": "state = (state * 0xcd15u) & 0xffffu;",
+      "new": "state = (state * 0xcd16u) & 0xffffu;"
+    },
+    {
+      "name": "wrong-zero",
+      "source": "iterations/v2/001-original-recovery/runs/851-session-reset/session_reset_851.cpp",
+      "old": "    session_reset_word_005e67b0 = 0u;",
+      "new": "    session_reset_word_005e67b0 = 1u;"
+    }
+  ]
+}
