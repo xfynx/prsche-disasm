@@ -1,0 +1,538 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "render_row_converter_887.hpp"
+#include "porsche/heap.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+struct Event { U kind, a0, a1; };
+struct Trace {
+    U abi_fail;
+    U result;
+    U palette_ptr_is_source;
+    U scratch_hash;
+    U dst_hash;
+    U event_count;
+    Event events[24];
+};
+
+static B* code = nullptr;
+static B* slot_534b90 = nullptr;
+static B* table_5de2fc = nullptr;
+static B* table_5de3fc = nullptr;
+static B* map_5de4fc = nullptr;
+
+struct StubEntry {
+    U va;
+    B* addr;
+    U size;
+};
+static StubEntry leaf_stubs[18] = {};
+
+static U palette_source[256] = {};
+static B color_lut[32768] = {};
+alignas(16) static B dst_buf[512] = {};
+alignas(16) static B src_buf[512] = {};
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U side = 0u;
+
+static U ptr(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+template <typename Fn>
+static U fn_ptr(Fn* fn) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(reinterpret_cast<const void*>(fn)));
+}
+
+static U rd(const void* p, U offset = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + offset, sizeof v);
+    return v;
+}
+
+static void wr(void* p, U offset, U value) {
+    std::memcpy(static_cast<B*>(p) + offset, &value, sizeof value);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", msg, cases, side);
+        std::fflush(stdout);
+        ExitProcess(10u);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("divergence native-fault %08lx eip=%08lx case=%u side=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip, cases, side);
+    std::fflush(stdout);
+    ExitProcess(10u);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void event(U kind, U a0, U a1 = 0u) {
+    require(trace.event_count < 24u, "event capacity");
+    trace.events[trace.event_count++] = {kind, a0, a1};
+}
+
+static U hash_bytes(const void* p, U size) {
+    const auto* b = static_cast<const B*>(p);
+    U h = 2166136261u;
+    for (U i = 0u; i < size; ++i) h = (h ^ b[i]) * 16777619u;
+    return h;
+}
+
+} // namespace
+
+namespace porsche {
+
+const std::uint8_t* render_color_lut_0069e0ac = nullptr;
+std::uint32_t render_palette_color_key_006a6420 = 0u;
+
+std::int32_t __cdecl render_shape_type_to_depth_index_005345e0(std::uint32_t t) {
+    I result = -1;
+    switch (t) {
+    case 0x01u: case 0x40u: case 0x7au: result = 0; break;
+    case 0x02u: case 0x41u: case 0x7bu: result = 1; break;
+    case 0x03u: case 0x7eu: result = 2; break;
+    case 0x04u: case 0x78u: result = 3; break;
+    case 0x05u: case 0x43u: case 0x7fu: result = 4; break;
+    case 0x7du: result = 5; break;
+    case 0x6du: result = 6; break;
+    case 0x42u: result = 7; break;
+    }
+    event(1u, t, static_cast<U>(result));
+    return result;
+}
+
+std::uint32_t __cdecl render_descriptor_bits_00537f90(const void* descriptor) {
+    static const B bits[128] = {
+        0,4,8,15,24,32,16,0,0,0,0,0,0,0,0,0,
+        15,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        15,32,24,0,24,0,0,0,0,16,32,0,32,15,32,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        4,8,15,24,1,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,16,0,0,
+        0,0,0,0,0,0,0,0,16,1,4,8,0,32,15,24,
+    };
+    const U type = rd(descriptor) & 0x7fu;
+    event(2u, type, bits[type]);
+    return bits[type];
+}
+
+std::uint32_t* __cdecl render_getclutptr_from_resource_005346d0(
+    const void* descriptor, std::uint32_t* palette) {
+    event(3u, rd(descriptor) & 0xffu, palette == render_depthconv_palette_scratch_006bda20);
+    for (U i = 0u; i < 256u; ++i) palette[i] = 0xa5000000u ^ (i * 0x010203u);
+    return palette_source;
+}
+
+std::uint32_t __cdecl render_color_pack_00537ed0(std::uint32_t color) {
+    const U r = ((color >> 16) & 0xffu) * 7u;
+    const U g = ((color >> 8) & 0xffu) * 13u;
+    const U b = (color & 0xffu) * 3u;
+    const U res = (r ^ g ^ b ^ (color >> 24)) & 0xffu;
+    event(4u, color, res);
+    return res;
+}
+
+void __cdecl heap_copy_dispatch_005323e0(void* dst, const void* src, std::uint32_t bytes) {
+    event(5u, static_cast<U>(dst == dst_buf) | (static_cast<U>(src == src_buf) << 1), bytes);
+    if (bytes > 0u && bytes <= sizeof(dst_buf)) {
+        std::memcpy(dst, src, bytes);
+    }
+}
+
+static void palette_call(U kind, std::uint16_t* dst, const std::uint32_t* src, I count) {
+    event(kind, static_cast<U>(count), src == palette_source);
+    for (I i = 0; i < count; ++i) {
+        dst[i] = static_cast<std::uint16_t>((src[i] ^ (kind * 0x1111u)) & 0xffffu);
+    }
+}
+
+void __cdecl render_palette_swap_rb555_00570260(std::uint16_t* d, const std::uint16_t* s, I n) {
+    (void)d; (void)s; (void)n;
+}
+void __cdecl render_palette_565_to_1555_005702a0(std::uint16_t* d, const std::uint16_t* s, I n) {
+    (void)d; (void)s; (void)n;
+}
+void __cdecl render_palette_555_to_565_00570420(std::uint16_t* d, const std::uint16_t* s, I n) {
+    (void)d; (void)s; (void)n;
+}
+void __cdecl render_palette_5551_to_8888_key_00570780(std::uint32_t* d, const std::uint16_t* s, I n) {
+    (void)d; (void)s; (void)n;
+}
+void __cdecl render_palette_565_to_8888_key_00570820(std::uint32_t* d, const std::uint16_t* s, I n) {
+    (void)d; (void)s; (void)n;
+}
+
+void __cdecl render_palette_8888_to_1555_alpha_00570330(
+    std::uint16_t* d, const std::uint32_t* s, I n) { palette_call(10u, d, s, n); }
+void __cdecl render_palette_888_to_1555_00570370(
+    std::uint16_t* d, const std::uint32_t* s, I n) { palette_call(11u, d, s, n); }
+void __cdecl render_palette_8888_to_565_alpha_005704c0(
+    std::uint16_t* d, const std::uint32_t* s, I n) { palette_call(12u, d, s, n); }
+void __cdecl render_palette_888_to_565_00570510(
+    std::uint16_t* d, const std::uint32_t* s, I n) { palette_call(13u, d, s, n); }
+void __cdecl render_palette_8888_to_4444_00570540(
+    std::uint16_t* d, const std::uint32_t* s, I n) { palette_call(14u, d, s, n); }
+
+} // namespace porsche
+
+namespace {
+
+static U map_va_to_host_fn(U va) {
+    switch (va) {
+    case 0x005700d0u: return fn_ptr(&porsche::render_row_4_copy_005700d0);
+    case 0x005700f0u: return fn_ptr(&porsche::render_row_8_to_4_005700f0);
+    case 0x00570150u: return fn_ptr(&porsche::render_row_4_to_8_00570150);
+    case 0x00570190u: return fn_ptr(&porsche::render_row_8_copy_00570190);
+    case 0x005701b0u: return fn_ptr(&porsche::render_row_565_to_8_005701b0);
+    case 0x00570260u: return fn_ptr(&porsche::render_palette_swap_rb555_00570260);
+    case 0x005702a0u: return fn_ptr(&porsche::render_palette_565_to_1555_005702a0);
+    case 0x005702f0u: return fn_ptr(&porsche::render_row_565_to_1555_005702f0);
+    case 0x00570330u: return fn_ptr(&porsche::render_palette_8888_to_1555_alpha_00570330);
+    case 0x00570370u: return fn_ptr(&porsche::render_palette_888_to_1555_00570370);
+    case 0x005703a0u: return fn_ptr(&porsche::render_row_4_to_16_lut_005703a0);
+    case 0x005703f0u: return fn_ptr(&porsche::render_row_8_to_16_lut_005703f0);
+    case 0x00570420u: return fn_ptr(&porsche::render_palette_555_to_565_00570420);
+    case 0x00570470u: return fn_ptr(&porsche::render_row_16_copy_00570470);
+    case 0x005704c0u: return fn_ptr(&porsche::render_palette_8888_to_565_alpha_005704c0);
+    case 0x00570510u: return fn_ptr(&porsche::render_palette_888_to_565_00570510);
+    case 0x00570540u: return fn_ptr(&porsche::render_palette_8888_to_4444_00570540);
+    case 0x005705a0u: return fn_ptr(&porsche::render_row_565_to_4444_key_005705a0);
+    case 0x00570650u: return fn_ptr(&porsche::render_row_8_to_24_lut_00570650);
+    case 0x00570690u: return fn_ptr(&porsche::render_row_565_to_24_00570690);
+    case 0x00570700u: return fn_ptr(&porsche::render_row_24_copy_00570700);
+    case 0x00570720u: return fn_ptr(&porsche::render_row_8888_to_24_00570720);
+    case 0x00570750u: return fn_ptr(&porsche::render_row_8_to_32_lut_00570750);
+    case 0x00570780u: return fn_ptr(&porsche::render_palette_5551_to_8888_key_00570780);
+    case 0x00570820u: return fn_ptr(&porsche::render_palette_565_to_8888_key_00570820);
+    case 0x005708a0u: return fn_ptr(&porsche::render_row_4444_to_8888_005708a0);
+    case 0x00570a00u: return fn_ptr(&porsche::render_row_24_to_8888_00570a00);
+    case 0x00570a80u: return fn_ptr(&porsche::render_row_32_copy_00570a80);
+    default: require(false, "unknown callback va"); return 0u;
+    }
+}
+
+static U invoke_cdecl3(void* fn, U a0, U a1, U a2, U& abi_fail) {
+    U result = 0u, fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a2
+        push a1
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        add esp, 12
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return result;
+}
+
+static void bind_abs32(B* base, U size, U old_va, U new_va, U expected_hits) {
+    U hits = 0u;
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (rd(base, i) == old_va) {
+            wr(base, i, new_va);
+            ++hits;
+            i += 3u;
+        }
+    }
+    require(hits == expected_hits, "bind_abs32 count");
+}
+
+static void bind_rel32(B* base, U base_va, U offset, U original_target, U replacement) {
+    require(base[offset] == 0xe8u, "bind_rel32 opcode");
+    const U decoded = base_va + offset + 5u + rd(base, offset + 1u);
+    require(decoded == original_target, "bind_rel32 target");
+    wr(base, offset + 1u, replacement - (ptr(base) + offset + 5u));
+}
+
+static void init_fixture() {
+    code = static_cast<B*>(VirtualAlloc(nullptr, 16384u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    std::memset(code, 0xcc, 16384u);
+
+    const B body[] = {@BODY_00534B90@};
+    const B table0[] = {@TABLE_005DE2FC@};
+    const B table1[] = {@TABLE_005DE3FC@};
+    const B map[] = {@MAP_005DE4FC@};
+    slot_534b90 = code;
+    table_5de2fc = code + 0x200u;
+    table_5de3fc = code + 0x300u;
+    map_5de4fc = code + 0x400u;
+    std::memcpy(slot_534b90, body, sizeof body);
+    std::memcpy(table_5de2fc, table0, sizeof table0);
+    std::memcpy(table_5de3fc, table1, sizeof table1);
+    std::memcpy(map_5de4fc, map, sizeof map);
+
+    for (U i = 0u; i < 64u; ++i) {
+        wr(table_5de2fc, i * 4u, map_va_to_host_fn(rd(table_5de2fc, i * 4u)));
+        wr(table_5de3fc, i * 4u, map_va_to_host_fn(rd(table_5de3fc, i * 4u)));
+    }
+
+    bind_abs32(slot_534b90, sizeof body, 0x005de2fcu, ptr(table_5de2fc), 1u);
+    bind_abs32(slot_534b90, sizeof body, 0x005de3fcu, ptr(table_5de3fc), 1u);
+    bind_abs32(slot_534b90, sizeof body, 0x005de4fcu, ptr(map_5de4fc), 1u);
+    bind_abs32(slot_534b90, sizeof body, 0x005de2f8u,
+               ptr(&porsche::render_depthconv_palette_ptr_005de2f8), 1u);
+    bind_abs32(slot_534b90, sizeof body, 0x006bda20u,
+               ptr(porsche::render_depthconv_palette_scratch_006bda20), 7u);
+
+    const U shape_index = fn_ptr(&porsche::render_shape_type_to_depth_index_005345e0);
+    bind_rel32(slot_534b90, 0x00534b90u, 0x1du, 0x005345e0u, shape_index);
+    bind_rel32(slot_534b90, 0x00534b90u, 0x29u, 0x005345e0u, shape_index);
+    bind_rel32(slot_534b90, 0x00534b90u, 0x51u, 0x005345e0u, shape_index);
+    bind_rel32(slot_534b90, 0x00534b90u, 0x59u, 0x005345e0u, shape_index);
+    bind_rel32(slot_534b90, 0x00534b90u, 0x71u, 0x005345e0u, shape_index);
+    bind_rel32(slot_534b90, 0x00534b90u, 0x79u, 0x005345e0u, shape_index);
+    const U bits = fn_ptr(&porsche::render_descriptor_bits_00537f90);
+    bind_rel32(slot_534b90, 0x00534b90u, 0x90u, 0x00537f90u, bits);
+    bind_rel32(slot_534b90, 0x00534b90u, 0x9cu, 0x00537f90u, bits);
+    bind_rel32(slot_534b90, 0x00534b90u, 0xc9u, 0x005346d0u,
+               fn_ptr(&porsche::render_getclutptr_from_resource_005346d0));
+    bind_rel32(slot_534b90, 0x00534b90u, 0xeau, 0x00570540u,
+               fn_ptr(&porsche::render_palette_8888_to_4444_00570540));
+    bind_rel32(slot_534b90, 0x00534b90u, 0x10eu, 0x00570330u,
+               fn_ptr(&porsche::render_palette_8888_to_1555_alpha_00570330));
+    bind_rel32(slot_534b90, 0x00534b90u, 0x12eu, 0x005704c0u,
+               fn_ptr(&porsche::render_palette_8888_to_565_alpha_005704c0));
+    bind_rel32(slot_534b90, 0x00534b90u, 0x14eu, 0x00570540u,
+               fn_ptr(&porsche::render_palette_8888_to_4444_00570540));
+    bind_rel32(slot_534b90, 0x00534b90u, 0x172u, 0x00570370u,
+               fn_ptr(&porsche::render_palette_888_to_1555_00570370));
+    bind_rel32(slot_534b90, 0x00534b90u, 0x192u, 0x00570510u,
+               fn_ptr(&porsche::render_palette_888_to_565_00570510));
+
+    const B b_5700d0[] = {@BODY_005700D0@};
+    const B b_5700f0[] = {@BODY_005700F0@};
+    const B b_570150[] = {@BODY_00570150@};
+    const B b_570190[] = {@BODY_00570190@};
+    const B b_5701b0[] = {@BODY_005701B0@};
+    const B b_5702f0[] = {@BODY_005702F0@};
+    const B b_5703a0[] = {@BODY_005703A0@};
+    const B b_5703f0[] = {@BODY_005703F0@};
+    const B b_570470[] = {@BODY_00570470@};
+    const B b_5705a0[] = {@BODY_005705A0@};
+    const B b_570650[] = {@BODY_00570650@};
+    const B b_570690[] = {@BODY_00570690@};
+    const B b_570700[] = {@BODY_00570700@};
+    const B b_570720[] = {@BODY_00570720@};
+    const B b_570750[] = {@BODY_00570750@};
+    const B b_5708a0[] = {@BODY_005708A0@};
+    const B b_570a00[] = {@BODY_00570A00@};
+    const B b_570a80[] = {@BODY_00570A80@};
+
+    const struct { U va; const B* raw; U sz; } defs[18] = {
+        {0x005700d0u, b_5700d0, sizeof b_5700d0},
+        {0x005700f0u, b_5700f0, sizeof b_5700f0},
+        {0x00570150u, b_570150, sizeof b_570150},
+        {0x00570190u, b_570190, sizeof b_570190},
+        {0x005701b0u, b_5701b0, sizeof b_5701b0},
+        {0x005702f0u, b_5702f0, sizeof b_5702f0},
+        {0x005703a0u, b_5703a0, sizeof b_5703a0},
+        {0x005703f0u, b_5703f0, sizeof b_5703f0},
+        {0x00570470u, b_570470, sizeof b_570470},
+        {0x005705a0u, b_5705a0, sizeof b_5705a0},
+        {0x00570650u, b_570650, sizeof b_570650},
+        {0x00570690u, b_570690, sizeof b_570690},
+        {0x00570700u, b_570700, sizeof b_570700},
+        {0x00570720u, b_570720, sizeof b_570720},
+        {0x00570750u, b_570750, sizeof b_570750},
+        {0x005708a0u, b_5708a0, sizeof b_5708a0},
+        {0x00570a00u, b_570a00, sizeof b_570a00},
+        {0x00570a80u, b_570a80, sizeof b_570a80},
+    };
+    U cursor = 0x1000u;
+    for (U i = 0u; i < 18u; ++i) {
+        leaf_stubs[i] = {defs[i].va, code + cursor, defs[i].sz};
+        std::memcpy(leaf_stubs[i].addr, defs[i].raw, defs[i].sz);
+        cursor += 0x100u;
+    }
+
+    const U copy_fn = fn_ptr(&porsche::heap_copy_dispatch_005323e0);
+    bind_rel32(leaf_stubs[0].addr, 0x005700d0u, 0x12u, 0x005323e0u, copy_fn);
+    bind_rel32(leaf_stubs[3].addr, 0x00570190u, 0x0fu, 0x005323e0u, copy_fn);
+    bind_rel32(leaf_stubs[4].addr, 0x005701b0u, 0x50u, 0x00537ed0u,
+               fn_ptr(&porsche::render_color_pack_00537ed0));
+    bind_abs32(leaf_stubs[4].addr, leaf_stubs[4].size, 0x0069e0acu,
+               ptr(&porsche::render_color_lut_0069e0ac), 1u);
+    bind_abs32(leaf_stubs[6].addr, leaf_stubs[6].size, 0x006bda20u,
+               ptr(porsche::render_depthconv_palette_scratch_006bda20), 1u);
+    bind_abs32(leaf_stubs[7].addr, leaf_stubs[7].size, 0x006bda20u,
+               ptr(porsche::render_depthconv_palette_scratch_006bda20), 1u);
+    bind_rel32(leaf_stubs[8].addr, 0x00570470u, 0x12u, 0x005323e0u, copy_fn);
+    bind_abs32(leaf_stubs[9].addr, leaf_stubs[9].size, 0x006a6420u,
+               ptr(&porsche::render_palette_color_key_006a6420), 1u);
+    bind_abs32(leaf_stubs[10].addr, leaf_stubs[10].size, 0x005de2f8u,
+               ptr(&porsche::render_depthconv_palette_ptr_005de2f8), 1u);
+    bind_rel32(leaf_stubs[12].addr, 0x00570700u, 0x12u, 0x005323e0u, copy_fn);
+    bind_abs32(leaf_stubs[14].addr, leaf_stubs[14].size, 0x005de2f8u,
+               ptr(&porsche::render_depthconv_palette_ptr_005de2f8), 1u);
+    bind_rel32(leaf_stubs[17].addr, 0x00570a80u, 0x16u, 0x005323e0u, copy_fn);
+
+    for (U i = 0u; i < 32768u; ++i) {
+        color_lut[i] = static_cast<B>((i * 37u + 13u) & 0xffu);
+    }
+    require(FlushInstructionCache(GetCurrentProcess(), code, 16384u) != 0,
+            "FlushInstructionCache");
+}
+
+static void prepare(U salt) {
+    std::memset(&trace, 0, sizeof trace);
+    porsche::render_depthconv_palette_ptr_005de2f8 = palette_source;
+    for (U i = 0u; i < 256u; ++i) {
+        palette_source[i] = 0x81000000u ^ (i * 0x010203u) ^ (salt * 0x010101u);
+        porsche::render_depthconv_palette_scratch_006bda20[i] = 0x5a5a0000u ^ (i * 0x13u) ^ salt;
+    }
+    for (U i = 0u; i < sizeof(src_buf); ++i) {
+        src_buf[i] = static_cast<B>((i * 29u + salt * 7u + 3u) & 0xffu);
+        dst_buf[i] = static_cast<B>((0xa5u ^ (i * 11u) ^ salt) & 0xffu);
+    }
+    // Include interesting 16-bit boundary pixels at the start of src_buf.
+    const std::uint16_t edge16[8] = {
+        0x0000u, 0xffffu, 0xf800u, 0x07e0u, 0x001fu, 0x1234u, 0x8000u, 0x7fffu
+    };
+    std::memcpy(src_buf, edge16, sizeof edge16);
+}
+
+static void snapshot_534b90(U result) {
+    trace.result = result;
+    trace.palette_ptr_is_source =
+        porsche::render_depthconv_palette_ptr_005de2f8 == palette_source ? 1u : 0u;
+    trace.scratch_hash = hash_bytes(porsche::render_depthconv_palette_scratch_006bda20, 1024u);
+    require(trace.abi_fail == 0u, "ABI");
+}
+
+static void run_534b90_case(U source_type, U target_type, I direct_mode) {
+    ++cases;
+    alignas(4) U shape[8] = {};
+    shape[0] = 0xa55a0000u | source_type;
+    for (side = 0u; side < 2u; ++side) {
+        prepare(cases * 17u);
+        porsche::render_depthconv_palette_ptr_005de2f8 =
+            reinterpret_cast<U*>(static_cast<std::uintptr_t>(0x11223344u));
+        void* fn = side == 0u ? static_cast<void*>(slot_534b90)
+                              : reinterpret_cast<void*>(&porsche::render_shape_row_converter_00534b90);
+        const U result = invoke_cdecl3(fn, ptr(shape), target_type,
+                                       static_cast<U>(direct_mode), trace.abi_fail);
+        snapshot_534b90(result);
+        if (side == 0u) expected = trace;
+        else require(std::memcmp(&trace, &expected, sizeof trace) == 0,
+                     "00534b90 trace");
+    }
+}
+
+static void run_leaf_case(U idx, void* cpp_fn, I count, bool use_lut, U key_val) {
+    ++cases;
+    for (side = 0u; side < 2u; ++side) {
+        prepare(cases * 31u + idx * 7u);
+        porsche::render_color_lut_0069e0ac = use_lut ? color_lut : nullptr;
+        porsche::render_palette_color_key_006a6420 = key_val;
+        void* fn = side == 0u ? static_cast<void*>(leaf_stubs[idx].addr) : cpp_fn;
+        (void)invoke_cdecl3(fn, ptr(dst_buf), ptr(src_buf), static_cast<U>(count), trace.abi_fail);
+        require(trace.abi_fail == 0u, "leaf ABI");
+        trace.dst_hash = hash_bytes(dst_buf, sizeof(dst_buf));
+        if (side == 0u) expected = trace;
+        else require(std::memcmp(&trace, &expected, sizeof trace) == 0,
+                     "leaf trace");
+    }
+}
+
+} // namespace
+
+int main() {
+    AddVectoredExceptionHandler(1, fault_handler);
+    init_fixture();
+
+    const U types[] = {
+        0x01u,0x40u,0x7au,0x02u,0x41u,0x7bu,0x03u,0x7eu,
+        0x04u,0x78u,0x05u,0x43u,0x7fu,0x7du,0x6du,0x42u,
+    };
+    const I modes[] = {0, 1, -7};
+    for (U s : types) for (U t : types) for (I m : modes) run_534b90_case(s, t, m);
+
+    void* const cpp_leaves[18] = {
+        reinterpret_cast<void*>(&porsche::render_row_4_copy_005700d0),
+        reinterpret_cast<void*>(&porsche::render_row_8_to_4_005700f0),
+        reinterpret_cast<void*>(&porsche::render_row_4_to_8_00570150),
+        reinterpret_cast<void*>(&porsche::render_row_8_copy_00570190),
+        reinterpret_cast<void*>(&porsche::render_row_565_to_8_005701b0),
+        reinterpret_cast<void*>(&porsche::render_row_565_to_1555_005702f0),
+        reinterpret_cast<void*>(&porsche::render_row_4_to_16_lut_005703a0),
+        reinterpret_cast<void*>(&porsche::render_row_8_to_16_lut_005703f0),
+        reinterpret_cast<void*>(&porsche::render_row_16_copy_00570470),
+        reinterpret_cast<void*>(&porsche::render_row_565_to_4444_key_005705a0),
+        reinterpret_cast<void*>(&porsche::render_row_8_to_24_lut_00570650),
+        reinterpret_cast<void*>(&porsche::render_row_565_to_24_00570690),
+        reinterpret_cast<void*>(&porsche::render_row_24_copy_00570700),
+        reinterpret_cast<void*>(&porsche::render_row_8888_to_24_00570720),
+        reinterpret_cast<void*>(&porsche::render_row_8_to_32_lut_00570750),
+        reinterpret_cast<void*>(&porsche::render_row_4444_to_8888_005708a0),
+        reinterpret_cast<void*>(&porsche::render_row_24_to_8888_00570a00),
+        reinterpret_cast<void*>(&porsche::render_row_32_copy_00570a80),
+    };
+    const I counts[] = {-1, 0, 1, 2, 3, 7, 16};
+    for (U i = 0u; i < 18u; ++i) {
+        for (I c : counts) {
+            run_leaf_case(i, cpp_leaves[i], c, false, 0x1234u);
+            if (i == 4u || i == 9u) {
+                run_leaf_case(i, cpp_leaves[i], c, true, 0xf800u);
+            }
+        }
+    }
+
+    // End-to-end call through converter returned by render_shape_row_converter_00534b90.
+    ++cases;
+    alignas(4) U shape[8] = {};
+    shape[0] = 0xa55a0002u;
+    prepare(999u);
+    void* returned = porsche::render_shape_row_converter_00534b90(shape, 0x7du, 1);
+    require(returned == cpp_leaves[14], "returned row converter pointer");
+    reinterpret_cast<void(__cdecl*)(void*, const void*, I)>(returned)(dst_buf, src_buf, 8);
+    require(rd(dst_buf, 0u) == palette_source[src_buf[0]], "end-to-end converter call");
+
+    std::printf("render_row_converter_887_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    std::fflush(stdout);
+    return 0;
+}
