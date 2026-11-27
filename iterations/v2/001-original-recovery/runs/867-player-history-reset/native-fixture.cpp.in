@@ -1,0 +1,129 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "player_history_reset_867.hpp"
+#include "porsche/application_state.hpp"
+#include "porsche/startup_service_516950.hpp"
+
+using Word = std::uint32_t;
+using Byte = std::uint8_t;
+
+namespace porsche {
+Word application_player_object_table_005e8b34[9];
+std::int32_t application_active_player_count_005e8b58;
+Word application_audio_source_storage_005e8bfc[10];
+}
+
+namespace {
+using namespace porsche;
+using Player = std::array<Byte, 0xe80>;
+using Players = std::array<Player, 9>;
+Players players;
+std::array<Word, 23> at_pause;
+unsigned pauses, cases;
+const Byte parent_bytes[] = {@BODY_004069E0@};
+const Byte leaf_bytes[] = {@BODY_0040AB00@};
+
+void require(bool ok, const char* label) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n", label, cases);
+        std::exit(10);
+    }
+}
+
+void snapshot(std::array<Word, 23>& target) {
+    target[0] = session_history_enabled_005e67a4;
+    std::memcpy(target.data() + 1, session_history_snapshots_005e6df0, 16);
+    std::memcpy(target.data() + 5, session_history_state_005e6658, 72);
+}
+
+void relocate(Byte* code, unsigned offset, Word expected, Word actual) {
+    Word operand;
+    std::memcpy(&operand, code + offset, 4);
+    require(operand == expected, "original operand");
+    std::memcpy(code + offset, &actual, 4);
+}
+
+using Parent = void(__cdecl*)();
+Parent prepare() {
+    auto* code = static_cast<Byte*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+    require(code != nullptr, "allocate");
+    std::memcpy(code, parent_bytes, sizeof parent_bytes);
+    std::memcpy(code + 512, leaf_bytes, sizeof leaf_bytes);
+    struct Fixup { unsigned offset; Word address; const void* cell; };
+    const Fixup words[] = {
+        {2,0x6573ec,&application_state_006573e8.word(0x6573ec)},
+        {16,0x5e67a4,&session_history_enabled_005e67a4},
+        {21,0x5e8b58,&application_active_player_count_005e8b58},
+        {36,0x5e8b34,application_player_object_table_005e8b34},
+        {55,0x5e8b58,&application_active_player_count_005e8b58},
+        {72,0x5e8c00,application_audio_source_storage_005e8bfc+1},
+        {77,0x5e6df4,session_history_snapshots_005e6df0+1},
+        {82,0x5e6df0,session_history_snapshots_005e6df0},
+        {87,0x5e8bd4,session_history_players_005e8bd4},
+        {92,0x5e6dfc,session_history_snapshots_005e6df0+3},
+        {97,0x5e6df8,session_history_snapshots_005e6df0+2},
+    };
+    for (const auto& fixup : words)
+        relocate(code, fixup.offset, fixup.address, reinterpret_cast<Word>(fixup.cell));
+    const unsigned stores[] = {108,114,120,126,133,143,153,163,173,183,193,203,213,223,233,243,253};
+    const unsigned slots[] = {2,1,0,15,5,4,3,8,7,6,11,10,9,14,13,12,17};
+    for (unsigned i=0; i<17; ++i)
+        relocate(code,stores[i],0x5e6658+4*slots[i],reinterpret_cast<Word>(session_history_state_005e6658+slots[i]));
+    relocate(code,50,0x40ab00-0x406a16,512-54);
+    relocate(code,102,0x516950-0x406a4a,reinterpret_cast<Word>(&startup_service_noop_00516950)-reinterpret_cast<Word>(code+106));
+    DWORD old;
+    require(VirtualProtect(code,4096,PAGE_EXECUTE_READ,&old) != 0,"protect");
+    require(FlushInstructionCache(GetCurrentProcess(),code,4096) != 0,"flush");
+    return reinterpret_cast<Parent>(code);
+}
+
+void reset(int count, Word mode, bool alias) {
+    pauses=0;
+    at_pause.fill(0xaaaaaaaa);
+    application_active_player_count_005e8b58=count;
+    application_state_006573e8.word(0x6573ec)=mode;
+    session_history_enabled_005e67a4=0xcc;
+    for (unsigned i=0;i<9;++i) {
+        for (unsigned j=0;j<players[i].size();++j) players[i][j]=static_cast<Byte>(11*i+7*j);
+        application_player_object_table_005e8b34[i]=reinterpret_cast<Word>(players[alias ? 0 : i].data());
+        session_history_players_005e8bd4[i]=0x34567800+i;
+    }
+    for (unsigned i=0;i<10;++i) application_audio_source_storage_005e8bfc[i]=0x98765400+i;
+    for (unsigned i=0;i<18;++i) session_history_state_005e6658[i]=0xbbbb1100+i;
+    for (unsigned i=0;i<4;++i) session_history_snapshots_005e6df0[i]=0xfedc0000+i;
+}
+
+void check(Parent oracle,int count,Word mode,bool alias) {
+    reset(count,mode,alias);
+    oracle();
+    require(pauses==1,"original pause");
+    const auto expected_pause=at_pause;
+    std::array<Word,23> expected,actual;
+    snapshot(expected);
+    const auto expected_players=players;
+    reset(count,mode,alias);
+    frame_reset_service_004069e0();
+    snapshot(actual);
+    require(pauses==1 && at_pause==expected_pause,"pause state");
+    require(actual==expected && players==expected_players,"player and global writes");
+    ++cases;
+}
+}
+
+namespace porsche {
+void __cdecl startup_service_noop_00516950() { ++pauses; snapshot(at_pause); }
+}
+
+int main() {
+    auto oracle=prepare();
+    for (auto mode : {0u,3u,0xffffffffu})
+        for (int count : {-1,0,1,2,9})
+            for (bool alias : {false,true}) check(oracle,count,mode,alias);
+    std::printf("cases=%u player_history_original_x86_vs_cpp=PASS\n",cases);
+}

@@ -1,0 +1,7 @@
+# Player history reset
+
+The Porsche.exe index and original bytes identify `004069e0..00406ae6` and `0040ab00..0040ab26`. All addresses use module SHA-256 `ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39`. The parent sets a flag from the game mode, walks the active player slots, copies two pointers into paired snapshots, calls the existing one-byte pause service, and clears 17 words while preserving the word at `005e6698`. Another service writes that word at `004012e7`.
+
+The leaf operates at player offset `+0xe3c`. It writes 7 at offsets 0 and 8, 1 at +0x14, seven all-ones words from +0x20, and zero at +0x3c. Run831 owns the primary player slots, Run853 owns the active count, and Run850 owns the pointer at `005e8c00` as element 1 of its audio-source storage. The other source table starts at `005e8bd4`. Its writer at `0040f2fb` indexes by the count stored at `005e8bf8`, bounding the shared span to nine words.
+
+[Native attempt 001](native-config.json) executed the original parent and leaf at both optimization levels. Thirty cases per level cover three game modes, signed counts from -1 through the nine-slot boundary, and distinct or aliased player pointers. The comparison covers each full player buffer, reset storage, pointer snapshots, the preserved gap and state at the pause call. Five mutations were detected. Live player construction and race behavior remain open.
