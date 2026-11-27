@@ -1,0 +1,77 @@
+{
+  "run": 880,
+  "experiment": "local/experiments/v2-sky-texture-reload-880",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/880-sky-texture-reload/sky_texture_reload_880.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/880-sky-texture-reload/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/880-sky-texture-reload",
+    "iterations/v2/001-original-recovery/runs/536-render-resource-nodes",
+    "iterations/v2/001-original-recovery/runs/533-render-resource-factories",
+    "iterations/v2/001-original-recovery/runs/791-scene-sky-texture-create",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/880-sky-texture-reload/sky_texture_reload_880.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "0044d9a0",
+      "bytes": 103,
+      "sha256": "d495d433efee9770f10046bda6bb53c3b3290928d3f35d46766194cabd71155b",
+      "token": "@BODY_0044D9A0@"
+    },
+    {
+      "va": "00536510",
+      "bytes": 135,
+      "sha256": "a04b8d079e4c7ed4bb65c52045d59136c70eedf34d1672b222c0f42a30ad14a6",
+      "token": "@BODY_00536510@"
+    }
+  ],
+  "pass_marker": "sky_texture_reload=PASS",
+  "mutations": [
+    {
+      "name": "parse-order",
+      "source": "iterations/v2/001-original-recovery/runs/880-sky-texture-reload/sky_texture_reload_880.cpp",
+      "old": "chunk, mode, tag",
+      "new": "chunk, tag, mode",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "dimension-sign",
+      "source": "iterations/v2/001-original-recovery/runs/880-sky-texture-reload/sky_texture_reload_880.cpp",
+      "old": "read<std::int16_t>(data, 4)",
+      "new": "read<std::uint16_t>(data, 4)",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "palette-data",
+      "source": "iterations/v2/001-original-recovery/runs/880-sky-texture-reload/sky_texture_reload_880.cpp",
+      "old": "palette + 0x10",
+      "new": "palette + 0x0c",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "cleanup-owner",
+      "source": "iterations/v2/001-original-recovery/runs/880-sky-texture-reload/sky_texture_reload_880.cpp",
+      "old": "free_00531f90(parsed.conversion)",
+      "new": "free_00531f90(parsed.mip)",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "restore-slot",
+      "source": "iterations/v2/001-original-recovery/runs/880-sky-texture-reload/sky_texture_reload_880.cpp",
+      "old": "(6, scene_sky_format",
+      "new": "(4, scene_sky_format",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    }
+  ]
+}

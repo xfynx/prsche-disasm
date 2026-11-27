@@ -1,0 +1,5 @@
+# Scene route binding and sky lifecycle
+
+Both game callers of the [route binder](../874-scene-route-binding/README.md) now resolve. The binder selects the route-specific or fallback sky archive, constructs or refreshes the [sky nodes](../878-sky-resource-nodes/README.md), and tears down existing flares. [Texture reload](../880-sky-texture-reload/README.md) binds the existing parser and renderer. [Flare teardown](../879-flare-teardown/README.md) reaches the compiled [slot releases](../882-flare-cleanup-slots/README.md) and [fourteen-row cleanup](../883-scene-sky-cleanup/README.md).
+
+[Build 001](build-001.json) compiled 514 translation units across eight projects. Relative to Run877, the two binder references closed and one reference opened to flare construction at `0045d800`. The linker reports 36 unresolved names and 38 references. The [shared audit](validation.json) passed 81,792 native comparisons and 22 mutation controls with 1,273 pinned inputs. Eleven indexed functions entered the registry. Startup and gameplay await a linked executable.

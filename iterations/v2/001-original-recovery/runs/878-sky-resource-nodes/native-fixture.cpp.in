@@ -1,0 +1,47 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "scene_sky_878.hpp"
+#include "porsche/render_startup.hpp"
+using U=std::uint32_t;using B=unsigned char;
+static unsigned cases,scenario;struct Trace {U data[400];unsigned n=0;void clear(){n=0;}void push_back(U v){data[n++]=v;}void add(std::initializer_list<U> values){for(U v:values)push_back(v);}bool operator!=(const Trace& b)const{return n!=b.n||std::memcmp(data,b.data,n*4)!=0;}};static Trace events;
+static B allocation[0x54],resource[0x54];
+static void fail(){std::puts("divergence");std::exit(10);}
+static U word(const void* p){return reinterpret_cast<U>(p);}
+namespace porsche {
+RenderDisplay display;RenderDisplay* render_display_00628130=&display;
+void* __cdecl startup_network_allocate_0059ef90(U n){events.push_back(n);return scenario%3 ? allocation:nullptr;}
+void* __fastcall render_resource_node_empty_ctor_00535ed0(void* s,void*,void* parent,U flags,const char* name){events.add({word(s),word(parent),flags,word(name)});return scenario%2?resource:nullptr;}
+void* __cdecl scene_chunk_find_tag_0053c680(const void* archive,const char* name){U tag;std::memcpy(&tag,name,4);events.add({word(archive),tag});return (tag+scenario)%3 ? reinterpret_cast<void*>(0x10000000+((tag&0xff)*16)):nullptr;}
+void __cdecl scene_sky_texture_update_0044d9a0(void* node,const void* chunk,U type,U mode){events.add({word(node),word(chunk),type,mode});}
+}
+static B ctor_body[]={@BODY_00460A50@},update_body[]={@BODY_00460CD0@};
+static void call(B* code,U base,U site,U target,void* dest){U prior;std::memcpy(&prior,code+site-base+1,4);if(prior!=target-site-5)fail();U delta=word(dest)-word(code+site-base)-5;std::memcpy(code+site-base+1,&delta,4);}
+static B* prepare(){
+ B* p=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));if(!p)fail();
+ std::memcpy(p,ctor_body,sizeof ctor_body);std::memcpy(p+512,update_body,sizeof update_body);
+ call(p,0x460a50,0x460a7d,0x59ef90,reinterpret_cast<void*>(&porsche::startup_network_allocate_0059ef90));
+ call(p,0x460a50,0x460a99,0x535ed0,reinterpret_cast<void*>(&porsche::render_resource_node_empty_ctor_00535ed0));
+ U addr=word(&porsche::render_display_00628130),prior;std::memcpy(&prior,p+0x3b,4);if(prior!=0x628130)fail();std::memcpy(p+0x3b,&addr,4);
+ call(p+512,0x460cd0,0x460cfd,0x53c680,reinterpret_cast<void*>(&porsche::scene_chunk_find_tag_0053c680));
+ call(p+512,0x460cd0,0x460d1a,0x44d9a0,reinterpret_cast<void*>(&porsche::scene_sky_texture_update_0044d9a0));
+ DWORD old;if(!VirtualProtect(p,4096,PAGE_EXECUTE_READ,&old))fail();FlushInstructionCache(GetCurrentProcess(),p,4096);return p;
+}
+int main(){
+ auto* p=prepare();using C=void*(__fastcall*)(void*,void*,void*);using F=void(__fastcall*)(void*,void*,void*);
+ C ctor=reinterpret_cast<C>(p);F update=reinterpret_cast<F>(p+512);
+ U parent=0x12345678;std::memcpy(porsche::display.bytes+0x74,&parent,4);
+ for(scenario=0;scenario<96;++scenario){
+  std::array<B,0x240> initial,a,b;for(U i=0;i<initial.size();++i)initial[i]=B(i*17+scenario);
+  for(U i=0;i<40;++i){U chunk=(i+scenario)%4?0x20000000+i*32:0,node=(i+scenario)%3?0x30000000+i*32:0;std::memcpy(initial.data()+8+i*4,&chunk,4);std::memcpy(initial.data()+0x198+i*4,&node,4);for(U j=0;j<6;++j)initial[0xa8+i*6+j]=B(i*7+j+scenario);}
+  void* archive=reinterpret_cast<void*>(0x45600000+scenario*16);
+  a=b=initial;events.clear();if(ctor(a.data(),nullptr,archive)!=a.data())fail();auto trace=events;events.clear();if(porsche::scene_sky_ctor_00460a50(b.data(),nullptr,archive)!=b.data())fail();if(a!=b||trace!=events)fail();++cases;
+  a=b=initial;events.clear();update(a.data(),nullptr,archive);trace=events;events.clear();porsche::scene_sky_update_00460cd0(b.data(),nullptr,archive);if(a!=b||trace!=events)fail();++cases;
+ }
+ std::printf("cases=%u sky_original_x86_vs_cpp=PASS\n",cases);return 0;
+}

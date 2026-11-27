@@ -1,0 +1,11 @@
+# Run882: flare cleanup slots
+
+Recovers `porsche::scene_flare_aux_cleanup_004599c0`, `scene_route_sky_cleanup_0045ccb0`, and `scene_flare_resource_cleanup_00459630` as no-argument cdecl providers matching Run879's dependencies. Four individually owned original loader-zero pointer cells are `00627e18`, `00627e1c`, `00627e38`, `00627e3c` (16 bytes). Existing canonical heap/table releases remain the production dependencies.
+
+`004599c0` conditionally frees 1c and then clears it. `0045ccb0` snapshots 38, clears its first byte before freeing; it loads 3c after that callback, clears38 before the unconditional second free, and then clears3c. `00459630` snapshots18, releases its +0x104 table, frees the saved original object, and clears18. Callback changes to slots must retain these exact ordering rules. No artificial resets precede callbacks.
+
+`scope-evidence.json` records PE SHA, full body hashes and disassembly, original section proof for loader-zero storage, no registry body/interior overlaps, and a search of the Run877 compiled source/header manifest with no matching existing cell ownership. Broad iteration source/header address inspection found adjacent separate cells and the view aggregate beginning627e80; none overlap these four cells.
+
+Proof: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/882-flare-cleanup-slots/native-config.json --attempt 1`. Receipt `local/experiments/v2-flare-cleanup-slots-882/001/receipt.json` passes 3,072 cases each at /Od and /O2 (6,144 total), across null/non-null masks, byte payloads, aliases, callback rewrites of slots, and all three functions. Four material mutations are killed: final slot clear, first-byte clear, unconditional second release, and resource field offset. Production BSS zero state is asserted before any fixture reset. Callbacks record current cell state at each release; resource pointer retention across table-release mutation is covered.
+
+The proof establishes original bounded transport and effects with controlled canonical dependency endpoints. It does not establish live allocation lifetime or full flare resource behavior. No shared build/registry edits/commit. Coordinator next: add source/header, bind three Run879 calls and canonical heap/table releases, then run one frozen shared integration build/audit. Run879 remains unchanged.

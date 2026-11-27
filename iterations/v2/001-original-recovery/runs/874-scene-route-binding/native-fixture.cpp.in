@@ -1,0 +1,68 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cstdarg>
+#include <array>
+
+#include "scene_route_binding_874.hpp"
+#include "porsche/install_paths.hpp"
+#include "porsche/formatter_entry.hpp"
+#include "porsche/application_alloc.hpp"
+using W=std::uint32_t;using B=std::uint8_t;
+namespace porsche {void* scene_flare_table_00627e48; void* scene_route_sky_00627e4c; const char* install_paths_table_0065b2a0[60];}
+using namespace porsche;
+unsigned cases,variant,allocs;struct Events { char rows[20][200]{}; unsigned count=0; bool operator==(const Events& b)const{return count==b.count&&memcmp(rows,b.rows,sizeof rows)==0;}}; Events events;
+void require(bool b,const char*s){if(!b){printf("divergence %s variant=%u cases=%u\n",s,variant,cases);exit(10);}}
+W addr(const void*p){return reinterpret_cast<W>(p);}
+void event(const char*s,W a=0,W b=0){char out[200];sprintf(out,"%s %08x %08x %08x %08x %08x",s,a,b,addr(scene_route_archive_00627e50),addr(scene_route_sky_00627e4c),addr(scene_flare_table_00627e48));require(events.count<20,"event bound");strcpy(events.rows[events.count++],out);}
+namespace porsche {
+W __cdecl free_00531f90(void*p){event("free",addr(p));return 0;}
+W __cdecl application_release_0059f050(void*p){event("release",addr(p));return 0;}
+int __cdecl formatter_entry_005a0fbf(char*out,const char*fmt,...){va_list v;va_start(v,fmt);int r=vsprintf(out,fmt,v);va_end(v);event(out);return r;}
+void* __cdecl resource_open_quiet_0059d9b0(const char*p,W f){require(f==0,"quiet flags");event(p,1);return variant&1?nullptr:reinterpret_cast<void*>(0x12345000);}
+void* __cdecl resource_open_0059d8e0(const char*p,W f){require(f==0,"fallback flags");event(p,2);return variant&2?nullptr:reinterpret_cast<void*>(0x22345000);}
+void* __cdecl startup_network_allocate_0059ef90(W n){event("allocate",n,allocs);unsigned index=allocs++;return variant&(4<<index)?nullptr:reinterpret_cast<void*>(0x34560000+index*0x1000);}
+void* __fastcall scene_sky_ctor_00460a50(void*p,void*,void*d){event("sky ctor",addr(p),addr(d));return reinterpret_cast<void*>(addr(p)+0x44);}
+void __fastcall scene_sky_update_00460cd0(void*p,void*,void*d){event("sky update",addr(p),addr(d));}
+void __fastcall scene_flare_teardown_0045db10(void*p,void*){event("flare teardown",addr(p));}
+void* __fastcall scene_flare_ctor_0045d800(void*p,void*,const char*d){event(d,addr(p));return reinterpret_cast<void*>(addr(p)+0x88);}
+}
+const B body[]={@BODY@};const char raw_path[]={@PATH@};const char raw_default[]={@DEFAULT@};
+void fix(B*p,unsigned o,W old,W value){W actual;memcpy(&actual,p+o,4);require(actual==old,"raw operand");memcpy(p+o,&value,4);}
+void call(B*p,unsigned o,W va,const void*t){fix(p,o,va-(0x45dbd0+o+4),addr(t)-addr(p+o+4));}
+using Fn=void(__cdecl*)(void*,W);
+Fn prepare(){require(strcmp(raw_path,"%sSky\\%s.fsh")==0&&strcmp(raw_default,"%sSky\\default.fsh")==0,"raw PE strings");auto*p=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));require(p!=nullptr,"allocate oracle");memcpy(p,body,sizeof body);
+fix(p,20,0x627e50,addr(&scene_route_archive_00627e50));
+call(p,26,0x531f90,&free_00531f90);
+fix(p,35,0x627e50,addr(&scene_route_archive_00627e50));
+fix(p,52,0x65b2b8,addr(install_paths_table_0065b2a0+6));
+fix(p,63,0x5cf130,addr(raw_path));
+call(p,69,0x5a0fbf,&formatter_entry_005a0fbf);
+call(p,81,0x59d9b0,&resource_open_quiet_0059d9b0);
+fix(p,89,0x627e50,addr(&scene_route_archive_00627e50));
+fix(p,99,0x65b2b8,addr(install_paths_table_0065b2a0+6));
+fix(p,109,0x5cf11c,addr(raw_default));
+call(p,115,0x5a0fbf,&formatter_entry_005a0fbf);
+call(p,127,0x59d8e0,&resource_open_0059d8e0);
+fix(p,135,0x627e50,addr(&scene_route_archive_00627e50));
+fix(p,145,0x627e4c,addr(&scene_route_sky_00627e4c));
+call(p,152,0x460cd0,&scene_sky_update_00460cd0);
+fix(p,158,0x627e48,addr(&scene_flare_table_00627e48));
+call(p,169,0x45db10,&scene_flare_teardown_0045db10);
+call(p,175,0x59f050,&application_release_0059f050);
+fix(p,184,0x627e48,addr(&scene_flare_table_00627e48));
+call(p,201,0x59ef90,&startup_network_allocate_0059ef90);
+fix(p,214,0x627e50,addr(&scene_route_archive_00627e50));
+call(p,222,0x460a50,&scene_sky_ctor_00460a50);
+fix(p,227,0x627e4c,addr(&scene_route_sky_00627e4c));
+fix(p,235,0x627e4c,addr(&scene_route_sky_00627e4c));
+call(p,246,0x59ef90,&startup_network_allocate_0059ef90);
+call(p,261,0x45d800,&scene_flare_ctor_0045d800);
+fix(p,267,0x627e48,addr(&scene_flare_table_00627e48));
+fix(p,282,0x627e48,addr(&scene_flare_table_00627e48));
+DWORD old;require(VirtualProtect(p,4096,PAGE_EXECUTE_READ,&old)!=0,"protect");FlushInstructionCache(GetCurrentProcess(),p,4096);return reinterpret_cast<Fn>(p);}
+void reset(){events=Events{};allocs=0;scene_route_archive_00627e50=variant&16?nullptr:reinterpret_cast<void*>(0x11111111);scene_route_sky_00627e4c=variant&32?nullptr:reinterpret_cast<void*>(0x22222222);scene_flare_table_00627e48=variant&64?nullptr:reinterpret_cast<void*>(0x33333333);install_paths_table_0065b2a0[6]=variant&128?"Data\\":"";install_paths_table_0065b2a0[5]="wrong\\";}
+int main(){require(scene_route_archive_00627e50==nullptr,"production BSS");auto oracle=prepare();W modes[]={0,1,0x100,0x101,0xffffff00,0xffffffff};char roots[][20]={"castle","","route_99"};for(variant=0;variant<256;++variant)for(W mode:modes)for(auto& root:roots){reset();oracle(root,mode);auto expected=events;void*a=scene_route_archive_00627e50,*b=scene_route_sky_00627e4c,*c=scene_flare_table_00627e48;auto n=allocs;reset();scene_route_bind_0045dbd0(root,mode);require(events==expected&&allocs==n&&a==scene_route_archive_00627e50&&b==scene_route_sky_00627e4c&&c==scene_flare_table_00627e48,"ordered callbacks and state");++cases;}printf("cases=%u scene_route_original_x86_vs_cpp=PASS\n",cases);}

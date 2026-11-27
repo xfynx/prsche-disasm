@@ -1,10 +1,10 @@
 # Original C/C++ recovery handoff
 
-[Run877](runs/877-route-keyframes-and-emitter-integration/README.md) is the accepted shared build. See [current status](../../../STATUS.md) for the measured corpus, registry and linker frontier. The coordinator owns registry updates, shared builds and publication.
+[Run884](runs/884-scene-route-binding-and-sky-integration/README.md) is the accepted shared build. See [current status](../../../STATUS.md) for the measured corpus, registry and linker frontier. The coordinator owns registry updates, shared builds and publication.
 
 ## Next dependencies
 
-- [Session reset](runs/851-session-reset/README.md) binds all ten direct callees. [Run873](runs/873-session-scene-and-world-reset-integration/README.md) recovered world-row and scene-record reset. [Run877](runs/877-route-keyframes-and-emitter-integration/README.md) closes both route getters and the emitter reset. The next shared dependency is scene route binding `0045dbd0`. Reuse the Run786 flare/sky pointers, install-path slot 6, and the existing quiet and fallback resource openers. Trace its constructor and teardown calls. Per-player initialization `00410730`, extension creation `00406520` and world destruction `00487590` remain open.
+- [Session reset](runs/851-session-reset/README.md) binds all ten direct callees. [Run873](runs/873-session-scene-and-world-reset-integration/README.md) recovered world-row and scene-record reset. [Run877](runs/877-route-keyframes-and-emitter-integration/README.md) closes both route getters and the emitter reset. [Run884](runs/884-scene-route-binding-and-sky-integration/README.md) binds both scene-route callers, sky and texture reload, and flare teardown. Next recover flare construction `0045d800`, starting with its three 28-byte keyframe cursors and the route-data owner at `00627e18`. The constructor branches on per-entry flags and appends a final effect. Per-player initialization `00410730`, extension creation `00406520` and world destruction `00487590` remain open.
 - [Run848, camera transform](runs/848-camera-transform/README.md). The wrapper and both setters now compile. The remaining dispatch at `0055a930` selects CPU-specific kernels. Trace cache and scratch writers and compare each reachable path using [Run845](runs/845-transform-vectors-trace/README.md).
 - [Run847, network callback](runs/847-network-context/README.md) has standalone proof. Establish the service and receive callbacks, shared registry extents and descriptor ownership before admitting the [transport initializers](runs/844-network-option-queries/README.md).
 - [Run857](runs/857-wide-environment-setter/README.md) recovered the wide setter and seven helpers. [Run862](runs/862-wide-locale-compare/README.md) recovers locale selection and locking. Bind the default engine at `005ae901` and localized engine at `005ae6b6`.
@@ -19,7 +19,7 @@ From the repository root, these read or audit existing results. The shared audit
 
 ```powershell
 py -3 scripts/research/recovery-progress.py
-py -3 scripts/research/audit-v2-native-game-batch.py --config iterations/v2/001-original-recovery/runs/877-route-keyframes-and-emitter-integration/acceptance.json
+py -3 scripts/research/audit-v2-native-game-batch.py --config iterations/v2/001-original-recovery/runs/884-scene-route-binding-and-sky-integration/acceptance.json
 ```
 
 [Run history](runs/) contains per-batch proofs, commands and known limits. The [full handoff through Run846](https://github.com/xfynx/prsche-disasm/blob/9bc538dcdaaa3915ac5d1e7e77dfd071d2056465/iterations/v2/001-original-recovery/PLAN.md) preserves prior assignments, hypotheses, exact verification commands and the compiler/ABI research trail.

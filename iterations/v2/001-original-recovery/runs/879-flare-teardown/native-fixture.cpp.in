@@ -1,0 +1,49 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+
+#include <cstdint>
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
+#include "flare_teardown_879.hpp"
+using U=std::uint32_t;using B=unsigned char;
+static const B original[]={@BODY@};
+static U slots[32],objects[10][4],vtable[3];
+static std::array<U,128> events;static unsigned event_count;static unsigned cases,scenario;
+static void require(bool b,const char* why){if(!b){printf("divergence %s case=%u\n",why,cases);exit(10);}}
+static void ev(U kind,U value=0){events[event_count++]=kind;events[event_count++]=value;}
+static void __fastcall destroy(void* p,void*,unsigned flags){ev(1,(static_cast<U*>(p)-&objects[0][0])*4);ev(2,flags);static_cast<U*>(p)[1]^=0x13456789;if(scenario&1)slots[9]=0;}
+namespace porsche {
+void __cdecl startup_service_noop_00516950(){} // original RET: no observable side effects
+U __cdecl application_release_0059f050(void* p){ev(3,reinterpret_cast<U>(p));if(scenario&2)slots[17]=0x12345678;return 0xabcdef00;}
+void __cdecl scene_flare_aux_cleanup_004599c0(){ev(4);slots[20]^=1;}
+void __cdecl scene_sky_cleanup_00460220(){ev(5);slots[21]^=2;}
+void __cdecl scene_route_sky_cleanup_0045ccb0(){ev(6);slots[22]^=4;}
+void __cdecl scene_flare_resource_cleanup_00459630(){ev(7);slots[23]^=8;}
+}
+using Fn=decltype(&porsche::scene_flare_teardown_0045db10);
+static Fn prepare(){
+ auto* code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));require(code!=nullptr,"alloc");memcpy(code,original,sizeof original);
+ struct Patch{U site,target;const void* replacement;};
+ const Patch patches[]={
+ {0x45db38,0x516950,&porsche::startup_service_noop_00516950},{0x45db3e,0x59f050,&porsche::application_release_0059f050},
+ {0x45db4f,0x516950,&porsche::startup_service_noop_00516950},{0x45db55,0x59f050,&porsche::application_release_0059f050},
+ {0x45db66,0x516950,&porsche::startup_service_noop_00516950},{0x45db6c,0x59f050,&porsche::application_release_0059f050},
+ {0x45db74,0x4599c0,&porsche::scene_flare_aux_cleanup_004599c0},{0x45db79,0x460220,&porsche::scene_sky_cleanup_00460220},
+ {0x45db7e,0x45ccb0,&porsche::scene_route_sky_cleanup_0045ccb0},{0x45db83,0x459630,&porsche::scene_flare_resource_cleanup_00459630}};
+ for(auto p:patches){B* at=code+p.site-0x45db10;U rel;memcpy(&rel,at+1,4);require(*at==0xe8&&rel==p.target-p.site-5,"call operand");rel=reinterpret_cast<U>(p.replacement)-reinterpret_cast<U>(at+5);memcpy(at+1,&rel,4);}
+ DWORD old;require(VirtualProtect(code,4096,PAGE_EXECUTE_READ,&old)!=0,"protect");require(FlushInstructionCache(GetCurrentProcess(),code,4096)!=0,"flush");return reinterpret_cast<Fn>(code);
+}
+static void reset(unsigned mask,unsigned buffers){
+ events.fill(0);event_count=0;for(unsigned i=0;i<32;++i)slots[i]=0x90000000+i;
+ for(unsigned i=0;i<10;++i){objects[i][0]=reinterpret_cast<U>(vtable);objects[i][1]=0x12340000+i;objects[i][2]=0x99887766;objects[i][3]=0x66554433;slots[i]=(mask&(1<<i))?reinterpret_cast<U>(objects[i]):0;}
+ for(unsigned i=0;i<3;++i)slots[17+i]=(buffers&(1<<i))?(0x10001000+i*256):0;
+}
+int main(){const auto oracle=prepare();vtable[0]=vtable[1]=0;vtable[2]=reinterpret_cast<U>(&destroy);
+ for(scenario=0;scenario<4;++scenario)for(unsigned mask=0;mask<1024;++mask)for(unsigned buffers=0;buffers<8;++buffers){
+ reset(mask,buffers);oracle(slots,nullptr);const auto expected=events;std::array<U,32> expected_slots;memcpy(expected_slots.data(),slots,sizeof slots);std::array<U,40> expected_objects;memcpy(expected_objects.data(),objects,sizeof objects);
+ reset(mask,buffers);porsche::scene_flare_teardown_0045db10(slots,nullptr);require(events==expected,"call order and args");require(memcmp(expected_slots.data(),slots,sizeof slots)==0,"all object bytes");require(memcmp(expected_objects.data(),objects,sizeof objects)==0,"virtual effects");++cases;
+ }
+ printf("cases=%u flare_teardown_original_x86_vs_cpp=PASS\n",cases);return 0;
+}

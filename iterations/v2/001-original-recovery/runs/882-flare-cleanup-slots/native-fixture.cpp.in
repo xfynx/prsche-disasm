@@ -1,0 +1,60 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "flare_cleanup_slots_882.hpp"
+#include "porsche/application_alloc.hpp"
+#include "porsche/context_effects.hpp"
+using U=std::uint32_t;using B=unsigned char;
+static const B body0[]={@BODY0@},body1[]={@BODY1@},body2[]={@BODY2@};
+static std::array<U,100> events;static unsigned count,cases,mode;
+static B bytes[16],resource[0x120],alternate[0x120];
+static U raw(const void* p){return reinterpret_cast<U>(p);}
+static void require(bool b,const char* why){if(!b){printf("divergence %s case=%u\n",why,cases);exit(10);}}
+static void ev(U kind,void* p){events[count++]=kind;events[count++]=raw(p);events[count++]=bytes[0];events[count++]=raw(porsche::scene_flare_resource_00627e18);events[count++]=raw(porsche::scene_flare_aux_00627e1c);events[count++]=raw(porsche::scene_route_sky_bytes_00627e38);events[count++]=raw(porsche::scene_route_sky_aux_00627e3c);}
+namespace porsche {
+U __cdecl application_release_0059f050(void* p){ev(1,p);if(mode&1){scene_flare_aux_00627e1c=alternate;scene_route_sky_bytes_00627e38=alternate;scene_route_sky_aux_00627e3c=alternate;scene_flare_resource_00627e18=alternate;}return 0xaabbccdd;}
+void __cdecl context_table_release_0059ecd0(void* p){ev(2,p);if(mode&2)scene_flare_resource_00627e18=alternate;}
+}
+using Fn=void(__cdecl*)();
+static B* prepare(){
+ B* code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));require(code!=nullptr,"alloc");
+ memcpy(code,body0,sizeof body0);memcpy(code+256,body1,sizeof body1);memcpy(code+512,body2,sizeof body2);
+ auto patch=[](B* at,U old,U value){U actual;memcpy(&actual,at,4);require(actual==old,"original operand");memcpy(at,&value,4);};
+patch(code+1,0x627e1c,reinterpret_cast<U>(&porsche::scene_flare_aux_00627e1c));
+patch(code+11,0x145681,reinterpret_cast<U>(&porsche::application_release_0059f050)-reinterpret_cast<U>(code+15));
+patch(code+20,0x627e1c,reinterpret_cast<U>(&porsche::scene_flare_aux_00627e1c));
+patch(code+257,0x627e38,reinterpret_cast<U>(&porsche::scene_route_sky_bytes_00627e38));
+patch(code+270,0x14238e,reinterpret_cast<U>(&porsche::application_release_0059f050)-reinterpret_cast<U>(code+274));
+patch(code+278,0x627e3c,reinterpret_cast<U>(&porsche::scene_route_sky_aux_00627e3c));
+patch(code+284,0x627e38,reinterpret_cast<U>(&porsche::scene_route_sky_bytes_00627e38));
+patch(code+294,0x142376,reinterpret_cast<U>(&porsche::application_release_0059f050)-reinterpret_cast<U>(code+298));
+patch(code+303,0x627e3c,reinterpret_cast<U>(&porsche::scene_route_sky_aux_00627e3c));
+patch(code+515,0x627e18,reinterpret_cast<U>(&porsche::scene_flare_resource_00627e18));
+patch(code+531,0x145689,reinterpret_cast<U>(&porsche::context_table_release_0059ecd0)-reinterpret_cast<U>(code+535));
+patch(code+537,0x145a03,reinterpret_cast<U>(&porsche::application_release_0059f050)-reinterpret_cast<U>(code+541));
+patch(code+546,0x627e18,reinterpret_cast<U>(&porsche::scene_flare_resource_00627e18));
+ DWORD old;require(VirtualProtect(code,4096,PAGE_EXECUTE_READ,&old)!=0,"protect");require(FlushInstructionCache(GetCurrentProcess(),code,4096)!=0,"flush");return code;
+}
+static void reset(unsigned mask,unsigned seed){
+ events.fill(0);count=0;
+ for(unsigned i=0;i<sizeof bytes;++i)bytes[i]=B(i*19+seed);
+ for(unsigned i=0;i<sizeof resource;++i){resource[i]=B(i*7+seed);alternate[i]=B(i*13+seed);}
+ U table=0x12340000+seed;memcpy(resource+0x104,&table,4);table^=0x99887766;memcpy(resource+0x100,&table,4);
+ porsche::scene_flare_resource_00627e18=(mask&1)?resource:nullptr;
+ porsche::scene_flare_aux_00627e1c=(mask&2)?bytes:nullptr;
+ porsche::scene_route_sky_bytes_00627e38=(mask&4)?bytes:nullptr;
+ porsche::scene_route_sky_aux_00627e3c=(mask&8)?((seed&1)?bytes:alternate):nullptr;
+}
+static std::array<U,4> slots(){return {raw(porsche::scene_flare_resource_00627e18),raw(porsche::scene_flare_aux_00627e1c),raw(porsche::scene_route_sky_bytes_00627e38),raw(porsche::scene_route_sky_aux_00627e3c)};}
+int main(){for(U v:slots())require(v==0,"production BSS");B* oracle=prepare();
+ const Fn recovered[]={porsche::scene_flare_aux_cleanup_004599c0,porsche::scene_route_sky_cleanup_0045ccb0,porsche::scene_flare_resource_cleanup_00459630};
+ for(unsigned entry=0;entry<3;++entry)for(mode=0;mode<4;++mode)for(unsigned mask=0;mask<16;++mask)for(unsigned seed=0;seed<16;++seed){
+  reset(mask,seed);reinterpret_cast<Fn>(oracle+entry*256)();auto expected=events;auto expected_slots=slots();std::array<B,16> expected_bytes;memcpy(expected_bytes.data(),bytes,sizeof bytes);
+  reset(mask,seed);recovered[entry]();require(events==expected,"effects order arguments and visible state");require(slots()==expected_slots,"post-call slots");require(memcmp(bytes,expected_bytes.data(),sizeof bytes)==0,"byte clear");++cases;
+ }
+ printf("cases=%u flare_cleanup_original_x86_vs_cpp=PASS\n",cases);
+}

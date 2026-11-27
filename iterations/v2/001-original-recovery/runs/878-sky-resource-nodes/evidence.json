@@ -1,0 +1,35 @@
+{
+  "module": "Porsche.exe",
+  "sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "index_query": "functions.jsonl entry_va 00460a50 and 00460cd0; original bytes and capstone disassembly",
+  "bodies": [
+    {
+      "entry": "00460a50",
+      "end": "00460aaf",
+      "bytes": 96,
+      "abi": "ECX self; stack archive; EAX self; RET4"
+    },
+    {
+      "entry": "00460cd0",
+      "end": "00460d31",
+      "bytes": 98,
+      "abi": "ECX self; stack archive; RET4"
+    }
+  ],
+  "registry_entry_text_matches": [],
+  "canonical_children": {
+    "0059ef90": "porsche::startup_network_allocate_0059ef90, application_alloc.hpp",
+    "00535ed0": "porsche::render_resource_node_empty_ctor_00535ed0, Run536",
+    "0053c680": "porsche::scene_chunk_find_tag_0053c680, Run786",
+    "00628130": "porsche::render_display_00628130, render_startup.cpp"
+  },
+  "new_child": "0044d9a0 __cdecl node,chunk,0x534b5920,1 (four stack args, caller ADD ESP,16); Run880 owns implementation",
+  "fields": {
+    "0": "allocated empty texture node pointer",
+    "4": "archive pointer",
+    "8..a7": "40 chunk pointers; activation gated by old pointer",
+    "a8..197": "40 six-byte names, preserved",
+    "198..237": "40 texture-node pointers"
+  },
+  "original_calculation": "For each active old chunk pointer, reread archive, lookup name at a8+6*i, replace chunk even if null; reread node at 198+4*i and update when nonnull. Constructor zeroes paired pointer arrays only, allocates 84 bytes, reads display+74 only on success, initializes empty node with flags=0/name=null."
+}

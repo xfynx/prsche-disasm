@@ -1,0 +1,9 @@
+# Run879: flare teardown
+
+Recovers the full 124-byte `0045db10..0045db8b` wrapper as `porsche::scene_flare_teardown_0045db10(void*,void*)` (`__fastcall`, ECX self, RET0). Deletes each nonnull one of ten virtual objects through vtable +8 with flag 1; then reads +0x4c, +0x48, +0x44 in that order and calls the canonical no-op and heap release for each nonnull value. Finally invokes four ordered cleanup frontiers. Slots are not cleared by this wrapper. No new global storage is introduced.
+
+Raw original bytes, instructions, ABI and dependency ownership are recorded in `scope-evidence.json`; PE SHA and original body hash are pinned by `native-config.json`. No existing registry entry owns the wrapper. Four cdecl cleanup dependencies remain explicit: `004599c0`, `00460220`, `0045ccb0`, `00459630`; virtual deletes remain indirect. Their full semantics and live resource teardown are outside this packet.
+
+Proof: `py -3 scripts/research/verify-v2-native-batch.py --config iterations/v2/001-original-recovery/runs/879-flare-teardown/native-config.json --attempt 2`. Receipt `local/experiments/v2-flare-teardown-879/002/receipt.json` passes 32,768 comparisons each at /Od and /O2, all ten-slot masks, all three-buffer masks, callback mutations of later slots and complete object bytes/call order/flags. Four material mutations are killed: loop extent, delete flag, buffer release order, final cleanup target. Controlled callbacks prove transport only. Original 00516950 is single RET and its ECX is unused; canonical no-argument cdecl binding preserves semantics.
+
+Attempt001 failed fixture link because std::vector required a C++ runtime symbol not supplied by the shared runner; retained unchanged. Attempt002 uses fixed-capacity fixture storage. No shared build, registry update, or commit performed. Coordinator next step: integrate this source/header and preserve four real cleanup frontiers; recover those owners before claiming complete flare destruction.

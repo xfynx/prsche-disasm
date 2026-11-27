@@ -1,0 +1,132 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "sky_texture_reload_880.hpp"
+#include "porsche/fe_stream.hpp"
+#include "porsche/render_display.hpp"
+#include "render_resource_node_536.hpp"
+#include "scene_sky_texture_791.hpp"
+#include <array>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <initializer_list>
+
+using namespace porsche;
+using Word = std::uint32_t;
+using Byte = unsigned char;
+using Buffer = std::array<Byte, 84>;
+static Buffer node, chunk, adjusted, palette;
+static unsigned scenario, cases;
+static const Byte wrapper_bytes[] = {@BODY_0044D9A0@};
+static const Byte reload_bytes[] = {@BODY_00536510@};
+struct Trace {
+    std::array<Word, 192> words;
+    unsigned count;
+};
+static Trace trace;
+
+static Word bits(const void* p) { return reinterpret_cast<Word>(p); }
+static void require(bool ok, const char* detail) {
+    if (!ok) { std::printf("divergence %s case=%u\n", detail, cases); std::exit(10); }
+}
+template<class T> void store(void* base, unsigned offset, T value) {
+    std::memcpy(static_cast<Byte*>(base) + offset, &value, sizeof value);
+}
+static void event(std::initializer_list<Word> words) {
+    require(trace.count + words.size() + 7 <= trace.words.size(), "trace size");
+    for (Word word : words) trace.words[trace.count++] = word;
+    Word state[7];
+    std::memcpy(state, node.data() + 8, sizeof state);
+    for (Word word : state) trace.words[trace.count++] = word;
+}
+namespace porsche {
+Word scene_sky_format_prefs_a_005ce52c[8], scene_sky_format_prefs_b_005ce54c[8];
+void* __fastcall scene_texture_descriptor_parse_0044d7e0(void* out, void*, const void* input, Word mode, Word tag) {
+    event({1, bits(input), mode, tag});
+    store(out, 12, (scenario & 1) ? adjusted.data() : chunk.data());
+    store(out, 20, (scenario & 2) ? adjusted.data() : nullptr);
+    store(out, 24, (scenario & 4) ? palette.data() : nullptr);
+    return out;
+}
+Word __cdecl render_resource_node_format_00556690(const void* p) {
+    event({2, bits(p)});
+    return 0xabe00007u + *static_cast<const Byte*>(p);
+}
+void* __cdecl render_resource_node_palette_00537fb0(const void* p) {
+    event({3, bits(p)});
+    return (scenario & 8) ? palette.data() : nullptr;
+}
+void* __cdecl render_display_texture_alloc_00554960(Word w, Word h, Word a, Word b, Word flags, const char* name) {
+    event({4, w, h, a, b, flags, bits(name)});
+    return (scenario & 16) ? nullptr : chunk.data() + 1;
+}
+void __cdecl render_display_texture_copy_00554d70(void* texture, void* pixels, Word colors) {
+    event({5, bits(texture), bits(pixels), colors});
+}
+Word __cdecl free_00531f90(void* p) { event({6, bits(p)}); return 0; }
+void __cdecl render_texture_format_table_set_00554950(Word slot, Word* table) { event({7, slot, bits(table)}); }
+}
+
+static void relocate(Byte* code, Word body, Word site, Word target, const void* mapped) {
+    auto* at = code + (site-body);
+    Word encoded;
+    std::memcpy(&encoded, at+1, 4);
+    if (*at == 0xe8) {
+        require(encoded + site + 5 == target, "original callee");
+        store(at, 1, bits(mapped) - bits(at+5));
+    } else {
+        require(*at == 0x68 && encoded == target, "original table");
+        store(at, 1, bits(mapped));
+    }
+}
+using Update = decltype(&scene_sky_texture_update_0044d9a0);
+static Update original() {
+    auto* code = static_cast<Byte*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));
+    require(code != nullptr, "allocate code");
+    auto* reload = code + 128;
+    std::memcpy(code,wrapper_bytes,sizeof wrapper_bytes);
+    std::memcpy(reload,reload_bytes,sizeof reload_bytes);
+    auto parent = [&](Word site, Word target, const void* fn) { relocate(code,0x44d9a0,site,target,fn); };
+    auto child = [&](Word site, Word target, const void* fn) { relocate(reload,0x536510,site,target,fn); };
+    parent(0x44d9b6,0x44d7e0,&scene_texture_descriptor_parse_0044d7e0);
+    parent(0x44d9c4,0x536510,reload);
+    parent(0x44d9d2,0x531f90,&free_00531f90);
+    parent(0x44d9e3,0x531f90,&free_00531f90);
+    parent(0x44d9eb,0x5ce52c,scene_sky_format_prefs_a_005ce52c);
+    parent(0x44d9f7,0x5ce54c,scene_sky_format_prefs_b_005ce54c);
+    parent(0x44d9f2,0x554950,&render_texture_format_table_set_00554950);
+    parent(0x44d9fe,0x554950,&render_texture_format_table_set_00554950);
+    child(0x53651b,0x556690,&render_resource_node_format_00556690);
+    child(0x536524,0x537fb0,&render_resource_node_palette_00537fb0);
+    child(0x536533,0x556690,&render_resource_node_format_00556690);
+    child(0x536577,0x554960,&render_display_texture_alloc_00554960);
+    child(0x536588,0x554d70,&render_display_texture_copy_00554d70);
+    DWORD old;
+    require(VirtualProtect(code,4096,PAGE_EXECUTE_READ,&old) && FlushInstructionCache(GetCurrentProcess(),code,4096), "executable");
+    return reinterpret_cast<Update>(code);
+}
+int main() {
+    const auto oracle = original();
+    for (scenario=0; scenario<64; ++scenario) {
+        for (unsigned j=0; j<node.size(); ++j) {
+            node[j] = Byte(scenario*23+3*j);
+            chunk[j] = Byte(scenario+j*7);
+            adjusted[j] = Byte(scenario*3+j*5);
+            palette[j] = Byte(251-scenario-j);
+        }
+        store(node.data(),8,(scenario & 32) ? node.data()+0x50 : nullptr);
+        const Buffer start = node;
+        const Word tag = 0x534b5920 + scenario, mode = 1 + 5*scenario;
+        trace = {};
+        oracle(node.data(),chunk.data(),tag,mode);
+        const auto expected_trace = trace;
+        const auto expected_node = node;
+        trace = {};
+        node = start;
+        scene_sky_texture_update_0044d9a0(node.data(),chunk.data(),tag,mode);
+        require(trace.count == expected_trace.count && trace.words == expected_trace.words &&
+            node == expected_node, "call sequence or node bytes");
+        ++cases;
+    }
+    std::printf("cases=%u sky_texture_reload=PASS\n",cases);
+}

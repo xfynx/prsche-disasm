@@ -1,0 +1,36 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "scene_sky_cleanup_883.hpp"
+using U=std::uint32_t;using B=unsigned char;
+static U trace[1024],n,cases,scenario;static B state[0xc0],rows[14][12],objects[14][8];
+static U word(const void* p){return reinterpret_cast<U>(p);}static void put(void* p,U off,U v){std::memcpy(static_cast<B*>(p)+off,&v,4);}
+static void fail(){std::puts("divergence");std::exit(10);}static void event(U kind,void* p,U flags=0){trace[n++]=kind;trace[n++]=word(p);trace[n++]=flags;trace[n++]=word(porsche::scene_sky_cleanup_state_00627e5c);}
+static void __fastcall destroy(void* p,void*,U flags){event(3,p,flags);if(scenario%2)porsche::scene_sky_cleanup_state_00627e5c=reinterpret_cast<void*>(0x12345678);}
+static void* vtable[]={reinterpret_cast<void*>(&destroy)};
+namespace porsche {
+void __cdecl context_table_release_0059ecd0(void* p){event(1,p);}
+U __cdecl application_release_0059f050(void* p){event(2,p);return 0xf00d;}
+}
+static B parent[]={@BODY_00460220@},child[]={@BODY_00468960@};
+static void call(B* p,U base,U site,U target,void* dest){U old;std::memcpy(&old,p+site-base+1,4);if(old!=target-site-5)fail();U delta=word(dest)-word(p+site-base)-5;std::memcpy(p+site-base+1,&delta,4);}
+static B* prepare(){B* p=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!p)fail();std::memcpy(p,parent,sizeof parent);std::memcpy(p+512,child,sizeof child);
+call(p,0x460220,0x460235,0x59ecd0,reinterpret_cast<void*>(&porsche::context_table_release_0059ecd0));
+for(U a:{0x460248,0x46025e,0x46026d})call(p,0x460220,a,0x59f050,reinterpret_cast<void*>(&porsche::application_release_0059f050));
+call(p,0x460220,0x460258,0x468960,p+512);call(p+512,0x468960,0x468967,0x59f050,reinterpret_cast<void*>(&porsche::application_release_0059f050));
+for(U off:{3u,0x57u,0x66u}){U old;std::memcpy(&old,p+off,4);if(old!=0x627e5c)fail();U a=word(&porsche::scene_sky_cleanup_state_00627e5c);std::memcpy(p+off,&a,4);}
+DWORD old;if(!VirtualProtect(p,4096,PAGE_EXECUTE_READ,&old))fail();FlushInstructionCache(GetCurrentProcess(),p,4096);return p;}
+static void init(){for(U i=0;i<sizeof state;++i)state[i]=B(i*7+scenario);for(U i=0;i<14;++i){put(objects[i],0,word(vtable));put(objects[i],4,0xaabbccdd);put(rows[i],0,(scenario+i)%3?word(objects[i]):0);put(rows[i],4,(scenario+i)%4?0x10000000+i*16:0);put(rows[i],8,0x87654321);put(state,i*4,(scenario+i)%5?word(rows[i]):0);put(state,0x38+i*4,(scenario+i)%2?0x20000000+i*16:0);}put(state,0xb8,scenario%3?0x34567890:0);porsche::scene_sky_cleanup_state_00627e5c=scenario%16?state:nullptr;n=0;}
+int main(){B* p=prepare();using P=void(__cdecl*)();using C=void(__fastcall*)(void*,void*);
+if(porsche::scene_sky_cleanup_state_00627e5c)fail();
+for(scenario=0;scenario<96;++scenario){
+ init();reinterpret_cast<P>(p)();U expected[1024],count=n;std::memcpy(expected,trace,n*4);B state_copy[sizeof state],rows_copy[sizeof rows];std::memcpy(state_copy,state,sizeof state);std::memcpy(rows_copy,rows,sizeof rows);if(porsche::scene_sky_cleanup_state_00627e5c)fail();
+ init();porsche::scene_sky_cleanup_00460220();if(n!=count||std::memcmp(expected,trace,n*4)||std::memcmp(state_copy,state,sizeof state)||std::memcmp(rows_copy,rows,sizeof rows)||porsche::scene_sky_cleanup_state_00627e5c)fail();++cases;
+ init();reinterpret_cast<C>(p+512)(rows[scenario%14],nullptr);count=n;std::memcpy(expected,trace,n*4);U final=word(porsche::scene_sky_cleanup_state_00627e5c);init();porsche::scene_sky_row_destroy_00468960(rows[scenario%14],nullptr);if(n!=count||std::memcmp(expected,trace,n*4)||word(porsche::scene_sky_cleanup_state_00627e5c)!=final)fail();++cases;
+}
+std::printf("cases=%u sky_cleanup_original_x86_vs_cpp=PASS\n",cases);return 0;}
+
