@@ -1,0 +1,97 @@
+{
+  "run": 875,
+  "experiment": "local/experiments/v2-route-keyframe-samples-875",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/875-route-keyframe-samples/route_keyframe_samples_875.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/875-route-keyframe-samples/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/875-route-keyframe-samples"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/875-route-keyframe-samples/route_keyframe_samples_875.hpp"
+  ],
+  "original_bodies": [
+    {
+      "va": "0045a540",
+      "bytes": 28,
+      "sha256": "9a11ba33cabcaca28d8b362dd09a42eff88020d087e46550fc3f5d2aa0ea6ed3",
+      "token": "@BODY_0045A540@"
+    },
+    {
+      "va": "0045a560",
+      "bytes": 305,
+      "sha256": "74bdd1e73670500fc9b3124995f5673ac16ae22f65874c991e4e3d5ff9db9387",
+      "token": "@BODY_0045A560@"
+    },
+    {
+      "va": "0045a8e0",
+      "bytes": 47,
+      "sha256": "e118e0244cda109a9e814cf975cd4c94bf55396667b72e11726ce47eddec2814",
+      "token": "@BODY_0045A8E0@"
+    },
+    {
+      "va": "0045a940",
+      "bytes": 47,
+      "sha256": "f42d46a151a09d045a9dd6df76613f86f1d4e35a93ed0ff247cebf2ab7e168bb",
+      "token": "@BODY_0045A940@"
+    },
+    {
+      "va": "0045cfd0",
+      "bytes": 36,
+      "sha256": "4b254f25a5c1dbc94b0b00f7cef1b36c2c3d685c0b226dd82c6ac05d3d8a0cc3",
+      "token": "@BODY_0045CFD0@"
+    },
+    {
+      "va": "0045d000",
+      "bytes": 36,
+      "sha256": "55b06649af6c96f055997f650a58cd7232096044a6d916575dd08260fa4587cd",
+      "token": "@BODY_0045D000@"
+    }
+  ],
+  "pass_marker": "route_keyframe_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "wrap-index",
+      "source": "iterations/v2/001-original-recovery/runs/875-route-keyframe-samples/route_keyframe_samples_875.cpp",
+      "old": "next < cursor->count ? next : 0",
+      "new": "next < cursor->count ? next : index",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "cached-range",
+      "source": "iterations/v2/001-original-recovery/runs/875-route-keyframe-samples/route_keyframe_samples_875.cpp",
+      "old": "position < cursor->keys[cursor->next].position",
+      "new": "position <= cursor->keys[cursor->next].position",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-period",
+      "source": "iterations/v2/001-original-recovery/runs/875-route-keyframe-samples/route_keyframe_samples_875.cpp",
+      "old": "values[0] = forward_distance(from, position, length);",
+      "new": "values[0] = forward_distance(to, position, length);",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "swapped-component",
+      "source": "iterations/v2/001-original-recovery/runs/875-route-keyframe-samples/route_keyframe_samples_875.cpp",
+      "old": "mov edx, 32",
+      "new": "mov edx, 24",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-forwarded-weight",
+      "source": "iterations/v2/001-original-recovery/runs/875-route-keyframe-samples/route_keyframe_samples_875.cpp",
+      "old": "        call route_key_sample_0045a940",
+      "new": "        xor dword ptr [esp], 01000000h\n        call route_key_sample_0045a940",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "scene_emitter_reset_876.hpp"
+#include "../821-scene-stage-58b80-ctor/scene_stage_58b80_ctor_821.hpp"
+
+using Byte=unsigned char;
+using Word=std::uint32_t;
+float _DAT_005b24a8=1.0f;
+const float half=0.5f, scale=150.0f;
+const double half_wide=0.5;
+const Byte parent_bytes[]={@BODY_004581A0@}, child_bytes[]={@BODY_004583F0@};
+const Byte zero_bytes[]={@BODY_004580E0@}, ftol_bytes[]={@BODY_005A0F98@};
+const void* zero_original;
+const void* ftol_original;
+unsigned calls,cases;
+Word seed;
+namespace porsche {
+__declspec(naked) void __fastcall scene_splt_zero_tables_004580e0(void*,void*) {
+    __asm { jmp dword ptr [zero_original] }
+}
+__declspec(naked) std::int64_t __cdecl audio_stream_ftol_005a0f98() {
+    __asm { jmp dword ptr [ftol_original] }
+}
+float __cdecl rand_unit_005561d0(){
+    ++calls;
+    seed=seed*1664525u+1013904223u;
+    return static_cast<float>(seed>>16)/65536.0f;
+}
+}
+namespace {
+using namespace porsche;
+using Record=std::array<Byte,0x6800>;
+using Fn=decltype(&scene_record_emitter_reset_004581a0);
+static Record initial,actual,expected;
+void require(bool ok,const char* why){if(!ok){std::printf("divergence %s case=%u\n",why,cases);std::exit(10);}}
+void operand(Byte* at,Word expected_word,Word replacement){
+    Word v;std::memcpy(&v,at,4);require(v==expected_word,"original operand");std::memcpy(at,&replacement,4);
+}
+void call(Byte* code,Word base,Word site,Word original_target,const void* endpoint){
+    auto* at=code+(site-base);require(*at==0xe8,"call");
+    operand(at+1,original_target-site-5,reinterpret_cast<Word>(endpoint)-reinterpret_cast<Word>(at+5));
+}
+Fn prepare(){
+    auto* code=static_cast<Byte*>(VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));
+    require(code!=nullptr,"allocate");
+    std::memcpy(code,parent_bytes,sizeof parent_bytes);
+    std::memcpy(code+512,child_bytes,sizeof child_bytes);
+    std::memcpy(code+1024,zero_bytes,sizeof zero_bytes);zero_original=code+1024;
+    std::memcpy(code+1280,ftol_bytes,sizeof ftol_bytes);ftol_original=code+1280;
+    call(code,0x4581a0,0x458210,0x4580e0,zero_original);
+    call(code,0x4581a0,0x458283,0x5a0f98,ftol_original);
+    call(code,0x4581a0,0x4582a6,0x4583f0,code+512);
+    call(code+512,0x4583f0,0x4583f4,0x5561d0,reinterpret_cast<void*>(&rand_unit_005561d0));
+    call(code+512,0x4583f0,0x458411,0x5561d0,reinterpret_cast<void*>(&rand_unit_005561d0));
+    for(Word site:{0x45821b,0x45822a})operand(code+(site-0x4581a0)+2,0x5b24a8,reinterpret_cast<Word>(&_DAT_005b24a8));
+    for(Word site:{0x458233,0x458243})operand(code+(site-0x4581a0)+2,0x5b23f0,reinterpret_cast<Word>(&half));
+    operand(code+(0x45826b-0x4581a0)+2,0x5b248c,reinterpret_cast<Word>(&scale));
+    operand(code+512+(0x458405-0x4583f0)+2,0x5b2778,reinterpret_cast<Word>(&half_wide));
+    DWORD old;require(VirtualProtect(code,4096,PAGE_EXECUTE_READ,&old)!=0,"protect");
+    require(FlushInstructionCache(GetCurrentProcess(),code,4096)!=0,"flush");
+    return reinterpret_cast<Fn>(code);
+}
+void put(unsigned off,float value){std::memcpy(initial.data()+off,&value,4);}
+float fp(Word bits){float v;std::memcpy(&v,&bits,4);return v;}
+void check(Fn oracle,float a,float b,unsigned scenario){
+    for(unsigned i=0;i<initial.size();++i)initial[i]=static_cast<Byte>(13*i+scenario+7);
+    put(0,scenario==0 ? -0.125f : scenario==1 ? 1.f : fp(0x7fc00007));
+    Word cached=scenario==2 ? 9 : 4;std::memcpy(initial.data()+8,&cached,4);
+    put(0x67b0,0.4375f);
+    for(unsigned i=0;i<11;++i)put(0x6768+4*i,float(int(i%4)-2)*1.18750012f+0.03123f);
+    const Word start=cases*19+0xfedcba98;
+    calls=0;seed=start;expected=initial;oracle(expected.data(),nullptr,a,b);
+    const Word final_seed=seed, n=calls;
+    calls=0;seed=start;actual=initial;scene_record_emitter_reset_004581a0(actual.data(),nullptr,a,b);
+    require(n==calls && seed==final_seed,"RNG order");
+    require(actual==expected,"emitter bytes");++cases;
+}
+}
+int main(){
+    const auto oracle=prepare();
+    const Word values[]={0xbf800000,0,0x3d8fffff,0x3effffff,0x3f000000,0x3f000001,0x3fc00000,0x7fc00007};
+    for(unsigned rc=0;rc<4;++rc){
+        unsigned short cw=static_cast<unsigned short>(0x037f|(rc<<10));
+        __asm { fldcw cw }
+        for(Word a:values)for(Word b:values)for(unsigned scenario=0;scenario<3;++scenario)
+            check(oracle,fp(a),fp(b),scenario);
+    }
+    __asm { fninit }
+    std::printf("cases=%u emitter_original_x86_vs_cpp=PASS\n",cases);
+    return 0;
+}

@@ -1,0 +1,116 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "route_keyframe_samples_875.hpp"
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+float _DAT_005b24a8=1.0f;
+namespace porsche { void* track_road_data_00628bc0; }
+namespace {
+using namespace porsche;
+using Word=std::uint32_t;
+using Byte=unsigned char;
+using Extended=std::array<Byte,10>;
+const Byte select_body[]={@BODY_0045A540@}, weight_body[]={@BODY_0045A560@};
+const Byte first_lerp[]={@BODY_0045A940@}, second_lerp[]={@BODY_0045A8E0@};
+const Byte first_getter[]={@BODY_0045CFD0@}, second_getter[]={@BODY_0045D000@};
+constexpr unsigned base=0x45a540;
+unsigned cases;
+void require(bool ok,const char* why){
+    if(!ok){std::printf("divergence %s case=%u\n",why,cases);std::exit(10);}
+}
+void fix(Byte* body,unsigned n,Word old_value,const void* value,unsigned expected) {
+    unsigned count=0;
+    for(unsigned i=0;i+4<=n;++i){
+        Word v;
+        std::memcpy(&v,body+i,4);
+        if(v==old_value){
+            std::memcpy(body+i,&value,4);
+            ++count;
+        }
+    }
+    require(count==expected,"operand count");
+}
+Byte* prepare(){
+    auto* code=static_cast<Byte*>(VirtualAlloc(nullptr,0x3000,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));
+    require(code!=nullptr,"allocate");
+    struct Piece {unsigned va;const Byte* src;unsigned n;};
+    const Piece pieces[]={{base,select_body,sizeof select_body},{0x45a560,weight_body,sizeof weight_body},
+        {0x45a940,first_lerp,sizeof first_lerp},{0x45a8e0,second_lerp,sizeof second_lerp},
+        {0x45cfd0,first_getter,sizeof first_getter},{0x45d000,second_getter,sizeof second_getter}};
+    for(auto p:pieces)std::memcpy(code+(p.va-base),p.src,p.n);
+    fix(code+0x20,sizeof weight_body,0x628bc0,&track_road_data_00628bc0,1);
+    fix(code+0x20,sizeof weight_body,0x5b24a8,&_DAT_005b24a8,2);
+    fix(code+(0x45a940-base),sizeof first_lerp,0x5b24a8,&_DAT_005b24a8,1);
+    fix(code+(0x45a8e0-base),sizeof second_lerp,0x5b24a8,&_DAT_005b24a8,1);
+    DWORD old;
+    require(VirtualProtect(code,0x3000,PAGE_EXECUTE_READ,&old)!=0,"protect");
+    require(FlushInstructionCache(GetCurrentProcess(),code,0x3000)!=0,"flush");
+    return code;
+}
+void invoke(const void* entry,void* self,bool has_arg,Word arg,Extended& result) {
+    auto* dst=result.data();
+    Word sp_before,sp_after;
+    __asm {
+        mov sp_before,esp
+        cmp has_arg,0
+        je no_arg
+        push arg
+    no_arg:
+        mov ecx,self
+        call entry
+        mov eax,dst
+        fstp tbyte ptr [eax]
+        mov sp_after,esp
+        mov esp,sp_before
+    }
+    require(sp_before==sp_after,"stack cleanup");
+}
+void compare(const Byte* oracle,unsigned kind,RouteCursor875 initial,int pos) {
+    const unsigned addrs[]={0x45a560,0x45cfd0,0x45d000};
+    const void* compiled[]={reinterpret_cast<void*>(&route_key_weight_0045a560),
+        reinterpret_cast<void*>(&scene_route_first_sample_0045cfd0),
+        reinterpret_cast<void*>(&scene_route_second_sample_0045d000)};
+    Word object[24]{};
+    object[20]=pos;
+    RouteCursor875 a=initial,b=initial;
+    Extended x{},y{};
+    object[18]=reinterpret_cast<Word>(&a);
+    invoke(oracle+(addrs[kind]-base),kind ? static_cast<void*>(object):&a,kind==0,pos,x);
+    object[18]=reinterpret_cast<Word>(&b);
+    invoke(compiled[kind],kind ? static_cast<void*>(object):&b,kind==0,pos,y);
+    require(x==y && std::memcmp(&a,&b,sizeof a)==0,"return ST0 or cursor");
+    ++cases;
+}
+}
+
+int main(){
+    auto* code=prepare();
+    std::array<RouteKeyframe875,5> keys{};
+    for(unsigned i=0;i<keys.size();++i){
+        keys[i].fields[7]=0x3f800001u+i*0x0102a3b1u;
+        keys[i].fields[5]=0xbfa74c83u-i*0x00acd1e3u;
+    }
+    int length;
+    track_road_data_00628bc0=&length;
+    const int positions[][5]={{0,4,8,13,15},{0,1,1,5,15},{-3,1,1,9,9},{7,7,7,7,7}};
+    for(unsigned rc=0;rc<4;++rc){
+        unsigned short cw=static_cast<unsigned short>(0x037f|(rc<<10));
+        __asm { fldcw cw }
+        for(auto& layout:positions){
+            for(unsigned i=0;i<keys.size();++i)keys[i].position=layout[i];
+            for(int size:{1,2,5})for(int initial=0;initial<size;++initial)
+                for(int period:{15,16,32}) for(int pos:{-17,-1,0,1,4,7,8,13,15,16,33}) {
+                    length=period;
+                    RouteCursor875 cursor{keys.data(),size,initial,(initial+1)%size};
+                    for(unsigned kind=0;kind<3;++kind)compare(code,kind,cursor,pos);
+                }
+        }
+    }
+    __asm { fninit }
+    std::printf("cases=%u route_keyframe_original_x86_vs_cpp=PASS\n",cases);
+    return 0;
+}
