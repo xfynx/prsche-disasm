@@ -1,0 +1,290 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "frame_reset_service_861.hpp"
+#include "porsche/application_state.hpp"
+#include "player_service_tables_831.hpp"
+
+namespace {
+
+using Byte = std::uint8_t;
+using Word = std::uint32_t;
+using Signed = std::int32_t;
+using namespace porsche;
+
+constexpr std::size_t kPrimarySlots = 9u;
+constexpr std::size_t kSecondarySlots = 128u;
+constexpr std::size_t kMaxEvents = 160u;
+
+struct OracleState {
+    std::array<Word, kPrimarySlots> primary{};
+    std::array<Word, kPrimarySlots> order{};
+    std::array<Word, kPrimarySlots> pair{};
+    std::array<Word, kSecondarySlots> secondary{};
+    Word secondary_count = 0u;
+    Word primary_count = 0u;
+};
+
+struct Event {
+    Word object;
+    Signed index;
+};
+
+OracleState original_state{};
+std::array<Event, kMaxEvents> original_events{};
+std::array<Event, kMaxEvents> candidate_events{};
+std::size_t original_event_count = 0u;
+std::size_t candidate_event_count = 0u;
+bool running_original = false;
+unsigned mutation_plan = 0u;
+
+const Byte original_body[] = {@BODY_004110A0@};
+
+void require(bool condition, const char* label) {
+    if (!condition) {
+        std::printf("divergence %s\n", label);
+        std::exit(10);
+    }
+}
+
+Word read_word(const void* source) {
+    Word value;
+    std::memcpy(&value, source, sizeof value);
+    return value;
+}
+
+void write_word(void* target, Word value) {
+    std::memcpy(target, &value, sizeof value);
+}
+
+Word& current_primary_count() {
+    return running_original
+        ? original_state.primary_count
+        : application_state_006573e8.word(0x00658080u);
+}
+
+Word& current_secondary_count() {
+    return running_original
+        ? original_state.secondary_count
+        : application_state_006573e8.word(0x0065807cu);
+}
+
+void apply_callback_mutation(std::size_t ordinal) {
+    if (mutation_plan == 1u && ordinal == 0u) {
+        current_primary_count() = 1u; // shrink the primary callback walk
+    } else if (mutation_plan == 2u && ordinal == 0u) {
+        current_primary_count() = 3u; // grow the primary callback walk
+    } else if (mutation_plan == 3u && ordinal == 1u) {
+        current_secondary_count() = 1u; // shrink after first secondary call
+    } else if (mutation_plan == 4u && ordinal == 1u) {
+        current_secondary_count() = 3u; // grow after first secondary call
+    } else if (mutation_plan == 5u && ordinal == 1u) {
+        current_primary_count() = 5u; // next secondary index must reload it
+    }
+}
+
+void record_callback(Word object, Signed index) {
+    auto& events = running_original ? original_events : candidate_events;
+    auto& count = running_original ? original_event_count : candidate_event_count;
+    require(count < events.size(), "callback event capacity");
+    events[count] = {object, index};
+    apply_callback_mutation(count);
+    ++count;
+}
+
+struct AbsolutePatch {
+    std::size_t offset;
+    Word expected;
+    void* replacement;
+};
+
+struct RelativePatch {
+    std::size_t offset;
+    Word original_next_va;
+};
+
+const void* prepare_original() {
+    auto* code = static_cast<Byte*>(VirtualAlloc(
+        nullptr, sizeof original_body, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    require(code != nullptr, "oracle code allocation");
+    std::memcpy(code, original_body, sizeof original_body);
+
+    const AbsolutePatch absolute[] = {
+        {2u, 0x00658080u, &original_state.primary_count},
+        {15u, 0x005e8b34u, original_state.primary.data()},
+        {22u, 0x005e8b88u, original_state.order.data()},
+        {29u, 0x005e8bacu, original_state.pair.data()},
+        {47u, 0x005e8b34u, original_state.primary.data()},
+        {62u, 0x00658080u, &original_state.primary_count},
+        {78u, 0x0065807cu, &original_state.secondary_count},
+        {89u, 0x005e8c24u, original_state.secondary.data()},
+        {97u, 0x00658080u, &original_state.primary_count},
+        {113u, 0x0065807cu, &original_state.secondary_count},
+    };
+    for (const auto& patch : absolute) {
+        require(read_word(code + patch.offset) == patch.expected,
+                "oracle absolute operand");
+        write_word(code + patch.offset,
+                   static_cast<Word>(reinterpret_cast<std::uintptr_t>(patch.replacement)));
+    }
+
+    const RelativePatch calls[] = {{56u, 0x004110dcu}, {108u, 0x00411110u}};
+    for (const auto& patch : calls) {
+        const Signed original_delta = static_cast<Signed>(read_word(code + patch.offset));
+        require(static_cast<Word>(patch.original_next_va + original_delta) == 0x00410730u,
+                "oracle call target");
+        const auto next = reinterpret_cast<std::uintptr_t>(code + patch.offset + 4u);
+        const auto target = reinterpret_cast<std::uintptr_t>(&frame_player_reset_00410730);
+        write_word(code + patch.offset, static_cast<Word>(target - next));
+    }
+
+    DWORD old_protection = 0;
+    require(VirtualProtect(code, sizeof original_body, PAGE_EXECUTE_READ,
+                           &old_protection) != FALSE,
+            "oracle code protection");
+    require(FlushInstructionCache(GetCurrentProcess(), code, sizeof original_body) != FALSE,
+            "oracle instruction cache flush");
+    return code;
+}
+
+bool invoke_cdecl(const void* function) {
+    Word before = 0u;
+    Word frame = 0u;
+    Word failed = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call function
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        jne bad
+        jmp done
+    bad:
+        mov failed, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    return failed == 0u;
+}
+
+void initialize_case(Signed primary_count, Signed secondary_count) {
+    original_state.primary_count = static_cast<Word>(primary_count);
+    original_state.secondary_count = static_cast<Word>(secondary_count);
+    application_state_006573e8.word(0x00658080u) = static_cast<Word>(primary_count);
+    application_state_006573e8.word(0x0065807cu) = static_cast<Word>(secondary_count);
+
+    for (std::size_t index = 0; index < kPrimarySlots; ++index) {
+        const Word object = 0x71000000u + static_cast<Word>(index * 0x101u);
+        const Word order = 0xa1000000u + static_cast<Word>(index);
+        const Word pair = 0xb2000000u + static_cast<Word>(index);
+        original_state.primary[index] = object;
+        original_state.order[index] = order;
+        original_state.pair[index] = pair;
+        application_player_object_table_005e8b34[index] = object;
+        frame_reset_order_table_005e8b88[index] = order;
+        frame_reset_pair_table_005e8bac[index] = pair;
+    }
+    for (std::size_t index = 0; index < kSecondarySlots; ++index) {
+        const Word object = 0x82000000u + static_cast<Word>(index * 0x103u);
+        original_state.secondary[index] = object;
+        frame_reset_secondary_table_005e8c24[index] = object;
+    }
+    original_event_count = 0u;
+    candidate_event_count = 0u;
+}
+
+void compare_case(const char* label) {
+    require(original_state.primary_count ==
+                application_state_006573e8.word(0x00658080u),
+            "primary count result");
+    require(original_state.secondary_count ==
+                application_state_006573e8.word(0x0065807cu),
+            "secondary count result");
+    require(std::memcmp(original_state.primary.data(),
+                        application_player_object_table_005e8b34,
+                        sizeof application_player_object_table_005e8b34) == 0,
+            "primary table result");
+    require(std::memcmp(original_state.order.data(), frame_reset_order_table_005e8b88,
+                        sizeof frame_reset_order_table_005e8b88) == 0,
+            "order table result");
+    require(std::memcmp(original_state.pair.data(), frame_reset_pair_table_005e8bac,
+                        sizeof frame_reset_pair_table_005e8bac) == 0,
+            "pair table result");
+    require(std::memcmp(original_state.secondary.data(),
+                        frame_reset_secondary_table_005e8c24,
+                        sizeof frame_reset_secondary_table_005e8c24) == 0,
+            "secondary table result");
+    require(original_event_count == candidate_event_count, "callback event count");
+    require(std::memcmp(original_events.data(), candidate_events.data(),
+                        original_event_count * sizeof(Event)) == 0,
+            "callback events");
+    (void)label;
+}
+
+} // namespace
+
+namespace porsche {
+
+void __cdecl frame_player_reset_00410730(Word object, Signed index) {
+    record_callback(object, index);
+}
+
+} // namespace porsche
+
+int main() {
+    // Verify all production-owned loader-zero storage before assigning cases.
+    for (Word value : frame_reset_order_table_005e8b88) require(value == 0u, "order BSS");
+    for (Word value : frame_reset_pair_table_005e8bac) require(value == 0u, "pair BSS");
+    for (Word value : frame_reset_secondary_table_005e8c24) require(value == 0u, "secondary BSS");
+    for (Word value : application_player_object_table_005e8b34) require(value == 0u, "primary BSS");
+
+    const void* original = prepare_original();
+    struct Case { Signed primary; Signed secondary; unsigned plan; const char* label; };
+    const Case cases[] = {
+        {0, 0, 0u, "zero"},
+        {-1, 2, 0u, "negative-primary"},
+        {3, 2, 0u, "plain"},
+        {3, 2, 1u, "primary-shrink"},
+        {1, 0, 2u, "primary-grow"},
+        {1, 3, 3u, "secondary-shrink"},
+        {1, 1, 4u, "secondary-grow"},
+        {1, 2, 5u, "secondary-primary-reload"},
+        {9, 0, 0u, "primary-capacity"},
+        {0, 128, 0u, "secondary-capacity"},
+    };
+
+    for (const auto& test : cases) {
+        mutation_plan = test.plan;
+        initialize_case(test.primary, test.secondary);
+        running_original = true;
+        require(invoke_cdecl(original), "original cdecl ABI");
+        running_original = false;
+        require(invoke_cdecl(reinterpret_cast<const void*>(&frame_reset_service_004110a0)),
+                "candidate cdecl ABI");
+        compare_case(test.label);
+    }
+
+    std::printf("cases=%zu frame_reset_service_original_x86_vs_cpp=PASS\n",
+                sizeof cases / sizeof cases[0]);
+}

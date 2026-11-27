@@ -1,0 +1,78 @@
+{
+  "run": 864,
+  "experiment": "local/experiments/v2-session-extension-pool-864",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/864-session-extension-pool/session_extension_pool_864.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/864-session-extension-pool/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/864-session-extension-pool"
+  ],
+  "original_bodies": [
+    {
+      "va": "00406710",
+      "bytes": 10,
+      "sha256": "5e0bd0cdcfc5f0833f7bcd898ec7fc5e19e3d5eecabd1c66c7aa4d6cb921e1d0",
+      "token": "@BODY_00406710@"
+    },
+    {
+      "va": "0040b490",
+      "bytes": 22,
+      "sha256": "246c4308f296c235028dc5d50d3394f1c379b24501e8d6a4592f1ff64e3aadc4",
+      "token": "@BODY_0040B490@"
+    },
+    {
+      "va": "0040b4b0",
+      "bytes": 22,
+      "sha256": "246c4308f296c235028dc5d50d3394f1c379b24501e8d6a4592f1ff64e3aadc4",
+      "token": "@BODY_0040B4B0@"
+    },
+    {
+      "va": "0040b530",
+      "bytes": 49,
+      "sha256": "7ce0a3abd04f4e8d69ef248b50c8abfe0075c680190f43a05ebc405dd5dce627",
+      "token": "@BODY_0040B530@"
+    },
+    {
+      "va": "0040b570",
+      "bytes": 41,
+      "sha256": "60d45f96a553e5e398e9eae4d65f3a340ad5c4017298fd730bfefed0b158ebb2",
+      "token": "@BODY_0040B570@"
+    }
+  ],
+  "pass_marker": "session_extension_pool_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "wrong-stride",
+      "source": "iterations/v2/001-original-recovery/runs/864-session-extension-pool/session_extension_pool_864.cpp",
+      "old": "return session_extension_records_005e6e38[i];",
+      "new": "return session_extension_records_005e6e38[0];"
+    },
+    {
+      "name": "size-gate",
+      "source": "iterations/v2/001-original-recovery/runs/864-session-extension-pool/session_extension_pool_864.cpp",
+      "old": "(void)ignored_size;",
+      "new": "if (ignored_size != 0xa0) return nullptr;"
+    },
+    {
+      "name": "wrong-release-flag",
+      "source": "iterations/v2/001-original-recovery/runs/864-session-extension-pool/session_extension_pool_864.cpp",
+      "old": "session_extension_flags_005e7484[i] = 0;",
+      "new": "session_extension_flags_005e7484[i] = 1;"
+    },
+    {
+      "name": "skip-counter-clear",
+      "source": "iterations/v2/001-original-recovery/runs/864-session-extension-pool/session_extension_pool_864.cpp",
+      "old": "session_extension_count_005e747c = 0;",
+      "new": "session_extension_count_005e747c = 1;"
+    },
+    {
+      "name": "wrong-order",
+      "source": "iterations/v2/001-original-recovery/runs/864-session-extension-pool/session_extension_pool_864.cpp",
+      "old": "    session_extension_clear_0040b4b0();\n    session_extension_service_00406520();",
+      "new": "    session_extension_service_00406520();\n    session_extension_clear_0040b4b0();"
+    }
+  ]
+}

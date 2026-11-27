@@ -1,0 +1,70 @@
+{
+  "run": 861,
+  "experiment": "local/experiments/v2-frame-reset-service-861",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/861-frame-reset-service/frame_reset_service_861.cpp",
+    "iterations/v2/001-original-recovery/runs/831-player-service-tables-and-callbacks/player_service_tables_831.cpp",
+    "iterations/v2/001-original-recovery/source/recovered/Porsche.exe/application_state.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/861-frame-reset-service/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/861-frame-reset-service",
+    "iterations/v2/001-original-recovery/runs/831-player-service-tables-and-callbacks",
+    "iterations/v2/001-original-recovery/runs/290-frame-service-cluster",
+    "iterations/v2/001-original-recovery/runs/334-resource-open",
+    "iterations/v2/001-original-recovery/source/include"
+  ],
+  "headers": [
+    "iterations/v2/001-original-recovery/runs/861-frame-reset-service/frame_reset_service_861.hpp",
+    "iterations/v2/001-original-recovery/runs/861-frame-reset-service/scope-evidence.json"
+  ],
+  "original_bodies": [
+    {
+      "va": "004110a0",
+      "bytes": 131,
+      "sha256": "7c5681ee1b73fc014d3de3a57f9ecd146fe0ed9ade126126fa52e5189a72eae2",
+      "token": "@BODY_004110A0@"
+    }
+  ],
+  "pass_marker": "frame_reset_service_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "wrong-copy-source",
+      "source": "iterations/v2/001-original-recovery/runs/861-frame-reset-service/frame_reset_service_861.cpp",
+      "old": "frame_reset_order_table_005e8b88[index] = object;",
+      "new": "frame_reset_order_table_005e8b88[index] = object ^ 1u;"
+    },
+    {
+      "name": "wrong-copy-bound",
+      "source": "iterations/v2/001-original-recovery/runs/861-frame-reset-service/frame_reset_service_861.cpp",
+      "old": "    for (std::int32_t index = 0; index < primary_bound; ++index) {\n        const std::uint32_t object =",
+      "new": "    for (std::int32_t index = 0; index + 1 < primary_bound; ++index) {\n        const std::uint32_t object ="
+    },
+    {
+      "name": "wrong-primary-latched",
+      "source": "iterations/v2/001-original-recovery/runs/861-frame-reset-service/frame_reset_service_861.cpp",
+      "old": "        primary_bound = static_cast<std::int32_t>(\n            application_state_006573e8.word(0x00658080u));\n    }\n\n    std::int32_t secondary_bound",
+      "new": "        /* wrong: do not reload callback-mutated primary bound */\n    }\n\n    std::int32_t secondary_bound"
+    },
+    {
+      "name": "wrong-secondary-base",
+      "source": "iterations/v2/001-original-recovery/runs/861-frame-reset-service/frame_reset_service_861.cpp",
+      "old": "            primary_bound + index);",
+      "new": "            primary_bound + index + 1);"
+    },
+    {
+      "name": "wrong-secondary-index",
+      "source": "iterations/v2/001-original-recovery/runs/861-frame-reset-service/frame_reset_service_861.cpp",
+      "old": "            primary_bound + index);",
+      "new": "            primary_bound);"
+    },
+    {
+      "name": "wrong-secondary-latched",
+      "source": "iterations/v2/001-original-recovery/runs/861-frame-reset-service/frame_reset_service_861.cpp",
+      "old": "        secondary_bound = static_cast<std::int32_t>(\n            application_state_006573e8.word(0x0065807cu));",
+      "new": "        /* wrong: do not reload callback-mutated secondary bound */"
+    }
+  ]
+}
