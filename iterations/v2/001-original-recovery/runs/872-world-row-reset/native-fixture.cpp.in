@@ -1,0 +1,108 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include "world_row_reset_872.hpp"
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+using Byte = unsigned char;
+using Word = std::uint32_t;
+using RowReset = decltype(&porsche::session_world_row_reset_00478d90);
+using Buffer = std::array<Word, 24>;
+const Byte row_bytes[] = {@BODY_00478D90@};
+const Byte sqrt_bytes[] = {@BODY_005327D0@};
+static const void* sqrt_entry;
+static unsigned cases;
+
+namespace porsche {
+// The fixture calls the seven original bytes. Run821 owns the compiled provider.
+double __cdecl math_fsqrt_005327d0(float value) {
+    double result;
+    __asm {
+        push value
+        call dword ptr [sqrt_entry]
+        add esp, 4
+        fstp qword ptr [result]
+    }
+    return result;
+}
+}
+
+static void require(bool ok, const char* label) {
+    if (!ok) {
+        std::printf("divergence %s case=%u\n",label,cases);
+        std::exit(10);
+    }
+}
+
+static RowReset original() {
+    auto* code = static_cast<Byte*>(VirtualAlloc(nullptr,4096,MEM_RESERVE | MEM_COMMIT,PAGE_READWRITE));
+    require(code != nullptr,"code allocation");
+    std::memcpy(code,row_bytes,sizeof row_bytes);
+    std::memcpy(code+256,sqrt_bytes,sizeof sqrt_bytes);
+    sqrt_entry=code+256;
+    constexpr unsigned call=0x478df5-0x478d90;
+    Word target;
+    std::memcpy(&target,code+call+1,4);
+    require(code[call]==0xe8 && target==0x5327d0-0x478dfa,"sqrt target");
+    target=256-call-5;
+    std::memcpy(code+call+1,&target,4);
+    DWORD old;
+    require(VirtualProtect(code,4096,PAGE_EXECUTE_READ,&old)!=0,"code protection");
+    require(FlushInstructionCache(GetCurrentProcess(),code,4096)!=0,"code flush");
+    return reinterpret_cast<RowReset>(code);
+}
+
+static void invoke(RowReset fn,Word* row,const Word* first,const Word* second,const Word* third,Word bits) {
+    Word original_sp,after_sp;
+    unsigned short before,after;
+    __asm {
+        fnstsw before
+        mov original_sp,esp
+        push bits
+        push third
+        push second
+        push first
+        mov ecx,row
+        mov edx,0badc0deh
+        call fn
+        mov after_sp,esp
+        mov esp,original_sp
+        fnstsw after
+    }
+    require(original_sp==after_sp && ((before^after)&0x3800)==0,"stack cleanup");
+}
+
+static void check(RowReset fn, Word x, Word z, unsigned alias) {
+    const Word first[]={x,0xbeef0001,0xc091abcd};
+    const Word second[]={0x41a00000,0xc0050000,0x1234abcd};
+    const Word third[]={z,0xbeef0003,0x11223344};
+    const Word patterns[]={0x80000000,0x7fc100ab,0x7f810005};
+    const Word carried=patterns[alias];
+    Buffer seed;
+    for (unsigned i=0;i<seed.size();++i) seed[i]=0x40000000u+i*0x10001u;
+    seed[2]=x;
+    seed[8]=z;
+    Buffer expected=seed, actual=seed;
+    auto run=[&](RowReset entry, Buffer& state) {
+        auto* row=state.data()+2;
+        const auto* a=alias==0 ? first : alias==1 ? row : row+1;
+        const auto* b=alias==0 ? second : alias==1 ? row+3 : row+2;
+        const auto* c=alias==0 ? third : alias==1 ? row+6 : row+12;
+        invoke(entry,row,a,b,c,carried);
+    };
+    run(fn,expected);
+    run(&porsche::session_world_row_reset_00478d90,actual);
+    require(expected==actual,"row or guard bytes");
+    ++cases;
+}
+
+int main() {
+    auto fn=original();
+    const Word values[]={0,0x80000000,0x3f800000,0xc0200000,0x3f800001,0x00800000,1,0x7f7fffff};
+    for (auto x:values) for (auto z:values)
+        for (unsigned alias=0;alias<3;++alias) check(fn,x,z,alias);
+    std::printf("cases=%u world_row_original_x86_vs_cpp=PASS\n",cases);
+}

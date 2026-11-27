@@ -1,0 +1,80 @@
+{
+  "run": 871,
+  "experiment": "local/experiments/v2-scene-records-reset-871",
+  "original_pe": "local/game/Porsche.exe",
+  "original_sha256": "ddd748fdbe6d2030e31f9257a4e01852749460b6b58560a6b4a8559d3799ff39",
+  "sources": [
+    "iterations/v2/001-original-recovery/runs/871-scene-records-reset/scene_records_reset_871.cpp"
+  ],
+  "fixture": "iterations/v2/001-original-recovery/runs/871-scene-records-reset/native-fixture.cpp.in",
+  "include_dirs": [
+    "iterations/v2/001-original-recovery/runs/871-scene-records-reset"
+  ],
+  "original_bodies": [
+    {
+      "va": "00459260",
+      "bytes": 677,
+      "sha256": "bb961712d03484e6e2b92962fa78289b449028dc0ba84ec4ffafac8bca4c1fb1",
+      "token": "@BODY_00459260@"
+    },
+    {
+      "va": "00459510",
+      "bytes": 65,
+      "sha256": "9e770e35a1913a6ee82c6f960ebde8d4fdb7a7884756d797e528922d4083b669",
+      "token": "@BODY_00459510@"
+    },
+    {
+      "va": "00459560",
+      "bytes": 65,
+      "sha256": "4d5cf3b2b18848e621d4bcf803e227a397da2dac895ccec7b674aca0abe7ed6d",
+      "token": "@BODY_00459560@"
+    },
+    {
+      "va": "004595b0",
+      "bytes": 65,
+      "sha256": "ab02045bea3b2350d986d55b329e64228c8fc845b47b596d39fc53380b928c41",
+      "token": "@BODY_004595B0@"
+    },
+    {
+      "va": "005a0f98",
+      "bytes": 39,
+      "sha256": "d0a2aca68648a0ae9d5cbfae1b276d4a64d4f797fc0c60f28b64096cdfa3148c",
+      "token": "@BODY_005A0F98@"
+    }
+  ],
+  "pass_marker": "scene_records_original_x86_vs_cpp=PASS",
+  "mutations": [
+    {
+      "name": "wrong-rng-word",
+      "source": "iterations/v2/001-original-recovery/runs/871-scene-records-reset/scene_records_reset_871.cpp",
+      "old": "shr eax, 8",
+      "new": "shr eax, 7",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-emitter-field",
+      "source": "iterations/v2/001-original-recovery/runs/871-scene-records-reset/scene_records_reset_871.cpp",
+      "old": "0x855c+12*i",
+      "new": "0x8560+12*i",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-count-threshold",
+      "source": "iterations/v2/001-original-recovery/runs/871-scene-records-reset/scene_records_reset_871.cpp",
+      "old": "count<3",
+      "new": "count<4",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    },
+    {
+      "name": "wrong-activation",
+      "source": "iterations/v2/001-original-recovery/runs/871-scene-records-reset/scene_records_reset_871.cpp",
+      "old": "+0x83a0+i)=1;",
+      "new": "+0x83a0+i)=0;",
+      "expected_exit": 10,
+      "failure_marker": "divergence"
+    }
+  ]
+}

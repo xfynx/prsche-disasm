@@ -1,0 +1,11 @@
+# Selected player scene reset
+
+Recovers original Porsche.exe `004690a0..004690c9` (42 bytes), `0045dd00..0045dd0f` (16), and `00452680..004526bb` (60). Module SHA-256 and body hashes are pinned in native-config.json. The binary-index Porsche catalog and raw SHA-guarded disassembly agree on these full ranges; registry/source searches found no prior body provider.
+
+The parent calls `session_world_list_reset_00479dd0`, forwards the application arena cell at `00657444` through the cdecl wrapper to canonical `scene_route_bind_0045dbd0(root,1)`, calls `session_scene_records_reset_00459260`, then reloads the selected index at `0065741c` and the Run831 player pointer. Both reset callees remain real production externs. The setter tests the full Run649 16-bit night flag and, if nonzero, writes Run649 head state `0061bcc8`, then the exact four words `ff808080,0,3fa3d70a,4067ae14` at `0061bd4c..0061bd5b`. The source preserves original write order (color, head pointer, three remaining words).
+
+Only the four-word span is new storage; compiled-source/header and registry searches found no existing owner. The PE .data section has RVA 001cb000, virtual size 000f6538 and raw size 0001c000: this span lies in its loader-zero tail. Application arena storage supplies only the path/root and selected index. Native startup asserts new storage is zero before reset.
+
+Native attempt 002 passes 36 cases at each of /Od and /O2. It relocates all three original bodies, checks raw operands before patching, and compares the entire application arena plus sparse night fields. Callbacks mutate the selected index at all three boundaries, replace the selected pointer, and set flags 0,1,0100,ffff. The callbacks assert exact call order, root address and cdecl argument values. All nine selected slots are covered. Four material mutations (gate, mode, float bits, selected slot) fail. Attempt 001 is preserved: normal comparisons and its first three controls passed; the final mutation had a fixture mutation syntax error, fixed in 002.
+
+Receipt: `local/experiments/v2-selected-player-scene-reset-869/002/receipt.json`. This proves bounded callback transport and state writes, not live scene/driver behavior or downstream callees. Parent coordinator owns graph integration and shared acceptance; no shared files or Git were changed.

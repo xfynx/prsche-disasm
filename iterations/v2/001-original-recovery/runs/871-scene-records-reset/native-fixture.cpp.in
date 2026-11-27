@@ -1,0 +1,200 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "scene_records_reset_871.hpp"
+using U=std::uint32_t;
+using B=unsigned char;
+float _DAT_005b253c=0.0000152587890625f;
+namespace porsche {
+void* __cdecl scene_flare_table_get_0045dd80();
+float __cdecl rand_unit_005561d0();
+void* scene_stage_58b80_00627e08=nullptr;
+U second_session_random_state_005ceae0=0xf874af01;
+U second_session_random_multiplier_005ceae4=1;
+}
+namespace {
+using namespace porsche;
+using Record=std::array<B,0x8800>;
+Record records[2];
+U stage[4],events[32],event_count,random_index,mode,cases;
+float samples[2];
+const float thousand=1000.0f, half=0.5f, unit=0.0000152587890625f;
+const B parent_bytes[]={@BODY_00459260@};
+const B x_bytes[]={@BODY_00459510@};
+const B y_bytes[]={@BODY_00459560@};
+const B z_bytes[]={@BODY_004595B0@};
+const B ftol_bytes[]={@BODY_005A0F98@};
+void require(bool ok,const char* why) {
+    if(!ok) { std::printf("divergence %s case=%u mode=%u\n",why,cases,mode); std::exit(10); }
+}
+U bits(float x) { U v; std::memcpy(&v,&x,4); return v; }
+float from_bits(U x) { float v; std::memcpy(&v,&x,4); return v; }
+void put(void* p,U off,U x) { std::memcpy(static_cast<B*>(p)+off,&x,4); }
+void event(U x) { require(event_count<32,"event capacity");events[event_count++]=x; }
+void relocate(B* code,U offset,U expected,U actual) {
+    U old;std::memcpy(&old,code+offset,4);require(old==expected,"original operand");std::memcpy(code+offset,&actual,4);
+}
+using Parent=void(__cdecl*)();
+using Sampler=decltype(&scene_record_sample_00459510);
+Sampler original_sampler[3];
+Parent prepare() {
+    B* code=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));
+    require(code!=nullptr,"allocation");
+    std::memcpy(code,parent_bytes,sizeof parent_bytes);
+    std::memcpy(code+1024,x_bytes,sizeof x_bytes);
+    std::memcpy(code+1152,y_bytes,sizeof y_bytes);
+    std::memcpy(code+1280,z_bytes,sizeof z_bytes);
+    std::memcpy(code+1408,ftol_bytes,sizeof ftol_bytes);
+    // Exact operands and call displacements are checked before substitution.
+    relocate(code,10,0x00627e08u,reinterpret_cast<U>(&scene_stage_58b80_00627e08));
+    relocate(code,25,0x00004b03u,reinterpret_cast<U>(&scene_flare_table_get_0045dd80)-reinterpret_cast<U>(code+29));
+    relocate(code,32,0x00003d4cu,reinterpret_cast<U>(&scene_route_first_sample_0045cfd0)-reinterpret_cast<U>(code+36));
+    relocate(code,40,0x00004af4u,reinterpret_cast<U>(&scene_flare_table_get_0045dd80)-reinterpret_cast<U>(code+44));
+    relocate(code,47,0x00003d6du,reinterpret_cast<U>(&scene_route_second_sample_0045d000)-reinterpret_cast<U>(code+51));
+    relocate(code,93,0x000fcf0fu,reinterpret_cast<U>(&rand_unit_005561d0)-reinterpret_cast<U>(code+97));
+    relocate(code,99,0x005b2428u,reinterpret_cast<U>(&thousand));
+    relocate(code,104,0x00147cccu,reinterpret_cast<U>(code + 1408)-reinterpret_cast<U>(code+108));
+    relocate(code,171,0x005b23f0u,reinterpret_cast<U>(&half));
+    relocate(code,230,0x005ceae4u,reinterpret_cast<U>(&second_session_random_multiplier_005ceae4));
+    relocate(code,237,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,271,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,282,0x005b253cu,reinterpret_cast<U>(&unit));
+    relocate(code,296,0x005ceae4u,reinterpret_cast<U>(&second_session_random_multiplier_005ceae4));
+    relocate(code,303,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,336,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,347,0x005b253cu,reinterpret_cast<U>(&unit));
+    relocate(code,361,0x005ceae4u,reinterpret_cast<U>(&second_session_random_multiplier_005ceae4));
+    relocate(code,368,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,401,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,413,0x005b253cu,reinterpret_cast<U>(&unit));
+    relocate(code,479,0x000fcd8du,reinterpret_cast<U>(&rand_unit_005561d0)-reinterpret_cast<U>(code+483));
+    relocate(code,485,0x005b2428u,reinterpret_cast<U>(&thousand));
+    relocate(code,490,0x00147b4au,reinterpret_cast<U>(code + 1408)-reinterpret_cast<U>(code+494));
+    relocate(code,557,0x005b23f0u,reinterpret_cast<U>(&half));
+    relocate(code,614,0x00000046u,reinterpret_cast<U>(code + 1024)-reinterpret_cast<U>(code+618));
+    relocate(code,624,0x0000008cu,reinterpret_cast<U>(code + 1152)-reinterpret_cast<U>(code+628));
+    relocate(code,633,0x000000d3u,reinterpret_cast<U>(code + 1280)-reinterpret_cast<U>(code+637));
+    relocate(code,666,0xffffeca2u,reinterpret_cast<U>(&scene_record_emitter_reset_004581a0)-reinterpret_cast<U>(code+670));
+    relocate(code,1026,0x005ceae4u,reinterpret_cast<U>(&second_session_random_multiplier_005ceae4));
+    relocate(code,1033,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,1065,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,1077,0x005b253cu,reinterpret_cast<U>(&unit));
+    relocate(code,1154,0x005ceae4u,reinterpret_cast<U>(&second_session_random_multiplier_005ceae4));
+    relocate(code,1161,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,1193,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,1205,0x005b253cu,reinterpret_cast<U>(&unit));
+    relocate(code,1282,0x005ceae4u,reinterpret_cast<U>(&second_session_random_multiplier_005ceae4));
+    relocate(code,1289,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,1321,0x005ceae0u,reinterpret_cast<U>(&second_session_random_state_005ceae0));
+    relocate(code,1333,0x005b253cu,reinterpret_cast<U>(&unit));
+    original_sampler[0]=reinterpret_cast<Sampler>(code+1024);
+    original_sampler[1]=reinterpret_cast<Sampler>(code+1152);
+    original_sampler[2]=reinterpret_cast<Sampler>(code+1280);
+    DWORD old;require(VirtualProtect(code,4096,PAGE_EXECUTE_READ,&old)!=0,"protect");
+    require(FlushInstructionCache(GetCurrentProcess(),code,4096)!=0,"flush");
+    return reinterpret_cast<Parent>(code);
+}
+void reset(unsigned scenario) {
+    mode=scenario;event_count=random_index=0;
+    std::memset(events,0,sizeof events);
+    for(unsigned j=0;j<2;++j) {
+        for(U i=0;i<records[j].size();++i) records[j][i]=static_cast<B>(i*13+j*29+scenario);
+        // Disjoint normal emitter records; only the documented prefix is used.
+        samples[j]=from_bits((scenario%11==10) ? 0x7fc12345u : bits(float(int((scenario+j*3)%9)-3)*0.25f));
+        put(records[j].data(),0,bits(scenario%3==0 ? samples[j] : -7.0f));
+        put(records[j].data(),8,(scenario%4==0) ? 3 : 0);
+        put(records[j].data(),0x862c,bits(float((scenario%5)+1)*4.0f));
+        const U off[]={0x860c,0x8618,0x8628,0x8604,0x8610,0x861c};
+        const float vals[]={1.25f,-3.5f,0.0f,-10.0f,0.03125f,123.75f};
+        for(U i=0;i<6;++i) put(records[j].data(),off[i],bits(vals[i]+float(j)));
+    }
+    stage[0]=0xabcdef01;stage[1]=reinterpret_cast<U>(records[0].data());
+    stage[2]=reinterpret_cast<U>(records[(scenario&16) ? 0 : 1].data());stage[3]=0x12340000;
+    scene_stage_58b80_00627e08=stage;
+    second_session_random_state_005ceae0=0x87654321u+scenario*997u;
+    second_session_random_multiplier_005ceae4=(scenario&1) ? 0xffffcd15u : 0x075bcd15u;
+}
+void sample80(Sampler fn, void* record, void* output) {
+    __asm {
+        mov ecx, record
+        call fn
+        mov eax, output
+        fstp tbyte ptr [eax]
+    }
+}
+void check_samplers(unsigned scenario) {
+    const Sampler candidates[]={scene_record_sample_00459510,scene_record_sample_00459560,scene_record_sample_004595b0};
+    for (unsigned j=0;j<3;++j) {
+        reset(scenario);
+        // Include fractional products beyond binary64 precision after adding the offset.
+        const U scale[]={0x860c,0x8618,0x8628}, base[]={0x8604,0x8610,0x861c};
+        put(records[0].data(),scale[j],0x45800001+scenario);
+        put(records[0].data(),base[j],0x21ffffff+scenario);
+        const auto seed=second_session_random_state_005ceae0;
+        std::array<B,10> expected{},actual{};
+        sample80(original_sampler[j],records[0].data(),expected.data());
+        auto next=second_session_random_state_005ceae0;
+        second_session_random_state_005ceae0=seed;
+        sample80(candidates[j],records[0].data(),actual.data());
+        require(expected==actual && next==second_session_random_state_005ceae0,"ST0 and RNG");
+        ++cases;
+    }
+}
+void invoke(Parent f) {
+    U before,after,bs,saved_esi,saved_edi;
+    __asm { mov before,esp }
+    __asm { push ebx }
+    __asm { push esi }
+    __asm { push edi }
+    __asm { mov ebx,0x11223344 }
+    __asm { mov esi,0x55667788 }
+    __asm { mov edi,0x12345678 }
+    __asm { call f }
+    __asm { mov bs,ebx }
+    __asm { mov saved_esi,esi }
+    __asm { mov saved_edi,edi }
+    __asm { pop edi }
+    __asm { pop esi }
+    __asm { pop ebx }
+    __asm { mov after,esp }
+    require(before==after && bs==0x11223344 && saved_esi==0x55667788 && saved_edi==0x12345678,"cdecl ABI");
+}
+void check(Parent oracle,U scenario) {
+    reset(scenario);invoke(oracle);
+    const auto first=records[0],second=records[1];
+    const U seed=second_session_random_state_005ceae0;
+    U expected_events[32];std::memcpy(expected_events,events,sizeof events);
+    const U expected_count=event_count,expected_random=random_index;
+    reset(scenario);invoke(session_scene_records_reset_00459260);
+    require(records[0]==first && records[1]==second,"all record bytes including gaps");
+    require(stage[0]==0 && seed==second_session_random_state_005ceae0,"stage and random state");
+    require(expected_count==event_count && expected_random==random_index && std::memcmp(events,expected_events,sizeof events)==0,"call order and arguments");
+    ++cases;
+}
+}
+namespace porsche {
+void* __cdecl scene_flare_table_get_0045dd80() { event(1);require(stage[0]==0,"clear precedes query");return reinterpret_cast<void*>(0x76543210); }
+float __fastcall scene_route_first_sample_0045cfd0(void* self,void*) { require(self==reinterpret_cast<void*>(0x76543210),"first ecx");event(2);return samples[0]; }
+float __fastcall scene_route_second_sample_0045d000(void* self,void*) { require(self==reinterpret_cast<void*>(0x76543210),"second ecx");event(3);return samples[1]; }
+float __cdecl rand_unit_005561d0() { ++random_index;event(10+random_index);return float((random_index*19997+mode*71)&65535)/65536.0f; }
+void __fastcall scene_record_emitter_reset_004581a0(void* self,void*,float second,float first) {
+    require(self==reinterpret_cast<void*>(0x12340000),"final ecx");
+    require(bits(first)==bits(samples[0]) && bits(second)==bits(samples[1]),"final argument order");event(30);
+}
+}
+int main() {
+    require(porsche::scene_stage_58b80_00627e08==nullptr && porsche::second_session_random_state_005ceae0==0xf874af01 && porsche::second_session_random_multiplier_005ceae4==1,"production initial state");
+    auto oracle=prepare();
+    for(unsigned rc=0;rc<4;++rc) {
+        unsigned short cw=static_cast<unsigned short>(0x037f|(rc<<10));
+        __asm { fldcw cw }
+        for(U scenario=0;scenario<64;++scenario){check(oracle,scenario);check_samplers(scenario);}
+    }
+    __asm { fninit }
+    std::printf("cases=%u scene_records_original_x86_vs_cpp=PASS\n",cases);
+    return 0;
+}

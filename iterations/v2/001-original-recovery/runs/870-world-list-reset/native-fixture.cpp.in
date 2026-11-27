@@ -1,0 +1,60 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "world_list_reset_870.hpp"
+#include "porsche/application_alloc.hpp"
+using W=std::uint32_t; using B=unsigned char;
+namespace {
+using namespace porsche;
+std::array<B,0x40> world;
+std::array<B,0x50*4> rows;
+std::array<std::array<W,17>,4> lists;
+struct Trace { std::array<W,256> words{}; unsigned n=0; void clear(){words.fill(0);n=0;} void push_back(W v){if(n==256)std::exit(11);words[n++]=v;} unsigned size()const{return n;} bool operator==(const Trace& x)const{return n==x.n && words==x.words;} };
+Trace trace;
+unsigned cases, scenario;
+const B original[]={@BODY@};
+void require(bool b,const char* label) {if(!b){std::printf("divergence %s case=%u\n",label,cases);std::exit(10);}}
+W rd(const void* p){W v;std::memcpy(&v,p,4);return v;}
+void wr(void* p,W v){std::memcpy(p,&v,4);}
+W ptr(const void* p){return reinterpret_cast<W>(p);}
+void fix(B* code,unsigned o,W expected,W actual){require(rd(code+o)==expected,"operand");wr(code+o,actual);}
+using Fn=void(__cdecl*)();
+Fn prepare(){
+ auto* c=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));require(c!=nullptr,"alloc");std::memcpy(c,original,sizeof original);
+ fix(c,6,0x628b74,ptr(&session_world_list_00628b74));
+ for(unsigned o:{83u,91u,109u}){W va=0x479dd0+o; fix(c,o,0x59f050-(va+4),ptr(&application_release_0059f050)-ptr(c+o+4));}
+ fix(c,135,0x478d90-0x479e5b,ptr(&session_world_row_reset_00478d90)-ptr(c+139));
+ DWORD old;require(VirtualProtect(c,4096,PAGE_EXECUTE_READ,&old)!=0,"protect");require(FlushInstructionCache(GetCurrentProcess(),c,4096)!=0,"flush");return reinterpret_cast<Fn>(c);
+}
+void reset(unsigned count,unsigned kind){
+ trace.clear();scenario=kind;world.fill(0xa7);for(unsigned i=0;i<rows.size();++i) rows[i]=static_cast<B>(i*13+9);
+ session_world_list_00628b74=ptr(world.data());wr(world.data()+0x18,count);wr(world.data()+0x30,ptr(rows.data()));
+ for(unsigned i=0;i<4;++i){for(unsigned j=0;j<17;++j)lists[i][j]=0x12340000+i*0x100+j;
+  unsigned n=(i+kind)%4;lists[i][0]=n;wr(rows.data()+i*0x50+0x38,kind==0?0:ptr(lists[i].data()+1));
+  const W carried[] = {0x80000000, 0x7f800000, 0x7fc12345, 0x7f800001};
+  wr(rows.data()+i*0x50+0x34,carried[i]);
+ }
+ if(kind==3)lists[0][0]=0xffffffff;
+}
+void check(Fn f,unsigned count,unsigned kind){reset(count,kind);f();auto expected=trace;auto expectedrows=rows;auto expectedworld=world;auto expectedlists=lists;
+ reset(count,kind);session_world_list_reset_00479dd0();require(trace==expected,"callback traces");require(rows==expectedrows && world==expectedworld && lists==expectedlists,"memory");++cases;
+}
+}
+namespace porsche {
+W __cdecl application_release_0059f050(void* p){trace.push_back(1);trace.push_back(ptr(p));
+ // A free callback can modify the next pointer; original reloads it after first free.
+ if(scenario==2 && trace.size()==2) lists[0][2+5*((lists[0][0]-1))]=0x87654321;
+ return 0xdeadbeef;
+}
+void __fastcall session_world_row_reset_00478d90(void* row,void*,const void* a,const void* b,const void* c,std::uint32_t value){
+ trace.push_back(2);trace.push_back(ptr(row));trace.push_back(ptr(a));trace.push_back(ptr(b));trace.push_back(ptr(c));trace.push_back(rd(&value));trace.push_back(rd(static_cast<B*>(row)+0x38));
+ // Transport observer has controlled writes and may shorten the live row count.
+ wr(static_cast<B*>(row)+0x40,0xabcdef01);
+ if(scenario==4)wr(world.data()+0x18,1);
+}
+}
+int main(){require(porsche::session_world_list_00628b74==0,"production loaderzero");auto f=prepare();for(unsigned kind=0;kind<5;++kind)for(unsigned n=0;n<=4;++n)check(f,n,kind);std::printf("cases=%u world_list_original_x86_vs_cpp=PASS\n",cases);}

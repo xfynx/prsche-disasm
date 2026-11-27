@@ -1,0 +1,41 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "selected_player_scene_reset_869.hpp"
+#include "porsche/application_state.hpp"
+using W=std::uint32_t; using B=std::uint8_t;
+namespace porsche {
+std::uint16_t startup_night_shape_enabled_00628a28;
+W startup_head_state_a_0061bcc8;
+W application_player_object_table_005e8b34[9];
+}
+using namespace porsche;
+unsigned cases,phase,variant;
+void require(bool b,const char* s){if(!b){std::printf("divergence %s case=%u\n",s,cases);std::exit(10);}}
+namespace porsche {
+void __cdecl session_world_list_reset_00479dd0(){require(phase++==0,"world order");application_state_006573e8.word(0x65741c)=1;}
+void __cdecl scene_route_bind_0045dbd0(void* root,W mode){require(phase++==1,"bind order");require(root==&application_state_006573e8.word(0x657444)&&mode==1,"bind ABI");application_state_006573e8.word(0x65741c)=2;}
+void __cdecl session_scene_records_reset_00459260(){require(phase++==2,"records order");application_state_006573e8.word(0x65741c)=variant%9;application_player_object_table_005e8b34[variant%9]=0x12340000+variant;startup_night_shape_enabled_00628a28=static_cast<std::uint16_t>((variant/9)==2 ? 0x100 : (variant/9)==3 ? 0xffff : variant/9);}
+}
+const B a[]={@BODY_004690A0@},b[]={@BODY_0045DD00@},c[]={@BODY_00452680@};
+void fix(B* p,unsigned off,W old,W value){W v;memcpy(&v,p+off,4);require(v==old,"raw operand");memcpy(p+off,&value,4);}
+W addr(const void* p){return reinterpret_cast<W>(p);}
+void call(B*p,unsigned off,W va,const void* target,W origin){fix(p,off,va-(origin+off+4),addr(target)-addr(p+off+4));}
+using Fn=void(__cdecl*)();
+Fn prepare(){auto*p=static_cast<B*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));require(p!=nullptr,"alloc");memcpy(p,a,sizeof a);memcpy(p+256,b,sizeof b);memcpy(p+512,c,sizeof c);
+call(p,1,0x479dd0,&session_world_list_reset_00479dd0,0x4690a0);
+fix(p,6,0x657444,addr(&application_state_006573e8.word(0x657444)));
+call(p,11,0x45dd00,p+256,0x4690a0);call(p,16,0x459260,&session_scene_records_reset_00459260,0x4690a0);
+fix(p,21,0x65741c,addr(&application_state_006573e8.word(0x65741c)));
+fix(p,28,0x5e8b34,addr(application_player_object_table_005e8b34));call(p,34,0x452680,p+512,0x4690a0);
+call(p+256,8,0x45dbd0,&scene_route_bind_0045dbd0,0x45dd00);
+fix(p+512,3,0x628a28,addr(&startup_night_shape_enabled_00628a28));
+fix(p+512,16,0x61bd4c,addr(selected_player_night_words_0061bd4c));fix(p+512,25,0x61bcc8,addr(&startup_head_state_a_0061bcc8));
+fix(p+512,31,0x61bd50,addr(selected_player_night_words_0061bd4c+1));fix(p+512,41,0x61bd54,addr(selected_player_night_words_0061bd4c+2));fix(p+512,51,0x61bd58,addr(selected_player_night_words_0061bd4c+3));
+DWORD old;require(VirtualProtect(p,4096,PAGE_EXECUTE_READ,&old)!=0,"protect");FlushInstructionCache(GetCurrentProcess(),p,4096);return reinterpret_cast<Fn>(p);}
+void reset(){phase=0;application_state_006573e8.words().fill(0xabcdef01);application_state_006573e8.word(0x65741c)=0;startup_night_shape_enabled_00628a28=0;startup_head_state_a_0061bcc8=0x87654321;for(unsigned i=0;i<4;i++)selected_player_night_words_0061bd4c[i]=0xdddd0000+i;for(unsigned i=0;i<9;i++)application_player_object_table_005e8b34[i]=0x55550000+i;}
+int main(){for(auto w:selected_player_night_words_0061bd4c)require(w==0,"production BSS");auto oracle=prepare();for(variant=0;variant<36;variant++){reset();oracle();require(phase==3,"oracle calls");auto arena=application_state_006573e8.words();std::array<W,4> words;memcpy(words.data(),selected_player_night_words_0061bd4c,16);auto head=startup_head_state_a_0061bcc8;reset();frame_reset_service_004690a0();require(phase==3,"calls");require(arena==application_state_006573e8.words()&&head==startup_head_state_a_0061bcc8&&memcmp(words.data(),selected_player_night_words_0061bd4c,16)==0,"sparse state");++cases;}std::printf("cases=%u selected_scene_original_x86_vs_cpp=PASS\n",cases);}
