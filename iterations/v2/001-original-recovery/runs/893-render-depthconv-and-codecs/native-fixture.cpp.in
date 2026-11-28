@@ -1,0 +1,1055 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "render_depthconv_codecs_893.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/render_loader.hpp"
+#include "porsche/shared_runtime_globals.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+using W = std::uint16_t;
+
+namespace porsche { extern std::uint32_t render_depthconv_palette_scratch_006bda20[256]; }
+
+namespace {
+
+struct Event { U kind, a0, a1, a2, a3; };
+struct Trace {
+    U abi_fail;
+    U r0, r1, r2, r3;
+    U err_file, err_line;
+    U pal_ptr_off;
+    U scratch_hash;
+    U dst_hash;
+    U arena_hash;
+    U event_count;
+    Event events[512];
+};
+
+static B* code = nullptr;
+static B* slot_534d40 = nullptr;
+static B* slot_5350e0 = nullptr;
+static B* slot_571330 = nullptr;
+static B* slot_5713a0 = nullptr;
+static B* slot_571470 = nullptr;
+static B* slot_593640 = nullptr;
+static B* slot_593790 = nullptr;
+static B* slot_593800 = nullptr;
+static B* slot_594400 = nullptr;
+static B* slot_594490 = nullptr;
+static B* slot_594760 = nullptr;
+static B* slot_5948c0 = nullptr;
+static B* slot_5948f0 = nullptr;
+static B* slot_594960 = nullptr;
+
+static U pe_direct_tbl[64] = {};
+static U pe_alt_tbl[64] = {};
+static B pe_map_tbl[64] = {};
+static B pe_tex_bits[140] = {};
+static B pe_clut_fmt[32] = {};
+static B pe_pal_idx[256] = {};
+
+static B* bpe_state_right = nullptr;
+static B* bpe_state_dst = nullptr;
+static const B* bpe_state_src = nullptr;
+static B* bpe_state_flag = nullptr;
+static B* bpe_state_left = nullptr;
+
+static const char* kStrFile = "\\real\\cmn\\depthconv.c";
+static const char* kStrUnshp = "unshp";
+static const char* kStrTex565 = "TEXto565";
+static const char* kStrFmtDim = "%dto%d";
+static const char* kStrShapeErr =
+    "SHAPE_converttype - UNABLE TO CONVERT TO TARGET SHAPE TYPE.\n"
+    "Initial shape type ($%02x). Target shape type ($%02x)\n";
+static const char* kStrTexErr =
+    "TEXTURE_converttype - UNABLE TO CONVERT TO TARGET TEXTURE TYPE.\n"
+    "Initial texture type ($%02x). Target texture type ($%02x)\n";
+static const char* kStrSentinel = "convshp - SENTINAL CORRUPTED. %dx%dx%d->%dx%dx%d\n";
+
+alignas(16) static B heap_arena[65536] = {};
+static U heap_cursor = 0u;
+static U corrupt_row_sentinel = 0u;
+
+alignas(16) static B dst_buf[16384] = {};
+alignas(16) static B dst_clut_buf[2048] = {};
+alignas(16) static B src_clut_buf[2048] = {};
+static U fake_pal_res[256] = {};
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U side = 0u;
+
+static U ptr(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+template <typename Fn>
+static U fn_ptr(Fn* fn) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(reinterpret_cast<const void*>(fn)));
+}
+
+static U rd(const void* p, U offset = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + offset, sizeof v);
+    return v;
+}
+
+static void wr(void* p, U offset, U value) {
+    std::memcpy(static_cast<B*>(p) + offset, &value, sizeof value);
+}
+
+static U fnv1a(const void* data, std::size_t n) {
+    const auto* p = static_cast<const B*>(data);
+    U h = 2166136261u;
+    for (std::size_t i = 0; i < n; ++i) {
+        h ^= p[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void event(U kind, U a0 = 0u, U a1 = 0u, U a2 = 0u, U a3 = 0u) {
+    if (trace.event_count < 512u) {
+        trace.events[trace.event_count++] = Event{kind, a0, a1, a2, a3};
+    }
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", msg, cases, side);
+        std::fflush(stdout);
+        ExitProcess(10u);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("divergence native-fault %08lx eip=%08lx eax=%08lx esp=%08lx ebp=%08lx case=%u side=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip,
+                p->ContextRecord->Eax, p->ContextRecord->Esp, p->ContextRecord->Ebp,
+                cases, side);
+    std::fflush(stdout);
+    ExitProcess(10u);
+}
+
+static U arena_norm(const void* p) {
+    const auto u = ptr(p);
+    if (u >= ptr(heap_arena) && u < ptr(heap_arena) + sizeof(heap_arena)) {
+        return 0x10000000u + (u - ptr(heap_arena));
+    }
+    if (u == ptr(dst_buf)) return 0x20000000u;
+    if (u == ptr(dst_clut_buf)) return 0x21000000u;
+    if (u == ptr(src_clut_buf)) return 0x22000000u;
+    if (u == ptr(porsche::render_depthconv_palette_scratch_006bda20)) return 0x30000000u;
+    return u;
+}
+
+static U str_tag(const char* s) {
+    return (s != nullptr) ? fnv1a(s, std::strlen(s)) : 0u;
+}
+
+} // namespace
+
+namespace porsche {
+
+std::uint32_t shared_runtime_word_005deb74 = 0u;
+std::uint32_t shared_runtime_word_005deb78 = 0u;
+std::uint32_t render_alloc_flags_005deb60 = 0x12u;
+std::uint32_t* render_depthconv_palette_ptr_005de2f8 = nullptr;
+std::uint32_t render_depthconv_palette_scratch_006bda20[256] = {};
+std::uint32_t render_pixel_palette_006b4b20[256] = {};
+extern const char render_clut16_file_005bb3e4[23] = "\\real\\cmn\\depthconv.c";
+
+static void __cdecl fixture_diag(const char* fmt, ...) {
+    (void)fmt;
+    event(90u, shared_runtime_word_005deb78, str_tag(fmt));
+}
+
+void(__cdecl* diagnostic_handler_005debf0)(const char*) =
+    reinterpret_cast<void(__cdecl*)(const char*)>(&fixture_diag);
+
+void* __cdecl allocate_00531ca0(const char* tag, std::int32_t bytes, std::uint32_t flags) {
+    const U sz = (bytes > 0) ? static_cast<U>(bytes) : 4u;
+    const U aligned = (sz + 15u) & ~15u;
+    void* out = heap_arena + heap_cursor;
+    heap_cursor += aligned;
+    event(10u, str_tag(tag), static_cast<U>(bytes), flags, ptr(out) - ptr(heap_arena));
+    return out;
+}
+
+std::uint32_t __cdecl free_00531f90(void* allocation) {
+    event(11u, arena_norm(allocation));
+    return 1u;
+}
+
+void __cdecl heap_copy_dispatch_005323e0(void* dst, const void* src, std::uint32_t bytes) {
+    event(12u, arena_norm(dst), arena_norm(src), bytes);
+    if (bytes != 0u) {
+        std::memcpy(dst, src, bytes);
+    }
+}
+
+void* __cdecl heap_word_0056e2c0(void* dst, std::uint32_t val, std::int32_t n) {
+    auto* p = static_cast<B*>(dst);
+    for (I i = 0; i < n; ++i) {
+        p[i] = static_cast<B>((val >> (8 * (n - 1 - i))) & 0xffu);
+    }
+    return dst;
+}
+
+void __cdecl render_loader_format_005a0fbf(char* out, const char* fmt, ...) {
+    I a0 = 0, a1 = 0;
+    const auto* ap = reinterpret_cast<const I*>(&fmt + 1);
+    a0 = ap[0];
+    a1 = ap[1];
+    std::snprintf(out, 32, fmt, a0, a1);
+    event(13u, str_tag(out));
+}
+
+std::int32_t __cdecl render_shape_type_to_depth_index_005345e0(std::uint32_t t) {
+    switch (t) {
+    case 0x01u: case 0x40u: case 0x7au: return 0;
+    case 0x02u: case 0x41u: case 0x7bu: return 1;
+    case 0x03u: case 0x7eu: return 2;
+    case 0x04u: case 0x78u: return 3;
+    case 0x05u: case 0x43u: case 0x7fu: return 4;
+    case 0x7du: return 5;
+    case 0x6du: return 6;
+    case 0x42u: return 7;
+    default: return -1;
+    }
+}
+
+std::int32_t __cdecl render_depth_format_index_00535340(std::uint32_t fmt) {
+    static const I tbl[14] = {-1, 0, 1, 2, 3, 4, 5, 6, -1, -1, -1, 2, -1, -1};
+    return (fmt < 14u) ? tbl[fmt] : -1;
+}
+
+std::uint32_t __cdecl render_depth_level_00535360(std::int32_t idx) {
+    static const U tbl[7] = {1u, 2u, 3u, 4u, 5u, 6u, 7u};
+    return (idx >= 0 && idx < 7) ? tbl[idx] : 0u;
+}
+
+std::uint32_t __cdecl render_descriptor_bits_00537f90(const void* descriptor) {
+    static const B bits[128] = {
+        0,4,8,15,24,32,16,0,0,0,0,0,0,0,0,0,
+        15,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        15,32,24,0,24,0,0,0,0,16,32,0,32,15,32,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        4,8,15,24,1,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,16,0,0,
+        0,0,0,0,0,0,0,0,16,1,4,8,0,32,15,24,
+    };
+    return bits[rd(descriptor) & 0x7fu];
+}
+
+void* __cdecl render_resource_node_palette_00537fb0(const void* descriptor) {
+    event(14u, rd(descriptor) & 0xffu);
+    return fake_pal_res;
+}
+
+std::uint32_t* __cdecl render_getclutptr_from_resource_005346d0(
+    const void* descriptor, std::uint32_t* palette) {
+    event(15u, static_cast<U>(descriptor == fake_pal_res), arena_norm(palette));
+    for (U i = 0u; i < 256u; ++i) {
+        palette[i] = 0x80000000u ^ (i * 0x010305u);
+    }
+    return fake_pal_res;
+}
+
+std::uint32_t __cdecl render_descriptor_read_be_0056e290(
+    const void* source, std::uint32_t count) {
+    const auto* p = static_cast<const B*>(source);
+    U v = 0u;
+    for (U i = 0u; i < count; ++i) {
+        v = (v << 8) | p[i];
+    }
+    return v;
+}
+
+std::uint32_t __cdecl render_buffer_read_word_0056e2a8(const void* src, std::int32_t bytes) {
+    const auto* p = static_cast<const B*>(src);
+    U v = 0u;
+    for (I i = 0; i < bytes; ++i) {
+        v |= static_cast<U>(p[i]) << (8 * i);
+    }
+    return v;
+}
+
+std::int32_t __cdecl splash_shape_row_stride_005712f0(const void* shape) {
+    const I w = static_cast<std::int16_t>(rd(shape, 4) & 0xffffu);
+    const I bpp = static_cast<I>(render_descriptor_bits_00537f90(shape));
+    return static_cast<I>(((static_cast<U>(bpp) + 1u) & ~1u) * static_cast<U>(w) + 7u) >> 3;
+}
+
+std::uint32_t __cdecl render_chunk_size_wrapper_00571520(const void* header) {
+    const auto* p = static_cast<const B*>(header);
+    if (p[1] != 0xfbu && p[1] != 0x32u) return 0u;
+    const U op = p[0] & 0xfeu;
+    if (op == 0x10u || op == 0x18u || op == 0x30u || op == 0x32u || op == 0x34u || op == 0x46u) {
+        const B* szp = ((p[0] & 1u) != 0u) ? (p + 5) : (p + 2);
+        return render_descriptor_read_be_0056e290(szp, 3u);
+    }
+    return 0u;
+}
+
+static void stub_row(U id, void* dst, const void* src, I count, U byte_scale) {
+    const auto* s = static_cast<const B*>(src);
+    auto* d = static_cast<B*>(dst);
+    const U out_bytes = (byte_scale == 0u) ? static_cast<U>((count + 1) >> 1)
+                                           : static_cast<U>(count) * byte_scale;
+    event(100u + id, arena_norm(dst), static_cast<U>(count),
+          static_cast<U>(render_depthconv_palette_ptr_005de2f8 == fake_pal_res));
+    for (U i = 0u; i < out_bytes; ++i) {
+        const U pal_mix = render_depthconv_palette_scratch_006bda20[i & 0xffu] & 0xffu;
+        d[i] = static_cast<B>((s[i & 15u] + id + i + pal_mix) & 0xffu);
+    }
+    if (corrupt_row_sentinel != 0u) {
+        d[out_bytes] ^= 0x5au;
+        corrupt_row_sentinel = 0u;
+    }
+}
+
+static void stub_pal16(U id, W* dst, const U* src, I count) {
+    event(200u + id, arena_norm(dst), static_cast<U>(src == fake_pal_res), static_cast<U>(count));
+    for (I i = 0; i < count; ++i) {
+        dst[i] = static_cast<W>((src[i] + id * 17u) & 0xffffu);
+    }
+}
+
+static void stub_pal32(U id, U* dst, const W* src, I count) {
+    event(200u + id, arena_norm(dst), static_cast<U>(count));
+    for (I i = 0; i < count; ++i) {
+        dst[i] = static_cast<U>(src[i]) ^ (id * 0x010101u);
+    }
+}
+
+void __cdecl render_row_4_copy_005700d0(void* d, const void* s, I c) { stub_row(1u, d, s, c, 0u); }
+void __cdecl render_row_8_to_4_005700f0(void* d, const void* s, I c) { stub_row(2u, d, s, c, 0u); }
+void __cdecl render_row_4_to_8_00570150(void* d, const void* s, I c) { stub_row(3u, d, s, c, 1u); }
+void __cdecl render_row_8_copy_00570190(void* d, const void* s, I c) { stub_row(4u, d, s, c, 1u); }
+void __cdecl render_row_565_to_8_005701b0(void* d, const void* s, I c) { stub_row(5u, d, s, c, 1u); }
+void __cdecl render_palette_swap_rb555_00570260(W* d, const W* s, I c) { stub_row(6u, d, s, c, 2u); }
+void __cdecl render_palette_565_to_1555_005702a0(W* d, const W* s, I c) { stub_row(7u, d, s, c, 2u); }
+void __cdecl render_row_565_to_1555_005702f0(void* d, const void* s, I c) { stub_row(8u, d, s, c, 2u); }
+void __cdecl render_palette_8888_to_1555_alpha_00570330(W* d, const U* s, I c) { stub_pal16(9u, d, s, c); }
+void __cdecl render_palette_888_to_1555_00570370(W* d, const U* s, I c) { stub_pal16(10u, d, s, c); }
+void __cdecl render_row_4_to_16_lut_005703a0(void* d, const void* s, I c) { stub_row(11u, d, s, c, 2u); }
+void __cdecl render_row_8_to_16_lut_005703f0(void* d, const void* s, I c) { stub_row(12u, d, s, c, 2u); }
+void __cdecl render_palette_555_to_565_00570420(W* d, const W* s, I c) { stub_row(13u, d, s, c, 2u); }
+void __cdecl render_row_16_copy_00570470(void* d, const void* s, I c) { stub_row(14u, d, s, c, 2u); }
+void __cdecl render_palette_8888_to_565_alpha_005704c0(W* d, const U* s, I c) { stub_pal16(15u, d, s, c); }
+void __cdecl render_palette_888_to_565_00570510(W* d, const U* s, I c) { stub_pal16(16u, d, s, c); }
+void __cdecl render_palette_8888_to_4444_00570540(W* d, const U* s, I c) { stub_pal16(17u, d, s, c); }
+void __cdecl render_row_565_to_4444_key_005705a0(void* d, const void* s, I c) { stub_row(18u, d, s, c, 2u); }
+void __cdecl render_row_8_to_24_lut_00570650(void* d, const void* s, I c) { stub_row(19u, d, s, c, 3u); }
+void __cdecl render_row_565_to_24_00570690(void* d, const void* s, I c) { stub_row(20u, d, s, c, 3u); }
+void __cdecl render_row_24_copy_00570700(void* d, const void* s, I c) { stub_row(21u, d, s, c, 3u); }
+void __cdecl render_row_8888_to_24_00570720(void* d, const void* s, I c) { stub_row(22u, d, s, c, 3u); }
+void __cdecl render_row_8_to_32_lut_00570750(void* d, const void* s, I c) { stub_row(23u, d, s, c, 4u); }
+void __cdecl render_palette_5551_to_8888_key_00570780(U* d, const W* s, I c) { stub_pal32(24u, d, s, c); }
+void __cdecl render_palette_565_to_8888_key_00570820(U* d, const W* s, I c) { stub_pal32(25u, d, s, c); }
+void __cdecl render_row_4444_to_8888_005708a0(void* d, const void* s, I c) { stub_row(26u, d, s, c, 4u); }
+void __cdecl render_row_24_to_8888_00570a00(void* d, const void* s, I c) { stub_row(27u, d, s, c, 4u); }
+void __cdecl render_row_32_copy_00570a80(void* d, const void* s, I c) { stub_row(28u, d, s, c, 4u); }
+
+} // namespace porsche
+
+namespace {
+
+static U map_row_va(U va) {
+    switch (va) {
+    case 0x005700d0u: return fn_ptr(&porsche::render_row_4_copy_005700d0);
+    case 0x005700f0u: return fn_ptr(&porsche::render_row_8_to_4_005700f0);
+    case 0x00570150u: return fn_ptr(&porsche::render_row_4_to_8_00570150);
+    case 0x00570190u: return fn_ptr(&porsche::render_row_8_copy_00570190);
+    case 0x005701b0u: return fn_ptr(&porsche::render_row_565_to_8_005701b0);
+    case 0x00570260u: return fn_ptr(&porsche::render_palette_swap_rb555_00570260);
+    case 0x005702a0u: return fn_ptr(&porsche::render_palette_565_to_1555_005702a0);
+    case 0x005702f0u: return fn_ptr(&porsche::render_row_565_to_1555_005702f0);
+    case 0x00570330u: return fn_ptr(&porsche::render_palette_8888_to_1555_alpha_00570330);
+    case 0x00570370u: return fn_ptr(&porsche::render_palette_888_to_1555_00570370);
+    case 0x005703a0u: return fn_ptr(&porsche::render_row_4_to_16_lut_005703a0);
+    case 0x005703f0u: return fn_ptr(&porsche::render_row_8_to_16_lut_005703f0);
+    case 0x00570420u: return fn_ptr(&porsche::render_palette_555_to_565_00570420);
+    case 0x00570470u: return fn_ptr(&porsche::render_row_16_copy_00570470);
+    case 0x005704c0u: return fn_ptr(&porsche::render_palette_8888_to_565_alpha_005704c0);
+    case 0x00570510u: return fn_ptr(&porsche::render_palette_888_to_565_00570510);
+    case 0x00570540u: return fn_ptr(&porsche::render_palette_8888_to_4444_00570540);
+    case 0x005705a0u: return fn_ptr(&porsche::render_row_565_to_4444_key_005705a0);
+    case 0x00570650u: return fn_ptr(&porsche::render_row_8_to_24_lut_00570650);
+    case 0x00570690u: return fn_ptr(&porsche::render_row_565_to_24_00570690);
+    case 0x00570700u: return fn_ptr(&porsche::render_row_24_copy_00570700);
+    case 0x00570720u: return fn_ptr(&porsche::render_row_8888_to_24_00570720);
+    case 0x00570750u: return fn_ptr(&porsche::render_row_8_to_32_lut_00570750);
+    case 0x00570780u: return fn_ptr(&porsche::render_palette_5551_to_8888_key_00570780);
+    case 0x00570820u: return fn_ptr(&porsche::render_palette_565_to_8888_key_00570820);
+    case 0x005708a0u: return fn_ptr(&porsche::render_row_4444_to_8888_005708a0);
+    case 0x00570a00u: return fn_ptr(&porsche::render_row_24_to_8888_00570a00);
+    case 0x00570a80u: return fn_ptr(&porsche::render_row_32_copy_00570a80);
+    default:
+        require(false, "unknown-row-va");
+        return 0u;
+    }
+}
+
+static void patch_call(B* slot, U call_off, U target) {
+    wr(slot, call_off, target - (ptr(slot) + call_off + 4u));
+}
+
+static void setup_pe() {
+    static const B b_534d40[] = {@BODY_00534D40@};
+    static const B b_5350e0[] = {@BODY_005350E0@};
+    static const B b_571330[] = {@BODY_00571330@};
+    static const B b_5713a0[] = {@BODY_005713A0@};
+    static const B b_571470[] = {@BODY_00571470@};
+    static const B b_593640[] = {@BODY_00593640@};
+    static const B b_593790[] = {@BODY_00593790@};
+    static const B b_593800[] = {@BODY_00593800@};
+    static const B b_594400[] = {@BODY_00594400@};
+    static const B b_594490[] = {@BODY_00594490@};
+    static const B b_594760[] = {@BODY_00594760@};
+    static const B b_5948c0[] = {@BODY_005948C0@};
+    static const B b_5948f0[] = {@BODY_005948F0@};
+    static const B b_594960[] = {@BODY_00594960@};
+
+    static const B raw_direct[256] = {@TABLE_005DE2FC@};
+    static const B raw_alt[256] = {@TABLE_005DE3FC@};
+    static const B raw_map[64] = {@MAP_005DE4FC@};
+    static const B raw_bits[140] = {@TABLE_005DE53C@};
+    static const B raw_clut[32] = {@TABLE_005DE5C8@};
+    static const B raw_idx[256] = {@TABLE_005DFA50@};
+
+    for (U i = 0u; i < 64u; ++i) {
+        pe_direct_tbl[i] = map_row_va(rd(raw_direct, i * 4u));
+        pe_alt_tbl[i] = map_row_va(rd(raw_alt, i * 4u));
+    }
+    std::memcpy(pe_map_tbl, raw_map, sizeof(pe_map_tbl));
+    std::memcpy(pe_tex_bits, raw_bits, sizeof(pe_tex_bits));
+    std::memcpy(pe_clut_fmt, raw_clut, sizeof(pe_clut_fmt));
+    std::memcpy(pe_pal_idx, raw_idx, sizeof(pe_pal_idx));
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 16384u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "virtual-alloc");
+    std::memset(code, 0xcc, 16384u);
+
+    auto place = [&](U& cursor, const B* bytes, U len) -> B* {
+        B* out = code + cursor;
+        std::memcpy(out, bytes, len);
+        cursor += (len + 15u) & ~15u;
+        return out;
+    };
+
+    U cur = 0u;
+    slot_534d40 = place(cur, b_534d40, sizeof(b_534d40));
+    slot_5350e0 = place(cur, b_5350e0, sizeof(b_5350e0));
+    slot_571330 = place(cur, b_571330, sizeof(b_571330));
+    slot_5713a0 = place(cur, b_5713a0, sizeof(b_5713a0));
+    slot_571470 = place(cur, b_571470, sizeof(b_571470));
+    slot_593640 = place(cur, b_593640, sizeof(b_593640));
+    slot_593790 = place(cur, b_593790, sizeof(b_593790));
+    slot_593800 = place(cur, b_593800, sizeof(b_593800));
+    slot_594400 = place(cur, b_594400, sizeof(b_594400));
+    slot_594490 = place(cur, b_594490, sizeof(b_594490));
+    slot_594760 = place(cur, b_594760, sizeof(b_594760));
+    slot_5948c0 = place(cur, b_5948c0, sizeof(b_5948c0));
+    slot_5948f0 = place(cur, b_5948f0, sizeof(b_5948f0));
+    slot_594960 = place(cur, b_594960, sizeof(b_594960));
+
+    // Patch 00534d40
+    patch_call(slot_534d40, 0x025u, ptr(slot_571330));
+    patch_call(slot_534d40, 0x034u, fn_ptr(&porsche::render_resource_node_palette_00537fb0));
+    patch_call(slot_534d40, 0x048u, fn_ptr(&porsche::render_shape_type_to_depth_index_005345e0));
+    patch_call(slot_534d40, 0x054u, fn_ptr(&porsche::render_shape_type_to_depth_index_005345e0));
+    wr(slot_534d40, 0x069u, ptr(pe_direct_tbl));
+    wr(slot_534d40, 0x076u, ptr(pe_alt_tbl));
+    wr(slot_534d40, 0x082u, ptr(pe_map_tbl));
+    wr(slot_534d40, 0x09bu, ptr(&porsche::shared_runtime_word_005deb74));
+    wr(slot_534d40, 0x09fu, ptr(kStrFile));
+    wr(slot_534d40, 0x0a5u, ptr(kStrShapeErr));
+    wr(slot_534d40, 0x0abu, ptr(&porsche::shared_runtime_word_005deb78));
+    wr(slot_534d40, 0x0b5u, ptr(&porsche::diagnostic_handler_005debf0));
+    patch_call(slot_534d40, 0x0beu, fn_ptr(&porsche::render_descriptor_bits_00537f90));
+    patch_call(slot_534d40, 0x0ceu, fn_ptr(&porsche::render_descriptor_bits_00537f90));
+    patch_call(slot_534d40, 0x0eau, fn_ptr(&porsche::splash_shape_row_stride_005712f0));
+    wr(slot_534d40, 0x132u, ptr(porsche::render_depthconv_palette_scratch_006bda20));
+    wr(slot_534d40, 0x13du, ptr(pe_pal_idx));
+    wr(slot_534d40, 0x147u, ptr(porsche::render_pixel_palette_006b4b20));
+    wr(slot_534d40, 0x155u, ptr(porsche::render_depthconv_palette_scratch_006bda20));
+    wr(slot_534d40, 0x160u, ptr(porsche::render_depthconv_palette_scratch_006bda20));
+    patch_call(slot_534d40, 0x166u, fn_ptr(&porsche::render_getclutptr_from_resource_005346d0));
+    wr(slot_534d40, 0x172u, ptr(&porsche::render_depthconv_palette_ptr_005de2f8));
+    wr(slot_534d40, 0x186u, ptr(porsche::render_depthconv_palette_scratch_006bda20));
+    patch_call(slot_534d40, 0x18bu, fn_ptr(&porsche::render_palette_8888_to_4444_00570540));
+    wr(slot_534d40, 0x199u, ptr(porsche::render_depthconv_palette_scratch_006bda20));
+    patch_call(slot_534d40, 0x19eu, fn_ptr(&porsche::render_palette_8888_to_1555_alpha_00570330));
+    wr(slot_534d40, 0x1acu, ptr(porsche::render_depthconv_palette_scratch_006bda20));
+    patch_call(slot_534d40, 0x1b1u, fn_ptr(&porsche::render_palette_8888_to_565_alpha_005704c0));
+    wr(slot_534d40, 0x1bfu, ptr(porsche::render_depthconv_palette_scratch_006bda20));
+    patch_call(slot_534d40, 0x1c4u, fn_ptr(&porsche::render_palette_8888_to_4444_00570540));
+    wr(slot_534d40, 0x1d2u, ptr(porsche::render_depthconv_palette_scratch_006bda20));
+    patch_call(slot_534d40, 0x1d7u, fn_ptr(&porsche::render_palette_888_to_1555_00570370));
+    wr(slot_534d40, 0x1e5u, ptr(porsche::render_depthconv_palette_scratch_006bda20));
+    patch_call(slot_534d40, 0x1eau, fn_ptr(&porsche::render_palette_888_to_565_00570510));
+    wr(slot_534d40, 0x204u, ptr(kStrFmtDim));
+    patch_call(slot_534d40, 0x20au, fn_ptr(&porsche::render_loader_format_005a0fbf));
+    wr(slot_534d40, 0x212u, ptr(&porsche::render_alloc_flags_005deb60));
+    patch_call(slot_534d40, 0x226u, fn_ptr(&porsche::allocate_00531ca0));
+    patch_call(slot_534d40, 0x23du, fn_ptr(&porsche::heap_word_0056e2c0));
+    patch_call(slot_534d40, 0x2d9u, fn_ptr(&porsche::render_descriptor_read_be_0056e290));
+    wr(slot_534d40, 0x2fau, ptr(&porsche::shared_runtime_word_005deb74));
+    wr(slot_534d40, 0x2feu, ptr(kStrFile));
+    wr(slot_534d40, 0x308u, ptr(kStrSentinel));
+    wr(slot_534d40, 0x30eu, ptr(&porsche::shared_runtime_word_005deb78));
+    wr(slot_534d40, 0x318u, ptr(&porsche::diagnostic_handler_005debf0));
+    patch_call(slot_534d40, 0x329u, fn_ptr(&porsche::free_00531f90));
+
+    // Patch 005350e0
+    patch_call(slot_5350e0, 0x046u, fn_ptr(&porsche::heap_copy_dispatch_005323e0));
+    patch_call(slot_5350e0, 0x05cu, fn_ptr(&porsche::render_chunk_size_wrapper_00571520));
+    wr(slot_5350e0, 0x064u, ptr(kStrTex565));
+    patch_call(slot_5350e0, 0x069u, fn_ptr(&porsche::allocate_00531ca0));
+    patch_call(slot_5350e0, 0x074u, ptr(slot_571470));
+    patch_call(slot_5350e0, 0x094u, fn_ptr(&porsche::render_depth_format_index_00535340));
+    patch_call(slot_5350e0, 0x09cu, fn_ptr(&porsche::render_depth_format_index_00535340));
+    wr(slot_5350e0, 0x0a7u, ptr(pe_direct_tbl));
+    patch_call(slot_5350e0, 0x0b0u, fn_ptr(&porsche::render_depth_format_index_00535340));
+    patch_call(slot_5350e0, 0x0b8u, fn_ptr(&porsche::render_depth_format_index_00535340));
+    wr(slot_5350e0, 0x0c1u, ptr(pe_map_tbl));
+    patch_call(slot_5350e0, 0x0c7u, fn_ptr(&porsche::render_shape_type_to_depth_index_005345e0));
+    patch_call(slot_5350e0, 0x0cdu, fn_ptr(&porsche::render_depth_level_00535360));
+    wr(slot_5350e0, 0x0ddu, ptr(kStrTexErr));
+    wr(slot_5350e0, 0x0e3u, ptr(&porsche::shared_runtime_word_005deb74));
+    wr(slot_5350e0, 0x0e7u, ptr(kStrFile));
+    wr(slot_5350e0, 0x0edu, ptr(&porsche::shared_runtime_word_005deb78));
+    wr(slot_5350e0, 0x0f7u, ptr(&porsche::diagnostic_handler_005debf0));
+    wr(slot_5350e0, 0x105u, ptr(pe_tex_bits));
+    wr(slot_5350e0, 0x10cu, ptr(pe_tex_bits));
+    wr(slot_5350e0, 0x11bu, ptr(kStrFmtDim));
+    patch_call(slot_5350e0, 0x121u, fn_ptr(&porsche::render_loader_format_005a0fbf));
+    wr(slot_5350e0, 0x126u, ptr(&porsche::render_alloc_flags_005deb60));
+    patch_call(slot_5350e0, 0x145u, fn_ptr(&porsche::allocate_00531ca0));
+    wr(slot_5350e0, 0x183u, ptr(pe_clut_fmt));
+    wr(slot_5350e0, 0x18cu, ptr(porsche::render_depthconv_palette_scratch_006bda20));
+    patch_call(slot_5350e0, 0x198u, ptr(slot_5350e0));
+    patch_call(slot_5350e0, 0x1bfu, fn_ptr(&porsche::free_00531f90));
+    wr(slot_5350e0, 0x228u, ptr(pe_clut_fmt));
+    wr(slot_5350e0, 0x236u, ptr(pe_clut_fmt));
+    patch_call(slot_5350e0, 0x241u, ptr(slot_5350e0));
+
+    // Patch 00571330
+    patch_call(slot_571330, 0x011u, fn_ptr(&porsche::render_chunk_size_wrapper_00571520));
+    wr(slot_571330, 0x01cu, ptr(kStrUnshp));
+    patch_call(slot_571330, 0x021u, fn_ptr(&porsche::allocate_00531ca0));
+    patch_call(slot_571330, 0x02cu, fn_ptr(&porsche::heap_copy_dispatch_005323e0));
+    patch_call(slot_571330, 0x036u, ptr(slot_571470));
+
+    // Patch 005713a0 & 00571470
+    static U pe_sw_jtbl[5] = {
+        ptr(slot_5713a0) + 0x33u,
+        ptr(slot_5713a0) + 0x45u,
+        ptr(slot_5713a0) + 0x57u,
+        ptr(slot_5713a0) + 0x69u,
+        ptr(slot_5713a0) + 0x77u,
+    };
+    static const B pe_sw_idx[55] = {
+        0,4,4,4,4,4,4,4, 1,4,4,4,4,4,4,4,
+        4,4,4,4,4,4,4,4, 4,4,4,4,4,4,4,4,
+        2,4,2,4,2,4,4,4, 4,4,4,4,4,4,4,4,
+        4,4,4,4,4,4,3,
+    };
+    wr(slot_5713a0, 0x028u, ptr(pe_sw_idx));
+    wr(slot_5713a0, 0x02fu, ptr(pe_sw_jtbl));
+    patch_call(slot_5713a0, 0x03cu, ptr(slot_594760));
+    patch_call(slot_5713a0, 0x04eu, ptr(slot_594400));
+    patch_call(slot_5713a0, 0x060u, ptr(slot_593800));
+    patch_call(slot_5713a0, 0x070u, ptr(slot_593640));
+    patch_call(slot_571470, 0x00bu, ptr(slot_5713a0));
+
+    // Patch 00593640 & 00593790
+    wr(slot_593640, 0x013u, ptr(&bpe_state_flag));
+    wr(slot_593640, 0x02au, ptr(&bpe_state_left));
+    wr(slot_593640, 0x039u, ptr(&bpe_state_src));
+    wr(slot_593640, 0x03fu, ptr(&bpe_state_dst));
+    wr(slot_593640, 0x045u, ptr(&bpe_state_right));
+    wr(slot_593640, 0x0ceu, ptr(&bpe_state_flag));
+    wr(slot_593640, 0x0d9u, ptr(&bpe_state_src));
+    wr(slot_593640, 0x0eau, ptr(&bpe_state_dst));
+    wr(slot_593640, 0x0f4u, ptr(&bpe_state_left));
+    patch_call(slot_593640, 0x0fdu, ptr(slot_593790));
+    wr(slot_593640, 0x102u, ptr(&bpe_state_right));
+    patch_call(slot_593640, 0x10bu, ptr(slot_593790));
+    wr(slot_593640, 0x111u, ptr(&bpe_state_src));
+    wr(slot_593640, 0x117u, ptr(&bpe_state_dst));
+    wr(slot_593640, 0x129u, ptr(&bpe_state_src));
+    wr(slot_593640, 0x135u, ptr(&bpe_state_dst));
+
+    wr(slot_593790, 0x001u, ptr(&bpe_state_flag));
+    wr(slot_593790, 0x018u, ptr(&bpe_state_left));
+    patch_call(slot_593790, 0x021u, ptr(slot_593790));
+    wr(slot_593790, 0x026u, ptr(&bpe_state_right));
+    wr(slot_593790, 0x02cu, ptr(&bpe_state_flag));
+    wr(slot_593790, 0x04cu, ptr(&bpe_state_dst));
+    wr(slot_593790, 0x056u, ptr(&bpe_state_dst));
+    wr(slot_593790, 0x05cu, ptr(&bpe_state_dst));
+    wr(slot_593790, 0x069u, ptr(&bpe_state_dst));
+
+    // Patch 00594400 & 00594490
+    patch_call(slot_594400, 0x013u, fn_ptr(&porsche::render_descriptor_read_be_0056e290));
+    patch_call(slot_594400, 0x024u, fn_ptr(&porsche::render_descriptor_read_be_0056e290));
+    patch_call(slot_594400, 0x056u, ptr(slot_594490));
+    patch_call(slot_594490, 0x00eu, fn_ptr(&porsche::render_buffer_read_word_0056e2a8));
+    patch_call(slot_594490, 0x01bu, fn_ptr(&porsche::render_buffer_read_word_0056e2a8));
+
+    // Patch 00594760 & 005948f0
+    patch_call(slot_594760, 0x0b1u, ptr(slot_5948f0));
+    patch_call(slot_594760, 0x0ffu, ptr(slot_5948f0));
+    patch_call(slot_594760, 0x12cu, ptr(slot_5948c0));
+    patch_call(slot_5948f0, 0x049u, ptr(slot_594960));
+    patch_call(slot_5948f0, 0x065u, ptr(slot_5948c0));
+}
+
+template <typename T>
+static U to_u32(T* p) { return ptr(p); }
+template <typename T>
+static U to_u32(T v) { return static_cast<U>(v); }
+
+template <typename Fn, typename... Args>
+static U call_cdecl_u(U fn, Args... args) {
+    DWORD esp_before = 0u, esp_after = 0u, eax_out = 0u;
+    auto target = reinterpret_cast<Fn>(static_cast<std::uintptr_t>(fn));
+    __asm {
+        mov esp_before, esp
+    }
+    eax_out = to_u32(target(args...));
+    __asm {
+        mov esp_after, esp
+    }
+    if (esp_before != esp_after) {
+        trace.abi_fail = 1u;
+    }
+    return eax_out;
+}
+
+template <typename Fn, typename... Args>
+static void call_cdecl_v(U fn, Args... args) {
+    DWORD esp_before = 0u, esp_after = 0u;
+    auto target = reinterpret_cast<Fn>(static_cast<std::uintptr_t>(fn));
+    __asm {
+        mov esp_before, esp
+    }
+    target(args...);
+    __asm {
+        mov esp_after, esp
+    }
+    if (esp_before != esp_after) {
+        trace.abi_fail = 1u;
+    }
+}
+
+static void reset_state() {
+    std::memset(&trace, 0, sizeof(trace));
+    std::memset(heap_arena, 0xcc, sizeof(heap_arena));
+    heap_cursor = 0u;
+    corrupt_row_sentinel = 0u;
+    std::memset(dst_buf, 0x55, sizeof(dst_buf));
+    std::memset(dst_clut_buf, 0x66, sizeof(dst_clut_buf));
+    for (U i = 0u; i < 256u; ++i) {
+        porsche::render_pixel_palette_006b4b20[i] = 0xff000000u | (i * 0x030507u);
+        fake_pal_res[i] = 0x77000000u ^ (i * 0x010204u);
+    }
+    std::memset(src_clut_buf, 0x11, sizeof(src_clut_buf));
+    std::memset(porsche::render_depthconv_palette_scratch_006bda20, 0x22,
+                sizeof(porsche::render_depthconv_palette_scratch_006bda20));
+    porsche::render_depthconv_palette_ptr_005de2f8 = nullptr;
+    porsche::shared_runtime_word_005deb74 = 0u;
+    porsche::shared_runtime_word_005deb78 = 0u;
+    bpe_state_right = nullptr;
+    bpe_state_dst = nullptr;
+    bpe_state_src = nullptr;
+    bpe_state_flag = nullptr;
+    bpe_state_left = nullptr;
+}
+
+static void finish_side(U dst_bytes) {
+    trace.err_file = (porsche::shared_runtime_word_005deb74 == ptr(kStrFile) ||
+                      porsche::shared_runtime_word_005deb74 == ptr(porsche::render_clut16_file_005bb3e4))
+                         ? 1u
+                         : porsche::shared_runtime_word_005deb74;
+    trace.err_line = porsche::shared_runtime_word_005deb78;
+    trace.pal_ptr_off = arena_norm(porsche::render_depthconv_palette_ptr_005de2f8);
+    if (porsche::render_depthconv_palette_ptr_005de2f8 == fake_pal_res) {
+        trace.pal_ptr_off = 0x40000000u;
+    }
+    trace.scratch_hash = fnv1a(porsche::render_depthconv_palette_scratch_006bda20, 1024u);
+    trace.dst_hash = fnv1a(dst_buf, dst_bytes);
+    trace.arena_hash = fnv1a(heap_arena, heap_cursor > 0u ? heap_cursor : 64u);
+}
+
+static void compare_sides() {
+    require(trace.abi_fail == 0u, "abi");
+    require(trace.r0 == expected.r0, "r0");
+    require(trace.r1 == expected.r1, "r1");
+    require(trace.r2 == expected.r2, "r2");
+    require(trace.r3 == expected.r3, "r3");
+    require(trace.err_file == expected.err_file, "err-file");
+    require(trace.err_line == expected.err_line, "err-line");
+    require(trace.pal_ptr_off == expected.pal_ptr_off, "pal-ptr");
+    require(trace.scratch_hash == expected.scratch_hash, "scratch-hash");
+    require(trace.dst_hash == expected.dst_hash, "dst-hash");
+    require(trace.arena_hash == expected.arena_hash, "arena-hash");
+    require(trace.event_count == expected.event_count, "event-count");
+    for (U i = 0u; i < trace.event_count; ++i) {
+        require(trace.events[i].kind == expected.events[i].kind, "event-kind");
+        require(trace.events[i].a0 == expected.events[i].a0, "event-a0");
+        require(trace.events[i].a1 == expected.events[i].a1, "event-a1");
+        require(trace.events[i].a2 == expected.events[i].a2, "event-a2");
+        require(trace.events[i].a3 == expected.events[i].a3, "event-a3");
+    }
+}
+
+template <typename Fn>
+static void run_case(U dst_bytes, Fn&& body) {
+    ++cases;
+    side = 0u;
+    reset_state();
+    body(true);
+    finish_side(dst_bytes);
+    expected = trace;
+
+    side = 1u;
+    reset_state();
+    body(false);
+    finish_side(dst_bytes);
+    compare_sides();
+}
+
+// Helper to build a test RefPack compressed stream with all 4 opcodes.
+static const B kRefPackAll[] = {
+    0x10, 0xfb, 0x00, 0x00, 0x26, // 38 bytes uncompressed
+    0xfc, 0x00,                   // dummy? No: start with 4-byte literal run (0xe0 -> 4 bytes)
+};
+
+// Carefully constructed exact RefPack test streams:
+// Stream 1: 0x10fb, ulen = 26, uses 0xe0 (4-byte literal "ABCD"), dist=1 RLE (0x04,0x00 -> lit=0,len=4,dist=1 => 'D'*4),
+//           dist=2 (0x08,0x01 -> lit=0,len=5,dist=2), dist=4 (0x10,0x03 -> lit=0,len=7,dist=4),
+//           0x84,0x01,0x02 ('X','Y', match), stop 0xfe ('Z','!')
+static const B kRefStream1[] = {
+    0x10, 0xfb, 0x00, 0x00, 0x1a,
+    0xe0, 'A', 'B', 'C', 'D',             // +4 literals -> "ABCD" (out=4)
+    0x04, 0x00,                           // short: lit=0, match=(1<<0)+3? No: (op>>2)&7=1 -> match=4, dist=1 -> "DDDD" (out=8)
+    0x08, 0x01,                           // short: lit=0, match=(2)+3=5, dist=2 -> "CDCDD" (out=13)
+    0x10, 0x03,                           // short: lit=0, match=(4)+3=7, dist=4 -> 7 bytes from out-4 (out=20)
+    0x82, 0x01, 0x04, 'X', 'Y',           // med: b0=0x82(match=2+4=6), b1=0x01(lit=0? wait: (b1>>6)=0, wait want lit=2 -> b1=0x80|0x01), wait compute cleanly below!
+    0xfe, 'Z', '!'                        // stop: +2 literals (out=26)
+};
+
+static B shape_buf[1024] = {};
+
+static void fill_shape(U type_word, I w, I h, U word2, U word3) {
+    std::memset(shape_buf, 0, sizeof(shape_buf));
+    wr(shape_buf, 0u, type_word);
+    wr(shape_buf, 4u, (static_cast<U>(h) << 16) | (static_cast<U>(w) & 0xffffu));
+    wr(shape_buf, 8u, word2);
+    wr(shape_buf, 12u, word3);
+    for (U i = 16u; i < 256u; ++i) {
+        shape_buf[i] = static_cast<B>((i * 11u + 3u) & 0xffu);
+    }
+}
+
+} // namespace
+
+int main() {
+    AddVectoredExceptionHandler(1u, &fault_handler);
+    setup_pe();
+
+    // Exact RefPack vector covering literal run, short dist 1/2/3/4, med opcode, long opcode, stop 0..3.
+    static const B ref_vec1[] = {
+        0x10, 0xfb, 0x00, 0x00, 0x29, // ulen = 41
+        0xe0, 'A', 'B', 'C', 'D',     // +4 => 4
+        0x04, 0x00,                   // lit=0, dist=1, match=4 => 8
+        0x08, 0x01,                   // lit=0, dist=2, match=5 => 13
+        0x08, 0x02,                   // lit=0, dist=3, match=5 => 18
+        0x10, 0x03,                   // lit=0, dist=4, match=7 => 25
+        0x82, 0x80, 0x04, 'X', 'Y',   // med: b0=0x82 (match=2+4=6), b1=0x80(lit=2,distHi=0), b2=0x04(dist=5) => +2+6=33
+        0xc1, 0x00, 0x07, 0x02, 'Q',  // long: b0=0xc1(lit=1,dist16=0,lenHi=0), b1=0, b2=7(dist=8), b3=2(match=5+2=7) => +1+7=41
+        0xfc                          // stop 0
+    };
+    static const B ref_vec2[] = {
+        0x11, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, // bit0=1 (5-byte skip) + 0x32 magic, ulen=7
+        0xe0, '1', '2', '3', '4',
+        0xff, '5', '6', '7'
+    };
+
+    using FnConvertShape = void*(__cdecl*)(const void*, U, I, I);
+    using FnConvertTex = I(__cdecl*)(U, U, U, U, U, U, U, U, I);
+    using FnUnpack = void*(__cdecl*)(const void*);
+    using FnDecomp = U(__cdecl*)(const void*, void*);
+    using FnBpe = I(__cdecl*)(const void*, void*);
+    using FnHuff = U(__cdecl*)(const void*, void*, I);
+    using FnDxt = I(__cdecl*)(const void*, void*, I);
+    using FnDxtBlk = void(__cdecl*)(W*, I, const void*);
+    using FnRef = I(__cdecl*)(const void*, void*, I);
+    using FnCopyDw = void*(__cdecl*)(void*, const void*, I);
+    using FnMatch = void*(__cdecl*)(void*, U, U);
+    using FnCopyB = void(__cdecl*)(void*, const void*, I);
+
+    // 1. RefPack vectors + helpers (00594760, 005948c0, 005948f0, 00594960, 005713a0, 00571470)
+    run_case(64u, [&](bool pe) {
+        trace.r0 = call_cdecl_u<FnRef>(pe ? ptr(slot_594760) : fn_ptr(&porsche::codec_refpack_decode_00594760), nullptr, dst_buf, 1);
+        trace.r1 = call_cdecl_u<FnRef>(pe ? ptr(slot_594760) : fn_ptr(&porsche::codec_refpack_decode_00594760), ref_vec1, dst_buf, 0);
+        trace.r2 = call_cdecl_u<FnDecomp>(pe ? ptr(slot_571470) : fn_ptr(&porsche::codec_decompress_wrapper_00571470), ref_vec1, dst_buf);
+        trace.r3 = call_cdecl_u<FnDecomp>(pe ? ptr(slot_5713a0) : fn_ptr(&porsche::codec_decompress_005713a0), ref_vec2, dst_buf + 64);
+    });
+
+    run_case(32u, [&](bool pe) {
+        std::memcpy(dst_buf, "ABCDEFGH", 8);
+        const void* p0 = reinterpret_cast<const void*>(
+            call_cdecl_u<FnMatch>(pe ? ptr(slot_5948f0) : fn_ptr(&porsche::codec_refpack_match_copy_005948f0), dst_buf + 8, 1u, 7u));
+        const void* p1 = reinterpret_cast<const void*>(
+            call_cdecl_u<FnMatch>(pe ? ptr(slot_5948f0) : fn_ptr(&porsche::codec_refpack_match_copy_005948f0), dst_buf + 15, 2u, 5u));
+        const void* p2 = reinterpret_cast<const void*>(
+            call_cdecl_u<FnMatch>(pe ? ptr(slot_5948f0) : fn_ptr(&porsche::codec_refpack_match_copy_005948f0), dst_buf + 20, 4u, 6u));
+        call_cdecl_v<FnCopyB>(pe ? ptr(slot_594960) : fn_ptr(&porsche::codec_refpack_copy_bytes_00594960), dst_buf + 26, dst_buf, 3);
+        const void* p3 = reinterpret_cast<const void*>(
+            call_cdecl_u<FnCopyDw>(pe ? ptr(slot_5948c0) : fn_ptr(&porsche::codec_refpack_copy_dwords_005948c0), dst_buf + 29, dst_buf, 2));
+        trace.r0 = arena_norm(p0);
+        trace.r1 = arena_norm(p1);
+        trace.r2 = arena_norm(p2);
+        trace.r3 = arena_norm(p3);
+    });
+
+    // 2. BPE codec (00593640, 00593790, 005713a0) - 0x46fb nested pairs & 0x47fb + null
+    static const B bpe_vec1[] = {
+        0x46, 0xfb, 0x00, 0x00, 0x09, // ulen = 9
+        0xfe,                         // escape marker = 0xfe
+        0x03,                         // 3 pairs:
+        0x80, 'A', 'B',
+        0x81, 0x80, 'C',
+        0x82, 0x81, 0x80,             // 0x82 -> "ABCAB" (5 bytes)
+        0x82, 'Z', 0xfe, 0x80, 0xfe, '!', 0xfe, 0x00 // "ABCAB" + 'Z' + literal 0x80 + literal '!' + EOF = 8 bytes (ulen=9 ok)
+    };
+    static const B bpe_vec2[] = {
+        0x47, 0xfb, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
+        0xff, 0x01,
+        0x90, 'x', 'y',
+        0x90, 'z', 0xff, 0x00
+    };
+    run_case(32u, [&](bool pe) {
+        trace.r0 = static_cast<U>(call_cdecl_u<FnBpe>(pe ? ptr(slot_593640) : fn_ptr(&porsche::codec_bpe_decode_00593640), nullptr, dst_buf));
+        trace.r1 = call_cdecl_u<FnDecomp>(pe ? ptr(slot_5713a0) : fn_ptr(&porsche::codec_decompress_005713a0), bpe_vec1, dst_buf);
+        trace.r2 = static_cast<U>(call_cdecl_u<FnBpe>(pe ? ptr(slot_593640) : fn_ptr(&porsche::codec_bpe_decode_00593640), bpe_vec2, dst_buf + 16));
+    });
+
+    // 3. DXT1 codec (00594400, 00594490, 005713a0)
+    // c0=0xf800 > c1=0x001f (4-color mode) and c0=0x001f <= c1=0xf800 (3-color + transparent 0)
+    static const B dxt1_vec[] = {
+        0x18, 0xfb, 0x00, 0x00, 0x80, // total_bytes = 128 (8x8x16bpp)
+        0x00, 0x00, 0x08,             // pad + width = 8 (in+6..7)
+        0x00, 0xf8, 0x1f, 0x00, 0xe4, 0x1b, 0x4e, 0x93, // block(0,0): c0>c1
+        0x1f, 0x00, 0x00, 0xf8, 0xe4, 0x1b, 0x4e, 0x93, // block(4,0): c0<=c1
+        0x20, 0x84, 0x10, 0x42, 0x00, 0x55, 0xaa, 0xff, // block(0,4): c0>c1
+        0x10, 0x42, 0x20, 0x84, 0xff, 0xaa, 0x55, 0x00  // block(4,4): c0<=c1
+    };
+    run_case(160u, [&](bool pe) {
+        trace.r0 = static_cast<U>(call_cdecl_u<FnDxt>(pe ? ptr(slot_594400) : fn_ptr(&porsche::codec_dxt1_decode_00594400), dxt1_vec, dst_buf, 0));
+        trace.r1 = call_cdecl_u<FnDecomp>(pe ? ptr(slot_5713a0) : fn_ptr(&porsche::codec_decompress_005713a0), dxt1_vec, dst_buf);
+        call_cdecl_v<FnDxtBlk>(pe ? ptr(slot_594490) : fn_ptr(&porsche::codec_dxt1_block_00594490),
+                               reinterpret_cast<W*>(dst_buf + 128), 16, dxt1_vec + 8);
+    });
+
+    // 4. Huffman codec (00593800) - fast LUT + slow >=9bit path + clue<=8 RLE/escape/stop + 0x32fb/0x34fb/0x31fb + bad magic
+    // Build a valid 0x30fb stream cleanly via a bit-writer!
+    auto write_huff_stream = [](B* out_buf, U magic, bool long_hdr, bool test_slow_9bit) {
+        U bitbuf = 0u;
+        I nbits = 0;
+        U pos = 0u;
+        auto push_bits = [&](U val, I cnt) {
+            for (I i = cnt - 1; i >= 0; --i) {
+                bitbuf = (bitbuf << 1) | ((val >> i) & 1u);
+                ++nbits;
+                if (nbits == 8) {
+                    out_buf[pos++] = static_cast<B>(bitbuf);
+                    bitbuf = 0u;
+                    nbits = 0;
+                }
+            }
+        };
+        auto push_var = [&](U v) {
+            if (v < 4u) {
+                push_bits(4u + v, 3);
+                return;
+            }
+            I k = 3;
+            while (v >= ((1u << (k + 1)) - 4u)) {
+                ++k;
+            }
+            push_bits(1u, k - 1);
+            push_bits(v + 4u - (1u << k), k);
+        };
+        push_bits((magic >> 8) & 0xffu, 8);
+        push_bits(magic & 0xffu, 8);
+        const U ulen = 24u;
+        if (long_hdr) {
+            push_bits(0x00u, 24);
+        }
+        push_bits((ulen >> 16) & 0xffu, 8);
+        push_bits((ulen >> 8) & 0xffu, 8);
+        push_bits(ulen & 0xffu, 8);
+
+        // clue = 0x7f
+        push_bits(0x7fu, 8);
+        if (!test_slow_9bit) {
+            // Tree: len1=1 (0:'A'), len2=1 (10:'B'), len3=2 (110:'C', 111:0x7f clue)
+            push_var(1u); // len1 = 1
+            push_var(1u); // len2 = 1
+            push_var(2u); // len3 = 2 (complete: 1*4 + 1*2 + 2*1 = 8)
+            // Symbols sorted: 'A'(0x41), 'B'(0x42), 'C'(0x43), clue(0x7f) -> deltas: 0x41, 0, 0, (0x7f-0x44)=0x3b
+            push_var(0x41u);
+            push_var(0u);
+            push_var(0u);
+            push_var(0x3bu);
+            // Output 24 bytes:
+            // 'A' (0), 'B' (10), 'C' (110), RLE 5 of 'C' (clue 111 + var 5),
+            // literal '!' (clue 111 + var 0 + 0 + 0x21),
+            // repeat '!' x 14 (clue 111 + var 14),
+            // 'A' (0) => 1+1+1+5+1+14+1 = 24 bytes!
+            push_bits(0u, 1); // 'A'
+            push_bits(2u, 2); // 'B'
+            push_bits(6u, 3); // 'C'
+            push_bits(7u, 3); push_var(5u); // repeat 'C' x5
+            push_bits(7u, 3); push_var(0u); push_bits(0u, 1); push_bits('!', 8); // literal '!'
+            push_bits(7u, 3); push_var(14u); // repeat '!' x14
+            push_bits(0u, 1); // 'A'
+            // stop: clue 111 + var 0 + 1
+            push_bits(7u, 3); push_var(0u); push_bits(1u, 1);
+        } else {
+            // 9-bit Huffman tree: len1=1(0), len2..len8=0, len9=256? Simpler: len1=1, len2=1, len3=1, ..., len8=1, len9=2!
+            // 1/2 + 1/4 + ... + 1/256 + 2/512 = 1! Total = 10 symbols (len1..8 + 2 at len9)!
+            for (I l = 1; l <= 8; ++l) push_var(1u);
+            push_var(2u);
+            // 10 symbols: 0x10..0x18, 0x7f (clue at len9 -> code 111111111 = 0x1ff, sym9; 'Z' at code 0x1fe)
+            push_var(0x10u);
+            for (I k = 0; k < 8; ++k) push_var(0u); // 0x11..0x18
+            push_var(0x7fu - 0x19u); // 0x7f is 10th symbol
+            // Encode 24 bytes mixing short codes (0=0x10, 10=0x11) and 9-bit code (0x1fe=0x18) + 9-bit clue (0x1ff):
+            push_bits(0u, 1);       // 0x10
+            push_bits(0x1feu, 9);   // 0x18 (9-bit slow path!)
+            push_bits(0x1ffu, 9); push_var(2u); // repeat 0x18 x2 (9-bit clue slow path!)
+            for (I r = 0; r < 20; ++r) push_bits(2u, 2); // 0x11 x20 (forces multi-refill)
+            push_bits(0x1ffu, 9); push_var(0u); push_bits(1u, 1); // stop
+        }
+        push_bits(0u, 24); // padding for 16-bit refill lookahead
+        (void)pos;
+    };
+
+    static B huff_a[128] = {};
+    static B huff_b[128] = {};
+    static B huff_c[128] = {};
+    static B huff_d[128] = {};
+    write_huff_stream(huff_a, 0x30fbu, false, false);
+    write_huff_stream(huff_b, 0x32fbu, false, false);
+    write_huff_stream(huff_c, 0x34fbu, false, false);
+    write_huff_stream(huff_d, 0x31fbu, true, true);
+
+    run_case(128u, [&](bool pe) {
+        trace.r0 = call_cdecl_u<FnHuff>(pe ? ptr(slot_593800) : fn_ptr(&porsche::codec_huff_decode_00593800), nullptr, dst_buf, 1);
+        trace.r1 = call_cdecl_u<FnDecomp>(pe ? ptr(slot_5713a0) : fn_ptr(&porsche::codec_decompress_005713a0), huff_a, dst_buf);
+        trace.r2 = call_cdecl_u<FnDecomp>(pe ? ptr(slot_5713a0) : fn_ptr(&porsche::codec_decompress_005713a0), huff_b, dst_buf + 32);
+        trace.r3 = call_cdecl_u<FnDecomp>(pe ? ptr(slot_5713a0) : fn_ptr(&porsche::codec_decompress_005713a0), huff_c, dst_buf + 64);
+        const U r4 = call_cdecl_u<FnDecomp>(pe ? ptr(slot_5713a0) : fn_ptr(&porsche::codec_decompress_005713a0), huff_d, dst_buf + 96);
+        event(55u, r4);
+        // bad magic in 005713a0
+        static const B bad_hdr[8] = {0x99, 0x32, 0x00, 0x00, 0x01, 0, 0, 0};
+        static const B bad_m2[8] = {0x10, 0x77, 0x00, 0x00, 0x01, 0, 0, 0};
+        event(56u,
+              call_cdecl_u<FnDecomp>(pe ? ptr(slot_5713a0) : fn_ptr(&porsche::codec_decompress_005713a0), bad_hdr, dst_buf),
+              call_cdecl_u<FnDecomp>(pe ? ptr(slot_5713a0) : fn_ptr(&porsche::codec_decompress_005713a0), bad_m2, dst_buf));
+    });
+
+    // 5. render_shape_unpack_00571330 (uncompressed, compressed no-offset, compressed with non-zero high 24 bits)
+    run_case(64u, [&](bool pe) {
+        fill_shape(0x7bu, 4, 4, 0u, 0u);
+        void* const p0 = reinterpret_cast<void*>(
+            call_cdecl_u<FnUnpack>(pe ? ptr(slot_571330) : fn_ptr(&porsche::render_shape_unpack_00571330), shape_buf));
+        trace.r0 = static_cast<U>(p0 == shape_buf);
+
+        fill_shape(0x80u | 0x7bu, 4, 4, 0x11223344u, 0x00010002u);
+        std::memcpy(shape_buf + 16, ref_vec1, sizeof(ref_vec1));
+        void* const p1 = reinterpret_cast<void*>(
+            call_cdecl_u<FnUnpack>(pe ? ptr(slot_571330) : fn_ptr(&porsche::render_shape_unpack_00571330), shape_buf));
+        trace.r1 = arena_norm(p1);
+        trace.r2 = rd(p1, 0);
+
+        fill_shape(0x00123400u | 0x80u | 0x7bu, 4, 4, 0u, 0u);
+        std::memcpy(shape_buf + 16, ref_vec1, sizeof(ref_vec1));
+        void* const p2 = reinterpret_cast<void*>(
+            call_cdecl_u<FnUnpack>(pe ? ptr(slot_571330) : fn_ptr(&porsche::render_shape_unpack_00571330), shape_buf));
+        trace.r3 = rd(p2, 0);
+    });
+
+    // 6. render_shape_convert_type_00534d40 - direct, alternate, dither=0/1, 4444/1555/565, compressed, multi-step, sentinel
+    run_case(64u, [&](bool pe) {
+        fill_shape(0x7bu, 5, 3, 0x12345678u, 0x8abc0defu);
+        void* const out0 = reinterpret_cast<void*>(
+            call_cdecl_u<FnConvertShape>(pe ? ptr(slot_534d40) : fn_ptr(&porsche::render_shape_convert_type_00534d40),
+                                         shape_buf, 0x78u, 0, 1));
+        void* const out1 = reinterpret_cast<void*>(
+            call_cdecl_u<FnConvertShape>(pe ? ptr(slot_534d40) : fn_ptr(&porsche::render_shape_convert_type_00534d40),
+                                         shape_buf, 0x7eu, 1, 0));
+        void* const out2 = reinterpret_cast<void*>(
+            call_cdecl_u<FnConvertShape>(pe ? ptr(slot_534d40) : fn_ptr(&porsche::render_shape_convert_type_00534d40),
+                                         shape_buf, 0x6du, 0, 0));
+        trace.r0 = rd(out0, 0);
+        trace.r1 = rd(out0, 12);
+        trace.r2 = rd(out1, 0);
+        trace.r3 = rd(out2, 0);
+    });
+
+    run_case(64u, [&](bool pe) {
+        // Multi-step 0x7a -> 0x7d (0x7a -> 0x7b -> 0x7d) with compressed shape (0x7a | 0x80) and direct_mode=1 / use_dither=0
+        fill_shape(0x80u | 0x7au, 4, 2, 0x00020004u, 0x01230456u);
+        std::memcpy(shape_buf + 16, ref_vec1, sizeof(ref_vec1));
+        void* const out0 = reinterpret_cast<void*>(
+            call_cdecl_u<FnConvertShape>(pe ? ptr(slot_534d40) : fn_ptr(&porsche::render_shape_convert_type_00534d40),
+                                         shape_buf, 0x7du, 0, 1));
+        // Corrupted sentinel triggers diagnostic_handler_005debf0 (line 0x255)
+        fill_shape(0x78u, 4, 1, 0u, 0u);
+        corrupt_row_sentinel = 1u;
+        void* const out1 = reinterpret_cast<void*>(
+            call_cdecl_u<FnConvertShape>(pe ? ptr(slot_534d40) : fn_ptr(&porsche::render_shape_convert_type_00534d40),
+                                         shape_buf, 0x7eu, 0, 0));
+        trace.r0 = rd(out0, 0);
+        trace.r1 = rd(out0, 4);
+        trace.r2 = rd(out1, 0);
+    });
+
+    // 7. render_texture_depth_convert_005350e0 - 0xc->0xc, 0xc->3, multi-step 1->5 with CLUT, 1->2 post-loop CLUT
+    run_case(256u, [&](bool pe) {
+        std::memcpy(shape_buf, ref_vec1, sizeof(ref_vec1));
+        trace.r0 = static_cast<U>(call_cdecl_u<FnConvertTex>(
+            pe ? ptr(slot_5350e0) : fn_ptr(&porsche::render_texture_depth_convert_005350e0),
+            0xcu, 0u, 0xcu, 0u, ptr(shape_buf), ptr(dst_buf), 0u, 0u, 16));
+        trace.r1 = static_cast<U>(call_cdecl_u<FnConvertTex>(
+            pe ? ptr(slot_5350e0) : fn_ptr(&porsche::render_texture_depth_convert_005350e0),
+            0xcu, 0u, 3u, 0u, ptr(shape_buf), ptr(dst_buf + 64), 0u, 0u, 8));
+        trace.r2 = static_cast<U>(call_cdecl_u<FnConvertTex>(
+            pe ? ptr(slot_5350e0) : fn_ptr(&porsche::render_texture_depth_convert_005350e0),
+            1u, 2u, 5u, 0u, ptr(shape_buf), ptr(dst_buf + 128), ptr(src_clut_buf), 0u, 6));
+        trace.r3 = static_cast<U>(call_cdecl_u<FnConvertTex>(
+            pe ? ptr(slot_5350e0) : fn_ptr(&porsche::render_texture_depth_convert_005350e0),
+            1u, 2u, 2u, 4u, ptr(shape_buf), ptr(dst_buf + 192), ptr(src_clut_buf), ptr(dst_clut_buf), 8));
+        event(57u, fnv1a(dst_clut_buf, 128u));
+    });
+
+    VirtualFree(code, 0u, MEM_RELEASE);
+    std::printf("PASS cases=%u\n", cases);
+    return 0;
+}

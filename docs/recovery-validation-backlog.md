@@ -1,11 +1,10 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run894 PASS (`889/005` on `Run891`: 16 bodies, 248 cases, 8 mutations,
-8B `.bss` + mode/vtable `.rdata`, 519 TUs, 40/42 names/refs, 1,286 pins,
-registry 1,615, no EXE). Closes `00406520`, opens 5 tick/reset + `00514990`;
-live renderer & startup open.
+Текущее: Run895 PASS (`893/012` on `Run894`: 14 bodies, 18 cases, 16 mutations,
+1,004B `.rdata`, 520 TUs, 38/39 names/refs, 1,289 pins, registry 1,629, no
+EXE). Closes `00534d40`/`005350e0`, `0` new; live renderer & startup open.
 
-Historical: Run891 PASS (`885/011` + `890/007` on `Run888`: 40 bodies, 340 cases,
+Historical: Run894 PASS (`889/005` on `Run891`: 16 bodies, 248 cases, 8 mutations,
 16 mutations, 5,444B `.bss`, 482 TUs, 52/59 names/refs, 1,194 pins, registry
 36 cases, 14 mutations, 55B `.data`/`.bss` + 324B `.rdata`, 480 TUs, 59/66
 632 cases, 30 mutations, 351B `.rdata` + 4B `.bss`, 478 TUs, 65/72 names/refs,

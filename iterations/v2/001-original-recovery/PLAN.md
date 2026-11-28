@@ -1,6 +1,6 @@
 # Original C/C++ recovery handoff
 
-[Run894](runs/894-session-extension-service-integration/README.md) (`519` TUs, **40 unresolved / 42 refs**, registry `1,615`) is the accepted shared build (`Run891` + `Run889`). See [current status](../../../STATUS.md) for the measured corpus, registry and linker frontier. The coordinator owns registry updates, shared builds and publication.
+[Run895](runs/895-render-depthconv-and-codecs-integration/README.md) (`520` TUs, **38 unresolved / 39 refs**, registry `1,629`) is the accepted shared build (`Run894` + `Run893`). See [current status](../../../STATUS.md) for the measured corpus, registry and linker frontier. The coordinator owns registry updates, shared builds and publication.
 
 ## Next dependencies
 
