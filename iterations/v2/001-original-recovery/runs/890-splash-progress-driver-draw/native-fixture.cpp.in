@@ -1,0 +1,857 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "render_driver_draw_890.hpp"
+#include "porsche/application_alloc.hpp"
+#include "porsche/fe_stream.hpp"
+#include "porsche/heap.hpp"
+#include "porsche/render_loader.hpp"
+#include "porsche/shared_runtime_globals.hpp"
+#include "porsche/splash_progress.hpp"
+#include "porsche/window_shutdown.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+namespace {
+
+struct Event { U kind, a0, a1, a2, a3; };
+struct Trace {
+    U abi_fail;
+    U result;
+    U backend_val;
+    U handle_null;
+    U dst_hash;
+    U event_count;
+    Event events[512];
+};
+
+static B* code = nullptr;
+static B* slot_53d570 = nullptr;
+static B* slot_572a90 = nullptr;
+static B* slot_572b40 = nullptr;
+static B* slot_572ee0 = nullptr;
+static B* slot_5b0c00 = nullptr;
+static B* span_stubs[15] = {};
+static B* tables_raw[5] = {};
+static B* table_sel_raw = nullptr;
+
+static const char* kChopTag = "CHOP texes";
+static B heap_arena[65536] = {};
+static U heap_cursor = 0u;
+static U fail_alloc_at = 0u;
+static U fail_tile_create_at = 0u;
+static U fail_talloc_at = 0u;
+static U talloc_calls = 0u;
+static U alloc_calls = 0u;
+static U tile_create_calls = 0u;
+static U force_tfree_ret = 1u;
+static U force_conv_null = 0u;
+static U force_about_caps_word = 1u;
+
+alignas(16) static B src_shape[32768] = {};
+alignas(16) static B dst_buf[1024] = {};
+alignas(16) static B src_buf[1024] = {};
+static U fake_about[16] = {};
+static B fake_caps[64] = {};
+
+static B backing_mode = 0u;
+static U backing_state = 0u;
+
+static Trace trace{};
+static Trace expected{};
+static U cases = 0u;
+static U side = 0u;
+
+static U ptr(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+template <typename Fn>
+static U fn_ptr(Fn* fn) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(reinterpret_cast<const void*>(fn)));
+}
+
+static U rd(const void* p, U offset = 0u) {
+    U v = 0u;
+    std::memcpy(&v, static_cast<const B*>(p) + offset, sizeof v);
+    return v;
+}
+
+static void wr(void* p, U offset, U value) {
+    std::memcpy(static_cast<B*>(p) + offset, &value, sizeof value);
+}
+
+static void require(bool ok, const char* msg) {
+    if (!ok) {
+        std::printf("divergence %s case=%u side=%u\n", msg, cases, side);
+        std::fflush(stdout);
+        ExitProcess(10u);
+    }
+}
+
+static LONG WINAPI fault_handler(EXCEPTION_POINTERS* p) {
+    std::printf("divergence native-fault %08lx eip=%08lx eax=%08lx esp=%08lx ebp=%08lx case=%u side=%u\n",
+                p->ExceptionRecord->ExceptionCode, p->ContextRecord->Eip,
+                p->ContextRecord->Eax, p->ContextRecord->Esp, p->ContextRecord->Ebp,
+                cases, side);
+    std::fflush(stdout);
+    ExitProcess(10u);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void event(U kind, U a0 = 0u, U a1 = 0u, U a2 = 0u, U a3 = 0u) {
+    require(trace.event_count < 512u, "event capacity");
+    trace.events[trace.event_count++] = {kind, a0, a1, a2, a3};
+}
+
+static U hash_bytes(const void* p, U size) {
+    const auto* b = static_cast<const B*>(p);
+    U h = 2166136261u;
+    for (U i = 0u; i < size; ++i) h = (h ^ b[i]) * 16777619u;
+    return h;
+}
+
+static void* bump_alloc(U bytes) {
+    const U aligned = (bytes + 15u) & ~15u;
+    require(heap_cursor + aligned <= sizeof(heap_arena), "heap_arena");
+    void* p = heap_arena + heap_cursor;
+    heap_cursor += aligned;
+    return p;
+}
+
+static void __cdecl rec_row_conv(void* dst, const void* src, I count) {
+    const U sh = count > 0 ? hash_bytes(src, static_cast<U>(count) * 2u) : 0u;
+    event(30u, static_cast<U>(count), sh, rd(src, 0u));
+    for (I i = 0; i < count; ++i) {
+        const std::uint16_t v = static_cast<const std::uint16_t*>(src)[i];
+        static_cast<std::uint16_t*>(dst)[i] = static_cast<std::uint16_t>(v ^ 0x5a5au);
+    }
+}
+
+static const U* __stdcall stub_about() {
+    wr(fake_caps, 0x18u, force_about_caps_word);
+    fake_about[0x30u / 4u] = ptr(fake_caps);
+    event(40u, force_about_caps_word);
+    return fake_about;
+}
+
+static void __stdcall stub_tupdate(U tex, void* pixels, U zero) {
+    const U h = hash_bytes(pixels, 64u);
+    event(41u, tex, h, zero);
+}
+
+static I __stdcall stub_tfree(U tex) {
+    event(42u, tex, force_tfree_ret);
+    return static_cast<I>(force_tfree_ret);
+}
+
+static void __stdcall stub_settexture(U tex) {
+    event(43u, tex);
+}
+
+static U __stdcall stub_talloc(U w, U h, U depth, U z0, U z1) {
+    ++talloc_calls;
+    if (talloc_calls == fail_talloc_at) {
+        event(44u, w, h, depth, 0u);
+        return 0u;
+    }
+    const U tok = 0x7000u + talloc_calls;
+    event(44u, w, h, depth, tok);
+    return tok;
+}
+
+static void __stdcall stub_setstate(U key, U val) {
+    event(45u, key, val);
+}
+
+static U __stdcall stub_getstate(U key) {
+    const U val = 0x9100u + key * 17u;
+    event(46u, key, val);
+    return val;
+}
+
+static void __stdcall stub_drawquad(const void* v0, const void* v1, const void* v2, const void* v3) {
+    const U h0 = hash_bytes(v0, 32u);
+    const U h1 = hash_bytes(v1, 32u);
+    const U h2 = hash_bytes(v2, 32u);
+    const U h3 = hash_bytes(v3, 32u);
+    event(47u, h0, h1, h2, h3);
+}
+
+} // namespace
+
+namespace porsche {
+
+std::uint32_t render_thrash_exports_006bd910[43] = {};
+std::uint8_t& window_shutdown_mode_005de630 = backing_mode;
+std::uint32_t& window_shutdown_state_005de64c = backing_state;
+std::uint32_t shared_runtime_word_005deb1c = 0u;
+std::uint32_t copy_flag_005deb18 = 0u;
+std::int32_t render_fill_backend_005decd8 = -1;
+
+void* __cdecl application_allocator_entry_00531f70(
+    const char* source, std::uint32_t bytes, std::uint32_t heap_index) {
+    ++alloc_calls;
+    const U tag_ok = (source != nullptr && std::strcmp(source, "CHOP texes") == 0) ? 1u : 0u;
+    if (alloc_calls == fail_alloc_at) {
+        event(1u, tag_ok, bytes, heap_index, 0u);
+        return nullptr;
+    }
+    void* p = bump_alloc(bytes);
+    event(1u, tag_ok, bytes, heap_index, 1u);
+    return p;
+}
+
+std::uint32_t __cdecl free_00531f90(void* p) {
+    event(2u, p != nullptr ? 1u : 0u);
+    return 1u;
+}
+
+void __cdecl heap_fill_0053c290(void* dst, std::uint32_t val, std::uint32_t bytes) {
+    event(3u, bytes, val);
+    std::memset(dst, static_cast<int>(val & 0xffu), bytes);
+}
+
+std::uint32_t __cdecl render_descriptor_format_00556880(std::uint32_t depth) {
+    const U fmt = (depth == 6u) ? 0x7eu : 0x78u;
+    event(4u, depth, fmt);
+    return fmt;
+}
+
+std::uint32_t __cdecl render_descriptor_bits_00537f90(const void* descriptor) {
+    const U t = rd(descriptor, 0u) & 0xffu;
+    const U b = (t == 0x7eu) ? 15u : ((t == 0x78u || t == 0x04u) ? 16u : 32u);
+    event(5u, t, b);
+    return b;
+}
+
+std::int32_t __cdecl splash_shape_row_stride_005712f0(const void* shape) {
+    const I w = static_cast<std::int16_t>(rd(shape, 4u) & 0xffffu);
+    const U t = rd(shape, 0u) & 0xffu;
+    const I bpp = (t == 0x7eu || t == 0x78u || t == 0x04u) ? 2 : 4;
+    const I stride = ((w * bpp) + 3) & ~3;
+    event(6u, t, static_cast<U>(w), static_cast<U>(stride));
+    return stride;
+}
+
+void* __cdecl scene_texture_shape_create_00574c70(
+    std::int32_t w, std::int32_t h, std::int32_t depth, std::uint32_t flags) {
+    ++tile_create_calls;
+    if (tile_create_calls == fail_tile_create_at) {
+        event(7u, static_cast<U>(w), static_cast<U>(h), static_cast<U>(depth), 0u);
+        return nullptr;
+    }
+    B* p = static_cast<B*>(bump_alloc(16u + static_cast<U>(w * h * 4)));
+    std::memset(p, 0, 16u + static_cast<U>(w * h * 4));
+    wr(p, 0u, 0xabcd0000u | (depth == 15 ? 0x7eu : 0x78u));
+    wr(p, 4u, static_cast<U>(w & 0xffff) | (static_cast<U>(h & 0xffff) << 16));
+    event(7u, static_cast<U>(w), static_cast<U>(h), static_cast<U>(depth), flags);
+    return p;
+}
+
+void* __cdecl render_shape_row_converter_00534b90(
+    const void* shape, std::uint32_t target_type, std::int32_t direct_mode) {
+    const U st = rd(shape, 0u) & 0xffu;
+    event(8u, st, target_type, static_cast<U>(direct_mode), force_conv_null);
+    if (force_conv_null != 0u) {
+        return nullptr;
+    }
+    return reinterpret_cast<void*>(&rec_row_conv);
+}
+
+void __cdecl render_shape_transfer_00571630(
+    const void* shape, std::int32_t x, std::int32_t y, const void* const* table) {
+    U table_idx = 99u;
+    const void* const* expected_tbls[5] = {
+        render_span_table_scalar_005dec38,
+        render_span_table_fpu_005dec58,
+        render_span_table_mmx_a_005dec78,
+        render_span_table_mmx_b_005dec98,
+        render_span_table_sse_005decb8,
+    };
+    for (U i = 0u; i < 5u; ++i) {
+        if (table == reinterpret_cast<const void* const*>(tables_raw[i]) || table == expected_tbls[i]) {
+            table_idx = i;
+            break;
+        }
+    }
+    require(table_idx < 5u, "known span table");
+    // Compare all 8 table slots (normalizing raw VA stubs vs C++ pointers).
+    const U slot5 = ptr(table[5]);
+    const U slot6 = ptr(table[6]);
+    const U slot7 = ptr(table[7]);
+    event(9u, static_cast<U>(x), static_cast<U>(y), table_idx, (slot5 ^ (slot6 << 4) ^ (slot7 << 8)));
+}
+
+void __cdecl render_mmx_empty_00573070() {
+    event(10u);
+}
+
+std::uint64_t __cdecl heap_copy_005b0000(void* d, const void* s, std::uint32_t n) {
+    event(11u, 0u, n);
+    if (n > 0u) std::memcpy(d, s, n);
+    return 0u;
+}
+void __cdecl heap_copy_005b0100(void* d, const void* s, std::uint32_t n) {
+    event(11u, 1u, n);
+    if (n > 0u) std::memcpy(d, s, n);
+}
+void __cdecl heap_copy_005b02c0(void* d, const void* s, std::uint32_t n) {
+    event(11u, 2u, n);
+    if (n > 0u) std::memcpy(d, s, n);
+}
+void __cdecl heap_copy_005b0480(void* d, const void* s, std::uint32_t n) {
+    event(11u, 3u, n);
+    if (n > 0u) std::memcpy(d, s, n);
+}
+
+} // namespace porsche
+
+namespace {
+
+static U invoke_cdecl1(void* fn, U a0, U& abi_fail) {
+    U result = 0u, fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        add esp, 4
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return result;
+}
+
+static U invoke_cdecl3(void* fn, U a0, U a1, U a2, U& abi_fail) {
+    U result = 0u, fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a2
+        push a1
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        add esp, 12
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return result;
+}
+
+static U invoke_cdecl4(void* fn, U a0, U a1, U a2, U a3, U& abi_fail) {
+    U result = 0u, fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a3
+        push a2
+        push a1
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        add esp, 16
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return result;
+}
+
+static U invoke_cdecl6(void* fn, U a0, U a1, U a2, U a3, U a4, U a5, U& abi_fail) {
+    U result = 0u, fail = 0u, before = 0u, frame = 0u;
+    __asm {
+        push ebx
+        push esi
+        push edi
+        mov before, esp
+        mov frame, ebp
+        push a5
+        push a4
+        push a3
+        push a2
+        push a1
+        push a0
+        mov ecx, 0cafebabeh
+        mov edx, 0deadc0deh
+        mov ebx, 13579bdfh
+        mov esi, 2468ace0h
+        mov edi, 10203040h
+        call fn
+        mov result, eax
+        add esp, 24
+        cmp esp, before
+        jne bad
+        cmp ebp, frame
+        jne bad
+        cmp ebx, 13579bdfh
+        jne bad
+        cmp esi, 2468ace0h
+        jne bad
+        cmp edi, 10203040h
+        je done
+    bad:
+        mov fail, 1
+    done:
+        mov esp, before
+        pop edi
+        pop esi
+        pop ebx
+    }
+    abi_fail = fail;
+    return result;
+}
+
+static void bind_abs32(B* base, U size, U old_va, U new_va, U expected_hits) {
+    U hits = 0u;
+    for (U i = 0u; i + 4u <= size; ++i) {
+        if (rd(base, i) == old_va) {
+            wr(base, i, new_va);
+            ++hits;
+            i += 3u;
+        }
+    }
+    require(hits == expected_hits, "bind_abs32 count");
+}
+
+static void bind_rel32(B* base, U base_va, U offset, U original_target, U replacement, B opcode = 0xe8u) {
+    require(base[offset] == opcode, "bind_rel32 opcode");
+    const U decoded = base_va + offset + 5u + rd(base, offset + 1u);
+    require(decoded == original_target, "bind_rel32 target");
+    wr(base, offset + 1u, replacement - (ptr(base) + offset + 5u));
+}
+
+static U& thrash_ref(U va) {
+    return porsche::render_thrash_exports_006bd910[(va - 0x006bd910u) / 4u];
+}
+
+static void init_fixture() {
+    thrash_ref(0x006bd934u) = fn_ptr(&stub_about);
+    thrash_ref(0x006bd940u) = fn_ptr(&stub_tupdate);
+    thrash_ref(0x006bd94cu) = fn_ptr(&stub_tfree);
+    thrash_ref(0x006bd954u) = fn_ptr(&stub_settexture);
+    thrash_ref(0x006bd968u) = fn_ptr(&stub_talloc);
+    thrash_ref(0x006bd97cu) = fn_ptr(&stub_setstate);
+    thrash_ref(0x006bd984u) = fn_ptr(&stub_getstate);
+    thrash_ref(0x006bd9a8u) = fn_ptr(&stub_drawquad);
+
+    code = static_cast<B*>(VirtualAlloc(nullptr, 16384u, MEM_COMMIT | MEM_RESERVE,
+                                        PAGE_EXECUTE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+    std::memset(code, 0xcc, 16384u);
+
+    const B b_53d570[] = {@BODY_0053D570@};
+    const B b_572a90[] = {@BODY_00572A90@};
+    const B b_572b40[] = {@BODY_00572B40@};
+    const B b_572ee0[] = {@BODY_00572EE0@};
+    const B b_5b0c00[] = {@BODY_005B0C00@};
+    const B t_5dec38[] = {@TABLE_005DEC38@};
+    const B t_5dec58[] = {@TABLE_005DEC58@};
+    const B t_5dec78[] = {@TABLE_005DEC78@};
+    const B t_5dec98[] = {@TABLE_005DEC98@};
+    const B t_5decb8[] = {@TABLE_005DECB8@};
+    const B t_5decdc[] = {@TABLE_005DECDC@};
+
+    slot_53d570 = code + 0x0000u;
+    slot_572a90 = code + 0x0200u;
+    slot_572b40 = code + 0x0400u;
+    slot_572ee0 = code + 0x0900u;
+    slot_5b0c00 = code + 0x0b00u;
+    for (U i = 0u; i < 5u; ++i) tables_raw[i] = code + 0x0e00u + i * 0x40u;
+    table_sel_raw = code + 0x0f80u;
+
+    std::memcpy(slot_53d570, b_53d570, sizeof b_53d570);
+    std::memcpy(slot_572a90, b_572a90, sizeof b_572a90);
+    std::memcpy(slot_572b40, b_572b40, sizeof b_572b40);
+    std::memcpy(slot_572ee0, b_572ee0, sizeof b_572ee0);
+    std::memcpy(slot_5b0c00, b_5b0c00, sizeof b_5b0c00);
+    std::memcpy(tables_raw[0], t_5dec38, sizeof t_5dec38);
+    std::memcpy(tables_raw[1], t_5dec58, sizeof t_5dec58);
+    std::memcpy(tables_raw[2], t_5dec78, sizeof t_5dec78);
+    std::memcpy(tables_raw[3], t_5dec98, sizeof t_5dec98);
+    std::memcpy(tables_raw[4], t_5decb8, sizeof t_5decb8);
+    std::memcpy(table_sel_raw, t_5decdc, sizeof t_5decdc);
+    for (U i = 0u; i < 5u; ++i) wr(table_sel_raw, i * 4u, ptr(tables_raw[i]));
+
+    // Bind 0053d570
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x005de630u, ptr(&porsche::window_shutdown_mode_005de630), 1u);
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x005de64cu, ptr(&porsche::window_shutdown_state_005de64c), 1u);
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x006a6450u, ptr(&porsche::render_choptex_handle_006a6450), 5u);
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x005decd8u, ptr(&porsche::render_fill_backend_005decd8), 3u);
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x005deb1cu, ptr(&porsche::shared_runtime_word_005deb1c), 1u);
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x005deb18u, ptr(&porsche::copy_flag_005deb18), 1u);
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x005decdcu, ptr(table_sel_raw), 1u);
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x006bd984u, ptr(&thrash_ref(0x006bd984u)), 2u);
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x006bd934u, ptr(&thrash_ref(0x006bd934u)), 1u);
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x006bd97cu, ptr(&thrash_ref(0x006bd97cu)), 2u);
+    bind_abs32(slot_53d570, sizeof b_53d570, 0x006bd954u, ptr(&thrash_ref(0x006bd954u)), 1u);
+    bind_rel32(slot_53d570, 0x0053d570u, 0x61u, 0x00572a90u, ptr(slot_572a90));
+    bind_rel32(slot_53d570, 0x0053d570u, 0x98u, 0x00572b40u, ptr(slot_572b40));
+    bind_rel32(slot_53d570, 0x0053d570u, 0xa3u, 0x00572ee0u, ptr(slot_572ee0));
+    bind_rel32(slot_53d570, 0x0053d570u, 0x10du, 0x00571630u, fn_ptr(&porsche::render_shape_transfer_00571630));
+    bind_rel32(slot_53d570, 0x0053d570u, 0x11eu, 0x00573070u, fn_ptr(&porsche::render_mmx_empty_00573070), 0xe9u);
+
+    // Bind 00572a90
+    bind_abs32(slot_572a90, sizeof b_572a90, 0x005c082cu, ptr(kChopTag), 1u);
+    bind_abs32(slot_572a90, sizeof b_572a90, 0x006bd968u, ptr(&thrash_ref(0x006bd968u)), 2u);
+    bind_rel32(slot_572a90, 0x00572a90u, 0x09u, 0x00556880u, fn_ptr(&porsche::render_descriptor_format_00556880));
+    bind_rel32(slot_572a90, 0x00572a90u, 0x17u, 0x00537f90u, fn_ptr(&porsche::render_descriptor_bits_00537f90));
+    bind_rel32(slot_572a90, 0x00572a90u, 0x2au, 0x00531f70u, fn_ptr(&porsche::application_allocator_entry_00531f70));
+    bind_rel32(slot_572a90, 0x00572a90u, 0x3du, 0x0053c290u, fn_ptr(&porsche::heap_fill_0053c290));
+    bind_rel32(slot_572a90, 0x00572a90u, 0x4eu, 0x00574c70u, fn_ptr(&porsche::scene_texture_shape_create_00574c70));
+
+    // Bind 00572b40
+    bind_abs32(slot_572b40, sizeof b_572b40, 0x005dfb7cu, ptr(&porsche::render_choptex_color_005dfb7c), 1u);
+    bind_abs32(slot_572b40, sizeof b_572b40, 0x006bd940u, ptr(&thrash_ref(0x006bd940u)), 1u);
+    bind_abs32(slot_572b40, sizeof b_572b40, 0x006bd954u, ptr(&thrash_ref(0x006bd954u)), 1u);
+    bind_abs32(slot_572b40, sizeof b_572b40, 0x006bd9a8u, ptr(&thrash_ref(0x006bd9a8u)), 1u);
+    bind_rel32(slot_572b40, 0x00572b40u, 0x39u, 0x00537f90u, fn_ptr(&porsche::render_descriptor_bits_00537f90));
+    bind_rel32(slot_572b40, 0x00572b40u, 0x49u, 0x005712f0u, fn_ptr(&porsche::splash_shape_row_stride_005712f0));
+    bind_rel32(slot_572b40, 0x00572b40u, 0x15du, 0x00534b90u, fn_ptr(&porsche::render_shape_row_converter_00534b90));
+    bind_rel32(slot_572b40, 0x00572b40u, 0x23cu, 0x005712f0u, fn_ptr(&porsche::splash_shape_row_stride_005712f0));
+
+    // Bind 00572ee0
+    bind_abs32(slot_572ee0, sizeof b_572ee0, 0x006bd94cu, ptr(&thrash_ref(0x006bd94cu)), 2u);
+    bind_rel32(slot_572ee0, 0x00572ee0u, 0x3au, 0x00531f90u, fn_ptr(&porsche::free_00531f90));
+    bind_rel32(slot_572ee0, 0x00572ee0u, 0x43u, 0x00531f90u, fn_ptr(&porsche::free_00531f90));
+
+    // 15 span wrappers
+    const B b_390[] = {@BODY_0053D390@}; const B b_3b0[] = {@BODY_0053D3B0@}; const B b_3d0[] = {@BODY_0053D3D0@};
+    const B b_3f0[] = {@BODY_0053D3F0@}; const B b_410[] = {@BODY_0053D410@}; const B b_430[] = {@BODY_0053D430@};
+    const B b_450[] = {@BODY_0053D450@}; const B b_470[] = {@BODY_0053D470@}; const B b_490[] = {@BODY_0053D490@};
+    const B b_4b0[] = {@BODY_0053D4B0@}; const B b_4d0[] = {@BODY_0053D4D0@}; const B b_4f0[] = {@BODY_0053D4F0@};
+    const B b_510[] = {@BODY_0053D510@}; const B b_530[] = {@BODY_0053D530@}; const B b_550[] = {@BODY_0053D550@};
+    const struct { U va; const B* raw; U sz; U call_off; U target_va; U target_host; } sdefs[15] = {
+        {0x0053d390u, b_390, sizeof b_390, 0x12u, 0x005b0000u, fn_ptr(&porsche::heap_copy_005b0000)},
+        {0x0053d3b0u, b_3b0, sizeof b_3b0, 0x12u, 0x005b0000u, fn_ptr(&porsche::heap_copy_005b0000)},
+        {0x0053d3d0u, b_3d0, sizeof b_3d0, 0x16u, 0x005b0000u, fn_ptr(&porsche::heap_copy_005b0000)},
+        {0x0053d3f0u, b_3f0, sizeof b_3f0, 0x12u, 0x005b0c00u, ptr(slot_5b0c00)},
+        {0x0053d410u, b_410, sizeof b_410, 0x12u, 0x005b0c00u, ptr(slot_5b0c00)},
+        {0x0053d430u, b_430, sizeof b_430, 0x16u, 0x005b0c00u, ptr(slot_5b0c00)},
+        {0x0053d450u, b_450, sizeof b_450, 0x12u, 0x005b0100u, fn_ptr(&porsche::heap_copy_005b0100)},
+        {0x0053d470u, b_470, sizeof b_470, 0x12u, 0x005b0100u, fn_ptr(&porsche::heap_copy_005b0100)},
+        {0x0053d490u, b_490, sizeof b_490, 0x16u, 0x005b0100u, fn_ptr(&porsche::heap_copy_005b0100)},
+        {0x0053d4b0u, b_4b0, sizeof b_4b0, 0x12u, 0x005b02c0u, fn_ptr(&porsche::heap_copy_005b02c0)},
+        {0x0053d4d0u, b_4d0, sizeof b_4d0, 0x12u, 0x005b02c0u, fn_ptr(&porsche::heap_copy_005b02c0)},
+        {0x0053d4f0u, b_4f0, sizeof b_4f0, 0x16u, 0x005b02c0u, fn_ptr(&porsche::heap_copy_005b02c0)},
+        {0x0053d510u, b_510, sizeof b_510, 0x12u, 0x005b0480u, fn_ptr(&porsche::heap_copy_005b0480)},
+        {0x0053d530u, b_530, sizeof b_530, 0x12u, 0x005b0480u, fn_ptr(&porsche::heap_copy_005b0480)},
+        {0x0053d550u, b_550, sizeof b_550, 0x16u, 0x005b0480u, fn_ptr(&porsche::heap_copy_005b0480)},
+    };
+    for (U i = 0u; i < 15u; ++i) {
+        span_stubs[i] = code + 0x1000u + i * 0x40u;
+        std::memcpy(span_stubs[i], sdefs[i].raw, sdefs[i].sz);
+        bind_rel32(span_stubs[i], sdefs[i].va, sdefs[i].call_off, sdefs[i].target_va, sdefs[i].target_host);
+    }
+
+    require(FlushInstructionCache(GetCurrentProcess(), code, 16384u) != 0, "FlushInstructionCache");
+}
+
+static void reset_state(U salt, I sw, I sh) {
+    std::memset(&trace, 0, sizeof trace);
+    heap_cursor = 0u;
+    talloc_calls = 0u;
+    alloc_calls = 0u;
+    tile_create_calls = 0u;
+    porsche::render_choptex_handle_006a6450 = nullptr;
+    porsche::render_choptex_color_005dfb7c = 0xabcdef01u ^ salt;
+    std::memset(src_shape, 0, sizeof src_shape);
+    wr(src_shape, 0u, 0xa55a0004u);
+    wr(src_shape, 4u, static_cast<U>(sw & 0xffff) | (static_cast<U>(sh & 0xffff) << 16));
+    for (U i = 16u; i < sizeof(src_shape); ++i) {
+        src_shape[i] = static_cast<B>((i * 19u + salt) & 0xffu);
+    }
+    for (U i = 0u; i < sizeof(src_buf); ++i) {
+        src_buf[i] = static_cast<B>((i * 23u + salt + 5u) & 0xffu);
+        dst_buf[i] = static_cast<B>((0xc3u ^ (i * 7u) ^ salt) & 0xffu);
+    }
+}
+
+static void run_driver_draw_case(B mode, U state, I backend, U sse_w, U mmx_w, U caps_w, U tfree_ret, bool pre_handle) {
+    ++cases;
+    for (side = 0u; side < 2u; ++side) {
+        reset_state(cases * 17u, 100, 80);
+        porsche::window_shutdown_mode_005de630 = mode;
+        porsche::window_shutdown_state_005de64c = state;
+        porsche::render_fill_backend_005decd8 = backend;
+        porsche::shared_runtime_word_005deb1c = sse_w;
+        porsche::copy_flag_005deb18 = mmx_w;
+        force_about_caps_word = caps_w;
+        force_tfree_ret = tfree_ret;
+        fail_alloc_at = 0u; fail_tile_create_at = 0u; fail_talloc_at = 0u; force_conv_null = 0u;
+        if (pre_handle) {
+            auto* h = static_cast<porsche::RenderChopTex*>(bump_alloc(sizeof(porsche::RenderChopTex)));
+            h->textures[0] = 0x5111u;
+            h->textures[1] = 0x5222u;
+            h->tile_shape = bump_alloc(16u + 64u * 64u * 2u);
+            wr(h->tile_shape, 0u, 0x00000078u);
+            wr(h->tile_shape, 4u, 64u | (64u << 16));
+            porsche::render_choptex_handle_006a6450 = h;
+        }
+        void* fn = side == 0u ? static_cast<void*>(slot_53d570)
+                              : reinterpret_cast<void*>(&porsche::splash_progress_driver_draw_0053d570);
+        (void)invoke_cdecl3(fn, ptr(src_shape), 13u, static_cast<U>(-7), trace.abi_fail);
+        require(trace.abi_fail == 0u, "53d570 ABI");
+        trace.backend_val = static_cast<U>(porsche::render_fill_backend_005decd8);
+        trace.handle_null = (porsche::render_choptex_handle_006a6450 == nullptr) ? 1u : 0u;
+        if (side == 0u) expected = trace;
+        else if (std::memcmp(&trace, &expected, sizeof trace) != 0) {
+            std::printf("diff exp_cnt=%u got_cnt=%u exp_be=%u got_be=%u exp_hn=%u got_hn=%u\n",
+                        expected.event_count, trace.event_count, expected.backend_val,
+                        trace.backend_val, expected.handle_null, trace.handle_null);
+            const U n = expected.event_count < trace.event_count ? expected.event_count : trace.event_count;
+            for (U i = 0u; i < n; ++i) {
+                if (std::memcmp(&expected.events[i], &trace.events[i], sizeof(Event)) != 0) {
+                    std::printf("first_ev[%u] exp=(%u,%x,%x,%x,%x) got=(%u,%x,%x,%x,%x)\n",
+                                i, expected.events[i].kind, expected.events[i].a0, expected.events[i].a1,
+                                expected.events[i].a2, expected.events[i].a3,
+                                trace.events[i].kind, trace.events[i].a0, trace.events[i].a1,
+                                trace.events[i].a2, trace.events[i].a3);
+                    break;
+                }
+            }
+            require(false, "53d570 trace");
+        }
+    }
+}
+
+static void run_create_case(I depth, U f_alloc, U f_tile, U f_talloc) {
+    ++cases;
+    for (side = 0u; side < 2u; ++side) {
+        reset_state(cases * 29u, 64, 64);
+        fail_alloc_at = f_alloc; fail_tile_create_at = f_tile; fail_talloc_at = f_talloc;
+        void* fn = side == 0u ? static_cast<void*>(slot_572a90)
+                              : reinterpret_cast<void*>(&porsche::render_choptex_create_00572a90);
+        const U res = invoke_cdecl4(fn, 64u, 32u, static_cast<U>(depth), 3u, trace.abi_fail);
+        require(trace.abi_fail == 0u, "572a90 ABI");
+        if (res != 0u) {
+            const auto* c = reinterpret_cast<const porsche::RenderChopTex*>(static_cast<std::uintptr_t>(res));
+            trace.result = c->textures[0] ^ (c->textures[1] << 8) ^ (rd(c->tile_shape, 0u) & 0xffu);
+        } else {
+            trace.result = 0u;
+        }
+        if (side == 0u) expected = trace;
+        else require(std::memcmp(&trace, &expected, sizeof trace) == 0, "572a90 trace");
+    }
+}
+
+static void run_draw_case(I sw, I sh, I tw, I th, I x, I y, I dw, I dh, U conv_null) {
+    ++cases;
+    for (side = 0u; side < 2u; ++side) {
+        reset_state(cases * 37u, sw, sh);
+        force_conv_null = conv_null;
+        porsche::RenderChopTex chop{};
+        chop.textures[0] = 0x3001u;
+        chop.textures[1] = 0x3002u;
+        chop.tile_shape = bump_alloc(16u + static_cast<U>(tw * th * 2));
+        wr(chop.tile_shape, 0u, 0x00000078u);
+        wr(chop.tile_shape, 4u, static_cast<U>(tw & 0xffff) | (static_cast<U>(th & 0xffff) << 16));
+        void* fn = side == 0u ? static_cast<void*>(slot_572b40)
+                              : reinterpret_cast<void*>(&porsche::render_choptex_draw_00572b40);
+        trace.result = invoke_cdecl6(fn, ptr(&chop), ptr(src_shape),
+                                     static_cast<U>(x), static_cast<U>(y),
+                                     static_cast<U>(dw), static_cast<U>(dh), trace.abi_fail);
+        require(trace.abi_fail == 0u, "572b40 ABI");
+        if (side == 0u) expected = trace;
+        else require(std::memcmp(&trace, &expected, sizeof trace) == 0, "572b40 trace");
+    }
+}
+
+static void run_free_case(bool null_chop, U t0, U t1, bool has_tile, U tfree_ret) {
+    ++cases;
+    for (side = 0u; side < 2u; ++side) {
+        reset_state(cases * 41u, 16, 16);
+        force_tfree_ret = tfree_ret;
+        porsche::RenderChopTex* chop = nullptr;
+        if (!null_chop) {
+            chop = static_cast<porsche::RenderChopTex*>(bump_alloc(sizeof(porsche::RenderChopTex)));
+            chop->textures[0] = t0;
+            chop->textures[1] = t1;
+            chop->tile_shape = has_tile ? bump_alloc(32u) : nullptr;
+        }
+        void* fn = side == 0u ? static_cast<void*>(slot_572ee0)
+                              : reinterpret_cast<void*>(&porsche::render_choptex_free_00572ee0);
+        trace.result = invoke_cdecl1(fn, ptr(chop), trace.abi_fail);
+        require(trace.abi_fail == 0u, "572ee0 ABI");
+        if (side == 0u) expected = trace;
+        else require(std::memcmp(&trace, &expected, sizeof trace) == 0, "572ee0 trace");
+    }
+}
+
+static void run_span_and_fpu_cases() {
+    const U offsets[] = {0u, 1u, 2u, 3u, 4u, 7u};
+    const U sizes[] = {0u, 1u, 3u, 7u, 15u, 31u, 64u, 135u, 259u};
+    for (U d_off : offsets) {
+        for (U sz : sizes) {
+            ++cases;
+            for (side = 0u; side < 2u; ++side) {
+                reset_state(cases * 13u, 16, 16);
+                void* fn = side == 0u ? static_cast<void*>(slot_5b0c00)
+                                      : reinterpret_cast<void*>(&porsche::heap_copy_005b0c00);
+                (void)invoke_cdecl3(fn, ptr(dst_buf + d_off), ptr(src_buf + (d_off & 3u)), sz, trace.abi_fail);
+                require(trace.abi_fail == 0u, "5b0c00 ABI");
+                trace.dst_hash = hash_bytes(dst_buf, sizeof(dst_buf));
+                if (side == 0u) expected = trace;
+                else require(std::memcmp(&trace, &expected, sizeof trace) == 0, "5b0c00 trace");
+            }
+        }
+    }
+
+    void* const cpp_spans[15] = {
+        reinterpret_cast<void*>(&porsche::render_span_scalar_16_0053d390),
+        reinterpret_cast<void*>(&porsche::render_span_scalar_24_0053d3b0),
+        reinterpret_cast<void*>(&porsche::render_span_scalar_32_0053d3d0),
+        reinterpret_cast<void*>(&porsche::render_span_fpu_16_0053d3f0),
+        reinterpret_cast<void*>(&porsche::render_span_fpu_24_0053d410),
+        reinterpret_cast<void*>(&porsche::render_span_fpu_32_0053d430),
+        reinterpret_cast<void*>(&porsche::render_span_mmx_a_16_0053d450),
+        reinterpret_cast<void*>(&porsche::render_span_mmx_a_24_0053d470),
+        reinterpret_cast<void*>(&porsche::render_span_mmx_a_32_0053d490),
+        reinterpret_cast<void*>(&porsche::render_span_mmx_b_16_0053d4b0),
+        reinterpret_cast<void*>(&porsche::render_span_mmx_b_24_0053d4d0),
+        reinterpret_cast<void*>(&porsche::render_span_mmx_b_32_0053d4f0),
+        reinterpret_cast<void*>(&porsche::render_span_sse_16_0053d510),
+        reinterpret_cast<void*>(&porsche::render_span_sse_24_0053d530),
+        reinterpret_cast<void*>(&porsche::render_span_sse_32_0053d550),
+    };
+    const U counts[] = {0u, 1u, 5u, 17u};
+    for (U i = 0u; i < 15u; ++i) {
+        for (U c : counts) {
+            ++cases;
+            for (side = 0u; side < 2u; ++side) {
+                reset_state(cases * 7u, 16, 16);
+                void* fn = side == 0u ? static_cast<void*>(span_stubs[i]) : cpp_spans[i];
+                (void)invoke_cdecl3(fn, ptr(dst_buf), ptr(src_buf), c, trace.abi_fail);
+                require(trace.abi_fail == 0u, "span ABI");
+                trace.dst_hash = hash_bytes(dst_buf, sizeof(dst_buf));
+                if (side == 0u) expected = trace;
+                else require(std::memcmp(&trace, &expected, sizeof trace) == 0, "span trace");
+            }
+        }
+    }
+}
+
+} // namespace
+
+int main() {
+    AddVectoredExceptionHandler(1, fault_handler);
+    init_fixture();
+
+    // Hardware mode combinations
+    run_driver_draw_case(1u, 0u, -1, 0u, 0u, 1u, 1u, false);
+    run_driver_draw_case(2u, 0u, -1, 0u, 0u, 2u, 0u, false);
+    run_driver_draw_case(1u, 0u, 2, 1u, 1u, 1u, 1u, true);
+
+    // Software mode combinations (all 5 backends + auto-detect)
+    run_driver_draw_case(0u, 0u, -1, 1u, 1u, 0u, 1u, false);
+    run_driver_draw_case(0xffu, 0u, -1, 0u, 1u, 0u, 1u, false);
+    run_driver_draw_case(1u, 1u, -1, 0u, 0u, 0u, 1u, false);
+    for (I b = 0; b <= 4; ++b) {
+        run_driver_draw_case(0u, 0u, b, 0u, 0u, 0u, 1u, false);
+    }
+
+    // 00572a90 create & error exits
+    run_create_case(6, 0u, 0u, 0u);
+    run_create_case(7, 0u, 0u, 0u);
+    run_create_case(6, 1u, 0u, 0u);
+    run_create_case(6, 0u, 1u, 0u);
+    run_create_case(6, 0u, 0u, 1u);
+    run_create_case(6, 0u, 0u, 2u);
+
+    // 00572b40 tiling, remainder clamping, scaling, failure
+    run_draw_case(100, 80, 64, 64, 10, 20, 200, 120, 0u);
+    run_draw_case(64, 64, 64, 64, -5, 0, 64, 64, 0u);
+    run_draw_case(130, 30, 64, 32, 0, 0, 260, 60, 0u);
+    run_draw_case(0, 64, 64, 64, 0, 0, 64, 64, 0u);
+    run_draw_case(64, 64, 64, 64, 0, 0, 64, 64, 1u);
+
+    // 00572ee0 free paths
+    run_free_case(true, 0u, 0u, false, 1u);
+    run_free_case(false, 0x11u, 0x22u, true, 1u);
+    run_free_case(false, 0u, 0x22u, false, 0u);
+
+    // 005b0c00 + 15 span copy wrappers
+    run_span_and_fpu_cases();
+
+    std::printf("render_driver_draw_890_original_x86_vs_cpp=PASS cases=%u\n", cases);
+    std::fflush(stdout);
+    return 0;
+}

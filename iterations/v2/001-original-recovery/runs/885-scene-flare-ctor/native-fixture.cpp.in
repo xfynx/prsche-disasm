@@ -1,0 +1,1175 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <array>
+#include <cmath>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "scene_flare_ctor_885.hpp"
+#include "flare_cleanup_slots_882.hpp"
+#include "porsche/application_alloc.hpp"
+#include "porsche/application_context_base.hpp"
+#include "porsche/application_state.hpp"
+#include "porsche/context_effects.hpp"
+#include "porsche/fe_stream.hpp"
+#include "porsche/formatter_entry.hpp"
+#include "porsche/formatter_float_helpers.hpp"
+#include "porsche/formatter_stdio.hpp"
+#include "porsche/formatter_text.hpp"
+#include "porsche/install_paths.hpp"
+#include "porsche/object_update.hpp"
+#include "scene_blur_stage_726.hpp"
+#include "scene_flare_resolve_786.hpp"
+#include "scene_sky_cleanup_883.hpp"
+#include "scene_stage_58b80_ctor_821.hpp"
+#include "scene_stage_constructor_781.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = unsigned char;
+
+static constexpr U kSkyCfgSize = 0x71dcu;
+
+static const B body_00459600[] = {@BODY_00459600@};
+static const B body_00459660[] = {@BODY_00459660@};
+static const B body_00459700[] = {@BODY_00459700@};
+static const B body_00459950[] = {@BODY_00459950@};
+static const B body_0045a2c0[] = {@BODY_0045a2c0@};
+static const B body_0045a490[] = {@BODY_0045a490@};
+static const B body_0045a970[] = {@BODY_0045a970@};
+static const B body_0045cb80[] = {@BODY_0045cb80@};
+static const B body_0045cc40[] = {@BODY_0045cc40@};
+static const B body_0045d800[] = {@BODY_0045d800@};
+static const B body_0045fb00[] = {@BODY_0045fb00@};
+static const B body_0045fb10[] = {@BODY_0045fb10@};
+static const B body_0045fb80[] = {@BODY_0045fb80@};
+static const B body_00460170[] = {@BODY_00460170@};
+static const B body_004601f0[] = {@BODY_004601f0@};
+static const B body_00460780[] = {@BODY_00460780@};
+static const B body_00460c70[] = {@BODY_00460c70@};
+static const B body_00461090[] = {@BODY_00461090@};
+static const B body_005327f0[] = {@BODY_005327f0@};
+static const B body_0053bfd0[] = {@BODY_0053bfd0@};
+
+enum BodySlot : unsigned {
+    SLOT_00459600 = 0x0000u,
+    SLOT_00459660 = 0x0040u,
+    SLOT_00459700 = 0x0100u,
+    SLOT_00459950 = 0x0360u,
+    SLOT_0045a2c0 = 0x03e0u,
+    SLOT_0045a490 = 0x0460u,
+    SLOT_0045a970 = 0x0520u,
+    SLOT_0045cb80 = 0x05a0u,
+    SLOT_0045cc40 = 0x0640u,
+    SLOT_0045d800 = 0x06c0u,
+    SLOT_0045fb00 = 0x09e0u,
+    SLOT_0045fb10 = 0x0a00u,
+    SLOT_0045fb80 = 0x0a80u,
+    SLOT_00460170 = 0x1080u,
+    SLOT_004601f0 = 0x10c0u,
+    SLOT_00460780 = 0x1100u,
+    SLOT_00460c70 = 0x13a0u,
+    SLOT_00461090 = 0x13c0u,
+    SLOT_005327f0 = 0x1440u,
+    SLOT_0053bfd0 = 0x1460u,
+};
+
+// Native literals matching Porsche.exe .data/.rdata tables.
+static const char nat_sky_tag[] = "SkyCnfig";
+static const char nat_sky_bin_fmt[] = "%sSky\\%s.bin";
+static const char nat_sky_def_bin_fmt[] = "%sSky\\default.bin";
+static const char nat_ltmp_name[] = "ltmp";
+static const char nat_sky_txt_fmt[] = "%sSky\\%s.txt";
+static const char nat_sky_def_txt_fmt[] = "%sSky\\default.txt";
+static const char nat_flarepos_fmt[] = "%sflarepos.dat";
+static const char nat_weather_names[5][20] = {
+    "low", "medium", "high", "amazing", "all"
+};
+static const char nat_kw_begin[] = "begin";
+static const char nat_kw_basic[] = "basic";
+static const char nat_kw_multinormal[] = "multinormal";
+static const char nat_kw_additive[] = "additive";
+static const char nat_warn_additive[] = "Additive mode no longer supported...use multiadditive\n";
+static const char nat_kw_multiadditive[] = "multiadditive";
+static const char nat_kw_multiattenuate[] = "multiattenuate";
+static const char nat_kw_multimodulate[] = "multimodulate";
+static const char nat_kw_freecloud[] = "freecloud";
+static const char nat_kw_config[] = "config";
+static const char nat_kw_basicwater[] = "basicwater";
+static const char nat_kw_multinormalwater[] = "multinormalwater";
+static const char nat_kw_multiadditivewater[] = "multiadditivewater";
+static const char nat_kw_multiattenuatewater[] = "multiattenuatewater";
+static const char nat_kw_multimodulatewater[] = "multimodulatewater";
+
+static const float nat_pos_neg002 = -0.02f;
+static const float nat_pos_pos002 = 0.02f;
+static const std::uint64_t nat_tau_bits = 0x401921fb20000000ull;
+
+static U g_case_id = 0u;
+static U g_tick_value = 0x12345678u;
+static U g_nat_tick_fn_slot = 0u;
+
+static void require(bool cond, const char* why) {
+    if (!cond) {
+        std::printf("divergence %s case=%u\n", why, g_case_id);
+        std::exit(7);
+    }
+}
+
+static inline U raw_addr(const void* p) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(p));
+}
+
+static U fnv1a_bytes(const void* data, U len) {
+    const auto* p = static_cast<const B*>(data);
+    U h = 2166136261u;
+    for (U i = 0u; i < len; ++i) {
+        h ^= p[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static U fnv1a_cstr(const char* s) {
+    if (s == nullptr) {
+        return 0u;
+    }
+    return fnv1a_bytes(s, static_cast<U>(std::strlen(s)));
+}
+
+// Shared deterministic side arena reset between native and C++ halves.
+struct AllocRec {
+    const void* ptr;
+    U size;
+};
+
+static alignas(16) B g_arena[262144];
+static U g_arena_pos = 0u;
+static std::array<AllocRec, 512> g_allocs{};
+static U g_alloc_count = 0u;
+
+static void* arena_alloc(U alloc_bytes, U reported_size) {
+    const U aligned = (alloc_bytes + 7u) & ~7u;
+    require(g_arena_pos + aligned <= sizeof(g_arena), "arena overflow");
+    require(g_alloc_count < g_allocs.size(), "alloc table overflow");
+    void* const p = g_arena + g_arena_pos;
+    std::memset(p, 0, aligned);
+    g_arena_pos += aligned;
+    g_allocs[g_alloc_count++] = {p, reported_size};
+    return p;
+}
+
+static U lookup_alloc_size(const void* p) {
+    for (U i = 0u; i < g_alloc_count; ++i) {
+        if (g_allocs[i].ptr == p) {
+            return g_allocs[i].size;
+        }
+    }
+    return 0u;
+}
+
+static std::array<U, 2048> g_events{};
+static U g_ev_count = 0u;
+static void push_ev(U tag) {
+    require(g_ev_count < g_events.size(), "event overflow");
+    g_events[g_ev_count++] = tag;
+}
+
+// Simulated VFS state for each test case.
+struct VfsState {
+    bool has_named_bin = false;
+    bool has_default_bin = false;
+    I bin_version = 9;
+    std::array<U, 256> bin_seed_words{};
+
+    bool has_named_txt = false;
+    bool has_default_txt = false;
+    const char* txt_body = nullptr;
+    U txt_len = 0u;
+
+    bool has_flarepos = false;
+    std::array<U, 14> flarepos_words{};
+
+    I ltmp_chunk_idx = -1;
+    std::array<B, 0x10u + 49u * 4u> sky_ltmp_chunk{};
+
+    bool fail_next_net_alloc = false;
+    U net_alloc_budget = 0xffffffffu;
+} g_vfs;
+
+static std::array<B, 0x100u> g_sky_obj{};
+static std::array<B, 0x64u> g_flare_obj{};
+
+namespace porsche {
+
+void* scene_flare_resource_00627e18 = nullptr;
+void* scene_flare_aux_00627e1c = nullptr;
+void* scene_route_sky_bytes_00627e38 = nullptr;
+void* scene_route_sky_aux_00627e3c = nullptr;
+void* scene_route_sky_00627e4c = nullptr;
+void* scene_sky_cleanup_state_00627e5c = nullptr;
+ApplicationStateArena application_state_006573e8{};
+const char* install_paths_table_0065b2a0[60]{};
+const char* startup_resource_prefix_0065b30c = nullptr;
+
+// ApplicationStateArena members referenced if needed by headers (not called directly).
+std::uint32_t& ApplicationStateArena::word(std::uint32_t va) {
+    return words_[(va - application_state_base_va) / 4u];
+}
+
+void* __cdecl startup_network_allocate_0059ef90(U bytes) {
+    push_ev(0x1001u);
+    push_ev(bytes);
+    if (g_vfs.fail_next_net_alloc || g_vfs.net_alloc_budget == 0u) {
+        g_vfs.fail_next_net_alloc = false;
+        push_ev(0u);
+        return nullptr;
+    }
+    if (g_vfs.net_alloc_budget != 0xffffffffu) {
+        --g_vfs.net_alloc_budget;
+    }
+    void* const p = arena_alloc(bytes + 4u, bytes);
+    push_ev(raw_addr(p));
+    return p;
+}
+
+U __cdecl application_release_0059f050(void* address) {
+    push_ev(0x1002u);
+    push_ev(raw_addr(address));
+    return 0u;
+}
+
+U __cdecl free_00531f90(void* address) {
+    push_ev(0x1003u);
+    push_ev(raw_addr(address));
+    return 0u;
+}
+
+void* __cdecl application_context_member_block_0059ecb0(U bytes, U heap, U source_va) {
+    push_ev(0x1004u);
+    push_ev(bytes);
+    push_ev(heap);
+    U tag_hash = 0u;
+    if (source_va != 0u) {
+        tag_hash = fnv1a_cstr(reinterpret_cast<const char*>(static_cast<std::uintptr_t>(source_va)));
+    }
+    push_ev(tag_hash);
+    void* const p = arena_alloc(bytes, bytes);
+    push_ev(raw_addr(p));
+    return p;
+}
+
+U __cdecl context_table_size_0059ece0(const void* block) {
+    const U sz = lookup_alloc_size(block);
+    push_ev(0x1005u);
+    push_ev(raw_addr(block));
+    push_ev(sz);
+    return sz;
+}
+
+void __cdecl context_table_release_0059ecd0(void* block) {
+    push_ev(0x1006u);
+    push_ev(raw_addr(block));
+}
+
+static void populate_sky_bin_buffer(B* buf, U case_tag) {
+    std::memcpy(buf, &g_vfs.bin_version, 4u);
+    // Populate distinct payload patterns across all legacy source offsets (0x04..0x2000)
+    // so v0..v8 copy/upgrade branches produce visible, material output differences.
+    for (U off = 4u; off < 0x1600u; off += 4u) {
+        const U val = 0x10000000u ^ (off * 0x0101u) ^ (case_tag * 0x1337u);
+        std::memcpy(buf + off, &val, 4u);
+    }
+    // Seed 4 weather rows at 0xce8..0xdd7 (optional non-zero triggers for aux_init).
+    for (U r = 0u; r < 4u; ++r) {
+        const U w = g_vfs.bin_seed_words[r];
+        std::memcpy(buf + 0xce8u + r * 0x3cu, &w, 4u);
+    }
+    // Sun & pos floats at 0x3c..0x48 and 0xcdc..0xce4 (used after upgrade).
+    const U cdc = g_vfs.bin_seed_words[4];
+    const U ce0 = g_vfs.bin_seed_words[5];
+    const U ce4 = g_vfs.bin_seed_words[6];
+    const U f3c = g_vfs.bin_seed_words[7];
+    const U f44 = g_vfs.bin_seed_words[8];
+    const U f48 = g_vfs.bin_seed_words[9];
+    std::memcpy(buf + 0xcdcu, &cdc, 4u);
+    std::memcpy(buf + 0xce0u, &ce0, 4u);
+    std::memcpy(buf + 0xce4u, &ce4, 4u);
+    std::memcpy(buf + 0x3cu, &f3c, 4u);
+    std::memcpy(buf + 0x44u, &f44, 4u);
+    std::memcpy(buf + 0x48u, &f48, 4u);
+    // Optional keyframe sentinel at 0xddcu, 0x1a5cu, 0x655cu for ver == 9.
+    for (U k = 0u; k < 6u; ++k) {
+        const U v = g_vfs.bin_seed_words[16u + k];
+        std::memcpy(buf + 0xddcu + k * 8u, &v, 4u);
+        std::memcpy(buf + 0x655cu + k * 8u, &v, 4u);
+    }
+    for (U k = 0u; k < 4u; ++k) {
+        const U v = g_vfs.bin_seed_words[24u + k];
+        std::memcpy(buf + 0x1a5cu + k * 0x30u, &v, 4u);
+    }
+}
+
+static void* handle_open(U ev_id, const char* name, U flags) {
+    push_ev(ev_id);
+    push_ev(fnv1a_cstr(name));
+    push_ev(flags);
+    if (name == nullptr) {
+        push_ev(0u);
+        return nullptr;
+    }
+    if (std::strstr(name, "default.bin") != nullptr) {
+        if (!g_vfs.has_default_bin) {
+            push_ev(0u);
+            return nullptr;
+        }
+        auto* const p = static_cast<B*>(arena_alloc(kSkyCfgSize, kSkyCfgSize));
+        populate_sky_bin_buffer(p, 0xdu);
+        push_ev(raw_addr(p));
+        return p;
+    }
+    if (std::strstr(name, ".bin") != nullptr) {
+        if (!g_vfs.has_named_bin) {
+            push_ev(0u);
+            return nullptr;
+        }
+        auto* const p = static_cast<B*>(arena_alloc(kSkyCfgSize, kSkyCfgSize));
+        populate_sky_bin_buffer(p, 0xbu);
+        push_ev(raw_addr(p));
+        return p;
+    }
+    if (std::strstr(name, "default.txt") != nullptr) {
+        if (!g_vfs.has_default_txt) {
+            push_ev(0u);
+            return nullptr;
+        }
+        auto* const p = static_cast<B*>(arena_alloc(g_vfs.txt_len + 8u, g_vfs.txt_len));
+        if (g_vfs.txt_len > 0u && g_vfs.txt_body != nullptr) {
+            std::memcpy(p, g_vfs.txt_body, g_vfs.txt_len);
+        }
+        push_ev(raw_addr(p));
+        return p;
+    }
+    if (std::strstr(name, ".txt") != nullptr) {
+        if (!g_vfs.has_named_txt) {
+            push_ev(0u);
+            return nullptr;
+        }
+        auto* const p = static_cast<B*>(arena_alloc(g_vfs.txt_len + 8u, g_vfs.txt_len));
+        if (g_vfs.txt_len > 0u && g_vfs.txt_body != nullptr) {
+            std::memcpy(p, g_vfs.txt_body, g_vfs.txt_len);
+        }
+        push_ev(raw_addr(p));
+        return p;
+    }
+    if (std::strstr(name, "flarepos.dat") != nullptr) {
+        if (!g_vfs.has_flarepos) {
+            push_ev(0u);
+            return nullptr;
+        }
+        auto* const p = static_cast<B*>(arena_alloc(0x38u, 0x38u));
+        std::memcpy(p, g_vfs.flarepos_words.data(), 0x38u);
+        push_ev(raw_addr(p));
+        return p;
+    }
+    push_ev(0u);
+    return nullptr;
+}
+
+void* __cdecl resource_open_0059d8e0(const char* name, U flags) {
+    return handle_open(0x1007u, name, flags);
+}
+
+void* __cdecl resource_open_quiet_0059d9b0(const char* name, U flags) {
+    return handle_open(0x1008u, name, flags);
+}
+
+U __cdecl install_paths_size_00556640(const void* blob) {
+    const U sz = lookup_alloc_size(blob);
+    push_ev(0x1009u);
+    push_ev(raw_addr(blob));
+    push_ev(sz);
+    return sz;
+}
+
+I __cdecl formatter_entry_005a0fbf(char* output, const char* format, ...) {
+    std::va_list ap;
+    va_start(ap, format);
+    const int n = std::vsprintf(output, format, ap);
+    va_end(ap);
+    push_ev(0x100au);
+    push_ev(fnv1a_cstr(format));
+    push_ev(fnv1a_cstr(output));
+    return n;
+}
+
+int __cdecl formatter_stdio_printf_005a177b(const char* fmt, ...) {
+    push_ev(0x100bu);
+    push_ev(fnv1a_cstr(fmt));
+    return 0;
+}
+
+int __cdecl formatter_float_lower_005a2248(int ch) {
+    if (ch >= 'A' && ch <= 'Z') {
+        return ch + ('a' - 'A');
+    }
+    return ch;
+}
+
+int __cdecl formatter_text_compare_n_005a2210(const char* a, const char* b, U n) {
+    for (U i = 0u; i < n; ++i) {
+        const unsigned char ca = static_cast<unsigned char>(a[i]);
+        const unsigned char cb = static_cast<unsigned char>(b[i]);
+        if (ca != cb) {
+            return (ca < cb) ? -1 : 1;
+        }
+        if (ca == 0u) {
+            return 0;
+        }
+    }
+    return 0;
+}
+
+I __fastcall scene_sky_find_name_00460b50(void* self, void*, const char* name) {
+    push_ev(0x100cu);
+    push_ev(raw_addr(self));
+    push_ev(fnv1a_cstr(name));
+    push_ev(static_cast<U>(g_vfs.ltmp_chunk_idx));
+    return g_vfs.ltmp_chunk_idx;
+}
+
+void* __fastcall scene_mode_ctor_005379f0(void* self, void*) {
+    push_ev(0x100du);
+    push_ev(raw_addr(self));
+    std::memset(self, 0x22, 0x18u);
+    return self;
+}
+
+void __fastcall scene_mode_set_00537a50(void* self, void*, U value) {
+    push_ev(0x100eu);
+    push_ev(raw_addr(self));
+    push_ev(value);
+}
+
+void* __fastcall scene_blur_program_ctor_00468240(
+    void* self, void*, U a, U b, U c, U d, U e) {
+    push_ev(0x100fu);
+    push_ev(raw_addr(self));
+    push_ev(a);
+    push_ev(b);
+    push_ev(c);
+    push_ev(d);
+    push_ev(e);
+    std::memset(self, 0x33, 0x28u);
+    return self;
+}
+
+void __fastcall scene_blur_program_setup_004685e0(
+    void* self, void*, U a, U b, U c, U d, U e, U f) {
+    push_ev(0x1010u);
+    push_ev(raw_addr(self));
+    push_ev(a);
+    push_ev(b);
+    push_ev(c);
+    push_ev(d);
+    push_ev(e);
+    push_ev(f);
+}
+
+double __cdecl math_fsin_tau_005327e0(float turns) {
+    static const std::uint64_t kTauBits = 0x401921fb20000000ull;
+    double result = 0.0;
+    __asm {
+        fld dword ptr [turns]
+        fmul qword ptr [kTauBits]
+        fsin
+        fstp qword ptr [result]
+    }
+    return result;
+}
+
+U __stdcall platform_get_tick_count() {
+    push_ev(0x1011u);
+    push_ev(g_tick_value);
+    return g_tick_value;
+}
+
+void* __fastcall scene_flare_final_effect_ctor_00459b50(
+    void* self, void*, void* sky, void* resource) {
+    push_ev(0x1012u);
+    push_ev(raw_addr(self));
+    push_ev(raw_addr(sky));
+    push_ev(raw_addr(resource));
+    std::memset(self, 0x41, 0x58u);
+    return self;
+}
+
+void* __fastcall scene_flare_effect_a_ctor_0045adf0(
+    void* self, void*, void* entry, void* sky, void* resource, B is_water) {
+    push_ev(0x1013u);
+    push_ev(raw_addr(self));
+    push_ev(entry != nullptr ? *static_cast<const U*>(entry) : 0u);
+    push_ev(entry != nullptr ? fnv1a_cstr(static_cast<const char* const*>(entry)[1]) : 0u);
+    push_ev(raw_addr(sky));
+    push_ev(raw_addr(resource));
+    push_ev(static_cast<U>(is_water));
+    std::memset(self, 0x42, 0x5cu);
+    return self;
+}
+
+void* __fastcall scene_flare_effect_b_ctor_0045b5a0(
+    void* self, void*, void* entry, void* sky, void* resource, U variant, B is_water) {
+    push_ev(0x1014u);
+    push_ev(raw_addr(self));
+    push_ev(entry != nullptr ? *static_cast<const U*>(entry) : 0u);
+    push_ev(entry != nullptr ? fnv1a_cstr(static_cast<const char* const*>(entry)[1]) : 0u);
+    push_ev(raw_addr(sky));
+    push_ev(raw_addr(resource));
+    push_ev(variant);
+    push_ev(static_cast<U>(is_water));
+    std::memset(self, 0x43, 0x88u);
+    return self;
+}
+
+void* __fastcall scene_flare_effect_c_ctor_0045bf80(
+    void* self, void*, void* entry, void* sky, void* resource) {
+    push_ev(0x1015u);
+    push_ev(raw_addr(self));
+    push_ev(entry != nullptr ? *static_cast<const U*>(entry) : 0u);
+    push_ev(entry != nullptr ? fnv1a_cstr(static_cast<const char* const*>(entry)[1]) : 0u);
+    push_ev(raw_addr(sky));
+    push_ev(raw_addr(resource));
+    std::memset(self, 0x44, 0xfcu);
+    return self;
+}
+
+} // namespace porsche
+
+static B* prepare_native() {
+    B* const code = static_cast<B*>(
+        VirtualAlloc(nullptr, 8192, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    require(code != nullptr, "VirtualAlloc");
+
+    std::memcpy(code + SLOT_00459600, body_00459600, sizeof(body_00459600));
+    std::memcpy(code + SLOT_00459660, body_00459660, sizeof(body_00459660));
+    std::memcpy(code + SLOT_00459700, body_00459700, sizeof(body_00459700));
+    std::memcpy(code + SLOT_00459950, body_00459950, sizeof(body_00459950));
+    std::memcpy(code + SLOT_0045a2c0, body_0045a2c0, sizeof(body_0045a2c0));
+    std::memcpy(code + SLOT_0045a490, body_0045a490, sizeof(body_0045a490));
+    std::memcpy(code + SLOT_0045a970, body_0045a970, sizeof(body_0045a970));
+    std::memcpy(code + SLOT_0045cb80, body_0045cb80, sizeof(body_0045cb80));
+    std::memcpy(code + SLOT_0045cc40, body_0045cc40, sizeof(body_0045cc40));
+    std::memcpy(code + SLOT_0045d800, body_0045d800, sizeof(body_0045d800));
+    std::memcpy(code + SLOT_0045fb00, body_0045fb00, sizeof(body_0045fb00));
+    std::memcpy(code + SLOT_0045fb10, body_0045fb10, sizeof(body_0045fb10));
+    std::memcpy(code + SLOT_0045fb80, body_0045fb80, sizeof(body_0045fb80));
+    std::memcpy(code + SLOT_00460170, body_00460170, sizeof(body_00460170));
+    std::memcpy(code + SLOT_004601f0, body_004601f0, sizeof(body_004601f0));
+    std::memcpy(code + SLOT_00460780, body_00460780, sizeof(body_00460780));
+    std::memcpy(code + SLOT_00460c70, body_00460c70, sizeof(body_00460c70));
+    std::memcpy(code + SLOT_00461090, body_00461090, sizeof(body_00461090));
+    std::memcpy(code + SLOT_005327f0, body_005327f0, sizeof(body_005327f0));
+    std::memcpy(code + SLOT_0053bfd0, body_0053bfd0, sizeof(body_0053bfd0));
+
+    auto patch_abs = [](B* fn, U off, U expected, U value) {
+        U actual = 0u;
+        std::memcpy(&actual, fn + off, 4u);
+        require(actual == expected, "reloc operand mismatch");
+        std::memcpy(fn + off, &value, 4u);
+    };
+    auto patch_rel = [](B* fn, U off, U expected_disp, U target) {
+        U actual = 0u;
+        std::memcpy(&actual, fn + off, 4u);
+        require(actual == expected_disp, "call disp mismatch");
+        const U disp = target - raw_addr(fn + off + 4u);
+        std::memcpy(fn + off, &disp, 4u);
+    };
+
+    const U a_res = raw_addr(&porsche::scene_flare_resource_00627e18);
+    const U a_aux = raw_addr(&porsche::scene_flare_aux_00627e1c);
+    const U a_skybytes = raw_addr(&porsche::scene_route_sky_bytes_00627e38);
+    const U a_skyaux = raw_addr(&porsche::scene_route_sky_aux_00627e3c);
+    const U a_sky = raw_addr(&porsche::scene_route_sky_00627e4c);
+    const U a_posstate = raw_addr(&porsche::scene_sky_cleanup_state_00627e5c);
+    const U a_weather_idx = raw_addr(&porsche::application_state_006573e8.words_[(0x00657d9cu - porsche::application_state_base_va) / 4u]);
+    const U a_path6 = raw_addr(&porsche::install_paths_table_0065b2a0[6]);
+    const U a_res_prefix = raw_addr(&porsche::startup_resource_prefix_0065b30c);
+
+    // 00459600
+    patch_abs(code + SLOT_00459600, 0x1eu, 0x627e18u, a_res);
+    patch_abs(code + SLOT_00459600, 0x25u, 0x627e18u, a_res);
+    patch_rel(code + SLOT_00459600, 0x06u, 0x145986u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_00459600, 0x19u, 0x000043u, raw_addr(code + SLOT_00459660));
+
+    // 00459660
+    patch_abs(code + SLOT_00459660, 0x18u, 0x65b2b8u, a_path6);
+    patch_abs(code + SLOT_00459660, 0x21u, 0x5ceefcu, raw_addr(nat_sky_bin_fmt));
+    patch_abs(code + SLOT_00459660, 0x3cu, 0x65b2b8u, a_path6);
+    patch_abs(code + SLOT_00459660, 0x42u, 0x5ceee8u, raw_addr(nat_sky_def_bin_fmt));
+    patch_abs(code + SLOT_00459660, 0x62u, 0x5ceedcu, raw_addr(nat_sky_tag));
+    patch_rel(code + SLOT_00459660, 0x27u, 0x147934u, raw_addr(&porsche::formatter_entry_005a0fbf));
+    patch_rel(code + SLOT_00459660, 0x2fu, 0x14431du, raw_addr(&porsche::resource_open_quiet_0059d9b0));
+    patch_rel(code + SLOT_00459660, 0x48u, 0x147913u, raw_addr(&porsche::formatter_entry_005a0fbf));
+    patch_rel(code + SLOT_00459660, 0x50u, 0x14422cu, raw_addr(&porsche::resource_open_0059d8e0));
+    patch_rel(code + SLOT_00459660, 0x6du, 0x1455dfu, raw_addr(&porsche::application_context_member_block_0059ecb0));
+    patch_rel(code + SLOT_00459660, 0x7fu, 0x00001du, raw_addr(code + SLOT_00459700));
+    patch_rel(code + SLOT_00459660, 0x95u, 0x000007u, raw_addr(code + SLOT_00459700));
+
+    // 00459700
+    patch_abs(code + SLOT_00459700, 0x08u, 0x5ceedcu, raw_addr(nat_sky_tag));
+    patch_rel(code + SLOT_00459700, 0x19u, 0x145593u, raw_addr(&porsche::application_context_member_block_0059ecb0));
+    patch_rel(code + SLOT_00459700, 0x21u, 0x1455bbu, raw_addr(&porsche::context_table_size_0059ece0));
+    patch_rel(code + SLOT_00459700, 0x233u, 0x145399u, raw_addr(&porsche::context_table_release_0059ecd0));
+
+    // 00459950
+    patch_abs(code + SLOT_00459950, 0x10u, 0x657d9cu, a_weather_idx);
+    patch_abs(code + SLOT_00459950, 0x17u, 0x627e18u, a_res);
+    patch_abs(code + SLOT_00459950, 0x5au, 0x627e1cu, a_aux);
+    patch_abs(code + SLOT_00459950, 0x61u, 0x627e1cu, a_aux);
+    patch_rel(code + SLOT_00459950, 0x03u, 0x145639u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+
+    // 0045cb80
+    patch_abs(code + SLOT_0045cb80, 0x0au, 0x5cf110u, raw_addr(nat_ltmp_name));
+    patch_rel(code + SLOT_0045cb80, 0x11u, 0x003fbbu, raw_addr(&porsche::scene_sky_find_name_00460b50));
+    patch_rel(code + SLOT_0045cb80, 0x4au, 0x0040a2u, raw_addr(code + SLOT_00460c70));
+
+    // 0045cc40
+    patch_abs(code + SLOT_0045cc40, 0x21u, 0x627e3cu, a_skyaux);
+    patch_abs(code + SLOT_0045cc40, 0x29u, 0x627e3cu, a_skyaux);
+    patch_abs(code + SLOT_0045cc40, 0x5du, 0x627e38u, a_skybytes);
+    patch_abs(code + SLOT_0045cc40, 0x65u, 0x627e38u, a_skybytes);
+    patch_rel(code + SLOT_0045cc40, 0x07u, 0x142345u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045cc40, 0x1cu, 0xffffff20u, raw_addr(code + SLOT_0045cb80));
+    patch_rel(code + SLOT_0045cc40, 0x30u, 0x14231cu, raw_addr(&porsche::startup_network_allocate_0059ef90));
+
+    // 0045d800
+    patch_abs(code + SLOT_0045d800, 0x44u, 0x627e18u, a_res);
+    patch_abs(code + SLOT_0045d800, 0x4du, 0x627e4cu, a_sky);
+    patch_abs(code + SLOT_0045d800, 0xf2u, 0x657d9cu, a_weather_idx);
+    patch_abs(code + SLOT_0045d800, 0x13eu, 0x627e4cu, a_sky);
+    patch_abs(code + SLOT_0045d800, 0x1ceu, 0x627e4cu, a_sky);
+    patch_abs(code + SLOT_0045d800, 0x21au, 0x627e4cu, a_sky);
+    patch_abs(code + SLOT_0045d800, 0x28fu, 0x627e4cu, a_sky);
+    patch_abs(code + SLOT_0045d800, 0x2d7u, 0x627e4cu, a_sky);
+    patch_rel(code + SLOT_0045d800, 0x3fu, 0xffffbdbdu, raw_addr(code + SLOT_00459600));
+    patch_rel(code + SLOT_0045d800, 0x57u, 0xfffff3e5u, raw_addr(code + SLOT_0045cc40));
+    patch_rel(code + SLOT_0045d800, 0x60u, 0x00298cu, raw_addr(code + SLOT_004601f0));
+    patch_rel(code + SLOT_0045d800, 0x65u, 0xffffc0e7u, raw_addr(code + SLOT_00459950));
+    patch_rel(code + SLOT_0045d800, 0x6cu, 0x141720u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045d800, 0x8bu, 0xffffca31u, raw_addr(code + SLOT_0045a2c0));
+    patch_rel(code + SLOT_0045d800, 0x99u, 0x1416f3u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045d800, 0xb8u, 0xffffcbd4u, raw_addr(code + SLOT_0045a490));
+    patch_rel(code + SLOT_0045d800, 0xc6u, 0x1416c6u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045d800, 0xe5u, 0xffffd087u, raw_addr(code + SLOT_0045a970));
+    patch_rel(code + SLOT_0045d800, 0xfdu, 0x00227fu, raw_addr(code + SLOT_0045fb80));
+    patch_rel(code + SLOT_0045d800, 0x11au, 0x0021e2u, raw_addr(code + SLOT_0045fb00));
+    patch_rel(code + SLOT_0045d800, 0x128u, 0x141664u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045d800, 0x15au, 0x0021a2u, raw_addr(code + SLOT_0045fb00));
+    patch_rel(code + SLOT_0045d800, 0x162u, 0xffffd48au, raw_addr(&porsche::scene_flare_effect_a_ctor_0045adf0));
+    patch_rel(code + SLOT_0045d800, 0x176u, 0x141616u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045d800, 0x1a6u, 0x1415e6u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045d800, 0x1dau, 0x002122u, raw_addr(code + SLOT_0045fb00));
+    patch_rel(code + SLOT_0045d800, 0x1e2u, 0xffffdbbau, raw_addr(&porsche::scene_flare_effect_b_ctor_0045b5a0));
+    patch_rel(code + SLOT_0045d800, 0x1f6u, 0x141596u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045d800, 0x226u, 0x0020d6u, raw_addr(code + SLOT_0045fb00));
+    patch_rel(code + SLOT_0045d800, 0x22eu, 0xffffdb6eu, raw_addr(&porsche::scene_flare_effect_b_ctor_0045b5a0));
+    patch_rel(code + SLOT_0045d800, 0x24fu, 0x14153du, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045d800, 0x27eu, 0x14150eu, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045d800, 0x29bu, 0x002061u, raw_addr(code + SLOT_0045fb00));
+    patch_rel(code + SLOT_0045d800, 0x2a3u, 0xffffe4d9u, raw_addr(&porsche::scene_flare_effect_c_ctor_0045bf80));
+    patch_rel(code + SLOT_0045d800, 0x2c7u, 0x1414c5u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045d800, 0x2e0u, 0xffffc06cu, raw_addr(&porsche::scene_flare_final_effect_ctor_00459b50));
+    patch_rel(code + SLOT_0045d800, 0x2fau, 0x002672u, raw_addr(code + SLOT_00460170));
+
+    // 0045fb80
+    patch_abs(code + SLOT_0045fb80, 0x29u, 0x65b2b8u, a_path6);
+    patch_abs(code + SLOT_0045fb80, 0x30u, 0x5cf518u, raw_addr(nat_sky_txt_fmt));
+    patch_abs(code + SLOT_0045fb80, 0x52u, 0x65b2b8u, a_path6);
+    patch_abs(code + SLOT_0045fb80, 0x5cu, 0x5cf504u, raw_addr(nat_sky_def_txt_fmt));
+    patch_abs(code + SLOT_0045fb80, 0x139u, 0x5cf3a0u, raw_addr(nat_weather_names));
+    patch_abs(code + SLOT_0045fb80, 0x16fu, 0x5cf3f0u, raw_addr(nat_weather_names[4]));
+    patch_abs(code + SLOT_0045fb80, 0x180u, 0x5cf3f0u, raw_addr(nat_weather_names[4]));
+    patch_abs(code + SLOT_0045fb80, 0x1d8u, 0x5cf4fcu, raw_addr(nat_kw_basic));
+    patch_abs(code + SLOT_0045fb80, 0x216u, 0x5cf4f0u, raw_addr(nat_kw_multinormal));
+    patch_abs(code + SLOT_0045fb80, 0x254u, 0x5cf4e4u, raw_addr(nat_kw_additive));
+    patch_abs(code + SLOT_0045fb80, 0x288u, 0x5cf4acu, raw_addr(nat_warn_additive));
+    patch_abs(code + SLOT_0045fb80, 0x29fu, 0x5cf49cu, raw_addr(nat_kw_multiadditive));
+    patch_abs(code + SLOT_0045fb80, 0x2ddu, 0x5cf48cu, raw_addr(nat_kw_multiattenuate));
+    patch_abs(code + SLOT_0045fb80, 0x31bu, 0x5cf47cu, raw_addr(nat_kw_multimodulate));
+    patch_abs(code + SLOT_0045fb80, 0x359u, 0x5cf470u, raw_addr(nat_kw_freecloud));
+    patch_abs(code + SLOT_0045fb80, 0x397u, 0x5cf468u, raw_addr(nat_kw_config));
+    patch_abs(code + SLOT_0045fb80, 0x3d5u, 0x5cf45cu, raw_addr(nat_kw_basicwater));
+    patch_abs(code + SLOT_0045fb80, 0x413u, 0x5cf448u, raw_addr(nat_kw_multinormalwater));
+    patch_abs(code + SLOT_0045fb80, 0x451u, 0x5cf434u, raw_addr(nat_kw_multiadditivewater));
+    patch_abs(code + SLOT_0045fb80, 0x48cu, 0x5cf420u, raw_addr(nat_kw_multiattenuatewater));
+    patch_abs(code + SLOT_0045fb80, 0x4c7u, 0x5cf40cu, raw_addr(nat_kw_multimodulatewater));
+    patch_abs(code + SLOT_0045fb80, 0x561u, 0x5cf404u, raw_addr(nat_kw_begin));
+    patch_abs(code + SLOT_0045fb80, 0x5aeu, 0x5cf404u, raw_addr(nat_kw_begin));
+    patch_rel(code + SLOT_0045fb80, 0x36u, 0x141405u, raw_addr(&porsche::formatter_entry_005a0fbf));
+    patch_rel(code + SLOT_0045fb80, 0x42u, 0x13ddeau, raw_addr(&porsche::resource_open_quiet_0059d9b0));
+    patch_rel(code + SLOT_0045fb80, 0x62u, 0x1413d9u, raw_addr(&porsche::formatter_entry_005a0fbf));
+    patch_rel(code + SLOT_0045fb80, 0x6eu, 0x13ddbeu, raw_addr(&porsche::resource_open_quiet_0059d9b0));
+    patch_rel(code + SLOT_0045fb80, 0x85u, 0x0f6a37u, raw_addr(&porsche::install_paths_size_00556640));
+    patch_rel(code + SLOT_0045fb80, 0x9bu, 0x0f6a21u, raw_addr(&porsche::install_paths_size_00556640));
+    patch_rel(code + SLOT_0045fb80, 0xa9u, 0xfffffee3u, raw_addr(code + SLOT_0045fb10));
+    patch_rel(code + SLOT_0045fb80, 0xc7u, 0x1425fdu, raw_addr(&porsche::formatter_float_lower_005a2248));
+    patch_rel(code + SLOT_0045fb80, 0x14fu, 0x14253du, raw_addr(&porsche::formatter_text_compare_n_005a2210));
+    patch_rel(code + SLOT_0045fb80, 0x185u, 0x142507u, raw_addr(&porsche::formatter_text_compare_n_005a2210));
+    patch_rel(code + SLOT_0045fb80, 0x292u, 0x141965u, raw_addr(&porsche::formatter_stdio_printf_005a177b));
+    patch_rel(code + SLOT_0045fb80, 0x534u, 0x13eed8u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_0045fb80, 0x567u, 0x142125u, raw_addr(&porsche::formatter_text_compare_n_005a2210));
+    patch_rel(code + SLOT_0045fb80, 0x5b4u, 0x1420d8u, raw_addr(&porsche::formatter_text_compare_n_005a2210));
+
+    // 00460170
+    patch_rel(code + SLOT_00460170, 0x14u, 0x13eec8u, raw_addr(&porsche::application_release_0059f050));
+    patch_rel(code + SLOT_00460170, 0x2du, 0x0d1defu, raw_addr(&porsche::free_00531f90));
+
+    // 004601f0
+    patch_abs(code + SLOT_004601f0, 0x1eu, 0x627e5cu, a_posstate);
+    patch_abs(code + SLOT_004601f0, 0x25u, 0x627e5cu, a_posstate);
+    patch_rel(code + SLOT_004601f0, 0x06u, 0x13ed96u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_004601f0, 0x19u, 0x000573u, raw_addr(code + SLOT_00460780));
+
+    // 00460780
+    patch_abs(code + SLOT_00460780, 0x56u, 0x5b3f54u, raw_addr(&nat_pos_neg002));
+    patch_abs(code + SLOT_00460780, 0x69u, 0x5b3f50u, raw_addr(&nat_pos_pos002));
+    patch_abs(code + SLOT_00460780, 0x7cu, 0x5b3f54u, raw_addr(&nat_pos_neg002));
+    patch_abs(code + SLOT_00460780, 0x8fu, 0x5b3f50u, raw_addr(&nat_pos_pos002));
+    patch_abs(code + SLOT_00460780, 0x1d9u, 0x65b30cu, a_res_prefix);
+    patch_abs(code + SLOT_00460780, 0x1dfu, 0x5cf564u, raw_addr(nat_flarepos_fmt));
+    patch_rel(code + SLOT_00460780, 0x0bu, 0x0db841u, raw_addr(code + SLOT_0053bfd0));
+    patch_rel(code + SLOT_00460780, 0x101u, 0x13e70bu, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_00460780, 0x10fu, 0x0d715du, raw_addr(&porsche::scene_mode_ctor_005379f0));
+    patch_rel(code + SLOT_00460780, 0x11eu, 0x0d71aeu, raw_addr(&porsche::scene_mode_set_00537a50));
+    patch_rel(code + SLOT_00460780, 0x125u, 0x13e6e7u, raw_addr(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(code + SLOT_00460780, 0x142u, 0x00797au, raw_addr(&porsche::scene_blur_program_ctor_00468240));
+    patch_rel(code + SLOT_00460780, 0x158u, 0x007d04u, raw_addr(&porsche::scene_blur_program_setup_004685e0));
+    patch_rel(code + SLOT_00460780, 0x1adu, 0x00075fu, raw_addr(code + SLOT_00461090));
+    patch_rel(code + SLOT_00460780, 0x1e5u, 0x140656u, raw_addr(&porsche::formatter_entry_005a0fbf));
+    patch_rel(code + SLOT_00460780, 0x1f0u, 0x13d03cu, raw_addr(&porsche::resource_open_quiet_0059d9b0));
+    patch_rel(code + SLOT_00460780, 0x208u, 0x13e324u, raw_addr(&porsche::application_context_member_block_0059ecb0));
+
+    // 00461090
+    patch_rel(code + SLOT_00461090, 0x07u, 0x0d1755u, raw_addr(code + SLOT_005327f0));
+    patch_rel(code + SLOT_00461090, 0x11u, 0x0d173bu, raw_addr(&porsche::math_fsin_tau_005327e0));
+
+    // 005327f0
+    patch_abs(code + SLOT_005327f0, 0x06u, 0x5bb2c0u, raw_addr(&nat_tau_bits));
+
+    // 0053bfd0 (indirect jmp dword ptr [IAT_GetTickCount])
+    g_nat_tick_fn_slot = raw_addr(&porsche::platform_get_tick_count);
+    patch_abs(code + SLOT_0053bfd0, 0x02u, 0x5b2080u, raw_addr(&g_nat_tick_fn_slot));
+
+    DWORD old_prot = 0;
+    require(VirtualProtect(code, 8192, PAGE_EXECUTE_READ, &old_prot) != 0, "VirtualProtect");
+    require(FlushInstructionCache(GetCurrentProcess(), code, 8192) != 0, "FlushInstructionCache");
+    return code;
+}
+
+static void reset_side(I weather_idx) {
+    g_arena_pos = 0u;
+    g_alloc_count = 0u;
+    g_ev_count = 0u;
+    g_events.fill(0u);
+    g_flare_obj.fill(0x5au);
+    g_sky_obj.fill(0u);
+    std::memset(g_arena, 0, sizeof(g_arena));
+
+    porsche::scene_flare_resource_00627e18 = nullptr;
+    porsche::scene_flare_aux_00627e1c = nullptr;
+    porsche::scene_route_sky_bytes_00627e38 = nullptr;
+    porsche::scene_route_sky_aux_00627e3c = nullptr;
+    porsche::scene_route_sky_00627e4c = g_sky_obj.data();
+    porsche::scene_sky_cleanup_state_00627e5c = nullptr;
+    porsche::application_state_006573e8.words_.fill(0u);
+    porsche::application_state_006573e8.words_[(0x00657d9cu - porsche::application_state_base_va) / 4u] =
+        static_cast<U>(weather_idx);
+    porsche::install_paths_table_0065b2a0[6] = "D:\\Data\\";
+    porsche::startup_resource_prefix_0065b30c = "P:\\Res\\";
+
+    const U chunk_ptr = raw_addr(g_vfs.sky_ltmp_chunk.data());
+    if (g_vfs.ltmp_chunk_idx >= 0) {
+        std::memcpy(g_sky_obj.data() + 8u + static_cast<U>(g_vfs.ltmp_chunk_idx) * 4u, &chunk_ptr, 4u);
+    }
+}
+
+struct Snapshot {
+    std::array<U, 2048> events;
+    U ev_count;
+    std::array<B, 0x64u> flare_obj;
+    std::array<U, 6> globals;
+    std::array<B, 262144> arena_used;
+    U used_bytes;
+};
+
+static Snapshot g_snap_expected{};
+static Snapshot g_snap_actual{};
+
+static void take_snapshot(Snapshot& s, U used_bytes) {
+    s.events = g_events;
+    s.ev_count = g_ev_count;
+    s.flare_obj = g_flare_obj;
+    s.globals = {
+        raw_addr(porsche::scene_flare_resource_00627e18),
+        raw_addr(porsche::scene_flare_aux_00627e1c),
+        raw_addr(porsche::scene_route_sky_bytes_00627e38),
+        raw_addr(porsche::scene_route_sky_aux_00627e3c),
+        raw_addr(porsche::scene_route_sky_00627e4c),
+        raw_addr(porsche::scene_sky_cleanup_state_00627e5c),
+    };
+    s.used_bytes = used_bytes;
+    std::memcpy(s.arena_used.data(), g_arena, used_bytes);
+}
+
+static void compare_snapshots(const Snapshot& a, const Snapshot& b, const char* tag) {
+    if (a.ev_count != b.ev_count) {
+        std::printf("  ev_count nat=%u cpp=%u\n", a.ev_count, b.ev_count);
+    }
+    require(a.ev_count == b.ev_count, tag);
+    for (U i = 0u; i < a.ev_count; ++i) {
+        if (a.events[i] != b.events[i]) {
+            const U start = (i > 12u) ? (i - 12u) : 0u;
+            for (U j = start; j <= i + 4u && j < a.ev_count; ++j) {
+                std::printf("  ev[%u] nat=0x%08x cpp=0x%08x\n", j, a.events[j], b.events[j]);
+            }
+            require(false, "events");
+        }
+    }
+    for (U i = 0u; i < 6u; ++i) {
+        if (a.globals[i] != b.globals[i]) {
+            std::printf("  global[%u] nat=0x%08x cpp=0x%08x\n", i, a.globals[i], b.globals[i]);
+            require(false, "globals");
+        }
+    }
+    for (U i = 0u; i < a.flare_obj.size(); ++i) {
+        if (a.flare_obj[i] != b.flare_obj[i]) {
+            std::printf("  flare_obj[0x%x] nat=0x%02x cpp=0x%02x\n", i, a.flare_obj[i], b.flare_obj[i]);
+            require(false, "flare_obj");
+        }
+    }
+    require(a.used_bytes == b.used_bytes, "used_bytes");
+    for (U i = 0u; i < a.used_bytes; ++i) {
+        if (a.arena_used[i] != b.arena_used[i]) {
+            std::printf("  arena[0x%x] nat=0x%02x cpp=0x%02x\n", i, a.arena_used[i], b.arena_used[i]);
+            require(false, "arena_used");
+        }
+    }
+}
+
+int main() {
+    require(porsche::scene_flare_resource_00627e18 == nullptr, "bss resource");
+    require(porsche::scene_flare_aux_00627e1c == nullptr, "bss aux");
+    require(porsche::scene_route_sky_bytes_00627e38 == nullptr, "bss sky_bytes");
+    require(porsche::scene_route_sky_aux_00627e3c == nullptr, "bss sky_aux");
+    require(porsche::scene_route_sky_00627e4c == nullptr, "bss sky");
+    require(porsche::scene_sky_cleanup_state_00627e5c == nullptr, "bss pos");
+
+    B* const code = prepare_native();
+    U cases = 0u;
+
+    // 1. Standalone sun_dir + math_fcos_tau precision check across turns & offsets.
+    using SunDirFn = void(__cdecl*)(float, float, float, float, float, float*, float);
+    using CosFn = double(__cdecl*)(float);
+    const auto nat_sundir = reinterpret_cast<SunDirFn>(code + SLOT_00461090);
+    const auto nat_cos = reinterpret_cast<CosFn>(code + SLOT_005327f0);
+    const float turns_list[] = {0.0f, 0.125f, 0.25f, 0.375f, 0.625f, -0.15f};
+    for (float t : turns_list) {
+        const float c_nat = static_cast<float>(nat_cos(t));
+        const float c_cpp = static_cast<float>(porsche::math_fcos_tau_005327f0(t));
+        require(std::memcmp(&c_nat, &c_cpp, 4u) == 0, "math_fcos_tau");
+
+        float v_nat[4]{}, v_cpp[4]{};
+        nat_sundir(0.15f, -0.25f, t, 75.0f, 0.0004f, v_nat, 1000.0f);
+        porsche::scene_flare_sun_dir_00461090(0.15f, -0.25f, t, 75.0f, 0.0004f, v_cpp, 1000.0f);
+        require(std::memcmp(v_nat, v_cpp, sizeof(v_nat)) == 0, "sun_dir");
+        ++cases;
+    }
+
+    // 2. Standalone cursor_a, cursor_b, cursor_c (0, 1, 3, and 400-key clamp).
+    using CursorFn = void*(__fastcall*)(void*, void*, void*, void*);
+    const auto nat_cura = reinterpret_cast<CursorFn>(code + SLOT_0045a2c0);
+    const auto nat_curb = reinterpret_cast<CursorFn>(code + SLOT_0045a490);
+    const auto nat_curc = reinterpret_cast<CursorFn>(code + SLOT_0045a970);
+    static std::array<B, 405u * 0x30u> k_work{}, k_init{}, k_nat_out{};
+    for (U key_cnt : {0u, 1u, 3u, 400u}) {
+        g_case_id = cases;
+        std::array<B, 28> c_nat{}, c_cpp{};
+        void* const res_tag = g_sky_obj.data();
+
+        k_init.fill(0xff);
+        for (U i = 0u; i < key_cnt; ++i) {
+            const U tm = i * 10u;
+            const U v = 0x3e800000u + i;
+            std::memcpy(k_init.data() + i * 8u, &tm, 4u);
+            std::memcpy(k_init.data() + i * 8u + 4u, &v, 4u);
+        }
+        k_work = k_init;
+        nat_cura(c_nat.data(), nullptr, k_work.data(), res_tag);
+        k_nat_out = k_work;
+        k_work = k_init;
+        porsche::scene_flare_cursor_a_ctor_0045a2c0(c_cpp.data(), nullptr, k_work.data(), res_tag);
+        require(c_nat == c_cpp && k_nat_out == k_work, "cursor_a");
+
+        k_init.fill(0xff);
+        for (U i = 0u; i < key_cnt; ++i) {
+            const U tm = i * 12u;
+            const U v = 0x1000u + i;
+            std::memcpy(k_init.data() + i * 8u, &tm, 4u);
+            std::memcpy(k_init.data() + i * 8u + 4u, &v, 4u);
+        }
+        c_nat.fill(0); c_cpp.fill(0);
+        k_work = k_init;
+        nat_curc(c_nat.data(), nullptr, k_work.data(), res_tag);
+        k_nat_out = k_work;
+        k_work = k_init;
+        porsche::scene_flare_cursor_c_ctor_0045a970(c_cpp.data(), nullptr, k_work.data(), res_tag);
+        require(c_nat == c_cpp && k_nat_out == k_work, "cursor_c");
+
+        k_init.fill(0xff);
+        for (U i = 0u; i < key_cnt; ++i) {
+            const U tm = i * 20u;
+            std::memcpy(k_init.data() + i * 0x30u, &tm, 4u);
+        }
+        c_nat.fill(0); c_cpp.fill(0);
+        k_work = k_init;
+        nat_curb(c_nat.data(), nullptr, k_work.data(), res_tag);
+        k_nat_out = k_work;
+        k_work = k_init;
+        porsche::scene_flare_cursor_b_ctor_0045a490(c_cpp.data(), nullptr, k_work.data(), res_tag);
+        require(c_nat == c_cpp && k_nat_out == k_work, "cursor_b");
+        ++cases;
+    }
+
+    // 3. Standalone tokenize + chunk_get + sky_aux_ctor.
+    using TokFn = I(__fastcall*)(void*, void*, char*, char*);
+    const auto nat_tok = reinterpret_cast<TokFn>(code + SLOT_0045fb10);
+    const char* tok_samples[] = {
+        "  alpha   beta\t\ngamma\r\ndelta",
+        "\t  one\n\n#comment\ntwo   ",
+        "single_no_newline",
+    };
+    for (const char* src : tok_samples) {
+        std::array<char, 128> b_nat{}, b_cpp{};
+        const U len = static_cast<U>(std::strlen(src));
+        std::memcpy(b_nat.data() + 1u, src, len);
+        std::memcpy(b_cpp.data() + 1u, src, len);
+        const I rn = nat_tok(nullptr, nullptr, b_nat.data() + 1u, b_nat.data() + 1u + len);
+        const I rc = porsche::scene_flare_cfg_tokenize_0045fb10(
+            nullptr, nullptr, b_cpp.data() + 1u, b_cpp.data() + 1u + len);
+        require(rn == rc && b_nat == b_cpp, "tokenize");
+        ++cases;
+    }
+
+    // 4. End-to-end scene_flare_ctor_0045d800 across all versions, VFS combos, weather rows, and sky modes.
+    using FlareCtorFn = void*(__fastcall*)(void*, void*, const char*);
+    const auto nat_flare_ctor = reinterpret_cast<FlareCtorFn>(code + SLOT_0045d800);
+
+    static const char kTxtPartA[] =
+        "# header comment\n"
+        "begin\n"
+        "  low|high|amazing\n"
+        "  BASIC\n"
+        "  flareA.fsh\n"
+        "begin\n"
+        "  all\n"
+        "  MultiNormal\n"
+        "  flareB.fsh\n"
+        "begin\n"
+        "  medium\n"
+        "  additive\n"
+        "  flareOld.fsh\n"
+        "begin\n"
+        "  all\n"
+        "  multiadditive\n"
+        "  flareC.fsh\n"
+        "begin\n"
+        "  amazing|high\n"
+        "  multiattenuate\n"
+        "  flareD.fsh\n"
+        "begin\n"
+        "  all\n"
+        "  multimodulate\n"
+        "  flareE.fsh\n"
+        "begin\n"
+        "  all\n"
+        "  freecloud\n"
+        "  cloud.fsh\n"
+        "begin\n"
+        "  all\n"
+        "  config\n"
+        "  cfg.dat\n";
+
+    static const char kTxtPartB[] =
+        "# water & unknown modes\n"
+        "begin\n"
+        "  all\n"
+        "  basicwater\n"
+        "  wb.fsh\n"
+        "begin\n"
+        "  all\n"
+        "  multinormalwater\n"
+        "  wn.fsh\n"
+        "begin\n"
+        "  all\n"
+        "  multiadditivewater\n"
+        "  wa.fsh\n"
+        "begin\n"
+        "  all\n"
+        "  multiattenuatewater\n"
+        "  wat.fsh\n"
+        "begin\n"
+        "  all\n"
+        "  multimodulatewater\n"
+        "  wm.fsh\n"
+        "begin\n"
+        "  all\n"
+        "  unknownmode\n"
+        "  unk.fsh\n";
+
+    static const char kTxtTiny[] =
+        "begin\n"
+        "  low\n"
+        "  multiadditivewater\n"
+        "  water_only.fsh\n";
+
+    struct Scenario {
+        I weather;
+        bool has_named_bin;
+        bool has_def_bin;
+        I bin_ver;
+        bool has_named_txt;
+        bool has_def_txt;
+        const char* txt;
+        bool has_flarepos;
+        I ltmp_idx;
+        U cdc_bits;
+        U ce0_bits;
+        U row_mask;
+        U key_a;
+    };
+
+    const Scenario scenarios[] = {
+        {2, true,  false, -1, true,  false, kTxtPartA, true,   3, 0x3b800000u, 0xbb800000u, 0x5u, 0xffffffffu},
+        {0, false, true,   0, false, true,  kTxtTiny,  false, -1, 0x3ca3d70au, 0x00000000u, 0x0u, 0x00000000u},
+        {1, true,  false,  1, true,  false, kTxtPartA, false,  1, 0xbca3d70au, 0x3f000000u, 0x3u, 0x00000005u},
+        {3, true,  false,  2, true,  false, kTxtPartB, true,   0, 0x00000000u, 0xbf000000u, 0x0u, 0xffffffffu},
+        {2, true,  false,  3, true,  false, kTxtTiny,  true,   2, 0x3c23d70au, 0xbc23d70au, 0x8u, 0x00000001u},
+        {1, true,  false,  4, false, false, nullptr,   false, -1, 0x3f800000u, 0x00000000u, 0x2u, 0xffffffffu},
+        {0, true,  false,  5, true,  false, "",        false,  4, 0x00000000u, 0x3c900000u, 0x1u, 0xffffffffu},
+        {3, true,  false,  6, true,  false, kTxtPartB, true,   5, 0x3ca3d70au, 0xbca3d70au, 0x4u, 0x00000002u},
+        {2, true,  false,  7, true,  false, kTxtPartA, true,   2, 0x00000000u, 0x00000000u, 0xau, 0xffffffffu},
+        {1, true,  false,  8, true,  false, kTxtPartB, false, -1, 0xbf800000u, 0xbf800000u, 0x0u, 0xffffffffu},
+        {3, true,  false,  9, true,  false, kTxtPartA, true,   1, 0x3c400000u, 0xbc400000u, 0xcu, 0x00000000u},
+        {2, false, false,  0, true,  false, kTxtTiny,  false,  0, 0x00000000u, 0x00000000u, 0x0u, 0xffffffffu},
+    };
+
+    for (const Scenario& sc : scenarios) {
+        g_case_id = cases;
+        g_vfs = VfsState{};
+        g_vfs.has_named_bin = sc.has_named_bin;
+        g_vfs.has_default_bin = sc.has_def_bin;
+        g_vfs.bin_version = sc.bin_ver;
+        g_vfs.has_named_txt = sc.has_named_txt;
+        g_vfs.has_default_txt = sc.has_def_txt;
+        g_vfs.txt_body = sc.txt;
+        g_vfs.txt_len = (sc.txt != nullptr) ? static_cast<U>(std::strlen(sc.txt)) : 0u;
+        g_vfs.has_flarepos = sc.has_flarepos;
+        g_vfs.ltmp_chunk_idx = sc.ltmp_idx;
+        for (U r = 0u; r < 4u; ++r) {
+            g_vfs.bin_seed_words[r] = ((sc.row_mask >> r) & 1u) ? (r + 1u) : 0u;
+        }
+        g_vfs.bin_seed_words[4] = sc.cdc_bits;
+        g_vfs.bin_seed_words[5] = sc.ce0_bits;
+        g_vfs.bin_seed_words[6] = 0x3e99999au; // 0.3f
+        g_vfs.bin_seed_words[7] = 0x3e000000u; // 0.125f
+        g_vfs.bin_seed_words[8] = 0x3a83126fu; // 0.001f
+        g_vfs.bin_seed_words[9] = 0x42480000u; // 50.0f
+        for (U k = 0u; k < 6u; ++k) {
+            g_vfs.bin_seed_words[16u + k] = (sc.key_a == 0xffffffffu) ? 0xffffffffu : (sc.key_a + k * 5u);
+        }
+        for (U k = 0u; k < 4u; ++k) {
+            g_vfs.bin_seed_words[24u + k] = (sc.key_a == 0xffffffffu) ? 0xffffffffu : (sc.key_a + k * 7u);
+        }
+        for (U i = 0u; i < 14u; ++i) {
+            g_vfs.flarepos_words[i] = 0x3f000000u + i * 0x00100000u;
+        }
+        for (U i = 0u; i < 49u; ++i) {
+            const U px = 0x01020304u * (i + 1u);
+            std::memcpy(g_vfs.sky_ltmp_chunk.data() + 0x10u + i * 4u, &px, 4u);
+        }
+
+        reset_side(sc.weather);
+        void* const nat_ret = nat_flare_ctor(g_flare_obj.data(), nullptr, "trackA");
+        require(nat_ret == g_flare_obj.data(), "nat ret");
+        const U used = g_arena_pos;
+        take_snapshot(g_snap_expected, used);
+
+        reset_side(sc.weather);
+        void* const cpp_ret = porsche::scene_flare_ctor_0045d800(g_flare_obj.data(), nullptr, "trackA");
+        require(cpp_ret == g_flare_obj.data(), "cpp ret");
+        take_snapshot(g_snap_actual, g_arena_pos);
+        compare_snapshots(g_snap_expected, g_snap_actual, "scene_flare_ctor");
+        ++cases;
+    }
+
+    // 5. Allocation-failure tolerance on leaves & ctor null-alloc branches (after res/pos/aux/cfg-item).
+    for (U budget : {33u, 34u, 35u, 37u, 38u}) {
+        g_case_id = cases;
+        g_vfs = VfsState{};
+        g_vfs.has_named_txt = true;
+        if (budget <= 35u) {
+            g_vfs.txt_body = "";
+            g_vfs.txt_len = 0u;
+        } else {
+            g_vfs.txt_body = kTxtTiny;
+            g_vfs.txt_len = static_cast<U>(std::strlen(kTxtTiny));
+        }
+        g_vfs.net_alloc_budget = budget;
+        reset_side(0);
+        nat_flare_ctor(g_flare_obj.data(), nullptr, "nullcase");
+        const U used_fail = g_arena_pos;
+        take_snapshot(g_snap_expected, used_fail);
+
+        g_vfs.net_alloc_budget = budget;
+        reset_side(0);
+        porsche::scene_flare_ctor_0045d800(g_flare_obj.data(), nullptr, "nullcase");
+        take_snapshot(g_snap_actual, g_arena_pos);
+        compare_snapshots(g_snap_expected, g_snap_actual, "alloc_fail_leaf");
+        ++cases;
+    }
+
+    // Standalone null-alloc tolerance for 00459600, 00459950, 0045cc40, 004601f0.
+    using VoidStrFn = void(__cdecl*)(const char*);
+    using VoidFn = void(__cdecl*)();
+    using VoidPtrFn = void(__cdecl*)(void*);
+    const auto nat_res_init = reinterpret_cast<VoidStrFn>(code + SLOT_00459600);
+    const auto nat_aux_init = reinterpret_cast<VoidFn>(code + SLOT_00459950);
+    const auto nat_pos_init = reinterpret_cast<VoidPtrFn>(code + SLOT_004601f0);
+    {
+        g_case_id = cases;
+        g_vfs = VfsState{};
+        g_vfs.net_alloc_budget = 0u;
+        reset_side(0);
+        nat_res_init("x");
+        nat_aux_init();
+        nat_pos_init(g_sky_obj.data());
+        const U u0 = g_arena_pos;
+        take_snapshot(g_snap_expected, u0);
+
+        g_vfs.net_alloc_budget = 0u;
+        reset_side(0);
+        porsche::scene_flare_resource_init_00459600("x");
+        porsche::scene_flare_aux_init_00459950();
+        porsche::scene_flare_pos_init_004601f0(g_sky_obj.data());
+        take_snapshot(g_snap_actual, g_arena_pos);
+        compare_snapshots(g_snap_expected, g_snap_actual, "standalone_null_init");
+        ++cases;
+    }
+
+    std::printf("cases=%u scene_flare_ctor_original_x86_vs_cpp=PASS\n", cases);
+    return 0;
+}

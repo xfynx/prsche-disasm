@@ -1,11 +1,11 @@
 # Отложенные проверки восстановления v2
 
-Текущее: Run888 PASS (`886/001` + `887/002` on `Run884`: 26 bodies, 1,828 cases,
-20 mutations, 518B `.rdata` + 1,040B `.data`/`.bss`, 516 TUs, 33/35 names/refs,
-1,278 pins, registry 1,559, no EXE). Closes `005ae901`/`005ae6b6`/`00534b90`,
-`0` new; live renderer & startup open.
+Текущее: Run891 PASS (`885/011` + `890/007` on `Run888`: 40 bodies, 340 cases,
+24 mutations, 8B writable + 180B `.rdata`, 518 TUs, 35/37 names/refs, 1,283
+pins, registry 1,599, no EXE). Closes `0045d800`/`0053d570`, opens 4 flare
+effect ctors (`00459b50`/`0045adf0`/`0045b5a0`/`0045bf80`); live renderer open.
 
-Historical: Run843 PASS (`842/004`: 4 bodies, 10 cases, 6 mutations, 126B `.rdata`,
+Historical: Run888 PASS (`886/001` + `887/002` on `Run884`: 26 bodies, 1,828 cases,
 16 mutations, 5,444B `.bss`, 482 TUs, 52/59 names/refs, 1,194 pins, registry
 36 cases, 14 mutations, 55B `.data`/`.bss` + 324B `.rdata`, 480 TUs, 59/66
 632 cases, 30 mutations, 351B `.rdata` + 4B `.bss`, 478 TUs, 65/72 names/refs,
