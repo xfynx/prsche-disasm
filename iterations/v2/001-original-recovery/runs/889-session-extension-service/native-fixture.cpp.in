@@ -1,0 +1,683 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "frame_loop_clusters_400.hpp"
+#include "player_service_tables_831.hpp"
+#include "porsche/application_alloc.hpp"
+#include "porsche/network_vtables.hpp"
+#include "session_extension_pool_864.hpp"
+#include "session_extension_service_889.hpp"
+#include "session_input_reset_853.hpp"
+#include "session_reset_gate_856.hpp"
+
+using U = std::uint32_t;
+using I = std::int32_t;
+using B = std::uint8_t;
+
+static const B body_00406520[] = {@BODY_00406520@};
+static const B body_004056b0[] = {@BODY_004056B0@};
+static const B body_00405910[] = {@BODY_00405910@};
+static const B body_00406490[] = {@BODY_00406490@};
+static const B body_00403e00[] = {@BODY_00403E00@};
+static const B body_00405c30[] = {@BODY_00405C30@};
+static const B body_00403cb0[] = {@BODY_00403CB0@};
+static const B body_00403800[] = {@BODY_00403800@};
+static const B body_00406790[] = {@BODY_00406790@};
+static const B body_0040b510[] = {@BODY_0040B510@};
+static const B body_00406800[] = {@BODY_00406800@};
+static const B body_00406840[] = {@BODY_00406840@};
+static const B body_004066b0[] = {@BODY_004066B0@};
+static const B body_004064c0[] = {@BODY_004064C0@};
+static const B body_00405950[] = {@BODY_00405950@};
+static const B body_00403d80[] = {@BODY_00403D80@};
+
+enum : U {
+    kSlot406520 = 0x0000u,
+    kSlot4056B0 = 0x01a0u,
+    kSlot405910 = 0x01c0u,
+    kSlot406490 = 0x0200u,
+    kSlot403E00 = 0x0240u,
+    kSlot405C30 = 0x0280u,
+    kSlot403CB0 = 0x03e0u,
+    kSlot403800 = 0x0440u,
+    kSlot406790 = 0x04a0u,
+    kSlot40B510 = 0x0520u,
+    kSlot406800 = 0x0540u,
+    kSlot406840 = 0x0580u,
+    kSlot4066B0 = 0x05c0u,
+    kSlot4064C0 = 0x0600u,
+    kSlot405950 = 0x0640u,
+    kSlot403D80 = 0x0680u,
+    kCodeBytes  = 0x0800u,
+    kMaxPlayers = 9u,
+    kMaxMainObjs = 16u,
+    kMaxPoolObjs = 16u,
+    kMainObjSize = 0x100u,
+    kPoolObjSize = 0x20u,
+    kPlayerSize  = 0x600u,
+    kMaxEvents   = 128u,
+};
+
+static B* code = nullptr;
+static U cases = 0u;
+static U events_total = 0u;
+static U active_side = 0u; // 0 = orig x86, 1 = C++
+
+// Shared arena and globals backing both runs identically.
+static B g_players[kMaxPlayers][kPlayerSize]{};
+static B g_main_arena[kMaxMainObjs][kMainObjSize]{};
+static B g_pool_arena[kMaxPoolObjs][kPoolObjSize]{};
+static B g_reset_obj[16]{};
+static U g_main_next = 0u;
+static U g_pool_next = 0u;
+static U g_oom_main_mask = 0u;
+static U g_oom_pool_mask = 0u;
+static U g_main_alloc_call = 0u;
+static U g_pool_alloc_call = 0u;
+
+static const float kConstOne = 1.0f;
+static const float kConst12  = 1.2f;
+static const float kConst066 = 0.66f;
+
+struct EventLog {
+    U count;
+    U op[kMaxEvents];
+    U val[kMaxEvents];
+};
+
+static EventLog g_orig_log{};
+static EventLog g_cpp_log{};
+
+static void record_event(U op, U val) {
+    EventLog& log = (active_side == 0u) ? g_orig_log : g_cpp_log;
+    if (log.count < kMaxEvents) {
+        log.op[log.count] = op;
+        log.val[log.count] = val;
+    }
+    ++log.count;
+    ++events_total;
+}
+
+static U arena_index(const void* p, const B* base, U stride, U count) {
+    const auto addr = reinterpret_cast<std::uintptr_t>(p);
+    const auto baddr = reinterpret_cast<std::uintptr_t>(base);
+    if (addr >= baddr && addr < baddr + static_cast<std::uintptr_t>(stride * count)) {
+        const auto diff = static_cast<U>(addr - baddr);
+        if ((diff % stride) == 0u) {
+            return diff / stride;
+        }
+    }
+    return 0xffffffffu;
+}
+
+namespace porsche {
+
+std::uint32_t application_player_object_table_005e8b34[9u] = {};
+std::int32_t application_active_player_count_005e8b58 = 0;
+void* session_player_extension_slots_005e6774[9] = {};
+SessionResetObject0040e3b0* session_reset_object_005e752c = nullptr;
+static std::uint32_t g_arena_657414 = 0u;
+static std::uint32_t g_arena_6573f0 = 0u;
+std::uint32_t& global_00657414 = g_arena_657414;
+std::uint32_t& global_006573f0 = g_arena_6573f0;
+
+void __cdecl session_extension_clear_0040b490() {
+    record_event(1u, 0u);
+}
+
+void* __cdecl session_extension_allocate_0040b530(std::uint32_t size) {
+    const U call_idx = g_pool_alloc_call++;
+    if ((g_oom_pool_mask & (1u << (call_idx & 31u))) != 0u) {
+        record_event(4u, 0xffffffffu);
+        return nullptr;
+    }
+    const U idx = g_pool_next++;
+    if (idx >= kMaxPoolObjs || size > kPoolObjSize) {
+        std::abort();
+    }
+    std::memset(g_pool_arena[idx], 0xcd, kPoolObjSize);
+    record_event(4u, (size << 16) | idx);
+    return g_pool_arena[idx];
+}
+
+void __cdecl session_extension_release_0040b570(void* pointer) {
+    const U idx = arena_index(pointer, &g_pool_arena[0][0], kPoolObjSize, kMaxPoolObjs);
+    record_event(5u, idx);
+}
+
+void* __cdecl startup_network_allocate_0059ef90(std::uint32_t size) {
+    const U call_idx = g_main_alloc_call++;
+    if ((g_oom_main_mask & (1u << (call_idx & 31u))) != 0u) {
+        record_event(2u, 0xffffffffu);
+        return nullptr;
+    }
+    const U idx = g_main_next++;
+    if (idx >= kMaxMainObjs || size > kMainObjSize) {
+        std::abort();
+    }
+    std::memset(g_main_arena[idx], 0xa5, kMainObjSize);
+    record_event(2u, (size << 16) | idx);
+    return g_main_arena[idx];
+}
+
+std::uint32_t __cdecl application_release_0059f050(void* address) {
+    const U idx = arena_index(address, &g_main_arena[0][0], kMainObjSize, kMaxMainObjs);
+    record_event(3u, idx);
+    return 1u;
+}
+
+[[noreturn]] void __fastcall network_purecall_005a1056(
+    void*, void*, std::uint32_t, const std::uint8_t*, std::uint32_t) {
+    std::abort();
+}
+
+void __cdecl render_registry_item_noop_00514990(void*) {
+}
+
+void __fastcall session_extension_a_tick_00405690(void*, void*) {}
+void __fastcall session_extension_b_tick_004058a0(void*, void*) {}
+void __fastcall session_extension_c_tick_00406020(void*, void*) {}
+void __fastcall session_extension_d_tick_00403e40(void*, void*) {}
+void __fastcall session_extension_ab_reset_00403990(void*, void*) {}
+
+} // namespace porsche
+
+// Original x86 mirror vtables.
+static U orig_vt_005b25b0[2]{};
+static U orig_vt_005b25a0[3]{};
+static U orig_vt_005b2594[2]{};
+static U orig_vt_005b2500[3]{};
+static U orig_vt_005b2544[3]{};
+static U orig_vt_005b2560[3]{};
+static U orig_vt_005b2588[2]{};
+static U orig_vt_005b2510[2]{};
+static U orig_vt_005b2570[3]{};
+static U orig_vt_005b24d0[3]{};
+static U orig_vt_005b24b0[2]{};
+
+static void __fastcall stub_noop_slot0(void*, void*) {}
+
+static void patch_rel(U slot, U offset, const void* target) {
+    const std::intptr_t disp =
+        reinterpret_cast<std::intptr_t>(target) -
+        reinterpret_cast<std::intptr_t>(code + slot + offset + 4u);
+    const auto rel = static_cast<std::int32_t>(disp);
+    std::memcpy(code + slot + offset, &rel, 4u);
+}
+
+static void patch_abs(U slot, U offset, const void* target) {
+    const U addr = static_cast<U>(reinterpret_cast<std::uintptr_t>(target));
+    std::memcpy(code + slot + offset, &addr, 4u);
+}
+
+static U fn_addr(const void* fn) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(fn));
+}
+
+template <typename Fn>
+static U pfn_addr(Fn fn) {
+    return static_cast<U>(reinterpret_cast<std::uintptr_t>(fn));
+}
+
+static void init_code() {
+    code = static_cast<B*>(VirtualAlloc(nullptr, kCodeBytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!code) std::abort();
+    std::memset(code, 0x90, kCodeBytes);
+
+    std::memcpy(code + kSlot406520, body_00406520, sizeof(body_00406520));
+    std::memcpy(code + kSlot4056B0, body_004056b0, sizeof(body_004056b0));
+    std::memcpy(code + kSlot405910, body_00405910, sizeof(body_00405910));
+    std::memcpy(code + kSlot406490, body_00406490, sizeof(body_00406490));
+    std::memcpy(code + kSlot403E00, body_00403e00, sizeof(body_00403e00));
+    std::memcpy(code + kSlot405C30, body_00405c30, sizeof(body_00405c30));
+    std::memcpy(code + kSlot403CB0, body_00403cb0, sizeof(body_00403cb0));
+    std::memcpy(code + kSlot403800, body_00403800, sizeof(body_00403800));
+    std::memcpy(code + kSlot406790, body_00406790, sizeof(body_00406790));
+    std::memcpy(code + kSlot40B510, body_0040b510, sizeof(body_0040b510));
+    std::memcpy(code + kSlot406800, body_00406800, sizeof(body_00406800));
+    std::memcpy(code + kSlot406840, body_00406840, sizeof(body_00406840));
+    std::memcpy(code + kSlot4066B0, body_004066b0, sizeof(body_004066b0));
+    std::memcpy(code + kSlot4064C0, body_004064c0, sizeof(body_004064c0));
+    std::memcpy(code + kSlot405950, body_00405950, sizeof(body_00405950));
+    std::memcpy(code + kSlot403D80, body_00403d80, sizeof(body_00403d80));
+
+    orig_vt_005b25b0[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b25b0[1] = fn_addr(code + kSlot406800);
+    orig_vt_005b25a0[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b25a0[1] = fn_addr(code + kSlot4066B0);
+    orig_vt_005b25a0[2] = fn_addr(code + kSlot403D80);
+    orig_vt_005b2594[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b2594[1] = fn_addr(code + kSlot406800);
+    orig_vt_005b2500[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b2500[1] = fn_addr(code + kSlot4066B0);
+    orig_vt_005b2500[2] = fn_addr(code + kSlot403D80);
+    orig_vt_005b2544[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b2544[1] = fn_addr(code + kSlot405950);
+    orig_vt_005b2544[2] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b2560[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b2560[1] = fn_addr(code + kSlot405950);
+    orig_vt_005b2560[2] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b2588[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b2588[1] = fn_addr(code + kSlot4064C0);
+    orig_vt_005b2510[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b2510[1] = fn_addr(code + kSlot4064C0);
+    orig_vt_005b2570[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b2570[1] = fn_addr(code + kSlot405950);
+    orig_vt_005b2570[2] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b24d0[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b24d0[1] = fn_addr(code + kSlot405950);
+    orig_vt_005b24d0[2] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b24b0[0] = pfn_addr(&stub_noop_slot0);
+    orig_vt_005b24b0[1] = fn_addr(code + kSlot4064C0);
+
+    // 00406520
+    patch_rel(kSlot406520, 5u, reinterpret_cast<const void*>(&porsche::session_extension_clear_0040b490));
+    patch_abs(kSlot406520, 10u, &porsche::application_active_player_count_005e8b58);
+    patch_abs(kSlot406520, 36u, porsche::application_player_object_table_005e8b34);
+    patch_rel(kSlot406520, 56u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(kSlot406520, 71u, code + kSlot4056B0);
+    patch_abs(kSlot406520, 78u, porsche::session_player_extension_slots_005e6774);
+    patch_abs(kSlot406520, 92u, porsche::session_player_extension_slots_005e6774);
+    patch_rel(kSlot406520, 111u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(kSlot406520, 126u, code + kSlot405910);
+    patch_abs(kSlot406520, 133u, porsche::session_player_extension_slots_005e6774);
+    patch_rel(kSlot406520, 149u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(kSlot406520, 164u, code + kSlot406490);
+    patch_abs(kSlot406520, 171u, porsche::session_player_extension_slots_005e6774);
+    patch_rel(kSlot406520, 187u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    patch_rel(kSlot406520, 210u, code + kSlot403E00);
+    patch_abs(kSlot406520, 217u, porsche::session_player_extension_slots_005e6774);
+    patch_rel(kSlot406520, 226u, reinterpret_cast<const void*>(&porsche::startup_network_allocate_0059ef90));
+    patch_abs(kSlot406520, 243u, orig_vt_005b25b0);
+    patch_rel(kSlot406520, 257u, reinterpret_cast<const void*>(&porsche::session_extension_allocate_0040b530));
+    patch_rel(kSlot406520, 277u, code + kSlot40B510);
+    patch_abs(kSlot406520, 283u, orig_vt_005b25a0);
+    patch_abs(kSlot406520, 326u, orig_vt_005b2594);
+    patch_abs(kSlot406520, 337u, porsche::session_player_extension_slots_005e6774);
+    patch_abs(kSlot406520, 346u, &porsche::application_active_player_count_005e8b58);
+    patch_abs(kSlot406520, 364u, &porsche::session_extension_any_mode20_005e67a0);
+    patch_abs(kSlot406520, 376u, &porsche::session_extension_any_mode20_005e67a0);
+
+    // 004056b0, 00405910, 00406490, 00403e00
+    patch_rel(kSlot4056B0, 9u, code + kSlot405C30);
+    patch_abs(kSlot4056B0, 15u, orig_vt_005b2544);
+    patch_rel(kSlot405910, 9u, code + kSlot405C30);
+    patch_abs(kSlot405910, 17u, orig_vt_005b2560);
+    patch_rel(kSlot406490, 9u, code + kSlot406790);
+    patch_abs(kSlot406490, 17u, orig_vt_005b2588);
+    patch_rel(kSlot403E00, 16u, code + kSlot403800);
+    patch_abs(kSlot403E00, 24u, orig_vt_005b2510);
+
+    // 00405c30
+    patch_rel(kSlot405C30, 12u, code + kSlot403CB0);
+    patch_abs(kSlot405C30, 24u, &porsche::session_extension_mode_table_005cbd20[0]);
+    patch_abs(kSlot405C30, 48u, &porsche::session_extension_mode_table_005cbd20[0].items);
+    patch_abs(kSlot405C30, 84u, orig_vt_005b2570);
+    patch_abs(kSlot405C30, 99u, &porsche::global_00657414);
+    patch_abs(kSlot405C30, 110u, &porsche::session_reset_object_005e752c);
+    patch_abs(kSlot405C30, 184u, &porsche::session_extension_tick_rate_005e7540);
+    patch_abs(kSlot405C30, 220u, &kConstOne);
+    patch_abs(kSlot405C30, 231u, &porsche::global_006573f0);
+    patch_abs(kSlot405C30, 242u, &kConst12);
+    patch_abs(kSlot405C30, 274u, &kConst066);
+
+    // 00403cb0, 00403800, 00406790, 0040b510
+    patch_rel(kSlot403CB0, 10u, code + kSlot406790);
+    patch_abs(kSlot403CB0, 30u, orig_vt_005b24d0);
+    patch_rel(kSlot403800, 10u, code + kSlot406790);
+    patch_abs(kSlot403800, 20u, orig_vt_005b24b0);
+    patch_abs(kSlot406790, 15u, orig_vt_005b25b0);
+    patch_rel(kSlot406790, 29u, reinterpret_cast<const void*>(&porsche::session_extension_allocate_0040b530));
+    patch_rel(kSlot406790, 49u, code + kSlot40B510);
+    patch_abs(kSlot406790, 55u, orig_vt_005b25a0);
+    patch_abs(kSlot40B510, 8u, orig_vt_005b2500);
+
+    // 00406800, 00406840, 004066b0, 004064c0, 00405950
+    patch_abs(kSlot406800, 8u, orig_vt_005b25b0);
+    patch_rel(kSlot406800, 39u, reinterpret_cast<const void*>(&porsche::application_release_0059f050));
+    patch_abs(kSlot406840, 8u, orig_vt_005b25b0);
+    patch_abs(kSlot4066B0, 11u, orig_vt_005b2500);
+    patch_rel(kSlot4066B0, 19u, reinterpret_cast<const void*>(&porsche::session_extension_release_0040b570));
+    patch_rel(kSlot4064C0, 4u, code + kSlot406840);
+    patch_rel(kSlot4064C0, 17u, reinterpret_cast<const void*>(&porsche::application_release_0059f050));
+    patch_abs(kSlot405950, 5u, orig_vt_005b24d0);
+    patch_rel(kSlot405950, 10u, code + kSlot406840);
+    patch_rel(kSlot405950, 23u, reinterpret_cast<const void*>(&porsche::application_release_0059f050));
+
+    FlushInstructionCache(GetCurrentProcess(), code, kCodeBytes);
+}
+
+static U vtable_tag(U v) {
+    if (v == fn_addr(orig_vt_005b25b0) || v == fn_addr(porsche::session_extension_vtable_005b25b0)) return 1u;
+    if (v == fn_addr(orig_vt_005b25a0) || v == fn_addr(porsche::session_extension_vtable_005b25a0)) return 2u;
+    if (v == fn_addr(orig_vt_005b2594) || v == fn_addr(porsche::session_extension_vtable_005b2594)) return 3u;
+    if (v == fn_addr(orig_vt_005b2500) || v == fn_addr(porsche::session_extension_vtable_005b2500)) return 4u;
+    if (v == fn_addr(orig_vt_005b2544) || v == fn_addr(porsche::session_extension_vtable_005b2544)) return 5u;
+    if (v == fn_addr(orig_vt_005b2560) || v == fn_addr(porsche::session_extension_vtable_005b2560)) return 6u;
+    if (v == fn_addr(orig_vt_005b2588) || v == fn_addr(porsche::session_extension_vtable_005b2588)) return 7u;
+    if (v == fn_addr(orig_vt_005b2510) || v == fn_addr(porsche::session_extension_vtable_005b2510)) return 8u;
+    if (v == fn_addr(orig_vt_005b2570) || v == fn_addr(porsche::session_extension_vtable_005b2570)) return 9u;
+    if (v == fn_addr(orig_vt_005b24d0) || v == fn_addr(porsche::session_extension_vtable_005b24d0)) return 10u;
+    if (v == fn_addr(orig_vt_005b24b0) || v == fn_addr(porsche::session_extension_vtable_005b24b0)) return 11u;
+    return v;
+}
+
+static U canonical_ptr(const void* p) {
+    if (!p) return 0u;
+    const U v = fn_addr(p);
+    const U vt = vtable_tag(v);
+    if (vt != v) return 0x80000000u | vt;
+    const U pi = arena_index(p, &g_players[0][0], kPlayerSize, kMaxPlayers);
+    if (pi != 0xffffffffu) return 0x81000000u | pi;
+    const U mi = arena_index(p, &g_main_arena[0][0], kMainObjSize, kMaxMainObjs);
+    if (mi != 0xffffffffu) return 0x82000000u | mi;
+    const U qi = arena_index(p, &g_pool_arena[0][0], kPoolObjSize, kMaxPoolObjs);
+    if (qi != 0xffffffffu) return 0x83000000u | qi;
+    if (p == &porsche::session_extension_mode_table_005cbd20[0]) return 0x84000000u;
+    if (p == porsche::session_extension_mode_table_005cbd20[0].items) return 0x85000000u;
+    return v;
+}
+
+struct Snapshot {
+    U ret;
+    U active_count;
+    U any_mode20;
+    U slots[kMaxPlayers];
+    B players[kMaxPlayers][kPlayerSize];
+    B main_arena[kMaxMainObjs][kMainObjSize];
+    B pool_arena[kMaxPoolObjs][kPoolObjSize];
+    EventLog log;
+};
+
+static Snapshot g_orig_snap{};
+static Snapshot g_cpp_snap{};
+
+struct CaseSpec {
+    I player_count;
+    U player_flags[kMaxPlayers];
+    std::int16_t player_ids[kMaxPlayers];
+    U g657414;
+    U g6573f0;
+    I tick_rate;
+    float rate_scale;
+    U oom_main_mask;
+    U oom_pool_mask;
+};
+
+static void setup_state(const CaseSpec& cs) {
+    std::memset(g_players, 0x11, sizeof(g_players));
+    std::memset(g_main_arena, 0x22, sizeof(g_main_arena));
+    std::memset(g_pool_arena, 0x33, sizeof(g_pool_arena));
+    std::memset(g_reset_obj, 0x44, sizeof(g_reset_obj));
+    std::memcpy(g_reset_obj + 4, &cs.rate_scale, sizeof(cs.rate_scale));
+    porsche::session_reset_object_005e752c =
+        reinterpret_cast<porsche::SessionResetObject0040e3b0*>(g_reset_obj);
+    porsche::global_00657414 = cs.g657414;
+    porsche::global_006573f0 = cs.g6573f0;
+    porsche::session_extension_tick_rate_005e7540 = cs.tick_rate;
+    porsche::session_extension_any_mode20_005e67a0 = 0xdeadbeefu;
+    porsche::application_active_player_count_005e8b58 = cs.player_count;
+    for (U i = 0u; i < kMaxPlayers; ++i) {
+        std::memcpy(g_players[i] + 0x08u, &cs.player_ids[i], sizeof(cs.player_ids[i]));
+        std::memcpy(g_players[i] + 0x52cu, &cs.player_flags[i], sizeof(cs.player_flags[i]));
+        g_players[i][0x7fu] = 0u;
+        porsche::application_player_object_table_005e8b34[i] = fn_addr(g_players[i]);
+        porsche::session_player_extension_slots_005e6774[i] =
+            reinterpret_cast<void*>(static_cast<std::uintptr_t>(0xfeed0000u + i));
+    }
+    g_main_next = 0u;
+    g_pool_next = 0u;
+    g_main_alloc_call = 0u;
+    g_pool_alloc_call = 0u;
+    g_oom_main_mask = cs.oom_main_mask;
+    g_oom_pool_mask = cs.oom_pool_mask;
+}
+
+static void canonicalize_obj(B* buf, U words) {
+    for (U w = 0u; w < words; ++w) {
+        U val = 0u;
+        std::memcpy(&val, buf + w * 4u, 4u);
+        const U c = canonical_ptr(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(val)));
+        std::memcpy(buf + w * 4u, &c, 4u);
+    }
+}
+
+static void capture_snap(Snapshot& s, U ret_val) {
+    s.ret = ret_val;
+    s.active_count = static_cast<U>(porsche::application_active_player_count_005e8b58);
+    s.any_mode20 = porsche::session_extension_any_mode20_005e67a0;
+    for (U i = 0u; i < kMaxPlayers; ++i) {
+        s.slots[i] = canonical_ptr(porsche::session_player_extension_slots_005e6774[i]);
+    }
+    std::memcpy(s.players, g_players, sizeof(g_players));
+    std::memcpy(s.main_arena, g_main_arena, sizeof(g_main_arena));
+    std::memcpy(s.pool_arena, g_pool_arena, sizeof(g_pool_arena));
+    for (U i = 0u; i < kMaxMainObjs; ++i) {
+        canonicalize_obj(s.main_arena[i], kMainObjSize / 4u);
+    }
+    for (U i = 0u; i < kMaxPoolObjs; ++i) {
+        canonicalize_obj(s.pool_arena[i], kPoolObjSize / 4u);
+    }
+    s.log = (active_side == 0u) ? g_orig_log : g_cpp_log;
+}
+
+static void fail(const char* label, const char* detail) {
+    std::printf("session_extension_service_original_x86_vs_cpp=FAIL (%s: %s)\n", label, detail);
+    std::exit(1);
+}
+
+static void compare_snaps(const char* label) {
+    if (g_orig_snap.ret != g_cpp_snap.ret) fail(label, "ret");
+    if (g_orig_snap.active_count != g_cpp_snap.active_count) fail(label, "active_count");
+    if (g_orig_snap.any_mode20 != g_cpp_snap.any_mode20) fail(label, "any_mode20");
+    if (std::memcmp(g_orig_snap.slots, g_cpp_snap.slots, sizeof(g_orig_snap.slots)) != 0) fail(label, "slots");
+    if (std::memcmp(g_orig_snap.players, g_cpp_snap.players, sizeof(g_orig_snap.players)) != 0) fail(label, "players");
+    if (std::memcmp(g_orig_snap.main_arena, g_cpp_snap.main_arena, sizeof(g_orig_snap.main_arena)) != 0) fail(label, "main_arena");
+    if (std::memcmp(g_orig_snap.pool_arena, g_cpp_snap.pool_arena, sizeof(g_orig_snap.pool_arena)) != 0) fail(label, "pool_arena");
+    if (g_orig_snap.log.count != g_cpp_snap.log.count ||
+        std::memcmp(g_orig_snap.log.op, g_cpp_snap.log.op, g_orig_snap.log.count * sizeof(U)) != 0 ||
+        std::memcmp(g_orig_snap.log.val, g_cpp_snap.log.val, g_orig_snap.log.count * sizeof(U)) != 0) {
+        fail(label, "log");
+    }
+    ++cases;
+}
+
+using VoidFn = void(__cdecl*)();
+using Ctor1Fn = void*(__fastcall*)(void*, void*, void*);
+using Ctor2Fn = void*(__fastcall*)(void*, void*, void*, U);
+using DtorFn = void*(__fastcall*)(void*, void*, U);
+using FiniFn = void(__fastcall*)(void*, void*);
+using Slot2Fn = U(__fastcall*)(void*, void*);
+
+static void run_service_and_teardown(const char* label, const CaseSpec& cs, U dtor_flags) {
+    // Pass 1: verify constructed state immediately after 00406520 (all vtables & fields intact).
+    for (U side = 0u; side < 2u; ++side) {
+        active_side = side;
+        if (side == 0u) g_orig_log.count = 0u;
+        else g_cpp_log.count = 0u;
+        setup_state(cs);
+        if (side == 0u) {
+            reinterpret_cast<VoidFn>(code + kSlot406520)();
+        } else {
+            porsche::session_extension_service_00406520();
+        }
+        capture_snap((side == 0u) ? g_orig_snap : g_cpp_snap, 0u);
+    }
+    compare_snaps(label);
+
+    // Pass 2: verify constructed + vtable[1] / helper vtable[2] teardown behavior.
+    for (U side = 0u; side < 2u; ++side) {
+        active_side = side;
+        if (side == 0u) g_orig_log.count = 0u;
+        else g_cpp_log.count = 0u;
+        setup_state(cs);
+        if (side == 0u) {
+            reinterpret_cast<VoidFn>(code + kSlot406520)();
+        } else {
+            porsche::session_extension_service_00406520();
+        }
+        for (I i = 0; i < cs.player_count; ++i) {
+            void* const ext = porsche::session_player_extension_slots_005e6774[i];
+            if (ext != nullptr) {
+                void* sub = nullptr;
+                std::memcpy(&sub, static_cast<const B*>(ext) + 8u, sizeof(sub));
+                if (sub != nullptr) {
+                    const auto* const svt = *static_cast<const U* const*>(sub);
+                    (void)reinterpret_cast<Slot2Fn>(svt[2])(sub, nullptr);
+                }
+                const auto* const vt = *static_cast<const U* const*>(ext);
+                reinterpret_cast<DtorFn>(vt[1])(ext, nullptr, dtor_flags);
+            }
+        }
+        capture_snap((side == 0u) ? g_orig_snap : g_cpp_snap, 0u);
+    }
+    compare_snaps(label);
+}
+
+static void run_direct_tests() {
+    CaseSpec base{};
+    base.player_count = 1;
+    base.player_ids[0] = -3;
+    base.player_flags[0] = 0x40u;
+    base.g657414 = 1u;
+    base.g6573f0 = 2u;
+    base.tick_rate = 190;
+    base.rate_scale = 2.5f;
+
+    // Test 00406790 replacing an existing non-null subobject at +0x08.
+    for (U side = 0u; side < 2u; ++side) {
+        active_side = side;
+        if (side == 0u) g_orig_log.count = 0u;
+        else g_cpp_log.count = 0u;
+        setup_state(base);
+        void* const obj = g_main_arena[15];
+        void* const old_sub = g_pool_arena[15];
+        std::memset(obj, 0xaa, 0x20u);
+        std::memset(old_sub, 0xbb, 8u);
+        const U old_vt = fn_addr((side == 0u) ? static_cast<const void*>(orig_vt_005b2500)
+                                              : static_cast<const void*>(porsche::session_extension_vtable_005b2500));
+        std::memcpy(old_sub, &old_vt, 4u);
+        std::memcpy(static_cast<B*>(old_sub) + 4u, &porsche::application_player_object_table_005e8b34[0], 4u);
+        std::memcpy(static_cast<B*>(obj) + 8u, &old_sub, 4u);
+        void* ret = nullptr;
+        if (side == 0u) {
+            ret = reinterpret_cast<Ctor1Fn>(code + kSlot406790)(obj, nullptr, g_players[0]);
+        } else {
+            ret = porsche::session_extension_base_ctor_00406790(obj, nullptr, g_players[0]);
+        }
+        capture_snap((side == 0u) ? g_orig_snap : g_cpp_snap, canonical_ptr(ret));
+    }
+    compare_snaps("direct_406790_replace");
+
+    // Test 00406840 directly with null +0x08 and non-null +0x08, and 00406800 flags=0/1.
+    for (U has_sub = 0u; has_sub < 2u; ++has_sub) {
+        for (U side = 0u; side < 2u; ++side) {
+            active_side = side;
+            if (side == 0u) g_orig_log.count = 0u;
+            else g_cpp_log.count = 0u;
+            setup_state(base);
+            void* const obj = g_main_arena[14];
+            if (has_sub != 0u) {
+                if (side == 0u) reinterpret_cast<Ctor1Fn>(code + kSlot406790)(obj, nullptr, g_players[0]);
+                else porsche::session_extension_base_ctor_00406790(obj, nullptr, g_players[0]);
+            } else {
+                std::memset(obj, 0, 0x18u);
+            }
+            if (side == 0u) reinterpret_cast<FiniFn>(code + kSlot406840)(obj, nullptr);
+            else porsche::session_extension_base_fini_00406840(obj, nullptr);
+            capture_snap((side == 0u) ? g_orig_snap : g_cpp_snap, 0u);
+        }
+        compare_snaps(has_sub ? "direct_406840_nonnull" : "direct_406840_null");
+    }
+
+    // Test 00403d80 directly.
+    for (U side = 0u; side < 2u; ++side) {
+        active_side = side;
+        if (side == 0u) g_orig_log.count = 0u;
+        else g_cpp_log.count = 0u;
+        setup_state(base);
+        const U r = (side == 0u)
+            ? reinterpret_cast<Slot2Fn>(code + kSlot403D80)(g_pool_arena[0], nullptr)
+            : porsche::session_extension_helper_slot2_00403d80(g_pool_arena[0], nullptr);
+        capture_snap((side == 0u) ? g_orig_snap : g_cpp_snap, r);
+    }
+    compare_snaps("direct_403d80");
+}
+
+int main() {
+    init_code();
+
+    // 1. Zero active players.
+    {
+        CaseSpec cs{};
+        cs.player_count = 0;
+        run_service_and_teardown("zero_players", cs, 1u);
+    }
+
+    // 2. Single-flag branch coverage across all 5 branches + tick modes + flag 0x40 + OOM.
+    const U branch_flags[] = {0x04u, 0x08u, 0x10u, 0x20u, 0x60u, 0x00u, 0x40u};
+    const U mode657414[] = {0u, 1u};
+    const U mode6573f0[] = {0u, 2u, 4u, 7u};
+    const I tick_rates[] = {0, 1, 5, 190, -15};
+
+    for (U bi = 0u; bi < sizeof(branch_flags) / sizeof(branch_flags[0]); ++bi) {
+        for (U g14 : mode657414) {
+            for (U g3f0 : mode6573f0) {
+                CaseSpec cs{};
+                cs.player_count = 1;
+                cs.player_flags[0] = branch_flags[bi];
+                cs.player_ids[0] = static_cast<std::int16_t>(bi - 2);
+                cs.g657414 = g14;
+                cs.g6573f0 = g3f0;
+                cs.tick_rate = tick_rates[bi % 5u];
+                cs.rate_scale = 1.75f;
+                run_service_and_teardown("single_branch", cs, (bi & 1u) ? 1u : 0u);
+            }
+        }
+    }
+
+    // 3. Multi-player mixed flags (hits all 5 branches + multiple mode20 indices + pool/main OOM).
+    {
+        CaseSpec cs{};
+        cs.player_count = 7;
+        cs.player_flags[0] = 0x04u;
+        cs.player_flags[1] = 0x20u;
+        cs.player_flags[2] = 0x08u;
+        cs.player_flags[3] = 0x10u;
+        cs.player_flags[4] = 0x00u;
+        cs.player_flags[5] = 0x60u;
+        cs.player_flags[6] = 0x04u | 0x08u; // precedence: 0x04 before 0x08
+        for (I i = 0; i < 7; ++i) cs.player_ids[i] = static_cast<std::int16_t>(100 + i);
+        cs.g657414 = 1u;
+        cs.g6573f0 = 2u;
+        cs.tick_rate = 190;
+        cs.rate_scale = 3.25f;
+        run_service_and_teardown("mixed_7players", cs, 1u);
+
+        cs.oom_main_mask = (1u << 1) | (1u << 4);
+        cs.oom_pool_mask = (1u << 2);
+        run_service_and_teardown("mixed_7players_oom", cs, 1u);
+
+        // Single mode20 whose alloc fails -> any_mode20 stays 0; then succeeds -> any_mode20 = 1.
+        CaseSpec cs2{};
+        cs2.player_count = 2;
+        cs2.player_flags[0] = 0x20u;
+        cs2.player_flags[1] = 0x00u;
+        cs2.player_ids[0] = 7;
+        cs2.player_ids[1] = 8;
+        cs2.oom_main_mask = 1u << 0;
+        run_service_and_teardown("mode20_oom", cs2, 1u);
+    }
+
+    run_direct_tests();
+
+    std::printf("session_extension_service_original_x86_vs_cpp=PASS cases=%u events=%u\n", cases, events_total);
+    return 0;
+}
